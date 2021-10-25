@@ -62,7 +62,11 @@ make -j
 ```
 
 By default CMake will target the GPU architecture(s) of the system you're compiling on. If you wish to target other architectures, pass the
-CMAKE_CUDA_ARCHITECTURES flag with a list of architectures to build for.
+GPU_ARCH flag with a list of architectures to build for:
+
+```
+cmake .. -DGPU_ARCH=60;70
+```
 
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
 
