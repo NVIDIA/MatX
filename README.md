@@ -31,7 +31,7 @@ are necessary
 MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, a minimum of CUDA 11.4 and g++9 is required currently.
 
 # Documentation
-Documentation for MatX can be either built locally as shown below
+Documentation for MatX can be built locally as shown below. Hosted site coming soon.
 
 # Supported Data Types
 MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
