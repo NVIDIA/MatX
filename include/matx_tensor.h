@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
+#define _LIBCUDACXX_HAS_NO_INT128
 #include <cinttypes>
 #include <cstdint>
 #include <cuda/std/atomic>
