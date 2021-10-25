@@ -34,7 +34,7 @@ function(find_and_configure_nvbench VERSION)
 
     CPMFindPackage(NAME nvbench
         GIT_REPOSITORY  https://github.com/NVIDIA/nvbench.git
-        GIT_TAG 2b8ef74
+        GIT_TAG ed27365
         GIT_SHALLOW     TRUE)
         
     if(nvbench_ADDED)
