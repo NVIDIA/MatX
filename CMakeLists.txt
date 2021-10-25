@@ -73,7 +73,7 @@ include(cmake/GetCPM.cmake)
 include(cmake/BuildType.cmake)
 
 rapids_find_package(
-  CUDAToolkit 11.5 REQUIRED
+  CUDAToolkit
   BUILD_EXPORT_SET matx-exports
   INSTALL_EXPORT_SET matx-exports)
 
@@ -88,6 +88,21 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
 "$<INSTALL_INTERFACE:include/kernels>")                                         
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+
+# 11.2 and above required for async allocation
+if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.2)
+    message(FATAL_ERROR "MatX requires CUDA 11.2 or higher. Please update before using.")
+endif()
+
+# If we're on CUDA 11.4 or lower we need a newer version of libcudacxx
+if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+    message(STATUS "Need libcuda++ 1.6.0 or higher (included in CTK 11.5+). Finding...")
+    set(LIBCUDACXX_VERSION "1.6.0" CACHE STRING "Version of libcudacxx to use")
+    include(cmake/FindLibcudacxx.cmake)
+    target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
+else()
+    message(STATUS "Recent libcuda++ found in CUDA toolkit. Skipping finding...")
+endif()
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0)

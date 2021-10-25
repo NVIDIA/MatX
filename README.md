@@ -28,7 +28,8 @@ are necessary
 * :arrow_up_down: IO capabilities for reading/writing files
 
 # Requirements
-MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, a minimum of CUDA 11.4 and g++9 is required currently.
+MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, a minimum of CUDA 11.2 and g++9 is required currently. A
+recent version of libcuda++ is required if not on CUDA toolkit 11.5 or higher. The build script will attempt to fetch this if not provided locally.
 
 # Documentation
 Documentation for MatX can be built locally as shown below. Hosted site coming soon.
