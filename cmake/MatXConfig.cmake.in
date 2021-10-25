@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+# Avoid repeatedly including the targets
+if(NOT TARGET matx::core)
+    # Provide path for scripts
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}") 
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR})
+    include(FindPackageHandleStandardArgs)
+    find_package_handle_standard_args(${CMAKE_FIND_PACKAGE_NAME} CONFIG_MODE)    
+endif()
