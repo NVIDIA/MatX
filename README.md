@@ -132,9 +132,9 @@ MatX may add other optional targets in the future inside the matx:: namespace as
 Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. Building documentation requires the following to be installed:
 doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, flex, bison
 
-A quick start guide can be [found here](docs/quickstart.rst)
-Current library limitations are [listed here](docs/limitations.rst)
-A conversion from MATLAB and Python is [found here](docs/matlabpython.rst)
+- A quick start guide can be [found here](docs/quickstart.rst)
+- Current library limitations are [listed here](docs/limitations.rst)
+- A conversion from MATLAB and Python is [found here](docs/matlabpython.rst)
 
 A hosting site for documentation is coming soon. 
 
