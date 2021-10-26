@@ -1,5 +1,8 @@
 # MatX - Matrix Primitives Library
 
+[![GitHub Releases](https://img.shields.io/github/v/release/NVIDIA/MatX)](https://github.com/NVIDIA/MatX/releases/)
+[![GitHub License](https://img.shields.io/badge/license-BSD-green)](https://github.com/NVIDIA/MatX/blob/main/LICENSE)
+
 **MatX** is a modern C++ library for numerical computing on NVIDIA GPUs. Near-native performance can be achieved while using a simple syntax common in higher-level languages such as Python or MATLAB.
 
 ![FFT resampler](docs/img/fft_resamp.PNG)
