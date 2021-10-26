@@ -31,8 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-// Next line is a workaround for libcuda++ 11.6.0 on CTK 11.4.100+. Remove once libcuda++ is fixed
-#define _LIBCUDACXX_HAS_NO_INT128
+
 #include "matx_error.h"
 #include "matx_shape.h"
 #include "matx_tensor_ops.h"
