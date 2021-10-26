@@ -2414,4 +2414,79 @@ private:
   std::array<index_t, RANK> s_; // +1 to avoid zero sized array
 };
 
+// make_tensor helpers
+/**
+ * Create a 0D tensor with managed memory
+ *
+ **/
+template <typename T>
+tensor_t<T,0> make_tensor() {
+  return tensor_t<T,0>{};
+}
+
+/**
+ * Create a 0D tensor with user memory
+ *
+ * @param data
+ *   Pointer to device data
+ **/
+template <typename T>
+tensor_t<T,0> make_tensor(T *const data) {
+  return tensor_t<T,0>{data};
+}
+
+/**
+ * Create a tensor with managed memory
+ *
+ * @param shape
+ *   Shape of tensor
+ **/
+template <typename T, int RANK>
+tensor_t<T,RANK> make_tensor(const index_t (&shape)[RANK]) {
+  return tensor_t<T,RANK>{shape};
+}
+
+/**
+ * Create a tensor with managed memory
+ *
+ * @param shape
+ *   Shape of tensor
+ * @param strides
+ *   Strides of tensor
+ **/
+template <typename T, int RANK>
+tensor_t<T,RANK> make_tensor(const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {
+  return tensor_t<T,RANK>{shape, strides};
+}
+
+
+/**
+ * Create a tensor with user memory
+ *
+ * @param data
+ *   Pointer to device data
+ * @param shape
+ *   Shape of tensor
+ **/
+template <typename T, int RANK>
+tensor_t<T,RANK> make_tensor(T *const data, const index_t (&shape)[RANK]) {
+  return tensor_t<T,RANK>{data, shape};
+}
+
+
+/**
+ * Create a tensor with user memory
+ *
+ * @param data
+ *   Pointer to device data
+ * @param shape
+ *   Shape of tensor
+ * @param strides
+ *   Strides of tensor
+ **/
+template <typename T, int RANK>
+tensor_t<T,RANK> make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {
+  return tensor_t<T,RANK>{data, shape, strides};
+}
+
 } // end namespace matx
