@@ -16,12 +16,12 @@ a nested namespace. For example, the visualization pieces of MatX are under ``ma
 
 Tensor Views
 ------------
-The most fundamental data type in MatX is the tensor view (tensor_t). The tensor view is used for both viewing and managing any 
+The most fundamental data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any 
 underlying GPU or host memory. While dynamically-typed languages like Python or MATLAB will implicitly allocate and manage data for the user, 
-MatX requires a one-time allocation or construction of any data used for operations. This gives more control over the lifetime of the data, and
+MatX requires either a one-time explicit memory allocation, or a user-provided device-side buffer. This gives more control over the lifetime of the data, and
 allows reusing memory regions for different operations.
 
-A tensor view is created using the following syntax:
+A tensor is created using the following syntax:
 
 .. code-block:: cpp
 
@@ -30,6 +30,14 @@ A tensor view is created using the following syntax:
 The constructor takes two required template parameters: the data type and the rank of the tensor. In this case we request a floating point
 tensor with rank 2 (2D array). The constructor arguments specify the shape of the tensor (10x20), or the size of each dimension. The number of elements 
 in the list must match the rank of the tensor.  Currently MatX supports ranks from 0 (scalar) up to 4 (4D array).
+
+To avoid the redundant rank and constructor arguments, the same tensor can be created using the ``make_tensor`` function:
+
+.. code-block:: cpp
+
+    auto t = make_tensor<float>({10, 20});
+
+In this case only the type is required as a template parameter, and the rank is deduced from the number of arguments in the dimension list. 
 
 After calling the constructor, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
 pass their own pointers in a different form of the constructor which will leave allocation and freeing of the memory to the caller (see 
