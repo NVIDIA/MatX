@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "Thank you for using MatX. Please cite it in your work as described below."
+authors:
+- family-names: "Burdick"
+  given-names: "Cliff"
+  orcid: "https://orcid.org/0000-0002-7860-0570"
+- family-names: "Luitjens"
+  given-names: "Justin"
+  orcid: "https://orcid.org/0000-0002-8787-8785"
+- family-names: "Thompson"
+  given-names: "Adam"
+  orcid: "https://orcid.org/0000-0001-9690-6357"
+title: "MatX Primitives Library for GPU-Accelerated Numerical Computing in C++"
+version: 0.1.0
+date-released: 2021-10-26
+url: "https://github.com/NVIDIA/matx"
