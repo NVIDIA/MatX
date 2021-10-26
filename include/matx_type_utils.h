@@ -39,6 +39,11 @@
 #include <cublas_v2.h>
 #include <type_traits>
 
+/**
+ * Defines type traits for host and device compilers. This file should be includable by
+ * the host compiler, so no device code should be present
+ */
+
 namespace matx {
 
 #ifdef INDEX_64_BIT
@@ -62,7 +67,7 @@ template <typename T>
 struct is_matx_op_impl<T, std::void_t<typename T::matxop>> : std::true_type {
 };
 
-template <typename T> __host__ __device__ constexpr bool is_matx_op()
+template <typename T> constexpr bool is_matx_op()
 {
   return is_matx_op_impl<T>::value;
 }
@@ -75,7 +80,7 @@ struct is_tensor_view<T, std::void_t<typename T::tensor_view>>
     : std::true_type {
 };
 
-template <typename T> __host__ __device__ constexpr bool is_tensor_view_t()
+template <typename T> constexpr bool is_tensor_view_t()
 {
   return is_tensor_view<T>::value;
 }
@@ -123,7 +128,7 @@ struct is_complex_half
 template <class T>
 inline constexpr bool is_complex_half_v = is_complex_half<T>::value;
 
-template <typename T> constexpr inline __host__ __device__ bool IsHalfType()
+template <typename T> constexpr inline bool IsHalfType()
 {
   return std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>;
 }
@@ -185,18 +190,6 @@ template <class T> using value_type_t = typename value_type<T>::type;
 
 template <typename T> using value_promote_t = promote_half_t<value_type_t<T>>;
 
-// Returns an address of a pointer of type T aligned to new address
-template <typename T>
-constexpr inline __host__ __device__ T *AlignAddr(uint8_t *addr)
-{
-  if (((uint64_t)addr % std::alignment_of_v<T>) != 0) {
-    return reinterpret_cast<T *>(
-        ((uint64_t)addr + (std::alignment_of_v<T> - 1)) /
-        std::alignment_of_v<T> * std::alignment_of_v<T>);
-  }
-
-  return reinterpret_cast<T *>(addr);
-}
 
 // Helpers for extracting types in the aliases
 template <typename T, typename = void> struct extract_scalar_type_impl {
@@ -211,249 +204,7 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 template <typename T>
 using extract_scalar_type_t = typename extract_scalar_type_impl<T>::scalar_type;
 
-template <typename T> inline constexpr __host__ __device__ T MAX(T a)
-{
-  return a;
-}
 
-template <typename T, typename... Args>
-inline constexpr __host__ __device__ T MAX(T a, Args... args)
-{
-  auto v = MAX(args...);
-  return (a >= v) ? a : v;
-}
-
-template <class T, class M = T>
-inline constexpr __host__ __device__ int32_t get_rank()
-{
-  if constexpr (is_matx_op<M>())
-    return T::Rank();
-  else
-    return -1;
-
-  // work around for compiler bug/warning
-  if constexpr (!is_matx_op<M>())
-    return -1;
-  else
-    return T::Rank();
-}
-
-template <class T, class M = T>
-inline __host__ __device__ index_t get_size([[maybe_unused]] T a,
-                                            [[maybe_unused]] uint32_t dim)
-{
-  if constexpr (is_matx_op<M>())
-    return a.Size(dim);
-  else
-    return 0;
-
-  // work around for compiler bug/warning
-  if constexpr (!is_matx_op<M>())
-    return 0;
-  else
-    return a.Size(dim);
-}
-
-template <int RANK, class T, class M = T>
-inline __host__ __device__ index_t
-    get_expanded_size([[maybe_unused]] T a, [[maybe_unused]] uint32_t dim)
-{
-  index_t size = 0;
-  constexpr int32_t rank = get_rank<T>();
-
-  if constexpr (rank > 0) {
-    constexpr int32_t diff = RANK - rank;
-    if constexpr (diff > 0) {
-      // auto expansion case,  remap dimension by difference in ranks
-      if (dim > diff) {
-        size = get_size(a, dim - diff);
-      }
-    }
-    else {
-      size = get_size(a, dim);
-    }
-  }
-
-  return size;
-}
-
-// get_matx_value is a work around some compiler bugs
-// it only works with matxop types.  It should only be
-// called from get_value below.
-// We also have to do this recursively to get around bug
-// We also have to invert logic and repeat to get around bug
-template <class T, class M = T>
-inline __device__ auto get_matx_value(T i, index_t idx)
-{
-  if constexpr (T::Rank() == 1) {
-    return i(idx);
-  }
-  else {
-    return i();
-  }
-
-  // Bug WAR
-  if constexpr (T::Rank() != 1) {
-    return i();
-  }
-  else {
-    return i(idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_matx_value(T i, index_t idy, index_t idx)
-{
-  if constexpr (T::Rank() == 2) {
-    return i(idy, idx);
-  }
-  else {
-    return get_matx_value(i, idx);
-  }
-
-  // Bug WAR
-  if constexpr (T::Rank() != 2) {
-    return get_matx_value(i, idx);
-  }
-  else {
-    return i(idy, idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_matx_value(T i, index_t idz, index_t idy,
-                                      index_t idx)
-{
-  if constexpr (T::Rank() == 3) {
-    return i(idz, idy, idx);
-  }
-  else {
-    return get_matx_value(i, idy, idx);
-  }
-
-  // Bug WAR
-  if constexpr (T::Rank() != 3) {
-    return get_matx_value(i, idy, idx);
-  }
-  else {
-    return i(idz, idy, idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_matx_value(T i, index_t idw, index_t idz,
-                                      index_t idy, index_t idx)
-{
-  if constexpr (T::Rank() == 4) {
-    return i(idw, idz, idy, idx);
-  }
-  else {
-    return get_matx_value(i, idz, idy, idx);
-  }
-
-  // Bug WAR
-  if constexpr (T::Rank() != 4) {
-    return get_matx_value(i, idz, idy, idx);
-  }
-  else {
-    return i(idw, idz, idy, idx);
-  }
-}
-
-template <class T, class M = T> inline __device__ auto get_value(T i)
-{
-  if constexpr (is_matx_op<M>()) {
-    return i();
-  }
-  else {
-    return i;
-  }
-
-  // Bug WAR
-  if constexpr (!is_matx_op<M>()) {
-    return i;
-  }
-  else {
-    return i();
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_value(T i, index_t idx)
-{
-  if constexpr (is_matx_op<M>()) {
-    return get_matx_value(i, idx);
-  }
-  else {
-    return i;
-  }
-
-  // Bug WAR
-  if constexpr (!is_matx_op<M>()) {
-    return i;
-  }
-  else {
-    return get_matx_value(i, idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_value(T i, index_t idy, index_t idx)
-{
-  if constexpr (is_matx_op<M>()) {
-    return get_matx_value(i, idy, idx);
-  }
-  else {
-    return i;
-  }
-
-  // Bug WAR
-  if constexpr (!is_matx_op<M>()) {
-    return i;
-  }
-  else {
-    return get_matx_value(i, idy, idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_value(T i, index_t idz, index_t idy, index_t idx)
-{
-  if constexpr (is_matx_op<M>()) {
-    return get_matx_value(i, idz, idy, idx);
-  }
-  else {
-    return i;
-  }
-
-  // Bug WAR
-  if constexpr (!is_matx_op<M>()) {
-    return i;
-  }
-  else {
-    return get_matx_value(i, idz, idy, idx);
-  }
-}
-
-template <class T, class M = T>
-inline __device__ auto get_value(T i, index_t idw, index_t idz, index_t idy,
-                                 index_t idx)
-{
-  if constexpr (is_matx_op<M>()) {
-    return get_matx_value(i, idw, idz, idy, idx);
-  }
-  else {
-    return i;
-  }
-
-  // Bug WAR
-  if constexpr (!is_matx_op<M>()) {
-    return i;
-  }
-  else {
-    return get_matx_value(i, idw, idz, idy, idx);
-  }
-}
 
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes
@@ -568,41 +319,6 @@ template <> struct IntToType<MATX_TYPE_UINT64> {
   using value_type = uint64_t;
 };
 
-/*
-inline bool MatXAnyCmp(std::any a, std::any b, MatXDataType_t type)
-{
-  #define ANY_CMP(t) \
-    case t: \
-      if constexpr (std::is_same_v<IntToType<t>::value_type, __half> ||
-std::is_same_v<IntToType<t>::value_type, __nv_bfloat16>) { \
-        return __half2float(std::any_cast<IntToType<t>::value_type>(a)) == \
-               __half2float(std::any_cast<IntToType<t>::value_type>(b)); \
-      } \
-      else { \
-        return std::any_cast<IntToType<t>::value_type>(a) == \
-              std::any_cast<IntToType<t>::value_type>(b); \
-      }
-
-  switch (type) {
-    ANY_CMP(MATX_TYPE_COMPLEX_FP32);
-    ANY_CMP(MATX_TYPE_COMPLEX_FP64);
-    ANY_CMP(MATX_TYPE_FP16);
-    ANY_CMP(MATX_TYPE_BF16);
-    ANY_CMP(MATX_TYPE_FP32);
-    ANY_CMP(MATX_TYPE_FP64);
-    ANY_CMP(MATX_TYPE_INT8);
-    ANY_CMP(MATX_TYPE_INT16);
-    ANY_CMP(MATX_TYPE_INT32);
-    ANY_CMP(MATX_TYPE_INT64);
-    ANY_CMP(MATX_TYPE_UINT8);
-    ANY_CMP(MATX_TYPE_UINT16);
-    ANY_CMP(MATX_TYPE_UINT32);
-    ANY_CMP(MATX_TYPE_UINT64);
-    case MATX_TYPE_INVALID: break;
-  }
-
-  return false;
-}*/
 
 template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
 {
@@ -653,23 +369,6 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
   return CUBLAS_COMPUTE_32F;
 }
 
-// Doxygen doesn't recognize the syntax of these
-template <typename T, typename S>
-inline
-    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                              cuda::std::complex<T>>
-        __host__ __device__ operator*(const cuda::std::complex<T> &c, S n)
-{
-  return c * T(n);
-}
 
-template <typename T, typename S>
-inline
-    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                              cuda::std::complex<T>>
-        __host__ __device__ operator*(S n, const cuda::std::complex<T> &c)
-{
-  return T(n) * c;
-}
 
 } // end namespace matx

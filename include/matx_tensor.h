@@ -44,6 +44,7 @@
 #include "matx_shape.h"
 #include "matx_type_utils.h"
 #include "matx_utility_kernels.cuh"
+#include "matx_tensor_utils.h"
 
 static constexpr int MAX_TENSOR_DIM = 4;
 static constexpr bool PRINT_ON_DEVICE = false;
