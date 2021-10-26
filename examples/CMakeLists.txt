@@ -1,4 +1,13 @@
-set(examples simple_pipeline recursive_filter convolution fft_conv resample mvdr_beamformer spectrogram spectrogram_graph)
+set(examples 
+    simple_pipeline 
+    recursive_filter 
+    convolution 
+    fft_conv 
+    resample 
+    mvdr_beamformer 
+    spectrogram 
+    spectrogram_graph
+    black_scholes)
 
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS}) 
