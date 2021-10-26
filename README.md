@@ -64,10 +64,10 @@ make -j
 ```
 
 By default CMake will target the GPU architecture(s) of the system you're compiling on. If you wish to target other architectures, pass the
-GPU_ARCH flag with a list of architectures to build for:
+CMAKE_CUDA_ARCHITECTURES flag with a list of architectures to build for:
 
 ```
-cmake .. -DGPU_ARCH=60;70
+cmake .. -CMAKE_CUDA_ARCHITECTURES="60;70"
 ```
 
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
@@ -129,7 +129,16 @@ MatX may add other optional targets in the future inside the matx:: namespace as
 
 
 ## Documentation
-Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. A hosting site for documentation is coming soon. We are currently using semantic versioning and reserve the right to introduce breaking API changes on major releases.
+Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. Building documentation requires the following to be installed:
+doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, flex, bison
+
+A quick start guide can be [found here](docs/quickstart.rst)
+Current library limitations are [listed here](docs/limitations.rst)
+A conversion from MATLAB and Python is [found here](docs/matlabpython.rst)
+
+A hosting site for documentation is coming soon. 
+
+We are currently using semantic versioning and reserve the right to introduce breaking API changes on major releases.
 
 ### Supported Data Types
 MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
