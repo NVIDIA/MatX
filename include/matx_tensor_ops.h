@@ -2047,6 +2047,7 @@ DEFINE_UNARY_OP(atan2, AngleOp);
 DEFINE_UNARY_OP(floor, FloorOp);
 DEFINE_UNARY_OP(ceil, CeilOp);
 DEFINE_UNARY_OP(round, RoundOp);
+DEFINE_UNARY_OP(normcdf, NormCdfOp);
 // DEFINE_UNARY_OP( operator-, SubNegOp );
 
 DEFINE_BINARY_OP(operator+, AddOp);

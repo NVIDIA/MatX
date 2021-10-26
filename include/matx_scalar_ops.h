@@ -221,6 +221,15 @@ MATX_UNARY_OP_GEN(asinh, Asinh);
 MATX_UNARY_OP_GEN(acosh, Acosh);
 MATX_UNARY_OP_GEN(atanh, Atanh);
 
+template <typename T> static inline __host__ __device__ auto _internal_normcdf(T v1)
+{
+  return normcdf(v1);
+}
+template <typename T> struct NormCdfF {
+  static inline __host__ __device__ auto op(T v1) { return _internal_normcdf(v1); }
+};
+template <typename T> using NormCdfOp = UnOp<T, NormCdfF<T>>;
+
 template <typename T>
 static inline __host__ __device__ auto _internal_angle(T v1)
 {
