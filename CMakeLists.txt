@@ -91,7 +91,7 @@ endif()
 # If we're on CUDA 11.4 or lower we need a newer version of libcudacxx
 if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
     message(STATUS "Need libcuda++ 1.6.0 or higher (included in CTK 11.5+). Finding...")
-    set(LIBCUDACXX_VERSION "3bc2d4b" CACHE STRING "Version of libcudacxx to use")
+    set(LIBCUDACXX_VERSION "1.6.0" CACHE STRING "Version of libcudacxx to use")
     include(cmake/FindLibcudacxx.cmake)
     target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 else()
