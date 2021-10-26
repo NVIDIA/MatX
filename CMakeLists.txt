@@ -16,7 +16,6 @@ option(BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MULTI_GPU "Multi-GPU support" OFF)
 option(EN_VISUALIZATION "Enable visualization support" OFF)
 option(EN_CUTLASS OFF)
-option(GPU_ARCH "List of GPU architectures to build for, separated by semicolon" OFF)
 
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (BUILD_DOCS)
@@ -24,13 +23,6 @@ if (BUILD_DOCS)
     add_subdirectory(docs)
     return()
 endif()
-
-# This needs to go after BUILD_DOCS check so it doesn't look for CUDA if we're just building docs
-project(MATX
-        LANGUAGES CUDA CXX
-        DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
-        VERSION 0.0.13
-        HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
 
 # In an upcoming CMake it will have the capability to auto-detect GPU architectures. For now, rapids-cmake has a utility
 # function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
@@ -44,24 +36,26 @@ include(rapids-cpm)
 include(rapids-export)
 include(rapids-find)
 
-rapids_cmake_write_version_file(include/version_config.h)
-
-# Figure out what GPU arch their on if it's not specified. If we can't figure it out and it's not specified, fall back to 70;80
-if(NOT GPU_ARCH)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
     set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
+    message(STATUS "Auto-detecting GPU architectures since CMAKE_CUDA_ARCHITECTURES not defined")
     rapids_cuda_init_architectures(MATX)
-    if (NOT CMAKE_CUDA_ARCHITECTURES)
-        message(STATUS "Tried to detect GPU architecture of current machine, but failed. Falling back to 70;80")
-        set(CMAKE_CUDA_ARCHITECTURES "70;80")
-    else()
-        message(STATUS "GPU_ARCH not specified. Using GPU architectures of this machine for building (${CMAKE_CUDA_ARCHITECTURES})")    
-    endif()
-else()
-    message(STATUS "Using GPU architectures ${GPU_ARCH}")
-    set(CMAKE_CUDA_ARCHITECTURES ${GPU_ARCH})
 endif()
 
+# This needs to go after BUILD_DOCS check so it doesn't look for CUDA if we're just building docs
+project(MATX
+        LANGUAGES CUDA CXX
+        DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
+        VERSION 0.0.13
+        HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
+
+if (NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES "70;80") 
+endif()        
+message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")        
+
+rapids_cmake_write_version_file(include/version_config.h)
 
 # MatX requires C++17 to build. Enforce on all libraries pulled in as well
 set (CMAKE_CXX_STANDARD 17)
@@ -73,7 +67,7 @@ include(cmake/GetCPM.cmake)
 include(cmake/BuildType.cmake)
 
 rapids_find_package(
-  CUDAToolkit
+  CUDAToolkit REQUIRED
   BUILD_EXPORT_SET matx-exports
   INSTALL_EXPORT_SET matx-exports)
 
