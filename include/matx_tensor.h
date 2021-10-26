@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#define _LIBCUDACXX_HAS_NO_INT128
+
 #include <cinttypes>
 #include <cstdint>
 #include <cuda/std/atomic>
@@ -300,10 +300,14 @@ public:
    *   Data pointer
    */
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  tensor_t(T *const data)
+  tensor_t(T *const data, cuda::std::atomic<uint32_t> *refcnt = nullptr) :
+    data_(data), ldata_(data), refcnt_(refcnt)
   {
-    data_ = data;
-    ldata_ = data;
+#ifndef __CUDA_ARCH__
+    if (refcnt != nullptr) {
+      (*refcnt)++;
+    }
+#endif    
   }
 
   /**
