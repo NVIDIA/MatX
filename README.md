@@ -42,7 +42,7 @@ are necessary
 
 
 ## Requirements
-MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, CUDA 11.5 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
+MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, CUDA 11.2 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
 MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. We currently do not support the Jetson embedded GPUs, as JetPack currently ships with CUDA 10.2.
 
@@ -129,7 +129,7 @@ MatX may add other optional targets in the future inside the matx:: namespace as
 
 
 ## Documentation
-Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. A hosting site for documentation is coming soon.
+Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. A hosting site for documentation is coming soon. We are currently using semantic versioning and reserve the right to introduce breaking API changes on major releases.
 
 ### Supported Data Types
 MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
@@ -167,7 +167,7 @@ cd build/test
 
 
 ## Quick Start Guide
-A [quick start guide](docs/quickstart.rst) can be found in the docs directory
+A [quick start guide](docs/quickstart.rst) can be found in the docs directory. Further, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 
 ## Filing Issues
