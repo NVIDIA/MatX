@@ -104,7 +104,7 @@ underlying data. To do this, we use the ``Slice`` member function of the view cl
 
     auto tCube  = t.Slice({3, 5}, {6, 8});                      // Cube of t using rows 3-5 and cols 5-7
     auto tRectS = t.Slice({0, 0}, {matxEnd, matxEnd}, {2, 2});  // Rectangle with stride of 2 in both dimensions
-    auto tCol   = t.Slice<1>({0, 4}, {matxEnd, matxDropDim});   // Creata a 1D tensor with only column 5
+    auto tCol   = t.Slice<1>({0, 4}, {matxEnd, matxDropDim});   // Create a 1D tensor with only column 5
     auto tRow   = t.Slice<1>({4, 0}, {matxDropDim, matxEnd});   // Create a 1D tensor with only row 5
     
 ``Slice`` returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
