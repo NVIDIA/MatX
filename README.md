@@ -7,7 +7,7 @@
 
 ![FFT resampler](docs/img/fft_resamp.PNG)
 
-The above image shows the Python (Numpy) version of an FFT resampler next to the MatX version. The total runtimes the NumPy version, CuPy version,
+The above image shows the Python (Numpy) version of an FFT resampler next to the MatX version. The total runtimes of the NumPy version, CuPy version,
 and MatX version are shown below:
 
 * Python/Numpy: **4500ms** (Xeon(R) CPU E5-2698 v4 @ 2.20GHz)
