@@ -1,4 +1,4 @@
-# MatX - Matrix Primitives Library
+# MatX - GPU-Acclerated Numerical Computingin C++
 
 [![GitHub Releases](https://img.shields.io/github/v/release/NVIDIA/MatX)](https://github.com/NVIDIA/MatX/releases/)
 [![GitHub License](https://img.shields.io/badge/license-BSD-green)](https://github.com/NVIDIA/MatX/blob/main/LICENSE)
