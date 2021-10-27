@@ -34,8 +34,8 @@ function(find_and_configure_nvbench VERSION)
 
     CPMFindPackage(NAME nvbench
         GIT_REPOSITORY  https://github.com/NVIDIA/nvbench.git
-        GIT_TAG ed27365
-        GIT_SHALLOW     TRUE)
+        GIT_TAG ${VERSION}
+        GIT_SHALLOW     false)
         
     if(nvbench_ADDED)
         set(nvbench nvbench PARENT_SCOPE)
@@ -45,5 +45,5 @@ function(find_and_configure_nvbench VERSION)
 endfunction()
 
 # NVBench doesn't tag yet
-set(CUDA_MATX_MIN_VERSION_nvbench "none")
+set(CUDA_MATX_MIN_VERSION_nvbench "old-cmake")
 find_and_configure_nvbench(${CUDA_MATX_MIN_VERSION_nvbench})
