@@ -39,7 +39,6 @@ target_link_libraries(  matx_bench PRIVATE
                         CUDA::nvToolsExt 
                         CUDA::cublas 
                         CUDA::cublasLt 
-                        gtest 
                         CUDA::cufft 
                         CUDA::cusolver)
 
