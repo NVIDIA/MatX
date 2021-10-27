@@ -62,7 +62,7 @@ To build all components, issue the standard cmake build commands in a cloned rep
 
 ```
 mkdir build && cd build
-cmake -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=ON -DBUILD_EXAMPLES=ON -DBUILD_DOCS=ON ..
+cmake -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=ON -DBUILD_EXAMPLES=ON -DBUILD_DOCS=OFF ..
 make -j
 ```
 
