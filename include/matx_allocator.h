@@ -165,7 +165,7 @@ inline void matxAlloc(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0)
 {
-  cudaError_t err = cudaSuccess;
+  [[maybe_unused]] cudaError_t err = cudaSuccess;
   switch (space) {
   case MATX_MANAGED_MEMORY:
     err = cudaMallocManaged(ptr, bytes);
@@ -204,7 +204,11 @@ inline void matxFree(void *ptr)
   std::unique_lock lck(memory_mtx);
   auto iter = allocationMap.find(ptr);
 
-  MATX_ASSERT(iter != allocationMap.end(), matxInvalidParameter);
+  if (iter == allocationMap.end()) {
+    MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+    return;
+  }
+
   size_t bytes = iter->second.size;
   matxMemoryStats.currentBytesAllocated -= bytes;
 

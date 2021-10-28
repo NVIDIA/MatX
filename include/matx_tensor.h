@@ -462,7 +462,7 @@ public:
   inline tensor_t(T *const data, T *const ldata,
                   tensorShape_t<RANK> const &shape,
                   const index_t (&strides)[RANK],
-                  cuda::std::atomic<uint32_t> *refcnt)
+                  cuda::std::atomic<uint32_t> *refcnt = nullptr)
       : data_(data), ldata_(ldata), shape_(shape), refcnt_(refcnt)
   {
     for (int i = 0; i < RANK; i++) {
@@ -1064,7 +1064,7 @@ public:
 #endif
     index_t n[RANK];
     index_t s[RANK];
-    bool done[RANK] = {0};
+    [[maybe_unused]] bool done[RANK] = {0};
 
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
@@ -1873,12 +1873,13 @@ public:
 #else
   template <int N = RANK,
             std::enable_if_t<(N <= RANK && RANK > 0), bool> = true>
-  inline tensor_t<T, N> Slice(const index_t (&firsts)[RANK],
-                              const index_t (&ends)[RANK],
-                              const index_t (&strides)[RANK]) const
+  inline tensor_t<T, N> Slice([[maybe_unused]] const index_t (&firsts)[RANK],
+                              [[maybe_unused]] const index_t (&ends)[RANK],
+                              [[maybe_unused]] const index_t (&strides)[RANK]) const
   {
 #endif
-    index_t n[N], s[N];
+    index_t n[N] = {};
+    index_t s[N] = {};
     T *data = data_;
     int d = 0;
     bool def_stride = (strides[0] == -1);
@@ -1887,6 +1888,9 @@ public:
     for (int i = 0; i < RANK; i++) {
       index_t first = firsts[i];
       index_t end = ends[i];
+
+      MATX_ASSERT_STR(first < end, matxInvalidSize, "Slice must be at least one element long");
+
       [[maybe_unused]] index_t stride_mult = (def_stride || strides[i] == matxKeepStride)
                                 ? 1
                                 : strides[i]; // custom stride
@@ -1899,22 +1903,20 @@ public:
       // offset by first
       data += first * s_[i];
 
-      if constexpr (N > 0) {
-        if (end != matxDropDim) {
-          if (end == matxEnd) {
-            n[d] = Size(i) - first;
-          }
-          else {
-            n[d] = end - first;
-          }
-
-          // New length is shorter if we have a non-1 stride
-          n[d] = static_cast<index_t>(std::ceil(
-              static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
-
-          s[d] = s_[i] * stride_mult;
-          d++;
+      if (end != matxDropDim) {
+        if (end == matxEnd) {
+          n[d] = Size(i) - first;
         }
+        else {
+          n[d] = end - first;
+        }
+
+        // New length is shorter if we have a non-1 stride
+        n[d] = static_cast<index_t>(std::ceil(
+            static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
+
+        s[d] = s_[i] * stride_mult;
+        d++;
       }
     }
 
@@ -1953,7 +1955,7 @@ public:
                        const index_t (&ends)[RANK]) const
   {
 #else
-  template <int N = RANK, std::enable_if_t<(N <= RANK), bool> = true>
+  template <int N = RANK, std::enable_if_t<(N <= RANK && RANK > 0), bool> = true>
   inline tensor_t<T, N> Slice(const index_t (&firsts)[RANK],
                               const index_t (&ends)[RANK]) const
   {

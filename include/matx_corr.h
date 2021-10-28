@@ -48,18 +48,14 @@ namespace matx {
 // passing in the shortest signal as the filter
 template <typename T, int RANK, typename In1Type, typename In2Type>
 void corr(tensor_t<T, RANK> &o, In1Type &i1, In2Type &i2,
-          matxConvCorrMode_t mode, matxConvCorrMethod_t method,
+          matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
           cudaStream_t stream)
 {
-  if (mode != MATX_C_MODE_FULL) {
-    MATX_THROW(matxNotSupported,
+  MATX_ASSERT_STR(mode != MATX_C_MODE_FULL, matxNotSupported,
                "Only full correlation mode supported at this time");
-  }
 
-  if (method != MATX_C_METHOD_DIRECT) {
-    MATX_THROW(matxNotSupported,
+  MATX_ASSERT_STR(method != MATX_C_METHOD_DIRECT, matxNotSupported,
                "Only direct correlation method supported at this time");
-  }
 
   auto i2r = reverseX(conj(i2));
   conv1d(o, i1, i2r, mode, stream);

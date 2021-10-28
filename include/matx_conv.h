@@ -51,8 +51,8 @@ inline void matxDirectConv1DInternal(tensor_t<T, RANK> o, InType i,
 {
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
-  MATX_ASSERT(RANK == InType::Rank(), matxInvalidDim);
-  MATX_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
+  MATX_STATIC_ASSERT(RANK == InType::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
 
   // Scale the filter
   size_t filter_shm;
@@ -111,7 +111,7 @@ inline void conv1d(tensor_t<T, RANK> o, In1Type i1, In2Type i2,
     matxDirectConv1DInternal(o, i2, i1, mode, stream);
   }
   else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_ASSERT(RANK == 1, matxInvalidDim);
+    MATX_STATIC_ASSERT(RANK == 1, matxInvalidDim);
     if (i1.Size(0) < i2.Size(0)) {
       matxDirectConv1DInternal(o, i2, i1, mode, stream);
     }
@@ -129,8 +129,8 @@ void matxDirectConv2DInternal(tensor_t<T, RANK> &o, InType &i,
                               FilterType &filter, matxConvCorrMode_t mode,
                               cudaStream_t stream)
 {
-  MATX_ASSERT(RANK == InType::Rank(), matxInvalidDim);
-  MATX_ASSERT(FilterType::Rank() == 2, matxInvalidDim);
+  MATX_STATIC_ASSERT(RANK == InType::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(FilterType::Rank() == 2, matxInvalidDim);
 
   using strip_input_t = typename InType::scalar_type;
   auto shmsize = sizeof(strip_input_t) * filter.Size(0) * filter.Size(1);
@@ -180,7 +180,7 @@ inline void conv2d(tensor_t<T, RANK> o, In1Type i1, In2Type i2,
     matxDirectConv2DInternal(o, i2, i1, mode, stream);
   }
   else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_ASSERT(RANK == 2, matxInvalidDim);
+    MATX_STATIC_ASSERT(RANK == 2, matxInvalidDim);
     if (i1.Size(0) * i1.Size(1) < i2.Size(0) * i2.Size(1)) {
       matxDirectConv2DInternal(o, i2, i1, mode, stream);
     }

@@ -161,7 +161,7 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
   T1 *x_normdiv, *y_normdiv;
   float *x_norm, *y_norm;
 
-  MATX_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
+  MATX_STATIC_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
   tensor_t<T1, RANK> ry(x);
 
   matxAlloc(reinterpret_cast<void **>(&x_normdiv),

@@ -196,6 +196,7 @@ TYPED_TEST(ViewTestsIntegral, Slice)
   auto t3t = this->t3.Slice({1, 2, 3}, {3, 5, 7});
   auto t4t = this->t4.Slice({1, 2, 3, 4}, {3, 5, 7, 9});
 
+#ifndef NDEBUG
   // Negative slice test
   try {
     auto t2e = this->t2.Slice({1, 2}, {1, 2});
@@ -204,6 +205,7 @@ TYPED_TEST(ViewTestsIntegral, Slice)
   catch (...) {
     ASSERT_EQ(true, true);
   }
+#endif  
 
   ASSERT_EQ(t2t.Size(0), 2);
   ASSERT_EQ(t2t.Size(1), 3);

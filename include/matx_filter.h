@@ -49,7 +49,7 @@ template <size_t num_recursive, size_t num_non_recursive, int RANK,
           typename OutType, typename InType, typename FilterType>
 class matxFilter_t {
 public:
-  matxFilter_t(tensor_t<OutType, RANK> &o, InType &i,
+  matxFilter_t([[maybe_unused]] tensor_t<OutType, RANK> &o, InType &i,
                tensor_t<FilterType, 1> &h_rec,
                tensor_t<FilterType, 1> &h_nonrec)
       : h_nonr_copy(h_nonrec)

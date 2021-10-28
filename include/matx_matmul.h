@@ -55,7 +55,7 @@ namespace matx {
  */
 typedef enum {
   PROVIDER_TYPE_CUTLASS = 0,  ///< CUTLASS library
-  PROVIDER_TYPE_CUBLASLT = 2, ///< cuBLASLt library
+  PROVIDER_TYPE_CUBLASLT = 1, ///< cuBLASLt library
   PROVIDER_TYPE_AUTO,         ///< Automatically select
 
   PROVIDER_TYPE_SENTINEL ///< Sentinel value. Do not use
@@ -142,7 +142,7 @@ public:
   {
 #endif
 
-    static_assert((PROV != PROVIDER_TYPE_CUTLASS) || ENABLE_CUTLASS,
+    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || ENABLE_CUTLASS, matxMatMulError,
                   "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
 
     static_assert(RANK >= 2);
@@ -384,36 +384,36 @@ private:
 
   void ConfigureCublasLt()
   {
-    MATX_ASSERT(cublasLtCreate(&ltHandle) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatmulPreferenceCreate(&preference) ==
-                    CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatmulDescCreate(
-                    &operationDesc, MatXTypeToCudaComputeType<T1>(),
-                    MatXTypeToCudaType<T1>()) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+    ret = cublasLtCreate(&ltHandle);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    MATX_ASSERT(cublasLtMatmulPreferenceSetAttribute(
+    ret = cublasLtMatmulPreferenceCreate(&preference);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatmulDescCreate(
+                    &operationDesc, MatXTypeToCudaComputeType<T1>(),
+                    MatXTypeToCudaType<T1>());
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatmulPreferenceSetAttribute(
                     preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                     &workspaceSize,
-                    sizeof(workspaceSize)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(workspaceSize));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
-    int res;
 
     // A operation
-    MATX_ASSERT(cublasLtMatmulDescSetAttribute(
+    ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &params_.opA,
-                    sizeof(params_.opA)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(params_.opA));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // B operation
-    MATX_ASSERT(cublasLtMatmulDescSetAttribute(
+    ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &params_.opB,
-                    sizeof(params_.opB)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(params_.opB));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Update this later when we're more flexible on compute type
     int32_t scaleType;
@@ -430,77 +430,86 @@ private:
     else {
       scaleType = CUDA_R_64F;
     }
-    MATX_ASSERT(cublasLtMatmulDescSetAttribute(
+
+    ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scaleType,
-                    sizeof(scaleType)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(scaleType));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Matrix layouts
-    MATX_ASSERT(cublasLtMatrixLayoutCreate(
+    ret = cublasLtMatrixLayoutCreate(
                     &Adesc, MatXTypeToCudaType<T2>(), params_.a_rows,
-                    params_.a_cols, params_.lda) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    params_.a_cols, params_.lda);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    MATX_ASSERT(cublasLtMatrixLayoutCreate(
+    ret =cublasLtMatrixLayoutCreate(
                     &Bdesc, MatXTypeToCudaType<T3>(), params_.b_rows,
-                    params_.b_cols, params_.ldb) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatrixLayoutCreate(
+                    params_.b_cols, params_.ldb);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatrixLayoutCreate(
                     &Cdesc, MatXTypeToCudaType<T1>(), params_.c_rows,
-                    params_.c_cols, params_.ldc) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    params_.c_cols, params_.ldc);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Matrix data order
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+    ret = cublasLtMatrixLayoutSetAttribute(
                     Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
-                    Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
-                    Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(rowOrder));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+    ret = cublasLtMatrixLayoutSetAttribute(
+                    Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
+                    sizeof(rowOrder));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatrixLayoutSetAttribute(
+                    Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
+                    sizeof(rowOrder));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatrixLayoutSetAttribute(
                     Adesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+                    sizeof(params_.batch));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatrixLayoutSetAttribute(
                     Bdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
-    MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+                    sizeof(params_.batch));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    ret = cublasLtMatrixLayoutSetAttribute(
                     Cdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch)) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                    sizeof(params_.batch));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     if constexpr (is_complex_half_v<T1> && is_complex_half_v<T2>) {
       size_t planarA = (params_.a_rows * params_.a_cols * sizeof(T1)) / 2;
       size_t planarB = (params_.b_rows * params_.b_cols * sizeof(T1)) / 2;
       size_t planarC = (params_.c_rows * params_.c_cols * sizeof(T1)) / 2;
 
-      MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+      ret = cublasLtMatrixLayoutSetAttribute(
                       Adesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarA,
-                      sizeof(planarA)) == CUBLAS_STATUS_SUCCESS,
-                  matxMatMulError);
-      MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+                      sizeof(planarA));
+      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+      ret = cublasLtMatrixLayoutSetAttribute(
                       Bdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarB,
-                      sizeof(planarB)) == CUBLAS_STATUS_SUCCESS,
-                  matxMatMulError);
-      MATX_ASSERT(cublasLtMatrixLayoutSetAttribute(
+                      sizeof(planarB));
+      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+      ret = cublasLtMatrixLayoutSetAttribute(
                       Cdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarC,
-                      sizeof(planarC)) == CUBLAS_STATUS_SUCCESS,
-                  matxMatMulError);
+                      sizeof(planarC));
+      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
     }
 
-    MATX_ASSERT(cublasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc,
+    int res;
+    ret = cublasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc,
                                                Bdesc, Cdesc, Cdesc, preference,
                                                1, &heuristicResult,
-                                               &res) == CUBLAS_STATUS_SUCCESS,
-                matxMatMulError);
+                                               &res);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
     MATX_ASSERT(res > 0, matxMatMulError);
   }
 
@@ -512,20 +521,14 @@ private:
                [[maybe_unused]] float alpha, [[maybe_unused]] float beta)
   {
 
-    MATX_ASSERT(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter);
-
-    if constexpr ((PROV == PROVIDER_TYPE_CUTLASS) &&
-                  (is_complex_half_v<T1> || is_complex_half_v<T2>)) {
-      MATX_THROW(matxInvalidType,
-                 "CUTLASS does not support complex fp16/bf16 yet");
-    }
-
-    if constexpr ((is_complex_half_v<T1> && !is_complex_half_v<T2>) ||
+    MATX_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Provider type out of range");
+    MATX_ASSERT_STR(PROV == PROVIDER_TYPE_CUTLASS &&
+                  (is_complex_half_v<T1> || is_complex_half_v<T2>), matxInvalidType,
+                 "CUTLASS does not support complex fp16/bf16 in MatX yet");
+    MATX_ASSERT_STR((is_complex_half_v<T1> && !is_complex_half_v<T2>) ||
                   (is_complex_half_v<T2> && !is_complex_half_v<T3>) ||
-                  (is_complex_half_v<T1> && !is_complex_half_v<T3>)) {
-      MATX_THROW(matxInvalidType,
+                  (is_complex_half_v<T1> && !is_complex_half_v<T3>), matxInvalidType,
                  "A/B/C types must all be half complex if any of them are");
-    }
 
     // Make copies of each tensor in case we have to do a transformation before
     // the GEMM
@@ -599,14 +602,13 @@ private:
       }
       else {
         for (index_t i = 0; i < a.Size(0); i++) {
-          MATX_ASSERT(
-              cublasLtMatmul(
+          auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)&a_adj(i, 0, 0, 0),
                   Adesc, (void *)&b_adj(i, 0, 0, 0), Bdesc, &sbeta,
                   (void *)&c_adj(i, 0, 0, 0), Cdesc, (void *)&c_adj(i, 0, 0, 0),
                   Cdesc, &heuristicResult.algo, workspace, workspaceSize,
-                  stream) == CUBLAS_STATUS_SUCCESS,
-              matxMatMulError);
+                  stream);
+          MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
         }
       }
     }
@@ -708,11 +710,11 @@ private:
 #endif
         }
         else {
-          MATX_ASSERT(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter);
+          MATX_STATIC_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Invalid MatMul provider");
         }
       }
       else { // Rank 4
-        static_assert(RANK == 4);
+        MATX_STATIC_ASSERT(RANK == 4, matxInvalidDim);
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #if ENABLE_CUTLASS
           // Loop over outer dimension and launch multiple batches

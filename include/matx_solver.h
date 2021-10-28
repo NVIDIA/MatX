@@ -52,18 +52,20 @@ class matxDnSolver_t {
 public:
   matxDnSolver_t()
   {
-    MATX_ASSERT(cusolverDnCreate(&handle) == CUSOLVER_STATUS_SUCCESS,
-                matxSolverError);
-    MATX_ASSERT(cusolverDnCreateParams(&dn_params) == CUSOLVER_STATUS_SUCCESS,
-                matxSolverError);
+    [[maybe_unused]] cusolverStatus_t  ret;
+    ret = cusolverDnCreate(&handle);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
+    ret = cusolverDnCreateParams(&dn_params);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   matxError_t SetAdvancedOptions(cusolverDnFunction_t function,
                                  cusolverAlgMode_t algo)
   {
-    MATX_ASSERT(cusolverDnSetAdvOptions(dn_params, function, algo) ==
-                    CUSOLVER_STATUS_SUCCESS,
-                matxSolverError);
+    cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
     return matxSuccess;
   }
 
@@ -195,12 +197,12 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    MATX_ASSERT(cusolverDnXpotrf_bufferSize(handle, dn_params, params.uplo,
+    cusolverStatus_t ret = cusolverDnXpotrf_bufferSize(handle, dn_params, params.uplo,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.n,
                                             MatXTypeToCudaType<T1>(), device,
-                                            host) == CUSOLVER_STATUS_SUCCESS,
-                matxCudaError);
+                                            host);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   static DnCholParams_t GetCholParams(const tensor_t<T1, RANK> &a,
@@ -401,12 +403,12 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    MATX_ASSERT(cusolverDnXgetrf_bufferSize(handle, dn_params, params.m,
+    cusolverStatus_t ret = cusolverDnXgetrf_bufferSize(handle, dn_params, params.m,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.m,
                                             MatXTypeToCudaType<T1>(), device,
-                                            host) == CUSOLVER_STATUS_SUCCESS,
-                matxCudaError);
+                                            host);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   static DnLUParams_t GetLUParams(tensor_t<int64_t, RANK - 1> &piv,
@@ -665,12 +667,11 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    MATX_ASSERT(
-        cusolverDnXgeqrf_bufferSize(
+    cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
             handle, dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
             params.A, params.m, MatXTypeToCudaType<T1>(), params.tau,
-            MatXTypeToCudaType<T1>(), device, host) == CUSOLVER_STATUS_SUCCESS,
-        matxCudaError);
+            MatXTypeToCudaType<T1>(), device, host);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   static DnQRParams_t GetQRParams(tensor_t<T1, RANK - 1> &tau,
@@ -921,14 +922,14 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    MATX_ASSERT(
+    cusolverStatus_t ret =
         cusolverDnXgesvd_bufferSize(
             handle, dn_params, params.jobu, params.jobvt, params.m, params.n,
             MatXTypeToCudaType<T1>(), params.A, params.m,
             MatXTypeToCudaType<T3>(), params.S, MatXTypeToCudaType<T2>(),
             params.U, params.m, MatXTypeToCudaType<T4>(), params.V, params.n,
-            MatXTypeToCudaType<T1>(), device, host) == CUSOLVER_STATUS_SUCCESS,
-        matxCudaError);
+            MatXTypeToCudaType<T1>(), device, host);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   static DnSVDParams_t
@@ -1178,13 +1179,13 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    MATX_ASSERT(cusolverDnXsyevd_bufferSize(
+    cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
                     handle, dn_params, params.jobz, params.uplo, params.m,
                     MatXTypeToCudaType<T1>(), params.A, params.m,
                     MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), device,
-                    host) == CUSOLVER_STATUS_SUCCESS,
-                matxCudaError);
+                    host);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
   static DnEigParams_t GetEigParams(tensor_t<T2, RANK - 1> &w,

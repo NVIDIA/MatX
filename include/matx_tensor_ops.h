@@ -562,7 +562,7 @@ namespace matx
   template <typename T1>
   auto reverseX(T1 t)
   {
-    MATX_ASSERT(T1::Rank() > 0, matxInvalidDim);
+    MATX_STATIC_ASSERT(T1::Rank() > 0, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 1>(t);
   };
 
@@ -575,7 +575,7 @@ namespace matx
   template <typename T1>
   auto reverseY(T1 t)
   {
-    MATX_ASSERT(T1::Rank() > 1, matxInvalidDim);
+    MATX_STATIC_ASSERT(T1::Rank() > 1, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 2>(t);
   };
 
@@ -588,7 +588,7 @@ namespace matx
   template <typename T1>
   auto reverseZ(T1 t)
   {
-    MATX_ASSERT(T1::Rank() > 2, matxInvalidDim);
+    MATX_STATIC_ASSERT(T1::Rank() > 2, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 3>(t);
   };
 
@@ -600,7 +600,7 @@ namespace matx
   template <typename T1>
   auto reverseW(T1 t)
   {
-    MATX_ASSERT(T1::Rank() > 3, matxInvalidDim);
+    MATX_STATIC_ASSERT(T1::Rank() > 3, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 4>(t);
   };
 

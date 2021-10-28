@@ -102,8 +102,8 @@ public:
       MATX_ASSERT(a.Size(i) == a_inv.Size(i), matxInvalidSize);
     }
 
-    MATX_ASSERT(cublasCreate(&handle) == CUBLAS_STATUS_SUCCESS,
-                matxInverseError);
+    ret = cublasCreate(&handle);
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
 
     params = GetInverseParams(a_inv, a);
 
