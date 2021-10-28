@@ -95,7 +95,7 @@ template <typename T, int RANK>
 void dct(tensor_t<T, RANK> &out, tensor_t<T, RANK> &in,
          const cudaStream_t stream = 0)
 {
-  MATX_ASSERT(RANK == 1, matxInvalidDim);
+  MATX_STATIC_ASSERT(RANK == 1, matxInvalidDim);
   index_t N = in.Size(RANK - 1);
 
   tensor_t<cuda::std::complex<T>, 1> tmp{{N + 1}};

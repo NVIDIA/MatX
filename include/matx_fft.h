@@ -286,55 +286,54 @@ protected:
 
   inline void InternalExec(const void *idata, void *odata, int dir)
   {
+    [[maybe_unused]] cufftResult res;
 #ifndef INDEX_64_BIT
     switch (params_.type) {
     case CUFFT_C2C:
-      MATX_ASSERT(CUFFT_SUCCESS == cufftExecC2C(this->plan_,
+      res = cufftExecC2C(this->plan_,
                                                 (cufftComplex *)idata,
-                                                (cufftComplex *)odata, dir),
-                  matxCufftError);
+                                                (cufftComplex *)odata, dir);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     case CUFFT_C2R:
       MATX_ASSERT(dir == CUFFT_INVERSE, matxInvalidParameter);
-      MATX_ASSERT(CUFFT_SUCCESS == cufftExecC2R(this->plan_,
+      res = cufftExecC2R(this->plan_,
                                                 (cufftComplex *)idata,
-                                                (cufftReal *)odata),
-                  matxCufftError);
+                                                (cufftReal *)odata);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     case CUFFT_R2C:
       MATX_ASSERT(dir == CUFFT_FORWARD, matxInvalidParameter);
-      MATX_ASSERT(CUFFT_SUCCESS == cufftExecR2C(this->plan_, (cufftReal *)idata,
-                                                (cufftComplex *)odata),
-                  matxCufftError);
+      res = cufftExecR2C(this->plan_, (cufftReal *)idata,
+                                                (cufftComplex *)odata);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     case CUFFT_Z2Z:
-      MATX_ASSERT(CUFFT_SUCCESS ==
-                      cufftExecZ2Z(this->plan_, (cufftDoubleComplex *)idata,
-                                   (cufftDoubleComplex *)odata, dir),
-                  matxCufftError);
+      res = cufftExecZ2Z(this->plan_, (cufftDoubleComplex *)idata,
+                                   (cufftDoubleComplex *)odata, dir);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     case CUFFT_Z2D:
       MATX_ASSERT(dir == CUFFT_INVERSE, matxInvalidParameter);
-      MATX_ASSERT(CUFFT_SUCCESS == cufftExecZ2D(this->plan_,
+      res = cufftExecZ2D(this->plan_,
                                                 (cufftDoubleComplex *)idata,
-                                                (cufftDoubleReal *)odata),
-                  matxCufftError);
+                                                (cufftDoubleReal *)odata);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     case CUFFT_D2Z:
       MATX_ASSERT(dir == CUFFT_FORWARD, matxInvalidParameter);
-      MATX_ASSERT(CUFFT_SUCCESS == cufftExecD2Z(this->plan_,
+      res = cufftExecD2Z(this->plan_,
                                                 (cufftDoubleReal *)idata,
-                                                (cufftDoubleComplex *)odata),
-                  matxCufftError);
+                                                (cufftDoubleComplex *)odata);
+      MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
       break;
     default:
       MATX_THROW(matxNotSupported, "Invalid CUFFT_TYPE");
       break;
     };
 #else
-    MATX_ASSERT(CUFFT_SUCCESS ==
-                    cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir),
-                matxCufftError);
+    res =cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
+    MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
 #endif
   }
 
@@ -519,7 +518,7 @@ public:
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
   cufftGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                    this->params_.ostride, this->params_.idist,
@@ -586,7 +585,7 @@ matxFFTPlan1D_t(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
   cufftGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                    this->params_.ostride, this->params_.idist,
@@ -654,7 +653,7 @@ matxFFTPlan1D_t(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
   cufftGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                    this->params_.ostride, this->params_.idist,
@@ -723,7 +722,7 @@ matxFFTPlan1D_t(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
   cufftGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                    this->params_.ostride, this->params_.idist,
@@ -873,7 +872,7 @@ public:
 
     size_t workspaceSize;
     cufftCreate(&this->plan_);
-    cufftResult error;
+    [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
     cufftGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                      this->params_.ostride, this->params_.idist,
@@ -946,7 +945,7 @@ public:
 
     size_t workspaceSize;
     cufftCreate(&this->plan_);
-    cufftResult error;
+    [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
     cufftGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                      this->params_.ostride, this->params_.idist,
@@ -1020,7 +1019,7 @@ public:
 
     size_t workspaceSize;
     cufftCreate(&this->plan_);
-    cufftResult error;
+    [[maybe_unused]] cufftResult error;
 #ifndef INDEX_64_BIT
     cufftGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                      this->params_.ostride, this->params_.idist,

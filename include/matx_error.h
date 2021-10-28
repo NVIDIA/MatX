@@ -39,141 +39,162 @@
 
 #include "matx_stacktrace.h"
 
-namespace matx {
-
-enum matxError_t {
-  matxSuccess,
-  matxIOError,
-  matxOutOfMemory,
-  matxNotSupported,
-  matxInvalidParameter,
-  matxInvalidDim,
-  matxInvalidSize,
-  matxCudaError,
-  matxCufftError,
-  matxMatMulError,
-  matxAssertError,
-  matxInvalidType,
-  matxLUError,
-  matxInverseError,
-  matxSolverError
-};
-
-static constexpr const char *matxErrorString(matxError_t e)
+namespace matx
 {
-  switch (e) {
-  case matxSuccess:
-    return "matxSuccess";
-    break;
-  case matxNotSupported:
-    return "matxNotSupported";
-    break;
-  case matxInvalidParameter:
-    return "matxInvalidParameter";
-    break;
-  case matxInvalidDim:
-    return "matxInvalidDim";
-    break;
-  case matxInvalidSize:
-    return "matxInvalidSize";
-    break;
-  case matxCudaError:
-    return "matxCudaError";
-    break;
-  case matxCufftError:
-    return "matxCufftError";
-    break;
-  case matxMatMulError:
-    return "matxMatMulError";
-    break;
-  case matxOutOfMemory:
-    return "matxOutOfMemory";
-    break;
-  case matxIOError:
-    return "matxIOError";
-    break;
-  case matxAssertError:
-    return "matxAssertError";
-    break;
-  case matxInvalidType:
-    return "matxInvalidType";
-    break;
-  case matxLUError:
-    return "matxLUError";
-    break;
-  case matxInverseError:
-    return "matxInverseError";
-    break;
-  case matxSolverError:
-    return "matxSolverError";
-    break;
-  default:
-    return "Unknown";
-  };
-}
 
-struct matxException : public std::exception {
-  matxError_t e;
-  char str[400];
-  std::stringstream stack;
-
-  matxException(matxError_t error, const char *s, const char *file, int line)
-      : e(error)
+  enum matxError_t
   {
-    snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
-             matxErrorString(error), s, file, line);
-    printStackTrace(stack);
+    matxSuccess,
+    matxIOError,
+    matxOutOfMemory,
+    matxNotSupported,
+    matxInvalidParameter,
+    matxInvalidDim,
+    matxInvalidSize,
+    matxCudaError,
+    matxCufftError,
+    matxMatMulError,
+    matxAssertError,
+    matxInvalidType,
+    matxLUError,
+    matxInverseError,
+    matxSolverError
+  };
+
+  static constexpr const char *matxErrorString(matxError_t e)
+  {
+    switch (e)
+    {
+    case matxSuccess:
+      return "matxSuccess";
+      break;
+    case matxNotSupported:
+      return "matxNotSupported";
+      break;
+    case matxInvalidParameter:
+      return "matxInvalidParameter";
+      break;
+    case matxInvalidDim:
+      return "matxInvalidDim";
+      break;
+    case matxInvalidSize:
+      return "matxInvalidSize";
+      break;
+    case matxCudaError:
+      return "matxCudaError";
+      break;
+    case matxCufftError:
+      return "matxCufftError";
+      break;
+    case matxMatMulError:
+      return "matxMatMulError";
+      break;
+    case matxOutOfMemory:
+      return "matxOutOfMemory";
+      break;
+    case matxIOError:
+      return "matxIOError";
+      break;
+    case matxAssertError:
+      return "matxAssertError";
+      break;
+    case matxInvalidType:
+      return "matxInvalidType";
+      break;
+    case matxLUError:
+      return "matxLUError";
+      break;
+    case matxInverseError:
+      return "matxInverseError";
+      break;
+    case matxSolverError:
+      return "matxSolverError";
+      break;
+    default:
+      return "Unknown";
+    };
   }
 
-  const char *what() const throw() { return str; }
-};
+  struct matxException : public std::exception
+  {
+    matxError_t e;
+    char str[400];
+    std::stringstream stack;
 
-#define MATX_ENTER_HANDLER() try {
+    matxException(matxError_t error, const char *s, const char *file, int line)
+        : e(error)
+    {
+      snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
+               matxErrorString(error), s, file, line);
+      printStackTrace(stack);
+    }
 
-#define MATX_EXIT_HANDLER()                                                    \
-  }                                                                            \
-  catch (matxException & e)                                                    \
-  {                                                                            \
-    fprintf(stderr, "%s\n", e.what());                                         \
-    fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str());                \
-    exit(1);                                                                   \
+    const char *what() const throw() { return str; }
+  };
+
+#define MATX_ENTER_HANDLER() \
+  try                        \
+  {
+
+#define MATX_EXIT_HANDLER()                                     \
+  }                                                             \
+  catch (matxException & e)                                     \
+  {                                                             \
+    fprintf(stderr, "%s\n", e.what());                          \
+    fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str()); \
+    exit(1);                                                    \
   }
 
-#define MATX_THROW(e, str)                                                     \
-  {                                                                            \
-    throw matxException(e, str, __FILE__, __LINE__);                           \
+#define MATX_THROW(e, str)                           \
+  {                                                  \
+    throw matxException(e, str, __FILE__, __LINE__); \
   }
 
-#define MATX_ASSERT(a, error)                                                  \
-  {                                                                            \
-    if ((a) != true) {                                                         \
-      MATX_THROW(error, #a);                                                   \
-    }                                                                          \
+#ifndef NDEBUG
+  #define MATX_ASSERT(a, error) \
+  {                           \
+    if ((a) != true)          \
+    {                         \
+      MATX_THROW(error, #a);  \
+    }                         \
   }
 
-#define MATX_ASSERT_STR(a, error, str)                                         \
-  {                                                                            \
-    if ((a) != true) {                                                         \
-      MATX_THROW(error, #a ": " str);                                          \
-    }                                                                          \
+  #define MATX_ASSERT_STR(a, error, str) \
+  {                                    \
+    if ((a) != true)                   \
+    {                                  \
+      MATX_THROW(error, #a ": " str);  \
+    }                                  \
+  }
+  
+#else
+  #define MATX_ASSERT(a, error) {}
+
+  #define MATX_ASSERT_STR(a, error, str) {}
+#endif
+
+#define MATX_STATIC_ASSERT(a, error)    \
+  {                                     \
+    static_assert((a), #error ": " #a); \
   }
 
-#define MATX_STATIC_ASSERT(a, error)                                           \
-  {                                                                            \
-    static_assert((a), #error ": " #a);                                        \
+#define MATX_STATIC_ASSERT_STR(a, error, str) \
+  {                                           \
+    static_assert((a), #error ": " #str);       \
   }
 
-#define MATX_CUDA_CHECK(e)                                                     \
-  if (e != cudaSuccess) {                                                      \
-    fprintf(stderr, "CUDA Error: %s\n", cudaGetErrorString(e));                \
-    MATX_THROW(matxCudaError, cudaGetErrorString(e));                          \
+#define MATX_CUDA_CHECK(e)                                      \
+  if (e != cudaSuccess)                                         \
+  {                                                             \
+    fprintf(stderr, "CUDA Error: %s\n", cudaGetErrorString(e)); \
+    MATX_THROW(matxCudaError, cudaGetErrorString(e));           \
   }
 
 // Macro for checking cuda errors following a cuda launch or api call
-#define CUDA_CHECK_LAST_ERROR()                                                \
-  {                                                                            \
-    const auto e = cudaGetLastError();                                         \
-    MATX_CUDA_CHECK(e);                                                        \
+#define CUDA_CHECK_LAST_ERROR()        \
+  {                                    \
+    const auto e = cudaGetLastError(); \
+    MATX_CUDA_CHECK(e);                \
   }
 
 } // end namespace matx
