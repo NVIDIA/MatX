@@ -93,6 +93,7 @@ class set : public BaseOp<set<T, RANK, Op>> {
 private:
   tensor_t<T, RANK> out_;
   Op op_;
+  std::array<index_t, RANK> size_;
 
 public:
   // Type specifier for reflection on class
@@ -117,6 +118,7 @@ public:
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
             "Size mismatch in source operator to destination tensor view");
+        size_[i] = out_.Size(i);
       }
     }
   }
@@ -208,7 +210,7 @@ public:
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
   inline __host__ __device__ index_t Size(uint32_t dim) const
   {
-    return out_.Size(dim);
+    return size_[dim];
   }
 };
 
