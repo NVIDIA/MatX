@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <cassert>
 #include <initializer_list>
-
 #include "matx_exec_kernel.h"
 #include "matx_scalar_ops.h"
 #include "matx_tensor.h"
@@ -251,6 +250,7 @@ namespace matx
   private:
     T1 op_;
     CHAIN<ARGS...> args_;
+    std::array<index_t, MAX(get_rank<T1>(), get_rank<T1, ARGS...>())> size_;
 
   public:
     // Scalar type of operation
@@ -261,6 +261,11 @@ namespace matx
       static_assert((... && !is_tensor_view<decltype(args)>()),
                     "Only operator emmitters are allowed in CHAIN. Tensor views "
                     "are not allowed");
+      for (int32_t i = 0; i < Rank(); i++) {
+        index_t size1 = get_expanded_size<Rank()>(op_, i);
+        index_t size2 = get_expanded_size<Rank()>(args_, i);
+        size_[i] = MAX(size1, size2);      
+      }
     }
 
     inline __device__ auto operator()()
@@ -300,9 +305,7 @@ namespace matx
 
     index_t inline __host__ __device__ Size(int dim) const noexcept
     {
-      index_t size1 = get_expanded_size<Rank()>(op_, dim);
-      index_t size2 = get_expanded_size<Rank()>(args_, dim);
-      return MAX(size1, size2);
+      return size_[dim];
     }
   };
 
@@ -326,6 +329,7 @@ namespace matx
   private:
     T1 cond_;
     T2 op_;
+    std::array<index_t, MAX(get_rank<T1>(), get_rank<T2>())> size_;
 
   public:
     using scalar_type = void;
@@ -347,6 +351,7 @@ namespace matx
           index_t size2 = get_expanded_size<Rank()>(op_, i);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
+          size_[i] = MAX(size1, size2);
         }
       }
     }
@@ -384,9 +389,7 @@ namespace matx
     }
     index_t inline __host__ __device__ Size(int dim) const
     {
-      index_t size1 = get_expanded_size<Rank()>(op_, dim);
-      index_t size2 = get_expanded_size<Rank()>(cond_, dim);
-      return MAX(size1, size2);
+      return size_[dim];
     }
   };
 
@@ -408,6 +411,7 @@ namespace matx
     C1 cond_;
     T1 op1_;
     T2 op2_;
+    std::array<index_t, MAX(get_rank<C1>(), get_rank<T1>(), get_rank<T2>())> size_;
 
   public:
     using scalar_type = void;
@@ -433,6 +437,7 @@ namespace matx
           MATX_ASSERT(size0 == 0 || size0 == Size(i), matxInvalidSize);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
+          size_[i] = MAX(size0, size1, size2);
         }
       }
     }
@@ -480,10 +485,7 @@ namespace matx
 
     index_t inline __host__ __device__ Size(int dim) const
     {
-      index_t size1 = get_expanded_size<Rank()>(op1_, dim);
-      index_t size2 = get_expanded_size<Rank()>(op2_, dim);
-      index_t size3 = get_expanded_size<Rank()>(cond_, dim);
-      return MAX(size1, size2, size3);
+      return size_[dim];
     }
   };
 
@@ -1467,13 +1469,20 @@ namespace matx
   private:
     I1 in1_;
     Op op_;
+    std::array<index_t, get_rank<I1>()> size_;
 
   public:
     // dummy type to signal this is a matxop
     using matxop = bool;
     using scalar_type = typename Op::scalar_type;
 
-    inline matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {}
+    inline matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
+      if constexpr (Rank() > 0) {
+        for (int32_t i = 0; i < Rank(); i++) {
+          size_[i] = get_size(in1_, i);
+        }
+      }
+    }
 
     __device__ inline auto operator()()
     {
@@ -1508,7 +1517,7 @@ namespace matx
 
     index_t inline __host__ __device__ Size(int dim) const
     {
-      return get_size(in1_, dim);
+      return size_[dim];
     }
   };
 
@@ -1680,6 +1689,7 @@ namespace matx
     I1 in1_;
     I2 in2_;
     Op op_;
+    std::array<index_t, MAX(get_rank<I1>(), get_rank<I2>())> size_;
 
   public:
     // dummy type to signal this is a matxop
@@ -1693,7 +1703,7 @@ namespace matx
         {
           index_t size1 = get_expanded_size<Rank()>(in1_, i);
           index_t size2 = get_expanded_size<Rank()>(in2_, i);
-
+          size_[i] = MAX(size1, size2);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
         }
@@ -1743,9 +1753,7 @@ namespace matx
 
     index_t inline __host__ __device__ Size(int dim) const
     {
-      index_t size1 = get_expanded_size<Rank()>(in1_, dim);
-      index_t size2 = get_expanded_size<Rank()>(in2_, dim);
-      return MAX(size1, size2);
+      return size_[dim];
     }
   };
 
