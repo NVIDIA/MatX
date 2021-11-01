@@ -41,7 +41,15 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-  typedef cuda::std::complex<float> complex;
+  using complex = cuda::std::complex<float>;
+
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);  
+
+  if (prop.sharedMemPerBlock < 40000) {
+    printf("Recursive filter example requires at least 40KB of shared memory to run. Exiting.");
+    return 0;
+  }
 
   uint32_t iterations = 100;
   index_t numSamples = 16384000;
