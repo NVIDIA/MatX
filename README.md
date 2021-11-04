@@ -49,6 +49,8 @@ MatX is using bleeding edge features in the CUDA compilers and libraries. For th
 
 MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. We currently do not support the Jetson embedded GPUs, as JetPack currently ships with CUDA 10.2.
 
+**Note for CUDA 11.4 and below**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5.
+
 
 ## Installation
 MatX is a header-only library that does not require compiling for using in your applications. However, building unit tests, benchmarks, 
