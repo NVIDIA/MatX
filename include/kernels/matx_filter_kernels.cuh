@@ -40,7 +40,7 @@ static __device__ uint32_t cid_assign[MAX_BATCHES] = {0};
 
 template <uint32_t num_recursive, uint32_t num_non_recursive, typename OutType,
           typename InType, typename FilterType>
-__global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 2) void RecursiveFilter(
+__global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     OutType d_out, InType d_in, const FilterType *__restrict__ d_nrec,
     const FilterType *__restrict__ d_corr,
     volatile FilterType *__restrict__ d_full_carries,
