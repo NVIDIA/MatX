@@ -115,10 +115,10 @@ public:
     if constexpr (RANK > 0) {
       for (int i = 0; i < RANK; i++) {
         index_t size = get_expanded_size<Rank()>(op_, i);
+        size_[i] = out_.Size(i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
-            "Size mismatch in source operator to destination tensor view");
-        size_[i] = out_.Size(i);
+            "Size mismatch in source operator to destination tensor view");        
       }
     }
   }
