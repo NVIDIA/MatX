@@ -51,10 +51,10 @@ void corr(tensor_t<T, RANK> &o, In1Type &i1, In2Type &i2,
           matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
           cudaStream_t stream)
 {
-  MATX_ASSERT_STR(mode != MATX_C_MODE_FULL, matxNotSupported,
+  MATX_ASSERT_STR(mode == MATX_C_MODE_FULL, matxNotSupported,
                "Only full correlation mode supported at this time");
 
-  MATX_ASSERT_STR(method != MATX_C_METHOD_DIRECT, matxNotSupported,
+  MATX_ASSERT_STR(method == MATX_C_METHOD_DIRECT, matxNotSupported,
                "Only direct correlation method supported at this time");
 
   auto i2r = reverseX(conj(i2));
