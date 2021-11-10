@@ -139,7 +139,8 @@ doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, f
 
 - A quick start guide can be [found here](docs/quickstart.rst)
 - Current library limitations are [listed here](docs/limitations.rst)
-- A conversion from MATLAB and Python is [found here](docs/matlabpython.rst)
+- A conversion from MATLAB and Python syntax is [found here](docs/matlabpython.rst)
+- A self-guided Jupyer notebook training can be [found here](docs/notebooks)
 
 A hosting site for documentation is coming soon. 
 
