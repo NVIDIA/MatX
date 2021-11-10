@@ -522,14 +522,18 @@ private:
   {
 
     MATX_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Provider type out of range");
-    MATX_ASSERT_STR(PROV == PROVIDER_TYPE_CUTLASS &&
-                  (is_complex_half_v<T1> || is_complex_half_v<T2>), matxInvalidType,
-                 "CUTLASS does not support complex fp16/bf16 in MatX yet");
-    MATX_ASSERT_STR((is_complex_half_v<T1> && !is_complex_half_v<T2>) ||
-                  (is_complex_half_v<T2> && !is_complex_half_v<T3>) ||
-                  (is_complex_half_v<T1> && !is_complex_half_v<T3>), matxInvalidType,
-                 "A/B/C types must all be half complex if any of them are");
+    if constexpr ((PROV == PROVIDER_TYPE_CUTLASS) &&
+                  (is_complex_half_v<T1> || is_complex_half_v<T2>)) {
+      MATX_THROW(matxInvalidType,
+                 "CUTLASS does not support complex fp16/bf16 yet");
+    }
 
+    if constexpr ((is_complex_half_v<T1> && !is_complex_half_v<T2>) ||
+                  (is_complex_half_v<T2> && !is_complex_half_v<T3>) ||
+                  (is_complex_half_v<T1> && !is_complex_half_v<T3>)) {
+      MATX_THROW(matxInvalidType,
+                 "A/B/C types must all be half complex if any of them are");
+    }
     // Make copies of each tensor in case we have to do a transformation before
     // the GEMM
     [[maybe_unused]] tensor_t<T1, RANK> a_adj { a };
