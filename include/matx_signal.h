@@ -54,19 +54,19 @@ private:
 public:
   dctOp(O out, I in, index_t N) : out_(out), in_(in), N_(N) {}
 
-  __device__ inline void operator()(index_t idx)
+  __MATX_DEVICE__ inline void operator()(index_t idx)
   {
     out_(idx) =
         in_(idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
         in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const
+  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
   {
     return out_.Size(i);
   }
 
-  static inline constexpr __host__ __device__ int32_t Rank()
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
     return O::Rank();
   }

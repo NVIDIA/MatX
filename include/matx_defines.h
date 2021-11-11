@@ -31,30 +31,33 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
 
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx_tensor_ops.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
+// This file is intended to contain simple defines that don't rely on any other headers. It must be
+// useable on both host and device compilers
+
+namespace matx {
+
+#ifdef INDEX_64_BIT
+    using index_t = long long int;
+#endif
+
+#ifdef INDEX_32_BIT
+    using index_t = int32_t;
+#endif
+
+#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
+     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
+static_assert(false, "Must choose either 64-bit or 32-bit index mode");
+#endif
+
+#ifdef __CUDA_CC__
+    #define __MATX_HOST__ __host__
+    #define __MATX_DEVICE__ __device__
+#else
+    #define __MATX_HOST__  __host__
+    #define __MATX_DEVICE__ __device__
+#endif
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
 
-#define TEST_VECTOR_PATH "generated/"
-
+}

@@ -46,19 +46,6 @@
 
 namespace matx {
 
-#ifdef INDEX_64_BIT
-using index_t = long long int;
-#endif
-
-#ifdef INDEX_32_BIT
-using index_t = int32_t;
-#endif
-
-#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
-     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
-static_assert(false, "Must choose either 64-bit or 32-bit index mode");
-#endif
-
 template <typename T, typename = void>
 struct is_matx_op_impl : std::false_type {
 };

@@ -36,20 +36,20 @@ namespace matx
 {
 
   template <typename T>
-  inline constexpr __host__ __device__ T MAX(T a)
+  inline constexpr __MATX_HOST__ __MATX_DEVICE__ T MAX(T a)
   {
     return a;
   }
 
   template <typename T, typename... Args>
-  inline constexpr __host__ __device__ T MAX(T a, Args... args)
+  inline constexpr __MATX_HOST__ __MATX_DEVICE__ T MAX(T a, Args... args)
   {
     auto v = MAX(args...);
     return (a >= v) ? a : v;
   }
 
   template <class T, class M = T>
-  inline constexpr __host__ __device__ int32_t get_rank()
+  inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t get_rank()
   {
     if constexpr (is_matx_op<M>())
       return T::Rank();
@@ -64,7 +64,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __host__ __device__ index_t get_size([[maybe_unused]] T a,
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t get_size([[maybe_unused]] T a,
                                               [[maybe_unused]] uint32_t dim)
   {
     if constexpr (is_matx_op<M>())
@@ -80,7 +80,7 @@ namespace matx
   }
 
   template <int RANK, class T, class M = T>
-  inline __host__ __device__ index_t
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t
   get_expanded_size([[maybe_unused]] T a, [[maybe_unused]] uint32_t dim)
   {
     index_t size = 0;
@@ -112,7 +112,7 @@ namespace matx
   // We also have to do this recursively to get around bug
   // We also have to invert logic and repeat to get around bug
   template <class T, class M = T>
-  inline __device__ auto get_matx_value(T i, index_t idx)
+  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idx)
   {
     if constexpr (T::Rank() == 1)
     {
@@ -135,7 +135,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_matx_value(T i, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idy, index_t idx)
   {
     if constexpr (T::Rank() == 2)
     {
@@ -158,7 +158,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_matx_value(T i, index_t idz, index_t idy,
+  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idz, index_t idy,
                                         index_t idx)
   {
     if constexpr (T::Rank() == 3)
@@ -182,7 +182,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_matx_value(T i, index_t idw, index_t idz,
+  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idw, index_t idz,
                                         index_t idy, index_t idx)
   {
     if constexpr (T::Rank() == 4)
@@ -206,7 +206,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_value(T i)
+  inline __MATX_DEVICE__ auto get_value(T i)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -229,7 +229,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_value(T i, index_t idx)
+  inline __MATX_DEVICE__ auto get_value(T i, index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -252,7 +252,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_value(T i, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ auto get_value(T i, index_t idy, index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -275,7 +275,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_value(T i, index_t idz, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ auto get_value(T i, index_t idz, index_t idy, index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -298,7 +298,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __device__ auto get_value(T i, index_t idw, index_t idz, index_t idy,
+  inline __MATX_DEVICE__ auto get_value(T i, index_t idw, index_t idz, index_t idy,
                                    index_t idx)
   {
     if constexpr (is_matx_op<M>())

@@ -86,7 +86,7 @@ public:
    * @returns Number of elements in dimension
    *
    */
-  inline __host__ __device__ index_t Size([[maybe_unused]] uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
       noexcept
   {
     if constexpr (Rank() > 0)
@@ -138,14 +138,14 @@ public:
    * @returns Rank of the tensor
    *
    */
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
 private:
   std::array<index_t, RANK> n_;
 };
 
 template <int RANK1, int RANK2>
-__host__ __device__ __forceinline__ bool
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool
 operator==(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
 {
   if constexpr (RANK1 != RANK2) {
@@ -162,7 +162,7 @@ operator==(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
 }
 
 template <int RANK1, int RANK2>
-__host__ __device__ __forceinline__ bool
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool
 operator!=(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
 {
   return !(lhs == rhs);

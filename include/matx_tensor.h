@@ -125,7 +125,7 @@ public:
 
   set &operator=(const set &) = delete;
 
-  __device__ inline auto operator()() noexcept
+  __MATX_DEVICE__ inline auto operator()() noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_))>) {
@@ -138,7 +138,7 @@ public:
     return out_();
   }
 
-  __device__ inline auto operator()(index_t i) noexcept
+  __MATX_DEVICE__ inline auto operator()(index_t i) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i))>) {
@@ -151,7 +151,7 @@ public:
     return out_(i);
   }
 
-  __device__ inline auto operator()(index_t i, index_t j) noexcept
+  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j))>) {
@@ -164,7 +164,7 @@ public:
     return out_(i, j);
   }
 
-  __device__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
+  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j, k))>) {
@@ -177,7 +177,7 @@ public:
     return out_(i, j, k);
   }
 
-  __device__ inline auto operator()(index_t i, index_t j, index_t k,
+  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j, index_t k,
                                     index_t l) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
@@ -197,7 +197,7 @@ public:
    * @return
    *   Rank of the operator
    */
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
   /**
    * Get the rank of the operator along a single dimension
@@ -208,7 +208,7 @@ public:
    *   Size of dimension
    */
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return size_[dim];
   }
@@ -241,7 +241,7 @@ public:
   template <int M = RANK, std::enable_if_t<M != 0, bool> = true>
   tensor_t() = delete;
 
-  __host__ __device__ tensor_t<T, RANK>(tensor_t<T, RANK> const &rhs) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ tensor_t<T, RANK>(tensor_t<T, RANK> const &rhs) noexcept
       : data_(rhs.data_), ldata_(rhs.ldata_), shape_(rhs.shape_), s_(rhs.s_),
         refcnt_(rhs.refcnt_)
   {
@@ -252,7 +252,7 @@ public:
 #endif
   }
 
-  __host__ __device__ tensor_t<T, RANK>(tensor_t<T, RANK> const &&rhs) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ tensor_t<T, RANK>(tensor_t<T, RANK> const &&rhs) noexcept
       : data_(rhs.data_), ldata_(rhs.ldata_), shape_(std::move(rhs.shape_)),
         s_(rhs.s_), refcnt_(rhs.refcnt_)
   {
@@ -267,7 +267,7 @@ public:
    * @param rhs
    *   Tensor to copy from
    */
-  __host__ __device__ void Shallow(const tensor_t<T, RANK> &rhs) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ void Shallow(const tensor_t<T, RANK> &rhs) noexcept
   {
     data_ = rhs.data_;
     ldata_ = rhs.ldata_;
@@ -279,7 +279,7 @@ public:
     }
   }
 
-  inline __host__ __device__ ~tensor_t()
+  inline __MATX_HOST__ __MATX_DEVICE__ ~tensor_t()
   {
 #ifndef __CUDA_ARCH__
     Free();
@@ -510,7 +510,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator=(const tensor_t<T, RANK> &op)
   {
     return set(*this, op);
   }
@@ -525,7 +525,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator=(const T2 &op)
   {
     return set(*this, op);
   }
@@ -540,7 +540,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator+=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator+=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this + op);
   }
@@ -556,7 +556,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator+=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator+=(const T2 &op)
   {
     return set(*this, *this + op);
   }
@@ -571,7 +571,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator-=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator-=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this - op);
   }
@@ -587,7 +587,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator-=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator-=(const T2 &op)
   {
     return set(*this, *this - op);
   }
@@ -602,7 +602,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator*=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator*=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this * op);
   }
@@ -618,7 +618,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator*=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator*=(const T2 &op)
   {
     return set(*this, *this * op);
   }
@@ -633,7 +633,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator/=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator/=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this / op);
   }
@@ -649,7 +649,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator/=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator/=(const T2 &op)
   {
     return set(*this, *this / op);
   }
@@ -664,7 +664,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator<<=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this << op);
   }
@@ -680,7 +680,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator<<=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const T2 &op)
   {
     return set(*this, *this << op);
   }
@@ -695,7 +695,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator>>=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this >> op);
   }
@@ -711,7 +711,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator>>=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const T2 &op)
   {
     return set(*this, *this >> op);
   }
@@ -726,7 +726,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator|=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator|=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this | op);
   }
@@ -742,7 +742,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator|=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator|=(const T2 &op)
   {
     return set(*this, *this | op);
   }
@@ -757,7 +757,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator&=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator&=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this & op);
   }
@@ -773,7 +773,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator&=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator&=(const T2 &op)
   {
     return set(*this, *this & op);
   }
@@ -788,7 +788,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator^=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator^=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this ^ op);
   }
@@ -804,7 +804,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator^=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator^=(const T2 &op)
   {
     return set(*this, *this ^ op);
   }
@@ -819,7 +819,7 @@ public:
    * @returns set object containing the destination view and source object
    *
    */
-  [[nodiscard]] inline __host__ auto operator%=(const tensor_t<T, RANK> &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator%=(const tensor_t<T, RANK> &op)
   {
     return set(*this, *this % op);
   }
@@ -835,7 +835,7 @@ public:
    *
    */
   template <typename T2>
-  [[nodiscard]] inline __host__ auto operator%=(const T2 &op)
+  [[nodiscard]] inline __MATX_HOST__ auto operator%=(const T2 &op)
   {
     return set(*this, *this % op);
   }
@@ -1119,7 +1119,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __host__ __device__ inline T *Data() const noexcept { return ldata_; }
+  __MATX_HOST__ __MATX_DEVICE__ inline T *Data() const noexcept { return ldata_; }
 
   /**
    * Set the underlying data pointer from the view
@@ -1134,7 +1134,7 @@ public:
    *   Optional reference count for new memory or nullptr if not tracked
    *
    */
-  __host__ inline void
+  __MATX_HOST__ inline void
   SetData(T *const data, cuda::std::atomic<uint32_t> *refcnt = nullptr) noexcept
   {
     SetData(data, data, refcnt);
@@ -1155,7 +1155,7 @@ public:
    *   Optional reference count for new memory or nullptr if not tracked
    *
    */
-  __host__ inline void
+  __MATX_HOST__ inline void
   SetData(T *const data, T *const ldata,
           cuda::std::atomic<uint32_t> *refcnt = nullptr) noexcept
   {
@@ -1176,7 +1176,7 @@ public:
    * @returns Rank of the tensor
    *
    */
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
   /**
    * Get the reference count
@@ -1184,7 +1184,7 @@ public:
    * @returns Reference count or 0 if not tracked
    *
    */
-  inline __host__ index_t GetRefCount() const noexcept
+  inline __MATX_HOST__ index_t GetRefCount() const noexcept
   {
     if (refcnt_ == nullptr) {
       return 0;
@@ -1202,7 +1202,7 @@ public:
    * @returns Number of elements in dimension
    *
    */
-  inline __host__ __device__ index_t Size(uint32_t dim) const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const noexcept
   {
     return shape_.Size(dim);
   }
@@ -1213,7 +1213,7 @@ public:
    * @return
    *    The size of the dimension
    */
-  inline __host__ __device__ index_t Lsize() const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Lsize() const noexcept
   {
     return shape_.Size(Rank() - 1);
   }
@@ -1224,7 +1224,7 @@ public:
    * @return
    *    The size of the dimension
    */
-  inline __host__ __device__ bool IsLinear() const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
   {
     index_t ttl = 1;
     for (int i = RANK - 1; i >= 0; i--) {
@@ -1252,7 +1252,7 @@ public:
   {
 #else
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __host__ __device__ index_t Stride(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Stride(uint32_t dim) const
   {
 #endif
     return s_[dim];
@@ -1274,11 +1274,11 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ const T &operator()() const noexcept
+  __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __host__ __device__ const T &operator()() const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
   {
 #endif
     return *ldata_;
@@ -1291,11 +1291,11 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ T &operator()() noexcept
+  __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __host__ __device__ T &operator()() noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
   {
 #endif
     return *ldata_;
@@ -1311,11 +1311,11 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ const T &operator()(index_t id0) const noexcept
+  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __host__ __device__ const T &operator()(index_t id0) const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
   {
 #endif
     return *(ldata_ + s_[0] * id0);
@@ -1331,11 +1331,11 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ T &operator()(index_t id0) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __host__ __device__ T &operator()(index_t id0) noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
   {
 #endif
     return *(ldata_ + s_[0] * id0);
@@ -1354,12 +1354,12 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ const T &operator()(index_t id0,
+  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
                                           index_t id1) const noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __host__ __device__ const T &operator()(index_t id0,
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
                                                  index_t id1) const noexcept
   {
 #endif
@@ -1379,11 +1379,11 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ T &operator()(index_t id0, index_t id1) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __host__ __device__ T &operator()(index_t id0, index_t id1) noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
   {
 #endif
     return *(ldata_ + s_[0] * id0 + s_[1] * id1);
@@ -1405,12 +1405,12 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ const T &operator()(index_t id0, index_t id1,
+  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
                                           index_t id2) const noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __host__ __device__ const T &operator()(index_t id0, index_t id1,
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
                                                  index_t id2) const noexcept
   {
 #endif
@@ -1433,12 +1433,12 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ T &operator()(index_t id0, index_t id1,
+  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
                                     index_t id2) noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __host__ __device__ T &operator()(index_t id0, index_t id1,
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
                                            index_t id2) noexcept
   {
 #endif
@@ -1464,12 +1464,12 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ const T &operator()(index_t id0, index_t id1, index_t id2,
+  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1, index_t id2,
                                           index_t id3) const noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __host__ __device__ const T &
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &
   operator()(index_t id0, index_t id1, index_t id2, index_t id3) const noexcept
   {
 #endif
@@ -1495,12 +1495,12 @@ public:
    *
    */
 #ifdef DOXYGEN_ONLY
-  __host__ __device__ T &operator()(index_t id0, index_t id1, index_t id2,
+  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1, index_t id2,
                                     index_t id3) noexcept
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __host__ __device__ T &operator()(index_t id0, index_t id1,
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
                                            index_t id2, index_t id3) noexcept
   {
 #endif
@@ -1643,7 +1643,7 @@ public:
    *
    */
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __host__ void SetVals(T const &val) noexcept
+  inline __MATX_HOST__ void SetVals(T const &val) noexcept
   {
     this->operator()() = val;
   }
@@ -1660,7 +1660,7 @@ public:
   template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 1) ||
                                                (is_cuda_complex_v<T> && M == 0),
                                            bool> = true>
-  inline __host__ void SetVals(const std::initializer_list<T> &vals) noexcept
+  inline __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals) noexcept
   {
     for (size_t i = 0; i < vals.size(); i++) {
       if constexpr (is_cuda_complex_v<T>) {
@@ -1686,7 +1686,7 @@ public:
   template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 2) ||
                                                (is_cuda_complex_v<T> && M == 1),
                                            bool> = true>
-  inline __host__ void
+  inline __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<T>>
               &vals) noexcept
   {
@@ -1719,7 +1719,7 @@ public:
   template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 3) ||
                                                (is_cuda_complex_v<T> && M == 2),
                                            bool> = true>
-  inline __host__ void
+  inline __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<T>>>
               vals) noexcept
@@ -1756,7 +1756,7 @@ public:
   template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 4) ||
                                                (is_cuda_complex_v<T> && M == 3),
                                            bool> = true>
-  inline __host__ void
+  inline __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>
               &vals) noexcept
@@ -1801,7 +1801,7 @@ public:
    */
   template <int M = RANK,
             std::enable_if_t<is_cuda_complex_v<T> && M == 4, bool> = true>
-  inline __host__ void
+  inline __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>>
@@ -1982,7 +1982,7 @@ public:
    *
    * @param val
    */
-  inline __host__ __device__ void PrintVal(const T &val) const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ void PrintVal(const T &val) const noexcept
   {
     if constexpr (is_complex_v<T>) {
       printf("%.4f%+.4fj ", static_cast<float>(val.real()),
@@ -2030,7 +2030,7 @@ public:
   void InternalPrint() const noexcept
 #else
   template <int N = RANK, std::enable_if_t<N == 0, bool> = true>
-  __host__ __device__ void InternalPrint() const noexcept
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint() const noexcept
 #endif
   {
     PrintVal(this->operator()());
@@ -2050,7 +2050,7 @@ public:
   void InternalPrint(const index_t k = 0) const noexcept
 #else
   template <int N = RANK, std::enable_if_t<N == 1, bool> = true>
-  __host__ __device__ void InternalPrint(const index_t k = 0) const noexcept
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t k = 0) const noexcept
 #endif
   {
     for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
@@ -2077,7 +2077,7 @@ public:
   void InternalPrint(const index_t k = 0, const index_t l = 0) const noexcept
 #else
   template <int N = RANK, std::enable_if_t<N == 2, bool> = true>
-  __host__ __device__ void InternalPrint(const index_t k = 0,
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t k = 0,
                                          const index_t l = 0) const noexcept
 #endif
   {
@@ -2115,7 +2115,7 @@ public:
                      const index_t l = 0) const noexcept
 #else
   template <int N = RANK, std::enable_if_t<N == 3, bool> = true>
-  __host__ __device__ void InternalPrint(const index_t j = 0,
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t j = 0,
                                          const index_t k = 0,
                                          const index_t l = 0) const noexcept
 #endif
@@ -2161,7 +2161,7 @@ public:
                      const index_t k = 0, const index_t l = 0) const
 #else
   template <int N = RANK, std::enable_if_t<N == 4, bool> = true>
-  __host__ __device__ void
+  __MATX_HOST__ __MATX_DEVICE__ void
   InternalPrint(const index_t i = 0, const index_t j = 0, const index_t k = 0,
                 const index_t l = 0) const noexcept
 #endif
