@@ -1183,7 +1183,6 @@ void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 #endif  
 }
 
-
 /**
  * Compute maxn reduction of a tensor and returns value + index
  *
