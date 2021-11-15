@@ -54,6 +54,7 @@ inline void matxDirectConv1DInternal(tensor_t<T, RANK> o, InType i,
   MATX_STATIC_ASSERT(RANK == InType::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
 
+#ifdef __CUDACC__  
   // Scale the filter
   size_t filter_shm;
   if (sizeof(strip_filter_t) < sizeof(strip_input_t)) {
@@ -98,6 +99,7 @@ inline void matxDirectConv1DInternal(tensor_t<T, RANK> o, InType i,
         <<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
             o, i, filter, sig_len, filter.Size(0), mode);
   }
+#endif  
 }
 
 // Entry point that allows swappable inputs, and also optimizes shared memory by
@@ -135,6 +137,7 @@ void matxDirectConv2DInternal(tensor_t<T, RANK> &o, InType &i,
   using strip_input_t = typename InType::scalar_type;
   auto shmsize = sizeof(strip_input_t) * filter.Size(0) * filter.Size(1);
 
+#ifdef __CUDACC__  
   if constexpr (RANK == 1) {
     MATX_THROW(matxInvalidDim,
                "matxDirectConv2D not supported on Rank 1 Tensors");
@@ -168,6 +171,7 @@ void matxDirectConv2DInternal(tensor_t<T, RANK> &o, InType &i,
     Conv2D<tensor_t<T, RANK>, InType, FilterType>
         <<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
   }
+#endif  
 }
 
 // Entry point that allows swappable inputs, and also optimizes shared memory by

@@ -38,6 +38,7 @@
 
 namespace matx {
 
+#ifdef __CUDACC__  
 template <class Op> __global__ void matxOpT0Kernel(Op op) { op(); }
 
 template <class Op>
@@ -86,9 +87,11 @@ __launch_bounds__(256) __global__
     op(idw, idz, idy, idx);
   }
 }
+#endif
 
 template <class Op> void exec(Op op, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   dim3 threads, blocks;
 
   if constexpr (op.Rank() == 0) {
@@ -129,5 +132,9 @@ template <class Op> void exec(Op op, cudaStream_t stream = 0)
     matxOpT4Kernel<<<blocks, threads, 0, stream>>>(op, size0, size1, size2,
                                                    size3);
   }
+#else
+  // Host-side operators
+
+#endif  
 }
 } // end namespace matx

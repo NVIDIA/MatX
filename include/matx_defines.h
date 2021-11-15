@@ -50,7 +50,7 @@ namespace matx {
 static_assert(false, "Must choose either 64-bit or 32-bit index mode");
 #endif
 
-#ifdef __CUDA_CC__
+#ifdef __CUDACC__
     #define __MATX_HOST__ __host__
     #define __MATX_DEVICE__ __device__
 #else

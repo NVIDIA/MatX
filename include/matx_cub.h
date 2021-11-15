@@ -38,7 +38,9 @@
 #include "matx_tensor.h"
 #include <any>
 #include <cstdio>
+#ifdef __CUDACC__  
 #include <cub/cub.cuh>
+#endif
 #include <numeric>
 
 namespace matx {
@@ -107,6 +109,7 @@ public:
 #endif
     static_assert(RANK >= 1);
 
+#ifdef __CUDACC__  
     // Input/output tensors much match rank/dims
     if constexpr (op != CUB_OP_HIST_EVEN) {
       for (int i = 0; i < a.Rank(); i++) {
@@ -161,6 +164,7 @@ public:
     // Allocate any workspace needed by Sort
     matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
               stream);
+#endif              
   }
 
   static CubParams_t GetCubParams(tensor_t<T2, RANK> &a_out,
@@ -218,6 +222,7 @@ public:
                            const tensor_t<T1, RANK> &a, const T1 lower,
                            const T1 upper, const cudaStream_t stream)
   {
+#ifdef __CUDACC__      
     if constexpr (RANK == 1) {
       cub::DeviceHistogram::HistogramEven(
           d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -254,6 +259,7 @@ public:
         }
       }
     }
+#endif    
   }
 
   /**
@@ -275,6 +281,7 @@ public:
                                const tensor_t<T1, RANK> &a,
                                const cudaStream_t stream)
   {
+#ifdef __CUDACC__      
     if constexpr (RANK == 1) {
       cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, a.Data(),
                                     a_out.Data(), static_cast<int>(a.Lsize()),
@@ -307,6 +314,7 @@ public:
         }
       }
     }
+#endif    
   }
 
   /**
@@ -331,6 +339,7 @@ public:
                        const cudaStream_t stream,
                        const SortDirection_t dir = SORT_DIR_ASC)
   {
+#ifdef __CUDACC__      
     if constexpr (RANK == 1) {
       if (dir == SORT_DIR_ASC) {
         cub::DeviceRadixSort::SortKeys(
@@ -344,29 +353,6 @@ public:
       }
     }
     else {
-      // Explore later to clean up. Not working yet.
-      // auto sfun = (dir == SORT_DIR_ASC) ?
-      //   std::bind(&cub::DeviceSegmentedRadixSort::SortKeys<T1,index_t*>,
-      //   d_temp, temp_storage_bytes, _1, _2, a.Lsize(), a.Size(RANK-2),
-      //   d_offsets, d_offsets + 1, 0, sizeof(T1)*8, stream) :
-      //   std::bind(&cub::DeviceSegmentedRadixSort::SortKeysDescending<T1,index_t*>,
-      //   d_temp, temp_storage_bytes, _1, _2, a.Lsize(), a.Size(RANK-2),
-      //   d_offsets, d_offsets + 1, 0, sizeof(T1)*8, stream);
-      // if constexpr (RANK == 2) {
-      //     sfun(a.Data(), a_out.Data());
-      // }
-      // else if constexpr (RANK == 3) {
-      //   for (index_t i = 0; i < a.Size(0); i++) {
-      //     sfun(&a.Data(i,0,0), &a_out.Data(i,0,0));
-      //   }
-      // }
-      // else if constexpr (RANK == 4) {
-      //   for (index_t i = 0; i < a.Size(0); i++) {
-      //     for (index_t j = 0; j < a.Size(1); j++) {
-      //       sfun(&a.Data(i,j,0,0), &a_out.Data(i,j,0,0));
-      //     }
-      //   }
-      //}
       if constexpr (RANK == 2) {
         if (dir == SORT_DIR_ASC) {
           cub::DeviceSegmentedRadixSort::SortKeys(
@@ -418,6 +404,7 @@ public:
         }
       }
     }
+#endif    
   }
 
 private:
@@ -495,6 +482,7 @@ void sort(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
           const SortDirection_t dir = SORT_DIR_ASC,
           const cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
       matxCubPlan_t<T1, T1, RANK, CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
@@ -514,6 +502,7 @@ void sort(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
             ret.value());
     sort_type->ExecSort(a_out, a, stream, dir);
   }
+#endif  
 }
 
 /**
@@ -537,6 +526,7 @@ template <typename T1, int RANK>
 void cumsum(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
             const cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
       matxCubPlan_t<T1, T1, RANK, CUB_OP_INC_SUM>::GetCubParams(a_out, a);
@@ -555,6 +545,7 @@ void cumsum(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
         static_cast<matxCubPlan_t<T1, T1, RANK, CUB_OP_INC_SUM> *>(ret.value());
     sort_type->ExecPrefixScanEx(a_out, a, stream);
   }
+#endif  
 }
 
 /**
@@ -586,6 +577,7 @@ template <typename T1, int RANK>
 void hist(tensor_t<int, RANK> &a_out, const tensor_t<T1, RANK> &a,
           const T1 lower, const T1 upper, const cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
       matxCubPlan_t<T1, int, RANK, CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
@@ -606,5 +598,6 @@ void hist(tensor_t<int, RANK> &a_out, const tensor_t<T1, RANK> &a,
             ret.value());
     sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   }
+#endif  
 }
 }; // namespace matx

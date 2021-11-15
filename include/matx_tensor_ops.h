@@ -150,6 +150,7 @@ namespace matx
       MATX_THROW(matxInvalidSize, "Must have a linear tensor view for transpose");
     }
 
+#ifdef __CUDACC__  
     size_t shm = sizeof(T) * TILE_DIM * (TILE_DIM + 1);
     if constexpr (RANK == 2)
     {
@@ -168,6 +169,7 @@ namespace matx
                 static_cast<int>((in.Size(RANK - 2) + TILE_DIM - 1) / TILE_DIM));
       transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
     }
+#endif    
   };
 
   /**

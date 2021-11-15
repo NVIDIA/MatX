@@ -35,6 +35,10 @@
 #include <shared_mutex>
 #include <unordered_map>
 #include <utility>
+#ifndef __CUDA_CC__
+#include <driver_types.h>
+#include <cuda_runtime_api.h>
+#endif
 
 #include "matx_error.h"
 
@@ -45,6 +49,7 @@ namespace matx {
 enum matxMemorySpace_t {
   MATX_MANAGED_MEMORY,
   MATX_HOST_MEMORY,
+  MATX_HOST_MALLOC_MEMORY,
   MATX_DEVICE_MEMORY,
   MATX_ASYNC_DEVICE_MEMORY,
   MATX_INVALID_MEMORY
@@ -169,22 +174,28 @@ inline void matxAlloc(void **ptr, size_t bytes,
   switch (space) {
   case MATX_MANAGED_MEMORY:
     err = cudaMallocManaged(ptr, bytes);
+    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
     break;
   case MATX_HOST_MEMORY:
     err = cudaMallocHost(ptr, bytes);
+    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+    break;
+  case MATX_HOST_MALLOC_MEMORY:
+    *ptr = malloc(bytes);
     break;
   case MATX_DEVICE_MEMORY:
     err = cudaMalloc(ptr, bytes);
+    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
     break;
   case MATX_ASYNC_DEVICE_MEMORY:
     err = cudaMallocAsync(ptr, bytes, stream);
+    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
     break;
   case MATX_INVALID_MEMORY:
     MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
     break;
   };
-
-  MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+  
   MATX_ASSERT(ptr != nullptr, matxOutOfMemory);
 
   std::unique_lock lck(memory_mtx);

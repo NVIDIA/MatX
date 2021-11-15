@@ -2106,6 +2106,7 @@ public:
   template <typename ... Args>
   inline void Print(Args ...dims) const
   {
+#ifdef __CUDACC__    
     auto kind = GetPointerKind(data_);
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
@@ -2122,6 +2123,9 @@ public:
         tmpv.Print(dims...);
       }
     }
+#else
+    InternalPrint(dims...);
+#endif    
   }  
 
 private:
