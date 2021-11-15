@@ -232,6 +232,9 @@ inline void matxFree(void *ptr)
   case MATX_HOST_MEMORY:
     cudaFreeHost(ptr);
     break;
+  case MATX_HOST_MALLOC_MEMORY:
+    free(ptr);
+    break;
   case MATX_ASYNC_DEVICE_MEMORY:
     cudaFreeAsync(ptr, iter->second.stream);
     break;

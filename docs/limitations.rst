@@ -4,7 +4,9 @@ Limitations
 With the executor and operator APIs, MatX attempts to make a seamless compatibility layer between a simple tensor API and existing CUDA C/C++ libraries. Many of the limitations are due to the inflexibility in the CUDA libraries in allowing different data layouts, types, or other limitations.
 
 Where possible, MatX tries to use the features of these libraries to accept advanced data layouts, but some libraries simply lack any support for this. The workaround for these issues are to copy/save the tensor in a different format before processing, but this
-negatively impacts performance. MatX will eventually remove these as new libraries add more compatibility. In addition to specific functions, MatX currently has limitations overall that may be relaxed in future releases. Those limitations are listed below:
+negatively impacts performance. MatX will eventually remove these as new libraries add more compatibility. In addition to specific functions, MatX currently has limitations overall that may be relaxed in future releases. Those limitations are listed in the table below.
+
+Note that for CPU/host execution only operator expressions are supported currently, and functions requiring a library call (FFT, GEMM, etc) are not supported at this time on the host.
 
 .. list-table:: General MatX Limitations Matrix
   :widths: 25 75

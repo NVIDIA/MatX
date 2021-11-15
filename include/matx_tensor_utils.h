@@ -112,7 +112,7 @@ namespace matx
   // We also have to do this recursively to get around bug
   // We also have to invert logic and repeat to get around bug
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idx)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T i, index_t idx)
   {
     if constexpr (T::Rank() == 1)
     {
@@ -135,7 +135,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T i, index_t idy, index_t idx)
   {
     if constexpr (T::Rank() == 2)
     {
@@ -158,7 +158,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idz, index_t idy,
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T i, index_t idz, index_t idy,
                                         index_t idx)
   {
     if constexpr (T::Rank() == 3)
@@ -182,7 +182,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_matx_value(T i, index_t idw, index_t idz,
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T i, index_t idw, index_t idz,
                                         index_t idy, index_t idx)
   {
     if constexpr (T::Rank() == 4)
@@ -206,7 +206,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_value(T i)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_value(T i)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -229,7 +229,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_value(T i, index_t idx)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_value(T i, [[maybe_unused]] index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -252,7 +252,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_value(T i, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_value(T i, [[maybe_unused]] index_t idy, [[maybe_unused]] index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -275,7 +275,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_value(T i, index_t idz, index_t idy, index_t idx)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_value(T i, [[maybe_unused]] index_t idz, [[maybe_unused]] index_t idy, [[maybe_unused]] index_t idx)
   {
     if constexpr (is_matx_op<M>())
     {
@@ -298,7 +298,7 @@ namespace matx
   }
 
   template <class T, class M = T>
-  inline __MATX_DEVICE__ auto get_value(T i, index_t idw, index_t idz, index_t idy,
+  inline __MATX_DEVICE__ __MATX_HOST__ auto get_value(T i, [[maybe_unused]] index_t idw, [[maybe_unused]] index_t idz, [[maybe_unused]] index_t idy,
                                    index_t idx)
   {
     if constexpr (is_matx_op<M>())

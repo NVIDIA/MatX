@@ -89,52 +89,68 @@ __launch_bounds__(256) __global__
 }
 #endif
 
-template <class Op> void exec(Op op, cudaStream_t stream = 0)
-{
-#ifdef __CUDACC__  
-  dim3 threads, blocks;
+/**
+ * @brief Executes operators on the host on a CUDA-enabled device
+ * 
+ * Optionally takes a stream for asynchronous execution
+ * 
+ */
+class CUDADeviceExecutor {
+  public:
+    using matx_executor = bool;
+    CUDADeviceExecutor(cudaStream_t stream) : stream_(stream) {}
+    CUDADeviceExecutor() : stream_(0) {}
 
-  if constexpr (op.Rank() == 0) {
-    threads = 1;
-    blocks = 1;
+    template <typename Op>
+    void Exec(Op &op) const noexcept {
+  #ifdef __CUDACC__      
+      dim3 threads, blocks;
 
-    matxOpT0Kernel<<<blocks, threads, 0, stream>>>(op);
-  }
-  else if constexpr (op.Rank() == 1) {
-    index_t size0 = op.Size(0);
+      if constexpr (op.Rank() == 0) {
+        threads = 1;
+        blocks = 1;
 
-    get_grid_dims(blocks, threads, size0, 256);
-    matxOpT1Kernel<<<blocks, threads, 0, stream>>>(op, size0);
-  }
-  else if constexpr (op.Rank() == 2) {
-    index_t size0 = op.Size(0);
-    index_t size1 = op.Size(1);
+        matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+      }
+      else if constexpr (op.Rank() == 1) {
+        index_t size0 = op.Size(0);
 
-    get_grid_dims(blocks, threads, size0, size1, 256);
-    matxOpT2Kernel<<<blocks, threads, 0, stream>>>(op, size0, size1);
-  }
-  else if constexpr (op.Rank() == 3) {
-    index_t size0 = op.Size(0);
-    index_t size1 = op.Size(1);
-    index_t size2 = op.Size(2);
+        get_grid_dims(blocks, threads, size0, 256);
+        matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, size0);
+      }
+      else if constexpr (op.Rank() == 2) {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
 
-    get_grid_dims(blocks, threads, size0, size1, size2, 256);
-    matxOpT3Kernel<<<blocks, threads, 0, stream>>>(op, size0, size1, size2);
-  }
-  else if constexpr (op.Rank() == 4) {
+        get_grid_dims(blocks, threads, size0, size1, 256);
+        matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1);
+      }
+      else if constexpr (op.Rank() == 3) {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
+        index_t size2 = op.Size(2);
 
-    index_t size0 = op.Size(0);
-    index_t size1 = op.Size(1);
-    index_t size2 = op.Size(2);
-    index_t size3 = op.Size(3);
+        get_grid_dims(blocks, threads, size0, size1, size2, 256);
+        matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2);
+      }
+      else {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
+        index_t size2 = op.Size(2);
+        index_t size3 = op.Size(3);
 
-    get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
-    matxOpT4Kernel<<<blocks, threads, 0, stream>>>(op, size0, size1, size2,
-                                                   size3);
-  }
-#else
-  // Host-side operators
+        get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
+        matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2,
+                                                        size3);
+      }  
+  #else
+      MATX_THROW(matxNotSupported, "Cannot execute device function from host compiler");    
+  #endif    
+    }
 
-#endif  
-}
+  private:
+    cudaStream_t stream_;
+};
+
+
 } // end namespace matx

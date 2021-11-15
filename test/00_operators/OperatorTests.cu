@@ -479,6 +479,63 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
   MATX_EXIT_HANDLER();
 }
 
+// TODO: add more host testing on everything that supports it
+TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
+{
+  MATX_ENTER_HANDLER();
+  index_t count = 100;
+
+  tensor_t<TypeParam, 1> a({count});
+  tensor_t<TypeParam, 1> b({count});
+  tensor_t<TypeParam, 1> c({count});
+
+  for (index_t i = 0; i < count; i++) {
+    a(i) = static_cast<value_promote_t<TypeParam>>(i);
+    b(i) = static_cast<value_promote_t<TypeParam>>(i + 100);
+  }
+
+  {
+    (c = a + b).run(SingleThreadHostExecutor{});
+    for (index_t i = 0; i < count; i++) {
+      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
+    }
+  }
+
+  {
+    (c = a * b).run(SingleThreadHostExecutor{});
+
+    for (index_t i = 0; i < count; i++) {
+      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
+    }
+  }
+
+  {
+    (c = a * b + a).run(SingleThreadHostExecutor{});
+
+    for (index_t i = 0; i < count; i++) {
+      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+          c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
+    }
+  }
+
+  {
+
+    (c = a * b + a * (TypeParam)4.0f).run(SingleThreadHostExecutor{});
+
+    for (index_t i = 0; i < count; i++) {
+      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+          c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
 {
   MATX_ENTER_HANDLER();
@@ -820,385 +877,6 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
   MATX_EXIT_HANDLER();
 }
 
-
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, VarianceStd)
-{
-  MATX_ENTER_HANDLER();
-  auto pb = std::make_unique<MatXPybind>();
-  constexpr index_t size = 100;
-  pb->InitAndRunTVGenerator<TypeParam>("00_operators", "stats", "run", {size});
-
-  tensor_t<TypeParam, 0> t0;
-  tensor_t<TypeParam, 1> t1({size});
-  pb->NumpyToTensorView(t1, "x");
-
-  var(t0, t1, 0);
-  MATX_TEST_ASSERT_COMPARE(pb, t0, "var", 0.01);
-
-  stdd(t0, t1, 0);
-  MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
-
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Reduce)
-{
-  MATX_ENTER_HANDLER();
-  {
-    tensor_t<TypeParam, 0> t0;
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-    auto t1 = ones<float>({30});
-
-    sum(t0, t4, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-        t0(), (TypeParam)(t4.Size(0) * t4.Size(1) * t4.Size(2) * t4.Size(3))));
-
-    sum(t0, t3, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-        t0(), (TypeParam)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
-
-    sum(t0, t2, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(
-        MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t2.Size(0) * t2.Size(1))));
-
-    sum(t0, t1, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
-  }
-  {
-    tensor_t<TypeParam, 1> t1({30});
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-    // t4.Print();
-    sum(t1, t4, 0);
-
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          t1(i), (TypeParam)(t4.Size(1) * t4.Size(2) * t4.Size(3))));
-    }
-
-    sum(t1, t3, 0);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          t1(i), (TypeParam)(t3.Size(1) * t3.Size(2))));
-    }
-
-    sum(t1, t2, 0);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2.Size(1))));
-    }
-  }
-
-  {
-    tensor_t<TypeParam, 2> t2({30, 40});
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-
-    sum(t2, t4, 0);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-            t2(i, j), (TypeParam)(t4.Size(2) * t4.Size(3))));
-      }
-    }
-
-    sum(t2, t3, 0);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2(i, j), (TypeParam)(t3.Size(2))));
-      }
-    }
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TEST(OperatorTests, Any)
-{
-  MATX_ENTER_HANDLER();
-  using TypeParam = float;
-  {
-    tensor_t<TypeParam, 0> t0;
-
-    tensor_t<float, 1> t1({30});
-    tensor_t<float, 2> t2({30, 40});
-    tensor_t<float, 3> t3({30, 40, 50});
-    tensor_t<float, 4> t4({30, 40, 50, 60});
-
-    (t1 = zeros<float>(t1.Shape())).run();
-    (t2 = zeros<float>(t2.Shape())).run();
-    (t3 = zeros<float>(t3.Shape())).run();
-    (t4 = zeros<float>(t4.Shape())).run();
-    cudaStreamSynchronize(0);
-
-    t1(5) = 5.0;
-    t3(1, 1, 1) = 6.0;
-
-    any(t0, t4);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(0)));
-
-    any(t0, t3);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    any(t0, t2);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(0)));
-
-    any(t0, t1);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TEST(OperatorTests, All)
-{
-  MATX_ENTER_HANDLER();
-  using TypeParam = float;
-  {
-    tensor_t<TypeParam, 0> t0;
-
-    tensor_t<float, 1> t1({30});
-    tensor_t<float, 2> t2({30, 40});
-    tensor_t<float, 3> t3({30, 40, 50});
-    tensor_t<float, 4> t4({30, 40, 50, 60});
-
-    (t1 = ones<float>(t1.Shape())).run();
-    (t2 = ones<float>(t2.Shape())).run();
-    (t3 = ones<float>(t3.Shape())).run();
-    (t4 = ones<float>(t4.Shape())).run();
-    cudaStreamSynchronize(0);
-
-    t1(5) = 0.0;
-    t3(1, 1, 1) = 0.0;
-
-    all(t0, t4);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    all(t0, t3);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(0)));
-
-    all(t0, t2);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    all(t0, t1);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(0)));
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TEST(OperatorTests, Median)
-{
-  MATX_ENTER_HANDLER();
-  using TypeParam = float;
-  {
-    tensor_t<TypeParam, 0> t0{};
-    tensor_t<TypeParam, 1> t1e{{10}};
-    tensor_t<TypeParam, 1> t1o{{11}};
-    tensor_t<TypeParam, 2> t2e{{2, 4}};
-    tensor_t<TypeParam, 2> t2o{{2, 5}};
-    tensor_t<TypeParam, 1> t1out{{2}};
-
-    t1e.SetVals({1, 3, 8, 2, 9, 6, 7, 4, 5, 0});
-    t1o.SetVals({1, 3, 8, 2, 9, 6, 7, 4, 5, 0, 10});
-    t2e.SetVals({{2, 4, 1, 3}, {3, 1, 2, 4}});
-    t2o.SetVals({{2, 4, 1, 3, 5}, {3, 1, 5, 2, 4}});
-
-    median(t0, t1e);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(4.5f)));
-
-    median(t0, t1o);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(5)));
-
-    median(t1out, t2e);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TypeParam)(2.5f)));
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TypeParam)(2.5f)));
-
-    median(t1out, t2o);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TypeParam)(3.0f)));
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TypeParam)(3.0f)));
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TEST(OperatorTests, Mean)
-{
-  MATX_ENTER_HANDLER();
-  using TypeParam = float;
-  {
-    tensor_t<TypeParam, 0> t0;
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-    auto t1 = ones<float>({30});
-
-    mean(t0, t4);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    mean(t0, t3);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    mean(t0, t2);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-
-    mean(t0, t1);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
-  }
-  {
-    tensor_t<TypeParam, 1> t1({30});
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-
-    mean(t1, t4);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(1)));
-    }
-
-    mean(t1, t3);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(1)));
-    }
-
-    mean(t1, t2);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(1)));
-    }
-  }
-
-  {
-    tensor_t<TypeParam, 2> t2({30, 40});
-
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-
-    mean(t2, t4);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TypeParam)(1)));
-      }
-    }
-
-    mean(t2, t3);
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TypeParam)(1)));
-      }
-    }
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(OperatorTestsNumericNonComplex, Prod)
-{
-  MATX_ENTER_HANDLER();
-  {
-    tensor_t<TypeParam, 0> t0;
-
-    tensorShape_t<2> s2({3, 4});
-    tensorShape_t<1> s1({3});
-
-    tensor_t<TypeParam, 1> t1{s1};
-    tensor_t<TypeParam, 2> t2{s2};
-    TypeParam t1p = (TypeParam)1;
-    for (int i = 0; i < s1.Size(0); i++) {
-      t1(i) = static_cast<value_promote_t<TypeParam>>((float)rand() /
-                                                      (float)INT_MAX * 2.0f);
-      t1p *= t1(i);
-    }
-
-    TypeParam t2p = (TypeParam)1;
-    for (int i = 0; i < s2.Size(0); i++) {
-      for (int j = 0; j < s2.Size(1); j++) {
-        t2(i, j) = static_cast<value_promote_t<TypeParam>>(
-            (float)rand() / (float)INT_MAX * 2.0f);
-        t2p *= t2(i, j);
-      }
-    }
-
-    prod(t0, t2);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t2p));
-
-    prod(t0, t1);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t1p));
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-// TYPED_TEST(OperatorTestsNumericNonComplex, Reduce)
-// {
-//   MATX_ENTER_HANDLER();
-//   {
-//     tensor_t<TypeParam, 0> t0data;
-//     tensor_t<TypeParam, 4> t4data({30, 40, 50, 60});
-
-//     auto t0 = t0data.View();
-//     auto t4 = t4data.View();
-//     for(index_t i = 0 ; i < t4.Size(0); i++) {
-//       for(index_t j = 0 ; j < t4.Size(1); j++) {
-//         for(index_t k = 0 ; k < t4.Size(2); k++) {
-//           for(index_t l = 0 ; l < t4.Size(3); l++) {
-//             t4(i,j,k,l) = (TypeParam) (i + j + k + l - 20);
-//           }
-//         }
-//       }
-//     }
-
-//     reduce(t0, t4, reduceOpMax<TypeParam>(), 0);
-//     cudaStreamSynchronize(0);
-//     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam) (t4.Size(0) +
-//     t4.Size(1) + t4.Size(2) + t4.Size(3) - 20 - 4) ));
-
-//     reduce(t0, t4, reduceOpMin<TypeParam>(), 0);
-//     cudaStreamSynchronize(0);
-//     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-20) ));
-//   }
-
-//   MATX_EXIT_HANDLER();
-// }
 
 TYPED_TEST(OperatorTestsNumeric, Broadcast)
 {

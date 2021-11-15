@@ -125,7 +125,7 @@ public:
 
   set &operator=(const set &) = delete;
 
-  __MATX_DEVICE__ inline auto operator()() noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()() noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_))>) {
@@ -138,7 +138,7 @@ public:
     return out_();
   }
 
-  __MATX_DEVICE__ inline auto operator()(index_t i) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i))>) {
@@ -151,7 +151,7 @@ public:
     return out_(i);
   }
 
-  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j))>) {
@@ -164,7 +164,7 @@ public:
     return out_(i, j);
   }
 
-  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j, k))>) {
@@ -177,7 +177,7 @@ public:
     return out_(i, j, k);
   }
 
-  __MATX_DEVICE__ inline auto operator()(index_t i, index_t j, index_t k,
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k,
                                     index_t l) noexcept
   {
     if constexpr (is_matx_half_v<T> &&

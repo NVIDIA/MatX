@@ -248,7 +248,7 @@ Tensor views can be mixed with scalars and operator functions:
 This expression squares each element in ``a``, divides each element in ``b`` by 2, adds the result to ``a``, and finally adds the resulting
 tensor to the absolute value of every element in ``a``. The result of the computation will be stored in the tensor view ``c``. 
 Again, the entire expression is generated at compile time and a kernel is stored in the variable ``op``, but the kernel is not launched on the device. 
-To launch the operator, we use the ``run`` function:
+To launch the operator in a CUDA stream, we use the ``run`` function:
 
 .. code-block:: cpp
 
@@ -271,6 +271,17 @@ the identity matrix are all examples of this. MatX provides "generators" that ca
 
 The example above uses the ``ones`` generator to create a tensor with only the value ``1`` matching the shape of a (10x20x5). ``ones`` simply returns the
 value ``1`` any time an element of it is requested, and no data is ever loaded from memory.
+
+Implicit in the ``run`` call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
+To run the same code on the host, a ``SingleThreadHostExecutor`` can be passed into ``run``:
+
+.. code-block:: cpp
+
+    (c = (a*a) + ones(a.Shape())).run(SingleThreadHostExecutor{});
+
+Instead of a CUDA stream, we pass an executor to ``run`` that instructs MatX to execute the code on the host instead of the device using a single CPU thread.
+Unlike CUDA calls, host executors are synchronous, and the line above will block until finished executing.
+
 
 A quick note about assignment
 -----------------------------
