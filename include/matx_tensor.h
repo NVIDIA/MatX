@@ -2021,363 +2021,108 @@ public:
   }
 
   /**
-   * Print a rank=0 tensor
+   * Print a tensor
    *
-   * Type-agnostic function to print a rank=0 tensor to stdout
+   * Type-agnostic function to print a tensor to stdout
    *
    */
-#ifdef DOXYGEN_ONLY
-  void InternalPrint() const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 0, bool> = true>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint() const noexcept
-#endif
+  template <typename ... Args>
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(Args ...dims) const noexcept
   {
-    PrintVal(this->operator()());
-    printf("\n");
-  }
+    MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
 
-  /**
-   * Print a rank=1 tensor
-   *
-   * Type-agnostic function to print a rank=1 tensor to stdout
-   *
-   * @param k
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void InternalPrint(const index_t k = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 1, bool> = true>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t k = 0) const noexcept
-#endif
-  {
-    for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
-      printf("%06lld: ", _k);
-      PrintVal(this->operator()(_k));
+    if constexpr (sizeof...(Args) == 0) {
+      PrintVal(this->operator()());
       printf("\n");
     }
-  }
-
-  /**
-   * Print a rank=2 tensor
-   *
-   * Type-agnostic function to print a rank=2 tensor to stdout
-   *
-   * @param k
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void InternalPrint(const index_t k = 0, const index_t l = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 2, bool> = true>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t k = 0,
-                                         const index_t l = 0) const noexcept
-#endif
-  {
-    for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
-      for (index_t _l = 0; _l < ((l == 0) ? Size(1) : l); _l++) {
-        if (_l == 0)
-          printf("%06lld: ", _k);
-
-        PrintVal(this->operator()(_k, _l));
+    else if constexpr (sizeof...(Args) == 1) {
+      auto& k = pp_get<0>(dims...);
+      for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
+        printf("%06lld: ", _k);
+        PrintVal(this->operator()(_k));
+        printf("\n");
       }
-      printf("\n");
     }
-  }
-
-  /**
-   * Print a rank=3 tensor
-   *
-   * Type-agnostic function to print a rank=3 tensor to stdout
-   *
-   * @param j
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param k
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of third dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  void InternalPrint(const index_t j = 0, const index_t k = 0,
-                     const index_t l = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 3, bool> = true>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(const index_t j = 0,
-                                         const index_t k = 0,
-                                         const index_t l = 0) const noexcept
-#endif
-  {
-    for (index_t _j = 0; _j < ((j == 0) ? Size(0) : j); _j++) {
-      printf("[%06lld,:,:]\n", _j);
-      for (index_t _k = 0; _k < ((k == 0) ? Size(1) : k); _k++) {
-        for (index_t _l = 0; _l < ((l == 0) ? Size(2) : l); _l++) {
+    else if constexpr (sizeof...(Args) == 2) {
+      auto& k = pp_get<0>(dims...);
+      auto& l = pp_get<1>(dims...);
+      for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
+        for (index_t _l = 0; _l < ((l == 0) ? Size(1) : l); _l++) {
           if (_l == 0)
             printf("%06lld: ", _k);
 
-          PrintVal(this->operator()(_j, _k, _l));
+          PrintVal(this->operator()(_k, _l));
         }
         printf("\n");
       }
-      printf("\n");
     }
-  }
-
-  /**
-   * Print a rank=4 tensor
-   *
-   * Type-agnostic function to print a rank=4 tensor to stdout
-   *
-   * @param i
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param j
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param k
-   *   Ending index of third dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of fourth dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void InternalPrint(const index_t i = 0, const index_t j = 0,
-                     const index_t k = 0, const index_t l = 0) const
-#else
-  template <int N = RANK, std::enable_if_t<N == 4, bool> = true>
-  __MATX_HOST__ __MATX_DEVICE__ void
-  InternalPrint(const index_t i = 0, const index_t j = 0, const index_t k = 0,
-                const index_t l = 0) const noexcept
-#endif
-  {
-    for (index_t _i = 0; _i < ((i == 0) ? Size(0) : i); _i++) {
-      for (index_t _j = 0; _j < ((j == 0) ? Size(1) : j); _j++) {
-        printf("[%06lld,%06lld,:,:]\n", _i, _j);
-        for (index_t _k = 0; _k < ((k == 0) ? Size(2) : k); _k++) {
-          for (index_t _l = 0; _l < ((l == 0) ? Size(3) : l); _l++) {
+    else if constexpr (sizeof...(Args) == 3) {
+      auto& j = pp_get<0>(dims...);
+      auto& k = pp_get<1>(dims...);
+      auto& l = pp_get<2>(dims...);
+      for (index_t _j = 0; _j < ((j == 0) ? Size(0) : j); _j++) {
+        printf("[%06lld,:,:]\n", _j);
+        for (index_t _k = 0; _k < ((k == 0) ? Size(1) : k); _k++) {
+          for (index_t _l = 0; _l < ((l == 0) ? Size(2) : l); _l++) {
             if (_l == 0)
               printf("%06lld: ", _k);
 
-            PrintVal(this->operator()(_i, _j, _k, _l));
+            PrintVal(this->operator()(_j, _k, _l));
           }
           printf("\n");
         }
         printf("\n");
+      }      
+    }
+    else if constexpr (sizeof...(Args) == 4) {
+      auto& i = pp_get<0>(dims...);
+      auto& j = pp_get<1>(dims...);
+      auto& k = pp_get<2>(dims...);
+      auto& l = pp_get<3>(dims...); 
+      for (index_t _i = 0; _i < ((i == 0) ? Size(0) : i); _i++) {
+        for (index_t _j = 0; _j < ((j == 0) ? Size(1) : j); _j++) {
+          printf("[%06lld,%06lld,:,:]\n", _i, _j);
+          for (index_t _k = 0; _k < ((k == 0) ? Size(2) : k); _k++) {
+            for (index_t _l = 0; _l < ((l == 0) ? Size(3) : l); _l++) {
+              if (_l == 0)
+                printf("%06lld: ", _k);
+
+              PrintVal(this->operator()(_i, _j, _k, _l));
+            }
+            printf("\n");
+          }
+          printf("\n");
+        }
       }
     }
-  }
+  }  
 
   /**
-   * Print a rank=0 tensor
+   * Print a tensor
    *
-   * Type-agnostic function to print a rank=0 tensor to stdout
+   * Type-agnostic function to print a tensor to stdout
    *
    */
-#ifdef DOXYGEN_ONLY
-  void Print() const
-#else
-  template <int N = RANK, std::enable_if_t<N == 0, bool> = true>
-  inline void Print() const
-#endif
+  template <typename ... Args>
+  inline void Print(Args ...dims) const
   {
     auto kind = GetPointerKind(data_);
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
-      InternalPrint();
+      InternalPrint(dims...);
     }
     else if (DevicePrintable(kind)) {
       if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this);
+        PrintKernel<<<1, 1>>>(*this, dims...);
       }
       else {
         tensor_t<T, RANK> tmpv(this->shape_, (const index_t(&)[RANK])this->s_);
         cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
                    cudaMemcpyDeviceToHost);
-        tmpv.Print();
+        tmpv.Print(dims...);
       }
     }
-  }
-
-  /**
-   * Print a rank=1 tensor
-   *
-   * Type-agnostic function to print a rank=1 tensor to stdout
-   *
-   * @param k
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void Print(index_t k = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 1, bool> = true>
-  inline void Print(index_t k = 0) const noexcept
-#endif
-  {
-    auto kind = GetPointerKind(data_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(k);
-    }
-    else if (DevicePrintable(kind)) {
-      if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, k);
-      }
-      else {
-        tensor_t<T, RANK> tmpv(this->shape_, (const index_t(&)[RANK])this->s_);
-        cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
-                   cudaMemcpyDeviceToHost);
-        tmpv.Print(k);
-      }
-    }
-  }
-
-  /**
-   * Print a rank=2 tensor
-   *
-   * Type-agnostic function to print a rank=2 tensor to stdout
-   *
-   * @param k
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void Print(const index_t k = 0, const index_t l = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 2, bool> = true>
-  inline void Print(const index_t k = 0, const index_t l = 0) const noexcept
-#endif
-  {
-    auto kind = GetPointerKind(data_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(k, l);
-    }
-    else if (DevicePrintable(kind)) {
-      if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, k, l);
-      }
-      else {
-        tensor_t<T, RANK> tmpv(this->shape_, (const index_t(&)[RANK])this->s_);
-        cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
-                   cudaMemcpyDeviceToHost);
-        tmpv.Print(k, l);
-      }
-    }
-  }
-
-  /**
-   * Print a rank=3 tensor
-   *
-   * Type-agnostic function to print a rank=3 tensor to stdout
-   *
-   * @param j
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param k
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of third dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  void Print(const index_t j = 0, const index_t k = 0,
-             const index_t l = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 3, bool> = true>
-  inline void Print(const index_t j = 0, const index_t k = 0,
-                    const index_t l = 0) const noexcept
-#endif
-  {
-    auto kind = GetPointerKind(data_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(j, k, l);
-    }
-    else if (DevicePrintable(kind)) {
-      if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, j, k, l);
-      }
-      else {
-        tensor_t<T, RANK> tmpv(this->shape_, (const index_t(&)[RANK])this->s_);
-        cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
-                   cudaMemcpyDeviceToHost);
-        tmpv.Print(j, k, l);
-      }
-    }
-  }
-
-  /**
-   * Print a rank=4 tensor
-   *
-   * Type-agnostic function to print a rank=4 tensor to stdout
-   *
-   * @param i
-   *   Ending index of first dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param j
-   *   Ending index of second dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param k
-   *   Ending index of third dimension. Use 0 to print all values
-   *   in dimension.
-   *
-   * @param l
-   *   Ending index of fourth dimension. Use 0 to print all values
-   *   in dimension.
-   */
-#ifdef DOXYGEN_ONLY
-  void Print(const index_t i = 0, const index_t j = 0, const index_t k = 0,
-             const index_t l = 0) const noexcept
-#else
-  template <int N = RANK, std::enable_if_t<N == 4, bool> = true>
-  inline void Print(const index_t i = 0, const index_t j = 0,
-                    const index_t k = 0, const index_t l = 0) const noexcept
-#endif
-  {
-    auto kind = GetPointerKind(data_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(i, j, k, l);
-    }
-    else if (DevicePrintable(kind)) {
-      if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, i, j, k, l);
-      }
-      else {
-        tensor_t<T, RANK> tmpv(this->shape_, (const index_t(&)[RANK])this->s_);
-        cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
-                   cudaMemcpyDeviceToHost);
-        tmpv.Print(i, j, k, l);
-      }
-    }
-  }
+  }  
 
 private:
   /**

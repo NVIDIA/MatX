@@ -191,6 +191,12 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 template <typename T>
 using extract_scalar_type_t = typename extract_scalar_type_impl<T>::scalar_type;
 
+// Get the n-th element from a parameter pack
+template <int I, class... Ts>
+__MATX_DEVICE__ __MATX_HOST__ decltype(auto) pp_get(Ts&&... ts) {
+  return std::get<I>(std::forward_as_tuple(ts...));
+}
+
 
 
 // Supported MatX data types. This enum helps translate types into integers for
