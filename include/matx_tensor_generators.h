@@ -51,20 +51,20 @@ public:
 
   ConstVal(tensorShape_t<RANK> s, T val) : s_(s), v_(val){};
 
-  inline __device__ T operator()() { return v_; };
-  inline __device__ T operator()(index_t) { return v_; };
-  inline __device__ T operator()(index_t, index_t) { return v_; };
-  inline __device__ T operator()(index_t, index_t, index_t) { return v_; };
-  inline __device__ T operator()(index_t, index_t, index_t, index_t)
+  inline __MATX_DEVICE__ T operator()() { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t) { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t) { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t) { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t, index_t)
   {
     return v_;
   };
 
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return s_.Size(dim);
   }
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
 
 /**
@@ -126,29 +126,29 @@ public:
 
   Diag(tensorShape_t<RANK> s, T val) : s_(s), val_(val){};
 
-  inline __device__ T operator()() { return T(val_); };
-  inline __device__ T operator()(index_t i)
+  inline __MATX_DEVICE__ T operator()() { return T(val_); };
+  inline __MATX_DEVICE__ T operator()(index_t i)
   {
     if (i == 0)
       return val_;
     else
       return T(0.0f);
   };
-  inline __device__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
   {
     if (i == j)
       return T(val_);
     else
       return T(0.0f);
   };
-  inline __device__ T operator()(index_t i, index_t j, index_t k)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
   {
     if (i == j && i == k)
       return T(val_);
     else
       return T(0.0f);
   };
-  inline __device__ T operator()(index_t i, index_t j, index_t k, index_t l)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
   {
     if (i == j && k == l && i == k)
       return T(val_);
@@ -156,11 +156,11 @@ public:
       return T(0.0f);
   };
 
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return s_.Size(dim);
   }
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
 
 /**
@@ -215,8 +215,8 @@ public:
   using scalar_type = typename Generator1D::scalar_type;
 
   matxGenerator1D_t(tensorShape_t<RANK> s, Generator1D f) : f_(f), s_(s) {}
-  inline __device__ auto operator()(int i) { return f_(i); };
-  inline __device__ auto operator()(int i, int j)
+  inline __MATX_DEVICE__ auto operator()(int i) { return f_(i); };
+  inline __MATX_DEVICE__ auto operator()(int i, int j)
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -227,7 +227,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __device__ auto operator()(int i, int j, int k)
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k)
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -241,7 +241,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __device__ auto operator()(int i, int j, int k, int l)
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l)
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -259,11 +259,11 @@ public:
     return scalar_type(0);
   };
 
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return s_.Size(dim);
   }
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
 private:
   Generator1D f_;
@@ -277,9 +277,9 @@ private:
 public:
   using scalar_type = T;
 
-  inline __host__ __device__ Hamming(index_t size) : size_(size){};
+  inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
-  inline __host__ __device__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
   {
     return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1));
   }
@@ -361,9 +361,9 @@ private:
 
 public:
   using scalar_type = T;
-  inline __host__ __device__ Hanning(index_t size) : size_(size){};
+  inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){};
 
-  inline __host__ __device__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
   {
     return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1)));
   }
@@ -444,9 +444,9 @@ private:
 
 public:
   using scalar_type = T;
-  inline __host__ __device__ Blackman(index_t size) : size_(size){};
+  inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
-  inline __host__ __device__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
   {
     return T(0.42) +
            ((T)0.5 *
@@ -529,9 +529,9 @@ private:
 
 public:
   using scalar_type = T;
-  inline __host__ __device__ Bartlett(index_t size) : size_(size){};
+  inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
-  inline __host__ __device__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
   {
     return (T(2) / (T(size_) - 1)) *
            (((T(size_) - 1) / T(2)) -
@@ -618,7 +618,7 @@ public:
 
   Range(T first, T step) : first_(first), step_(step) {}
 
-  __device__ inline T operator()(index_t idx)
+  __MATX_DEVICE__ inline T operator()(index_t idx)
   {
     if constexpr (is_matx_half_v<T>) {
       return first_ + T(static_cast<T>((float)idx) * step_);
@@ -828,7 +828,7 @@ public:
 #endif
   }
 
-  __device__ inline T operator()(index_t idx) { return range_(idx); }
+  __MATX_DEVICE__ inline T operator()(index_t idx) { return range_(idx); }
 };
 
 /// @name Linspace
@@ -926,7 +926,7 @@ public:
 #endif
   }
 
-  __device__ inline T operator()(index_t idx)
+  __MATX_DEVICE__ inline T operator()(index_t idx)
   {
     if constexpr (is_matx_half_v<T>) {
       return static_cast<T>(
@@ -1025,16 +1025,16 @@ public:
 
   Meshgrid_X(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 
-  inline __device__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
   {
     return x_[0] + j * (x_[1] - x_[0]) / (x_[2] - 1);
   }
 
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return (dim == 0) ? y_[2] : x_[2];
   }
-  static inline constexpr __host__ __device__ int32_t Rank() { return 2; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 2; }
 };
 
 template <typename T> class Meshgrid_Y {
@@ -1049,16 +1049,16 @@ public:
 
   Meshgrid_Y(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 
-  inline __device__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
   {
     return y_[0] + i * (y_[1] - y_[0]) / (y_[2] - 1);
   };
 
-  inline __host__ __device__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return (dim == 0) ? y_[2] : x_[2];
   }
-  static inline constexpr __host__ __device__ int32_t Rank() { return 2; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 2; }
 };
 /**
  * Creates an mesh grid X matrix

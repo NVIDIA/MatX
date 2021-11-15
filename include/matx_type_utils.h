@@ -46,19 +46,6 @@
 
 namespace matx {
 
-#ifdef INDEX_64_BIT
-using index_t = long long int;
-#endif
-
-#ifdef INDEX_32_BIT
-using index_t = int32_t;
-#endif
-
-#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
-     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
-static_assert(false, "Must choose either 64-bit or 32-bit index mode");
-#endif
-
 template <typename T, typename = void>
 struct is_matx_op_impl : std::false_type {
 };
@@ -203,6 +190,12 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 
 template <typename T>
 using extract_scalar_type_t = typename extract_scalar_type_impl<T>::scalar_type;
+
+// Get the n-th element from a parameter pack
+template <int I, class... Ts>
+__MATX_DEVICE__ __MATX_HOST__ decltype(auto) pp_get(Ts&&... ts) {
+  return std::get<I>(std::forward_as_tuple(ts...));
+}
 
 
 

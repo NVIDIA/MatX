@@ -62,7 +62,7 @@ public:
   {
   }
 
-  __device__ inline void operator()(index_t idy, index_t idx)
+  __MATX_DEVICE__ inline void operator()(index_t idy, index_t idx)
   {
 
     index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
@@ -77,12 +77,12 @@ public:
     }
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const
+  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
   {
     return out_.Size(i);
   }
 
-  static inline constexpr __host__ __device__ int32_t Rank()
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
     return O::Rank();
   }
@@ -102,7 +102,7 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut), nfreq_(nfreq)
   {
   }
-  __device__ inline void operator()(index_t idx)
+  __MATX_DEVICE__ inline void operator()(index_t idx)
   {
 
     out_(idx) =
@@ -112,11 +112,11 @@ public:
         x_(idx);
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const
+  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
   {
     return out_.Size(i);
   }
-  static inline constexpr __host__ __device__ int32_t Rank()
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
     return O::Rank();
   }
@@ -134,7 +134,7 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut)
   {
   }
-  __device__ inline void operator()(index_t idx)
+  __MATX_DEVICE__ inline void operator()(index_t idx)
   {
 
     out_(idx) = exp(cuda::std::complex<float>{
@@ -142,11 +142,11 @@ public:
                 x_(idx);
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const
+  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
   {
     return out_.Size(i);
   }
-  static inline constexpr __host__ __device__ int32_t Rank()
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
     return O::Rank();
   }

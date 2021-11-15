@@ -34,6 +34,7 @@
 
 #include "cuda_bf16.h"
 #include "cuda_fp16.h"
+#include "matx_defines.h"
 #include <type_traits>
 
 namespace matx {
@@ -47,33 +48,33 @@ namespace matx {
 template <typename T> struct alignas(sizeof(T)) matxHalf {
   using value_type = T;
 
-  __host__ __device__ __forceinline__ matxHalf() : x(0.0f) {}
-  __host__ __device__ __forceinline__ matxHalf(const matxHalf<T> &x_) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf() : x(0.0f) {}
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf(const matxHalf<T> &x_) noexcept
       : x(x_.x)
   {
   }
 
   template <typename T2>
-  __host__ __device__ __forceinline__ matxHalf(const T2 &x_) noexcept
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf(const T2 &x_) noexcept
       : x(static_cast<float>(x_))
   {
   }
   __forceinline__ ~matxHalf() = default;
 
-  __host__ __device__ __forceinline__ operator float() const
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ operator float() const
   {
     return static_cast<float>(x);
   }
-  __host__ __device__ __forceinline__ operator double() const
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ operator double() const
   {
     return static_cast<double>(x);
   }
-  // __host__ __device__ __forceinline__ operator const float() const { return
+  // __MATX_HOST__ __MATX_DEVICE__ __forceinline__ operator const float() const { return
   // static_cast<float>(x); }
-  // __host__ __device__ __forceinline__ operator const double() const { return
+  // __MATX_HOST__ __MATX_DEVICE__ __forceinline__ operator const double() const { return
   // static_cast<float>(x); }
 
-  __host__ __device__ __forceinline__ matxHalf<T> &
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &
   operator=(const matxHalf<T> &rhs)
   {
     x = rhs.x;
@@ -81,14 +82,14 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   template <typename T2>
-  __host__ __device__ __forceinline__ matxHalf<T> &operator=(const T2 &rhs)
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &operator=(const T2 &rhs)
   {
     x = static_cast<float>(rhs);
     return *this;
   }
 
   template <typename X>
-  __host__ __device__ __forceinline__ matxHalf<T> &
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &
   operator+=(const matxHalf<X> &rhs)
   {
     *this = *this + rhs;
@@ -96,7 +97,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   template <typename X>
-  __host__ __device__ __forceinline__ matxHalf<T> &
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &
   operator-=(const matxHalf<X> &rhs)
   {
     *this = *this - rhs;
@@ -104,7 +105,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   template <typename X>
-  __host__ __device__ __forceinline__ matxHalf<T> &
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &
   operator*=(const matxHalf<X> &rhs)
   {
     *this = *this * rhs;
@@ -112,14 +113,14 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   template <typename X>
-  __host__ __device__ __forceinline__ matxHalf<T> &
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &
   operator/=(const matxHalf<X> &rhs)
   {
     *this = *this / rhs;
     return *this;
   }
 
-  __host__ __device__ __forceinline__ matxHalf<T> &operator+=(float f) const
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &operator+=(float f) const
   {
 #ifdef __CUDA_ARCH__
     return {x + f};
@@ -128,7 +129,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 #endif
   }
 
-  __host__ __device__ __forceinline__ matxHalf<T> &operator-=(float f) const
+  __MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> &operator-=(float f) const
   {
 #ifdef __CUDA_ARCH__
     return {x + f};
@@ -141,7 +142,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 };
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator+(const matxHalf<T> &lhs, const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -149,7 +150,7 @@ operator+(const matxHalf<T> &lhs, const T &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator+(const T &lhs, const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -157,7 +158,7 @@ operator+(const T &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator-(const matxHalf<T> &lhs, const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -165,7 +166,7 @@ operator-(const matxHalf<T> &lhs, const T &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator-(const T &lhs, const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -173,7 +174,7 @@ operator-(const T &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator*(const matxHalf<T> &lhs, const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -181,7 +182,7 @@ operator*(const matxHalf<T> &lhs, const T &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator*(const T &lhs, const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -189,7 +190,7 @@ operator*(const T &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator/(const matxHalf<T> &lhs, const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -197,7 +198,7 @@ operator/(const matxHalf<T> &lhs, const T &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator/(const T &lhs, const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -205,13 +206,13 @@ operator/(const T &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T> operator-(const matxHalf<T> &l)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> operator-(const matxHalf<T> &l)
 {
   return {-l.x};
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
                                                     const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -222,7 +223,7 @@ __host__ __device__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
                                                     const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -230,7 +231,7 @@ __host__ __device__ __forceinline__ bool operator==(const matxHalf<T> &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator==(const T &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator==(const T &lhs,
                                                     const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -238,14 +239,14 @@ __host__ __device__ __forceinline__ bool operator==(const T &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator!=(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator!=(const matxHalf<T> &lhs,
                                                     const matxHalf<T> &rhs)
 {
   return !(lhs == rhs);
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator!=(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator!=(const matxHalf<T> &lhs,
                                                     const T &rhs)
 {
   matxHalf<T> tmp{rhs};
@@ -253,7 +254,7 @@ __host__ __device__ __forceinline__ bool operator!=(const matxHalf<T> &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator!=(const T &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator!=(const T &lhs,
                                                     const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
@@ -261,7 +262,7 @@ __host__ __device__ __forceinline__ bool operator!=(const T &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator>(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator>(const matxHalf<T> &lhs,
                                                    const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -272,7 +273,7 @@ __host__ __device__ __forceinline__ bool operator>(const matxHalf<T> &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator<(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator<(const matxHalf<T> &lhs,
                                                    const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -283,21 +284,21 @@ __host__ __device__ __forceinline__ bool operator<(const matxHalf<T> &lhs,
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator<=(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator<=(const matxHalf<T> &lhs,
                                                     const matxHalf<T> &rhs)
 {
   return lhs < rhs || lhs == rhs;
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ bool operator>=(const matxHalf<T> &lhs,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool operator>=(const matxHalf<T> &lhs,
                                                     const matxHalf<T> &rhs)
 {
   return lhs > rhs || lhs == rhs;
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator+(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -308,7 +309,7 @@ operator+(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator-(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -319,7 +320,7 @@ operator-(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator*(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -330,7 +331,7 @@ operator*(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 }
 
 template <typename T>
-__host__ __device__ __forceinline__ matxHalf<T>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T>
 operator/(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 {
 #ifdef __CUDA_ARCH__
@@ -341,7 +342,7 @@ operator/(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> abs(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> abs(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return __habs(x.x);
@@ -351,7 +352,7 @@ __host__ __device__ __forceinline__ matxHalf<T> abs(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 abs(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -362,7 +363,7 @@ abs(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> log(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> log(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hlog(x.x);
@@ -372,7 +373,7 @@ __host__ __device__ __forceinline__ matxHalf<T> log(const matxHalf<T> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> sqrt(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> sqrt(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hsqrt(x.x);
@@ -382,7 +383,7 @@ __host__ __device__ __forceinline__ matxHalf<T> sqrt(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 sqrt(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -393,7 +394,7 @@ sqrt(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ int isinf(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ int isinf(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return __hisinf(x.x);
@@ -403,7 +404,7 @@ __host__ __device__ __forceinline__ int isinf(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ int isinf(const matxHalf<__nv_bfloat16> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ int isinf(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
   return __hisinf(x.x);
@@ -413,7 +414,7 @@ __host__ __device__ __forceinline__ int isinf(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 log(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -424,7 +425,7 @@ log(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> log10(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> log10(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hlog10(x.x);
@@ -434,7 +435,7 @@ __host__ __device__ __forceinline__ matxHalf<T> log10(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 log10(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -445,7 +446,7 @@ log10(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> log2(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> log2(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hlog2(x.x);
@@ -455,7 +456,7 @@ __host__ __device__ __forceinline__ matxHalf<T> log2(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 log2(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -466,7 +467,7 @@ log2(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> exp(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> exp(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hexp(x.x);
@@ -476,7 +477,7 @@ __host__ __device__ __forceinline__ matxHalf<T> exp(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 exp(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -488,7 +489,7 @@ exp(const matxHalf<__nv_bfloat16> &x)
 
 // Trig functions
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
                                                     const matxHalf<T> &y)
 {
   auto tmp = cuda::std::pow(static_cast<float>(x.x), static_cast<float>(y.x));
@@ -496,7 +497,7 @@ __host__ __device__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
                                                     const T &y)
 {
   auto tmp = cuda::std::pow(static_cast<float>(x.x), static_cast<float>(y));
@@ -504,7 +505,7 @@ __host__ __device__ __forceinline__ matxHalf<T> pow(const matxHalf<T> &x,
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> pow(const T &x,
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> pow(const T &x,
                                                     const matxHalf<T> &y)
 {
   auto tmp = cuda::std::pow(x, static_cast<float>(y.x));
@@ -512,7 +513,7 @@ __host__ __device__ __forceinline__ matxHalf<T> pow(const T &x,
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> floor(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> floor(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hfloor(x.x);
@@ -522,7 +523,7 @@ __host__ __device__ __forceinline__ matxHalf<T> floor(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 floor(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -533,7 +534,7 @@ floor(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> ceil(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> ceil(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hceil(x.x);
@@ -543,7 +544,7 @@ __host__ __device__ __forceinline__ matxHalf<T> ceil(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 ceil(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -554,7 +555,7 @@ ceil(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> round(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> round(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hrint(x.x);
@@ -564,7 +565,7 @@ __host__ __device__ __forceinline__ matxHalf<T> round(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 round(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -575,7 +576,7 @@ round(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> sin(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> sin(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hsin(x.x);
@@ -585,7 +586,7 @@ __host__ __device__ __forceinline__ matxHalf<T> sin(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 sin(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -596,7 +597,7 @@ sin(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> cos(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> cos(const matxHalf<T> &x)
 {
 #ifdef __CUDA_ARCH__
   return hcos(x.x);
@@ -606,7 +607,7 @@ __host__ __device__ __forceinline__ matxHalf<T> cos(const matxHalf<T> &x)
 }
 
 template <>
-__host__ __device__ __forceinline__ matxHalf<__nv_bfloat16>
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<__nv_bfloat16>
 cos(const matxHalf<__nv_bfloat16> &x)
 {
 #if __CUDA_ARCH__ >= 800
@@ -617,61 +618,61 @@ cos(const matxHalf<__nv_bfloat16> &x)
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> tan(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> tan(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::tan(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> asin(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> asin(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::asin(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> acos(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> acos(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::acos(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> atan(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> atan(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::atan(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> asinh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> asinh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::asinh(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> acosh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> acosh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::acosh(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> atanh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> atanh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::atanh(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> sinh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> sinh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::sinh(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> cosh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> cosh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::cosh(static_cast<float>(x.x)));
 }
 
 template <class T>
-__host__ __device__ __forceinline__ matxHalf<T> tanh(const matxHalf<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __forceinline__ matxHalf<T> tanh(const matxHalf<T> &x)
 {
   return static_cast<T>(cuda::std::tanh(static_cast<float>(x.x)));
 }

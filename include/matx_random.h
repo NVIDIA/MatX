@@ -55,7 +55,7 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 };
 
 template <typename Gen>
-__inline__ __device__ void get_random(float &val, Gen *state,
+__inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
                                       Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -67,7 +67,7 @@ __inline__ __device__ void get_random(float &val, Gen *state,
 };
 
 template <typename Gen>
-__inline__ __device__ void get_random(double &val, Gen *state,
+__inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
                                       Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -79,7 +79,7 @@ __inline__ __device__ void get_random(double &val, Gen *state,
 };
 
 template <typename Gen>
-__inline__ __device__ void get_random(cuda::std::complex<float> &val,
+__inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
                                       Gen *state, Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -94,7 +94,7 @@ __inline__ __device__ void get_random(cuda::std::complex<float> &val,
 };
 
 template <typename Gen>
-__inline__ __device__ void get_random(cuda::std::complex<double> &val,
+__inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
                                       Gen *state, Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -235,11 +235,11 @@ public:
   /**
    * Retrieve a value from a rank-0 random view
    */
-  __device__ T operator()()
+  __MATX_DEVICE__ T operator()()
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __device__ T operator()()
+  inline __MATX_DEVICE__ T operator()()
   {
 #endif
     T val;
@@ -254,11 +254,11 @@ public:
    * @param i
    *   First index
    */
-  __device__ T operator()(index_t i)
+  __MATX_DEVICE__ T operator()(index_t i)
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __device__ T operator()(index_t i)
+  inline __MATX_DEVICE__ T operator()(index_t i)
   {
 #endif
     T val;
@@ -275,11 +275,11 @@ public:
    * @param j
    *   Second index
    */
-  __device__ T operator()(index_t i, index_t j)
+  __MATX_DEVICE__ T operator()(index_t i, index_t j)
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __device__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
   {
 #endif
     T val;
@@ -298,11 +298,11 @@ public:
    * @param k
    *   Third index
    */
-  __device__ T operator()(index_t i, index_t j, index_t k)
+  __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __device__ T operator()(index_t i, index_t j, index_t k)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
   {
 #endif
     T val;
@@ -324,11 +324,11 @@ public:
    * @param l
    *   Fourth index
    */
-  __device__ T operator()(index_t i, index_t j, index_t k, index_t l)
+  __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
   {
 #else
   template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __device__ T operator()(index_t i, index_t j, index_t k, index_t l)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
   {
 #endif
     T val;
@@ -339,9 +339,9 @@ public:
     return alpha_ * val + beta_;
   };
 
-  static inline constexpr __host__ __device__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
-  index_t inline __host__ __device__ Size(int dim) const
+  index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
     return shape_.Size(dim);
   }

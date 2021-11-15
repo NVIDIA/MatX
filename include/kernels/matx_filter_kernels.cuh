@@ -38,6 +38,7 @@ typedef enum {
 // Chunk ID assignment used for atomic incrementing between blocks
 static __device__ uint32_t cid_assign[MAX_BATCHES] = {0};
 
+
 template <uint32_t num_recursive, uint32_t num_non_recursive, typename OutType,
           typename InType, typename FilterType>
 __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
@@ -608,5 +609,6 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
   return;
 }
+
 
 }; // namespace matx

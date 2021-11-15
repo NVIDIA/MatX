@@ -54,7 +54,7 @@
  * @returns
  *   Value shuffled*
  */
-__device__ inline auto __shfl_down_sync(unsigned mask,
+__MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
                                         cuda::std::complex<float> var,
                                         unsigned int delta)
 {
@@ -78,7 +78,7 @@ __device__ inline auto __shfl_down_sync(unsigned mask,
  * @returns
  *   Value shuffled
  */
-__device__ inline auto __shfl_down_sync(unsigned mask,
+__MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
                                         cuda::std::complex<double> var,
                                         unsigned int delta)
 {
@@ -97,7 +97,7 @@ __device__ inline auto __shfl_down_sync(unsigned mask,
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicMin(float *addr, float val)
+__MATX_DEVICE__ inline void atomicMin(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -120,7 +120,7 @@ __device__ inline void atomicMin(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicMax(float *addr, float val)
+__MATX_DEVICE__ inline void atomicMax(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -143,7 +143,7 @@ __device__ inline void atomicMax(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicAny(float *addr, float val)
+__MATX_DEVICE__ inline void atomicAny(float *addr, float val)
 {
   // We don't actually need an atomic operation here since we only write to the
   // location if any thread has the correct value.
@@ -163,7 +163,7 @@ __device__ inline void atomicAny(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-template <typename T> __device__ T atomicMul(T *address, T val)
+template <typename T> __MATX_DEVICE__ T atomicMul(T *address, T val)
 {
   T old = *address, assumed;
 
@@ -195,7 +195,7 @@ template <typename T> __device__ T atomicMul(T *address, T val)
  * @param val
  *   Value to compare against
  */
-template <> __device__ inline float atomicMul(float *address, float val)
+template <> __MATX_DEVICE__ inline float atomicMul(float *address, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)address;
   unsigned int old = *address_as_uint, assumed;
@@ -222,7 +222,7 @@ template <> __device__ inline float atomicMul(float *address, float val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicAll(float *addr, float val)
+__MATX_DEVICE__ inline void atomicAll(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -245,7 +245,7 @@ __device__ inline void atomicAll(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-template <> __device__ inline double atomicMul(double *address, double val)
+template <> __MATX_DEVICE__ inline double atomicMul(double *address, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)address;
   unsigned long long int old = *address_as_ull, assumed;
@@ -272,7 +272,7 @@ template <> __device__ inline double atomicMul(double *address, double val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicMin(double *addr, double val)
+__MATX_DEVICE__ inline void atomicMin(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -295,7 +295,7 @@ __device__ inline void atomicMin(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicMax(double *addr, double val)
+__MATX_DEVICE__ inline void atomicMax(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -319,7 +319,7 @@ __device__ inline void atomicMax(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicAny(double *addr, double val)
+__MATX_DEVICE__ inline void atomicAny(double *addr, double val)
 {
   // We don't actually need an atomic operation here since we only write to the
   // location if any thread has the correct value.
@@ -338,7 +338,7 @@ __device__ inline void atomicAny(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__device__ inline void atomicAll(double *addr, float val)
+__MATX_DEVICE__ inline void atomicAll(double *addr, float val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -363,7 +363,7 @@ __device__ inline void atomicAll(double *addr, float val)
  * @param val
  *   Value to add
  */
-__device__ inline void atomicAdd(cuda::std::complex<float> *addr,
+__MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<float> *addr,
                                  cuda::std::complex<float> val)
 {
   float *addrf = reinterpret_cast<float *>(addr);
@@ -383,7 +383,7 @@ __device__ inline void atomicAdd(cuda::std::complex<float> *addr,
  * @param val
  *   Value to add
  */
-__device__ inline void atomicAdd(cuda::std::complex<double> *addr,
+__MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<double> *addr,
                                  cuda::std::complex<double> val)
 {
   double *addrp = reinterpret_cast<double *>(addr);
@@ -392,46 +392,46 @@ __device__ inline void atomicAdd(cuda::std::complex<double> *addr,
 }
 
 namespace matx {
-template <typename T> constexpr inline __host__ __device__ T maxVal();
-template <typename T> constexpr inline __host__ __device__ T minVal();
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal();
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal();
 
 /* Returns the max value of an int32_t at compile time */
-template <> constexpr inline __host__ __device__ int32_t maxVal<int32_t>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int32_t maxVal<int32_t>()
 {
   return INT_MAX;
 }
 /* Returns the min value of an int32_t at compile time */
-template <> constexpr inline __host__ __device__ int32_t minVal<int32_t>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int32_t minVal<int32_t>()
 {
   return INT_MIN;
 }
 /* Returns the max value of a uint32_t at compile time */
-template <> constexpr inline __host__ __device__ uint32_t maxVal<uint32_t>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint32_t maxVal<uint32_t>()
 {
   return UINT_MAX;
 }
 /* Returns the min value of a uint32_t at compile time */
-template <> constexpr inline __host__ __device__ uint32_t minVal<uint32_t>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint32_t minVal<uint32_t>()
 {
   return 0;
 }
 /* Returns the max value of a float at compile time */
-template <> constexpr inline __host__ __device__ float maxVal<float>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ float maxVal<float>()
 {
   return FLT_MAX;
 }
 /* Returns the min value of a float at compile time */
-template <> constexpr inline __host__ __device__ float minVal<float>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ float minVal<float>()
 {
   return -FLT_MAX;
 }
 /* Returns the max value of a double at compile time */
-template <> constexpr inline __host__ __device__ double maxVal<double>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double maxVal<double>()
 {
   return DBL_MAX;
 }
 /* Returns the min value of a double at compile time */
-template <> constexpr inline __host__ __device__ double minVal<double>()
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double minVal<double>()
 {
   return -DBL_MAX;
 }
@@ -445,9 +445,9 @@ template <> constexpr inline __host__ __device__ double minVal<double>()
 template <typename T> class reduceOpSum {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2) { return v1 + v2; }
-  __host__ __device__ inline T Init() { return T(0); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 + v2; }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return T(0); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
 };
 
 /**
@@ -459,9 +459,9 @@ public:
 template <typename T> class reduceOpProd {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2) { return v1 * v2; }
-  __host__ __device__ inline T Init() { return T(1); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 * v2; }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return T(1); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
 };
 
 /**
@@ -474,9 +474,9 @@ public:
 template <typename T> class reduceOpMax {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2) { return v1 > v2 ? v1 : v2; }
-  __host__ __device__ inline T Init() { return minVal<T>(); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 > v2 ? v1 : v2; }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return minVal<T>(); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
 };
 
 /**
@@ -488,12 +488,12 @@ public:
 template <typename T> class reduceOpAny {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2)
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2)
   {
     return (v1 != 0) || (v2 != 0);
   }
-  __host__ __device__ inline T Init() { return (T)(0); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return (T)(0); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
 
 /**
@@ -505,12 +505,12 @@ public:
 template <typename T> class reduceOpAll {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2)
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2)
   {
     return (v1 != 0) && (v2 != 0);
   }
-  __host__ __device__ inline T Init() { return (T)(1); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return (T)(1); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
 /**
@@ -523,9 +523,9 @@ public:
 template <typename T> class reduceOpMin {
 public:
   using matx_reduce = bool;
-  __host__ __device__ inline T Reduce(T v1, T v2) { return v1 < v2 ? v1 : v2; }
-  __host__ __device__ inline T Init() { return maxVal<T>(); }
-  __device__ inline void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 < v2 ? v1 : v2; }
+  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return maxVal<T>(); }
+  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
 };
 
 #if 0
@@ -533,19 +533,19 @@ public:
     class reduceOpSumMax {
       public:
         using matx_reduce = bool;
-        __host__ __device__ inline T Reduce(T v1, T v2) {
+        __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) {
           T val;
           val.x = reduceOpSum<decltype(T::x)>().Reduce(v1,v2);
           val.y = reduceOpMax<decltype(T::y)>().Reduce(v1,v2); 
           return val;
         }
-        __host__ __device__ inline T Init() {
+        __MATX_HOST__ __MATX_DEVICE__ inline T Init() {
           T val;
           val.x = reduceOpSum<decltype(T::x)>().Init();
           val.y = reduceOpMax<decltype(T::y)>().Init();
           return val;
         }
-        __device__ inline void atomicReduce(T *addr, T val) {
+        __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) {
           reduceOpSum<decltype(T::x)>().atomicReduce(&(addr->x), val.x);
           reduceOpMax<decltype(T::y)>().atomicReduce(&(addr->y), val.y);
         }
@@ -553,7 +553,7 @@ public:
 #endif
 
 template <typename T, typename Op>
-__device__ inline T warpReduceOp(T val, Op op, uint32_t size)
+__MATX_DEVICE__ inline T warpReduceOp(T val, Op op, uint32_t size)
 {
   // breaking this out so common case is faster without branches
   if (size > 16) {
