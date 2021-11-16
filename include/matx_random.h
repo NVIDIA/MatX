@@ -46,6 +46,7 @@ namespace matx {
  */
 enum Distribution_t { UNIFORM, NORMAL };
 
+#ifdef __CUDACC__  
 template <typename Gen>
 __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 {
@@ -53,6 +54,7 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
   if (idx < size)
     curand_init(seed, idx, 0, &states[idx]);
 };
+#endif
 
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
@@ -141,6 +143,7 @@ public:
   inline randomGenerator_t(index_t total_threads, uint64_t seed)
       : total_threads_(total_threads)
   {
+#ifdef __CUDACC__      
     matxAlloc((void **)&states_,
               total_threads_ * sizeof(curandStatePhilox4_32_10_t),
               MATX_DEVICE_MEMORY);
@@ -148,6 +151,7 @@ public:
     int threads = 128;
     int blocks = static_cast<int>((total_threads_ + threads - 1) / threads);
     curand_setup_kernel<<<blocks, threads>>>(states_, seed, total_threads);
+#endif    
   };
 
   /**

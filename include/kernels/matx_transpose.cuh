@@ -12,6 +12,7 @@
 
 namespace matx {
 
+#ifdef __CUDACC__  
 // Tile dims for one block
 #define TILE_DIM 32
 
@@ -76,5 +77,6 @@ __global__ void transpose_kernel_oop(tensor_t<T, RANK> out,
     }
   }
 }
+#endif
 
 }; // namespace matx

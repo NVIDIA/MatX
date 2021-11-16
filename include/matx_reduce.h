@@ -39,6 +39,7 @@
 #include "matx_type_utils.h"
 #include <cfloat>
 
+#ifdef __CUDACC__  
 /**
  * Warp shuffle down with a complex float
  *
@@ -390,8 +391,11 @@ __MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<double> *addr,
   atomicAdd(addrp, val.real());
   atomicAdd(addrp + 1, val.imag());
 }
+#endif
 
 namespace matx {
+
+#ifdef __CUDACC__  
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal();
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal();
 
@@ -435,6 +439,7 @@ template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double minVal<double>
 {
   return -DBL_MAX;
 }
+
 
 /**
  * Operator for performing a sum reduction
@@ -732,6 +737,8 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
 #endif
 }
 
+#endif
+
 /**
  * Perform a reduction
  *
@@ -772,7 +779,7 @@ template <typename T, int RANK, typename InType, typename ReduceOp>
 void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
-
+#ifdef __CUDACC__  
   using scalar_type = typename InType::scalar_type;
 
   static_assert(RANK < InType::Rank());
@@ -803,6 +810,7 @@ void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
   }
   matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp());
+#endif      
 }
 
 /**
@@ -832,6 +840,7 @@ template <typename T, int RANK, typename InType>
 void inline mean(tensor_t<T, RANK> &dest, const InType &in,
                  cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   float scale = 1.0;
 
   reduce(dest, in, reduceOpSum<T>(), stream);
@@ -843,6 +852,7 @@ void inline mean(tensor_t<T, RANK> &dest, const InType &in,
   }
 
   (dest = dest * 1.0 / scale).run(stream);
+#endif  
 }
 
 /**
@@ -873,6 +883,7 @@ template <typename T, int RANK, int RANK_IN>
 void inline median(tensor_t<T, RANK> &dest,
                    const tensor_t<T, RANK_IN> &in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   static_assert(RANK_IN <= 2 && (RANK_IN == RANK + 1));
 
   tensor_t<T, RANK_IN> tmp_sort(in.Shape());
@@ -918,6 +929,7 @@ void inline median(tensor_t<T, RANK> &dest,
       (dest = (sv + sv2) / 2.0f).run(stream);
     }
   }
+#endif  
 }
 
 /**
@@ -942,7 +954,9 @@ void inline median(tensor_t<T, RANK> &dest,
 template <typename T, int RANK, typename InType>
 void inline sum(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__
   reduce(dest, in, reduceOpSum<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -967,7 +981,9 @@ void inline sum(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline prod(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__
   reduce(dest, in, reduceOpProd<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -995,7 +1011,9 @@ void inline prod(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__
   reduce(dest, in, reduceOpMax<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -1023,7 +1041,9 @@ void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   reduce(dest, in, reduceOpMin<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -1050,7 +1070,9 @@ void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline any(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   reduce(dest, in, reduceOpAny<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -1077,7 +1099,9 @@ void inline any(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline all(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   reduce(dest, in, reduceOpAll<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -1103,6 +1127,7 @@ void inline all(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__    
   T *tmps;
   matxAlloc((void **)&tmps, dest.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
   auto tmpv = tensor_t<T, RANK>(dest);
@@ -1125,6 +1150,7 @@ void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
   (dest = dest / static_cast<double>(N - 1)).run(stream);
 
   matxFree(tmps);
+#endif  
 }
 
 /**
@@ -1150,8 +1176,10 @@ void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline stdd(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   var(dest, in, stream);
   (dest = sqrt(dest)).run(stream);
+#endif  
 }
 
 } // end namespace matx

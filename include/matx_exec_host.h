@@ -31,33 +31,70 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <type_traits>
 
-// This file is intended to contain simple defines that don't rely on any other headers. It must be
-// useable on both host and device compilers
+#include "matx_error.h"
+#include "matx_get_grid_dims.h"
 
-namespace matx {
+namespace matx 
+{
 
-#ifdef INDEX_64_BIT
-    using index_t = long long int;
-#endif
+class SingleThreadHostExecutor {
+  public:
+    using matx_executor = bool;
+    
+    template <typename Op>
+    void Exec(Op &op) const noexcept {
+      if constexpr (op.Rank() == 0) {
+        op();
+      }
+      else if constexpr (op.Rank() == 1) {
+        index_t size0 = op.Size(0);
+        for (index_t idx = 0; idx < size0; idx++) {
+          op(idx);
+        }
+      }
+      else if constexpr (op.Rank() == 2) {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
 
-#ifdef INDEX_32_BIT
-    using index_t = int32_t;
-#endif
+        for (index_t idx = 0; idx < size0; idx++) {
+          for (index_t idy = 0; idy < size1; idy++) {
+            op(idx, idy);
+          }
+        }
+      }
+      else if constexpr (op.Rank() == 3) {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
+        index_t size2 = op.Size(2);
 
-#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
-     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
-static_assert(false, "Must choose either 64-bit or 32-bit index mode");
-#endif
+        for (index_t idx = 0; idx < size0; idx++) {
+          for (index_t idy = 0; idy < size1; idy++) {
+            for (index_t idz = 0; idz < size2; idz++) {
+              op(idx, idy, idz);
+            }
+          }
+        }
+      }
+      else {
+        index_t size0 = op.Size(0);
+        index_t size1 = op.Size(1);
+        index_t size2 = op.Size(2);
+        index_t size3 = op.Size(3);
 
-#ifdef __CUDACC__
-    #define __MATX_HOST__ __host__
-    #define __MATX_DEVICE__ __device__
-#else
-    #define __MATX_HOST__  __host__
-    #define __MATX_DEVICE__ __device__
-#endif
-
+        for (index_t idx = 0; idx < size0; idx++) {
+          for (index_t idy = 0; idy < size1; idy++) {
+            for (index_t idz = 0; idz < size2; idz++) {
+              for (index_t idw = 0; idw < size3; idw++) {
+                op(idx, idy, idz, idw);
+              }
+            }
+          }
+        }
+      }        
+    }
+};
 
 
 }

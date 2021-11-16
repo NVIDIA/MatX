@@ -32,32 +32,34 @@
 
 #pragma once
 
-// This file is intended to contain simple defines that don't rely on any other headers. It must be
-// useable on both host and device compilers
+#include "matx_defines.h"
+#include "matx_exec_host.h"
+#include "matx_exec_kernel.h"
 
-namespace matx {
+namespace matx
+{  
+  /* Executors define how an operator is executed. Currently supported types are
+     CUDA device and single-threaded host
+  */
+  class Executor {
+    public:
+      template <typename Op> 
+      void Exec(Op &op) const noexcept {
+        MATX_THROW(matxInvalidParameter, "Must use a concrete executor type!");
+      }
+  };
 
-#ifdef INDEX_64_BIT
-    using index_t = long long int;
-#endif
-
-#ifdef INDEX_32_BIT
-    using index_t = int32_t;
-#endif
-
-#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
-     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
-static_assert(false, "Must choose either 64-bit or 32-bit index mode");
-#endif
-
-#ifdef __CUDACC__
-    #define __MATX_HOST__ __host__
-    #define __MATX_DEVICE__ __device__
-#else
-    #define __MATX_HOST__  __host__
-    #define __MATX_DEVICE__ __device__
-#endif
+  template <class Op> 
+  void __forceinline__ exec(Op op, const cudaStream_t stream)
+  {
+    exec(op, CUDADeviceExecutor{stream});
+  }    
 
 
+  template <typename Op, typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true> 
+  void __forceinline__ exec(Op op, Ex ex)
+  {
+    ex.Exec(op);
+  }  
 
-}
+};
