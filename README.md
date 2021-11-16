@@ -182,7 +182,10 @@ cd build/test
 
 
 ## Quick Start Guide
-A [quick start guide](docs/quickstart.rst) can be found in the docs directory. Further, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
+We provide a variety of training materials and examples to quickly learn the MatX API.
+- A [quick start guide](docs/quickstart.rst) can be found in the docs directory. The MatX quick start guide is modeled after [NumPy's](https://numpy.org/doc/stable/user/quickstart.html) and demonstrates how to manipulate and create tensors.
+- A set of MatX [notebooks](docs/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
+- Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 
 ## Filing Issues
