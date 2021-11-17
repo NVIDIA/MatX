@@ -72,7 +72,20 @@ template <typename T> constexpr bool is_tensor_view_t()
   return is_tensor_view<T>::value;
 }
 
-// Identify reduction operator
+
+template <typename T, typename = void> struct is_executor : std::false_type {
+};
+
+template <typename T>
+struct is_executor<T, std::void_t<typename T::matx_executor>>
+    : std::true_type {
+};
+
+template <typename T> constexpr bool is_executor_t()
+{
+  return is_executor<T>::value;
+}
+
 template <typename T, typename = void>
 struct is_matx_reduction_impl : std::false_type {
 };
@@ -202,6 +215,8 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 
 template <typename T>
 using extract_scalar_type_t = typename extract_scalar_type_impl<T>::scalar_type;
+
+
 
 // Get the n-th element from a parameter pack
 template <int I, class... Ts>

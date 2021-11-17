@@ -3,7 +3,7 @@
 [![GitHub Releases](https://img.shields.io/github/v/release/NVIDIA/MatX)](https://github.com/NVIDIA/MatX/releases/)
 [![GitHub License](https://img.shields.io/badge/license-BSD-green)](https://github.com/NVIDIA/MatX/blob/main/LICENSE)
 
-**MatX** is a modern C++ library for numerical computing on NVIDIA GPUs. Near-native performance can be achieved while using a simple syntax common in higher-level languages such as Python or MATLAB.
+**MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs. Near-native performance can be achieved while using a simple syntax common in higher-level languages such as Python or MATLAB.
 
 ![FFT resampler](docs/img/fft_resamp.PNG)
 
@@ -45,11 +45,15 @@ are necessary
 
 
 ## Requirements
-MatX is using bleeding edge features in the CUDA compilers and libraries. For this reason, CUDA 11.2 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
+MatX is using bleeding edge features in C++17 and the CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.2 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
-MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. We currently do not support the Jetson embedded GPUs, as JetPack currently ships with CUDA 10.2.
+MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. We currently do not support the Jetson embedded GPUs, as JetPack currently ships with CUDA 10.2. CPU support should work
+on any CPU that will compile the code.
 
 **Note for CUDA 11.4 and below**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5.
+
+**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator
+on CPU, please report it in the issues above. 
 
 
 ## Installation
