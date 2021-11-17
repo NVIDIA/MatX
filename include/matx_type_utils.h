@@ -72,6 +72,7 @@ template <typename T> constexpr bool is_tensor_view_t()
   return is_tensor_view<T>::value;
 }
 
+// Identify reduction operator
 template <typename T, typename = void>
 struct is_matx_reduction_impl : std::false_type {
 };
@@ -81,6 +82,17 @@ struct is_matx_reduction_impl<T, std::void_t<typename T::matx_reduce>>
 };
 template <typename T>
 inline constexpr bool is_matx_reduction_v = is_matx_reduction_impl<T>::value;
+
+// Identify reduction operators supporting indexes and values
+template <typename T, typename = void>
+struct is_matx_idx_reduction_impl : std::false_type {
+};
+template <typename T>
+struct is_matx_idx_reduction_impl<T, std::void_t<typename T::matx_reduce_index>>
+    : std::true_type {
+};
+template <typename T>
+inline constexpr bool is_matx_index_reduction_v = is_matx_idx_reduction_impl<T>::value;
 
 template <class T> struct is_cuda_complex : std::false_type {
 };

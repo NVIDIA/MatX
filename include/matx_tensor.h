@@ -238,7 +238,7 @@ public:
   using matxop = bool;
 
   // Delete default constructor for ranks higher than 0
-  template <int M = RANK, std::enable_if_t<M != 0, bool> = true>
+  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
   tensor_t() = delete;
 
   __MATX_HOST__ __MATX_DEVICE__ tensor_t<T, RANK>(tensor_t<T, RANK> const &rhs) noexcept
@@ -1268,6 +1268,52 @@ public:
   inline index_t TotalSize() const noexcept { return shape_.TotalSize(); }
 
   /**
+   * operator() getter with an array index
+   *
+   * @returns value in tensor
+   *
+   */
+  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
+  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(const std::array<index_t, RANK> &idx) const noexcept
+  {
+    if constexpr (RANK == 1) {
+      return this->operator()(idx[0]);
+    }
+    else if constexpr (RANK == 2) {
+      return this->operator()(idx[0], idx[1]);
+    }
+    else if constexpr (RANK == 3) {
+      return this->operator()(idx[0], idx[1], idx[2]);
+    }
+    else if constexpr (RANK == 4) {
+      return this->operator()(idx[0], idx[1], idx[2], idx[3]);
+    }            
+  }  
+
+  /**
+   * operator() setter with an array index
+   *
+   * @returns value in tensor
+   *
+   */
+  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
+  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
+  {
+    if constexpr (RANK == 1) {
+      return this->operator()(idx[0]);
+    }
+    else if constexpr (RANK == 2) {
+      return this->operator()(idx[0], idx[1]);
+    }
+    else if constexpr (RANK == 3) {
+      return this->operator()(idx[0], idx[1], idx[2]);
+    }
+    else if constexpr (RANK == 4) {
+      return this->operator()(idx[0], idx[1], idx[2], idx[3]);
+    }            
+  }    
+
+  /**
    * Rank-0 operator() getter
    *
    * @returns value in tensor
@@ -1994,6 +2040,9 @@ public:
     else if constexpr (std::is_floating_point_v<T>) {
       printf("%.4f ", val);
     }
+    else if constexpr (std::is_same_v<T, long long int>) {
+      printf("%lld ", val);
+    }
     else if constexpr (std::is_same_v<T, int64_t>) {
       printf("%" PRId64 " ", val);
     }
@@ -2126,7 +2175,31 @@ public:
 #else
     InternalPrint(dims...);
 #endif    
-  }  
+  }
+
+  /**
+   * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
+   * 
+   * @param abs Absolute index
+   * @return std::array of indices 
+   */
+  __forceinline__ std::array<index_t, RANK> GetIdxFromAbs(index_t abs) {
+    std::array<index_t, RANK> indices;
+    std::array sh = shape_.AsArray();
+    
+    for (int idx = 0; idx < RANK; idx++) {
+      if (idx == RANK-1) {
+        indices[RANK-1] = abs;
+      }
+      else {
+        index_t prod = std::accumulate(sh.data() + idx + 1, sh.data() + RANK, 1, std::multiplies<index_t>());
+        indices[idx] = abs / prod;
+        abs -= prod * indices[idx];
+      }
+    }
+
+    return indices;
+  }
 
 private:
   /**
@@ -2167,6 +2240,9 @@ private:
   tensorShape_t<RANK> shape_;
   std::array<index_t, RANK> s_; // +1 to avoid zero sized array
 };
+
+
+
 
 // make_tensor helpers
 /**

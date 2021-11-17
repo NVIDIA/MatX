@@ -109,7 +109,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Reduce)
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
 {
   MATX_ENTER_HANDLER();
   {
@@ -312,6 +312,60 @@ TEST(ReductionTests, Median)
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TypeParam)(3.0f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TypeParam)(3.0f)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ReductionTests, MinMax)
+{
+  MATX_ENTER_HANDLER();
+  using TypeParam = float;
+  {
+    tensor_t<TypeParam, 0> t0{};
+    tensor_t<index_t, 0> t0i{};    
+    tensor_t<TypeParam, 1> t1o{{11}};
+    tensor_t<TypeParam, 2> t2o{{2, 5}};
+    tensor_t<TypeParam, 1> t1o_small{{2}};    
+    tensor_t<index_t, 1> t1i_small{{2}};
+
+    t1o.SetVals({1, 3, 8, 2, 9, 10, 6, 7, 4, 5, -1, 10, -1});
+    t2o.SetVals({{2, 4, 1, 3, 5}, {3, 1, 5, 2, 4}});
+
+    rmin(t0, t1o);
+    cudaStreamSynchronize(0);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-1)));
+
+    rmax(t0, t1o);
+    cudaStreamSynchronize(0);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(10)));    
+
+    argmax(t0, t0i, t1o);
+    cudaStreamSynchronize(0);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(10)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(5)));
+
+    argmin(t0, t0i, t1o);
+    cudaStreamSynchronize(0);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-1)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(10)));    
+
+    argmax(t1o_small, t1i_small, t2o);
+    cudaStreamSynchronize(0);
+
+    // We need to convert the absolue index into relative before comparing
+    auto rel = t2o.GetIdxFromAbs(t1i_small(0));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(5)));
+    rel = t2o.GetIdxFromAbs(t1i_small(1));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(5)));
+
+    argmin(t1o_small, t1i_small, t2o);
+    cudaStreamSynchronize(0);
+    
+    rel = t2o.GetIdxFromAbs(t1i_small(0));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(1)));
+    rel = t2o.GetIdxFromAbs(t1i_small(1));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(1)));  
   }
 
   MATX_EXIT_HANDLER();
