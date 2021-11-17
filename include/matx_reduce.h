@@ -479,6 +479,7 @@ public:
 template <typename T> class reduceOpMax {
 public:
   using matx_reduce = bool;
+  using matx_reduce_index = bool;
   __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 > v2 ? v1 : v2; }
   __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return minVal<T>(); }
   __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
@@ -528,6 +529,7 @@ public:
 template <typename T> class reduceOpMin {
 public:
   using matx_reduce = bool;
+  using matx_reduce_index = bool;
   __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 < v2 ? v1 : v2; }
   __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return maxVal<T>(); }
   __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
@@ -589,6 +591,7 @@ __MATX_DEVICE__ inline T warpReduceOp(T val, Op op, uint32_t size)
   return val;
 }
 
+
 template <typename T, int RANK, typename InType, typename ReduceOp>
 __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
                                  ReduceOp red)
@@ -596,7 +599,6 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
 
   constexpr int DRANK = InType::Rank() - RANK;
   using scalar_type = typename InType::scalar_type;
-#if 1
   // This is for 2 stage reduction
 
   // nvcc limitation here.  we have to declare shared memory with the same type
@@ -618,7 +620,6 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
     // offset shared memory
     smem = smem_ + soff;
   }
-#endif
 
   // Read input
   typename InType::scalar_type in_val = red.Init();
@@ -702,14 +703,7 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
 
   // reduce along x dim (warp)
   in_val = warpReduceOp(in_val, red, blockDim.x);
-#if 0
-      // single stage reduction
-      if(out !=nullptr && threadIdx.x%32 == 0) {
-        // thread 0 update global memory
-        red.atomicReduce(out, in_val);
-      }
 
-#else
   if (blockDim.x > 32) {
     // enter 2 stage reduction
 
@@ -734,16 +728,124 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
     // thread 0 update global memory
     red.atomicReduce(out, in_val);
   }
-#endif
 }
 
+template <typename T, int RANK, typename InType>
+__global__ void matxIndexKernel(tensor_t<index_t, RANK> idest, tensor_t<T, RANK> dest, InType in)
+{
+  typename InType::scalar_type in_val;
+  [[maybe_unused]] index_t idx, idy, idz, idw;
+  constexpr int DRANK = InType::Rank() - RANK;
+  index_t abs_idx;
+
+  if constexpr (InType::Rank() == 1) {
+    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (idx < in.Size(0)) {
+      in_val = in(idx);
+      abs_idx = idx;
+    }
+  }
+  else if constexpr (InType::Rank() == 2) {
+    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (idy < in.Size(0) && idx < in.Size(1)) {
+      in_val = in(idy, idx);
+      abs_idx = idy*in.Size(1) + idx;
+    }
+  }
+  else if constexpr (InType::Rank() == 3) {
+    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
+    if (idz < in.Size(0) && idy < in.Size(1) && idx < in.Size(2)) {
+      in_val = in(idz, idy, idx);
+      abs_idx = idz*in.Size(0)*in.Size(1) + idy*in.Size(1) + idx;
+    }
+  }
+  else if constexpr (InType::Rank() == 4) {
+    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    idy = nmy % in.Size(2);
+    idz = nmy / in.Size(2);
+    idw = blockIdx.z * blockDim.z + threadIdx.z;
+    if (idw < in.Size(0) && idz < in.Size(1) && idy < in.Size(2) &&
+        idx < in.Size(3)) {
+      in_val = in(idw, idz, idy, idx);
+      abs_idx = idw*in.Size(0)*in.Size(1)*in.Size(2) + idz*in.Size(0)*in.Size(1) + idy*in.Size(1) + idx;
+    }
+  }
+
+  // Compare value to reduced
+  // Compute offset index based on rank difference
+  if constexpr (DRANK == 1) {
+    // Shift ranks by 1
+    if constexpr (InType::Rank() >= 2)
+      idx = idy;
+    if constexpr (InType::Rank() >= 3)
+      idy = idz;
+    if constexpr (InType::Rank() >= 4)
+      idz = idw;
+  }
+  else if constexpr (DRANK == 2) {
+    // Shift ranks by 2
+    if constexpr (InType::Rank() >= 3)
+      idx = idz;
+    if constexpr (InType::Rank() >= 4)
+      idy = idw;
+  }
+  else if constexpr (DRANK == 3) {
+    // shift ranks by 3
+    if constexpr (InType::Rank() >= 4)
+      idx = idw;
+  }
+
+  // Compute output location
+  T *out = nullptr;
+  index_t *iout = nullptr;
+  bool valid = false;
+
+  // compute output offsets
+  if constexpr (RANK == 0) {
+    out  = &dest();
+    iout = &idest();
+    valid = true;
+  }
+  else if constexpr (RANK == 1) {
+    if (idx < dest.Size(0)) {
+      out = &dest(idx);
+      iout = &idest(idx);
+      valid = true;
+    }
+  }
+  else if constexpr (RANK == 2) {
+    if (idx < dest.Size(1) && idy < dest.Size(0))
+      out = &dest(idy, idx);
+      iout = &idest(idy, idx);
+      valid = true;
+  }
+  else if constexpr (RANK == 3) {
+    if (idx < dest.Size(2) && idy < dest.Size(1) && idz < dest.Size(0))
+      out = &dest(idz, idy, idx);
+      iout = &idest(idz, idy, idx);
+      valid = true;
+  }
+
+  if (valid) {  
+    __threadfence();
+
+    // Value matches
+    if (*out == in_val) {    
+      atomicMin(iout, abs_idx);
+    }
+  }  
+}
 #endif
 
 /**
- * Perform a reduction
+ * Perform a reduction and preserves indices
  *
- * Performs a reduction from tensor "in" into tensor "dest" using reduction
- * operation ReduceOp. The output tensor dictates which elements the reduction
+ * Performs a reduction from tensor "in" into values tensor "dest" and index tensor idest using reduction
+ * operation ReduceOp. The output tensor rank dictates which elements the reduction
  * is performed over. In general, the reductions are performed over the
  * innermost dimensions, where the number of dimensions is the difference
  * between the input and output tensor ranks. For example, for a 0D (scalar)
@@ -757,13 +859,17 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
  *
  * @tparam T
  *   Output data type
+ * @param RANK
+ *   Rank of output value tensor
  * @tparam InType
  *   Input data type
  * @tparam ReduceOp
  *   Reduction operator to apply
  *
  * @param dest
- *   Destination view of reduction
+ *   Destination view of values reduced
+ * @param idest
+ *   Destination view of indices
  * @param in
  *   Input data to reduce
  * @param op
@@ -776,14 +882,19 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
  *   in the reduction.
  */
 template <typename T, int RANK, typename InType, typename ReduceOp>
-void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
+void inline reduce(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
 #ifdef __CUDACC__  
   using scalar_type = typename InType::scalar_type;
 
   static_assert(RANK < InType::Rank());
-  static_assert(is_matx_reduction_v<ReduceOp>);
+  if (idest.Data() != nullptr) {
+    MATX_ASSERT_STR(is_matx_index_reduction_v<ReduceOp>, matxInvalidParameter, "Must use a reduction operator capable of saving indices");
+  }
+
+  static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");    
+
 
   if constexpr (RANK > 0) {
     for (uint32_t i = 0; i < RANK; i++) {
@@ -808,9 +919,65 @@ void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
+
   matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp());
-#endif      
+
+  // If we need the indices too, launch that kernel
+  if (idest.Data() != nullptr) {
+    (idest = std::numeric_limits<index_t>::max()).run(stream);
+    matxIndexKernel<<<blocks, threads, 0, stream>>>(
+        idest, dest, in);     
+  }
+#endif  
+}
+
+
+
+/**
+ * Perform a reduction
+ *
+ * Performs a reduction from tensor "in" into tensor "dest" using reduction
+ * operation ReduceOp. The output tensor dictates which elements the reduction
+ * is performed over. In general, the reductions are performed over the
+ * innermost dimensions, where the number of dimensions is the difference
+ * between the input and output tensor ranks. For example, for a 0D (scalar)
+ * output tensor, the reduction is performed over the entire tensor. For
+ * anything higher, the reduction is performed across the number of ranks below
+ * the input tensor that the output tensor is. For example, if the input tensor
+ * is a 4D tensor and the output is a 1D tensor, the reduction is performed
+ * across the innermost dimension of the input. If the output is a 2D tensor,
+ * the reduction is performed across the two innermost dimensions of the input,
+ * and so on.
+ *
+ * @tparam T
+ *   Output data type
+ * @param RANK
+ *   Rank of output value tensor
+ * @tparam InType
+ *   Input data type
+ * @tparam ReduceOp
+ *   Reduction operator to apply
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param op
+ *   Reduction operator
+ * @param stream
+ *   CUDA stream
+ * @param init
+ *   if true dest will be initialized with ReduceOp::Init()
+ *   otherwise the values in the destination will be included
+ *   in the reduction.
+ */
+template <typename T, int RANK, typename InType, typename ReduceOp>
+void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
+                   cudaStream_t stream = 0, bool init = true)
+{
+  auto tmp = tensor_t<index_t, RANK>{nullptr, dest.Shape()};
+  reduce(dest, tmp, in, op, stream, init);
 }
 
 /**
@@ -1016,6 +1183,34 @@ void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 #endif  
 }
 
+
+/**
+ * Compute maxn reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with maximums and indices
+ *
+ * @tparam T
+ *   Output data type
+ * @tparam RANK
+ *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction values
+ * @param idest
+ *   Destination view of reduction indices
+ * @param in
+ *   Input data to reduce
+ * @param stream
+ *   CUDA stream
+ */
+template <typename T, int RANK, typename InType>
+void inline argmax(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
+{
+  reduce(dest, idest, in, reduceOpMax<T>(), stream, true);
+}
+
 /**
  * Compute min reduction of a tensor
  *
@@ -1044,6 +1239,33 @@ void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 #ifdef __CUDACC__  
   reduce(dest, in, reduceOpMin<T>(), stream, true);
 #endif  
+}
+
+/**
+ * Compute min reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with minimums and indices
+ *
+ * @tparam T
+ *   Output data type
+ * @tparam RANK
+ *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction values
+ * @param idest
+ *   Destination view of reduction indices
+ * @param in
+ *   Input data to reduce
+ * @param stream
+ *   CUDA stream
+ */
+template <typename T, int RANK, typename InType>
+void inline argmin(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
+{
+  reduce(dest, idest, in, reduceOpMin<T>(), stream, true);
 }
 
 /**

@@ -133,6 +133,15 @@ public:
   }
 
   /**
+   * Get shape as an array
+   *
+   */
+  inline std::array<index_t, RANK> AsArray()
+  {
+    return n_;
+  }  
+
+  /**
    * Get the rank of the tensor
    *
    * @returns Rank of the tensor
