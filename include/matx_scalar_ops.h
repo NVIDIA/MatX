@@ -90,7 +90,7 @@ namespace matx {
     }                                                                          \
   };                                                                           \
   template <typename T1, typename T2>                                          \
-  using AddOp = BinOp<T1, T2, OPNAME##F<T1, T2>>;
+  using OPNAME##Op = BinOp<T1, T2, OPNAME##F<T1, T2>>;
 
 template <typename T1, typename F> class UnOp {
 public:

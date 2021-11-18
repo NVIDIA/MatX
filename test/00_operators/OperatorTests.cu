@@ -188,10 +188,10 @@ TYPED_TEST(OperatorTestsAll, OperatorFuncs)
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
-  CHAIN(tov0 = c, tov00 = c).run();
+  (tov0 = c, tov00 = c).run();
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  
 
   MATX_EXIT_HANDLER();
 }
@@ -232,7 +232,7 @@ TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_log2(c)));
 
-  (tov0 = floor(tiv0)).run();
+  (tov0 = floor(tiv0)).run();   
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_floor(c)));
 

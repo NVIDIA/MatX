@@ -89,6 +89,65 @@ namespace matx
     return T(n) * c;
   }  
 
+/**
+ * Chain multiple operator statements
+ *
+ * Takes a variable list of operator statements to execute concurrently.
+ * Chaining may improve performance over executing each operation separately.
+ */
+  template<class Op1, class Op2>
+  class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
+      public:
+        __MATX_DEVICE__ __MATX_HOST__ __forceinline__  CommaOp(Op1 op1, Op2 op2) : op1_(op1), op2_(op2) {
+          MATX_STATIC_ASSERT_STR(Op1::Rank() == Op2::Rank(), matxInvalidSize, 
+            "Chained expressions using the comma operator must match in rank");
+        }
+        auto __forceinline__ __MATX_HOST__ __MATX_DEVICE__ operator()() {
+          op1_();
+          return op2_();
+        }
+
+        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i)
+        {
+            op1_(i);
+            return op2_(i);
+        }
+        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j)
+        {
+            op1_(i,j);
+            return op2_(i,j);
+        }
+        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j, index_t k)
+        {
+            op1_(i,j,k);
+            return op2_(i,j,k);
+        }
+        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+        {
+            op1_(i,j,k,l);
+            return op2_(i,j,k,l);
+        }                      
+
+        static __forceinline__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+        {
+          return Op2::Rank();
+        }
+
+        index_t __forceinline__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+        {
+          return op2_.Size(dim);
+        }        
+    private:
+        Op1 op1_;
+        Op2 op2_;
+  };  
+
+  template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
+  __forceinline__ __MATX_HOST__ __MATX_DEVICE__ auto operator,(T l, S r)
+  {
+    return CommaOp(l, r);
+  }
+
   /**
  * Make a deep copy of a view into another view
  *
@@ -211,114 +270,6 @@ namespace matx
     copy(out, in_t, stream);
   };
 
-/**
- * Chain multiple operator statements
- *
- * Takes a variable list of operator statements to execute concurrently.
- * Chaining may improve performance over executing each operation separately.
- */
-#ifdef DOXYGEN_ONLY
-  template <typename T1>
-#else
-  template <typename... T1>
-#endif
-  class CHAIN : public BaseOp<CHAIN<T1...>>
-  {
-  public:
-    using scalar_type = void;
-
-    // Rank=0 accessor
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()() {}
-    // Rank=1 accessor
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) {}
-    // Rank=2 accessor
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j) {}
-    // Rank=3 accessor
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k) {}
-    // Rank=4 accessor
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
-    {
-    }
-
-    // Rank of chain. Purely for type annotations and has no meaning
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return -2; }
-    // Size of dimension. Purely for type annotations and has no meaning
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int) const { return 0; }
-  };
-
-  /**
- * Chain multiple operator statements
- *
- * Takes a variable list of operator statements to execute concurrently.
- * Chaining may improve performance over executing each operation separately.
- */
-  template <typename T1, typename... ARGS>
-  class CHAIN<T1, ARGS...> : public BaseOp<CHAIN<T1, ARGS...>>
-  {
-  private:
-    T1 op_;
-    CHAIN<ARGS...> args_;
-    std::array<index_t, MAX(get_rank<T1>(), get_rank<T1, ARGS...>())> size_;
-
-  public:
-    // Scalar type of operation
-    using scalar_type = void;
-
-    inline CHAIN(T1 op, ARGS... args) : op_(op), args_(args...)
-    {
-      static_assert((... && !is_tensor_view<decltype(args)>()),
-                    "Only operator emmitters are allowed in CHAIN. Tensor views "
-                    "are not allowed");
-      for (int32_t i = 0; i < Rank(); i++) {
-        index_t size1 = get_expanded_size<Rank()>(op_, i);
-        index_t size2 = get_expanded_size<Rank()>(args_, i);
-        size_[i] = MAX(size1, size2);      
-      }
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()()
-    {
-      get_value(op_);
-      args_.operator()();
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
-    {
-      get_value(op_, i);
-      args_.operator()(i);
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
-    {
-      get_value(op_, i, j);
-      args_.operator()(i, j);
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
-    {
-      get_value(op_, i, j, k);
-      args_.operator()(i, j, k);
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
-    {
-      get_value(op_, i, j, k, l);
-      args_.operator()(i, j, k, l);
-    }
-
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
-    {
-      return std::max({T1::Rank(), ARGS::Rank()...});
-    }
-
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
-    {
-      return size_[dim];
-    }
-  };
-
-  template <typename... Args>
-  CHAIN(Args...) -> CHAIN<Args...>;
 
   /**
  * Conditionally execute an operator
@@ -1763,7 +1714,9 @@ namespace matx
     {
       return size_[dim];
     }
-  };
+};
+
+
 
 // Returns an address of a pointer of type T aligned to new address
 template <typename T>
