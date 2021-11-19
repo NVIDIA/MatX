@@ -109,7 +109,7 @@ public:
    *    size of the data type itself, but only the product of the lengths of
    * each dimension
    */
-  inline index_t TotalSize() const noexcept
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() const noexcept
   {
     index_t size = 1;
     for (int i = 0; i < RANK; i++) {

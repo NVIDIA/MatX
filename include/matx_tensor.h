@@ -34,7 +34,7 @@
 
 #include <cinttypes>
 #include <cstdint>
-#include <cuda/std/atomic>
+#include <atomic>
 #include <iomanip>
 #include <numeric>
 #include <type_traits>
@@ -42,6 +42,7 @@
 #include "matx_allocator.h"
 #include "matx_error.h"
 #include "matx_shape.h"
+#include "matx_tensor_impl.h"
 #include "matx_type_utils.h"
 #include "matx_utility_kernels.cuh"
 #include "matx_tensor_utils.h"
@@ -52,8 +53,6 @@ static constexpr bool PRINT_ON_DEVICE = false;
 // forward declare
 namespace matx {
 template <typename T, int RANK> class tensor_t;
-
-template <typename T> class BaseOp;
 } // namespace matx
 
 /* Special values used to indicate properties of tensors */
@@ -74,145 +73,7 @@ enum {
 };
 #endif
 
-/**
- * Assignment from one operator/View into a View
- *
- * The set function is used in lieu of the assignment operator to avoid
- * ambiguity in certain scenarios. It can be used in the same scenarios
- * as the assignment operator.
- *
- * @tparam T
- *   Type of operator
- * @tparam RANK
- *   Rank of operator
- * @tparam Op
- *   Operator to use as input
- **/
-template <class T, int RANK, class Op>
-class set : public BaseOp<set<T, RANK, Op>> {
-private:
-  tensor_t<T, RANK> out_;
-  Op op_;
-  std::array<index_t, RANK> size_;
 
-public:
-  // Type specifier for reflection on class
-  using scalar_type = void;
-
-  /**
-   * Constructor to assign an operator to a view
-   *
-   * @param out
-   *   Output destination view
-   *
-   * @param op
-   *   Input operator
-   */
-  inline set(tensor_t<T, RANK> &out, const Op op) : out_(out), op_(op)
-  {
-    MATX_STATIC_ASSERT(get_rank<Op>() == -1 || Rank() == get_rank<Op>(),
-                       matxInvalidDim);
-    if constexpr (RANK > 0) {
-      for (int i = 0; i < RANK; i++) {
-        index_t size = get_expanded_size<Rank()>(op_, i);
-        size_[i] = out_.Size(i);
-        MATX_ASSERT_STR(
-            size == 0 || size == Size(i), matxInvalidSize,
-            "Size mismatch in source operator to destination tensor view");        
-      }
-    }
-  }
-
-  set &operator=(const set &) = delete;
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()() noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_))>) {
-      out_() = static_cast<float>(get_value(op_));
-    }
-    else {
-      out_() = get_value(op_);
-    }
-
-    return out_();
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i))>) {
-      out_(i) = static_cast<float>(get_value(op_, i));
-    }
-    else {
-      out_(i) = get_value(op_, i);
-    }
-
-    return out_(i);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j))>) {
-      out_(i, j) = static_cast<float>(get_value(op_, i, j));
-    }
-    else {
-      out_(i, j) = get_value(op_, i, j);
-    }
-
-    return out_(i, j);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j, k))>) {
-      out_(i, j, k) = static_cast<float>(get_value(op_, i, j, k));
-    }
-    else {
-      out_(i, j, k) = get_value(op_, i, j, k);
-    }
-
-    return out_(i, j, k);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k,
-                                    index_t l) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j, k, l))>) {
-      out_(i, j, k, l) = static_cast<float>(get_value(op_, i, j, k, l));
-    }
-    else {
-      out_(i, j, k, l) = get_value(op_, i, j, k, l);
-    }
-
-    return out_(i, j, k, l);
-  }
-
-  /**
-   * Get the rank of the operator
-   *
-   * @return
-   *   Rank of the operator
-   */
-  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
-
-  /**
-   * Get the rank of the operator along a single dimension
-   *
-   * @param dim
-   *   Dimension to retrieve size
-   * @return
-   *   Size of dimension
-   */
-  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
-  {
-    return size_[dim];
-  }
-};
 
 /**
  * View of an underlying tensor data object
@@ -227,7 +88,8 @@ public:
  * using multiple views on the same data. Failure to do so can result in race
  * conditions on the device or host.
  */
-template <typename T, int RANK> class tensor_t {
+template <typename T, int RANK> 
+class tensor_t : public tensor_impl_t<T,RANK> {
 public:
   // Type specifier for reflection on class
   using type = T; // TODO is this necessary
@@ -237,12 +99,24 @@ public:
   // Type specifier for signaling this is a matx operation
   using matxop = bool;
 
+
+  // /**
+  //  * @brief Conversion to basic tensor implementation
+  //  * 
+  //  */
+  // operator tensor_impl_t<T,RANK>() {
+  //   return tensor_impl_t<T, RANK>{ldata_, shape_, s_};
+  // }
+
   // Delete default constructor for ranks higher than 0
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
   tensor_t() = delete;
 
-  __MATX_HOST__ __MATX_DEVICE__ tensor_t<T, RANK>(tensor_t<T, RANK> const &rhs) noexcept
-      : data_(rhs.data_), ldata_(rhs.ldata_), shape_(rhs.shape_), s_(rhs.s_),
+  __MATX_HOST__ tensor_t<T, RANK>(tensor_t<T, RANK> const &rhs) noexcept
+      : tensor_impl_t<T,RANK>(rhs.ldata_, 
+          rhs.shape_, 
+          rhs.s_), 
+        data_(rhs.data_), 
         refcnt_(rhs.refcnt_)
   {
 #ifndef __CUDA_ARCH__
@@ -252,34 +126,33 @@ public:
 #endif
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ tensor_t<T, RANK>(tensor_t<T, RANK> const &&rhs) noexcept
-      : data_(rhs.data_), ldata_(rhs.ldata_), shape_(std::move(rhs.shape_)),
-        s_(rhs.s_), refcnt_(rhs.refcnt_)
-  {
-  }
+  __MATX_HOST__ tensor_t<T, RANK>(tensor_t<T, RANK> const &&rhs) noexcept
+      : tensor_impl_t<T,RANK>(rhs.ldata_, rhs.shape_, rhs.s_), 
+        data_(rhs.data_), 
+        refcnt_(rhs.refcnt_)  { }
 
   /** Perform a shallow copy of a tensor view
    *
-   * Alternative to operator= since it's used for lazu evaluation. This function
+   * Alternative to operator= since it's used for lazy evaluation. This function
    * is used to perform a shallow copy of a tensor view where the data pointer
    * points to the same location as the right hand side's data. *
    *
    * @param rhs
    *   Tensor to copy from
    */
-  __MATX_HOST__ __MATX_DEVICE__ void Shallow(const tensor_t<T, RANK> &rhs) noexcept
+  __MATX_HOST__ void Shallow(const tensor_t<T, RANK> &rhs) noexcept
   {
     data_ = rhs.data_;
-    ldata_ = rhs.ldata_;
-    shape_ = rhs.shape_;
-    s_ = rhs.s_;
+    this->ldata_ = rhs.ldata_;
+    this->shape_ = rhs.shape_;
+    this->s_ = rhs.s_;
     refcnt_ = rhs.refcnt_;
     if (refcnt_ != nullptr) {
       (*refcnt_)++;
     }
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ ~tensor_t()
+  inline __MATX_HOST__  ~tensor_t()
   {
 #ifndef __CUDA_ARCH__
     Free();
@@ -303,8 +176,10 @@ public:
    *   Data pointer
    */
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  tensor_t(T *const data, cuda::std::atomic<uint32_t> *refcnt = nullptr) :
-    data_(data), ldata_(data), refcnt_(refcnt)
+  tensor_t(T *const data, std::atomic<uint32_t> *refcnt = nullptr) :
+    tensor_impl_t<T,RANK>(data), 
+    data_(data), 
+    refcnt_(refcnt)
   {
 #ifndef __CUDA_ARCH__
     if (refcnt != nullptr) {
@@ -319,22 +194,9 @@ public:
    * @param shape
    *   Tensor shape
    */
-  inline tensor_t(tensorShape_t<RANK> const &shape) : shape_(shape)
+  inline tensor_t(tensorShape_t<RANK> const &shape) :
+    tensor_impl_t<T, RANK>(shape)
   {
-    for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                      "Must specify size larger than 0 for each dimension");
-    }
-
-    if constexpr (RANK >= 1) {
-      s_[RANK - 1] = 1;
-    }
-
-#pragma unroll
-    for (int i = RANK - 2; i >= 0; i--) {
-      s_[i] = s_[i + 1] * shape_.Size(i + 1);
-    }
-
     Allocate();
   }
 
@@ -348,15 +210,9 @@ public:
    */
   inline tensor_t(tensorShape_t<RANK> const &shape,
                   const index_t (&strides)[RANK])
-      : shape_(shape)
+      : tensor_impl_t<T,RANK>(shape, strides)
   {
-    for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                      "Must specify size larger than 0 for each dimension");
-    }
-
     Allocate();
-    memcpy((void *)s_.data(), (void *)strides, s_.size() * sizeof(index_t));
   }
 
   /**
@@ -385,23 +241,11 @@ public:
    */
   inline tensor_t(T *const data, T *const ldata,
                   const tensorShape_t<RANK> &shape,
-                  cuda::std::atomic<uint32_t> *refcnt)
-      : data_(data), ldata_(ldata), shape_(shape), refcnt_(refcnt)
+                  std::atomic<uint32_t> *refcnt)
+      : tensor_impl_t<T,RANK>(ldata, shape),
+        data_(data), 
+        refcnt_(refcnt)
   {
-    for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                      "Must specify size larger than 0 for each dimension");
-    }
-
-    if constexpr (RANK >= 1) {
-      s_[RANK - 1] = 1;
-    }
-
-#pragma unroll
-    for (int i = RANK - 2; i >= 0; i--) {
-      s_[i] = s_[i + 1] * shape_.Size(i + 1);
-    }
-
 #ifndef __CUDA_ARCH__
     if (refcnt != nullptr) {
       (*refcnt)++;
@@ -464,16 +308,11 @@ public:
   inline tensor_t(T *const data, T *const ldata,
                   tensorShape_t<RANK> const &shape,
                   const index_t (&strides)[RANK],
-                  cuda::std::atomic<uint32_t> *refcnt = nullptr)
-      : data_(data), ldata_(ldata), shape_(shape), refcnt_(refcnt)
+                  std::atomic<uint32_t> *refcnt = nullptr)
+      : tensor_impl_t<T,RANK>(ldata, shape, strides),
+        data_(data), 
+        refcnt_(refcnt)
   {
-    for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                      "Must specify size larger than 0 for each dimension");
-    }
-
-    memcpy((void *)s_.data(), (void *)strides, s_.size() * sizeof(index_t));
-
 #ifndef __CUDA_ARCH__
     if (refcnt != nullptr) {
       (*refcnt)++;
@@ -500,353 +339,358 @@ public:
   {
   }
 
-  /**
-   * Lazy assignment operator=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, op);
-  }
-  /**
-   * Lazy assignment operator=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator=(const T2 &op)
-  {
-    return set(*this, op);
-  }
 
-  /**
-   * Lazy assignment operator+=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator+=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this + op);
-  }
+    // Lazy operators
+    /**
+     * Lazy assignment operator=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, op);
+    }
+    /**
+     * Lazy assignment operator=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, op_base);
+    }
 
-  /**
-   * Lazy assignment operator+=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator+=(const T2 &op)
-  {
-    return set(*this, *this + op);
-  }
+    /**
+     * Lazy assignment operator+=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator+=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this + op);
+    }
 
-  /**
-   * Lazy assignment operator-=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator-=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this - op);
-  }
+    /**
+     * Lazy assignment operator+=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator+=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this + op_base);
+    }
 
-  /**
-   * Lazy assignment operator-=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator-=(const T2 &op)
-  {
-    return set(*this, *this - op);
-  }
+    /**
+     * Lazy assignment operator-=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator-=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this - op);
+    }
 
-  /**
-   * Lazy assignment operator*=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator*=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this * op);
-  }
+    /**
+     * Lazy assignment operator-=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator-=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this - op_base);
+    }
 
-  /**
-   * Lazy assignment operator*=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator*=(const T2 &op)
-  {
-    return set(*this, *this * op);
-  }
+    /**
+     * Lazy assignment operator*=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator*=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this * op);
+    }
 
-  /**
-   * Lazy assignment operator/=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator/=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this / op);
-  }
+    /**
+     * Lazy assignment operator*=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator*=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this * op_base);
+    }
 
-  /**
-   * Lazy assignment operator/=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator/=(const T2 &op)
-  {
-    return set(*this, *this / op);
-  }
+    /**
+     * Lazy assignment operator/=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator/=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this / op);
+    }
 
-  /**
-   * Lazy assignment operator<<=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this << op);
-  }
+    /**
+     * Lazy assignment operator/=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator/=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this / op_base);
+    }
 
-  /**
-   * Lazy assignment operator<<=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const T2 &op)
-  {
-    return set(*this, *this << op);
-  }
+    /**
+     * Lazy assignment operator<<=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this << op);
+    }
 
-  /**
-   * Lazy assignment operator>>=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this >> op);
-  }
+    /**
+     * Lazy assignment operator<<=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this << op_base);
+    }
 
-  /**
-   * Lazy assignment operator>>=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const T2 &op)
-  {
-    return set(*this, *this >> op);
-  }
+    /**
+     * Lazy assignment operator>>=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this >> op);
+    }
 
-  /**
-   * Lazy assignment operator|=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator|=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this | op);
-  }
+    /**
+     * Lazy assignment operator>>=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this >> op_base);
+    }
 
-  /**
-   * Lazy assignment operator|=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator|=(const T2 &op)
-  {
-    return set(*this, *this | op);
-  }
+    /**
+     * Lazy assignment operator|=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator|=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this | op);
+    }
 
-  /**
-   * Lazy assignment operator&=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator&=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this & op);
-  }
+    /**
+     * Lazy assignment operator|=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator|=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this | op_base);
+    }
 
-  /**
-   * Lazy assignment operator&=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator&=(const T2 &op)
-  {
-    return set(*this, *this & op);
-  }
+    /**
+     * Lazy assignment operator&=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator&=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this & op);
+    }
 
-  /**
-   * Lazy assignment operator^=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator^=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this ^ op);
-  }
+    /**
+     * Lazy assignment operator&=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator&=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this & op_base);
+    }
 
-  /**
-   * Lazy assignment operator^=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator^=(const T2 &op)
-  {
-    return set(*this, *this ^ op);
-  }
+    /**
+     * Lazy assignment operator^=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator^=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this ^ op);
+    }
 
-  /**
-   * Lazy assignment operator%=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Tensor view source
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  [[nodiscard]] inline __MATX_HOST__ auto operator%=(const tensor_t<T, RANK> &op)
-  {
-    return set(*this, *this % op);
-  }
+    /**
+     * Lazy assignment operator^=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator^=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+      return set(*this, *this ^ op_base);
+    }
 
-  /**
-   * Lazy assignment operator%=. Used to create a "set" object for deferred
-   * execution on a device
-   *
-   * @param op
-   *   Operator or scalar type to assign
-   *
-   * @returns set object containing the destination view and source object
-   *
-   */
-  template <typename T2>
-  [[nodiscard]] inline __MATX_HOST__ auto operator%=(const T2 &op)
-  {
-    return set(*this, *this % op);
-  }
+    /**
+     * Lazy assignment operator%=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] inline __MATX_HOST__ auto operator%=(const tensor_t<T, RANK> &op)
+    {
+        return set(*this, *this % op);
+    }
 
-  /**
-   * Get the shape the tensor from the underlying data
-   *
-   * @return
-   *    A shape of the data with the appropriate dimensions set
-   */
-  inline tensorShape_t<RANK> Shape() const noexcept { return shape_; }
+    /**
+     * Lazy assignment operator%=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Operator or scalar type to assign
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    template <typename T2>
+    [[nodiscard]] inline __MATX_HOST__ auto operator%=(const T2 &op)
+    {
+      const typename base_type<T2>::type &op_base = op;
+        return set(*this, *this % op_base);
+    }
 
   /**
    * Get a view of the tensor from the underlying data using a custom shape
@@ -932,10 +776,10 @@ public:
     }
 
     for (int i = RANK - 2; i >= 0; i--) {
-      strides[i] = strides[i + 1] * Size(i + 1);
+      strides[i] = strides[i + 1] * this->Size(i + 1);
     }
 
-    return tensor_t<T, RANK>(data_, data_, shape_, strides, refcnt_);
+    return tensor_t<T, RANK>(data_, data_, this->shape_, strides, refcnt_);
   }
 
   /**
@@ -952,7 +796,7 @@ public:
   {
     int dev;
     cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(data_, TotalSize() * sizeof(T), dev, stream);
+    cudaMemPrefetchAsync(data_, this->TotalSize() * sizeof(T), dev, stream);
   }
 
   /**
@@ -967,7 +811,7 @@ public:
    */
   inline void PrefetchHost(cudaStream_t const stream) const noexcept
   {
-    cudaMemPrefetchAsync(data_, TotalSize() * sizeof(T), cudaCpuDeviceId,
+    cudaMemPrefetchAsync(data_, this->TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
 
@@ -992,7 +836,7 @@ public:
     index_t strides[RANK];
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
-      strides[i] = s_[i];
+      strides[i] = this->s_[i];
     }
 
     if constexpr (RANK > 0) {
@@ -1002,7 +846,7 @@ public:
       }
     }
 
-    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, shape_,
+    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, this->shape_,
                                 strides, refcnt_);
   }
 
@@ -1027,7 +871,7 @@ public:
     index_t strides[RANK];
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
-      strides[i] = s_[i];
+      strides[i] = this->s_[i];
     }
 
     if constexpr (RANK > 0) {
@@ -1037,7 +881,7 @@ public:
       }
     }
 
-    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, shape_,
+    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, this->shape_,
                                 strides, refcnt_);
   }
 
@@ -1076,8 +920,8 @@ public:
       MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
                       "Cannot list the same dimension to permute twice");
       done[d] = true;
-      n[i] = Size(d);
-      s[i] = s_[d];
+      n[i] = this->Size(d);
+      s[i] = this->s_[d];
     }
 
     return tensor_t(data_, data_, n, s, refcnt_);
@@ -1119,7 +963,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __MATX_HOST__ __MATX_DEVICE__ inline T *Data() const noexcept { return ldata_; }
+  __MATX_HOST__ inline T *Data() const noexcept { return this->ldata_; }
 
   /**
    * Set the underlying data pointer from the view
@@ -1135,7 +979,7 @@ public:
    *
    */
   __MATX_HOST__ inline void
-  SetData(T *const data, cuda::std::atomic<uint32_t> *refcnt = nullptr) noexcept
+  SetData(T *const data, std::atomic<uint32_t> *refcnt = nullptr) noexcept
   {
     SetData(data, data, refcnt);
   }
@@ -1157,26 +1001,18 @@ public:
    */
   __MATX_HOST__ inline void
   SetData(T *const data, T *const ldata,
-          cuda::std::atomic<uint32_t> *refcnt = nullptr) noexcept
+          std::atomic<uint32_t> *refcnt = nullptr) noexcept
   {
     Free();
 
     data_ = data;
-    ldata_ = ldata;
+    this->ldata_ = ldata;
 
     refcnt_ = refcnt;
     if (refcnt_ != nullptr) {
       (*refcnt_)++;
     }
   }
-
-  /**
-   * Get the rank of the tensor
-   *
-   * @returns Rank of the tensor
-   *
-   */
-  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
   /**
    * Get the reference count
@@ -1194,51 +1030,6 @@ public:
   }
 
   /**
-   * Get the size of a single dimension of the tensor
-   *
-   * @param dim
-   *   Desired dimension
-   *
-   * @returns Number of elements in dimension
-   *
-   */
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const noexcept
-  {
-    return shape_.Size(dim);
-  }
-
-  /**
-   * Get the size of the last dimension
-   *
-   * @return
-   *    The size of the dimension
-   */
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Lsize() const noexcept
-  {
-    return shape_.Size(Rank() - 1);
-  }
-
-  /**
-   * Check if a tensor is linear in memory for all elements in the view
-   *
-   * @return
-   *    The size of the dimension
-   */
-  inline __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
-  {
-    index_t ttl = 1;
-    for (int i = RANK - 1; i >= 0; i--) {
-      if (s_[i] != ttl) {
-        return false;
-      }
-
-      ttl *= shape_.Size(i);
-    }
-
-    return true;
-  }
-
-  /**
    * Get the stride of a single dimension of the tensor
    *
    * @param dim
@@ -1252,306 +1043,12 @@ public:
   {
 #else
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Stride(uint32_t dim) const
+  inline __MATX_HOST__ index_t Stride(uint32_t dim) const
   {
 #endif
-    return s_[dim];
+    return this->s_[dim];
   }
 
-  /**
-   * Get the total number of elements in the tensor
-   *
-   *
-   * @returns Total number of elements across all dimensions
-   *
-   */
-  inline index_t TotalSize() const noexcept { return shape_.TotalSize(); }
-
-  /**
-   * operator() getter with an array index
-   *
-   * @returns value in tensor
-   *
-   */
-  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(const std::array<index_t, RANK> &idx) const noexcept
-  {
-    if constexpr (RANK == 1) {
-      return this->operator()(idx[0]);
-    }
-    else if constexpr (RANK == 2) {
-      return this->operator()(idx[0], idx[1]);
-    }
-    else if constexpr (RANK == 3) {
-      return this->operator()(idx[0], idx[1], idx[2]);
-    }
-    else if constexpr (RANK == 4) {
-      return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-    }            
-  }  
-
-  /**
-   * operator() setter with an array index
-   *
-   * @returns value in tensor
-   *
-   */
-  template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
-  {
-    if constexpr (RANK == 1) {
-      return this->operator()(idx[0]);
-    }
-    else if constexpr (RANK == 2) {
-      return this->operator()(idx[0], idx[1]);
-    }
-    else if constexpr (RANK == 3) {
-      return this->operator()(idx[0], idx[1], idx[2]);
-    }
-    else if constexpr (RANK == 4) {
-      return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-    }            
-  }    
-
-  /**
-   * Rank-0 operator() getter
-   *
-   * @returns value in tensor
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
-  {
-#endif
-    return *ldata_;
-  }
-
-  /**
-   * Rank-0 operator() setter
-   *
-   * @returns reference to value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
-  {
-#endif
-    return *ldata_;
-  }
-
-  /**
-   * Rank-1 operator() getter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @returns value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0);
-  }
-
-  /**
-   * Rank-1 operator() setter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @returns reference to value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0);
-  }
-
-  /**
-   * Rank-2 operator() getter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @returns value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
-                                          index_t id1) const noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
-                                                 index_t id1) const noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1);
-  }
-
-  /**
-   * Rank-2 operator() setter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @returns reference to value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1);
-  }
-
-  /**
-   * Rank-3 operator() getter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @param id2
-   *   Index into third dimension
-   *
-   * @returns value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
-                                          index_t id2) const noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
-                                                 index_t id2) const noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
-  }
-
-  /**
-   * Rank-3 operator() setter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @param id2
-   *   Index into third dimension
-   *
-   * @returns reference to value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
-                                    index_t id2) noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
-                                           index_t id2) noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
-  }
-
-  /**
-   * Rank-4 operator() getter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @param id2
-   *   Index into third dimension
-   *
-   * @param id3
-   *   Index into fourth dimension
-   *
-   * @returns value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1, index_t id2,
-                                          index_t id3) const noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ const T &
-  operator()(index_t id0, index_t id1, index_t id2, index_t id3) const noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
-  }
-
-  /**
-   * Rank-4 operator() setter
-   *
-   * @param id0
-   *   Index into first dimension
-   *
-   * @param id1
-   *   Index into second dimension
-   *
-   * @param id2
-   *   Index into third dimension
-   *
-   * @param id3
-   *   Index into fourth dimension
-   *
-   * @returns reference to value at given index
-   *
-   */
-#ifdef DOXYGEN_ONLY
-  __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1, index_t id2,
-                                    index_t id3) noexcept
-  {
-#else
-  template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
-                                           index_t id2, index_t id3) noexcept
-  {
-#endif
-    return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
-  }
 
   /**
    * Create an overlapping tensor view
@@ -1604,7 +1101,7 @@ public:
     // Figure out the actual length of the signal we can use. It might be
     // shorter than the original tensor if the window/stride doesn't line up
     // properly to make a rectangular matrix.
-    index_t adj_el = Size(0) - window_size;
+    index_t adj_el = this->Size(0) - window_size;
     while ((adj_el % stride_size) != 0) {
       adj_el--;
     }
@@ -1659,12 +1156,12 @@ public:
       index_t size = clones[i];
 
       if (size == matxKeepDim) {
-        n[i] = Size(d);
+        n[i] = this->Size(d);
         if constexpr (RANK == 0) {
           s[i] = 1;
         }
         else {
-          s[i] = s_[d];
+          s[i] = this->s_[d];
         }
         d++;
       }
@@ -1945,15 +1442,15 @@ public:
 
       MATX_ASSERT_STR(first < end, matxInvalidParameter,
                       "Starting slice must be less than end slice");
-      MATX_ASSERT_STR(first < Size(i), matxInvalidParameter,
+      MATX_ASSERT_STR(first < this->Size(i), matxInvalidParameter,
                       "Index to slice is larger than the tensor rank");
 
       // offset by first
-      data += first * s_[i];
+      data += first * this->s_[i];
 
       if (end != matxDropDim) {
         if (end == matxEnd) {
-          n[d] = Size(i) - first;
+          n[d] = this->Size(i) - first;
         }
         else {
           n[d] = end - first;
@@ -1963,7 +1460,7 @@ public:
         n[d] = static_cast<index_t>(std::ceil(
             static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
 
-        s[d] = s_[i] * stride_mult;
+        s[d] = this->s_[i] * stride_mult;
         d++;
       }
     }
@@ -2019,7 +1516,7 @@ public:
    * @return
    *    The size (in bytes) of all dimensions combined
    */
-  inline size_t Bytes() const noexcept { return sizeof(T) * TotalSize(); };
+  inline size_t Bytes() const noexcept { return sizeof(T) * this->TotalSize(); };
 
   /**
    * Print a value
@@ -2028,7 +1525,7 @@ public:
    *
    * @param val
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ void PrintVal(const T &val) const noexcept
+  inline __MATX_HOST__ void PrintVal(const T &val) const noexcept
   {
     if constexpr (is_complex_v<T>) {
       printf("%.4f%+.4fj ", static_cast<float>(val.real()),
@@ -2076,7 +1573,7 @@ public:
    *
    */
   template <typename ... Args>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(Args ...dims) const noexcept
+  __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
   {
     MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
 
@@ -2086,7 +1583,7 @@ public:
     }
     else if constexpr (sizeof...(Args) == 1) {
       auto& k = pp_get<0>(dims...);
-      for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
+      for (index_t _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
         printf("%06lld: ", _k);
         PrintVal(this->operator()(_k));
         printf("\n");
@@ -2095,8 +1592,8 @@ public:
     else if constexpr (sizeof...(Args) == 2) {
       auto& k = pp_get<0>(dims...);
       auto& l = pp_get<1>(dims...);
-      for (index_t _k = 0; _k < ((k == 0) ? Size(0) : k); _k++) {
-        for (index_t _l = 0; _l < ((l == 0) ? Size(1) : l); _l++) {
+      for (index_t _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
+        for (index_t _l = 0; _l < ((l == 0) ? this->Size(1) : l); _l++) {
           if (_l == 0)
             printf("%06lld: ", _k);
 
@@ -2109,10 +1606,10 @@ public:
       auto& j = pp_get<0>(dims...);
       auto& k = pp_get<1>(dims...);
       auto& l = pp_get<2>(dims...);
-      for (index_t _j = 0; _j < ((j == 0) ? Size(0) : j); _j++) {
+      for (index_t _j = 0; _j < ((j == 0) ? this->Size(0) : j); _j++) {
         printf("[%06lld,:,:]\n", _j);
-        for (index_t _k = 0; _k < ((k == 0) ? Size(1) : k); _k++) {
-          for (index_t _l = 0; _l < ((l == 0) ? Size(2) : l); _l++) {
+        for (index_t _k = 0; _k < ((k == 0) ? this->Size(1) : k); _k++) {
+          for (index_t _l = 0; _l < ((l == 0) ? this->Size(2) : l); _l++) {
             if (_l == 0)
               printf("%06lld: ", _k);
 
@@ -2128,11 +1625,11 @@ public:
       auto& j = pp_get<1>(dims...);
       auto& k = pp_get<2>(dims...);
       auto& l = pp_get<3>(dims...); 
-      for (index_t _i = 0; _i < ((i == 0) ? Size(0) : i); _i++) {
-        for (index_t _j = 0; _j < ((j == 0) ? Size(1) : j); _j++) {
+      for (index_t _i = 0; _i < ((i == 0) ? this->Size(0) : i); _i++) {
+        for (index_t _j = 0; _j < ((j == 0) ? this->Size(1) : j); _j++) {
           printf("[%06lld,%06lld,:,:]\n", _i, _j);
-          for (index_t _k = 0; _k < ((k == 0) ? Size(2) : k); _k++) {
-            for (index_t _l = 0; _l < ((l == 0) ? Size(3) : l); _l++) {
+          for (index_t _k = 0; _k < ((k == 0) ? this->Size(2) : k); _k++) {
+            for (index_t _l = 0; _l < ((l == 0) ? this->Size(3) : l); _l++) {
               if (_l == 0)
                 printf("%06lld: ", _k);
 
@@ -2185,7 +1682,7 @@ public:
    */
   __forceinline__ std::array<index_t, RANK> GetIdxFromAbs(index_t abs) {
     std::array<index_t, RANK> indices;
-    std::array sh = shape_.AsArray();
+    std::array<index_t, RANK> sh = this->shape_.AsArray();
     
     for (int idx = 0; idx < RANK; idx++) {
       if (idx == RANK-1) {
@@ -2211,8 +1708,8 @@ private:
   {
     matxAlloc((void **)&data_, Bytes());
     MATX_ASSERT(data_ != NULL, matxOutOfMemory);
-    ldata_ = data_;
-    refcnt_ = new cuda::std::atomic<uint32_t>{1};
+    this->ldata_ = data_;
+    refcnt_ = new std::atomic<uint32_t>{1};
   }
 
   /**
@@ -2234,11 +1731,8 @@ private:
     }
   };
 
-  T *data_; // Local data pointer to this tensor view
-  T *ldata_;
-  cuda::std::atomic<uint32_t> *refcnt_;
-  tensorShape_t<RANK> shape_;
-  std::array<index_t, RANK> s_; // +1 to avoid zero sized array
+  T *data_; // Starting data pointer to this tensor view
+  std::atomic<uint32_t> *refcnt_;
 };
 
 
@@ -2250,7 +1744,7 @@ private:
  *
  **/
 template <typename T>
-tensor_t<T,0> make_tensor() {
+auto make_tensor() {
   return tensor_t<T,0>{};
 }
 
@@ -2261,7 +1755,7 @@ tensor_t<T,0> make_tensor() {
  *   Pointer to device data
  **/
 template <typename T>
-tensor_t<T,0> make_tensor(T *const data) {
+auto make_tensor(T *const data) {
   return tensor_t<T,0>{data};
 }
 
@@ -2272,7 +1766,7 @@ tensor_t<T,0> make_tensor(T *const data) {
  *   Shape of tensor
  **/
 template <typename T, int RANK>
-tensor_t<T,RANK> make_tensor(const index_t (&shape)[RANK]) {
+auto make_tensor(const index_t (&shape)[RANK]) {
   return tensor_t<T,RANK>{shape};
 }
 
@@ -2285,7 +1779,7 @@ tensor_t<T,RANK> make_tensor(const index_t (&shape)[RANK]) {
  *   Strides of tensor
  **/
 template <typename T, int RANK>
-tensor_t<T,RANK> make_tensor(const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {
+auto make_tensor(const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {
   return tensor_t<T,RANK>{shape, strides};
 }
 
@@ -2318,5 +1812,6 @@ template <typename T, int RANK>
 tensor_t<T,RANK> make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {
   return tensor_t<T,RANK>{data, shape, strides};
 }
+
 
 } // end namespace matx

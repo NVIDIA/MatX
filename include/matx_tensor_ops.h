@@ -45,31 +45,6 @@
 namespace matx
 {
 
-  template <typename T>
-  class BaseOp
-  {
-  public:
-    using matxop = bool;
-
-    // Launch work in the stream
-    void run(cudaStream_t stream = 0) noexcept
-    {
-      exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
-    }
-
-    // Record an event after the work
-    void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
-    {
-      exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
-      cudaEventRecord(ev, stream);
-    }
-
-    template <typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true>
-    void run (Ex ex) {
-      exec(*static_cast<T *>(this), ex);
-    }
-  };
-
   // Doxygen doesn't recognize the syntax of these
   template <typename T, typename S>
   inline
@@ -138,8 +113,8 @@ namespace matx
           return op2_.Size(dim);
         }        
     private:
-        Op1 op1_;
-        Op2 op2_;
+        typename base_type<Op1>::type op1_;
+        typename base_type<Op2>::type op2_;
   };  
 
   template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
@@ -167,7 +142,7 @@ namespace matx
  *   CUDA stream to operate in
  */
   template <class T, int Rank>
-  inline void copy(tensor_t<T, Rank> out, const tensor_t<T, Rank> &in,
+  inline void copy(tensor_impl_t<T, Rank> out, const tensor_impl_t<T, Rank> &in,
                    const cudaStream_t stream)
   {
     constexpr int rank = Rank;
@@ -177,7 +152,7 @@ namespace matx
       MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
     }
 
-    (out = self(in)).run(stream);
+    (out = in).run(stream);
   };
 
   /**
@@ -200,8 +175,8 @@ namespace matx
  *
  */
   template <class T, int RANK>
-  inline void transpose(tensor_t<T, RANK> &out,
-                        const tensor_t<T, RANK> &in,
+  inline void transpose(tensor_impl_t<T, RANK> &out,
+                        const tensor_impl_t<T, RANK> &in,
                         const cudaStream_t stream)
   {
 
@@ -260,7 +235,7 @@ namespace matx
  *
  */
   template <class T, int Rank>
-  inline void permute(tensor_t<T, Rank> &out, const tensor_t<T, Rank> &in,
+  inline void permute(tensor_impl_t<T, Rank> &out, const tensor_impl_t<T, Rank> &in,
                       const std::initializer_list<uint32_t> &dims,
                       const cudaStream_t stream)
   {
@@ -286,8 +261,8 @@ namespace matx
   class IF : public BaseOp<IF<T1, T2>>
   {
   private:
-    T1 cond_;
-    T2 op_;
+    typename base_type<T1>::type cond_;
+    typename base_type<T2>::type op_;
     std::array<index_t, MAX(get_rank<T1>(), get_rank<T2>())> size_;
 
   public:
@@ -367,9 +342,9 @@ namespace matx
   class IFELSE : public BaseOp<IFELSE<C1, T1, T2>>
   {
   private:
-    C1 cond_;
-    T1 op1_;
-    T2 op2_;
+    typename base_type<C1>::type cond_;
+    typename base_type<T1>::type op1_;
+    typename base_type<T2>::type op2_;    
     std::array<index_t, MAX(get_rank<C1>(), get_rank<T1>(), get_rank<T2>())> size_;
 
   public:
@@ -460,7 +435,7 @@ namespace matx
   class ReverseOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -521,7 +496,7 @@ namespace matx
  * Requires a tensor of at least rank 1
  */
   template <typename T1>
-  auto reverseX(T1 t)
+  auto __forceinline__ reverseX(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 0, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 1>(t);
@@ -534,7 +509,7 @@ namespace matx
  * Requires a tensor of at least rank 2
  */
   template <typename T1>
-  auto reverseY(T1 t)
+  auto __forceinline__ reverseY(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 1, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 2>(t);
@@ -547,7 +522,7 @@ namespace matx
  * Requires a tensor of at least rank 3
  */
   template <typename T1>
-  auto reverseZ(T1 t)
+  auto __forceinline__ reverseZ(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 2, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 3>(t);
@@ -559,7 +534,7 @@ namespace matx
  * Requires a tensor of rank 4
  */
   template <typename T1>
-  auto reverseW(T1 t)
+  auto __forceinline__ reverseW(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 3, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 4>(t);
@@ -569,7 +544,7 @@ namespace matx
  * Flip the vertical axis of a tensor.
  */
   template <typename T1>
-  auto flipud(T1 t)
+  auto __forceinline__ flipud(T1 t)
   {
     if constexpr (T1::Rank() == 1)
     {
@@ -583,7 +558,7 @@ namespace matx
  * Flip the horizontal axis of a tensor.
  */
   template <typename T1>
-  auto fliplr(T1 t)
+  auto __forceinline__ fliplr(T1 t)
   {
     if constexpr (T1::Rank() == 1)
     {
@@ -603,8 +578,8 @@ namespace matx
   class HermitianTransOp
   {
   private:
-    T1 op_;
-
+    typename base_type<T1>::type op_;
+    
   public:
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
@@ -640,7 +615,7 @@ namespace matx
  * Helper function for creating a hermitian transpose from an operator/View
  */
   template <typename T1>
-  auto hermitianT(T1 t)
+  auto __forceinline__ hermitianT(T1 t)
   {
     return HermitianTransOp<T1, T1::Rank()>(t);
   }
@@ -657,7 +632,7 @@ namespace matx
   class DiagOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -723,7 +698,7 @@ namespace matx
  *   Input operator
  */
   template <typename T1>
-  auto diag(T1 t) { return DiagOp<T1, T1::Rank()>(t); }
+  auto __forceinline__ diag(T1 t) { return DiagOp<T1, T1::Rank()>(t); }
 
   /**
  * Kronecker tensor product
@@ -736,8 +711,8 @@ namespace matx
   class KronOp
   {
   private:
-    T1 op1_;
-    T2 op2_;
+    typename base_type<T1>::type op1_;
+    typename base_type<T2>::type op2_;
 
   public:
     using matxop = bool;
@@ -794,7 +769,7 @@ namespace matx
  *   New operator of the kronecker product
  */
   template <typename T1, typename T2>
-  auto kron(T1 a, T2 b)
+  auto __forceinline__ kron(T1 a, T2 b)
   {
     return KronOp<T1, T2, T1::Rank()>(a, b);
   };
@@ -812,7 +787,7 @@ namespace matx
   class RepMatOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
     index_t reps_[MAX_TENSOR_DIM];
 
   public:
@@ -883,7 +858,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto repmat(T1 t, index_t reps)
+  auto __forceinline__ repmat(T1 t, index_t reps)
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -902,7 +877,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto repmat(T1 t, const index_t (&reps)[])
+  auto __forceinline__ repmat(T1 t, const index_t (&reps)[])
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -921,7 +896,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto repmat(T1 t, const index_t *reps)
+  auto __forceinline__ repmat(T1 t, const index_t *reps)
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -936,7 +911,7 @@ namespace matx
   class SelfOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -994,7 +969,7 @@ namespace matx
   class ShiftOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
     index_t shift_;
     index_t base_;
 
@@ -1086,7 +1061,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto shift0(T1 t, index_t s)
+  auto __forceinline__ shift0(T1 t, index_t s)
   {
     return ShiftOp<T1, 0>(t, s);
   };
@@ -1105,7 +1080,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto shift1(T1 t, index_t s)
+  auto __forceinline__ shift1(T1 t, index_t s)
   {
     return ShiftOp<T1, 1>(t, s);
   };
@@ -1124,7 +1099,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto shift2(T1 t, index_t s)
+  auto __forceinline__ shift2(T1 t, index_t s)
   {
     return ShiftOp<T1, 2>(t, s);
   };
@@ -1143,7 +1118,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto shift3(T1 t, index_t s)
+  auto __forceinline__ shift3(T1 t, index_t s)
   {
     return ShiftOp<T1, 3>(t, s);
   };
@@ -1152,7 +1127,7 @@ namespace matx
   class FFTShift1DOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1219,7 +1194,7 @@ namespace matx
   class FFTShift2DOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1287,7 +1262,7 @@ namespace matx
   class IFFTShift1DOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1355,7 +1330,7 @@ namespace matx
   class IFFTShift2DOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1426,8 +1401,8 @@ namespace matx
   class matxUnaryOp
   {
   private:
-    I1 in1_;
-    Op op_;
+    typename base_type<I1>::type in1_;
+    typename base_type<Op>::type op_;
     std::array<index_t, get_rank<I1>()> size_;
 
   public:
@@ -1485,7 +1460,7 @@ namespace matx
   class ComplexPlanarOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1571,7 +1546,7 @@ namespace matx
   class ComplexInterleavedOp
   {
   private:
-    T1 op_;
+    typename base_type<T1>::type op_;
 
   public:
     using matxop = bool;
@@ -1645,9 +1620,9 @@ namespace matx
   class matxBinaryOp
   {
   private:
-    I1 in1_;
-    I2 in2_;
-    Op op_;
+    typename base_type<I1>::type in1_;
+    typename base_type<I2>::type in2_;
+    typename base_type<Op>::type op_;
     std::array<index_t, MAX(get_rank<I1>(), get_rank<I2>())> size_;
 
   public:
@@ -1738,7 +1713,7 @@ constexpr inline __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
   {                                                                 \
     using I1Type = extract_scalar_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
-    return matxUnaryOp<I1, Op>(i1, Op());                           \
+    return matxUnaryOp(i1, Op());                           \
   }
 
 #define DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
@@ -1750,7 +1725,7 @@ constexpr inline __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
     using I1Type = extract_scalar_type_t<I1>;                        \
     using I2Type = extract_scalar_type_t<I2>;                        \
     using Op = TENSOR_OP<I1Type, I2Type>;                            \
-    return matxBinaryOp<I1, I2, Op>(i1, i2, Op());                   \
+    return matxBinaryOp(i1, i2, Op());                   \
   }
 
 #ifdef DOXYGEN_ONLY
