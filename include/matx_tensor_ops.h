@@ -368,10 +368,10 @@ namespace matx
           index_t size0 = get_expanded_size<Rank()>(cond_, i);
           index_t size1 = get_expanded_size<Rank()>(op1, i);
           index_t size2 = get_expanded_size<Rank()>(op2, i);
+          size_[i] = MAX(size0, size1, size2);
           MATX_ASSERT(size0 == 0 || size0 == Size(i), matxInvalidSize);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
-          MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
-          size_[i] = MAX(size0, size1, size2);
+          MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);          
         }
       }
     }
