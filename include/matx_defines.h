@@ -58,6 +58,12 @@ static_assert(false, "Must choose either 64-bit or 32-bit index mode");
     #define __MATX_DEVICE__ __device__
 #endif
 
-
+#ifdef __GNUC__ 
+    #define __MATX_INLINE__ __attribute__((always_inline)) inline
+#elif __CUDACC__
+    #define __MATX_INLINE__ __forceinline__ 
+#else
+    #define __MATX_INLINE__ inline
+#endif
 
 }
