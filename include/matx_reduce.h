@@ -1207,7 +1207,9 @@ void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline argmax(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   reduce(dest, idest, in, reduceOpMax<T>(), stream, true);
+#endif  
 }
 
 /**
@@ -1264,7 +1266,9 @@ void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
 template <typename T, int RANK, typename InType>
 void inline argmin(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
 {
+#ifdef __CUDACC__  
   reduce(dest, idest, in, reduceOpMin<T>(), stream, true);
+#endif  
 }
 
 /**

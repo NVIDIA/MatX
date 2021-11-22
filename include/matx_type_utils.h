@@ -86,6 +86,18 @@ template <typename T> constexpr bool is_executor_t()
   return is_executor<T>::value;
 }
 
+template <typename T, int RANK> class tensor_t;
+template <typename T, int RANK> class tensor_impl_t;
+// Traits for casting down to impl tensor conditionally
+template <typename T> struct base_type {
+  using type = T;
+};
+
+template <typename T, int RANK> 
+struct base_type<tensor_t<T, RANK>> {
+  using type = tensor_impl_t<T, RANK>;
+};
+
 template <typename T, typename = void>
 struct is_matx_reduction_impl : std::false_type {
 };

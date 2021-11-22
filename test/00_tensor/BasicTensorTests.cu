@@ -130,31 +130,31 @@ TYPED_TEST(BasicTensorTestsAll, RefCnt)
 {
   MATX_ENTER_HANDLER();
 
-  tensor_t<float, 2> tmp{{10,4}};
+  tensor_t<TypeParam, 2> tmp{{10,4}};
   ASSERT_EQ(tmp.GetRefCount(), 1);
 
-  float *data = tmp.Data();
-
-  tensor_t<float, 2> tmp2{tmp};
+  tensor_t<TypeParam, 2> tmp2{tmp};
   ASSERT_EQ(tmp.GetRefCount(), 2);
   ASSERT_EQ(tmp2.GetRefCount(), 2);  
 
-  tensor_t<float, 2> tmp3{{10,4}};
+  tensor_t<TypeParam, 2> tmp3{{10,4}};
   tmp3.Shallow(tmp2);  
   ASSERT_EQ(tmp.GetRefCount(), 3);
   ASSERT_EQ(tmp2.GetRefCount(), 3);  
   ASSERT_EQ(tmp3.GetRefCount(), 3);
 
-  tmp3.SetData(nullptr);
-  ASSERT_EQ(tmp.GetRefCount(), 2);  
-  ASSERT_EQ(tmp2.GetRefCount(), 2);  
+  TypeParam *data = tmp.Data();
 
-  tmp.SetData(nullptr);
-  tmp2.SetData(nullptr);
-  ASSERT_EQ(tmp.GetRefCount(), 0); 
+  tmp3.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  ASSERT_EQ(tmp3.GetRefCount(), 1);   
+
+  tmp2.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  ASSERT_EQ(tmp.GetRefCount(), 1);  
+
+  tmp.SetData(reinterpret_cast<TypeParam*>(0x1234567)); 
 
   // Check if pointer was freed
-  ASSERT_EQ(IsAllocated(data), false);
+  ASSERT_EQ(IsAllocated(data), false);  
 
   MATX_EXIT_HANDLER();
 }
