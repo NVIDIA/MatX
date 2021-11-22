@@ -73,42 +73,42 @@ namespace matx
   template<class Op1, class Op2>
   class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
       public:
-        __MATX_DEVICE__ __MATX_HOST__ __forceinline__  CommaOp(Op1 op1, Op2 op2) : op1_(op1), op2_(op2) {
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__  CommaOp(Op1 op1, Op2 op2) : op1_(op1), op2_(op2) {
           MATX_STATIC_ASSERT_STR(Op1::Rank() == Op2::Rank(), matxInvalidSize, 
             "Chained expressions using the comma operator must match in rank");
         }
-        auto __forceinline__ __MATX_HOST__ __MATX_DEVICE__ operator()() {
+        auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()() {
           op1_();
           return op2_();
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i)
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
         {
             op1_(i);
             return op2_(i);
         }
-        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j)
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
         {
             op1_(i,j);
             return op2_(i,j);
         }
-        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j, index_t k)
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
         {
             op1_(i,j,k);
             return op2_(i,j,k);
         }
-        __MATX_DEVICE__ __MATX_HOST__ __forceinline__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
         {
             op1_(i,j,k,l);
             return op2_(i,j,k,l);
         }                      
 
-        static __forceinline__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
         {
           return Op2::Rank();
         }
 
-        index_t __forceinline__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+        index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
         {
           return op2_.Size(dim);
         }        
@@ -118,7 +118,7 @@ namespace matx
   };  
 
   template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
-  __forceinline__ __MATX_HOST__ __MATX_DEVICE__ auto operator,(T l, S r)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator,(T l, S r)
   {
     return CommaOp(l, r);
   }
@@ -142,7 +142,7 @@ namespace matx
  *   CUDA stream to operate in
  */
   template <class T, int Rank>
-  inline void copy(tensor_impl_t<T, Rank> out, const tensor_impl_t<T, Rank> &in,
+  __MATX_INLINE__ void copy(tensor_impl_t<T, Rank> out, const tensor_impl_t<T, Rank> &in,
                    const cudaStream_t stream)
   {
     constexpr int rank = Rank;
@@ -175,7 +175,7 @@ namespace matx
  *
  */
   template <class T, int RANK>
-  inline void transpose(tensor_impl_t<T, RANK> &out,
+  __MATX_INLINE__ void transpose(tensor_impl_t<T, RANK> &out,
                         const tensor_impl_t<T, RANK> &in,
                         const cudaStream_t stream)
   {
@@ -235,7 +235,7 @@ namespace matx
  *
  */
   template <class T, int Rank>
-  inline void permute(tensor_impl_t<T, Rank> &out, const tensor_impl_t<T, Rank> &in,
+  __MATX_INLINE__ void permute(tensor_impl_t<T, Rank> &out, const tensor_impl_t<T, Rank> &in,
                       const std::initializer_list<uint32_t> &dims,
                       const cudaStream_t stream)
   {
@@ -267,7 +267,7 @@ namespace matx
 
   public:
     using scalar_type = void;
-    inline IF(T1 cond, T2 op) : cond_(cond), op_(op)
+    __MATX_INLINE__ IF(T1 cond, T2 op) : cond_(cond), op_(op)
     {
       static_assert((!is_tensor_view_t<T2>()),
                     "Only operator emmitters are allowed in IF. Tensor views are "
@@ -290,38 +290,38 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
     {
       if (get_value(cond_))
       {
         get_value(op_);
       }
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
     {
       if (get_value(cond_, i))
         get_value(op_, i);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
     {
       if (get_value(cond_, i, j))
         get_value(op_, i, j);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
     {
       if (get_value(cond_, i, j, k))
         get_value(op_, i, j, k);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if (get_value(cond_, i, j, k, l))
         get_value(op_, i, j, k, l);
     }
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return MAX(get_rank<T1>(), get_rank<T2>());
     }
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -349,7 +349,7 @@ namespace matx
 
   public:
     using scalar_type = void;
-    inline IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
+    __MATX_INLINE__ IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
     {
       static_assert((!is_tensor_view_t<T1>() && !is_tensor_view_t<T2>()),
                     "Only operator emmitters are allowed in IFELSE. Tensor views "
@@ -376,35 +376,35 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
     {
       if (get_value(cond_))
         get_value(op1_);
       else
         get_value(op2_);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
     {
       if (get_value(cond_, i))
         get_value(op1_, i);
       else
         get_value(op2_, i);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
     {
       if (get_value(cond_, i, j))
         get_value(op1_, i, j);
       else
         get_value(op2_, i, j);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
     {
       if (get_value(cond_, i, j, k))
         get_value(op1_, i, j, k);
       else
         get_value(op2_, i, j, k);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if (get_value(cond_, i, j, k, l))
         get_value(op1_, i, j, k, l);
@@ -412,12 +412,12 @@ namespace matx
         get_value(op2_, i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return MAX(get_rank<C1>(), get_rank<T1>(), get_rank<T2>());
     }
 
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -441,15 +441,15 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline ReverseOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+    __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
     {
       if constexpr (DIM == 0)
         i = Size(0) - i - 1;
       return op_(i);
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       if constexpr (DIM == 0)
         i = Size(0) - i - 1;
@@ -457,7 +457,7 @@ namespace matx
         j = Size(1) - j - 1;
       return op_(i, j);
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       if constexpr (DIM == 0)
         i = Size(0) - i - 1;
@@ -467,7 +467,7 @@ namespace matx
         k = Size(2) - k - 1;
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if constexpr (DIM == 0)
         i = Size(0) - i - 1;
@@ -480,11 +480,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -496,7 +496,7 @@ namespace matx
  * Requires a tensor of at least rank 1
  */
   template <typename T1>
-  auto __forceinline__ reverseX(T1 t)
+  auto __MATX_INLINE__ reverseX(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 0, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 1>(t);
@@ -509,7 +509,7 @@ namespace matx
  * Requires a tensor of at least rank 2
  */
   template <typename T1>
-  auto __forceinline__ reverseY(T1 t)
+  auto __MATX_INLINE__ reverseY(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 1, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 2>(t);
@@ -522,7 +522,7 @@ namespace matx
  * Requires a tensor of at least rank 3
  */
   template <typename T1>
-  auto __forceinline__ reverseZ(T1 t)
+  auto __MATX_INLINE__ reverseZ(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 2, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 3>(t);
@@ -534,7 +534,7 @@ namespace matx
  * Requires a tensor of rank 4
  */
   template <typename T1>
-  auto __forceinline__ reverseW(T1 t)
+  auto __MATX_INLINE__ reverseW(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 3, matxInvalidDim);
     return ReverseOp<T1, T1::Rank() - 4>(t);
@@ -544,7 +544,7 @@ namespace matx
  * Flip the vertical axis of a tensor.
  */
   template <typename T1>
-  auto __forceinline__ flipud(T1 t)
+  auto __MATX_INLINE__ flipud(T1 t)
   {
     if constexpr (T1::Rank() == 1)
     {
@@ -558,7 +558,7 @@ namespace matx
  * Flip the horizontal axis of a tensor.
  */
   template <typename T1>
-  auto __forceinline__ fliplr(T1 t)
+  auto __MATX_INLINE__ fliplr(T1 t)
   {
     if constexpr (T1::Rank() == 1)
     {
@@ -584,28 +584,28 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline HermitianTransOp(T1 op) : op_(op) {}
+    __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {}
 
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return conj(op_()); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return conj(op_(i)); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return conj(op_()); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return conj(op_(i)); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       return conj(op_(j, i));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       return conj(op_(k, j, i));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       return conj(op_(l, k, j, i));
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(Rank() - dim - 1);
     }
@@ -615,7 +615,7 @@ namespace matx
  * Helper function for creating a hermitian transpose from an operator/View
  */
   template <typename T1>
-  auto __forceinline__ hermitianT(T1 t)
+  auto __MATX_INLINE__ hermitianT(T1 t)
   {
     return HermitianTransOp<T1, T1::Rank()>(t);
   }
@@ -638,44 +638,44 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline DiagOp(T1 op) : op_(op) {}
+    __MATX_INLINE__ DiagOp(T1 op) : op_(op) {}
 
     template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()()
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()()
     {
       return op_(0);
     }
 
     template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
     {
       return op_(i, i);
     }
     template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       return op_(i, j, j);
     }
     template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       return op_(i, j, k, k);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return RANK - 1;
     }
 
     template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
     {
       return std::min(op_.Size((uint32_t)(RANK - 1)),
                       op_.Size((uint32_t)(RANK - 2)));
     }
 
     template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return dim == 0 ? op_.Size(dim)
                       : std::min(op_.Size((uint32_t)(RANK - 1)),
@@ -683,7 +683,7 @@ namespace matx
     }
 
     template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return (dim <= 1) ? op_.Size(dim)
                         : std::min(op_.Size((uint32_t)(RANK - 1)),
@@ -698,7 +698,7 @@ namespace matx
  *   Input operator
  */
   template <typename T1>
-  auto __forceinline__ diag(T1 t) { return DiagOp<T1, T1::Rank()>(t); }
+  auto __MATX_INLINE__ diag(T1 t) { return DiagOp<T1, T1::Rank()>(t); }
 
   /**
  * Kronecker tensor product
@@ -719,31 +719,31 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     template <int M = DIM, std::enable_if_t<M >= 2, bool> = true>
-    inline KronOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
+    __MATX_INLINE__ KronOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
     {
     }
 
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       return op2_(i % op2_.Size(0), j % op2_.Size(1)) *
              op1_(i / op2_.Size(0), j / op2_.Size(1));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       return op2_(i, j % op2_.Size(1), k % op2_.Size(2)) *
              op1_(i, j / op2_.Size(1), k / op2_.Size(2));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       return op2_(i, j, k % op2_.Size(2), l % op2_.Size(3)) *
              op1_(i, j, k / op2_.Size(2), l / op2_.Size(3));
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op1_.Size(dim) * op2_.Size(dim);
     }
@@ -769,7 +769,7 @@ namespace matx
  *   New operator of the kronecker product
  */
   template <typename T1, typename T2>
-  auto __forceinline__ kron(T1 a, T2 b)
+  auto __MATX_INLINE__ kron(T1 a, T2 b)
   {
     return KronOp<T1, T2, T1::Rank()>(a, b);
   };
@@ -794,7 +794,7 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline RepMatOp(T1 op, index_t reps) : op_(op)
+    __MATX_INLINE__ RepMatOp(T1 op, index_t reps) : op_(op)
     {
       for (int dim = 0; dim < DIM; dim++)
       {
@@ -802,7 +802,7 @@ namespace matx
       }
     }
 
-    inline RepMatOp(T1 op, const std::array<index_t, DIM> reps) : op_(op)
+    __MATX_INLINE__ RepMatOp(T1 op, const std::array<index_t, DIM> reps) : op_(op)
     {
       for (int dim = 0; dim < DIM; dim++)
       {
@@ -810,7 +810,7 @@ namespace matx
       }
     }
 
-    inline RepMatOp(T1 op, const index_t *reps) : op_(op)
+    __MATX_INLINE__ RepMatOp(T1 op, const index_t *reps) : op_(op)
     {
       for (int dim = 0; dim < DIM; dim++)
       {
@@ -818,27 +818,27 @@ namespace matx
       }
     }
 
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return op_(i % op_.Size(0)); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return op_(i % op_.Size(0)); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       return op_(i % op_.Size(0), j % op_.Size(1));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       return op_(i % op_.Size(0), j % op_.Size(1), k % op_.Size(2));
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       return op_(i % op_.Size(0), j % op_.Size(1), k % op_.Size(2),
                  l % op_.Size(3));
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim) * reps_[dim];
     }
@@ -858,7 +858,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto __forceinline__ repmat(T1 t, index_t reps)
+  auto __MATX_INLINE__ repmat(T1 t, index_t reps)
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -877,7 +877,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto __forceinline__ repmat(T1 t, const index_t (&reps)[])
+  auto __MATX_INLINE__ repmat(T1 t, const index_t (&reps)[])
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -896,7 +896,7 @@ namespace matx
  *   New operator with repeated data
  */
   template <typename T1>
-  auto __forceinline__ repmat(T1 t, const index_t *reps)
+  auto __MATX_INLINE__ repmat(T1 t, const index_t *reps)
   {
     return RepMatOp<T1, T1::Rank()>(t, reps);
   };
@@ -917,25 +917,25 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline SelfOp(T1 op) : op_(op) {}
+    __MATX_INLINE__ SelfOp(T1 op) : op_(op) {}
 
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return op_(i); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j) { return op_(i, j); }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) { return op_(i); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j) { return op_(i, j); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -977,7 +977,7 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline ShiftOp(T1 op, index_t shift) : op_(op), shift_(shift)
+    __MATX_INLINE__ ShiftOp(T1 op, index_t shift) : op_(op), shift_(shift)
     {
       if (shift < 0)
       {
@@ -999,14 +999,14 @@ namespace matx
       }
     }
 
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       if constexpr (DIM == 0)
         i = (base_ + i) % Size(0);
       return op_(i);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       if constexpr (DIM == 0)
         i = (base_ + i) % Size(0);
@@ -1014,7 +1014,7 @@ namespace matx
         j = (base_ + j) % Size(1);
       return op_(i, j);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       if constexpr (DIM == 0)
         i = (base_ + i) % Size(0);
@@ -1024,7 +1024,7 @@ namespace matx
         k = (base_ + k) % Size(2);
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if constexpr (DIM == 0)
         i = (base_ + i) % Size(0);
@@ -1037,11 +1037,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -1061,7 +1061,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto __forceinline__ shift0(T1 t, index_t s)
+  auto __MATX_INLINE__ shift0(T1 t, index_t s)
   {
     return ShiftOp<T1, 0>(t, s);
   };
@@ -1080,7 +1080,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto __forceinline__ shift1(T1 t, index_t s)
+  auto __MATX_INLINE__ shift1(T1 t, index_t s)
   {
     return ShiftOp<T1, 1>(t, s);
   };
@@ -1099,7 +1099,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto __forceinline__ shift2(T1 t, index_t s)
+  auto __MATX_INLINE__ shift2(T1 t, index_t s)
   {
     return ShiftOp<T1, 2>(t, s);
   };
@@ -1118,7 +1118,7 @@ namespace matx
  *   New operator with shifted indices
  */
   template <typename T1>
-  auto __forceinline__ shift3(T1 t, index_t s)
+  auto __MATX_INLINE__ shift3(T1 t, index_t s)
   {
     return ShiftOp<T1, 3>(t, s);
   };
@@ -1133,27 +1133,27 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline FFTShift1DOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ FFTShift1DOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       i = i;
       j = j;
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       i = i;
       j = j;
@@ -1162,11 +1162,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -1200,27 +1200,27 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline FFTShift2DOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ FFTShift2DOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       i = i;
       j = j;
@@ -1229,11 +1229,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -1268,27 +1268,27 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline IFFTShift1DOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ IFFTShift1DOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       i = i;
       j = j;
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       i = i;
       j = j;
@@ -1297,11 +1297,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -1336,27 +1336,27 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline IFFTShift2DOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ IFFTShift2DOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       i = (i + Size(0) / 2) % Size(0);
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       i = i;
       j = j;
@@ -1365,11 +1365,11 @@ namespace matx
       return op_(i, j, k, l);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
@@ -1410,7 +1410,7 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename Op::scalar_type;
 
-    inline matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
+    __MATX_INLINE__ matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
       if constexpr (Rank() > 0) {
         for (int32_t i = 0; i < Rank(); i++) {
           size_[i] = get_size(in1_, i);
@@ -1418,38 +1418,38 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
     {
       auto i1 = get_value(in1_);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
     {
       auto i1 = get_value(in1_, i);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
     {
       auto i1 = get_value(in1_, i, j);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
     {
       auto i1 = get_value(in1_, i, j, k);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, uint32_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, uint32_t j, index_t k, index_t l)
     {
       auto i1 = get_value(in1_, i, j, k, l);
       return op_(i1);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<I1>();
     }
 
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -1466,9 +1466,9 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename T1::scalar_type;
 
-    inline ComplexPlanarOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ ComplexPlanarOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       if (i >= op_.Size(0))
       {
@@ -1476,7 +1476,7 @@ namespace matx
       }
       return op_(i).real();
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       if (i >= op_.Size(0))
       {
@@ -1484,7 +1484,7 @@ namespace matx
       }
       return op_(i, j).real();
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       if (j >= op_.Size(1))
       {
@@ -1492,7 +1492,7 @@ namespace matx
       }
       return op_(i, j, k).real();
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if (k >= op_.Size(2))
       {
@@ -1501,11 +1501,11 @@ namespace matx
       return op_(i, j, k, l).real();
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       if constexpr (Rank() <= 1)
       {
@@ -1556,30 +1556,30 @@ namespace matx
                                             matxHalfComplex<scalar_type>,
                                             cuda::std::complex<scalar_type>>;
 
-    inline ComplexInterleavedOp(T1 op) : op_(op){};
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ ComplexInterleavedOp(T1 op) : op_(op){};
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
     {
       return complex_type{op_(i), op_(op_.Size(0) / 2 + i)};
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
     {
       return complex_type{op_(i, j), op_(op_.Size(0) / 2 + i, j)};
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
     {
       return {op_(i, j, k), op_(i, j + op_.Size(1) / 2, k)};
     }
-    inline __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       return {op_(i, j, k, l), op_(i, j, k + op_.Size(2) / 2, l)};
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return get_rank<T1>();
     }
-    inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       if constexpr (Rank() <= 1)
       {
@@ -1629,7 +1629,7 @@ namespace matx
     // dummy type to signal this is a matxop
     using matxop = bool;
     using scalar_type = typename Op::scalar_type;
-    inline matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
+    __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
     {
       if constexpr (Rank() > 0)
       {
@@ -1644,35 +1644,35 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
     {
       // Rank 0
       auto i1 = get_value(in1_);
       auto i2 = get_value(in2_);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
     {
       // Rank 1
       auto i1 = get_value(in1_, i);
       auto i2 = get_value(in2_, i);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
     {
       // Rank 2
       auto i1 = get_value(in1_, i, j);
       auto i2 = get_value(in2_, i, j);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
     {
       // Rank 3
       auto i1 = get_value(in1_, i, j, k);
       auto i2 = get_value(in2_, i, j, k);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       // Rank 4
       auto i1 = get_value(in1_, i, j, k, l);
@@ -1680,12 +1680,12 @@ namespace matx
       return op_(i1, i2);
     }
 
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return MAX(get_rank<I1>(), get_rank<I2>());
     }
 
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -1695,7 +1695,7 @@ namespace matx
 
 // Returns an address of a pointer of type T aligned to new address
 template <typename T>
-constexpr inline __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
+constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
 {
   if (((uint64_t)addr % std::alignment_of_v<T>) != 0) {
     return reinterpret_cast<T *>(
@@ -1709,7 +1709,7 @@ constexpr inline __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
 #define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
-  [[nodiscard]] inline auto FUNCTION(I1 i1)                         \
+  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1)                         \
   {                                                                 \
     using I1Type = extract_scalar_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
@@ -1720,7 +1720,7 @@ constexpr inline __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
   template <typename I1, typename I2,                                \
             typename = typename std::enable_if_t<is_matx_op<I1>() or \
                                                  is_matx_op<I2>()>>  \
-  [[nodiscard]] inline auto FUNCTION(I1 i1, I2 i2)                   \
+  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1, I2 i2)                   \
   {                                                                  \
     using I1Type = extract_scalar_type_t<I1>;                        \
     using I2Type = extract_scalar_type_t<I2>;                        \

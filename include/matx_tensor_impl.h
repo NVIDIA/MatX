@@ -109,7 +109,7 @@ class tensor_impl_t {
         : ldata_(ldata), shape_(shape), s_(strides) { }        
 
 
-    inline __MATX_HOST__ __MATX_DEVICE__ ~tensor_impl_t() = default;
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~tensor_impl_t() = default;
 
     /**
      * Constructor for a rank-0 tensor (scalar).
@@ -131,7 +131,7 @@ class tensor_impl_t {
      * @param shape
      *   Tensor shape
      */
-    inline tensor_impl_t(tensorShape_t<RANK> const &shape) : shape_(shape)
+    __MATX_INLINE__ tensor_impl_t(tensorShape_t<RANK> const &shape) : shape_(shape)
     {
       for (int i = 0; i < RANK; i++) {
         MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
@@ -156,7 +156,7 @@ class tensor_impl_t {
      * @param strides
      *   Tensor strides
      */
-    inline tensor_impl_t(tensorShape_t<RANK> const &shape, const index_t (&strides)[RANK])
+    __MATX_INLINE__ tensor_impl_t(tensorShape_t<RANK> const &shape, const index_t (&strides)[RANK])
         : shape_(shape)
     {
       for (int i = 0; i < RANK; i++) {
@@ -173,7 +173,7 @@ class tensor_impl_t {
      * @param shape
      *   Sizes for each dimension. Length of sizes must match RANK
      */
-    inline tensor_impl_t(const index_t (&shape)[RANK])
+    __MATX_INLINE__ tensor_impl_t(const index_t (&shape)[RANK])
         : tensor_impl_t(tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
     {
     }
@@ -191,7 +191,7 @@ class tensor_impl_t {
      * @param refcnt
      *   Reference counter or nullptr if not tracked
      */
-    inline tensor_impl_t(T *const ldata, const tensorShape_t<RANK> &shape)
+    __MATX_INLINE__ tensor_impl_t(T *const ldata, const tensorShape_t<RANK> &shape)
         : ldata_(ldata), shape_(shape)
     {
       for (int i = 0; i < RANK; i++) {
@@ -221,7 +221,7 @@ class tensor_impl_t {
      * @param shape
      *   Sizes for each dimension. Length of sizes must match RANK
      */
-    inline tensor_impl_t(T *const data, const index_t (&shape)[RANK]) noexcept
+    __MATX_INLINE__ tensor_impl_t(T *const data, const index_t (&shape)[RANK]) noexcept
         : tensor_impl_t(data, tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
     {
     }
@@ -244,7 +244,7 @@ class tensor_impl_t {
      * @param refcnt
      *   Reference counter or nullptr if not tracked
      */
-    inline tensor_impl_t(T *const ldata,
+    __MATX_INLINE__ tensor_impl_t(T *const ldata,
                     tensorShape_t<RANK> const &shape,
                     const index_t (&strides)[RANK])
         : ldata_(ldata), shape_(shape)
@@ -269,7 +269,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, op);
     }
@@ -284,7 +284,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, op_base);
@@ -300,7 +300,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator+=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator+=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this + op);
     }
@@ -316,7 +316,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator+=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator+=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this + op_base);
@@ -332,7 +332,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator-=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator-=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this - op);
     }
@@ -348,7 +348,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator-=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator-=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this - op_base);
@@ -364,7 +364,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator*=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator*=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this * op);
     }
@@ -380,7 +380,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator*=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator*=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this * op_base);
@@ -396,7 +396,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator/=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator/=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this / op);
     }
@@ -412,7 +412,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator/=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator/=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this / op_base);
@@ -428,7 +428,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator<<=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this << op);
     }
@@ -444,7 +444,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator<<=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator<<=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this << op_base);
@@ -460,7 +460,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator>>=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this >> op);
     }
@@ -476,7 +476,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator>>=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator>>=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this >> op_base);
@@ -492,7 +492,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator|=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator|=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this | op);
     }
@@ -508,7 +508,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator|=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator|=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this | op_base);
@@ -524,7 +524,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator&=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator&=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this & op);
     }
@@ -540,7 +540,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator&=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator&=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this & op_base);
@@ -556,7 +556,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator^=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator^=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this ^ op);
     }
@@ -572,7 +572,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator^=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator^=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
       return set(*this, *this ^ op_base);
@@ -588,7 +588,7 @@ class tensor_impl_t {
      * @returns set object containing the destination view and source object
      *
      */
-    [[nodiscard]] inline __MATX_HOST__ auto operator%=(const tensor_impl_t<T, RANK> &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator%=(const tensor_impl_t<T, RANK> &op)
     {
         return set(*this, *this % op);
     }
@@ -604,7 +604,7 @@ class tensor_impl_t {
      *
      */
     template <typename T2>
-    [[nodiscard]] inline __MATX_HOST__ auto operator%=(const T2 &op)
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator%=(const T2 &op)
     {
       const typename base_type<T2>::type &op_base = op;
         return set(*this, *this % op_base);
@@ -616,7 +616,7 @@ class tensor_impl_t {
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    inline tensorShape_t<RANK> Shape() const noexcept { return this->shape_; }    
+    __MATX_INLINE__ tensorShape_t<RANK> Shape() const noexcept { return this->shape_; }    
 
   /**
    * Check if a tensor is linear in memory for all elements in the view
@@ -624,7 +624,7 @@ class tensor_impl_t {
    * @return
    *    The size of the dimension
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
   {
     index_t ttl = 1;
     for (int i = RANK - 1; i >= 0; i--) {
@@ -645,7 +645,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(const std::array<index_t, RANK> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(const std::array<index_t, RANK> &idx) const noexcept
     {
       if constexpr (RANK == 1) {
         return this->operator()(idx[0]);
@@ -668,7 +668,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
     {
       if constexpr (RANK == 1) {
         return this->operator()(idx[0]);
@@ -691,7 +691,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
     {
       return *ldata_;
     }
@@ -703,7 +703,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
     {
       return *ldata_;
     }
@@ -718,7 +718,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
     {
       return *(ldata_ + s_[0] * id0);
     }
@@ -733,7 +733,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
     {
       return *(ldata_ + s_[0] * id0);
     }
@@ -751,7 +751,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
                                                   index_t id1) const noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1);
@@ -770,7 +770,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1);
     }
@@ -791,7 +791,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
                                                   index_t id2) const noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
@@ -813,7 +813,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
                                             index_t id2) noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
@@ -838,7 +838,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ const T &
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &
     operator()(index_t id0, index_t id1, index_t id2, index_t id3) const noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
@@ -863,7 +863,7 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    inline __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
                                             index_t id2, index_t id3) noexcept
     {
       return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
@@ -875,7 +875,7 @@ class tensor_impl_t {
    * @returns Rank of the tensor
    *
    */
-  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+  static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
 
   /**
@@ -885,7 +885,7 @@ class tensor_impl_t {
    * @returns Total number of elements across all dimensions
    *
    */
-  inline index_t __MATX_HOST__ __MATX_DEVICE__ TotalSize() const noexcept { return shape_.TotalSize(); }  
+  __MATX_INLINE__ index_t __MATX_HOST__ __MATX_DEVICE__ TotalSize() const noexcept { return shape_.TotalSize(); }  
 
   /**
    * Get the size of a single dimension of the tensor
@@ -896,7 +896,7 @@ class tensor_impl_t {
    * @returns Number of elements in dimension
    *
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const noexcept
   {
     return shape_.Size(dim);
   }
@@ -907,7 +907,7 @@ class tensor_impl_t {
    * @return
    *    The size of the dimension
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Lsize() const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Lsize() const noexcept
   {
     return shape_.Size(Rank() - 1);
   }
