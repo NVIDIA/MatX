@@ -36,55 +36,76 @@
 #include "matx_error.h"
 #include "matx_get_grid_dims.h"
 
+constexpr int CUDA_MAX_VAL_PARAM = 4096;
+
 namespace matx {
 
 #ifdef __CUDACC__  
-template <class Op> __global__ void matxOpT0Kernel(Op op) { op(); }
-
-template <class Op>
-__launch_bounds__(256) __global__ void matxOpT1Kernel(Op op, index_t size)
-{
-  index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (idx < size) {
-    op(idx);
+template <class Op> __global__ void matxOpT0Kernel(Op op) { 
+  if constexpr (std::is_pointer_v<Op>) {
+    (*op)(); 
+  }
+  else {
+    op();
   }
 }
 
 template <class Op>
-__launch_bounds__(256) __global__
-    void matxOpT2Kernel(Op op, index_t size0, index_t size1)
-{
+__global__ void matxOpT1Kernel(Op op, index_t size0) {
+  index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (idx < size0) {
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idx); 
+    }
+    else {
+      op(idx);
+    }
+  }
+}
+
+template <class Op>
+__global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   if (idx < size1 && idy < size0) {
-    op(idy, idx);
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idy, idx); 
+    }
+    else {
+      op(idy, idx);
+    }    
   }
 }
 
 template <class Op>
-__launch_bounds__(256) __global__
-    void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size2)
-{
+__global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size2) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx < size2 && idy < size1 && idz < size0) {
-    op(idz, idy, idx);
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idz, idy, idx); 
+    }
+    else {
+      op(idz, idy, idx);
+    }      
   }
 }
 
 template <class Op>
-__launch_bounds__(256) __global__
-    void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size2,
-                        index_t size3)
-{
+__global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idy = nmy % size2;
   index_t idz = nmy / size2;
   index_t idw = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx < size3 && idy < size2 && idz < size1 && idw < size0) {
-    op(idw, idz, idy, idx);
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idw, idz, idy, idx); 
+    }
+    else {
+      op(idw, idz, idy, idx);
+    }      
   }
 }
 #endif
@@ -104,45 +125,90 @@ class CUDADeviceExecutor {
     template <typename Op>
     void Exec(Op &op) const noexcept {
   #ifdef __CUDACC__      
-      dim3 threads, blocks;
+      dim3 threads, blocks;   
 
-      if constexpr (op.Rank() == 0) {
-        threads = 1;
-        blocks = 1;
+      if constexpr ((sizeof(op) + sizeof(index_t) * Op::Rank() )> CUDA_MAX_VAL_PARAM) {
+        // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
+        // need to async allocate memory for it, call the kernel, then free it
+        Op *tmp = nullptr;           
+        matxAlloc(reinterpret_cast<void**>(&tmp), sizeof(op), MATX_ASYNC_DEVICE_MEMORY, stream_);
+        cudaMemcpyAsync(tmp, &op, sizeof(op), cudaMemcpyHostToDevice , stream_);
 
-        matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
-      }
-      else if constexpr (op.Rank() == 1) {
-        index_t size0 = op.Size(0);
+        if constexpr (op.Rank() == 0) {
+          threads = 1;
+          blocks = 1;
+          matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(tmp);
+        }
+        else if constexpr (op.Rank() == 1) {
+          index_t size0 = op.Size(0);
 
-        get_grid_dims(blocks, threads, size0, 256);
-        matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, size0);
-      }
-      else if constexpr (op.Rank() == 2) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
+          get_grid_dims(blocks, threads, size0, 256);
+          matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0);     
+        }
+        else if constexpr (op.Rank() == 2) {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
 
-        get_grid_dims(blocks, threads, size0, size1, 256);
-        matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1);
-      }
-      else if constexpr (op.Rank() == 3) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
+          get_grid_dims(blocks, threads, size0, size1, 256);
+          matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1);
+        }
+        else if constexpr (op.Rank() == 3) {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
+          index_t size2 = op.Size(2);
 
-        get_grid_dims(blocks, threads, size0, size1, size2, 256);
-        matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2);
+          get_grid_dims(blocks, threads, size0, size1, size2, 256);
+          matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1, size2);
+        }
+        else {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
+          index_t size2 = op.Size(2);
+          index_t size3 = op.Size(3);
+
+          get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
+          matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1, size2, size3);
+        } 
+
+        matxFree(tmp);        
       }
       else {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
-        index_t size3 = op.Size(3);
+        if constexpr (op.Rank() == 0) {
+          threads = 1;
+          blocks = 1;
+          matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+        }
+        else if constexpr (op.Rank() == 1) {
+          index_t size0 = op.Size(0);
 
-        get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
-        matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2,
-                                                        size3);
-      }  
+          get_grid_dims(blocks, threads, size0, 256);
+          matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, size0);      
+        }
+        else if constexpr (op.Rank() == 2) {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
+
+          get_grid_dims(blocks, threads, size0, size1, 256);
+          matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1);
+        }
+        else if constexpr (op.Rank() == 3) {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
+          index_t size2 = op.Size(2);
+
+          get_grid_dims(blocks, threads, size0, size1, size2, 256);
+          matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2);
+        }
+        else {
+          index_t size0 = op.Size(0);
+          index_t size1 = op.Size(1);
+          index_t size2 = op.Size(2);
+          index_t size3 = op.Size(3);
+
+          get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
+          matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2, size3);
+        } 
+      }
   #else
       MATX_THROW(matxNotSupported, "Cannot execute device function from host compiler");    
   #endif    
