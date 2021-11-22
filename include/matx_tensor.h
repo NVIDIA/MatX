@@ -37,6 +37,7 @@
 #include <atomic>
 #include <iomanip>
 #include <numeric>
+#include <memory>
 #include <type_traits>
 
 #include "matx_allocator.h"
@@ -116,20 +117,13 @@ public:
       : tensor_impl_t<T,RANK>(rhs.ldata_, 
           rhs.shape_, 
           rhs.s_), 
-        data_(rhs.data_), 
-        refcnt_(rhs.refcnt_)
-  {
-#ifndef __CUDA_ARCH__
-    if (refcnt_ != nullptr) {
-      (*refcnt_)++;
-    }
-#endif
-  }
+        data_(rhs.data_)
+  { }
 
   __MATX_HOST__ tensor_t<T, RANK>(tensor_t<T, RANK> const &&rhs) noexcept
       : tensor_impl_t<T,RANK>(rhs.ldata_, rhs.shape_, rhs.s_), 
-        data_(rhs.data_), 
-        refcnt_(rhs.refcnt_)  { }
+        data_(std::move(rhs.data_))  
+  { }
 
   /** Perform a shallow copy of a tensor view
    *
@@ -146,27 +140,17 @@ public:
     this->ldata_ = rhs.ldata_;
     this->shape_ = rhs.shape_;
     this->s_ = rhs.s_;
-    refcnt_ = rhs.refcnt_;
-    if (refcnt_ != nullptr) {
-      (*refcnt_)++;
-    }
   }
 
-  inline __MATX_HOST__  ~tensor_t()
-  {
-#ifndef __CUDA_ARCH__
-    Free();
-#endif
-  }
+  inline __MATX_HOST__  ~tensor_t() = default;
 
   /**
    * Constructor for a rank-0 tensor (scalar).
    */
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true> tensor_t()
+  template <int M = RANK, std::enable_if_t<M == 0, bool> = true> 
+  tensor_t()
   {
-#ifndef __CUDA_ARCH__
     Allocate();
-#endif
   }
 
   /**
@@ -176,17 +160,22 @@ public:
    *   Data pointer
    */
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  tensor_t(T *const data, std::atomic<uint32_t> *refcnt = nullptr) :
+  tensor_t(T *const data) :
     tensor_impl_t<T,RANK>(data), 
-    data_(data), 
-    refcnt_(refcnt)
-  {
-#ifndef __CUDA_ARCH__
-    if (refcnt != nullptr) {
-      (*refcnt)++;
-    }
-#endif    
-  }
+    data_(std::move(std::shared_ptr<T>{data, [](auto){}}))
+  { }
+
+  /**
+   * Constructor for a rank-0 tensor (scalar).
+   *
+   * @param data
+   *   Shared data pointer
+   */
+  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
+  tensor_t(std::shared_ptr<T> data) :
+    tensor_impl_t<T,RANK>(data.get()), 
+    data_(data)
+  { }  
 
   /**
    * Constructor for a rank-1 and above tensor.
@@ -236,22 +225,29 @@ public:
    *   Offset data pointer (start of view)
    * @param shape
    *   Sizes for each dimension. Length of sizes must match RANK
-   * @param refcnt
-   *   Reference counter or nullptr if not tracked
    */
   inline tensor_t(T *const data, T *const ldata,
-                  const tensorShape_t<RANK> &shape,
-                  std::atomic<uint32_t> *refcnt)
+                  const tensorShape_t<RANK> &shape)
       : tensor_impl_t<T,RANK>(ldata, shape),
-        data_(data), 
-        refcnt_(refcnt)
-  {
-#ifndef __CUDA_ARCH__
-    if (refcnt != nullptr) {
-      (*refcnt)++;
-    }
-#endif
-  }
+        data_(std::move(std::shared_ptr<T>{data, [](auto){}}))
+  { }
+
+  /**
+   * Constructor for a rank-1 and above tensor using a user pointer and shape
+   * input
+   *
+   * @param data
+   *   Shared base data pointer (allocated address)
+   * @param ldata
+   *   Offset data pointer (start of view)
+   * @param shape
+   *   Sizes for each dimension. Length of sizes must match RANK
+   */
+  inline tensor_t(std::shared_ptr<T> data, T *const ldata,
+                  const tensorShape_t<RANK> &shape)
+      : tensor_impl_t<T,RANK>(ldata, shape),
+        data_(data)
+  { }  
 
   /**
    * Constructor for creating a view with a user-defined data pointer.
@@ -265,9 +261,25 @@ public:
    *   Tensor shape
    */
   inline tensor_t(T *const data, const tensorShape_t<RANK> &shape)
-      : tensor_t(data, data, shape, nullptr)
+      : tensor_t(data, data, shape)
   {
   }
+
+  /**
+   * Constructor for creating a view with a user-defined data pointer.
+   *
+   * If not reference counted, it is the caller's responsibility to manage the
+   * data pointer, including allocation and freeing.
+   *
+   * @param data
+   *   Shared pointer to data
+   * @param shape
+   *   Tensor shape
+   */
+  inline tensor_t(std::shared_ptr<T> data, const tensorShape_t<RANK> &shape)
+      : tensor_t(data, data, shape)
+  {
+  }  
 
   /**
    * Constructor for creating a view with a user-defined data pointer.
@@ -283,8 +295,7 @@ public:
    */
   inline tensor_t(T *const data, const index_t (&shape)[RANK]) noexcept
       : tensor_t(data, data,
-                 tensorShape_t<RANK>{static_cast<index_t const *>(shape)},
-                 nullptr)
+                 tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
   {
   }
 
@@ -302,23 +313,35 @@ public:
    *   Sizes for each dimension. Length of sizes must match RANK
    * @param strides
    *   Tensor strides
-   * @param refcnt
-   *   Reference counter or nullptr if not tracked
    */
   inline tensor_t(T *const data, T *const ldata,
                   tensorShape_t<RANK> const &shape,
-                  const index_t (&strides)[RANK],
-                  std::atomic<uint32_t> *refcnt = nullptr)
+                  const index_t (&strides)[RANK])
       : tensor_impl_t<T,RANK>(ldata, shape, strides),
-        data_(data), 
-        refcnt_(refcnt)
-  {
-#ifndef __CUDA_ARCH__
-    if (refcnt != nullptr) {
-      (*refcnt)++;
-    }
-#endif
-  }
+        data_(std::move(std::shared_ptr<T>{data, [](auto){}}))
+  { }
+
+  /**
+   * Constructor for creating a view with a user-defined data pointer.
+   *
+   * If not reference counted, it is the caller's responsibility to manage the
+   * data pointer, including allocation and freeing.
+   *
+   * @param data
+   *   Shared base data pointer (allocated address)
+   * @param ldata
+   *   Offset data pointer (start of view)
+   * @param shape
+   *   Sizes for each dimension. Length of sizes must match RANK
+   * @param strides
+   *   Tensor strides
+   */
+  inline tensor_t(std::shared_ptr<T> data, T *const ldata,
+                  tensorShape_t<RANK> const &shape,
+                  const index_t (&strides)[RANK])
+      : tensor_impl_t<T,RANK>(ldata, shape, strides),
+        data_(data)
+  { }  
 
   /**
    * Constructor for creating a view with a user-defined data pointer.
@@ -335,7 +358,7 @@ public:
    */
   inline tensor_t(T *const data, tensorShape_t<RANK> const &shape,
                   const index_t (&strides)[RANK])
-      : tensor_t(data, data, shape, strides, nullptr)
+      : tensor_t(data, data, shape, strides)
   {
   }
 
@@ -747,7 +770,7 @@ public:
       strides[i] = strides[i + 1] * shape.Size(i + 1);
     }
 
-    return tensor_t<M, R>(data_, data_, shape, strides, refcnt_);
+    return tensor_t<M, R>(data_, data_.get(), shape, strides);
   }
 
   template <typename M = T, int R = RANK>
@@ -779,7 +802,7 @@ public:
       strides[i] = strides[i + 1] * this->Size(i + 1);
     }
 
-    return tensor_t<T, RANK>(data_, data_, this->shape_, strides, refcnt_);
+    return tensor_t<T, RANK>(data_, data_.get(), this->shape_, strides);
   }
 
   /**
@@ -796,7 +819,7 @@ public:
   {
     int dev;
     cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(data_, this->TotalSize() * sizeof(T), dev, stream);
+    cudaMemPrefetchAsync(data_.get(), this->TotalSize() * sizeof(T), dev, stream);
   }
 
   /**
@@ -811,7 +834,7 @@ public:
    */
   inline void PrefetchHost(cudaStream_t const stream) const noexcept
   {
-    cudaMemPrefetchAsync(data_, this->TotalSize() * sizeof(T), cudaCpuDeviceId,
+    cudaMemPrefetchAsync(data_.get(), this->TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
 
@@ -832,7 +855,7 @@ public:
   {
 #endif
     using Type = typename U::value_type;
-    Type *data = reinterpret_cast<Type *>(data_);
+    Type *data = reinterpret_cast<Type *>(data_.get());
     index_t strides[RANK];
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
@@ -846,8 +869,8 @@ public:
       }
     }
 
-    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, this->shape_,
-                                strides, refcnt_);
+    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_.get()), data, this->shape_,
+                                strides);
   }
 
   /**
@@ -867,7 +890,7 @@ public:
   {
 #endif
     using Type = typename U::value_type;
-    Type *data = reinterpret_cast<Type *>(data_) + 1;
+    Type *data = reinterpret_cast<Type *>(data_.get()) + 1;
     index_t strides[RANK];
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
@@ -881,8 +904,8 @@ public:
       }
     }
 
-    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_), data, this->shape_,
-                                strides, refcnt_);
+    return tensor_t<Type, RANK>(reinterpret_cast<Type *>(data_.get()), data, this->shape_,
+                                strides);
   }
 
   /**
@@ -924,7 +947,7 @@ public:
       s[i] = this->s_[d];
     }
 
-    return tensor_t(data_, data_, n, s, refcnt_);
+    return tensor_t(data_, data_.get(), n, s);
   }
 
   /**
@@ -979,9 +1002,9 @@ public:
    *
    */
   __MATX_HOST__ inline void
-  SetData(T *const data, std::atomic<uint32_t> *refcnt = nullptr) noexcept
+  SetData(T *const data) noexcept
   {
-    SetData(data, data, refcnt);
+    SetData(data, data);
   }
 
   /**
@@ -995,38 +1018,52 @@ public:
    *   Allocated data pointer
    * @param ldata
    *   Local data pointer offset into allocated
+   *
+   */
+  __MATX_HOST__ inline void
+  SetData(T *const data, T *const ldata) noexcept
+  {
+    data_.reset(data, [](auto ){});
+    this->ldata_ = ldata;
+  }
+
+  /**
+   * Set the underlying data pointer from the view
+   *
+   * Decrements any reference-counted memory and potentially frees before
+   * resetting the data pointer. If refcnt is not nullptr, the count is
+   * incremented.
+   *
+   * @param data
+   *   Data pointer to set
    * @param refcnt
    *   Optional reference count for new memory or nullptr if not tracked
    *
    */
   __MATX_HOST__ inline void
-  SetData(T *const data, T *const ldata,
-          std::atomic<uint32_t> *refcnt = nullptr) noexcept
+  SetData(std::shared_ptr<T> data) noexcept
   {
-    Free();
-
-    data_ = data;
-    this->ldata_ = ldata;
-
-    refcnt_ = refcnt;
-    if (refcnt_ != nullptr) {
-      (*refcnt_)++;
-    }
+    SetData(data, data);
   }
 
   /**
-   * Get the reference count
+   * Set the underlying data and local data pointer from the view
    *
-   * @returns Reference count or 0 if not tracked
+   * Decrements any reference-counted memory and potentially frees before
+   * resetting the data pointer. If refcnt is not nullptr, the count is
+   * incremented.
+   *
+   * @param data
+   *   Allocated data pointer
+   * @param ldata
+   *   Local data pointer offset into allocated
    *
    */
-  inline __MATX_HOST__ index_t GetRefCount() const noexcept
+  __MATX_HOST__ inline void
+  SetData(std::shared_ptr<T> data, T *const ldata) noexcept
   {
-    if (refcnt_ == nullptr) {
-      return 0;
-    }
-
-    return refcnt_->load();
+    data_ = data;
+    this->ldata_ = ldata;
   }
 
   /**
@@ -1048,6 +1085,17 @@ public:
 #endif
     return this->s_[dim];
   }
+
+  /**
+   * Get the reference count
+   *
+   * @returns Reference count or 0 if not tracked
+   *
+   */
+  inline __MATX_HOST__ auto GetRefCount() const noexcept
+  {
+    return data_.use_count();
+  }  
 
 
   /**
@@ -1111,7 +1159,7 @@ public:
     n[0] = adj_el / stride_size + 1;
     s[0] = stride_size;
 
-    return tensor_t<T, RANK + 1>(data_, data_, n, s, refcnt_);
+    return tensor_t<T, RANK + 1>(data_, data_.get(), n, s);
   }
 
   /**
@@ -1173,7 +1221,7 @@ public:
     MATX_ASSERT_STR(d == RANK, matxInvalidDim,
                     "Must keep as many dimension as the original tensor has");
 
-    return tensor_t<T, N>(data_, data_, n, s, refcnt_);
+    return tensor_t<T, N>(data_, data_.get(), n, s);
   }
 
   /**
@@ -1425,7 +1473,7 @@ public:
 #endif
     index_t n[N] = {};
     index_t s[N] = {};
-    T *data = data_;
+    T *data = data_.get();
     int d = 0;
     bool def_stride = (strides[0] == -1);
 
@@ -1468,7 +1516,7 @@ public:
     MATX_ASSERT_STR(d == N, matxInvalidDim,
                     "Number of indices must match the target rank to slice to");
 
-    return tensor_t<T, N>(data_, data, n, s, refcnt_);
+    return tensor_t<T, N>(data_, data, n, s);
   }
 
   /**
@@ -1706,33 +1754,18 @@ private:
    **/
   inline void Allocate()
   {
-    matxAlloc((void **)&data_, Bytes());
-    MATX_ASSERT(data_ != NULL, matxOutOfMemory);
-    this->ldata_ = data_;
-    refcnt_ = new std::atomic<uint32_t>{1};
+    T *tmp;
+    matxAlloc((void **)&tmp, Bytes());
+    MATX_ASSERT(tmp != NULL, matxOutOfMemory);
+
+    data_ = std::shared_ptr<T>{tmp, [](auto ptr) { 
+      matxFree(reinterpret_cast<void*>(ptr));
+    }};
+
+    this->ldata_ = tmp;
   }
 
-  /**
-   * Free managed memory backing the view
-   *
-   * Used when no user-defined pointer is passed in
-   **/
-  inline void Free()
-  {
-    if (refcnt_ == nullptr) {
-      return;
-    }
-
-    if (--(*refcnt_) == 0) {
-      MATX_ASSERT(data_ != nullptr, matxAssertError);
-      matxFree(data_);
-      data_ = nullptr;
-      delete refcnt_;
-    }
-  };
-
-  T *data_; // Starting data pointer to this tensor view
-  std::atomic<uint32_t> *refcnt_;
+  std::shared_ptr<T> data_; // Starting data pointer to this tensor view
 };
 
 
