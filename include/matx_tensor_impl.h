@@ -69,6 +69,46 @@ public:
   }
 };
 
+template <typename T, typename RankOp>
+class BaseOpCustom
+{
+public:
+  using matxop = bool;
+  tensorShape_t<RankOp::Rank()> size_;
+
+  BaseOpCustom() = delete;
+  BaseOpCustom(const tensorShape_t<RankOp::Rank()> &size) :
+    size_(size) {}
+
+  // Launch work in the stream
+  void run(cudaStream_t stream = 0) noexcept
+  {
+    exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
+  }
+
+  // Record an event after the work
+  void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
+  {
+    exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
+    cudaEventRecord(ev, stream);
+  }
+
+  template <typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true>
+  void run (Ex ex) {
+    exec(*static_cast<T *>(this), ex);
+  }
+
+  static inline constexpr int32_t Rank()
+  {
+    return RankOp::Rank();
+  }  
+
+  index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+  {
+    return size_[dim];
+  }
+};
+
 
 
 /**
