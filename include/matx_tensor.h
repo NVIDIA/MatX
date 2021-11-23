@@ -142,7 +142,7 @@ public:
     this->s_ = rhs.s_;
   }
 
-  __MATX_INLINE__ __MATX_HOST__  ~tensor_t() = default;
+  __MATX_INLINE__  ~tensor_t() = default;
 
   /**
    * Constructor for a rank-0 tensor (scalar).

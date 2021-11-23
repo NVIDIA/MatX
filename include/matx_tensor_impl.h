@@ -109,7 +109,7 @@ class tensor_impl_t {
         : ldata_(ldata), shape_(shape), s_(strides) { }        
 
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~tensor_impl_t() = default;
+    __MATX_INLINE__ ~tensor_impl_t() = default;
 
     /**
      * Constructor for a rank-0 tensor (scalar).
