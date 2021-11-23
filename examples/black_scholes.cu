@@ -111,7 +111,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   using dtype = double;
 
-  uint32_t input_size = 100000000;
+  index_t input_size = 100000000;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 

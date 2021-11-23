@@ -32,110 +32,82 @@
 
 #pragma once
 
+
 namespace matx {
 
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, index_t size0,
+
+template <int RANK>
+inline void get_grid_dims(dim3 &blocks, dim3 &threads, const index_t(&sizes)[RANK],
                           int max_cta_size = 1024)
 {
   int nt = 1;
   threads.x = 1;
   threads.y = 1;
   threads.z = 1;
-
   // Dynamic logic to pick thread block size.
   //   Fill in order x, y, z up to 1024 threads
-  while (nt < max_cta_size) {
-    if (static_cast<index_t>(threads.x) < size0) {
-      threads.x *= 2;
+  if constexpr (RANK == 4) {
+    while (nt < max_cta_size) {
+      if (static_cast<index_t>(threads.x) < sizes[3]) {
+        threads.x *= 2;
+      }
+      else if (static_cast<index_t>(threads.y) < sizes[1] * sizes[2]) {
+        threads.y *= 2;
+      }
+      else if (static_cast<index_t>(threads.z) < sizes[0]) {
+        threads.z *= 2;
+      }
+      nt *= 2;
     }
-    nt *= 2;
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((sizes[3] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<int>((sizes[1] * sizes[2] + threads.y - 1) / threads.y);
+    blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
   }
-  // launch as many blocks as necessary
-  blocks.x = static_cast<int>((size0 + threads.x - 1) / threads.x);
-  blocks.y = 1;
-  blocks.z = 1;
-}
-
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, index_t size0,
-                          index_t size1, int max_cta_size = 1024)
-{
-  int nt = 1;
-  threads.x = 1;
-  threads.y = 1;
-  threads.z = 1;
-
-  // Dynamic logic to pick thread block size.
-  //   Fill in order x, y, z up to 1024 threads
-  while (nt < max_cta_size) {
-    if (static_cast<index_t>(threads.x) < size1) {
-      threads.x *= 2;
+  else if constexpr (RANK == 3) {
+    while (nt < max_cta_size) {
+      if (static_cast<index_t>(threads.x) < sizes[2]) {
+        threads.x *= 2;
+      }
+      else if (static_cast<index_t>(threads.y) < sizes[1]) {
+        threads.y *= 2;
+      }
+      else if (static_cast<index_t>(threads.z) < sizes[0]) {
+        threads.z *= 2;
+      }
+      nt *= 2;
     }
-    else if (static_cast<index_t>(threads.y) < size0) {
-      threads.y *= 2;
-    }
-    nt *= 2;
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((sizes[2] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<int>((sizes[1] + threads.y - 1) / threads.y);
+    blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
   }
-  // launch as many blocks as necessary
-  blocks.x = static_cast<int>((size1 + threads.x - 1) / threads.x);
-  blocks.y = static_cast<int>((size0 + threads.y - 1) / threads.y);
-  blocks.z = 1;
-}
-
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, index_t size0,
-                          index_t size1, index_t size2, int max_cta_size = 1024)
-{
-  int nt = 1;
-  threads.x = 1;
-  threads.y = 1;
-  threads.z = 1;
-
-  // Dynamic logic to pick thread block size.
-  //   Fill in order x, y, z up to 1024 threads
-  while (nt < max_cta_size) {
-    if (static_cast<index_t>(threads.x) < size2) {
-      threads.x *= 2;
+  else if constexpr (RANK == 2) {
+    while (nt < max_cta_size) {
+      if (static_cast<index_t>(threads.x) < sizes[1]) {
+        threads.x *= 2;
+      }
+      else if (static_cast<index_t>(threads.y) < sizes[0]) {
+        threads.y *= 2;
+      }
+      nt *= 2;
     }
-    else if (static_cast<index_t>(threads.y) < size1) {
-      threads.y *= 2;
-    }
-    else if (static_cast<index_t>(threads.z) < size0) {
-      threads.z *= 2;
-    }
-    nt *= 2;
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
+    blocks.z = 1;  
   }
-  // launch as many blocks as necessary
-  blocks.x = static_cast<int>((size2 + threads.x - 1) / threads.x);
-  blocks.y = static_cast<int>((size1 + threads.y - 1) / threads.y);
-  blocks.z = static_cast<int>((size0 + threads.z - 1) / threads.z);
-}
-
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, index_t size0,
-                          index_t size1, index_t size2, index_t size3,
-                          int max_cta_size = 1024)
-{
-  int nt = 1;
-  threads.x = 1;
-  threads.y = 1;
-  threads.z = 1;
-
-  // Dynamic logic to pick thread block size.
-  //   Fill in order x, y, z up to 1024 threads
-  while (nt < max_cta_size) {
-    if (static_cast<index_t>(threads.x) < size3) {
-      threads.x *= 2;
+  else if constexpr (RANK == 1) {
+    while (nt < max_cta_size) {
+      if (static_cast<index_t>(threads.x) < sizes[0]) {
+        threads.x *= 2;
+      }
+      nt *= 2;
     }
-    else if (static_cast<index_t>(threads.y) < size1 * size2) {
-      threads.y *= 2;
-    }
-    else if (static_cast<index_t>(threads.z) < size0) {
-      threads.z *= 2;
-    }
-    nt *= 2;
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    blocks.y = 1;
+    blocks.z = 1;  
   }
-  // launch as many blocks as necessary
-  blocks.x = static_cast<int>((size3 + threads.x - 1) / threads.x);
-  blocks.y = static_cast<int>((size1 * size2 + threads.y - 1) / threads.y);
-  blocks.z = static_cast<int>((size0 + threads.z - 1) / threads.z);
 }
-
 } // end namespace matx

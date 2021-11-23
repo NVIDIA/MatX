@@ -1260,7 +1260,7 @@ public:
         this->operator()() = {real, imag};
       }
       else {
-        this->operator()(i) = *(vals.begin() + i);
+        this->operator()(static_cast<index_t>(i)) = *(vals.begin() + i);
       }
     }
   }
@@ -1292,7 +1292,7 @@ public:
           j++;
         }
         else {
-          this->operator()(i, j) = *((vals.begin() + i)->begin() + j);
+          this->operator()(static_cast<index_t>(i), static_cast<index_t>(j)) = *((vals.begin() + i)->begin() + j);
         }
       }
     }
@@ -1327,7 +1327,7 @@ public:
             k++;
           }
           else {
-            this->operator()(i, j, k) =
+            this->operator()(static_cast<index_t>(i), static_cast<index_t>(j), static_cast<index_t>(k)) =
                 *(((vals.begin() + i)->begin() + j)->begin() + k);
           }
         }
@@ -1371,7 +1371,7 @@ public:
               l++;
             }
             else {
-              this->operator()(i, j, k, l) =
+              this->operator()(static_cast<index_t>(i), static_cast<index_t>(j), static_cast<index_t>(k), static_cast<index_t>(l)) =
                   *((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
                     l);
             }

@@ -54,7 +54,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  uint32_t sig_size = 16;
+  index_t sig_size = 16;
   tensor_t<complex, 1> xv{{sig_size}};
   std::unique_ptr<MatXPybind> pb;
 };
@@ -65,7 +65,7 @@ TEST_F(RadarAmbiguityFunction, Cut2D)
 
   tensor_t<float, 2> amf2dv(
       {2 * sig_size - 1,
-       (long long)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
+       (index_t)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
 
   signal::ambgfun(amf2dv, xv, 1e3, signal::AMGBFUN_CUT_TYPE_2D, 1.0);
   MATX_TEST_ASSERT_COMPARE(pb, amf2dv, "amf_2d", 0.01);
@@ -78,7 +78,7 @@ TEST_F(RadarAmbiguityFunction, CutDelay)
   MATX_ENTER_HANDLER();
 
   tensor_t<float, 2> amf_delay_v(
-      {1, (long long)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
+      {1, (index_t)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
 
   signal::ambgfun(amf_delay_v, xv, 1e3, signal::AMGBFUN_CUT_TYPE_DELAY, 1.0);
 

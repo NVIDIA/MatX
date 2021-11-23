@@ -126,10 +126,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (index_t i = 0; i < filtered_size; i++) {
     if (fabs(time_out(i).real() - sig_freq(i).real()) > 0.001 ||
         fabs(time_out(i).imag() - sig_freq(i).imag()) > 0.001) {
-      printf(
-          "Verification failed at item %lld. Direct=%f%+.2fj, FFT=%f%+.2fj\n",
-          i, time_out(i).real(), time_out(i).imag(), sig_freq(i).real(),
-          sig_freq(i).imag());
+      std::cout <<
+          "Verification failed at item " << i << ". Direct=" << time_out(i).real() << " " << time_out(i).imag() << ", FFT=" <<
+          sig_freq(i).real() << " " <<
+          sig_freq(i).imag() << "\n";
       return -1;
     }
   }

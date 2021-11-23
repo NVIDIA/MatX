@@ -271,7 +271,7 @@ private:
 struct DnCholParamsKeyHash {
   std::size_t operator()(const DnCholParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.n)) + (std::hash<index_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size));
   }
 };
 
@@ -494,8 +494,8 @@ private:
 struct DnLUParamsKeyHash {
   std::size_t operator()(const DnLUParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.m)) + (std::hash<index_t>()(k.n)) +
-           (std::hash<index_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
+           (std::hash<uint64_t>()(k.batch_size));
   }
 };
 
@@ -763,8 +763,8 @@ private:
 struct DnQRParamsKeyHash {
   std::size_t operator()(const DnQRParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.m)) + (std::hash<index_t>()(k.n)) +
-           (std::hash<index_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
+           (std::hash<uint64_t>()(k.batch_size));
   }
 };
 
@@ -1029,8 +1029,8 @@ private:
 struct DnSVDParamsKeyHash {
   std::size_t operator()(const DnSVDParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.m)) + (std::hash<index_t>()(k.n)) +
-           (std::hash<index_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
+           (std::hash<uint64_t>()(k.batch_size));
   }
 };
 
@@ -1285,7 +1285,7 @@ private:
 struct DnEigParamsKeyHash {
   std::size_t operator()(const DnEigParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.m)) + (std::hash<index_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.batch_size));
   }
 };
 

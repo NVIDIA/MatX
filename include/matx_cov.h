@@ -213,8 +213,8 @@ public:
 struct CovParamsKeyHash {
   std::size_t operator()(const CovParams_t &k) const noexcept
   {
-    return std::hash<index_t>()((uint64_t)k.A) +
-           std::hash<index_t>()((size_t)k.stream);
+    return std::hash<uint64_t>()((uint64_t)k.A) +
+           std::hash<uint64_t>()((size_t)k.stream);
   }
 };
 

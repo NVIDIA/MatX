@@ -370,11 +370,11 @@ static auto matxMakeFilter(tensor_t<OutType, RANK> &o, InType &i,
   tensor_t<FilterType, 1> nonrec_v({static_cast<index_t>(h_nonrec.size())});
 
   for (size_t j = 0; j < h_rec.size(); j++) {
-    rec_v(j) = h_rec[j];
+    rec_v(static_cast<index_t>(j)) = h_rec[j];
   }
 
   for (size_t j = 0; j < h_nonrec.size(); j++) {
-    nonrec_v(j) = h_nonrec[j];
+    nonrec_v(static_cast<index_t>(j)) = h_nonrec[j];
   }
 
   return new matxFilter_t<NR, NNR, RANK, OutType, InType, FilterType>{
