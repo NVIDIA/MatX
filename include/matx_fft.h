@@ -288,7 +288,7 @@ protected:
   {
     [[maybe_unused]] cufftResult res;
 #ifndef INDEX_64_BIT
-    switch (params_.type) {
+    switch (DeduceFFTTransformType()) {
     case CUFFT_C2C:
       res = cufftExecC2C(this->plan_,
                                                 (cufftComplex *)idata,
@@ -1119,11 +1119,11 @@ virtual void inline Exec(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i,
 struct FftParamsKeyHash {
   std::size_t operator()(const FftParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.n[0])) + (std::hash<index_t>()(k.n[1])) +
-           (std::hash<index_t>()(k.fft_rank)) +
-           (std::hash<index_t>()(k.exec_type)) +
-           (std::hash<index_t>()(k.batch)) + (std::hash<index_t>()(k.istride)) +
-           (std::hash<index_t>()((uint64_t)k.stream));
+    return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
+           (std::hash<uint64_t>()(k.fft_rank)) +
+           (std::hash<uint64_t>()(k.exec_type)) +
+           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
+           (std::hash<uint64_t>()((uint64_t)k.stream));
   }
 };
 

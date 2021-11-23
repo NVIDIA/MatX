@@ -858,10 +858,10 @@ private:
 struct MatMulParamsKeyHash {
   std::size_t operator()(const MatMulParams_t &k) const noexcept
   {
-    return std::hash<index_t>()(k.m) + std::hash<index_t>()(k.n) +
-           std::hash<index_t>()(k.k) + std::hash<index_t>()(k.batch) +
-           std::hash<index_t>()(k.prov) +
-           std::hash<index_t>()((size_t)k.stream);
+    return std::hash<uint64_t>()(k.m) + std::hash<uint64_t>()(k.n) +
+           std::hash<uint64_t>()(k.k) + std::hash<uint64_t>()(k.batch) +
+           std::hash<uint64_t>()(k.prov) +
+           std::hash<uint64_t>()((size_t)k.stream);
   }
 };
 

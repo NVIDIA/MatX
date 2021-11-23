@@ -427,11 +427,11 @@ private:
 struct CubParamsKeyHash {
   std::size_t operator()(const CubParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.size)) + (std::hash<index_t>()(k.batches)) +
-           (std::hash<index_t>()((uint64_t)k.A)) +
-           (std::hash<index_t>()((uint64_t)k.a_out)) +
-           (std::hash<index_t>()((uint64_t)k.stream)) +
-           (std::hash<index_t>()((uint64_t)k.op));
+    return (std::hash<uint64_t>()(k.size)) + (std::hash<uint64_t>()(k.batches)) +
+           (std::hash<uint64_t>()((uint64_t)k.A)) +
+           (std::hash<uint64_t>()((uint64_t)k.a_out)) +
+           (std::hash<uint64_t>()((uint64_t)k.stream)) +
+           (std::hash<uint64_t>()((uint64_t)k.op));
   }
 };
 

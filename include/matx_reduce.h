@@ -904,17 +904,17 @@ void inline reduce(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType
   dim3 blocks, threads;
 
   if constexpr (InType::Rank() == 1) {
-    get_grid_dims(blocks, threads, in.Size(0));
+    get_grid_dims(blocks, threads, {in.Size(0)});
   }
   else if constexpr (InType::Rank() == 2) {
-    get_grid_dims(blocks, threads, in.Size(0), in.Size(1));
+    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1)});
   }
   else if constexpr (InType::Rank() == 3) {
-    get_grid_dims(blocks, threads, in.Size(0), in.Size(1), in.Size(2));
+    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1), in.Size(2)});
   }
   else if constexpr (InType::Rank() == 4) {
-    get_grid_dims(blocks, threads, in.Size(0), in.Size(1), in.Size(2),
-                  in.Size(3));
+    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1), in.Size(2),
+                  in.Size(3)});
   }
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);

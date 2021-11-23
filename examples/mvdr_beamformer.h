@@ -45,8 +45,8 @@ public:
    * Constructs and MVDRBeamformer object, and allocates all handles needed to
    * beamform.
    */
-  MVDRBeamformer(uint32_t num_beams, uint32_t num_el, uint32_t data_len,
-                 uint32_t snap_len)
+  MVDRBeamformer(index_t num_beams, index_t num_el, index_t data_len,
+                 index_t snap_len)
       : num_beams_(num_beams), num_el_(num_el), data_len_(data_len),
         snap_len_(snap_len)
   {
@@ -123,10 +123,10 @@ public:
   auto GetCovMatInvView() { return *invCovMatView; }
 
 private:
-  uint32_t num_beams_;
-  uint32_t num_el_;
-  uint32_t data_len_;
-  uint32_t snap_len_;
+  index_t num_beams_;
+  index_t num_el_;
+  index_t data_len_;
+  index_t snap_len_;
   cuda::std::complex<float> load_coeff_ = {0.1f, 0.f};
 
   tensor_t<complex, 2> *vView;

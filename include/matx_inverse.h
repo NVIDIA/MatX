@@ -304,10 +304,10 @@ private:
 struct InverseParamsKeyHash {
   std::size_t operator()(const InverseParams_t &k) const noexcept
   {
-    return (std::hash<index_t>()(k.n)) + (std::hash<index_t>()(k.batch_size)) +
-           (std::hash<index_t>()((uint64_t)k.A)) +
-           (std::hash<index_t>()((uint64_t)k.A_inv)) +
-           (std::hash<index_t>()((uint64_t)k.stream));
+    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size)) +
+           (std::hash<uint64_t>()((uint64_t)k.A)) +
+           (std::hash<uint64_t>()((uint64_t)k.A_inv)) +
+           (std::hash<uint64_t>()((uint64_t)k.stream));
   }
 };
 

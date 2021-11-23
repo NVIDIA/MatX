@@ -44,10 +44,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   using complex = cuda::std::complex<float>;
 
-  uint32_t num_samp = 100000000;
-  uint32_t num_samp_resamp = 100000;
-  uint32_t N = std::min(num_samp, num_samp_resamp);
-  uint32_t nyq = N / 2 + 1;
+  index_t num_samp = 100000000;
+  index_t num_samp_resamp = 100000;
+  index_t N = std::min(num_samp, num_samp_resamp);
+  index_t nyq = N / 2 + 1;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 

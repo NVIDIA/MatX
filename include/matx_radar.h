@@ -192,7 +192,7 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
   }
 
   index_t len_seq = x_normdiv_v.Size(RANK - 1) + y_normdiv_v.Size(RANK - 1);
-  uint32_t nfreq = static_cast<uint32_t>(
+  index_t nfreq = static_cast<index_t>(
       powf(2.0, static_cast<float>(std::ceil(std::log2(len_seq - 1)))));
   index_t xlen = x_normdiv_v.Size(RANK - 1);
 

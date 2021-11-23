@@ -121,8 +121,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wduplicated-cond
         -Wduplicated-branches
         -Wlogical-op
-        -Wnull-dereference
-        -Wuseless-cast)
+        -Wnull-dereference)
 endif()
 
 # CUTLASS slows down compile times when used, so leave it as optional for now

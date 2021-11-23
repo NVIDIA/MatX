@@ -69,12 +69,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&stop);
 
   float fs = 10000;
-  uint32_t N = 100000;
+  index_t N = 100000;
   float amp = static_cast<float>(2 * sqrt(2));
-  uint32_t nperseg = 256;
-  uint32_t nfft = 256;
-  uint32_t noverlap = nperseg / 8;
-  uint32_t nstep = nperseg - noverlap;
+  index_t nperseg = 256;
+  index_t nfft = 256;
+  index_t noverlap = nperseg / 8;
+  index_t nstep = nperseg - noverlap;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 

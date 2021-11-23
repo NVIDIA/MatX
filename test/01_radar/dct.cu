@@ -43,7 +43,7 @@ using complex = cuda::std::complex<float>;
 
 class DctTests : public ::testing::Test {
 protected:
-  uint32_t sig_size = 100;
+  index_t sig_size = 100;
   void SetUp() override
   {
 

@@ -142,14 +142,14 @@ class CUDADeviceExecutor {
         else if constexpr (op.Rank() == 1) {
           index_t size0 = op.Size(0);
 
-          get_grid_dims(blocks, threads, size0, 256);
+          get_grid_dims(blocks, threads, {size0}, 256);
           matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0);     
         }
         else if constexpr (op.Rank() == 2) {
           index_t size0 = op.Size(0);
           index_t size1 = op.Size(1);
 
-          get_grid_dims(blocks, threads, size0, size1, 256);
+          get_grid_dims(blocks, threads, {size0, size1}, 256);
           matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1);
         }
         else if constexpr (op.Rank() == 3) {
@@ -157,7 +157,7 @@ class CUDADeviceExecutor {
           index_t size1 = op.Size(1);
           index_t size2 = op.Size(2);
 
-          get_grid_dims(blocks, threads, size0, size1, size2, 256);
+          get_grid_dims(blocks, threads, {size0, size1, size2}, 256);
           matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1, size2);
         }
         else {
@@ -166,7 +166,7 @@ class CUDADeviceExecutor {
           index_t size2 = op.Size(2);
           index_t size3 = op.Size(3);
 
-          get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
+          get_grid_dims(blocks, threads, {size0, size1, size2, size3}, 256);
           matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(tmp, size0, size1, size2, size3);
         } 
 
@@ -181,14 +181,14 @@ class CUDADeviceExecutor {
         else if constexpr (op.Rank() == 1) {
           index_t size0 = op.Size(0);
 
-          get_grid_dims(blocks, threads, size0, 256);
+          get_grid_dims(blocks, threads, {size0}, 256);
           matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, size0);      
         }
         else if constexpr (op.Rank() == 2) {
           index_t size0 = op.Size(0);
           index_t size1 = op.Size(1);
 
-          get_grid_dims(blocks, threads, size0, size1, 256);
+          get_grid_dims(blocks, threads, {size0, size1}, 256);
           matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1);
         }
         else if constexpr (op.Rank() == 3) {
@@ -196,7 +196,7 @@ class CUDADeviceExecutor {
           index_t size1 = op.Size(1);
           index_t size2 = op.Size(2);
 
-          get_grid_dims(blocks, threads, size0, size1, size2, 256);
+          get_grid_dims(blocks, threads, {size0, size1, size2}, 256);
           matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2);
         }
         else {
@@ -205,7 +205,7 @@ class CUDADeviceExecutor {
           index_t size2 = op.Size(2);
           index_t size3 = op.Size(3);
 
-          get_grid_dims(blocks, threads, size0, size1, size2, size3, 256);
+          get_grid_dims(blocks, threads, {size0, size1, size2, size3}, 256);
           matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2, size3);
         } 
       }

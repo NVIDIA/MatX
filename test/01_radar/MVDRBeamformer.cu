@@ -44,10 +44,10 @@ TEST(Radar, MVDRBeamformer)
 {
   MATX_ENTER_HANDLER();
 
-  uint32_t num_beams = 60;
-  uint32_t num_el = 6;
-  uint32_t data_len = 1000;
-  uint32_t snap_len = 2 * num_el;
+  index_t num_beams = 60;
+  index_t num_el = 6;
+  index_t data_len = 1000;
+  index_t snap_len = 2 * num_el;
 
   auto mvdr = MVDRBeamformer(num_beams, num_el, data_len, snap_len);
 
