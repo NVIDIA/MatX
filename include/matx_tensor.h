@@ -1491,7 +1491,7 @@ public:
       MATX_ASSERT_STR(first < end, matxInvalidParameter,
                       "Starting slice must be less than end slice");
       MATX_ASSERT_STR(first < this->Size(i), matxInvalidParameter,
-                      "Index to slice is larger than the tensor rank");
+                      "Requested slice start index out of bounds");
 
       // offset by first
       data += first * this->s_[i];
