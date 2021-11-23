@@ -125,14 +125,12 @@ class CUDADeviceExecutor {
     template <typename Op>
     void Exec(Op &op) const noexcept {
   #ifdef __CUDACC__      
-      dim3 threads, blocks;   
-
+      dim3 threads, blocks;  
+      
+      // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
+      // need to error out and have them break up the statement
       MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
-        "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple" \
-        " executions to limit the size of the parameters") {
-        // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
-        // need to error out and have them break up the statement
-      }
+        "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
       if constexpr (op.Rank() == 0) {
         threads = 1;
