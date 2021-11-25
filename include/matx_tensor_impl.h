@@ -656,9 +656,9 @@ class tensor_impl_t {
       else if constexpr (RANK == 3) {
         return this->operator()(idx[0], idx[1], idx[2]);
       }
-      else if constexpr (RANK == 4) {
+      else {
         return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-      }            
+      }
     }  
 
     /**
@@ -679,9 +679,9 @@ class tensor_impl_t {
       else if constexpr (RANK == 3) {
         return this->operator()(idx[0], idx[1], idx[2]);
       }
-      else if constexpr (RANK == 4) {
+      else {
         return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-      }            
+      }
     }    
 
     /**
