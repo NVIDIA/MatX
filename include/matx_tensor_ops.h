@@ -141,13 +141,11 @@ namespace matx
  * @param stream
  *   CUDA stream to operate in
  */
-  template <class T, int Rank>
-  __MATX_INLINE__ void copy(tensor_impl_t<T, Rank> out, const tensor_impl_t<T, Rank> &in,
+  template <typename OutputTensor, typename InputTensor>
+  __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
                    const cudaStream_t stream)
   {
-    constexpr int rank = Rank;
-
-    for (int i = 0; i < rank; i++)
+    for (int i = 0; i < OutputTensor::Rank(); i++)
     {
       MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
     }
@@ -174,12 +172,12 @@ namespace matx
  *   CUDA stream to operate in
  *
  */
-  template <class T, int RANK>
-  __MATX_INLINE__ void transpose(tensor_impl_t<T, RANK> &out,
-                        const tensor_impl_t<T, RANK> &in,
+  template <typename OutputTensor, typename InputTensor>
+  __MATX_INLINE__ void transpose(OutputTensor &out,
+                        const InputTensor &in,
                         const cudaStream_t stream)
   {
-
+    constexpr int RANK = OutputTensor::Rank();
     if constexpr (RANK <= 1)
     {
       return;
@@ -191,7 +189,7 @@ namespace matx
     }
 
 #ifdef __CUDACC__  
-    size_t shm = sizeof(T) * TILE_DIM * (TILE_DIM + 1);
+    size_t shm = sizeof(typename OutputTensor::scalar_type) * TILE_DIM * (TILE_DIM + 1);
     if constexpr (RANK == 2)
     {
       dim3 block(TILE_DIM, TILE_DIM);
@@ -269,7 +267,7 @@ namespace matx
     using scalar_type = void;
     __MATX_INLINE__ IF(T1 cond, T2 op) : cond_(cond), op_(op)
     {
-      static_assert((!is_tensor_view_t<T2>()),
+      static_assert((!is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IF. Tensor views are "
                     "not allowed");
       constexpr index_t rank1 = get_rank<T1>();
@@ -351,7 +349,7 @@ namespace matx
     using scalar_type = void;
     __MATX_INLINE__ IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
     {
-      static_assert((!is_tensor_view_t<T1>() && !is_tensor_view_t<T2>()),
+      static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IFELSE. Tensor views "
                     "are not allowed");
       constexpr int32_t rank0 = get_rank<C1>();
@@ -442,7 +440,7 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()()  { return op_(); }
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
     {
       if constexpr (DIM == 0)
@@ -1691,20 +1689,6 @@ namespace matx
     }
 };
 
-
-
-// Returns an address of a pointer of type T aligned to new address
-template <typename T>
-constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
-{
-  if (((uint64_t)addr % std::alignment_of_v<T>) != 0) {
-    return reinterpret_cast<T *>(
-        ((uint64_t)addr + (std::alignment_of_v<T> - 1)) /
-        std::alignment_of_v<T> * std::alignment_of_v<T>);
-  }
-
-  return reinterpret_cast<T *>(addr);
-}  
 
 #define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
   template <typename I1,                                            \

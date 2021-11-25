@@ -152,40 +152,48 @@ public:
   }
 };
 
-template <typename T1, typename T2, int RANK>
-void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
-                     std::optional<tensor_t<T1, RANK>> y,
+template <typename AMFTensor, typename XTensor>
+void InternalAmbgFun(AMFTensor &amf, XTensor &x,
+                     std::optional<XTensor> &y,
                      [[maybe_unused]] double fs, AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
+  constexpr int RANK = XTensor::Rank();
+  using T1 = typename XTensor::scalar_type;
+  using T2 = typename AMFTensor::scalar_type;
+
   T1 *x_normdiv, *y_normdiv;
   float *x_norm, *y_norm;
 
   MATX_STATIC_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
-  tensor_t<T1, RANK> ry(x);
+  auto ry = x.View();
+  //tensor_t<T1, RANK> ry(x);
 
   matxAlloc(reinterpret_cast<void **>(&x_normdiv),
             sizeof(T1) * x.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
   matxAlloc(reinterpret_cast<void **>(&x_norm), sizeof(*x_norm),
             MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  auto x_normdiv_v = tensor_t<T1, 1>(x_normdiv, x.Shape());
-  auto x_norm_v = tensor_t<float, 0>(x_norm);
+printf("Alloc x_normdiv %p\n", x_normdiv);
+printf("Alloc x_norm %p\n", x_norm);
+  auto x_normdiv_v = make_tensor<T1>(x_normdiv, x.Shape());
+  auto x_norm_v = make_tensor<float>(x_norm);
 
   reduce(x_norm_v, norm(x), reduceOpSum<float>(), 0);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
   (x_normdiv_v = x / x_norm_v).run(stream);
 
-  tensor_t<T1, RANK> y_normdiv_v(x_normdiv_v.Data(), x_normdiv_v.Shape());
+  auto y_normdiv_v = x_normdiv_v.View();
 
   if (y) {
-    ry.Shallow(y.value());
+    ry.Reset(y.value().Data(), y.value().Shape());
     matxAlloc(reinterpret_cast<void **>(&y_normdiv),
               sizeof(T1) * ry.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
     matxAlloc(reinterpret_cast<void **>(&y_norm), sizeof(*y_norm),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-    y_normdiv_v.Shallow(tensor_t<T1, RANK>(y_normdiv, ry.Shape()));
-    auto y_norm_v = tensor_t<float, 0>(y_norm);
+printf("Alloc y_normdiv %p\n", y_normdiv);
+printf("Alloc y_norm %p\n", y_norm);              
+    y_normdiv_v.Reset(y_normdiv, ry.Shape());
+    auto y_norm_v = make_tensor<float>(y_norm);
 
     reduce(y_norm_v, norm(ry), reduceOpSum<float>(), 0);
     (y_normdiv_v = ry / y_norm_v).run(stream);
@@ -201,7 +209,8 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&new_ynorm),
               sizeof(T1) * (len_seq - 1) * xlen, MATX_ASYNC_DEVICE_MEMORY,
               stream);
-    auto new_ynorm_v = tensor_t<T1, 2>(new_ynorm, {len_seq - 1, xlen});
+printf("Alloc new_ynorm %p\n", new_ynorm);              
+    auto new_ynorm_v = make_tensor<T1>(new_ynorm, {len_seq - 1, xlen});
 
     newYNorm(new_ynorm_v, x_normdiv_v, y_normdiv_v).run(stream);
 
@@ -209,11 +218,12 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&fft_data),
               sizeof(*fft_data) * nfreq * (len_seq - 1),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto fullfft = tensor_t<T1, 2>(fft_data, {{(len_seq - 1), nfreq}});
+    printf("Alloc fft_data %p\n", fft_data);    
+    auto fullfft = make_tensor<T1>(fft_data, {(len_seq - 1), nfreq});
     auto partfft = fullfft.Slice({0, 0}, {(len_seq - 1), xlen});
 
     (fullfft = 0).run(stream);
-    copy(partfft, new_ynorm_v, stream);
+    matx::copy(partfft, new_ynorm_v, stream);
 
     ifft(fullfft, fullfft, stream);
 
@@ -222,12 +232,10 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&amf_tmp),
               sizeof(*amf_tmp) * nfreq * (len_seq - 1),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto amf_tmp_v = tensor_t<T1, 2>(amf_tmp, {{(len_seq - 1), nfreq}});
+printf("Alloc amf_tmp %p\n", amf_tmp);                  
+    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {(len_seq - 1), nfreq});
     (amf_tmp_v = (float)nfreq * abs(fftshift1D(fullfft))).run(stream);
-    copy(amf, amf_tmp_v.RealView(), stream);
-
-    matxFree(fft_data);
-    matxFree(amf_tmp);
+    matx::copy(amf, amf_tmp_v.RealView(), stream);
   }
   else if (cut == AMGBFUN_CUT_TYPE_DELAY) {
     T1 *fft_data_x, *fft_data_y, *amf_tmp;
@@ -235,20 +243,20 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
               sizeof(*fft_data_x) * nfreq, MATX_ASYNC_DEVICE_MEMORY, stream);
     matxAlloc(reinterpret_cast<void **>(&fft_data_y),
               sizeof(*fft_data_y) * nfreq, MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto fullfft_x = tensor_t<T1, 1>(fft_data_x, {nfreq});
+    auto fullfft_x = make_tensor<T1>(fft_data_x, {nfreq});
     auto partfft_x = fullfft_x.Slice({0}, {xlen});
     (fullfft_x = 0).run(stream);
-    copy(partfft_x, x_normdiv_v, stream);
+    matx::copy(partfft_x, x_normdiv_v, stream);
 
     fft(fullfft_x, fullfft_x, stream);
     AmbgFftXOp(fullfft_x, fullfft_x, fs, cut_val, (float)nfreq).run(stream);
     ifft(fullfft_x, fullfft_x, stream);
 
-    auto fullfft_y = tensor_t<T1, 1>(fft_data_y, {nfreq});
+    auto fullfft_y = make_tensor<T1>(fft_data_y, {nfreq});
     (fullfft_y = 0).run(stream);
 
     auto partfft_y = fullfft_y.Slice({0}, {xlen});
-    copy(partfft_y, y_normdiv_v, stream);
+    matx::copy(partfft_y, y_normdiv_v, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
     ifft(fullfft_y, fullfft_y, stream);
 
@@ -257,16 +265,13 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&amf_tmp),
               sizeof(*amf_tmp) * fullfft_y.Size(0), MATX_ASYNC_DEVICE_MEMORY,
               stream);
-    auto amf_tmp_v = tensor_t<T1, 1>(amf_tmp, {fullfft_y.Size(0)});
+    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {fullfft_y.Size(0)});
 
     (amf_tmp_v = (float)nfreq * abs(ifftshift1D(fullfft_y))).run(stream);
 
-    auto amfv = tensor_t<T1, 2>(amf_tmp_v.Data(), {1, amf.Size(1)});
-    copy(amf, amfv.RealView(), stream);
-
-    matxFree(amf_tmp);
-    matxFree(fft_data_x);
-    matxFree(fft_data_y);
+    std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
+    auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
+    matx::copy(amf, amfv.RealView(), stream);
   }
   else if (cut == AMGBFUN_CUT_TYPE_DOPPLER) {
     T1 *fft_data_x, *fft_data_y, *amf_tmp;
@@ -276,17 +281,18 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&fft_data_y),
               sizeof(*fft_data_y) * (len_seq - 1), MATX_ASYNC_DEVICE_MEMORY,
               stream);
-    auto fullfft_y = tensor_t<T1, 1>(fft_data_y, {len_seq - 1});
+    auto fullfft_y = make_tensor<T1>(fft_data_y, {len_seq - 1});
     auto partfft_y = fullfft_y.Slice({0}, {y_normdiv_v.Size(0)});
 
     (fullfft_y = 0).run(stream);
-    copy(partfft_y, y_normdiv_v, stream);
+    matx::copy(partfft_y, y_normdiv_v, stream);
     fft(fullfft_y, fullfft_y, stream);
 
-    auto fullfft_x = tensor_t<T1, 1>(fft_data_x, {len_seq - 1});
+    auto fullfft_x = make_tensor<T1>(fft_data_x, {len_seq - 1});
     (fullfft_x = 0).run(stream);
 
-    auto partfft_x = tensor_t<T1, 1>(fft_data_x, {x_normdiv_v.Size(0)});
+    std::array<index_t, 1> xnd_size = {x_normdiv_v.Size(0)};
+    auto partfft_x = make_tensor(fullfft_x.GetStorage(), xnd_size);
 
     AmbgDoppX(partfft_x, x_normdiv_v, fs, cut_val).run(stream);
     fft(fullfft_x, fullfft_x, stream);
@@ -296,26 +302,21 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
     matxAlloc(reinterpret_cast<void **>(&amf_tmp),
               sizeof(*amf_tmp) * fullfft_x.Size(0), MATX_ASYNC_DEVICE_MEMORY,
               stream);
-    auto amf_tmp_v = tensor_t<T1, 1>(amf_tmp, {fullfft_x.Size(0)});
+    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {fullfft_x.Size(0)});
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
     ifft(fullfft_y, fullfft_y, stream);
 
     (amf_tmp_v = abs(fftshift1D(fullfft_y))).run(stream);
 
-    auto amfv = tensor_t<T1, 2>(amf_tmp_v.Data(), {1, amf.Size(1)});
-    copy(amf, amfv.RealView(), stream);
-    matxFree(amf_tmp);
-    matxFree(fft_data_x);
-    matxFree(fft_data_y);
+    std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
+    auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
+    matx::copy(amf, amfv.RealView(), stream);
   }
 
-  matxFree(x_normdiv);
-  matxFree(x_norm);
-
-  if (y) {
-    matxFree(y_normdiv);
-    matxFree(y_norm);
-  }
+  // if (y) {
+  //   matxFree(y_normdiv);
+  //   matxFree(y_norm);
+  // }
 }
 
 /**
@@ -352,9 +353,9 @@ void InternalAmbgFun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
  *   CUDA stream
  *
  */
-template <typename T1, typename T2, int RANK>
-inline void ambgfun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
-                    tensor_t<T1, RANK> y, double fs, AMBGFunCutType_t cut,
+template <typename AMFTensor, typename XTensor, typename YTensor>
+inline void ambgfun(AMFTensor &amf, XTensor &x,
+                    YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0, cudaStream_t stream = 0)
 {
   InternalAmbgFun(amf, x, std::make_optional(y), fs, cut, cut_val, stream);
@@ -391,12 +392,14 @@ inline void ambgfun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
  *   CUDA stream
  *
  */
-template <typename T1, typename T2, int RANK>
-inline void ambgfun(tensor_t<T2, 2> &amf, tensor_t<T1, RANK> x,
+template <typename AMFTensor, typename XTensor>
+inline void ambgfun(AMFTensor &amf, XTensor &x,
                     double fs, AMBGFunCutType_t cut, float cut_val = 0.0,
                     cudaStream_t stream = 0)
 {
-  std::optional<tensor_t<T1, RANK>> nil = std::nullopt;
+  static_assert(AMFTensor::Rank() == 2, "Output tensor of ambgfun must be 2D");
+  
+  std::optional<XTensor> nil = std::nullopt;
   InternalAmbgFun(amf, x, nil, fs, cut, cut_val, stream);
 }
 }; // namespace signal

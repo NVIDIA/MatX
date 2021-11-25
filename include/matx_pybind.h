@@ -143,14 +143,15 @@ public:
     return "";
   }
 
-  template <typename T, int RANK>
-  static py::object GetEmptyNumpy(const tensor_t<T, RANK> &ten)
+  template <typename TensorType>
+  static py::object GetEmptyNumpy(const TensorType &ten)
   {
+    using T = typename TensorType::scalar_type;
     auto np = py::module_::import("numpy");
     py::list dims;
 
     // Set up dims of numpy tensor
-    for (int i = 0; i < RANK; i++) {
+    for (int i = 0; i < TensorType::Rank(); i++) {
       dims.append(ten.Size(i));
     }
 
@@ -274,18 +275,20 @@ public:
     return {in.real(), in.imag()};
   }
 
-  template <typename TensorType, int RANK>
-  void NumpyToTensorView(matx::tensor_t<TensorType, RANK> ten,
+  template <typename TensorType>
+  void NumpyToTensorView(TensorType &ten,
                          const std::string fname)
   {
     auto resobj = res_dict[fname.c_str()];
     NumpyToTensorView(ten, resobj);
   }
 
-  template <typename T, int RANK>
-  void NumpyToTensorView(matx::tensor_t<T, RANK> ten,
+  template <typename TensorType>
+  void NumpyToTensorView(TensorType ten,
                          const pybind11::object &np_ten)
   {
+    using T = typename TensorType::scalar_type;
+    constexpr int RANK = TensorType::Rank();
     using ntype = matx_convert_complex_type<T>;
     auto ften = py::array_t<ntype>(np_ten);
 
@@ -315,11 +318,13 @@ public:
     }
   }
 
-  template <typename T, int RANK>
+  template <typename TensorType>
   void TensorViewToNumpy(pybind11::object &np_ten,
-                         const matx::tensor_t<T, RANK> &ten)
+                         const TensorType &ten)
   {
-    using ntype = matx_convert_complex_type<T>;
+    constexpr int RANK = TensorType::Rank();
+
+    using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
     auto ften = py::array_t<ntype>(np_ten);
 
     for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
@@ -349,15 +354,16 @@ public:
     }
   }
 
-  template <typename TensorType, int RANK,
-            typename CT = matx_convert_complex_type<TensorType>>
+  template <typename TensorType, 
+            typename CT = matx_convert_complex_type<typename TensorType::scalar_type>>
   std::optional<TestFailResult<CT>>
-  CompareOutput(const matx::tensor_t<TensorType, RANK> &ten,
+  CompareOutput(const TensorType &ten,
                 const std::string fname, double thresh, bool debug = false)
   {
-    using ntype = matx_convert_complex_type<TensorType>;
+    using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
     auto resobj = res_dict[fname.c_str()];
     auto ften = py::array_t<ntype>(resobj);
+    constexpr int RANK = TensorType::Rank();
 
     cudaDeviceSynchronize();
 

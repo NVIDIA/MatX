@@ -92,6 +92,7 @@ TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNoHalfTypes);
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
 {
   MATX_ENTER_HANDLER();
+
   auto pb = std::make_unique<MatXPybind>();
   constexpr index_t size = 100;
   pb->InitAndRunTVGenerator<TypeParam>("00_operators", "stats", "run", {size});
@@ -353,7 +354,7 @@ TEST(ReductionTests, MinMax)
     argmax(t1o_small, t1i_small, t2o);
     cudaStreamSynchronize(0);
 
-    // We need to convert the absolue index into relative before comparing
+    // We need to convert the absolute index into relative before comparing
     auto rel = t2o.GetIdxFromAbs(t1i_small(0));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(5)));
     rel = t2o.GetIdxFromAbs(t1i_small(1));
@@ -457,21 +458,21 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
   {
     tensor_t<TypeParam, 0> t0;
 
-    tensorShape_t<2> s2({3, 4});
-    tensorShape_t<1> s1({3});
+    std::array<index_t, 2> s2{3, 4};
+    std::array<index_t, 1> s1{3};
 
     tensor_t<TypeParam, 1> t1{s1};
     tensor_t<TypeParam, 2> t2{s2};
     TypeParam t1p = (TypeParam)1;
-    for (int i = 0; i < s1.Size(0); i++) {
+    for (int i = 0; i < t1.Size(0); i++) {
       t1(i) = static_cast<value_promote_t<TypeParam>>((float)rand() /
                                                       (float)INT_MAX * 2.0f);
       t1p *= t1(i);
     }
 
     TypeParam t2p = (TypeParam)1;
-    for (int i = 0; i < s2.Size(0); i++) {
-      for (int j = 0; j < s2.Size(1); j++) {
+    for (int i = 0; i < t2.Size(0); i++) {
+      for (int j = 0; j < t2.Size(1); j++) {
         t2(i, j) = static_cast<value_promote_t<TypeParam>>(
             (float)rand() / (float)INT_MAX * 2.0f);
         t2p *= t2(i, j);

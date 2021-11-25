@@ -53,8 +53,10 @@ struct CovParams_t {
   cudaStream_t stream;
 };
 
-template <typename T1, int RANK> class matxCovHandle_t {
+template <typename TensorTypeC, typename TensorTypeA> class matxCovHandle_t {
 public:
+  static constexpr int RANK = TensorTypeA::Rank();
+  using T1 = typename TensorTypeA::scalar_type;
   /**
    * Construct a handle for computing a covariance matrix
    *
@@ -73,13 +75,8 @@ public:
    * @param c
    *   C output covariance matrix view
    */
-#ifdef DOXYGEN_ONLY
-  matxCovHandle_t(tensor_t c, tensor_t a)
+  matxCovHandle_t(TensorTypeC &c, const TensorTypeA &a)
   {
-#else
-  matxCovHandle_t(tensor_t<T1, RANK> c, tensor_t<T1, RANK> a)
-  {
-#endif
     static_assert(RANK >= 2);
     MATX_ASSERT(c.Size(RANK - 1) == c.Size(RANK - 2), matxInvalidSize);
     MATX_ASSERT(a.Size(RANK - 1) == c.Size(RANK - 1), matxInvalidSize);
@@ -92,9 +89,9 @@ public:
     // This must come before the things below to properly set class parameters
     params_ = GetCovParams(c, a);
 
-    onesM = new tensor_t<T1, 2>({a.Size(RANK - 2), a.Size(RANK - 2)});
-    means = new tensor_t<T1, RANK>(a.Shape());
-    devs = new tensor_t<T1, RANK>(a.Shape());
+    onesM = make_tensor_p<T1>({a.Size(RANK - 2), a.Size(RANK - 2)});
+    means = make_tensor_p<T1>(a.Shape());
+    devs = make_tensor_p<T1>(a.Shape());
 
     // Transposed view of deviations
     tensorShape_t<RANK> tmp;
@@ -102,21 +99,15 @@ public:
       tmp.SetSize(i, a.Size(RANK - i - 1));
     }
 
-    devsT = new tensor_t<T1, RANK>(tmp);
-
-    onesMM = new matxMatMulHandle_t<T1, T1, T1, RANK, PROVIDER_TYPE_CUBLASLT>(
-        *means, *onesM, a);
-    covMM = new matxMatMulHandle_t<T1, T1, T1, RANK, PROVIDER_TYPE_CUBLASLT>(
-        c, *devsT, *devs);
+    devsT = make_tensor_p<T1>(tmp);
 
     // Populate our ones matrix
     exec(set(*onesM,
-             ones(tensorShape_t<2>({a.Size(RANK - 2), a.Size(RANK - 2)}))),
+             ones({a.Size(RANK - 2), a.Size(RANK - 2)})),
          0);
   }
 
-  static CovParams_t GetCovParams([[maybe_unused]] tensor_t<T1, RANK> &c,
-                                  tensor_t<T1, RANK> &a)
+  static CovParams_t GetCovParams([[maybe_unused]] TensorTypeC &c, const TensorTypeA &a)
   {
     CovParams_t params;
     params.dtype = TypeToInt<T1>();
@@ -137,8 +128,6 @@ public:
     delete onesM;
     delete means;
     delete devs;
-    delete onesMM;
-    delete covMM;
   }
 
 /**
@@ -162,16 +151,11 @@ public:
  *   CUDA stream
  *
  */
-#ifdef DOXYGEN_ONLY
-    inline void Exec(tensor_t &c, 
-          tensor_t &a, cudaStream_t stream {
-#else
-  inline void Exec(tensor_t<T1, RANK> &c, tensor_t<T1, RANK> &a,
+  inline void Exec(TensorTypeC &c, const TensorTypeA &a,
                    cudaStream_t stream)
   {
-#endif
     // Calculate a matrix of means
-    onesMM->Exec(*means, *onesM, a, stream,
+    matmul(*means, *onesM, a, stream,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
 
     // Subtract the means from the observations to get the deviations
@@ -190,18 +174,16 @@ public:
     }
 
     // Multiply by itself and scale by N-1 for the final covariance
-    covMM->Exec(c, *devsT, *devs, stream,
+    matmul(c, *devsT, *devs, stream,
                 1.0f / static_cast<float>(a.Size(RANK - 2) - 1));
-      }    
+  }    
 
   private:
     // Member variables
-    matxMatMulHandle_t<T1, T1, T1, RANK, PROVIDER_TYPE_CUBLASLT> *onesMM;
-    matxMatMulHandle_t<T1, T1, T1, RANK, PROVIDER_TYPE_CUBLASLT> *covMM;
     tensor_t<T1, 2> *onesM;
     tensor_t<T1, RANK> *means;
     tensor_t<T1, RANK> *devs;
-    tensor_t<T1, RANK> *devsT;
+    tensor_t<T1, RANK> *devsT;  
     CovParams_t params_;
 };
 
@@ -253,24 +235,24 @@ static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void cov(tensor_t<T1, RANK> c, tensor_t<T1, RANK> a,
+template <typename TensorTypeC, typename TensorTypeA>
+void cov(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
   // Get parameters required by these tensors
-  auto params = matxCovHandle_t<T1, RANK>::GetCovParams(c, a);
+  auto params = matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a);
   params.stream = stream;
 
   // Get cache or new cov plan if it doesn't exist
   auto ret = cov_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxCovHandle_t<T1, RANK>{c, a};
+    auto tmp = new matxCovHandle_t<TensorTypeC, TensorTypeA>{c, a};
     cov_cache.Insert(params, static_cast<void *>(tmp));
 
     tmp->Exec(c, a, stream);
   }
   else {
-    auto cov_type = static_cast<matxCovHandle_t<T1, RANK> *>(ret.value());
+    auto cov_type = static_cast<matxCovHandle_t<TensorTypeC, TensorTypeA> *>(ret.value());
     cov_type->Exec(c, a, stream);
   }
 }

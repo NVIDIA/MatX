@@ -91,14 +91,15 @@ public:
  *   CUDA stream
  *
  **/
-template <typename T, int RANK>
-void dct(tensor_t<T, RANK> &out, tensor_t<T, RANK> &in,
+template <typename OutputTensor, typename InputTensor>
+void dct(OutputTensor &out, const InputTensor &in,
          const cudaStream_t stream = 0)
 {
-  MATX_STATIC_ASSERT(RANK == 1, matxInvalidDim);
-  index_t N = in.Size(RANK - 1);
+  static_assert(OutputTensor::Rank() == InputTensor::Rank(), "DCT input and output tensor ranks must match");
+  MATX_STATIC_ASSERT(OutputTensor::Rank() == 1, matxInvalidDim);
+  index_t N = in.Size(OutputTensor::Rank() - 1);
 
-  tensor_t<cuda::std::complex<T>, 1> tmp{{N + 1}};
+  tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
   fft(tmp, in);
   auto s = tmp.Slice({0}, {N});
   dctOp(out, s, N).run(stream);

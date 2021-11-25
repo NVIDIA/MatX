@@ -64,9 +64,6 @@ public:
     abfAView = new tensor_t<complex, 2>({num_beams, num_beams});
     abfAInvView = new tensor_t<complex, 2>({num_beams, num_beams});
     abfWeightsView = new tensor_t<complex, 2>({num_el, num_beams});
-
-    cbf_mm = new matxMatMulHandle_t(*cbfView, *vhView, *inVecView);
-    cov_mat_mm = new matxMatMulHandle_t(*covMatView, *ivsView, *ivshView);
   }
 
   /**
@@ -94,13 +91,13 @@ public:
   {
     (*vhView = hermitianT(*vView)).run(stream);
 
-    cbf_mm->Exec(*cbfView, *vhView, *inVecView, stream);
+    matmul(*cbfView, *vhView, *inVecView, stream);
 
-    copy(*ivsView, inVecView->Slice({0, 0}, {matxEnd, snap_len_}), stream);
+    matx::copy(*ivsView, inVecView->Slice({0, 0}, {matxEnd, snap_len_}), stream);
 
     (*ivshView = hermitianT(*ivsView)).run(stream);
 
-    cov_mat_mm->Exec(*covMatView, *ivsView, *ivshView, stream);
+    matmul(*covMatView, *ivsView, *ivshView, stream);
 
     (*covMatView = (*covMatView * (1.0f / static_cast<float>(snap_len_))) +
                    eye<complex>({num_el_, num_el_}) * load_coeff_)
@@ -142,7 +139,4 @@ private:
   tensor_t<complex, 2> *abfAView;
   tensor_t<complex, 2> *abfBView;
   tensor_t<complex, 2> *abfAInvView;
-
-  matxMatMulHandle_t<complex, complex, complex, 2> *cbf_mm;
-  matxMatMulHandle_t<complex, complex, complex, 2> *cov_mat_mm;
 };

@@ -245,4 +245,20 @@ inline void matxFree(void *ptr)
   allocationMap.erase(iter);
 }
 
+// Follows PMR allocator interface in C++17. Will adapt for streams in future release
+template <typename T>
+struct matx_allocator {
+  inline T* allocate(size_t size)
+  {
+    T *tmp;
+    matxAlloc(reinterpret_cast<void**>(&tmp), size);
+    return tmp;
+  }
+
+  inline void deallocate(void *ptr, [[maybe_unused]] size_t size)
+  {
+    matxFree(ptr);
+  }  
+};
+
 } // end namespace matx

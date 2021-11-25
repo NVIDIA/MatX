@@ -29,25 +29,14 @@
 # // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # /////////////////////////////////////////////////////////////////////////////////
-function(find_and_configure_cudf VERSION)
-    CPMFindPackage(NAME cudf
-        VERSION         ${VERSION}
-        GIT_REPOSITORY  https://github.com/rapidsai/cudf.git
-        GIT_TAG         v${VERSION}
-        GIT_SHALLOW     TRUE
-        SOURCE_SUBDIR   cpp
-        OPTIONS         "BUILD_TESTS OFF"
-                        "BUILD_BENCHMARKS OFF"
-                        "CUDF_ENABLE_ARROW_S3 OFF")
-       
-    if(cudf_ADDED)
-        set(cudf_ADDED TRUE PARENT_SCOPE)
-        set(cudf_SOURCE_DIR ${cudf_SOURCE_DIR} PARENT_SCOPE)
-        set(RMM_SOURCE_DIR ${RMM_SOURCE_DIR} PARENT_SCOPE)
-        set(spdlog_SOURCE_DIR ${spdlog_SOURCE_DIR} PARENT_SCOPE)
-    endif()
+
+# This function finds rmm and sets any additional necessary environment variables.
+function(find_and_configure_rmm)
+  include(${rapids-cmake-dir}/cpm/rmm.cmake)
+
+  # Find or install RMM
+  rapids_cpm_rmm(BUILD_EXPORT_SET matx-exports INSTALL_EXPORT_SET matx-exports)
 
 endfunction()
 
-set(CUDA_MATX_MIN_VERSION_cudf 21.08.02)
-find_and_configure_cudf(${CUDA_MATX_MIN_VERSION_cudf})
+find_and_configure_rmm()

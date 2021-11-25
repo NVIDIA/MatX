@@ -30,11 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "matx.h"
+#include "matx_type_utils.h"
+#include "matx_tensor.h"
 #include "matx_conv.h"
 #include <cassert>
 #include <cstdio>
-#include <cuda/std/ccomplex>
 
 using namespace matx;
 
@@ -132,7 +132,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // out2DData.PrefetchDevice(stream);
 
   // Measure recursive runtime
-  cudaEventRecord(start, stream);
+  // cudaEventRecord(start, stream);
 
   // for (auto i = 0; i < iterations; i++)
   // {
@@ -142,22 +142,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //   }
   // }
 
-  cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
-  cudaEventElapsedTime(&time_ms, start, stop);
-  time_ms /= static_cast<float>(iterations);
+  // cudaEventRecord(stop, stream);
+  // cudaStreamSynchronize(stream);
+  // cudaEventElapsedTime(&time_ms, start, stop);
+  // time_ms /= static_cast<float>(iterations);
 
-  printf("2D Convolution kernel time = %.2fus (%.2fGB/s), %.2f billion/s\n",
-         time_ms * 1e3,
-         static_cast<double>(inView.Size(0) * inView.Size(1) * sizeof(InType) *
-                             2) /
-             1e9 / (time_ms / 1e3),
-         static_cast<double>(inView.Size(0) * inView.Size(1)) / 1e9 /
-             (time_ms / 1e3));
+  // printf("2D Convolution kernel time = %.2fus (%.2fGB/s), %.2f billion/s\n",
+  //        time_ms * 1e3,
+  //        static_cast<double>(inView.Size(0) * inView.Size(1) * sizeof(InType) *
+  //                            2) /
+  //            1e9 / (time_ms / 1e3),
+  //        static_cast<double>(inView.Size(0) * inView.Size(1)) / 1e9 /
+  //            (time_ms / 1e3));
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
-  cudaStreamDestroy(stream);
+  // cudaEventDestroy(start);
+  // cudaEventDestroy(stop);
+  // cudaStreamDestroy(stream);
 
   matxPrintMemoryStatistics();
 

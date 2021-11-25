@@ -34,6 +34,7 @@
 
 #include "cuda_bf16.h"
 #include "cuda_fp16.h"
+#include <cuda/std/cmath>
 #include "matx_defines.h"
 #include <type_traits>
 

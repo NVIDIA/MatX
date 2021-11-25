@@ -62,8 +62,12 @@ struct InverseParams_t {
   cudaStream_t stream;
 };
 
-template <typename T1, int RANK, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
+template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 class matxInversePlan_t {
+  constexpr static int RANK = TensorTypeA::Rank();
+  static_assert(RANK == TensorTypeAInv::Rank(), "Input and output tensor ranks must match");
+  using T1 = typename TensorTypeAInv::scalar_type;
+
 public:
   /**
    * Construct a matrix inverse handle
@@ -86,14 +90,12 @@ public:
    *   Inverse of A (if it exists)
    *
    */
-#ifdef DOXYGEN_ONLY
-  matxInversePlan_t(tensor_t a_inv, tensor_t a)
+  matxInversePlan_t(TensorTypeAInv &a_inv, const TensorTypeA &a)
   {
-#else
-  matxInversePlan_t(tensor_t<T1, RANK> a_inv, tensor_t<T1, RANK> a)
-  {
-#endif
     static_assert(RANK >= 2);
+
+    // Ok to remove since we're just passing a list of RO pointers
+    //using a_nc = typename std::remove_const<decltype(a)>(a); 
 
     // Ensure matrix is square
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
@@ -110,7 +112,7 @@ public:
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       // cuBLAS requires a list of pointers to each matrix. Construct that list
       // here as our batch dims
-      std::vector<T1 *> in_pointers;
+      std::vector<const T1 *> in_pointers;
       std::vector<T1 *> out_pointers;
       if constexpr (RANK == 2) {
         in_pointers.push_back(&a(0, 0));
@@ -209,7 +211,6 @@ public:
    */
   inline void Exec(cudaStream_t stream)
   {
-
     cublasSetStream(handle, stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
@@ -329,16 +330,14 @@ struct InverseParamsKeyEq {
 static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
     inv_cache;
 
-#ifdef DOXYGEN_ONLY
-void inv(tensor_t a_inv, tensor_t a, cudaStream_t stream = 0)
-#else
-template <typename T1, int RANK, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
-void inv(tensor_t<T1, RANK> a_inv, tensor_t<T1, RANK> a,
+template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
+void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
-#endif
 {
+  using T1 = typename TensorTypeAInv::scalar_type;
+  static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
-  auto params = matxInversePlan_t<T1, RANK, ALGO>::GetInverseParams(a_inv, a);
+  auto params = matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
   params.stream = stream;
 
   // Get cache or new inverse plan if it doesn't exist
@@ -350,7 +349,7 @@ void inv(tensor_t<T1, RANK> a_inv, tensor_t<T1, RANK> a,
   }
   else {
     auto inv_type =
-        static_cast<matxInversePlan_t<T1, RANK, ALGO> *>(ret.value());
+        static_cast<matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
     inv_type->Exec(stream);
   }
 }

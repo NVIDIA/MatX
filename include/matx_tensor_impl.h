@@ -34,9 +34,9 @@
 
 #include <type_traits>
 #include "matx_error.h"
-#include "matx_shape.h"
 #include "matx_set.h"
 #include "matx_defines.h"
+#include "matx_tensor_desc.h"
 #include "matx_type_utils.h"
 #include "matx_tensor_utils.h"
 #include "matx_exec_kernel.h"
@@ -74,10 +74,10 @@ class BaseOpCustom
 {
 public:
   using matxop = bool;
-  tensorShape_t<RankOp::Rank()> size_;
+  std::array<index_t, RankOp::Rank()> size_;
 
   BaseOpCustom() = delete;
-  BaseOpCustom(const tensorShape_t<RankOp::Rank()> &size) :
+  BaseOpCustom(const std::array<index_t, RankOp::Rank()> &size) :
     size_(size) {}
 
   // Launch work in the stream
@@ -127,26 +127,22 @@ public:
  * @tparam T Type of tensor
  * @tparam RANK Rank of tensor
  */
-template <typename T, int RANK> 
+template <typename T, int RANK, typename Desc = tensor_desc_cr_ds_64_64_t<RANK>> 
 class tensor_impl_t {
   public:
     // Type specifier for reflection on class
     using type = T; // TODO is this necessary
     using scalar_type = T;
     using tensor_view = bool;
+    using shape_type = typename Desc::shape_type;
+    using stride_type = typename Desc::stride_type;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
-    __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t<T, RANK>(tensor_impl_t<T, RANK> const &rhs) noexcept
-        : ldata_(rhs.ldata_), shape_(rhs.shape_), s_(rhs.s_) { }
-
-    __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t<T, RANK>(tensor_impl_t<T, RANK> const &&rhs) noexcept
-        : ldata_(rhs.ldata_), shape_(rhs.shape_), s_(rhs.s_) { }
-
-    __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t<T, RANK>(T *const ldata,
-                  const tensorShape_t<RANK> &shape, const std::array<index_t, RANK> strides) noexcept
-        : ldata_(ldata), shape_(shape), s_(strides) { }        
+    __MATX_HOST__ tensor_impl_t(const tensor_impl_t &) = default;
+    __MATX_HOST__ tensor_impl_t(tensor_impl_t &&) = default;
+    __MATX_HOST__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
 
 
     __MATX_INLINE__ ~tensor_impl_t() = default;
@@ -154,7 +150,9 @@ class tensor_impl_t {
     /**
      * Constructor for a rank-0 tensor (scalar).
      */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true> tensor_impl_t() {};
+    tensor_impl_t() {
+      static_assert(RANK == 0, "Default constructor is only for rank 0 tensors.");
+    }
 
     /**
      * Constructor for a rank-0 tensor (scalar).
@@ -171,21 +169,10 @@ class tensor_impl_t {
      * @param shape
      *   Tensor shape
      */
-    __MATX_INLINE__ tensor_impl_t(tensorShape_t<RANK> const &shape) : shape_(shape)
+    template <typename ShapeType, 
+              std::enable_if_t<!is_tensor_view_v<typename remove_cvref<ShapeType>::type> && !is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+    __MATX_INLINE__ tensor_impl_t(ShapeType &&shape) : desc_(std::forward<ShapeType>(shape))
     {
-      for (int i = 0; i < RANK; i++) {
-        MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                        "Must specify size larger than 0 for each dimension");
-      }
-
-      if constexpr (RANK >= 1) {
-        s_[RANK - 1] = 1;
-      }
-
-  #pragma unroll
-      for (int i = RANK - 2; i >= 0; i--) {
-        s_[i] = s_[i + 1] * shape_.Size(i + 1);
-      }
     }
 
     /**
@@ -196,27 +183,11 @@ class tensor_impl_t {
      * @param strides
      *   Tensor strides
      */
-    __MATX_INLINE__ tensor_impl_t(tensorShape_t<RANK> const &shape, const index_t (&strides)[RANK])
-        : shape_(shape)
+    template <typename ShapeType, typename StrideType>
+    __MATX_INLINE__ tensor_impl_t(ShapeType &&shape, StrideType &&strides)
+        : desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
-      for (int i = 0; i < RANK; i++) {
-        MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                        "Must specify size larger than 0 for each dimension");
-      }
-
-      memcpy((void *)s_.data(), (void *)strides, s_.size() * sizeof(index_t));
-    }
-
-    /**
-     * Constructor for a rank-1 and above tensor using a shape input
-     *
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     */
-    __MATX_INLINE__ tensor_impl_t(const index_t (&shape)[RANK])
-        : tensor_impl_t(tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
-    {
-    }
+    }    
 
     /**
      * Constructor for a rank-1 and above tensor using a user pointer and shape
@@ -231,40 +202,28 @@ class tensor_impl_t {
      * @param refcnt
      *   Reference counter or nullptr if not tracked
      */
-    __MATX_INLINE__ tensor_impl_t(T *const ldata, const tensorShape_t<RANK> &shape)
-        : ldata_(ldata), shape_(shape)
-    {
-      for (int i = 0; i < RANK; i++) {
-        MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                        "Must specify size larger than 0 for each dimension");
-      }
-
-      if constexpr (RANK >= 1) {
-        s_[RANK - 1] = 1;
-      }
-
-  #pragma unroll
-      for (int i = RANK - 2; i >= 0; i--) {
-        s_[i] = s_[i + 1] * shape_.Size(i + 1);
-      }
-    }
-
-    /**
-     * Constructor for creating a view with a user-defined data pointer.
-     *
-     * If not reference counted, it is the caller's responsibility to manage the
-     * data pointer, including allocation and freeing.
-     *
-     * @param data
-     *   Pointer to data
-     *
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     */
-    __MATX_INLINE__ tensor_impl_t(T *const data, const index_t (&shape)[RANK]) noexcept
-        : tensor_impl_t(data, tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
+    template <typename ShapeType, std::enable_if_t<!is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+    __MATX_INLINE__ tensor_impl_t(T *const ldata, ShapeType &&shape)
+        : ldata_(ldata), desc_(std::forward<ShapeType>(shape))
     {
     }
+
+    // /**
+    //  * Constructor for creating a view with a user-defined data pointer.
+    //  *
+    //  * If not reference counted, it is the caller's responsibility to manage the
+    //  * data pointer, including allocation and freeing.
+    //  *
+    //  * @param data
+    //  *   Pointer to data
+    //  *
+    //  * @param shape
+    //  *   Sizes for each dimension. Length of sizes must match RANK
+    //  */
+    // __MATX_INLINE__ tensor_impl_t(T *const data, const index_t (&shape)[RANK]) noexcept
+    //     : tensor_impl_t(data, tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
+    // {
+    // }
     
 
     /**
@@ -284,18 +243,61 @@ class tensor_impl_t {
      * @param refcnt
      *   Reference counter or nullptr if not tracked
      */
+    template <typename ShapeType, typename StrideType>    
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
-                    tensorShape_t<RANK> const &shape,
-                    const index_t (&strides)[RANK])
-        : ldata_(ldata), shape_(shape)
+                    ShapeType &&shape,
+                    StrideType &&strides)
+        : ldata_(ldata), desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
-      for (int i = 0; i < RANK; i++) {
-        MATX_ASSERT_STR(shape.Size(i) > 0, matxInvalidSize,
-                        "Must specify size larger than 0 for each dimension");
-      }
-
-      memcpy((void *)s_.data(), (void *)strides, s_.size() * sizeof(index_t));
     }
+
+
+    /**
+     * Constructor for creating a view with only a descriptor
+     *
+     * If not reference counted, it is the caller's responsibility to manage the
+     * data pointer, including allocation and freeing.
+     *
+     * @param data
+     *   Base data pointer (allocated address)
+     * @param ldata
+     *   Offset data pointer (start of view)
+     * @param shape
+     *   Sizes for each dimension. Length of sizes must match RANK
+     * @param strides
+     *   Tensor strides
+     * @param refcnt
+     *   Reference counter or nullptr if not tracked
+     */
+    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    __MATX_INLINE__ tensor_impl_t(T *const ldata,
+                    DescriptorType &&desc)
+        : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
+    {
+    }
+
+    /**
+     * Constructor for creating a view with only a descriptor
+     *
+     * If not reference counted, it is the caller's responsibility to manage the
+     * data pointer, including allocation and freeing.
+     *
+     * @param data
+     *   Base data pointer (allocated address)
+     * @param ldata
+     *   Offset data pointer (start of view)
+     * @param shape
+     *   Sizes for each dimension. Length of sizes must match RANK
+     * @param strides
+     *   Tensor strides
+     * @param refcnt
+     *   Reference counter or nullptr if not tracked
+     */
+    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
+        : desc_{std::forward<DescriptorType>(desc)}
+    {
+    }        
 
     // Lazy operators
     
@@ -656,27 +658,211 @@ class tensor_impl_t {
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    __MATX_INLINE__ tensorShape_t<RANK> Shape() const noexcept { return this->shape_; }    
+    __MATX_INLINE__ auto Shape() const noexcept { return this->desc_.Shape(); }
 
-  /**
-   * Check if a tensor is linear in memory for all elements in the view
-   *
-   * @return
-   *    The size of the dimension
-   */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
-  {
-    index_t ttl = 1;
-    for (int i = RANK - 1; i >= 0; i--) {
-      if (s_[i] != ttl) {
-        return false;
-      }
+    /**
+     * Set the size of a dimension
+     *
+     * @return
+     *    A shape of the data with the appropriate dimensions set
+     */
+    __MATX_INLINE__ auto Descriptor() const noexcept { return this->desc_; }      
 
-      ttl *= shape_.Size(i);
+    /**
+     * Check if a tensor is linear in memory for all elements in the view
+     *
+     * @return
+     *    The size of the dimension
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
+    {
+      return desc_.IsLinear();
     }
 
-    return true;
-  }    
+    /**
+     * Rank-0 operator() getter
+     *
+     * @returns value in tensor
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
+    {
+      return *ldata_;
+    }
+
+    /**
+     * Rank-0 operator() setter
+     *
+     * @returns reference to value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
+    {   
+      return *ldata_;
+    }
+
+    /**
+     * Rank-1 operator() getter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @returns value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0) const noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0);
+    }
+
+    /**
+     * Rank-1 operator() setter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @returns reference to value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0) noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0);
+    }
+
+    /**
+     * Rank-2 operator() getter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @returns value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0,
+                                                  shape_type id1) const noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1);
+    }
+
+    /**
+     * Rank-2 operator() setter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @returns reference to value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1) noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1);
+    }
+
+    /**
+     * Rank-3 operator() getter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @param id2
+     *   Index into third dimension
+     *
+     * @returns value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0, shape_type id1,
+                                                  shape_type id2) const noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2);
+    }
+
+    /**
+     * Rank-3 operator() setter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @param id2
+     *   Index into third dimension
+     *
+     * @returns reference to value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1,
+                                            shape_type id2) noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 +desc_.Stride(1) * id1 + desc_.Stride(2) * id2);
+    }
+
+    /**
+     * Rank-4 operator() getter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @param id2
+     *   Index into third dimension
+     *
+     * @param id3
+     *   Index into fourth dimension
+     *
+     * @returns value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &
+    operator()(shape_type id0, shape_type id1, shape_type id2, shape_type id3) const noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2 + desc_.Stride(3) * id3);
+    }
+
+    /**
+     * Rank-4 operator() setter
+     *
+     * @param id0
+     *   Index into first dimension
+     *
+     * @param id1
+     *   Index into second dimension
+     *
+     * @param id2
+     *   Index into third dimension
+     *
+     * @param id3
+     *   Index into fourth dimension
+     *
+     * @returns reference to value at given index
+     *
+     */
+    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1,
+                                            shape_type id2, shape_type id3) noexcept
+    {
+      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2 + desc_.Stride(3) * id3);
+    }  
 
     /**
      * operator() getter with an array index
@@ -722,241 +908,84 @@ class tensor_impl_t {
       else {
         return this->operator()(idx[0], idx[1], idx[2], idx[3]);
       }
+    }      
+
+    /**
+     * Get the rank of the tensor
+     *
+     * @returns Rank of the tensor
+     *
+     */
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+
+
+    /**
+     * Get the total number of elements in the tensor
+     *
+     *
+     * @returns Total number of elements across all dimensions
+     *
+     */
+    __MATX_INLINE__ stride_type __MATX_HOST__ __MATX_DEVICE__ TotalSize() const noexcept { return desc_.TotalSize(); }  
+
+    /**
+     * Get the size of a single dimension of the tensor
+     *
+     * @param dim
+     *   Desired dimension
+     *
+     * @returns Number of elements in dimension
+     *
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const noexcept
+    {
+      return desc_.Size(dim);
+    }
+
+    /**
+     * Get the stride of a single dimension of the tensor
+     *
+     * @param dim
+     *   Desired dimension
+     *
+     * @returns Stride of dimension
+     *
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(uint32_t dim) const noexcept
+    {
+      return desc_.Stride(dim);
+    }
+
+
+    /**
+     * Get the size of the last dimension
+     *
+     * @return
+     *    The size of the dimension
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Lsize() const noexcept
+    {
+      return desc_.Size(Rank() - 1);
+    }
+
+    __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
+    {
+      return TotalSize() * sizeof(*ldata_);
     }    
 
     /**
-     * Rank-0 operator() getter
-     *
-     * @returns value in tensor
-     *
+     * @brief Set local data pointer
+     * 
+     * @param data
+     *   Data pointer to set
      */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
-    {
-      return *ldata_;
+    void SetLocalData(T* data) {
+      ldata_ = data;
     }
-
-    /**
-     * Rank-0 operator() setter
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
-    {
-      return *ldata_;
-    }
-
-    /**
-     * Rank-1 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0) const noexcept
-    {
-      return *(ldata_ + s_[0] * id0);
-    }
-
-    /**
-     * Rank-1 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0) noexcept
-    {
-      return *(ldata_ + s_[0] * id0);
-    }
-
-    /**
-     * Rank-2 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0,
-                                                  index_t id1) const noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1);
-    }
-
-    /**
-     * Rank-2 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1) noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1);
-    }
-
-    /**
-     * Rank-3 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(index_t id0, index_t id1,
-                                                  index_t id2) const noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
-    }
-
-    /**
-     * Rank-3 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
-                                            index_t id2) noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2);
-    }
-
-    /**
-     * Rank-4 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @param id3
-     *   Index into fourth dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &
-    operator()(index_t id0, index_t id1, index_t id2, index_t id3) const noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
-    }
-
-    /**
-     * Rank-4 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @param id3
-     *   Index into fourth dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(index_t id0, index_t id1,
-                                            index_t id2, index_t id3) noexcept
-    {
-      return *(ldata_ + s_[0] * id0 + s_[1] * id1 + s_[2] * id2 + s_[3] * id3);
-    }  
-
-  /**
-   * Get the rank of the tensor
-   *
-   * @returns Rank of the tensor
-   *
-   */
-  static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
-
-
-  /**
-   * Get the total number of elements in the tensor
-   *
-   *
-   * @returns Total number of elements across all dimensions
-   *
-   */
-  __MATX_INLINE__ index_t __MATX_HOST__ __MATX_DEVICE__ TotalSize() const noexcept { return shape_.TotalSize(); }  
-
-  /**
-   * Get the size of a single dimension of the tensor
-   *
-   * @param dim
-   *   Desired dimension
-   *
-   * @returns Number of elements in dimension
-   *
-   */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const noexcept
-  {
-    return shape_.Size(dim);
-  }
-
-  /**
-   * Get the size of the last dimension
-   *
-   * @return
-   *    The size of the dimension
-   */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Lsize() const noexcept
-  {
-    return shape_.Size(Rank() - 1);
-  }
 
   protected:
     T *ldata_;
-    tensorShape_t<RANK> shape_;
-    std::array<index_t, RANK> s_; // +1 to avoid zero sized array    
+    Desc desc_;
 };
-
 
 };

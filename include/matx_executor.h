@@ -50,14 +50,14 @@ namespace matx
   };
 
   template <class Op> 
-  void __forceinline__ exec(Op op, const cudaStream_t stream)
+  void __MATX_INLINE__ exec(Op op, const cudaStream_t stream)
   {
     exec(op, CUDADeviceExecutor{stream});
   }    
 
 
   template <typename Op, typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true> 
-  void __forceinline__ exec(Op op, Ex ex)
+  void __MATX_INLINE__ exec(Op op, Ex ex)
   {
     ex.Exec(op);
   }  

@@ -145,13 +145,13 @@ TYPED_TEST(BasicTensorTestsAll, RefCnt)
 
   TypeParam *data = tmp.Data();
 
-  tmp3.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  tmp3.Reset(reinterpret_cast<TypeParam*>(0x1234567));
   ASSERT_EQ(tmp3.GetRefCount(), 1);   
 
-  tmp2.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  tmp2.Reset(reinterpret_cast<TypeParam*>(0x1234567));
   ASSERT_EQ(tmp.GetRefCount(), 1);  
 
-  tmp.SetData(reinterpret_cast<TypeParam*>(0x1234567)); 
+  tmp.Reset(reinterpret_cast<TypeParam*>(0x1234567)); 
 
   // Check if pointer was freed
   ASSERT_EQ(IsAllocated(data), false);  
@@ -420,7 +420,7 @@ TYPED_TEST(BasicTensorTestsAll, MakeTensor)
   auto mt1 = make_tensor<float>({10});
   auto mt3 = make_tensor<float>({10, 5, 4});
   auto mt4 = make_tensor<float>({10, 5, 4, 3});
-  ASSERT_EQ(mt0.Size(0), 0);
+
   ASSERT_EQ(mt1.Size(0), 10);
   ASSERT_EQ(mt3.Size(0), 10);
   ASSERT_EQ(mt3.Size(1), 5);

@@ -235,42 +235,31 @@ public:
     states_ = states;
   }
 
-#ifdef DOXYGEN_ONLY
   /**
    * Retrieve a value from a rank-0 random view
    */
-  __MATX_DEVICE__ T operator()()
-  {
-#else
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-  inline __MATX_DEVICE__ T operator()()
+  inline __MATX_DEVICE__ T operator()() const
   {
-#endif
     T val;
     get_random(val, &states_[0], dist_);
     return alpha_ * val + beta_;
   };
 
-#ifdef DOXYGEN_ONLY
   /**
    * Retrieve a value from a rank-1 random view
    *
    * @param i
    *   First index
    */
-  __MATX_DEVICE__ T operator()(index_t i)
-  {
-#else
   template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-  inline __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_DEVICE__ T operator()(index_t i) const
   {
-#endif
     T val;
     get_random(val, &states_[i], dist_);
     return alpha_ * val + beta_;
   };
 
-#ifdef DOXYGEN_ONLY
   /**
    * Retrieve a value from a rank-2 random view
    *
@@ -279,19 +268,14 @@ public:
    * @param j
    *   Second index
    */
-  __MATX_DEVICE__ T operator()(index_t i, index_t j)
-  {
-#else
   template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
   {
-#endif
     T val;
     get_random(val, &states_[(index_t)i * Size(1) + j], dist_);
     return alpha_ * val + beta_;
   };
 
-#ifdef DOXYGEN_ONLY
   /**
    * Retrieve a value from a rank-3 random view
    *
@@ -302,20 +286,15 @@ public:
    * @param k
    *   Third index
    */
-  __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
-  {
-#else
   template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k) const
   {
-#endif
     T val;
     get_random(val, &states_[(index_t)i * Size(1) * Size(2) + j * Size(2) + k],
                dist_);
     return alpha_ * val + beta_;
   };
 
-#ifdef DOXYGEN_ONLY
   /**
    * Retrieve a value from a rank-4 random view
    *
@@ -328,13 +307,9 @@ public:
    * @param l
    *   Fourth index
    */
-  __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
-  {
-#else
   template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l) const
   {
-#endif
     T val;
     get_random(val,
                &states_[i * Size(1) * Size(2) * Size(3) +

@@ -39,9 +39,11 @@
 
 namespace matx {
 
-template <typename T, int RANK> class ConstVal {
+template <typename T, typename ShapeType> class ConstVal {
+  static constexpr int RANK = std::tuple_size<typename remove_cvref<ShapeType>::type>::value;
+
 private:
-  tensorShape_t<RANK> s_;
+  ShapeType s_;
   T v_;
 
 public:
@@ -49,20 +51,20 @@ public:
   using matxop = bool;
   using scalar_type = T;
 
-  ConstVal(tensorShape_t<RANK> s, T val) : s_(s), v_(val){};
+  ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
-  inline __MATX_DEVICE__ T operator()() { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t) { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t) { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t) { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t, index_t)
+  inline __MATX_DEVICE__ T operator()() const { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t) const { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t) const { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t) const { return v_; };
+  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t, index_t) const
   {
     return v_;
   };
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
-    return s_.Size(dim);
+    return *(s_.begin() + dim);
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
@@ -79,16 +81,17 @@ public:
  * @param s
  *   Shape of tensor
  */
-template <typename T = int, int RANK>
-inline auto zeros(const tensorShape_t<RANK> &s)
+template <typename T = int, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto zeros(ShapeType &&s)
 {
-  return ConstVal<T, RANK>(s, T(0));
+  return ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
 }
 
 template <typename T = int, int RANK>
 inline auto zeros(const index_t (&s)[RANK])
 {
-  return zeros(tensorShape_t<RANK>{(const index_t *)s});
+  return zeros(to_array(s));
 }
 
 /**
@@ -103,20 +106,24 @@ inline auto zeros(const index_t (&s)[RANK])
  * @param s
  *   Shape of tensor
  */
-template <typename T = int, int RANK>
-inline auto ones(const tensorShape_t<RANK> &s)
+template <typename T = int, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto ones(ShapeType &&s)
 {
-  return ConstVal<T, RANK>(s, T(1));
+  return ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));
 }
 
-template <typename T = int, int RANK> inline auto ones(const index_t (&s)[RANK])
+template <typename T = int, int RANK> 
+inline auto ones(const index_t (&s)[RANK])
 {
-  return ones(tensorShape_t<RANK>{(const index_t *)s});
+  return ones(to_array(s));
 }
 
-template <typename T, int RANK> class Diag {
+template <typename T, typename ShapeType> class Diag {
+  static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
+
 private:
-  tensorShape_t<RANK> s_;
+  ShapeType s_;
   T val_;
 
 public:
@@ -124,31 +131,31 @@ public:
   using matxop = bool;
   using scalar_type = T;
 
-  Diag(tensorShape_t<RANK> s, T val) : s_(s), val_(val){};
+  Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val){};
 
-  inline __MATX_DEVICE__ T operator()() { return T(val_); };
-  inline __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_DEVICE__ T operator()() const { return T(val_); };
+  inline __MATX_DEVICE__ T operator()(index_t i) const
   {
     if (i == 0)
       return val_;
     else
       return T(0.0f);
   };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
   {
     if (i == j)
       return T(val_);
     else
       return T(0.0f);
   };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k) const
   {
     if (i == j && i == k)
       return T(val_);
     else
       return T(0.0f);
   };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l) const
   {
     if (i == j && k == l && i == k)
       return T(val_);
@@ -156,9 +163,9 @@ public:
       return T(0.0f);
   };
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
-    return s_.Size(dim);
+    return *(s_.begin() + dim);
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
@@ -174,16 +181,17 @@ public:
  *   Data type
  *
  */
-template <typename T = int, int RANK>
-inline auto diag(const tensorShape_t<RANK> &s, T val)
+template <typename T = int, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto diag(ShapeType &&s, T val)
 {
-  return Diag<T, RANK>(s, val);
+  return Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
 }
 
 template <typename T = int, int RANK>
 inline auto diag(const index_t (&s)[RANK], T val)
 {
-  return diag(tensorShape_t<RANK>{(const index_t *)s}, val);
+  return diag(to_array(s), val);
 }
 
 /**
@@ -197,26 +205,28 @@ inline auto diag(const index_t (&s)[RANK], T val)
  *   Data type
  *
  */
-template <typename T = int, int RANK>
-inline auto eye(const tensorShape_t<RANK> &s)
+template <typename T = int, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto eye(ShapeType &&s)
 {
-  return Diag<T, RANK>(s, T(1));
+  return Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
 }
 
 template <typename T = int, int RANK> inline auto eye(const index_t (&s)[RANK])
 {
-  return eye(tensorShape_t<RANK>{(const index_t *)s});
+  return eye(to_array(s));
 }
 
-template <typename Generator1D, int Dim, int RANK> class matxGenerator1D_t {
+template <typename Generator1D, int Dim, typename ShapeType> class matxGenerator1D_t {
 public:
   // dummy type to signal this is a matxop
   using matxop = bool;
   using scalar_type = typename Generator1D::scalar_type;
+  static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
-  matxGenerator1D_t(tensorShape_t<RANK> s, Generator1D f) : f_(f), s_(s) {}
-  inline __MATX_DEVICE__ auto operator()(int i) { return f_(i); };
-  inline __MATX_DEVICE__ auto operator()(int i, int j)
+  matxGenerator1D_t(ShapeType &&s, Generator1D f) : f_(f), s_(std::forward<ShapeType>(s)) {}
+  inline __MATX_DEVICE__ auto operator()(int i)  { return f_(i); };
+  inline __MATX_DEVICE__ auto operator()(int i, int j) 
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -227,7 +237,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k)
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k) 
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -241,7 +251,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l)
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l) 
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -259,15 +269,15 @@ public:
     return scalar_type(0);
   };
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
-    return s_.Size(dim);
+    return *(s_.begin() + dim);
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
 private:
   Generator1D f_;
-  tensorShape_t<RANK> s_;
+  ShapeType s_;
 };
 
 template <typename T> class Hamming {
@@ -279,7 +289,7 @@ public:
 
   inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) 
   {
     return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1));
   }
@@ -302,56 +312,64 @@ public:
  *
  * Returns values for a Hamming window across the selected dimension.
  */
-template <typename T = float, int RANK>
-inline auto hamming_x(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hamming_x(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  Hamming<T> h(s.Size(RANK - 1));
-  return matxGenerator1D_t<Hamming<T>, RANK - 1, RANK>(s, h);
+  Hamming<T> h( *(s.begin() + RANK - 1));
+  return matxGenerator1D_t<Hamming<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hamming_x(const index_t (&s)[RANK])
 {
-  return hamming_x(tensorShape_t<RANK>{(const index_t *)s});
+  return hamming_x(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hamming_y(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hamming_y(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  Hamming<T> h(s.Size(RANK - 2));
-  return matxGenerator1D_t<Hamming<T>, RANK - 2, RANK>(s, h);
+  Hamming<T> h( *(s.begin() + RANK - 2));
+  return matxGenerator1D_t<Hamming<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hamming_y(const index_t (&s)[RANK])
 {
-  return hamming_y(tensorShape_t<RANK>{(const index_t *)s});
+  return hamming_y(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hamming_z(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hamming_z(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  Hamming<T> h(s.Size(RANK - 3));
-  return matxGenerator1D_t<Hamming<T>, RANK - 3, RANK>(s, h);
+  Hamming<T> h( *(s.begin() + RANK - 3));
+  return matxGenerator1D_t<Hamming<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hamming_z(const index_t (&s)[RANK])
 {
-  return hamming_z(tensorShape_t<RANK>{(const index_t *)s});
+  return hamming_z(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hamming_w(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hamming_w(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  Hamming<T> h(s.Size(RANK - 4));
-  return matxGenerator1D_t<Hamming<T>, RANK - 4, RANK>(s, h);
+  Hamming<T> h( *(s.begin() + RANK - 4));
+  return matxGenerator1D_t<Hamming<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hamming_w(const index_t (&s)[RANK])
 {
-  return hamming_w(tensorShape_t<RANK>{(const index_t *)s});
+  return hamming_w(to_array(s));
 }
 
 /// @}
@@ -386,56 +404,64 @@ public:
  *
  * Returns values for a Hanning window across the selected dimension.
  */
-template <typename T = float, int RANK>
-inline auto hanning_x(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hanning_x(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  Hanning<T> h(s.Size(RANK - 1));
-  return matxGenerator1D_t<Hanning<T>, RANK - 1, RANK>(s, h);
+  Hanning<T> h( *(s.begin() + RANK - 1));
+  return matxGenerator1D_t<Hanning<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hanning_x(const index_t (&s)[RANK])
 {
-  return hanning_x(tensorShape_t<RANK>{(const index_t *)s});
+  return hanning_x(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hanning_y(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hanning_y(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  Hanning<T> h(s.Size(RANK - 2));
-  return matxGenerator1D_t<Hanning<T>, RANK - 2, RANK>(s, h);
+  Hanning<T> h( *(s.begin() + RANK - 2));
+  return matxGenerator1D_t<Hanning<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hanning_y(const index_t (&s)[RANK])
 {
-  return hanning_y(tensorShape_t<RANK>{(const index_t *)s});
+  return hanning_y(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hanning_z(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hanning_z(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  Hanning<T> h(s.Size(RANK - 3));
-  return matxGenerator1D_t<Hanning<T>, RANK - 3, RANK>(s, h);
+  Hanning<T> h( *(s.begin() + RANK - 3));
+  return matxGenerator1D_t<Hanning<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hanning_z(const index_t (&s)[RANK])
 {
-  return hanning_z(tensorShape_t<RANK>{(const index_t *)s});
+  return hanning_z(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto hanning_w(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto hanning_w(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  Hanning<T> h(s.Size(RANK - 4));
-  return matxGenerator1D_t<Hanning<T>, RANK - 4, RANK>(s, h);
+  Hanning<T> h( *(s.begin() + RANK - 4));
+  return matxGenerator1D_t<Hanning<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto hanning_w(const index_t (&s)[RANK])
 {
-  return hanning_w(tensorShape_t<RANK>{(const index_t *)s});
+  return hanning_w(to_array(s));
 }
 
 template <typename T> class Blackman {
@@ -471,56 +497,64 @@ public:
  *
  * Returns values for a Blackman window across the selected dimension.
  */
-template <typename T = float, int RANK>
-inline auto blackman_x(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto blackman_x(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  Blackman<T> h(s.Size(RANK - 1));
-  return matxGenerator1D_t<Blackman<T>, RANK - 1, RANK>(s, h);
+  Blackman<T> h( *(s.begin() + RANK - 1));
+  return matxGenerator1D_t<Blackman<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto blackman_x(const index_t (&s)[RANK])
 {
-  return blackman_x(tensorShape_t<RANK>{(const index_t *)s});
+  return blackman_x(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto blackman_y(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto blackman_y(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  Blackman<T> h(s.Size(RANK - 2));
-  return matxGenerator1D_t<Blackman<T>, RANK - 2, RANK>(s, h);
+  Blackman<T> h( *(s.begin() + RANK - 2));
+  return matxGenerator1D_t<Blackman<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto blackman_y(const index_t (&s)[RANK])
 {
-  return blackman_y(tensorShape_t<RANK>{(const index_t *)s});
+  return blackman_y(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto blackman_z(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto blackman_z(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  Blackman<T> h(s.Size(RANK - 3));
-  return matxGenerator1D_t<Blackman<T>, RANK - 3, RANK>(s, h);
+  Blackman<T> h( *(s.begin() + RANK - 3));
+  return matxGenerator1D_t<Blackman<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto blackman_z(const index_t (&s)[RANK])
 {
-  return blackman_z(tensorShape_t<RANK>{(const index_t *)s});
+  return blackman_z(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto blackman_w(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto blackman_w(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  Blackman<T> h(s.Size(RANK - 4));
-  return matxGenerator1D_t<Blackman<T>, RANK - 4, RANK>(s, h);
+  Blackman<T> h( *(s.begin() + RANK - 4));
+  return matxGenerator1D_t<Blackman<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto blackman_w(const index_t (&s)[RANK])
 {
-  return blackman_w(tensorShape_t<RANK>{(const index_t *)s});
+  return blackman_w(to_array(s));
 }
 
 template <typename T> class Bartlett {
@@ -531,7 +565,7 @@ public:
   using scalar_type = T;
   inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) 
   {
     return (T(2) / (T(size_) - 1)) *
            (((T(size_) - 1) / T(2)) -
@@ -554,56 +588,64 @@ public:
  *
  * Returns values for a Bartlett window across the selected dimension.
  */
-template <typename T = float, int RANK>
-inline auto bartlett_x(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto bartlett_x(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  Bartlett<T> h(s.Size(RANK - 1));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 1, RANK>(s, h);
+  Bartlett<T> h( *(s.begin() + RANK - 1));
+  return matxGenerator1D_t<Bartlett<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto bartlett_x(const index_t (&s)[RANK])
 {
-  return bartlett_x(tensorShape_t<RANK>{(const index_t *)s});
+  return bartlett_x(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto bartlett_y(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto bartlett_y(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  Bartlett<T> h(s.Size(RANK - 2));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 2, RANK>(s, h);
+  Bartlett<T> h( *(s.begin() + RANK - 2));
+  return matxGenerator1D_t<Bartlett<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto bartlett_y(const index_t (&s)[RANK])
 {
-  return bartlett_y(tensorShape_t<RANK>{(const index_t *)s});
+  return bartlett_y(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto bartlett_z(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto bartlett_z(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  Bartlett<T> h(s.Size(RANK - 3));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 3, RANK>(s, h);
+  Bartlett<T> h( *(s.begin() + RANK - 3));
+  return matxGenerator1D_t<Bartlett<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto bartlett_z(const index_t (&s)[RANK])
 {
-  return bartlett_z(tensorShape_t<RANK>{(const index_t *)s});
+  return bartlett_z(to_array(s));
 }
 
-template <typename T = float, int RANK>
-inline auto bartlett_w(const tensorShape_t<RANK> &s)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto bartlett_w(ShapeType &&s)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  Bartlett<T> h(s.Size(RANK - 4));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 4, RANK>(s, h);
+  Bartlett<T> h( *(s.begin() + RANK - 4));
+  return matxGenerator1D_t<Bartlett<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
 }
 template <typename T = float, int RANK>
 inline auto bartlett_w(const index_t (&s)[RANK])
 {
-  return bartlett_w(tensorShape_t<RANK>{(const index_t *)s});
+  return bartlett_w(to_array(s));
 }
 
 template <class T> class Range {
@@ -618,7 +660,7 @@ public:
 
   Range(T first, T step) : first_(first), step_(step) {}
 
-  __MATX_DEVICE__ inline T operator()(index_t idx)
+  __MATX_DEVICE__ inline T operator()(index_t idx) const
   {
     if constexpr (is_matx_half_v<T>) {
       return first_ + T(static_cast<T>((float)idx) * step_);
@@ -650,12 +692,14 @@ public:
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_x(const tensorShape_t<RANK> &s, T first, T step)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto range_x(ShapeType &&s, T first, T step)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
   Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 1, RANK>(s, r);
+  return matxGenerator1D_t<Range<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
@@ -675,7 +719,7 @@ inline auto range_x(const tensorShape_t<RANK> &s, T first, T step)
 template <typename T = float, int RANK>
 inline auto range_x(const index_t (&s)[RANK], T first, T step)
 {
-  return range_x(tensorShape_t<RANK>{(const index_t *)s}, first, step);
+  return range_x(to_array(s), first, step);
 }
 
 /**
@@ -692,12 +736,14 @@ inline auto range_x(const index_t (&s)[RANK], T first, T step)
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_y(const tensorShape_t<RANK> &s, T first, T step)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto range_y(ShapeType &&s, T first, T step)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
   Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 2, RANK>(s, r);
+  return matxGenerator1D_t<Range<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
@@ -717,7 +763,7 @@ inline auto range_y(const tensorShape_t<RANK> &s, T first, T step)
 template <typename T = float, int RANK>
 inline auto range_y(const index_t (&s)[RANK], T first, T step)
 {
-  return range_y(tensorShape_t<RANK>{(const index_t *)s}, first, step);
+  return range_y(to_array(s), first, step);
 }
 
 /**
@@ -734,12 +780,14 @@ inline auto range_y(const index_t (&s)[RANK], T first, T step)
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_z(const tensorShape_t<RANK> &s, T first, T step)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto range_z(ShapeType &&s, T first, T step)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
   Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 3, RANK>(s, r);
+  return matxGenerator1D_t<Range<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
@@ -759,7 +807,7 @@ inline auto range_z(const tensorShape_t<RANK> &s, T first, T step)
 template <typename T = float, int RANK>
 inline auto range_z(const index_t (&s)[RANK], T first, T step)
 {
-  return range_z(tensorShape_t<RANK>{(const index_t *)s}, first, step);
+  return range_z(to_array(s), first, step);
 }
 
 /**
@@ -776,12 +824,14 @@ inline auto range_z(const index_t (&s)[RANK], T first, T step)
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_w(const tensorShape_t<RANK> &s, T first, T step)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto range_w(ShapeType &&s, T first, T step)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
   Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 4, RANK>(s, r);
+  return matxGenerator1D_t<Range<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
@@ -801,7 +851,7 @@ inline auto range_w(const tensorShape_t<RANK> &s, T first, T step)
 template <typename T = float, int RANK>
 inline auto range_w(const index_t (&s)[RANK], T first, T step)
 {
-  return range_w(tensorShape_t<RANK>{(const index_t *)s}, first, step);
+  return range_w(to_array(s), first, step);
 }
 
 template <class T> class Linspace {
@@ -828,7 +878,7 @@ public:
 #endif
   }
 
-  __MATX_DEVICE__ inline T operator()(index_t idx) { return range_(idx); }
+  __MATX_DEVICE__ inline T operator()(index_t idx) const { return range_(idx); }
 };
 
 /// @name Linspace
@@ -841,60 +891,68 @@ public:
  * by the shape and selected dimension.
  *
  */
-template <typename T = float, int RANK>
-inline auto linspace_x(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto linspace_x(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  index_t count = s.Size(RANK - 1);
+  auto count =  *(s.begin() + RANK - 1);
   Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 1, RANK>(s, l);
+  return matxGenerator1D_t<Linspace<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto linspace_x(const index_t (&s)[RANK], T first, T last)
 {
-  return linspace_x(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return linspace_x(to_array(s), first, last);
 }
 
-template <typename T = float, int RANK>
-inline auto linspace_y(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto linspace_y(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  index_t count = s.Size(RANK - 2);
+  auto count =  *(s.begin() + RANK - 2);
   Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 2, RANK>(s, l);
+  return matxGenerator1D_t<Linspace<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto linspace_y(const index_t (&s)[RANK], T first, T last)
 {
-  return linspace_y(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return linspace_y(to_array(s), first, last);
 }
 
-template <typename T = float, int RANK>
-inline auto linspace_z(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto linspace_z(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  index_t count = s.Size(RANK - 3);
+  auto count =  *(s.begin() + RANK - 3);
   Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 3, RANK>(s, l);
+  return matxGenerator1D_t<Linspace<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto linspace_z(const index_t (&s)[RANK], T first, T last)
 {
-  return linspace_z(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return linspace_z(to_array(s), first, last);
 }
 
-template <typename T = float, int RANK>
-inline auto linspace_w(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto linspace_w(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  index_t count = s.Size(RANK - 4);
+  auto count =  *(s.begin() + RANK - 4);
   Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 4, RANK>(s, l);
+  return matxGenerator1D_t<Linspace<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto linspace_w(const index_t (&s)[RANK], T first, T last)
 {
-  return linspace_w(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return linspace_w(to_array(s), first, last);
 }
 
 template <class T> class Logspace {
@@ -926,7 +984,7 @@ public:
 #endif
   }
 
-  __MATX_DEVICE__ inline T operator()(index_t idx)
+  __MATX_DEVICE__ inline T operator()(index_t idx) const
   {
     if constexpr (is_matx_half_v<T>) {
       return static_cast<T>(
@@ -957,60 +1015,69 @@ public:
  * by the shape and selected dimension.
  *
  */
-template <typename T = float, int RANK>
-inline auto logspace_x(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto logspace_x(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 1);
-  index_t count = s.Size(RANK - 1);
+  auto count = *(s.begin() + RANK - 1);
   Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 1, RANK>(s, l);
-}
-template <typename T = float, int RANK>
-inline auto logspace_x(const index_t (&s)[RANK], T first, T last)
-{
-  return logspace_x(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return matxGenerator1D_t<Logspace<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), l);
 }
 
 template <typename T = float, int RANK>
-inline auto logspace_y(const tensorShape_t<RANK> &s, T first, T last)
+inline auto logspace_x(const index_t (&s)[RANK], T first, T last)
 {
+  return logspace_x(to_array(s), first, last);
+}
+
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto logspace_y(ShapeType &&s, T first, T last)
+{
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 2);
-  index_t count = s.Size(RANK - 2);
+  auto count = *(s.begin() + RANK - 2);
   Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 2, RANK>(s, l);
+  return matxGenerator1D_t<Logspace<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto logspace_y(const index_t (&s)[RANK], T first, T last)
 {
-  return logspace_y(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return logspace_y(to_array(s), first, last);
 }
 
-template <typename T = float, int RANK>
-inline auto logspace_z(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto logspace_z(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 3);
-  index_t count = s.Size(RANK - 3);
+  auto count = *(s.begin() + RANK - 3);
   Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 3, RANK>(s, l);
+  return matxGenerator1D_t<Logspace<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto logspace_z(const index_t (&s)[RANK], T first, T last)
 {
-  return logspace_z(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return logspace_z(to_array(s), first, last);
 }
 
-template <typename T = float, int RANK>
-inline auto logspace_w(const tensorShape_t<RANK> &s, T first, T last)
+template <typename T = float, typename ShapeType,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto logspace_w(ShapeType &&s, T first, T last)
 {
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
   static_assert(RANK >= 4);
-  index_t count = s.Size(RANK - 4);
+  auto count = *(s.begin() + RANK - 4);
   Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 4, RANK>(s, l);
+  return matxGenerator1D_t<Logspace<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), l);
 }
 template <typename T = float, int RANK>
 inline auto logspace_w(const index_t (&s)[RANK], T first, T last)
 {
-  return logspace_w(tensorShape_t<RANK>{(const index_t *)s}, first, last);
+  return logspace_w(to_array(s), first, last);
 }
 
 template <typename T> class Meshgrid_X {
@@ -1025,12 +1092,12 @@ public:
 
   Meshgrid_X(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
   {
     return x_[0] + j * (x_[1] - x_[0]) / (x_[2] - 1);
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
     return (dim == 0) ? y_[2] : x_[2];
   }
@@ -1049,7 +1116,7 @@ public:
 
   Meshgrid_Y(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j)
+  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
   {
     return y_[0] + i * (y_[1] - y_[0]) / (y_[2] - 1);
   };

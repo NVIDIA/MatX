@@ -38,8 +38,8 @@
 #include "gtest/gtest.h"
 
 using namespace matx;
-constexpr int m = 100;
-constexpr int n = 50;
+constexpr index_t m = 100;
+constexpr index_t n = 50;
 
 template <typename T> class SVDSolverTest : public ::testing::Test {
 protected:

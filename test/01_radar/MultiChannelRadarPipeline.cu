@@ -90,7 +90,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
   this->pb->NumpyToTensorView(x_in, "x_init");
 
   // Copy the replicated data into the actual data pointer
-  copy(*d, x_clone, 0);
+  matx::copy(*d, x_clone, 0);
 
   d->PrefetchDevice(0);
 

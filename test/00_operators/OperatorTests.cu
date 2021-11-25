@@ -97,6 +97,7 @@ TYPED_TEST(OperatorTestsFloat, TrigFuncs)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
   (tov0 = sin(tiv0)).run();
+  return;
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_sin(c)));
 
@@ -404,14 +405,13 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
 
   // abs and norm take a complex and output a floating point value
   tensor_t<typename TypeParam::value_type, 0> tdd0;
-  auto tvd0 = tdd0.View();
-  (tvd0 = norm(tiv0)).run();
+  (tdd0 = norm(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tvd0(), _internal_norm(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), _internal_norm(c)));
 
-  (tvd0 = abs(tiv0)).run();
+  (tdd0 = abs(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tvd0(), _internal_abs(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), _internal_abs(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -700,7 +700,7 @@ TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
 
   t2.PrefetchDevice(0);
   t2t.PrefetchDevice(0);
-  copy(t2t, t2, 0);
+  matx::copy(t2t, t2, 0);
 
   t2t.PrefetchHost(0);
   cudaStreamSynchronize(0);
@@ -882,6 +882,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 {
   MATX_ENTER_HANDLER();
   {
+    printf("1\n");
     tensor_t<TypeParam, 0> t0;
     tensor_t<TypeParam, 4> t4i({10, 20, 30, 40});
     tensor_t<TypeParam, 4> t4o({10, 20, 30, 40});
@@ -900,7 +901,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t4i * t0).run();
     cudaStreamSynchronize(0);
-
+printf("2\n");
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -918,7 +919,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
     }
     (t4o = t0 * t4i).run();
     cudaStreamSynchronize(0);
-
+printf("3\n");
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -943,7 +944,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
     for (index_t i = 0; i < t1.Size(0); i++) {
       t1(i) = static_cast<value_promote_t<TypeParam>>(i);
     }
-
+printf("3\n");
     for (index_t i = 0; i < t4i.Size(0); i++) {
       for (index_t j = 0; j < t4i.Size(1); j++) {
         for (index_t k = 0; k < t4i.Size(2); k++) {
@@ -957,7 +958,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t4i * t1).run();
     cudaStreamSynchronize(0);
-
+printf("4\n");
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -976,7 +977,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t1 * t4i).run();
     cudaStreamSynchronize(0);
-
+printf("5\n");
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -1015,7 +1016,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-
+printf("2\n");
     (t4o = t4i * t2).run();
     cudaStreamSynchronize(0);
 
@@ -1034,7 +1035,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-
+printf("2\n");
     (t4o = t2 * t4i).run();
     cudaStreamSynchronize(0);
 
@@ -1078,7 +1079,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-
+printf("2\n");
     (t4o = t4i * t3).run();
     cudaStreamSynchronize(0);
 
@@ -1117,7 +1118,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
       }
     }
   }
-
+printf("2\n");
   {
     tensor_t<TypeParam, 0> t0;
     tensor_t<TypeParam, 1> t1({4});
@@ -1181,7 +1182,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t0 + t1 + t2 + t3 + t4i).run();
     cudaStreamSynchronize(0);
-
+printf("2\n");
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {

@@ -96,9 +96,8 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   const index_t win_size = 100;
   pb->InitAndRunTVGenerator<TypeParam>("00_operators", "window", "run",
                                        {win_size});
-
-  tensorShape_t<1> shape({win_size});
-  tensor_t<TypeParam, 1> ov(shape);
+  std::array<index_t, 1> shape({win_size});
+  auto ov = make_tensor<TypeParam>(shape);
 
   (ov = hanning_x(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hanning", 0.01);
@@ -200,9 +199,9 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
-  tensorShape_t s({count});
+  std::array<index_t, 1> s({count});
 
-  tensor_t<TypeParam, 1> t1(s);
+  auto t1 = make_tensor<TypeParam>(s);
 
   (t1 = zeros(s)).run();
   cudaStreamSynchronize(0);
@@ -222,9 +221,9 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
-  tensorShape_t s({count});
+  std::array<index_t, 1> s({count});
+  auto t1 = make_tensor<TypeParam>(s);
 
-  tensor_t<TypeParam, 1> t1(s);
   (t1 = ones(s)).run();
   cudaStreamSynchronize(0);
 
@@ -244,9 +243,8 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
   MATX_ENTER_HANDLER();
   index_t count = 100;
   tensor_t<TypeParam, 1> t1{{count}};
-  tensorShape_t s = t1.Shape();
 
-  (t1 = range_x(s, 1, 1)).run();
+  (t1 = range_x(t1.Shape(), 1, 1)).run();
   cudaStreamSynchronize(0);
 
   TypeParam one = 1;
@@ -352,7 +350,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
   // Use doubles for verification since half operators have no equivalent host
   // types
   double step = (static_cast<double>(stop) - static_cast<double>(start)) /
-                static_cast<double>(s.Size(s.Rank() - 1) - 1);
+                static_cast<double>(s[s.size() - 1] - 1);
 
   for (index_t i = 0; i < count; i++) {
     if constexpr (IsHalfType<TypeParam>()) {
