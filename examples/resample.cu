@@ -74,7 +74,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // Inverse Transform - FFT size based on output
   ifft(resampView, sliceView, stream);
-  (resampView = resampView * 1.0 / N).run(stream);
+  (resampView = resampView * 1.0 / static_cast<double>(N)).run(stream);
 
   cudaEventRecord(start, stream);
 
@@ -88,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     // Inverse Transform - FFT size based on output
     ifft(resampView, sv, stream);
 
-    (resampView = resampView * 1.0 / N).run(stream);
+    (resampView = resampView * 1.0 / static_cast<double>(N)).run(stream);
   }
 
   cudaEventRecord(stop, stream);
