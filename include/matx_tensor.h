@@ -1573,7 +1573,7 @@ public:
    *
    * @param val
    */
-  __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void PrintVal(const T &val) const noexcept
   {
     if constexpr (is_complex_v<T>) {
       printf("%.4f%+.4fj ", static_cast<float>(val.real()),
@@ -1621,7 +1621,7 @@ public:
    *
    */
   template <typename ... Args>
-  __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
+  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(Args ...dims) const noexcept
   {
     MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
 
@@ -1698,7 +1698,7 @@ public:
    *
    */
   template <typename ... Args>
-  __MATX_INLINE__ void Print(Args ...dims) const
+  void Print(Args ...dims) const
   {
 #ifdef __CUDACC__    
     auto kind = GetPointerKind(data_.get());
