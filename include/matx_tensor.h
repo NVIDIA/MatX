@@ -1701,7 +1701,7 @@ public:
   __MATX_INLINE__ void Print(Args ...dims) const
   {
 #ifdef __CUDACC__    
-    auto kind = GetPointerKind(data_);
+    auto kind = GetPointerKind(data_.get());
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
       InternalPrint(dims...);
