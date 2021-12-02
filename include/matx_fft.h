@@ -286,7 +286,7 @@ protected:
 
   inline void InternalExec(const void *idata, void *odata, int dir)
   {
-    cufftResult res;
+    [[maybe_unused]] cufftResult res;
     res = cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
     MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
   }
@@ -472,7 +472,7 @@ matxFFTPlan1D_t(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
   cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
@@ -521,7 +521,7 @@ matxFFTPlan1D_t(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
   cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
@@ -571,7 +571,7 @@ matxFFTPlan1D_t(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
     cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                        this->params_.istride, this->params_.idist,
                        this->params_.input_type, this->params_.onembed,
