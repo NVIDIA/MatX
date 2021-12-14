@@ -39,12 +39,11 @@
 namespace matx {
 
 /**
- * Create a tensor
+ * Create a tensor with a C array for the shape using implicitly-allocated memory
  *
- * @param data
- *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename T, int RANK, typename O = owning>
 auto make_tensor(const index_t (&shape)[RANK]) {
@@ -54,6 +53,13 @@ auto make_tensor(const index_t (&shape)[RANK]) {
   return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
 }
 
+/**
+ * Create a tensor with a C array for the shape using implicitly-allocated memory
+ *
+ * @param shape
+ *   Shape of tensor
+ * @returns Pointer to new tensor
+ **/
 template <typename T, int RANK, typename O = owning>
 auto make_tensor_p(const index_t (&shape)[RANK]) {
   DefaultDescriptor<RANK> desc{shape};
@@ -63,14 +69,17 @@ auto make_tensor_p(const index_t (&shape)[RANK]) {
 }
 
 /**
- * Create a tensor
+ * Create a tensor using a tensorShape_t
+ * 
+ * This function is deprecated and other container types (std::array, for example) should be 
+ * preferred over tensorShape_t.
  *
- * @param data
- *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename T, int RANK, typename O = owning>
+[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
 auto make_tensor(const tensorShape_t<RANK> &shape) {
   DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
   raw_pointer_buffer<T, O, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize())};
@@ -78,7 +87,18 @@ auto make_tensor(const tensorShape_t<RANK> &shape) {
   return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
 }
 
+/**
+ * Create a tensor using a tensorShape_t
+ * 
+ * This function is deprecated and other container types (std::array, for example) should be 
+ * preferred over tensorShape_t.
+ *
+ * @param shape
+ *   Shape of tensor
+ * @returns Pointer to new tensor
+ **/
 template <typename T, int RANK, typename O = owning>
+[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
 auto make_tensor_p(const tensorShape_t<RANK> &shape) {
   DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
   raw_pointer_buffer<T, O, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize())};
@@ -87,14 +107,16 @@ auto make_tensor_p(const tensorShape_t<RANK> &shape) {
 }
 
 /**
- * Create a tensor
+ * Create a tensor using a tensorShape_t and user-defined pointer
  *
- * @param data
+ * @param ptr
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns Pointer to new tensor
  **/
 template <typename T, int RANK, typename O = owning>
+[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
 auto make_tensor(T *ptr, const tensorShape_t<RANK> &shape) {
   DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
   raw_pointer_buffer<T, O, matx_allocator<T>> rp{ptr, static_cast<size_t>(desc.TotalSize())};
@@ -103,12 +125,15 @@ auto make_tensor(T *ptr, const tensorShape_t<RANK> &shape) {
 }
 
 /**
- * Create a tensor
+ * Create a tensor from a conforming container type
+ * 
+ * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * and std::vector meet this criteria.
  *
- * @param data
- *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
+ * 
  **/
 template <typename T, typename ShapeType, typename O = owning,
   std::enable_if_t< !is_matx_shape_v<ShapeType> && 
@@ -123,6 +148,17 @@ auto make_tensor(ShapeType &&shape) {
   decltype(desc)>{std::move(s), std::move(desc)};
 }
 
+/**
+ * Create a tensor from a conforming container type
+ * 
+ * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * and std::vector meet this criteria.
+ *
+ * @param shape
+ *   Shape of tensor
+ * @returns Pointer to new tensor
+ * 
+ **/
 template <typename T, typename ShapeType, typename O = owning,
   std::enable_if_t< !is_matx_shape_v<ShapeType> && 
                     !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
@@ -136,12 +172,26 @@ auto make_tensor_p(ShapeType &&shape) {
   decltype(desc)>{std::move(s), std::move(desc)};
 }
 
+/**
+ * Create a 0D tensor with implicitly-allocated memory
+ * 
+ * @returns New tensor
+ * 
+ **/
 template <typename T>
 auto make_tensor() {
   std::array<T, 0> shape;
   return make_tensor<T, 0>(std::move(shape));
 }
 
+/**
+ * Create a 0D tensor with user-defined memory
+ * 
+ * @param ptr
+ *  Pointer to data
+ * @returns New tensor
+ * 
+ **/
 template <typename T>
 auto make_tensor(T *ptr) {
   std::array<T, 0> shape;
@@ -151,12 +201,13 @@ auto make_tensor(T *ptr) {
 
 
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory and a C array
  *
  * @param data
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename T, int RANK, typename O = owning>
 auto make_tensor(T *const data, const index_t (&shape)[RANK]) {
@@ -167,12 +218,13 @@ auto make_tensor(T *const data, const index_t (&shape)[RANK]) {
 }
 
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory and conforming shape type
  *
  * @param data
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename T, typename ShapeType, typename O = owning, 
   std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
@@ -186,12 +238,13 @@ auto make_tensor(T *const data, ShapeType &&shape) {
 }
 
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory and conforming shape type
  *
  * @param data
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename T, typename ShapeType, typename O = owning, 
   std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
@@ -205,12 +258,13 @@ auto make_tensor_p(T *const data, ShapeType &&shape) {
 }
 
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory, custom storage, and conforming shape type
  *
- * @param data
- *   Pointer to device data
+ * @param s
+ *   Storage object
  * @param shape
  *   Shape of tensor
+ * @returns New tensor
  **/
 template <typename Storage, typename ShapeType,  
   std::enable_if_t<is_matx_storage_v<Storage> && 
@@ -226,12 +280,13 @@ auto make_tensor(Storage s, ShapeType &&shape) {
 
 
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory and an existing descriptor
  *
  * @param data
  *   Pointer to device data
- * @param shape
- *   Shape of tensor
+ * @param desc
+ *   Tensor descriptor (tensor_desc_t)
+ * @returns New tensor
  **/
 template <typename T, typename D, typename O = owning, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
 auto make_tensor(T* const data, D &&desc) {    
@@ -241,14 +296,8 @@ auto make_tensor(T* const data, D &&desc) {
   return tensor_t<T, Dstrip::Rank(), decltype(s), Dstrip>{std::move(s), std::forward<D>(desc)};
 }
 
-
-
-
-// template <typename T, typename T2>
-// int make_tensor(T&&t, T2&&t2) {}
-
 /**
- * Create a tensor with user memory
+ * Create a tensor with user-defined memory and C-array shapes and strides
  *
  * @param data
  *   Pointer to device data
@@ -256,6 +305,7 @@ auto make_tensor(T* const data, D &&desc) {
  *   Shape of tensor
  * @param strides
  *   Strides of tensor
+ * @returns New tensor
  **/
 template <typename T, int RANK>
 auto make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&strides)[RANK]) {

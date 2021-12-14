@@ -173,8 +173,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
             sizeof(T1) * x.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
   matxAlloc(reinterpret_cast<void **>(&x_norm), sizeof(*x_norm),
             MATX_ASYNC_DEVICE_MEMORY, stream);
-printf("Alloc x_normdiv %p\n", x_normdiv);
-printf("Alloc x_norm %p\n", x_norm);
+
   auto x_normdiv_v = make_tensor<T1>(x_normdiv, x.Shape());
   auto x_norm_v = make_tensor<float>(x_norm);
 
@@ -190,8 +189,7 @@ printf("Alloc x_norm %p\n", x_norm);
               sizeof(T1) * ry.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
     matxAlloc(reinterpret_cast<void **>(&y_norm), sizeof(*y_norm),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-printf("Alloc y_normdiv %p\n", y_normdiv);
-printf("Alloc y_norm %p\n", y_norm);              
+              
     y_normdiv_v.Reset(y_normdiv, ry.Shape());
     auto y_norm_v = make_tensor<float>(y_norm);
 
@@ -209,7 +207,7 @@ printf("Alloc y_norm %p\n", y_norm);
     matxAlloc(reinterpret_cast<void **>(&new_ynorm),
               sizeof(T1) * (len_seq - 1) * xlen, MATX_ASYNC_DEVICE_MEMORY,
               stream);
-printf("Alloc new_ynorm %p\n", new_ynorm);              
+          
     auto new_ynorm_v = make_tensor<T1>(new_ynorm, {len_seq - 1, xlen});
 
     newYNorm(new_ynorm_v, x_normdiv_v, y_normdiv_v).run(stream);
@@ -218,7 +216,7 @@ printf("Alloc new_ynorm %p\n", new_ynorm);
     matxAlloc(reinterpret_cast<void **>(&fft_data),
               sizeof(*fft_data) * nfreq * (len_seq - 1),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-    printf("Alloc fft_data %p\n", fft_data);    
+  
     auto fullfft = make_tensor<T1>(fft_data, {(len_seq - 1), nfreq});
     auto partfft = fullfft.Slice({0, 0}, {(len_seq - 1), xlen});
 
@@ -232,7 +230,7 @@ printf("Alloc new_ynorm %p\n", new_ynorm);
     matxAlloc(reinterpret_cast<void **>(&amf_tmp),
               sizeof(*amf_tmp) * nfreq * (len_seq - 1),
               MATX_ASYNC_DEVICE_MEMORY, stream);
-printf("Alloc amf_tmp %p\n", amf_tmp);                  
+             
     auto amf_tmp_v = make_tensor<T1>(amf_tmp, {(len_seq - 1), nfreq});
     (amf_tmp_v = (float)nfreq * abs(fftshift1D(fullfft))).run(stream);
     matx::copy(amf, amf_tmp_v.RealView(), stream);
