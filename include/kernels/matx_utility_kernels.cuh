@@ -12,8 +12,8 @@
 
 namespace matx {
 
-template <typename T, int RANK, typename Storage, typename Desc, typename ... Args>
-__global__ void PrintKernel(tensor_t<T, RANK, Storage, Desc> v, Args ...dims)
+template <typename Tensor, typename ... Args>
+__global__ void PrintKernel(Tensor v, Args ...dims)
 {
   v.InternalPrint(dims...);
 }

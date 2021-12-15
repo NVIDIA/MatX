@@ -48,7 +48,6 @@
 #include "matx_tensor_utils.h"
 
 static constexpr int MAX_TENSOR_DIM = 4;
-static constexpr bool PRINT_ON_DEVICE = false;
 
 // forward declare
 namespace matx {
@@ -956,8 +955,6 @@ public:
     s[0] = stride_size;
 
     tensor_desc_t<decltype(n), decltype(s), RANK+1> new_desc{std::move(n), std::move(s)}; 
-    printf("%lld %lld\n", n[0], n[1]);
-    printf("%lld %lld\n", s[0], s[1]);
     return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};    
   }
 
@@ -1341,163 +1338,6 @@ public:
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
     const typename Desc::stride_type strides[RANK] = {-1};
     return Slice<N>(firsts, ends, strides);
-  }
-
-
-  /**
-   * Print a value
-   *
-   * Type-agnostic function to print a value to stdout
-   *
-   * @param val
-   */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void PrintVal(const T &val) const noexcept
-  {
-    if constexpr (is_complex_v<T>) {
-      printf("%.4f%+.4fj ", static_cast<float>(val.real()),
-             static_cast<float>(val.imag()));
-    }
-    else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
-      printf("%.4f ", static_cast<float>(val));
-    }
-    else if constexpr (std::is_floating_point_v<T>) {
-      printf("%.4f ", val);
-    }
-    else if constexpr (std::is_same_v<T, long long int>) {
-      printf("%lld ", val);
-    }
-    else if constexpr (std::is_same_v<T, int64_t>) {
-      printf("%" PRId64 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, int32_t>) {
-      printf("%" PRId32 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, int16_t>) {
-      printf("%" PRId16 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, int8_t>) {
-      printf("%" PRId8 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, uint64_t>) {
-      printf("%" PRIu64 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, uint32_t>) {
-      printf("%" PRIu32 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, uint16_t>) {
-      printf("%" PRIu16 " ", val);
-    }
-    else if constexpr (std::is_same_v<T, uint8_t>) {
-      printf("%" PRIu8 " ", val);
-    }
-  }
-
-  /**
-   * Print a tensor
-   *
-   * Type-agnostic function to print a tensor to stdout
-   *
-   */
-  template <typename ... Args>
-  __MATX_HOST__ __MATX_DEVICE__ void InternalPrint(Args ...dims) const noexcept
-  {
-    MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
-
-    if constexpr (sizeof...(Args) == 0) {
-      PrintVal(this->operator()());
-      printf("\n");
-    }
-    else if constexpr (sizeof...(Args) == 1) {
-      auto& k = pp_get<0>(dims...);
-      for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
-        printf("%06lld: ", _k);
-        PrintVal(this->operator()(_k));
-        printf("\n");
-      }
-    }
-    else if constexpr (sizeof...(Args) == 2) {
-      auto& k = pp_get<0>(dims...);
-      auto& l = pp_get<1>(dims...);
-      for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
-        for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(1) : l); _l++) {
-          if (_l == 0)
-            printf("%06lld: ", _k);
-
-          PrintVal(this->operator()(_k, _l));
-        }
-        printf("\n");
-      }
-    }
-    else if constexpr (sizeof...(Args) == 3) {
-      auto& j = pp_get<0>(dims...);
-      auto& k = pp_get<1>(dims...);
-      auto& l = pp_get<2>(dims...);
-      for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(0) : j); _j++) {
-        printf("[%06lld,:,:]\n", _j);
-        for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(1) : k); _k++) {
-          for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(2) : l); _l++) {
-            if (_l == 0)
-              printf("%06lld: ", _k);
-
-            PrintVal(this->operator()(_j, _k, _l));
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }      
-    }
-    else if constexpr (sizeof...(Args) == 4) {
-      auto& i = pp_get<0>(dims...);
-      auto& j = pp_get<1>(dims...);
-      auto& k = pp_get<2>(dims...);
-      auto& l = pp_get<3>(dims...); 
-      for (typename Desc::shape_type _i = 0; _i < ((i == 0) ? this->Size(0) : i); _i++) {
-        for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(1) : j); _j++) {
-          printf("[%06lld,%06lld,:,:]\n", _i, _j);
-          for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(2) : k); _k++) {
-            for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(3) : l); _l++) {
-              if (_l == 0)
-                printf("%06lld: ", _k);
-
-              PrintVal(this->operator()(_i, _j, _k, _l));
-            }
-            printf("\n");
-          }
-          printf("\n");
-        }
-      }
-    }
-  }  
-
-  /**
-   * Print a tensor
-   *
-   * Type-agnostic function to print a tensor to stdout
-   *
-   */
-  template <typename ... Args>
-  void Print(Args ...dims) const
-  {
-#ifdef __CUDACC__    
-    auto kind = GetPointerKind(this->ldata_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(dims...);
-    }
-    else if (DevicePrintable(kind)) {
-      if (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, dims...);
-      }
-      else {
-        tensor_t<T, RANK, Storage, Desc> tmpv(this->shape_, (const typename Desc::stride_type(&)[RANK])this->s_);
-        cudaMemcpy(tmpv.Data(), this->Data(), tmpv.Bytes(),
-                   cudaMemcpyDeviceToHost);
-        tmpv.Print(dims...);
-      }
-    }
-#else
-    InternalPrint(dims...);
-#endif    
   }
 
   /**

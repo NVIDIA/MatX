@@ -71,7 +71,7 @@ namespace matx
       size_ = rhs.size_; 
       data_ = std::move(rhs.data_);
     } 
-    ~raw_pointer_buffer() {}
+    ~raw_pointer_buffer() = default;
 
     [[nodiscard]] __MATX_INLINE__ T *data() noexcept
     {
@@ -259,6 +259,7 @@ namespace matx
     __MATX_INLINE__ basic_storage(const basic_storage &) = default;
     __MATX_INLINE__ basic_storage(basic_storage &&) = default;
     __MATX_INLINE__ basic_storage& operator=(const basic_storage &) = default;
+    __MATX_INLINE__ ~basic_storage() = default;
 
     [[nodiscard]] __MATX_INLINE__ T *data() noexcept
     {
@@ -296,7 +297,7 @@ namespace matx
      * @returns Reference count or 0 if not tracked
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ auto use_count() const noexcept
+    __MATX_INLINE__ auto use_count() const noexcept
     {
       return container_.use_count();
     }

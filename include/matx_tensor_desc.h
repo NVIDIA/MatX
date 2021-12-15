@@ -57,9 +57,9 @@ public:
   using matx_descriptor = bool;
 
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t<ShapeType, StrideType, RANK>(const tensor_desc_t& ) = default;
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t& operator=(const tensor_desc_t&) = default;
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t& operator=(tensor_desc_t&&) = default;
+  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
+  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(const tensor_desc_t&) = default;
+  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
   template <typename S = ShapeType, std::enable_if_t<!std::is_array_v<ShapeType> && !std::is_array_v<StrideType>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeType &&shape, StrideType &&stride)

@@ -45,24 +45,267 @@
 namespace matx
 {
 
-  // Doxygen doesn't recognize the syntax of these
-  template <typename T, typename S>
-  inline
-      typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                                cuda::std::complex<T>>
-          __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
-  {
-    return c * T(n);
-  }
+// Helper functions for multiplying complex numbers by scalars
+template <typename T, typename S>
+inline
+    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
+                              cuda::std::complex<T>>
+        __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
+{
+  return c * T(n);
+}
 
-  template <typename T, typename S>
-  inline
-      typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                                cuda::std::complex<T>>
-          __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
+template <typename T, typename S>
+inline
+    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
+                              cuda::std::complex<T>>
+        __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
+{
+  return T(n) * c;
+}
+
+
+/**
+ * Concatenate two tensors
+ *
+ * Class for concatening two tensors along a single dimension. Sizes of the tensors not
+ * being concatenated must be the same, and the new tensor has dimensions equal to the original
+ * tensors on non-index dimension, and the sum of sizes along the index dimension.
+ */
+  template <int Dim, typename Op1, typename Op2>
+  class Concatenate: public BaseOp<Concatenate<Dim, Op1, Op2>>
   {
-    return T(n) * c;
+    static_assert(Op1::Rank() == Op2::Rank(), "Ranks of concatenating tensors must match");
+    static_assert(Dim < Op1::Rank(), "Dimension to concatenate must be within range"); 
+    static_assert(Dim < Op2::Rank(), "Dimension to concatenate must be within range");
+
+  public:
+    // Scalar type of operation
+    using scalar_type = void;
+
+    inline __MATX_DEVICE__ __MATX_HOST__ Concatenate(Op1 op1, Op2 op2) : op1_(op1), op2_(op2)
+    {
+
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0));
+        }
+        else {
+          return get_value(op1_, i);
+        }
+      }
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j);
+        }
+        else {
+          return get_value(op1_, i, j);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1));
+        }
+        else {
+          return get_value(op1_, i, j);
+        }        
+      }
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j, k);
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1), k);
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }
+      else if constexpr (Dim == 2) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k - op1_.Size(2));
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }      
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j, k, l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1), k, l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }
+      else if constexpr (Dim == 2) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k - op1_.Size(2), l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      } 
+      else if constexpr (Dim == 3) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k, l - op1_.Size(3));
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }       
+    }
+
+    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+    {
+      return get_rank<Op1>();
+    }
+
+    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+    {
+      if (dim == Dim) {
+        return op1_.Size(dim) + op2_.Size(dim);
+      }
+      else {
+        return op1_.Size(dim);
+      }
+    }
+
+  private:
+      typename base_type<Op1>::type op1_;
+      typename base_type<Op2>::type op2_;    
+  };  
+
+  template <int Dim, typename T1, typename T2, std::enable_if_t<is_matx_op<T1>() && is_matx_op<T2>(), bool> = true>
+  __MATX_INLINE__ __MATX_HOST__  auto concat(T1 &t1, T2 &t2)
+  {
+    return Concatenate<Dim, T1, T2>{t1, t2};
   }  
+
+//   /**
+//  * Chain multiple operator statements
+//  *
+//  * Takes a variable list of operator statements to execute concurrently.
+//  * Chaining may improve performance over executing each operation separately.
+//  */
+//   template <typename... Ts>
+//   class Concatenate: public BaseOp<Concatenate<Ts...>>
+//   {
+//   private:
+//     std::tuple<Ts...> ops_;
+//     std::array<index_t, get_rank<T1>()> size_;
+//     int ldim_;
+
+//   public:
+//     // Scalar type of operation
+//     using scalar_type = void;
+
+//     inline Concatenate(int ldim, Ts... ts) : ops_(ts...), ldim_(ldim)
+//     {
+//       using first = std::tuple_element_t<0, decltype(ops_)>;
+//       constexpr auto rank = first::Rank();
+//       static_assert(rank > 0, "Cannot concatenate rank-0 tensors");
+//       static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
+//       static_assert((... && (Ts::Rank() == rank)));
+
+//       MATX_ASSERT_STR(ldim < rank, "Dimension to concatenate must be within range");
+
+//       auto tsum = [&](int dim, auto ...args){ return (args.Size(dim) + ...); };
+//       for (int32_t i = 0; i < rank; i++) {
+//         size_[i] = tsum(i, ts);
+
+//         // if (i != ldim) {
+//         //   #pragma unroll
+//         //   for (int t = 1; t < sizeof...(Ts); t++) {
+//         //     MATX_ASSERT_STR(std::get<t-1>(ts).Size(i) == std::get<t>(ts).Size(i), matxInvalidDim, 
+//         //       "All dimensions not being concatenate must match in size");
+//         //   }
+//         // }
+//       }
+
+//       // int dim = 0;
+//       // std::apply([&](const auto &... t){ ((main_dim_size_[dim++] = t.Size(ldim_)), ...); }, ops_);      
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+//     {
+//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
+//       std::apply(
+//         [&](Ts const&... targs){(
+//           (
+//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
+//           ), ...);
+//         }, ops_
+//       );
+
+//       return res;
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+//     {
+//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
+//       std::apply(
+//         [&](Ts const&... targs){(
+//           (
+//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
+//           ), ...);
+//         }, ops_
+//       );
+
+//       return res;
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+//     {
+//       get_value(op_, i, j, k);
+//       args_.operator()(i, j, k);
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+//     {
+//       get_value(op_, i, j, k, l);
+//       args_.operator()(i, j, k, l);
+//     }
+
+//     static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+//     {
+//       return get_rank<T1>();
+//     }
+
+//     index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+//     {
+//       return size_[dim];
+//     }
+//   };
+
 
 /**
  * Chain multiple operator statements
