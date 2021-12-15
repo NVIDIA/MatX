@@ -882,7 +882,6 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 {
   MATX_ENTER_HANDLER();
   {
-    printf("1\n");
     tensor_t<TypeParam, 0> t0;
     tensor_t<TypeParam, 4> t4i({10, 20, 30, 40});
     tensor_t<TypeParam, 4> t4o({10, 20, 30, 40});
@@ -901,7 +900,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t4i * t0).run();
     cudaStreamSynchronize(0);
-printf("2\n");
+
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -919,7 +918,7 @@ printf("2\n");
     }
     (t4o = t0 * t4i).run();
     cudaStreamSynchronize(0);
-printf("3\n");
+
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -944,7 +943,7 @@ printf("3\n");
     for (index_t i = 0; i < t1.Size(0); i++) {
       t1(i) = static_cast<value_promote_t<TypeParam>>(i);
     }
-printf("3\n");
+
     for (index_t i = 0; i < t4i.Size(0); i++) {
       for (index_t j = 0; j < t4i.Size(1); j++) {
         for (index_t k = 0; k < t4i.Size(2); k++) {
@@ -958,7 +957,7 @@ printf("3\n");
 
     (t4o = t4i * t1).run();
     cudaStreamSynchronize(0);
-printf("4\n");
+
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -977,7 +976,7 @@ printf("4\n");
 
     (t4o = t1 * t4i).run();
     cudaStreamSynchronize(0);
-printf("5\n");
+
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -1016,7 +1015,7 @@ printf("5\n");
         }
       }
     }
-printf("2\n");
+
     (t4o = t4i * t2).run();
     cudaStreamSynchronize(0);
 
@@ -1035,7 +1034,7 @@ printf("2\n");
         }
       }
     }
-printf("2\n");
+
     (t4o = t2 * t4i).run();
     cudaStreamSynchronize(0);
 
@@ -1079,7 +1078,7 @@ printf("2\n");
         }
       }
     }
-printf("2\n");
+
     (t4o = t4i * t3).run();
     cudaStreamSynchronize(0);
 
@@ -1118,7 +1117,7 @@ printf("2\n");
       }
     }
   }
-printf("2\n");
+
   {
     tensor_t<TypeParam, 0> t0;
     tensor_t<TypeParam, 1> t1({4});
@@ -1182,7 +1181,7 @@ printf("2\n");
 
     (t4o = t0 + t1 + t2 + t3 + t4i).run();
     cudaStreamSynchronize(0);
-printf("2\n");
+
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -1202,5 +1201,80 @@ printf("2\n");
       }
     }
   }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
+{
+  MATX_ENTER_HANDLER();
+
+  index_t i,j;
+
+  auto t11 = make_tensor<TypeParam>({10});
+  auto t12 = make_tensor<TypeParam>({5});
+  auto t1o = make_tensor<TypeParam>({15});
+
+  t11.SetVals({0,1,2,3,4,5,6,7,8,9});
+  t12.SetVals({0,1,2,3,4});
+
+  (t1o = concat<0>(t11, t12)).run();
+  cudaStreamSynchronize(0);
+
+  for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
+    if (i < t11.Size(0)) {
+      ASSERT_EQ(t11(i), t1o(i));
+    }
+    else {
+      ASSERT_EQ(t12(i - t11.Size(0)), t1o(i));
+    }
+  }
+
+  auto t21 = make_tensor<TypeParam>({4, 4});
+  auto t22 = make_tensor<TypeParam>({3, 4});
+  auto t23 = make_tensor<TypeParam>({4, 3});
+
+  auto t2o1 = make_tensor<TypeParam>({7,4});  
+  auto t2o2 = make_tensor<TypeParam>({4,7});  
+  t21.SetVals({{1,2,3,4},
+               {2,3,4,5},
+               {3,4,5,6},
+               {4,5,6,7}} );
+  t22.SetVals({{5,6,7,8},
+               {6,7,8,9},
+               {9,10,11,12}});
+  t23.SetVals({{5,6,7},
+               {6,7,8},
+               {9,10,11},
+               {10,11,12}});
+
+  (t2o1 = concat<0>(t21, t22)).run();
+  cudaStreamSynchronize(0);
+
+  for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
+    for (j = 0; j < t21.Size(1); j++) {
+      if (i < t21.Size(0)) {
+        ASSERT_EQ(t21(i,j), t2o1(i,j));
+      }
+      else {
+        ASSERT_EQ(t22(i - t21.Size(0), j), t2o1(i,j));
+      }
+    }
+  }
+
+  (t2o2 = concat<1>(t21, t23)).run(); 
+  cudaStreamSynchronize(0);
+  
+  for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
+    for (i = 0; i < t21.Size(0); i++) {
+      if (j < t21.Size(1)) {
+        ASSERT_EQ(t21(i,j), t2o2(i,j));
+      }
+      else {
+        ASSERT_EQ(t23(i, j - t21.Size(1)), t2o2(i,j));
+      }
+    }
+  }  
+
+  
   MATX_EXIT_HANDLER();
 }

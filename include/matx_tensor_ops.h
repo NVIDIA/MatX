@@ -204,6 +204,16 @@ inline
       typename base_type<Op2>::type op2_;    
   };  
 
+  /**
+   * @brief Concatenate two tensors
+   * 
+   * @tparam Dim dimension to concatenate
+   * @tparam T1 First tensor type
+   * @tparam T2 Second tensor type
+   * @param t1 First tensor
+   * @param t2 Second tensor
+   * @return Concatenation operator 
+   */
   template <int Dim, typename T1, typename T2, std::enable_if_t<is_matx_op<T1>() && is_matx_op<T2>(), bool> = true>
   __MATX_INLINE__ __MATX_HOST__  auto concat(T1 &t1, T2 &t2)
   {
