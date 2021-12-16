@@ -96,19 +96,14 @@ TYPED_TEST_SUITE(TensorCreationTestsBoolean, MatXBoolTypes);
 
 TYPED_TEST(TensorCreationTestsAll, MakeShape)
 {
-  auto mt2 = make_tensor<float>({2, 2});
+  auto mt2 = make_tensor<TypeParam>({2, 2});
   ASSERT_EQ(mt2.Size(0), 2);
   ASSERT_EQ(mt2.Size(1), 2);
-  mt2.SetVals({{1,2}, {5,6}});
-  ASSERT_EQ(mt2(0,0), 1);
-  ASSERT_EQ(mt2(0,1), 2);
-  ASSERT_EQ(mt2(1,0), 5);
-  ASSERT_EQ(mt2(1,1), 6);
 
-  auto mt0 = make_tensor<float>();
-  auto mt1 = make_tensor<float>({10});
-  auto mt3 = make_tensor<float>({10, 5, 4});
-  auto mt4 = make_tensor<float>({10, 5, 4, 3});
+  auto mt0 = make_tensor<TypeParam>();
+  auto mt1 = make_tensor<TypeParam>({10});
+  auto mt3 = make_tensor<TypeParam>({10, 5, 4});
+  auto mt4 = make_tensor<TypeParam>({10, 5, 4, 3});
 
   ASSERT_EQ(mt1.Size(0), 10);
   ASSERT_EQ(mt3.Size(0), 10);
@@ -122,8 +117,21 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
 
 TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
 {
-  auto mt2 = make_static_tensor<float, 10, 40>();
+  auto mt1 = make_static_tensor<TypeParam, 10>();
+  ASSERT_EQ(mt1.Size(0), 10);
+
+  auto mt2 = make_static_tensor<TypeParam, 10, 40>();
   ASSERT_EQ(mt2.Size(0), 10);
   ASSERT_EQ(mt2.Size(1), 40);
- 
+
+  auto mt3 = make_static_tensor<TypeParam, 10, 40, 30>();
+  ASSERT_EQ(mt3.Size(0), 10);
+  ASSERT_EQ(mt3.Size(1), 40);  
+  ASSERT_EQ(mt3.Size(2), 30);  
+
+  auto mt4 = make_static_tensor<TypeParam, 10, 40, 30, 6>();
+  ASSERT_EQ(mt4.Size(0), 10);
+  ASSERT_EQ(mt4.Size(1), 40);  
+  ASSERT_EQ(mt4.Size(2), 30);    
+  ASSERT_EQ(mt4.Size(3), 6);    
 }
