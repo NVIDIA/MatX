@@ -21,6 +21,10 @@ underlying GPU or host memory. While dynamically-typed languages like Python or 
 MatX requires either a one-time explicit memory allocation, or a user-provided device-side buffer. This gives more control over the lifetime of the data, and
 allows reusing memory regions for different operations.
 
+.. note::
+
+    For more information about creating tensors, see the "Creating Tensors" documentation
+
 A tensor is created using the following syntax:
 
 .. code-block:: cpp
@@ -39,7 +43,16 @@ To avoid the redundant rank and constructor arguments, the same tensor can be cr
 
 In this case only the type is required as a template parameter, and the rank is deduced from the number of arguments in the dimension list. 
 
-After calling the constructor, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
+If the shape of the tensor is known at compile time, a static tensor can be created for a performance improvement when accessing elements of the
+tensor:
+
+.. code-block:: cpp
+
+    auto t = make_tensor<float, 10, 20>();
+
+Note that for a static tensor the shape is moved to the template parameters instead of function arguments.
+
+After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
 pass their own pointers in a different form of the constructor which will leave allocation and freeing of the memory to the caller (see 
 *Creating a view from an existing pointer* below). Note that MatX treats the initial tensor view as the owner of the memory. When this view is
 destructed, whether by going out of scope or manually, all memory is freed. If there were other views still pointing to this memory, it is no
@@ -70,7 +83,7 @@ Tensors can also be initialized using initializer list syntax using the ``SetVal
 
 .. code-block:: cpp
 
-    auto myT = tensor_t<float, 2>({3, 3});
+    auto myT = make_tensor<float>({3, 3});
     myT.SetVals({ {1,2,3}, {4,5,6}, {7,8,9} });
 
 In other languages it's very common to initialize a tensor with a set of values on creation (ones, zeros, ranges). This will be covered later 
@@ -140,14 +153,14 @@ Permuting a tensor is done using the ``Permute`` member function of a view:
 
 .. code-block:: cpp
 
-    auto t = tensor_t<float, 2>({10, 20});
+    auto t = make_tensor<float>({10, 20});
     auto tp = t.Permute({1,0});
 
 ``tp`` is now a view into ``t`` where the rows and columns are swapped (transpose). ``Permute`` is not limited to matrices, though:
 
 .. code-block:: cpp
 
-    auto t4 = tensor_t<float, 4>({10, 20, 5, 2});
+    auto t4 = make_tensor<float>({10, 20, 5, 2});
     auto tp4 = t.Permute({1,3,2,0});
 
 ``t4p`` is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list.
@@ -159,7 +172,7 @@ a new tensor so that the new layout is contiguous. Using the variables from abov
 
 .. code-block:: cpp
 
-    auto t4pc = tensor_t<float, 4>(tp4.Shape());
+    auto t4pc = make_tensor<float>(tp4.Shape());
     copy(t4pc, t4p);
 
 ``t4pc`` will now contain the permuted data, but in contiguous memory.
@@ -171,8 +184,8 @@ a reshaped view of an existing view. This is commonly done when we want to take 
 a tensor of a different rank. The product of dimensions in one rank must equal the product of dimensions in the other rank. For example,
 to take a 1D tensor of size 16 and reshape into a 2D tensor of shape 4x4::
 
-    auto t1 = tensor_t<1>({16});
-    auto t2 = t1.View(tensorShape_t<2>({4,4});
+    auto t1 = make_tensor<float>({16});
+    auto t2 = t1.View({4,4});
 
 ``t2`` is now a view into the same memory as ``t1``, but viewed as a different rank. Any modifications to one tensor will be seen in the
 other since no data was copied.
@@ -184,8 +197,8 @@ all rows in a matrix, you can clone the tensor to a higher rank to match the oth
 
 .. code-block:: cpp
 
-    auto t1 = tensor_t({16});
-    auto t2 = tensor_t({16, 16});
+    auto t1 = make_tensor<int>({16});
+    auto t2 = make_tensor<float>({16, 16});
     // ... Initialize tensors
 
     auto t1c = t1.Clone<2>({16, matxKeepDim});
@@ -212,7 +225,7 @@ attempt to allocate or free any memory when this constructor is used, and it is 
 .. code-block:: cpp
 
     float *my_device_ptr;  // Assume my_device_ptr is allocated somewhere
-    auto t2 = tensor_t<float, 2>(my_device_ptr, {20,100});
+    auto t2 = make_tensor<float>(my_device_ptr, {20,100});
     t2(1,1) = 5; // Error! Don't do this!
 
 In the example above, ``t2`` is a new view pointing to the existing device-allocated memory. Unlike with managed memory, ``operator()``
@@ -228,9 +241,9 @@ For example:
 
 .. code-block:: cpp
 
-    tensor_t<float, 2> a({10, 20});
-    tensor_t<float, 2> b({10, 20});
-    tensor_t<float, 2> c({10, 20});
+    auto a = make_tensor<float>({10, 20});
+    auto b = make_tensor<float>({10, 20});
+    auto c = make_tensor<float>({10, 20});
     (c = a + b).run();
 
 Ignoring that the data is unitialized, the first three lines simply create three 3D tensors with the same dimensions, while the last line runs an
@@ -323,7 +336,7 @@ Similar to high-level languages, generators can store their values in existing t
 
 .. code-block:: cpp
 
-    tensor_t<float,1> t1{{100}};
+    auto t1 = make_tensor<float>({100});
     (t1 = linspace_x(t1.Shape(), 1.0f, 100.0f)).run();
 
 Similar to the ``set`` calls above, instead of an algebraic equation we are storing the output of generator ``linspace_x`` into the tensor ``t1``.
@@ -335,7 +348,7 @@ expression and are not limited to simply assigning to a tensor. Expanding on our
 
 .. code-block:: cpp
 
-    tensor_t<float,1> t1{{100}};
+    auto t1 = make_tensor<float>({100});
     (t1 = ones<float>(t1.Shape()) + linspace_x(t1.Shape(), 1.0f, 100.0f) * 5.0).run();   
     
 Instead of setting ``t1`` to a range, we multiply the range by 5.0, and add that range to a vector of ones using the ``ones`` generator. Without any
@@ -378,8 +391,8 @@ Common reduction executors are also available, such as ``sum()``, ``mean()``, ``
 
 .. code-block:: cpp
 
-    tensor_t<float,4> t4{{100, 100, 100, 100}};
-    tensor_t<float,0> t0{};
+    auto t4 = make_tensor<float>({100, 100, 100, 100});
+    auto t0 = make_tensor<float>();
     sum(t0, t4);
 
 The above code performs an optimized sum reduction of ``t4`` into ``t0``. Currently reduction type exectors *can* take operators as an input. Please
@@ -392,7 +405,7 @@ is slightly different than other types above:
 
 .. code-block:: cpp
 
-    tensor_t<float, 2> t({100, 50});
+    auto t = make_tensor<float>({100, 50});
     randomGenerator_t<float> randData(t.TotalSize(), 0);
     auto randTensor = randData.GetTensorView<2>({100,50}, NORMAL);
 
@@ -405,7 +418,7 @@ Using the random tensor view above in an expression is the same as any other vie
 
 .. code-block:: cpp
 
-    tensor_t<float, 2> t2({100, 50});
+    auto t2 = make_tensor<float>({100, 50});
     (t2 = randTensor*5 + randTensor).run(stream);
 
 Unlike normal views, ``randTensor`` will give a new random value every time it is accessed. Not only will every element in the first multiply get A
