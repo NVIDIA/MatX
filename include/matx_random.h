@@ -238,7 +238,9 @@ public:
   /**
    * Retrieve a value from a rank-0 random view
    */
+#ifndef DOXYGEN_ONLY  
   template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
+#endif  
   inline __MATX_DEVICE__ T operator()() const
   {
     T val;
@@ -252,7 +254,9 @@ public:
    * @param i
    *   First index
    */
+#ifndef DOXYGEN_ONLY    
   template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
+#endif    
   inline __MATX_DEVICE__ T operator()(index_t i) const
   {
     T val;
@@ -268,7 +272,9 @@ public:
    * @param j
    *   Second index
    */
+#ifndef DOXYGEN_ONLY    
   template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
+#endif    
   inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
   {
     T val;
@@ -286,7 +292,9 @@ public:
    * @param k
    *   Third index
    */
+#ifndef DOXYGEN_ONLY    
   template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
+#endif    
   inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k) const
   {
     T val;
@@ -307,7 +315,9 @@ public:
    * @param l
    *   Fourth index
    */
+#ifndef DOXYGEN_ONLY    
   template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
+#endif    
   inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l) const
   {
     T val;

@@ -61,7 +61,8 @@ Advanced Operators
 ------------------
 .. doxygenclass:: matx::set
 .. doxygenfunction:: copy
-.. doxygenclass:: matx::CHAIN
+.. doxygenclass:: matx::CommaOp
+.. doxygenclass:: matx::Concatenate
 .. doxygenclass:: matx::IF 
 .. doxygenclass:: matx::IFELSE
 .. doxygenclass:: matx::ReverseOp

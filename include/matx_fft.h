@@ -689,15 +689,15 @@ struct FftParamsKeyEq {
 static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_1d;
 static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_2d;
 
-template <typename TensorType1, typename TensorType2>
-auto  GetFFTInputView([[maybe_unused]] TensorType1 &o,
-                    const TensorType2 &i,
+template <typename OutputTensor, typename InputTensor>
+auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
+                    const InputTensor &i,
                     [[maybe_unused]] cudaStream_t stream)
 {
-  using index_type = typename TensorType1::shape_type;
-  using T1    = typename TensorType1::scalar_type;
-  using T2    = typename TensorType2::scalar_type;
-  constexpr int RANK = TensorType1::Rank();
+  using index_type = typename OutputTensor::shape_type;
+  using T1    = typename OutputTensor::scalar_type;
+  using T2    = typename InputTensor::scalar_type;
+  constexpr int RANK = OutputTensor::Rank();
 
   index_type starts[RANK] = {0};
   index_type ends[RANK];
@@ -792,27 +792,27 @@ auto  GetFFTInputView([[maybe_unused]] TensorType1 &o,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType1, typename TensorType2>
-void fft(TensorType1 &o, const TensorType2 &i,
+template <typename OutputTensor, typename InputTensor>
+void fft(OutputTensor &o, const InputTensor &i,
          cudaStream_t stream = 0)
 {
-  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+  MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
   auto i_new = GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i_new, 1);
+  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<TensorType1, TensorType2>{o, i_new};
+    auto tmp = new matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
     cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Forward(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<TensorType1, TensorType2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Forward(o, i_new, stream);
   }
   
@@ -845,28 +845,28 @@ void fft(TensorType1 &o, const TensorType2 &i,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType1, typename TensorType2>
-void ifft(TensorType1 &o, const TensorType2 &i,
+template <typename OutputTensor, typename InputTensor>
+void ifft(OutputTensor &o, const InputTensor &i,
           cudaStream_t stream = 0)
 {
-  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+  MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
 
   auto i_new = GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i_new, 1);
+  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<TensorType1, TensorType2>{o, i_new};
+    auto tmp = new matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
     cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<TensorType1, TensorType2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Inverse(o, i_new, stream);
   }
 
@@ -940,26 +940,26 @@ void fft2(OutputTensor &o, const InputTensor &i,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType1, typename TensorType2>
-void ifft2(TensorType1 &o, const TensorType2 &i,
+template <typename OutputTensor, typename InputTensor>
+void ifft2(OutputTensor &o, const InputTensor &i,
            cudaStream_t stream = 0)
 {
-  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+  MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i, 2);
+  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_2d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan2D_t<TensorType1, TensorType2>{o, i};
+    auto tmp = new matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
     cache_2d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan2D_t<TensorType1, TensorType2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Inverse(o, i, stream);
   }
 }

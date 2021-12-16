@@ -20,6 +20,7 @@ Table of Contents
 
     build
     quickstart
+    creation
     api/index    
     matlabpython
     examples/index
