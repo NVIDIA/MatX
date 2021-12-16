@@ -4,11 +4,11 @@ The API below provides transformations for Fast Fourier Transforms (FFTs) of bot
 
 Cached API
 ----------
-.. doxygenfunction:: fft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i, cudaStream_t stream = 0)
-.. doxygenfunction:: ifft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i, cudaStream_t stream = 0)
-.. doxygenfunction:: fft2(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i, cudaStream_t stream = 0)
-.. doxygenfunction:: ifft2(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i, cudaStream_t stream = 0)
-.. doxygenfunction:: dct(tensor_t<T, RANK> &out, tensor_t<T, RANK> &in, const cudaStream_t stream = 0)
+.. doxygenfunction:: fft(OutputTensor &o, const InputTensor &i, cudaStream_t stream = 0)
+.. doxygenfunction:: ifft(OutputTensor &o, const InputTensor &i, cudaStream_t stream = 0)
+.. doxygenfunction:: fft2(OutputTensor &o, const InputTensor &i, cudaStream_t stream = 0)
+.. doxygenfunction:: ifft2(OutputTensor &o, const InputTensor &i, cudaStream_t stream = 0)
+.. doxygenfunction:: dct(OutputTensor &out, const InputTensor &in, const cudaStream_t stream = 0)
 
 Non-Cached API
 --------------

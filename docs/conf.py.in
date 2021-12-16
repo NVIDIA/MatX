@@ -81,7 +81,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
 
-cpp_id_attributes = ["__global__", "__device__", "__host__", "__forceinline__"]
+cpp_id_attributes = ["__global__", "__device__", "__host__", "__forceinline__","__MATX_DEVICE__","__MATX_HOST__","__MATX_INLINE__"]
 
 
 # -- Options for HTML output -------------------------------------------------
