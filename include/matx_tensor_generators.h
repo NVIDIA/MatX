@@ -225,8 +225,8 @@ public:
   static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
   matxGenerator1D_t(ShapeType &&s, Generator1D f) : f_(f), s_(std::forward<ShapeType>(s)) {}
-  inline __MATX_DEVICE__ auto operator()(int i)  { return f_(i); };
-  inline __MATX_DEVICE__ auto operator()(int i, int j) 
+  inline __MATX_DEVICE__ auto operator()(int i) const  { return f_(i); };
+  inline __MATX_DEVICE__ auto operator()(int i, int j) const
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -237,7 +237,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k) 
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k) const 
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -251,7 +251,7 @@ public:
     // BUG WAR
     return scalar_type(0);
   };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l) 
+  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l) const 
   {
     if constexpr (Dim == 0) {
       return f_(i);
@@ -289,7 +289,7 @@ public:
 
   inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) 
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
   {
     return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1));
   }
@@ -381,7 +381,7 @@ public:
   using scalar_type = T;
   inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
   {
     return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1)));
   }
@@ -472,7 +472,7 @@ public:
   using scalar_type = T;
   inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i)
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
   {
     return T(0.42) +
            ((T)0.5 *
@@ -565,7 +565,7 @@ public:
   using scalar_type = T;
   inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
-  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) 
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
   {
     return (T(2) / (T(size_) - 1)) *
            (((T(size_) - 1) / T(2)) -

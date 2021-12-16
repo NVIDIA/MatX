@@ -1385,26 +1385,26 @@ inline
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ FFTShift1DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = j;
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1452,26 +1452,26 @@ inline
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ FFTShift2DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1520,26 +1520,26 @@ inline
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ IFFTShift1DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = j;
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1588,26 +1588,26 @@ inline
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ IFFTShift2DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = (i + Size(0) / 2) % Size(0);
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1669,27 +1669,27 @@ inline
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()() const
     {
       auto i1 = get_value(in1_);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i) const
     {
       auto i1 = get_value(in1_, i);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j) const
     {
       auto i1 = get_value(in1_, i, j);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k) const
     {
       auto i1 = get_value(in1_, i, j, k);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, uint32_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, uint32_t j, index_t k, index_t l) const
     {
       auto i1 = get_value(in1_, i, j, k, l);
       return op_(i1);
@@ -1718,8 +1718,8 @@ inline
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ComplexPlanarOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       if (i >= op_.Size(0))
       {
@@ -1727,7 +1727,7 @@ inline
       }
       return op_(i).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       if (i >= op_.Size(0))
       {
@@ -1735,7 +1735,7 @@ inline
       }
       return op_(i, j).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       if (j >= op_.Size(1))
       {
@@ -1743,7 +1743,7 @@ inline
       }
       return op_(i, j, k).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       if (k >= op_.Size(2))
       {
@@ -1808,20 +1808,20 @@ inline
                                             cuda::std::complex<scalar_type>>;
 
     __MATX_INLINE__ ComplexInterleavedOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       return complex_type{op_(i), op_(op_.Size(0) / 2 + i)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       return complex_type{op_(i, j), op_(op_.Size(0) / 2 + i, j)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       return {op_(i, j, k), op_(i, j + op_.Size(1) / 2, k)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       return {op_(i, j, k, l), op_(i, j, k + op_.Size(2) / 2, l)};
     }
@@ -1895,35 +1895,35 @@ inline
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()() const
     {
       // Rank 0
       auto i1 = get_value(in1_);
       auto i2 = get_value(in2_);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i) const
     {
       // Rank 1
       auto i1 = get_value(in1_, i);
       auto i2 = get_value(in2_, i);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j) const
     {
       // Rank 2
       auto i1 = get_value(in1_, i, j);
       auto i2 = get_value(in2_, i, j);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k) const
     {
       // Rank 3
       auto i1 = get_value(in1_, i, j, k);
       auto i2 = get_value(in2_, i, j, k);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       // Rank 4
       auto i1 = get_value(in1_, i, j, k, l);
