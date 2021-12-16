@@ -77,13 +77,13 @@ public:
     cusolverDnDestroy(handle);
   }
 
-  template <typename T, int RANK>
-  void SetBatchPointers(tensor_t<T, RANK> &a)
+  template <typename TensorType>
+  void SetBatchPointers(TensorType &a)
   {
-    if constexpr (RANK == 2) {
+    if constexpr (TensorType::Rank() == 2) {
       batch_a_ptrs.push_back(&a(0, 0));
     }
-    else if constexpr (RANK == 3) {
+    else if constexpr (TensorType::Rank() == 3) {
       for (int i = 0; i < a.Size(0); i++) {
         batch_a_ptrs.push_back(&a(i, 0, 0));
       }
@@ -107,23 +107,22 @@ public:
    * @param stream
    *   CUDA stream
    */
-  template <typename T, int RANK>
-  static inline tensor_t<T, RANK>
-  TransposeCopy(T *tp, const tensor_t<T, RANK> &a, cudaStream_t stream = 0)
+  template <typename TensorType>
+  static inline TensorType
+  TransposeCopy(typename TensorType::scalar_type *tp, const TensorType &a, cudaStream_t stream = 0)
   {
     auto pa = a.PermuteMatrix();
-
-    tensor_t<T, RANK> tv{tp, pa.Shape()};
-    copy(tv, pa, stream);
+    auto tv = make_tensor(tp, pa.Shape());
+    matx::copy(tv, pa, stream);
     return tv;
   }
 
-  template <typename T, int RANK>
-  static inline uint32_t GetNumBatches(const tensor_t<T, RANK> &a)
+  template <typename TensorType>
+  static inline uint32_t GetNumBatches(const TensorType &a)
   {
     uint32_t cnt = 1;
-    for (int i = 3; i <= RANK; i++) {
-      cnt *= static_cast<uint32_t>(a.Size(RANK - i));
+    for (int i = 3; i <= TensorType::Rank(); i++) {
+      cnt *= static_cast<uint32_t>(a.Size(TensorType::Rank() - i));
     }
 
     return cnt;
@@ -161,8 +160,12 @@ struct DnCholParams_t {
   MatXDataType_t dtype;
 };
 
-template <typename T1, int RANK>
+template <typename OutputTensor, typename ATensor>
 class matxDnCholSolverPlan_t : public matxDnSolver_t {
+  static_assert(OutputTensor::Rank() == ATensor::Rank(), "Cholesky input/output tensor ranks must match");
+  using T1 = typename OutputTensor::scalar_type;
+  static constexpr int RANK = OutputTensor::Rank();
+
 public:
   /**
    * Plan for solving
@@ -185,7 +188,7 @@ public:
    *   Use upper or lower triangle for computation
    *
    */
-  matxDnCholSolverPlan_t(const tensor_t<T1, RANK> &a,
+  matxDnCholSolverPlan_t(const ATensor &a,
                          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
   {
     static_assert(RANK >= 2);
@@ -205,7 +208,7 @@ public:
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
-  static DnCholParams_t GetCholParams(const tensor_t<T1, RANK> &a,
+  static DnCholParams_t GetCholParams(const ATensor &a,
                                       cublasFillMode_t uplo)
   {
     DnCholParams_t params;
@@ -218,7 +221,7 @@ public:
     return params;
   }
 
-  void Exec(tensor_t<T1, RANK> &out, const tensor_t<T1, RANK> &a,
+  void Exec(OutputTensor &out, const ATensor &a,
             cudaStream_t stream, cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
   {
     // Ensure matrix is square
@@ -233,7 +236,7 @@ public:
 
     SetBatchPointers(out);
     if (out.Data() != a.Data()) {
-      copy(out, a, stream);
+      matx::copy(out, a, stream);
     }
 
     // At this time cuSolver does not have a batched 64-bit cholesky interface.
@@ -315,11 +318,13 @@ static matxCache_t<DnCholParams_t, DnCholParamsKeyHash, DnCholParamsKeyEq>
  * @param uplo
  *   Part of matrix to fill
  */
-template <typename T1, int RANK>
-void chol(tensor_t<T1, RANK> &out, const tensor_t<T1, RANK> &a,
+template <typename OutputTensor, typename ATensor>
+void chol(OutputTensor &out, const ATensor &a,
           cudaStream_t stream = 0,
           cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
+  using T1 = typename OutputTensor::scalar_type;
+
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
@@ -332,26 +337,25 @@ void chol(tensor_t<T1, RANK> &out, const tensor_t<T1, RANK> &a,
   auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
 
   // Get parameters required by these tensors
-  auto params = matxDnCholSolverPlan_t<T1, RANK>::GetCholParams(tv, uplo);
+  auto params = matxDnCholSolverPlan_t<OutputTensor, ATensor>::GetCholParams(tv, uplo);
   params.uplo = uplo;
 
   // Get cache or new inverse plan if it doesn't exist
   auto ret = dnchol_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxDnCholSolverPlan_t{tv};
+    auto tmp = new matxDnCholSolverPlan_t<OutputTensor, ATensor>{tv, uplo};
     dnchol_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tv, tv, stream, uplo);
   }
   else {
     auto chol_type =
-        static_cast<matxDnCholSolverPlan_t<T1, RANK> *>(ret.value());
+        static_cast<matxDnCholSolverPlan_t<OutputTensor, ATensor> *>(ret.value());
     chol_type->Exec(tv, tv, stream, uplo);
   }
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
-  copy(out, tv.PermuteMatrix(), stream);
-  matxFree(tp);
+  matx::copy(out, tv.PermuteMatrix(), stream);
 }
 
 /***************************************** LU FACTORIZATION
@@ -370,8 +374,13 @@ struct DnLUParams_t {
   MatXDataType_t dtype;
 };
 
-template <typename T1, int RANK>
+template <typename OutputTensor, typename PivotTensor, typename ATensor>
 class matxDnLUSolverPlan_t : public matxDnSolver_t {
+  static constexpr int RANK = OutputTensor::Rank();
+  using T1 = typename OutputTensor::scalar_type;
+  static_assert(RANK-1 == PivotTensor::Rank(), "Pivot tensor rank must be one less than output");
+  static_assert(std::is_same_v<typename PivotTensor::scalar_type, int64_t>, "Pivot tensor type must be int64_t");  
+
 public:
   /**
    * Plan for factoring A such that \f$\textbf{P} * \textbf{A} = \textbf{L} *
@@ -391,8 +400,8 @@ public:
    *   Input tensor view
    *
    */
-  matxDnLUSolverPlan_t(tensor_t<int64_t, RANK - 1> &piv,
-                       const tensor_t<T1, RANK> &a)
+  matxDnLUSolverPlan_t(PivotTensor &piv,
+                       const ATensor &a)
   {
     static_assert(RANK >= 2);
 
@@ -411,8 +420,8 @@ public:
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
-  static DnLUParams_t GetLUParams(tensor_t<int64_t, RANK - 1> &piv,
-                                  const tensor_t<T1, RANK> &a) noexcept
+  static DnLUParams_t GetLUParams(PivotTensor &piv,
+                                  const ATensor &a) noexcept
   {
     DnLUParams_t params;
     params.batch_size = matxDnSolver_t::GetNumBatches(a);
@@ -425,8 +434,8 @@ public:
     return params;
   }
 
-  void Exec(tensor_t<T1, RANK> &out, tensor_t<int64_t, RANK - 1> &piv,
-            const tensor_t<T1, RANK> &a, const cudaStream_t stream = 0)
+  void Exec(OutputTensor &out, PivotTensor &piv,
+            const ATensor &a, const cudaStream_t stream = 0)
   {
     cusolverDnSetStream(handle, stream);
     int info;
@@ -450,7 +459,7 @@ public:
     SetBatchPointers(out);
 
     if (out.Data() != a.Data()) {
-      copy(out, a, stream);
+      matx::copy(out, a, stream);
     }
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
@@ -536,10 +545,13 @@ static matxCache_t<DnLUParams_t, DnLUParamsKeyHash, DnLUParamsKeyEq> dnlu_cache;
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void lu(tensor_t<T1, RANK> &out, tensor_t<int64_t, RANK - 1> &piv,
-        const tensor_t<T1, RANK> &a, const cudaStream_t stream = 0)
+template <typename OutputTensor, typename PivotTensor, typename ATensor>
+void lu(OutputTensor &out, PivotTensor &piv,
+        const ATensor &a, const cudaStream_t stream = 0)
 {
+  constexpr int RANK = OutputTensor::Rank();
+  using T1 = typename OutputTensor::scalar_type;
+
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
@@ -553,25 +565,24 @@ void lu(tensor_t<T1, RANK> &out, tensor_t<int64_t, RANK - 1> &piv,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = matxDnLUSolverPlan_t<T1, RANK>::GetLUParams(piv, tvt);
+  auto params = matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>::GetLUParams(piv, tvt);
 
   // Get cache or new LU plan if it doesn't exist
   auto ret = dnlu_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxDnLUSolverPlan_t{piv, tvt};
+    auto tmp = new matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>{piv, tvt};
 
     dnlu_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tvt, piv, tvt, stream);
   }
   else {
-    auto lu_type = static_cast<matxDnLUSolverPlan_t<T1, RANK> *>(ret.value());
+    auto lu_type = static_cast<matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor> *>(ret.value());
     lu_type->Exec(tvt, piv, tvt, stream);
   }
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
-  copy(out, tv.PermuteMatrix(), stream);
-  matxFree(tp);
+  matx::copy(out, tv.PermuteMatrix(), stream);
 }
 
 /**
@@ -594,10 +605,13 @@ void lu(tensor_t<T1, RANK> &out, tensor_t<int64_t, RANK - 1> &piv,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void det(tensor_t<T1, RANK - 2> &out, const tensor_t<T1, RANK> &a,
+template <typename OutputTensor, typename InputTensor>
+void det(OutputTensor &out, const InputTensor &a,
          const cudaStream_t stream = 0)
 {
+  static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
+  constexpr int RANK = InputTensor::Rank();
+
   // Get parameters required by these tensors
   tensorShape_t<RANK - 1> s;
 
@@ -608,8 +622,8 @@ void det(tensor_t<T1, RANK - 2> &out, const tensor_t<T1, RANK> &a,
 
   s.SetSize(RANK - 2, std::min(a.Size(RANK - 1), a.Size(RANK - 2)));
 
-  tensor_t<int64_t, RANK - 1> piv{s};
-  tensor_t<T1, RANK> ac{a.Shape()};
+  auto piv = make_tensor<int64_t>(s);
+  auto ac = make_tensor<typename OutputTensor::scalar_type>(a.Shape());
 
   lu(ac, piv, a, stream);
   prod(out, diag(ac), stream);
@@ -631,8 +645,13 @@ struct DnQRParams_t {
   MatXDataType_t dtype;
 };
 
-template <typename T1, int RANK>
+template <typename OutTensor, typename TauTensor, typename ATensor>
 class matxDnQRSolverPlan_t : public matxDnSolver_t {
+  using T1 = typename OutTensor::scalar_type;
+  static constexpr int RANK = OutTensor::Rank();
+  static_assert(OutTensor::Rank()-1 == TauTensor::Rank(), "Tau tensor must be one rank less than output tensor");
+  static_assert(OutTensor::Rank() == ATensor::Rank(), "Output tensor must match A tensor rank in SVD");
+
 public:
   /**
    * Plan for factoring A such that \f$\textbf{A} = \textbf{Q} * \textbf{R}\f$
@@ -655,8 +674,8 @@ public:
    *   Input tensor view
    *
    */
-  matxDnQRSolverPlan_t(tensor_t<T1, RANK - 1> &tau,
-                       const tensor_t<T1, RANK> &a)
+  matxDnQRSolverPlan_t(TauTensor &tau,
+                       const ATensor &a)
   {
     static_assert(RANK >= 2);
 
@@ -674,8 +693,8 @@ public:
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
-  static DnQRParams_t GetQRParams(tensor_t<T1, RANK - 1> &tau,
-                                  const tensor_t<T1, RANK> &a)
+  static DnQRParams_t GetQRParams(TauTensor &tau,
+                                  const ATensor &a)
   {
     DnQRParams_t params;
 
@@ -689,8 +708,8 @@ public:
     return params;
   }
 
-  void Exec(tensor_t<T1, RANK> &out, tensor_t<T1, RANK - 1> &tau,
-            const tensor_t<T1, RANK> &a, cudaStream_t stream = 0)
+  void Exec(OutTensor &out, TauTensor &tau,
+            const ATensor &a, cudaStream_t stream = 0)
   {
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
@@ -716,7 +735,7 @@ public:
     }
 
     if (out.Data() != a.Data()) {
-      copy(out, a, stream);
+      matx::copy(out, a, stream);
     }
 
     cusolverDnSetStream(handle, stream);
@@ -805,10 +824,13 @@ static matxCache_t<DnQRParams_t, DnQRParamsKeyHash, DnQRParamsKeyEq> dnqr_cache;
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void qr(tensor_t<T1, RANK> &out, tensor_t<T1, RANK - 1> &tau,
-        const tensor_t<T1, RANK> &a, cudaStream_t stream = 0)
+template <typename OutTensor, typename TauTensor, typename ATensor>
+void qr(OutTensor &out, TauTensor &tau,
+        const ATensor &a, cudaStream_t stream = 0)
 {
+  using T1 = typename OutTensor::scalar_type;
+  constexpr int RANK = OutTensor::Rank();
+
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
@@ -822,25 +844,24 @@ void qr(tensor_t<T1, RANK> &out, tensor_t<T1, RANK - 1> &tau,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = matxDnQRSolverPlan_t<T1, RANK>::GetQRParams(tau, tvt);
+  auto params = matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>::GetQRParams(tau, tvt);
 
   // Get cache or new QR plan if it doesn't exist
   auto ret = dnqr_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxDnQRSolverPlan_t{tau, tvt};
+    auto tmp = new matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>{tau, tvt};
 
     dnqr_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tvt, tau, tvt, stream);
   }
   else {
-    auto qr_type = static_cast<matxDnQRSolverPlan_t<T1, RANK> *>(ret.value());
+    auto qr_type = static_cast<matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor> *>(ret.value());
     qr_type->Exec(tvt, tau, tvt, stream);
   }
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
-  copy(out, tv.PermuteMatrix(), stream);
-  matxFree(tp);
+  matx::copy(out, tv.PermuteMatrix(), stream);
 }
 
 /********************************************** SVD
@@ -863,8 +884,17 @@ struct DnSVDParams_t {
   MatXDataType_t dtype;
 };
 
-template <typename T1, typename T2, typename T3, typename T4, int RANK>
+template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
 class matxDnSVDSolverPlan_t : public matxDnSolver_t {
+  using T1 = typename ATensor::scalar_type;
+  using T2 = typename UTensor::scalar_type;
+  using T3 = typename STensor::scalar_type;
+  using T4 = typename VTensor::scalar_type;
+  static constexpr int RANK = UTensor::Rank();
+  static_assert(UTensor::Rank()-1 == STensor::Rank(), "S tensor must be 1 rank lower than U tensor in SVD");
+  static_assert(UTensor::Rank() == ATensor::Rank(), "U tensor must match A tensor rank in SVD");
+  static_assert(UTensor::Rank() == VTensor::Rank(), "U tensor must match V tensor rank in SVD");
+
 public:
   /**
    * Plan for factoring A such that \f$\textbf{A} = \textbf{U} * \textbf{\Sigma}
@@ -899,10 +929,10 @@ public:
    * cuSolver documentation for more info
    *
    */
-  matxDnSVDSolverPlan_t(tensor_t<T2, RANK> &u,
-                        tensor_t<T3, RANK - 1> &s,
-                        tensor_t<T4, RANK> &v,
-                        const tensor_t<T1, RANK> &a, const char jobu = 'A',
+  matxDnSVDSolverPlan_t(UTensor &u,
+                        STensor &s,
+                        VTensor &v,
+                        const ATensor &a, const char jobu = 'A',
                         const char jobvt = 'A')
   {
     static_assert(RANK >= 2);
@@ -911,7 +941,7 @@ public:
     matxAlloc(reinterpret_cast<void **>(&tmp), a.Bytes(), MATX_DEVICE_MEMORY);
     MATX_ASSERT(tmp != nullptr, matxOutOfMemory);
 
-    scratch = new tensor_t<T1, RANK>(tmp, a.Shape());
+    scratch = make_tensor_p<T1>(tmp, a.Shape());
     params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
 
     GetWorkspaceSize(&hspace, &dspace);
@@ -933,8 +963,8 @@ public:
   }
 
   static DnSVDParams_t
-  GetSVDParams(tensor_t<T2, RANK> &u, tensor_t<T3, RANK - 1> &s,
-               tensor_t<T4, RANK> &v, const tensor_t<T1, RANK> &a,
+  GetSVDParams(UTensor &u, STensor &s,
+               VTensor &v, const ATensor &a,
                const char jobu = 'A', const char jobvt = 'A')
   {
     DnSVDParams_t params;
@@ -952,8 +982,8 @@ public:
     return params;
   }
 
-  void Exec(tensor_t<T2, RANK> u, tensor_t<T3, RANK - 1> s,
-            tensor_t<T4, RANK> v, const tensor_t<T1, RANK> a,
+  void Exec(UTensor &u, STensor &s,
+            VTensor &v, const ATensor &a,
             const char jobu = 'A', const char jobvt = 'A',
             cudaStream_t stream = 0)
   {
@@ -980,7 +1010,7 @@ public:
     }
 
     cusolverDnSetStream(handle, stream);
-    copy(*scratch, a, stream);
+    matx::copy(*scratch, a, stream);
     int info;
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
@@ -1080,11 +1110,17 @@ static matxCache_t<DnSVDParams_t, DnSVDParamsKeyHash, DnSVDParamsKeyEq>
  * cuSolver documentation for more info
  *
  */
-template <typename T1, typename T2, typename T3, typename T4, int RANK>
-void svd(tensor_t<T2, RANK> &u, tensor_t<T3, RANK - 1> &s,
-         tensor_t<T4, RANK> &v, const tensor_t<T1, RANK> &a,
+template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
+void svd(UTensor &u, STensor &s,
+         VTensor &v, const ATensor &a,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
+  using T1 = typename ATensor::scalar_type;
+  using T2 = typename UTensor::scalar_type;
+  using T3 = typename STensor::scalar_type;
+  using T4 = typename VTensor::scalar_type;
+  constexpr int RANK = UTensor::Rank();
+
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
@@ -1098,7 +1134,7 @@ void svd(tensor_t<T2, RANK> &u, tensor_t<T3, RANK - 1> &s,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = matxDnSVDSolverPlan_t<T1, T2, T3, T4, RANK>::GetSVDParams(
+  auto params = matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor>::GetSVDParams(
       u, s, v, tvt, jobu, jobvt);
 
   // Get cache or new QR plan if it doesn't exist
@@ -1111,13 +1147,9 @@ void svd(tensor_t<T2, RANK> &u, tensor_t<T3, RANK - 1> &s,
   }
   else {
     auto svd_type =
-        static_cast<matxDnSVDSolverPlan_t<T1, T2, T3, T4, RANK> *>(ret.value());
+        static_cast<matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor> *>(ret.value());
     svd_type->Exec(u, s, v, tvt, jobu, jobvt, stream);
   }
-
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  matxFree(tp);
 }
 
 /*************************************** Eigenvalues and eigenvectors
@@ -1138,9 +1170,15 @@ struct DnEigParams_t {
   MatXDataType_t dtype;
 };
 
-template <typename T1, typename T2, int RANK>
+template <typename OutputTensor, typename WTensor, typename ATensor>
 class matxDnEigSolverPlan_t : public matxDnSolver_t {
 public:
+  using T2 = typename WTensor::scalar_type;
+  using T1 = typename ATensor::scalar_type;
+  static constexpr int RANK = OutputTensor::Rank();
+  static_assert(RANK == ATensor::Rank(), "Output and A tensor ranks must match for eigen solver");
+  static_assert(RANK-1 == WTensor::Rank(), "W tensor must be one rank lower than output for eigen solver");
+
   /**
    * Plan computing eigenvalues/vectors on A such that:
    *
@@ -1165,8 +1203,8 @@ public:
    *   Where to store data in A
    *
    */
-  matxDnEigSolverPlan_t(tensor_t<T2, RANK - 1> &w,
-                        const tensor_t<T1, RANK> &a,
+  matxDnEigSolverPlan_t(WTensor &w,
+                        const ATensor &a,
                         cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
                         cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
   {
@@ -1188,8 +1226,8 @@ public:
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
-  static DnEigParams_t GetEigParams(tensor_t<T2, RANK - 1> &w,
-                                    const tensor_t<T1, RANK> &a,
+  static DnEigParams_t GetEigParams(WTensor &w,
+                                    const ATensor &a,
                                     cusolverEigMode_t jobz,
                                     cublasFillMode_t uplo)
   {
@@ -1205,8 +1243,8 @@ public:
     return params;
   }
 
-  void Exec(tensor_t<T1, RANK> &out, tensor_t<T2, RANK - 1> &w,
-            const tensor_t<T1, RANK> &a,
+  void Exec(OutputTensor &out, WTensor &w,
+            const ATensor &a,
             cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
             cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER,
             cudaStream_t stream = 0)
@@ -1238,7 +1276,7 @@ public:
     SetBatchPointers(out);
 
     if (out.Data() != a.Data()) {
-      copy(out, a, stream);
+      matx::copy(out, a, stream);
     }
 
     cusolverDnSetStream(handle, stream);
@@ -1333,9 +1371,9 @@ static matxCache_t<DnEigParams_t, DnEigParamsKeyHash, DnEigParamsKeyEq>
  * @param uplo
  *   Where to store data in A
  */
-template <typename T1, typename T2, int RANK>
-void eig(tensor_t<T1, RANK> &out, tensor_t<T2, RANK - 1> &w,
-         const tensor_t<T1, RANK> &a, cudaStream_t stream = 0,
+template <typename OutputTensor, typename WTensor, typename ATensor>
+void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
+         const ATensor &a, cudaStream_t stream = 0,
          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
@@ -1345,6 +1383,9 @@ void eig(tensor_t<T1, RANK> &out, tensor_t<T2, RANK - 1> &w,
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
   */
+  using T1 = typename OutputTensor::scalar_type;
+  constexpr int RANK = OutputTensor::Rank();
+
   T1 *tp;
   matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
             stream);
@@ -1352,26 +1393,24 @@ void eig(tensor_t<T1, RANK> &out, tensor_t<T2, RANK - 1> &w,
 
   // Get parameters required by these tensors
   auto params =
-      matxDnEigSolverPlan_t<T1, T2, RANK>::GetEigParams(w, tv, jobz, uplo);
+      matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>::GetEigParams(w, tv, jobz, uplo);
 
   // Get cache or new eigen plan if it doesn't exist
   auto ret = dneig_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxDnEigSolverPlan_t{w, tv, jobz, uplo};
+    auto tmp = new matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>{w, tv, jobz, uplo};
 
     dneig_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tv, w, tv, jobz, uplo, stream);
   }
   else {
     auto eig_type =
-        static_cast<matxDnEigSolverPlan_t<T1, T2, RANK> *>(ret.value());
+        static_cast<matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor> *>(ret.value());
     eig_type->Exec(tv, w, tv, jobz, uplo, stream);
   }
 
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  copy(out, tv.PermuteMatrix(), stream);
-  matxFree(tp);
+  /* Copy and free async buffer for transpose */
+  matx::copy(out, tv.PermuteMatrix(), stream);  
 }
 
 } // end namespace matx

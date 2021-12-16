@@ -66,8 +66,8 @@ using namespace pybind11::literals;
  * @param out_fname
  *   Output file name. If blank, a new window will open with the plot in a browser window
  */
-template <typename T, int RANK>
-void line(const tensor_t<T, RANK> &ten, 
+template <typename TensorType>
+void line(const TensorType &ten, 
           const std::string &title,
           const std::string &xlabel,
           const std::string &ylabel,
@@ -113,9 +113,9 @@ void line(const tensor_t<T, RANK> &ten,
  * @param out_fname
  *   Output file name. If blank, a new window will open with the plot in a browser window
  */
-template <typename T, int RANK>
-void scatter(const tensor_t<T, RANK> &x, 
-          const tensor_t<T, RANK> &y,
+template <typename TensorType>
+void scatter(const TensorType &x, 
+          const TensorType &y,
           const std::string &title,
           const std::string &xlabel,
           const std::string &ylabel,
@@ -124,7 +124,7 @@ void scatter(const tensor_t<T, RANK> &x,
   auto px = py::module_::import("plotly.express");   
   auto np = py::module_::import("numpy");   
 
-  MATX_ASSERT(RANK == 1, matxInvalidDim);
+  MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
   auto np_x_ten = MatXPybind::GetEmptyNumpy(x);
@@ -162,8 +162,8 @@ void scatter(const tensor_t<T, RANK> &x,
  * @param out_fname
  *   Output file name. If blank, a new window will open with the plot in a browser window
  */
-template <typename T, int RANK>
-void bar(const tensor_t<T, RANK> &y, 
+template <typename TensorType>
+void bar(const TensorType &y, 
           const std::string &title,
           const std::string &ylabel,
           const std::string &out_fname = "") {
@@ -171,7 +171,7 @@ void bar(const tensor_t<T, RANK> &y,
   auto px = py::module_::import("plotly.express");   
   auto np = py::module_::import("numpy");   
 
-  MATX_ASSERT(RANK == 1, matxInvalidDim);
+  MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
 
   auto np_y_ten = MatXPybind::GetEmptyNumpy(y);
   pb->TensorViewToNumpy(np_y_ten, y);
@@ -211,9 +211,9 @@ void bar(const tensor_t<T, RANK> &y,
  * @param out_fname
  *   Output file name. If blank, a new window will open with the plot in a browser window
  */
-template <typename T, int RANK>
-void bar( const tensor_t<T, RANK> &x, 
-          const tensor_t<T, RANK> &y, 
+template <typename TensorType>
+void bar( const TensorType &x, 
+          const TensorType &y, 
           const std::string &title,
           const std::string &xlabel,
           const std::string &ylabel,
@@ -222,7 +222,7 @@ void bar( const tensor_t<T, RANK> &x,
   auto px = py::module_::import("plotly.express");   
   auto np = py::module_::import("numpy");   
 
-  MATX_ASSERT(RANK == 1, matxInvalidDim);
+  MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
   auto np_x_ten = MatXPybind::GetEmptyNumpy(x);
@@ -262,11 +262,13 @@ void bar( const tensor_t<T, RANK> &x,
  * @param out_fname
  *   Output file name. If blank, a new window will open with the plot in a browser window
  */
-template <typename T, int RANK>
-void contour( const tensor_t<T, RANK-1> &x, 
-              const tensor_t<T, RANK-1> &y, 
-              const tensor_t<T, RANK> &z,
+template <typename T1, typename T2>
+void contour( const T1 &x, 
+              const T1 &y, 
+              const T2 &z,
               const std::string &out_fname = "") {
+  MATX_STATIC_ASSERT_STR(T1::Rank() == T2::Rank()-1, matxInvalidDim, "X/Y rank must be one less than Z rank");
+
   std::unique_ptr<MatXPybind> pb;  
   auto go = py::module_::import("plotly.graph_objects");   
   auto np = py::module_::import("numpy");   

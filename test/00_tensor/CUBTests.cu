@@ -170,7 +170,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   tensor_t<TypeParam, 1> tmpv({this->t1.Lsize()});
 
   // Ascending
-  sort(tmpv, this->t1, SORT_DIR_ASC);
+  matx::sort(tmpv, this->t1, SORT_DIR_ASC);
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
@@ -178,7 +178,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // Descending
-  sort(tmpv, this->t1, SORT_DIR_DESC);
+  matx::sort(tmpv, this->t1, SORT_DIR_DESC);
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
@@ -194,7 +194,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
     }
   }
 
-  sort(tmpv2, this->t2, SORT_DIR_ASC);
+  matx::sort(tmpv2, this->t2, SORT_DIR_ASC);
 
   cudaStreamSynchronize(0);
 
@@ -205,7 +205,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // Descending
-  sort(tmpv2, this->t2, SORT_DIR_DESC);
+  matx::sort(tmpv2, this->t2, SORT_DIR_DESC);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {

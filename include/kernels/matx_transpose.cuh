@@ -19,10 +19,13 @@ namespace matx {
 /* Out of place. Adapted from:
    https://developer.nvidia.com/blog/efficient-matrix-transpose-cuda-cc/. Works
    for both square and rectangular matrices. */
-template <typename T, int RANK>
-__global__ void transpose_kernel_oop(tensor_impl_t<T, RANK> out,
-                                     const tensor_impl_t<T, RANK> in)
+template <typename OutputTensor, typename InputTensor>
+__global__ void transpose_kernel_oop(OutputTensor out,
+                                     const InputTensor in)
 {
+  using T = typename OutputTensor::scalar_type;
+  constexpr int RANK = OutputTensor::Rank();
+  
   extern __shared__ float
       tile[]; // Need to swap complex types also, so cast when needed
   T *shm_tile = reinterpret_cast<T *>(&tile[0]);

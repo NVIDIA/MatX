@@ -38,6 +38,7 @@
 #include "matx_cache.h"
 #include "matx_dim.h"
 #include "matx_error.h"
+#include "matx_make.h"
 #include "matx_tensor.h"
 
 #include <cstdio>
@@ -67,8 +68,13 @@ struct FftParams_t {
 };
 
 /* Base class for FFTs. This should not be used directly. */
-template <typename T1, typename T2> class matxFFTPlan_t {
+template <typename OutTensorType, typename InTensorType> class matxFFTPlan_t {
 public:
+  using index_type = typename OutTensorType::shape_type;
+  using T1    = typename OutTensorType::scalar_type;
+  using T2    = typename InTensorType::scalar_type;
+  static constexpr int RANK = OutTensorType::Rank();    
+
   /**
    * Execute an FFT in a stream
    *
@@ -83,9 +89,8 @@ public:
    * @param stream
    *   CUDA stream
    **/
-  template <int RANK>
-  void inline Forward(tensor_t<T1, RANK> &o,
-                      const tensor_t<T2, RANK> &i, cudaStream_t stream)
+  void inline Forward(OutTensorType &o,
+                      const InTensorType &i, cudaStream_t stream)
   {
     cufftSetStream(this->plan_, stream);
     Exec(o, i, CUFFT_FORWARD);
@@ -105,9 +110,8 @@ public:
    * @param stream
    *   CUDA stream
    **/
-  template <int RANK>
-  void inline Inverse(tensor_t<T1, RANK> &o,
-                      const tensor_t<T2, RANK> &i, cudaStream_t stream)
+  void inline Inverse(OutTensorType &o,
+                      const InTensorType &i, cudaStream_t stream)
   {
     cufftSetStream(this->plan_, stream);
     Exec(o, i, CUFFT_INVERSE);
@@ -123,16 +127,15 @@ public:
     }
   }
 
-  template <int RANK>
-  static FftParams_t GetFFTParams(tensor_t<T1, RANK> &o,
-                                  const tensor_t<T2, RANK> &i, int fft_rank)
+  static FftParams_t GetFFTParams(OutTensorType &o,
+                          const InTensorType &i, int fft_rank)
   {
     FftParams_t params;
 
     params.transform_type = DeduceFFTTransformType();
-    params.input_type = matxFFTPlan_t<T1, T2>::GetInputType();
-    params.output_type = matxFFTPlan_t<T1, T2>::GetOutputType();
-    params.exec_type = matxFFTPlan_t<T1, T2>::GetExecType();
+    params.input_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetInputType();
+    params.output_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetOutputType();
+    params.exec_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetExecType();
 
     if (fft_rank == 1) {
       if constexpr (o.Rank() == 1 && i.Rank() == 1) {
@@ -275,14 +278,7 @@ public:
 protected:
   matxFFTPlan_t(){};
 
-  virtual void Exec(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i,
-                    int dir) = 0;
-  virtual void Exec(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i,
-                    int dir) = 0;
-  virtual void Exec(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i,
-                    int dir) = 0;
-  virtual void Exec(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i,
-                    int dir) = 0;
+  virtual void Exec(OutTensorType &o, const InTensorType &i, int dir) = 0;
 
   inline void InternalExec(const void *idata, void *odata, int dir)
   {
@@ -431,9 +427,13 @@ protected:
  * @tparam T2
  *   Input view data type
  */
-template <typename T1, typename T2 = T1>
-class matxFFTPlan1D_t : public matxFFTPlan_t<T1, T2> {
+template <typename OutTensorType, typename InTensorType = OutTensorType>
+class matxFFTPlan1D_t : public matxFFTPlan_t<OutTensorType, InTensorType> {
 public:
+  using T1    = typename OutTensorType::scalar_type;
+  using T2    = typename InTensorType::scalar_type;
+  static constexpr int RANK = OutTensorType::Rank();
+  
 /**
  * Construct a 1D FFT plan
  *
@@ -443,12 +443,8 @@ public:
  *   Input view
  *
  * */
-#ifdef DOXYGEN_ONLY
-matxFFTPlan1D_t(tensor_t &o, const tensor_t &i){
-#else
-matxFFTPlan1D_t(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i)
+matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
 {
-#endif
   int dev;
   cudaGetDevice(&dev);
 
@@ -470,9 +466,15 @@ matxFFTPlan1D_t(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i)
     MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
   }
 
+  if constexpr (RANK >= 2) {
+    for (int r = 0; r < RANK - 1; r++) {
+      MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
+    }
+  }
+
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  [[maybe_unused]] cufftResult error;
+  cufftResult error;
   cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
@@ -494,192 +496,31 @@ matxFFTPlan1D_t(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i)
   MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
 }
 
-matxFFTPlan1D_t(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i)
-{
-  int dev;
-  cudaGetDevice(&dev);
-
-  this->workspace_ = nullptr;
-  this->params_ = this->GetFFTParams(o, i, 1);
-
-  if (this->params_.transform_type == CUFFT_C2R ||
-      this->params_.transform_type == CUFFT_Z2D) {
-    MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                matxInvalidType);
-  }
-  else if (this->params_.transform_type == CUFFT_R2C ||
-           this->params_.transform_type == CUFFT_D2Z) {
-    MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                matxInvalidType);
-  }
-  else {
-    MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-    MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
-  }
-
-  MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
-
-  size_t workspaceSize;
-  cufftCreate(&this->plan_);
-  [[maybe_unused]] cufftResult error;
-  cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
-                      this->params_.istride, this->params_.idist,
-                      this->params_.input_type, this->params_.onembed,
-                      this->params_.ostride, this->params_.odist,
-                      this->params_.output_type, this->params_.batch,
-                      &workspaceSize, this->params_.exec_type);
-
-  matxAlloc((void **)&this->workspace_, workspaceSize);
-  cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
-  cufftSetWorkArea(this->plan_, this->workspace_);
-
-  error = cufftXtMakePlanMany(
-      this->plan_, 1, this->params_.n, this->params_.inembed,
-      this->params_.istride, this->params_.idist, this->params_.input_type,
-      this->params_.onembed, this->params_.ostride, this->params_.odist,
-      this->params_.output_type, this->params_.batch, &workspaceSize,
-      this->params_.exec_type);
-
-  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
-}
-
-matxFFTPlan1D_t(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i)
-{
-  int dev;
-  cudaGetDevice(&dev);
-
-  this->workspace_ = nullptr;
-  this->params_ = this->GetFFTParams(o, i, 1);
-
-  if (this->params_.transform_type == CUFFT_C2R ||
-      this->params_.transform_type == CUFFT_Z2D) {
-    MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                matxInvalidType);
-  }
-  else if (this->params_.transform_type == CUFFT_R2C ||
-           this->params_.transform_type == CUFFT_D2Z) {
-    MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                matxInvalidType);
-  }
-  else {
-    MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-    MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
-  }
-
-  MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
-  MATX_ASSERT(o.Size(1) == i.Size(1), matxInvalidSize);
-
-  size_t workspaceSize;
-  cufftCreate(&this->plan_);
-  [[maybe_unused]] cufftResult error;
-    cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
-                       this->params_.istride, this->params_.idist,
-                       this->params_.input_type, this->params_.onembed,
-                       this->params_.ostride, this->params_.odist,
-                       this->params_.output_type, this->params_.batch,
-                       &workspaceSize, this->params_.exec_type);
-
-    matxAlloc((void **)&this->workspace_, workspaceSize);
-    cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
-    cufftSetWorkArea(this->plan_, this->workspace_);
-
-    error = cufftXtMakePlanMany(
-        this->plan_, 1, this->params_.n, this->params_.inembed,
-        this->params_.istride, this->params_.idist, this->params_.input_type,
-        this->params_.onembed, this->params_.ostride, this->params_.odist,
-        this->params_.output_type, this->params_.batch, &workspaceSize,
-        this->params_.exec_type);
-
-  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
-}
-
-matxFFTPlan1D_t(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i)
-{
-  int dev;
-  cudaGetDevice(&dev);
-
-  this->params_ = this->GetFFTParams(o, i, 1);
-  this->workspace_ = nullptr;
-
-  if (this->params_.transform_type == CUFFT_C2R ||
-      this->params_.transform_type == CUFFT_Z2D) {
-    MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                matxInvalidType);
-  }
-  else if (this->params_.transform_type == CUFFT_R2C ||
-           this->params_.transform_type == CUFFT_D2Z) {
-    MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                matxInvalidType);
-  }
-  else {
-    MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-    MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
-  }
-
-  MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
-  MATX_ASSERT(o.Size(1) == i.Size(1), matxInvalidSize);
-  MATX_ASSERT(o.Size(2) == i.Size(2), matxInvalidSize);
-
-  size_t workspaceSize;
-  cufftCreate(&this->plan_);
-  cufftResult error;
-  cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
-                      this->params_.istride, this->params_.idist,
-                      this->params_.input_type, this->params_.onembed,
-                      this->params_.ostride, this->params_.odist,
-                      this->params_.output_type, this->params_.batch,
-                      &workspaceSize, this->params_.exec_type);
-
-  matxAlloc((void **)&this->workspace_, workspaceSize);
-  cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
-  cufftSetWorkArea(this->plan_, this->workspace_);
-
-  error = cufftXtMakePlanMany(
-      this->plan_, 1, this->params_.n, this->params_.inembed,
-      this->params_.istride, this->params_.idist, this->params_.input_type,
-      this->params_.onembed, this->params_.ostride, this->params_.odist,
-      this->params_.output_type, this->params_.batch, &workspaceSize,
-      this->params_.exec_type);
-
-  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
-}
-
 private:
-virtual void inline Exec(tensor_t<T1, 1> &o, const tensor_t<T2, 1> &i,
+virtual void inline Exec(OutTensorType &o, const InTensorType &i,
                          int dir) override
 {
-  this->InternalExec(static_cast<const void *>(i.Data()),
-                     static_cast<void *>(o.Data()), dir);
-}
-
-virtual void inline Exec(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i,
-                         int dir) override
-{
-  this->InternalExec(static_cast<const void *>(i.Data()),
-                     static_cast<void *>(o.Data()), dir);
-}
-
-virtual void inline Exec(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i,
-                         int dir) override
-{
-  for (index_t z = 0; z < o.Size(0); z++) {
-    this->InternalExec(static_cast<const void *>(&i(z, 0, 0)),
-                       static_cast<void *>(&o(z, 0, 0)), dir);
+  if constexpr (OutTensorType::Rank() <= 2) {
+    this->InternalExec(static_cast<const void *>(i.Data()),
+                      static_cast<void *>(o.Data()), dir);
   }
-}
-
-virtual void inline Exec(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i,
-                         int dir) override
-{
-  for (index_t z = 0; z < o.Size(0); z++) {
-    for (index_t y = 0; y < o.Size(1); y++) {
-      this->InternalExec(static_cast<const void *>(&i(z, y, 0, 0)),
-                         static_cast<void *>(&o(z, y, 0, 0)), dir);
+  else if constexpr (OutTensorType::Rank() == 3) {
+    for (index_t z = 0; z < o.Size(0); z++) {
+      this->InternalExec(static_cast<const void *>(&i(z, 0, 0)),
+                        static_cast<void *>(&o(z, 0, 0)), dir);
     }
   }
+  else if constexpr (OutTensorType::Rank() == 4) {
+    for (index_t z = 0; z < o.Size(0); z++) {
+      for (index_t y = 0; y < o.Size(1); y++) {
+        this->InternalExec(static_cast<const void *>(&i(z, y, 0, 0)),
+                          static_cast<void *>(&o(z, y, 0, 0)), dir);
+      }
+    }
+  }      
 }
 
-}; // namespace matx
+}; 
 
 /**
  * Create a 2D FFT plan
@@ -701,13 +542,12 @@ virtual void inline Exec(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i,
  * @tparam T2
  *   Input view data type
  */
-template <typename T1, typename T2 = T1>
-class matxFFTPlan2D_t : public matxFFTPlan_t<T1, T2> {
+template <typename OutTensorType, typename InTensorType = OutTensorType>
+class matxFFTPlan2D_t : public matxFFTPlan_t<OutTensorType, InTensorType> {
 public:
-  matxFFTPlan2D_t(tensor_t<T1, 1> &o, tensor_t<T2, 1> &i)
-  {
-    MATX_THROW(matxInvalidSize, "Cannot use a 1D tensor in a 2D FFT");
-  }
+  static constexpr int RANK = OutTensorType::Rank();
+  using T1    = typename OutTensorType::scalar_type;
+  using T2    = typename InTensorType::scalar_type;
 
   /**
    * Construct a 2D FFT plan
@@ -718,13 +558,9 @@ public:
    *   Input view
    *
    * */
-#ifdef DOXYGEN_ONLY
-  matxFFTPlan2D_t(tensor_t &o, const tensor_t &i)
+  matxFFTPlan2D_t(OutTensorType &o, const InTensorType &i)
   {
-#else
-  matxFFTPlan2D_t(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i)
-  {
-#endif
+    static_assert(RANK >= 2, "2D FFTs require a rank-2 tensor or higher");
     int dev;
     cudaGetDevice(&dev);
 
@@ -733,14 +569,14 @@ public:
 
     if (this->params_.transform_type == CUFFT_C2R ||
         this->params_.transform_type == CUFFT_Z2D) {
-      MATX_ASSERT((o.Size(0) * (o.Size(1) / 2 + 1)) == i.Size(1) * i.Size(0),
+      MATX_ASSERT((o.Size(RANK-2) * (o.Size(RANK-1) / 2 + 1)) == i.Size(RANK-1) * i.Size(RANK-2),
                   matxInvalidSize);
       MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
                   matxInvalidType);
     }
     else if (this->params_.transform_type == CUFFT_R2C ||
-             this->params_.transform_type == CUFFT_D2Z) {
-      MATX_ASSERT(o.Size(1) * o.Size(0) == (i.Size(0) * (i.Size(1) / 2 + 1)),
+            this->params_.transform_type == CUFFT_D2Z) {
+      MATX_ASSERT(o.Size(RANK-1) * o.Size(RANK-2) == (i.Size(RANK-2) * (i.Size(RANK-1) / 2 + 1)),
                   matxInvalidSize);
       MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
                   matxInvalidType);
@@ -748,120 +584,13 @@ public:
     else {
       MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
       MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-      MATX_ASSERT(o.Size(0) * o.Size(1) == i.Size(0) * i.Size(1),
+      MATX_ASSERT(o.Size(RANK-2) * o.Size(RANK-1) == i.Size(RANK-2) * i.Size(RANK-1),
                   matxInvalidSize);
     }
 
-    size_t workspaceSize;
-    cufftCreate(&this->plan_);
-    cufftResult error;
-    cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
-                       this->params_.istride, this->params_.idist,
-                       this->params_.input_type, this->params_.onembed,
-                       this->params_.ostride, this->params_.odist,
-                       this->params_.output_type, this->params_.batch,
-                       &workspaceSize, this->params_.exec_type);
-
-    matxAlloc((void **)&this->workspace_, workspaceSize);
-    cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
-    cufftSetWorkArea(this->plan_, this->workspace_);
-
-    error = cufftXtMakePlanMany(
-        this->plan_, 2, this->params_.n, this->params_.inembed,
-        this->params_.istride, this->params_.idist, this->params_.input_type,
-        this->params_.onembed, this->params_.ostride, this->params_.odist,
-        this->params_.output_type, this->params_.batch, &workspaceSize,
-        this->params_.exec_type);
-
-    MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
-  }
-
-  matxFFTPlan2D_t(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i)
-  {
-    int dev;
-    cudaGetDevice(&dev);
-
-    this->workspace_ = nullptr;
-    this->params_ = this->GetFFTParams(o, i, 2);
-
-    if (this->params_.transform_type == CUFFT_C2R ||
-        this->params_.transform_type == CUFFT_Z2D) {
-      MATX_ASSERT((o.Size(1) * (o.Size(2) / 2 + 1)) == i.Size(2) * i.Size(1),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                  matxInvalidType);
-    }
-    else if (this->params_.transform_type == CUFFT_R2C ||
-             this->params_.transform_type == CUFFT_D2Z) {
-      MATX_ASSERT(o.Size(2) * o.Size(1) == (i.Size(1) * (i.Size(2) / 2 + 1)),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                  matxInvalidType);
-    }
-    else {
-      MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
-      MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-      MATX_ASSERT(o.Size(1) * o.Size(2) == i.Size(1) * i.Size(2),
-                  matxInvalidSize);
-    }
-
-    MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
-
-    size_t workspaceSize;
-    cufftCreate(&this->plan_);
-    cufftResult error;
-    cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
-                       this->params_.istride, this->params_.idist,
-                       this->params_.input_type, this->params_.onembed,
-                       this->params_.ostride, this->params_.odist,
-                       this->params_.output_type, this->params_.batch,
-                       &workspaceSize, this->params_.exec_type);
-
-    matxAlloc((void **)&this->workspace_, workspaceSize);
-    cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
-    cufftSetWorkArea(this->plan_, this->workspace_);
-
-    error = cufftXtMakePlanMany(
-        this->plan_, 2, this->params_.n, this->params_.inembed,
-        this->params_.istride, this->params_.idist, this->params_.input_type,
-        this->params_.onembed, this->params_.ostride, this->params_.odist,
-        this->params_.output_type, this->params_.batch, &workspaceSize,
-        this->params_.exec_type);
-
-    MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
-  }
-
-  matxFFTPlan2D_t(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i)
-  {
-    int dev;
-    cudaGetDevice(&dev);
-
-    this->workspace_ = nullptr;
-    this->params_ = this->GetFFTParams(o, i, 2);
-
-    if (this->params_.transform_type == CUFFT_C2R ||
-        this->params_.transform_type == CUFFT_Z2D) {
-      MATX_ASSERT((o.Size(2) * (o.Size(3) / 2 + 1)) == i.Size(3) * i.Size(2),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                  matxInvalidType);
-    }
-    else if (this->params_.transform_type == CUFFT_R2C ||
-             this->params_.transform_type == CUFFT_D2Z) {
-      MATX_ASSERT(o.Size(3) * o.Size(2) == (i.Size(2) * (i.Size(3) / 2 + 1)),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                  matxInvalidType);
-    }
-    else {
-      MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
-      MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-      MATX_ASSERT(o.Size(2) * o.Size(3) == i.Size(2) * i.Size(3),
-                  matxInvalidSize);
-    }
-
-    MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
-    MATX_ASSERT(o.Size(1) == i.Size(1), matxInvalidSize);
+    for (int r = 0; r < RANK - 2; r++) {
+      MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
+    }   
 
     size_t workspaceSize;
     cufftCreate(&this->plan_);
@@ -902,42 +631,25 @@ private:
    * @param dir
    *   Direction of FFT
    **/
-  virtual void inline Exec([[maybe_unused]] tensor_t<T1, 1> &o,
-                           [[maybe_unused]] const tensor_t<T2, 1> &i,
-                           [[maybe_unused]] int dir) override
-  {
-    MATX_THROW(matxInvalidSize, "Cannot use a 1D tensor in a 2D FFT");
-  }
-
-#ifdef DOXYGEN_ONLY
-  virtual void inline Exec(tensor_t &o, const tensor_t &i,
-                           int dir) override{
-#else
-  virtual void inline Exec(tensor_t<T1, 2> &o, const tensor_t<T2, 2> &i,
+  virtual void inline Exec(OutTensorType &o, const InTensorType &i,
                            int dir) override
   {
-#endif
+    static_assert(RANK >= 2);
+
+    if constexpr (RANK <= 3) {
       this->InternalExec(static_cast<const void *>(i.Data()),
                          static_cast<void *>(o.Data()), dir);
+    }
+    else if constexpr (RANK == 4) {
+      for (index_t z = 0; z < o.Size(0); z++) {
+        this->InternalExec(static_cast<const void *>(&i(z, 0, 0, 0)),
+                          static_cast<void *>(&o(z, 0, 0, 0)), dir);
+      }      
+    }
+
 }
 
-virtual void inline Exec(tensor_t<T1, 3> &o, const tensor_t<T2, 3> &i,
-                         int dir) override
-{
-  this->InternalExec(static_cast<const void *>(i.Data()),
-                     static_cast<void *>(o.Data()), dir);
-}
-
-virtual void inline Exec(tensor_t<T1, 4> &o, const tensor_t<T2, 4> &i,
-                         int dir) override
-{
-  for (index_t z = 0; z < o.Size(0); z++) {
-    this->InternalExec(static_cast<const void *>(&i(z, 0, 0, 0)),
-                       static_cast<void *>(&o(z, 0, 0, 0)), dir);
-  }
-}
-}
-;
+};
 
 /**
  *  Crude hash on FFT to get a reasonably good delta for collisions. This
@@ -977,17 +689,21 @@ struct FftParamsKeyEq {
 static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_1d;
 static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_2d;
 
-template <typename T1, typename T2, int RANK>
-tensor_t<T2, RANK>
-    GetFFTInputView([[maybe_unused]] tensor_t<T1, RANK> &o,
-                    const tensor_t<T2, RANK> &i,
+template <typename TensorType1, typename TensorType2>
+auto  GetFFTInputView([[maybe_unused]] TensorType1 &o,
+                    const TensorType2 &i,
                     [[maybe_unused]] cudaStream_t stream)
 {
-  index_t starts[RANK] = {0};
-  index_t ends[RANK];
-  index_t in_size = i.Lsize();
-  index_t nom_fft_size = in_size;
-  index_t act_fft_size = o.Lsize();
+  using index_type = typename TensorType1::shape_type;
+  using T1    = typename TensorType1::scalar_type;
+  using T2    = typename TensorType2::scalar_type;
+  constexpr int RANK = TensorType1::Rank();
+
+  index_type starts[RANK] = {0};
+  index_type ends[RANK];
+  index_type in_size = i.Lsize();
+  index_type nom_fft_size = in_size;
+  index_type act_fft_size = o.Lsize();
 
   // If R2C transform, set length of FFT appropriately
   if constexpr ((std::is_same_v<T2, float> &&
@@ -1032,20 +748,20 @@ tensor_t<T2, RANK>
       // advantage of that without changing the API.
 
       // Create a new shape where n is the size of the last dimension
-      auto shape = i.Shape();
-      shape.SetSize(RANK - 1, act_fft_size);
+      auto desc = i.Descriptor();
+      desc.SetSize(RANK - 1, act_fft_size);
 
       // Make a new buffer large enough for our input
       matxAlloc(reinterpret_cast<void **>(&i_pad),
-                sizeof(T1) * shape.TotalSize(), MATX_ASYNC_DEVICE_MEMORY,
+                sizeof(T1) * desc.TotalSize(), MATX_ASYNC_DEVICE_MEMORY,
                 stream);
 
-      tensor_t<T2, RANK> i_new = tensor_t<T2, RANK>(i_pad, shape);
+      auto i_new = make_tensor(i_pad, desc);
       ends[RANK - 1] = i.Lsize();
       auto i_pad_part_v = i_new.Slice(starts, ends);
 
       (i_new = static_cast<promote_half_t<T2>>(0)).run(stream);
-      copy(i_pad_part_v, i, stream);
+      matx::copy(i_pad_part_v, i, stream);
       return i_new;
     }
   }
@@ -1076,32 +792,34 @@ tensor_t<T2, RANK>
  * @param stream
  *   CUDA stream
  */
-template <typename T1, typename T2, int RANK>
-void fft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
+template <typename TensorType1, typename TensorType2>
+void fft(TensorType1 &o, const TensorType2 &i,
          cudaStream_t stream = 0)
 {
+  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+    "Input and output tensor ranks must match");  
   auto i_new = GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<T1, T2>::GetFFTParams(o, i_new, 1);
+  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<T1, T2>{o, i_new};
+    auto tmp = new matxFFTPlan1D_t<TensorType1, TensorType2>{o, i_new};
     cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Forward(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<T1, T2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan1D_t<TensorType1, TensorType2> *>(ret.value());
     fft_type->Forward(o, i_new, stream);
   }
-
+  
   // If we async-allocated memory for zero-padding, free it here
-  if (i_new.Data() != i.Data()) {
-    matxFree(i_new.Data());
-  }
+  // if (i_new.Data() != i.Data()) {
+  //   matxFree(i_new.Data());
+  // }
 }
 
 /**
@@ -1127,32 +845,35 @@ void fft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, typename T2, int RANK>
-void ifft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
+template <typename TensorType1, typename TensorType2>
+void ifft(TensorType1 &o, const TensorType2 &i,
           cudaStream_t stream = 0)
 {
+  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+    "Input and output tensor ranks must match");
+
   auto i_new = GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<T1, T2>::GetFFTParams(o, i_new, 1);
+  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<T1, T2>{o, i_new};
+    auto tmp = new matxFFTPlan1D_t<TensorType1, TensorType2>{o, i_new};
     cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<T1, T2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan1D_t<TensorType1, TensorType2> *>(ret.value());
     fft_type->Inverse(o, i_new, stream);
   }
 
   // If we async-allocated memory for zero-padding, free it here
-  if (i_new.Data() != i.Data()) {
-    matxFree(i_new.Data());
-  }
+  // if (i_new.Data() != i.Data()) {
+  //   matxFree(i_new.Data());
+  // }
 }
 
 /**
@@ -1175,23 +896,26 @@ void ifft(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, typename T2, int RANK>
-void fft2(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
-          cudaStream_t stream = 0)
+template <typename OutputTensor, typename InputTensor>
+void fft2(OutputTensor &o, const InputTensor &i,
+           cudaStream_t stream = 0)
 {
+  MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
+    "Input and output tensor ranks must match");
+
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<T1, T2>::GetFFTParams(o, i, 2);
+  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_2d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan2D_t<T1, T2>{o, i};
+    auto tmp = new matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
     cache_2d.Insert(params, static_cast<void *>(tmp));
     tmp->Forward(o, i, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan2D_t<T1, T2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Forward(o, i, stream);
   }
 }
@@ -1216,25 +940,27 @@ void fft2(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, typename T2, int RANK>
-void ifft2(tensor_t<T1, RANK> &o, const tensor_t<T2, RANK> &i,
+template <typename TensorType1, typename TensorType2>
+void ifft2(TensorType1 &o, const TensorType2 &i,
            cudaStream_t stream = 0)
 {
+  MATX_STATIC_ASSERT_STR(TensorType1::Rank() == TensorType2::Rank(), matxInvalidDim,
+    "Input and output tensor ranks must match");
+
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<T1, T2>::GetFFTParams(o, i, 2);
+  auto params = matxFFTPlan_t<TensorType1, TensorType2>::GetFFTParams(o, i, 2);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = cache_2d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan2D_t<T1, T2>{o, i};
+    auto tmp = new matxFFTPlan2D_t<TensorType1, TensorType2>{o, i};
     cache_2d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan2D_t<T1, T2> *>(ret.value());
+    auto fft_type = static_cast<matxFFTPlan2D_t<TensorType1, TensorType2> *>(ret.value());
     fft_type->Inverse(o, i, stream);
   }
 }
-}
-; // end namespace matx
+}; // end namespace matx

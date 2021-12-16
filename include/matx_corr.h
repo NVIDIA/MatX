@@ -46,8 +46,8 @@ namespace matx {
 
 // Entry point that allows swappable inputs, and also optimizes shared memory by
 // passing in the shortest signal as the filter
-template <typename T, int RANK, typename In1Type, typename In2Type>
-void corr(tensor_t<T, RANK> &o, In1Type &i1, In2Type &i2,
+template <typename OutputTensor, typename In1Type, typename In2Type>
+void corr(OutputTensor &o, const In1Type &i1, const In2Type &i2,
           matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
           cudaStream_t stream)
 {

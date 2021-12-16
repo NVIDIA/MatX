@@ -32,6 +32,7 @@
 
 #include "matx.h"
 #include "matx_viz.h"
+#include "matx_make.h"
 #include <cassert>
 #include <cstdio>
 #include <math.h>
@@ -68,28 +69,28 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&stop);
 
   float fs = 10000;
-  index_t N = 100000;
+  constexpr index_t N = 100000;
   float amp = static_cast<float>(2 * sqrt(2));
-  index_t nperseg = 256;
-  index_t nfft = 256;
-  index_t noverlap = nperseg / 8;
-  index_t nstep = nperseg - noverlap;
+  constexpr index_t nperseg = 256;
+  constexpr index_t nfft = 256;
+  constexpr index_t noverlap = nperseg / 8;
+  constexpr index_t nstep = nperseg - noverlap;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 
-  tensorShape_t<1> num_samps({N});
-  tensorShape_t<1> half_win({nfft / 2 + 1});
-  tensorShape_t<1> s_time_shape({(N - noverlap) / nstep});
+  std::array<index_t, 1> num_samps{N};
+  std::array<index_t, 1> half_win{nfft / 2 + 1};
+  std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
 
-  tensor_t<float, 1> time({N});
-  tensor_t<float, 1> modulation({N});
-  tensor_t<float, 1> carrier({N});
-  tensor_t<float, 1> noise({N});
-  tensor_t<float, 1> x({N});
-  tensor_t<float, 1> freqs(half_win);
-  tensor_t<complex, 2> fftStackedMatrix(
-      {(N - noverlap) / nstep, nfft / 2 + 1});
-  tensor_t<float, 1> s_time({(N - noverlap) / nstep});
+  auto time = make_static_tensor<float, N>();
+  auto modulation = make_static_tensor<float, N>();
+  auto carrier = make_static_tensor<float, N>();
+  auto noise = make_static_tensor<float, N>();
+  auto x = make_static_tensor<float, N>();
+
+  auto freqs = make_static_tensor<float, nfft / 2 + 1>();
+  auto fftStackedMatrix = make_tensor<complex>({(N - noverlap) / nstep, nfft / 2 + 1});
+  auto s_time = make_static_tensor<float,(N - noverlap) / nstep>();
 
   randomGenerator_t<float> randData({N}, 0);
   auto randDataView = randData.GetTensorView<1>(num_samps, NORMAL);
@@ -137,7 +138,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if (i == 1) {
       // Generate a spectrogram visualization using a contour plot
-      viz::contour(time, freqs, Sxx);
+      //viz::contour(time, freqs, Sxx);
     }
   }
 

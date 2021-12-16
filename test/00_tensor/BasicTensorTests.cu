@@ -145,13 +145,13 @@ TYPED_TEST(BasicTensorTestsAll, RefCnt)
 
   TypeParam *data = tmp.Data();
 
-  tmp3.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  tmp3.Reset(reinterpret_cast<TypeParam*>(0x1234567));
   ASSERT_EQ(tmp3.GetRefCount(), 1);   
 
-  tmp2.SetData(reinterpret_cast<TypeParam*>(0x1234567));
+  tmp2.Reset(reinterpret_cast<TypeParam*>(0x1234567));
   ASSERT_EQ(tmp.GetRefCount(), 1);  
 
-  tmp.SetData(reinterpret_cast<TypeParam*>(0x1234567)); 
+  tmp.Reset(reinterpret_cast<TypeParam*>(0x1234567)); 
 
   // Check if pointer was freed
   ASSERT_EQ(IsAllocated(data), false);  
@@ -405,28 +405,3 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(BasicTensorTestsAll, MakeTensor)
-{
-  auto mt2 = make_tensor<float>({2, 2});
-  ASSERT_EQ(mt2.Size(0), 2);
-  ASSERT_EQ(mt2.Size(1), 2);
-  mt2.SetVals({{1,2}, {5,6}});
-  ASSERT_EQ(mt2(0,0), 1);
-  ASSERT_EQ(mt2(0,1), 2);
-  ASSERT_EQ(mt2(1,0), 5);
-  ASSERT_EQ(mt2(1,1), 6);
-
-  auto mt0 = make_tensor<float>();
-  auto mt1 = make_tensor<float>({10});
-  auto mt3 = make_tensor<float>({10, 5, 4});
-  auto mt4 = make_tensor<float>({10, 5, 4, 3});
-  ASSERT_EQ(mt0.Size(0), 0);
-  ASSERT_EQ(mt1.Size(0), 10);
-  ASSERT_EQ(mt3.Size(0), 10);
-  ASSERT_EQ(mt3.Size(1), 5);
-  ASSERT_EQ(mt3.Size(2), 4);
-  ASSERT_EQ(mt4.Size(0), 10);
-  ASSERT_EQ(mt4.Size(1), 5);
-  ASSERT_EQ(mt4.Size(2), 4);
-  ASSERT_EQ(mt4.Size(3), 3);  
-}

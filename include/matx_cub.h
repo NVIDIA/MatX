@@ -72,8 +72,14 @@ template <typename T> struct HistEvenParams_t {
 
 typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
 
-template <typename T1, typename T2, int RANK, CUBOperation_t op>
+template <typename OutputTensor, typename InputTensor, CUBOperation_t op>
 class matxCubPlan_t {
+  static_assert(OutputTensor::Rank() == InputTensor::Rank(), "CUB input and output tensor ranks must match");
+  static constexpr int RANK = OutputTensor::Rank();
+  static_assert(RANK >= 1);
+  using T1 = typename InputTensor::scalar_type;
+  using T2 = typename OutputTensor::scalar_type;
+
 public:
   /**
    * Construct a handle for CUB operations
@@ -98,17 +104,9 @@ public:
    *   Parameter structure specific to the operation
    *
    */
-#ifdef DOXYGEN_ONLY
-  matxCubPlan_t(tensor_t &a_out, const tensor_t &a,
-                const std::any &cparams, cudaStream_t stream = 0)
-  {
-#else
-  matxCubPlan_t(tensor_t<T2, RANK> &a_out, const tensor_t<T1, RANK> &a,
+  matxCubPlan_t(OutputTensor &a_out, const InputTensor &a,
                 const std::any &cparams, const cudaStream_t stream = 0)
   {
-#endif
-    static_assert(RANK >= 1);
-
 #ifdef __CUDACC__  
     // Input/output tensors much match rank/dims
     if constexpr (op != CUB_OP_HIST_EVEN) {
@@ -167,8 +165,8 @@ public:
 #endif              
   }
 
-  static CubParams_t GetCubParams(tensor_t<T2, RANK> &a_out,
-                                  const tensor_t<T1, RANK> &a)
+  static CubParams_t GetCubParams(OutputTensor &a_out,
+                                  const InputTensor &a)
   {
     CubParams_t params;
     params.size = a.Lsize();
@@ -218,8 +216,8 @@ public:
    *   CUDA stream
    *
    */
-  inline void ExecHistEven(tensor_t<int, RANK> &a_out,
-                           const tensor_t<T1, RANK> &a, const T1 lower,
+  inline void ExecHistEven(OutputTensor &a_out,
+                           const InputTensor &a, const T1 lower,
                            const T1 upper, const cudaStream_t stream)
   {
 #ifdef __CUDACC__      
@@ -277,8 +275,8 @@ public:
    *   CUDA stream
    *
    */
-  inline void ExecPrefixScanEx(tensor_t<T2, RANK> &a_out,
-                               const tensor_t<T1, RANK> &a,
+  inline void ExecPrefixScanEx(OutputTensor &a_out,
+                               const InputTensor &a,
                                const cudaStream_t stream)
   {
 #ifdef __CUDACC__      
@@ -334,8 +332,8 @@ public:
    *   Sort order (SORT_DIR_ASC or SORT_DIR_DESC)
    *
    */
-  inline void ExecSort(tensor_t<T2, RANK> &a_out,
-                       const tensor_t<T1, RANK> &a,
+  inline void ExecSort(OutputTensor &a_out,
+                       const InputTensor &a,
                        const cudaStream_t stream,
                        const SortDirection_t dir = SORT_DIR_ASC)
   {
@@ -477,28 +475,28 @@ static matxCache_t<CubParams_t, CubParamsKeyHash, CubParamsKeyEq> cub_cache;
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void sort(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
+template <typename OutputTensor, typename InputTensor>
+void sort(OutputTensor &a_out, const InputTensor &a,
           const SortDirection_t dir = SORT_DIR_ASC,
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
-      matxCubPlan_t<T1, T1, RANK, CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
+      matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
   params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = cub_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxCubPlan_t<T1, T1, RANK, CUB_OP_RADIX_SORT>{
+    auto tmp = new matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_RADIX_SORT>{
         a_out, a, {}, stream};
     cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSort(a_out, a, stream, dir);
   }
   else {
     auto sort_type =
-        static_cast<matxCubPlan_t<T1, T1, RANK, CUB_OP_RADIX_SORT> *>(
+        static_cast<matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_RADIX_SORT> *>(
             ret.value());
     sort_type->ExecSort(a_out, a, stream, dir);
   }
@@ -522,27 +520,27 @@ void sort(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void cumsum(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
+template <typename OutputTensor, typename InputTensor>
+void cumsum(OutputTensor &a_out, const InputTensor &a,
             const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
-      matxCubPlan_t<T1, T1, RANK, CUB_OP_INC_SUM>::GetCubParams(a_out, a);
+      matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_INC_SUM>::GetCubParams(a_out, a);
   params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp =
-        new matxCubPlan_t<T1, T1, RANK, CUB_OP_INC_SUM>{a_out, a, {}, stream};
+        new matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_INC_SUM>{a_out, a, {}, stream};
     cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecPrefixScanEx(a_out, a, stream);
   }
   else {
     auto sort_type =
-        static_cast<matxCubPlan_t<T1, T1, RANK, CUB_OP_INC_SUM> *>(ret.value());
+        static_cast<matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_INC_SUM> *>(ret.value());
     sort_type->ExecPrefixScanEx(a_out, a, stream);
   }
 #endif  
@@ -573,28 +571,30 @@ void cumsum(tensor_t<T1, RANK> &a_out, const tensor_t<T1, RANK> &a,
  * @param stream
  *   CUDA stream
  */
-template <typename T1, int RANK>
-void hist(tensor_t<int, RANK> &a_out, const tensor_t<T1, RANK> &a,
-          const T1 lower, const T1 upper, const cudaStream_t stream = 0)
+template <typename OutputTensor, typename InputTensor>
+void hist(OutputTensor &a_out, const InputTensor &a,
+          const typename InputTensor::scalar_type lower, 
+          const typename InputTensor::scalar_type upper, const cudaStream_t stream = 0)
 {
+  static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram tensor must use int type");
 #ifdef __CUDACC__    
   // Get parameters required by these tensors
   auto params =
-      matxCubPlan_t<T1, int, RANK, CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
+      matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
   params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = cub_cache.Lookup(params);
   if (ret == std::nullopt) {
-    HistEvenParams_t<T1> hp{lower, upper};
-    auto tmp = new matxCubPlan_t<T1, int, RANK, CUB_OP_HIST_EVEN>{
-        a_out, a, std::make_any<HistEvenParams_t<T1>>(hp), stream};
+    HistEvenParams_t<typename InputTensor::scalar_type> hp{lower, upper};
+    auto tmp = new matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_HIST_EVEN>{
+        a_out, a, std::make_any<HistEvenParams_t<typename InputTensor::scalar_type>>(hp), stream};
     cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecHistEven(a_out, a, lower, upper, stream);
   }
   else {
     auto sort_type =
-        static_cast<matxCubPlan_t<T1, int, RANK, CUB_OP_HIST_EVEN> *>(
+        static_cast<matxCubPlan_t<OutputTensor, InputTensor, CUB_OP_HIST_EVEN> *>(
             ret.value());
     sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   }

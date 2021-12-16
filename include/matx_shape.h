@@ -50,6 +50,8 @@ namespace matx {
  */
 template <int RANK> class tensorShape_t {
 public:
+  using matx_shape = bool;
+
   tensorShape_t(){};
 
   /**
@@ -72,10 +74,23 @@ public:
    * @param sizes
    *   Sizes for each dimension. Length of sizes must match RANK
    */
-  inline tensorShape_t(const index_t (&sizes)[RANK])
+  template <int M = RANK, std::enable_if_t<M != 0, bool> = true>
+  inline tensorShape_t(const index_t (&sizes)[M])
       : tensorShape_t(reinterpret_cast<const index_t *>(sizes))
   {
   }
+
+  /**
+   * Constructor for a rank-1 and above tensor using initializer lists
+   *
+   * @param sizes
+   *   Sizes for each dimension. Length of sizes must match RANK
+   */
+  template <typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type> && !std::is_pointer_v<typename remove_cvref<T>::type>, bool> = true>
+  inline tensorShape_t(const T &sizes)
+      : tensorShape_t(reinterpret_cast<const index_t *>(sizes.data()))
+  {
+  }  
 
   /**
    * Get the size of a single dimension of the tensor
@@ -136,7 +151,7 @@ public:
    * Get shape as an array
    *
    */
-  inline std::array<index_t, RANK> AsArray()
+  inline std::array<index_t, RANK> AsArray() const
   {
     return n_;
   }  

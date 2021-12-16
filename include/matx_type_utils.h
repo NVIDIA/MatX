@@ -33,10 +33,13 @@
 #pragma once
 
 #include "cuda_fp16.h"
-#include "matx.h"
+#include "matx_half.h"
+#include "matx_half_complex.h"
 #include <any>
+#include <memory>
 #include <complex>
 #include <cublas_v2.h>
+#include <cuda/std/complex>
 #include <type_traits>
 
 /**
@@ -44,7 +47,16 @@
  * the host compiler, so no device code should be present
  */
 
+
 namespace matx {
+
+template< class T >
+struct remove_cvref {
+    using type = std::remove_cv_t<std::remove_reference_t<T>>;
+};  
+
+template <typename T, int RANK, typename Desc> class tensor_impl_t;
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;  
 
 template <typename T, typename = void>
 struct is_matx_op_impl : std::false_type {
@@ -66,11 +78,10 @@ template <typename T>
 struct is_tensor_view<T, std::void_t<typename T::tensor_view>>
     : std::true_type {
 };
+template< class T >
+inline constexpr bool is_tensor_view_v = is_tensor_view<typename remove_cvref<T>::type>::value;
 
-template <typename T> constexpr bool is_tensor_view_t()
-{
-  return is_tensor_view<T>::value;
-}
+
 
 
 template <typename T, typename = void> struct is_executor : std::false_type {
@@ -86,16 +97,16 @@ template <typename T> constexpr bool is_executor_t()
   return is_executor<T>::value;
 }
 
-template <typename T, int RANK> class tensor_t;
-template <typename T, int RANK> class tensor_impl_t;
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+template <typename T, int RANK, typename Desc> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
 template <typename T> struct base_type {
   using type = T;
 };
 
-template <typename T, int RANK> 
-struct base_type<tensor_t<T, RANK>> {
-  using type = tensor_impl_t<T, RANK>;
+template <typename T, int RANK, typename Storage, typename Desc> 
+struct base_type<tensor_t<T, RANK, Storage, Desc>> {
+  using type = tensor_impl_t<T, RANK, Desc>;
 };
 
 template <typename T, typename = void>
@@ -118,6 +129,11 @@ struct is_matx_idx_reduction_impl<T, std::void_t<typename T::matx_reduce_index>>
 };
 template <typename T>
 inline constexpr bool is_matx_index_reduction_v = is_matx_idx_reduction_impl<T>::value;
+
+template<typename T> struct is_smart_ptr : std::false_type {};
+template<typename T> struct is_smart_ptr<std::shared_ptr<T>> : std::true_type {};
+template<typename T> struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {};
+template <typename T> inline constexpr bool is_smart_ptr_v = is_smart_ptr<T>::value;
 
 template <class T> struct is_cuda_complex : std::false_type {
 };
@@ -142,6 +158,62 @@ template <> struct is_complex<matxFp16Complex> : std::true_type {
 template <> struct is_complex<matxBf16Complex> : std::true_type {
 };
 template <class T> inline constexpr bool is_complex_v = is_complex<T>::value;
+
+template <typename T, typename = void>
+struct is_matx_shape : std::false_type {
+};
+template <typename T>
+struct is_matx_shape<T, std::void_t<typename T::matx_shape>>
+    : std::true_type {
+};
+template <typename T>
+inline constexpr bool is_matx_shape_v = is_matx_shape<typename remove_cvref<T>::type>::value;
+
+// From C++20
+namespace detail {
+  template <class T, std::size_t N, std::size_t... I>
+  constexpr std::array<std::remove_cv_t<T>, N>
+      to_array_impl(T (&a)[N], std::index_sequence<I...>)
+  {
+      return { {a[I]...} };
+  }
+}
+template <class T, std::size_t N>
+constexpr std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
+{
+    return detail::to_array_impl(a, std::make_index_sequence<N>{});
+}
+
+
+template <typename T, typename = void>
+struct is_matx_storage : std::false_type {
+};
+template <typename T>
+struct is_matx_storage<T, std::void_t<typename T::matx_storage>>
+    : std::true_type {
+};
+template <typename T>
+inline constexpr bool is_matx_storage_v = is_matx_storage<typename remove_cvref<T>::type>::value;
+
+template <typename T, typename = void>
+struct is_matx_storage_container : std::false_type {
+};
+template <typename T>
+struct is_matx_storage_container<T, std::void_t<typename T::matx_storage_container>>
+    : std::true_type {
+};
+template <typename T>
+inline constexpr bool is_matx_storage_container_v = is_matx_storage_container<typename remove_cvref<T>::type>::value;
+
+template <typename T, typename = void>
+struct is_matx_descriptor : std::false_type {
+};
+template <typename T>
+struct is_matx_descriptor<T, std::void_t<typename T::matx_descriptor>>
+    : std::true_type {
+};
+template <typename T>
+inline constexpr bool is_matx_descriptor_v = is_matx_descriptor<typename remove_cvref<T>::type>::value;
 
 template <typename T>
 struct is_complex_half
@@ -401,6 +473,8 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
   return CUBLAS_COMPUTE_32F;
 }
 
+struct owning {};
+struct non_owning {};
 
 
 } // end namespace matx

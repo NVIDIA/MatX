@@ -35,13 +35,15 @@
 #include <type_traits>
 
 #include "matx_error.h"
-#include "matx_tensor_impl.h"
 #include "matx_type_utils.h"
 #include "matx_tensor_utils.h"
 
 namespace matx {
 
 template <typename T> class BaseOp;
+template <typename T, int RANK, typename Desc> class tensor_impl_t;
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+
 
 /**
  * Assignment from one operator/View into a View
@@ -57,12 +59,12 @@ template <typename T> class BaseOp;
  * @tparam Op
  *   Operator to use as input
  **/
-template <class T, int RANK, class Op>
-class set : public BaseOp<set<T, RANK, Op>> {
+template <typename T, int RANK, typename Desc, typename Op>
+class set : public BaseOp<set<T, RANK, Desc, Op>> {
 private:
-  tensor_impl_t<T, RANK> out_;
+  tensor_impl_t<T, RANK, Desc> out_;
   typename base_type<Op>::type op_;
-  std::array<index_t, RANK> size_;
+  std::array<typename Desc::shape_type, RANK> size_;
 
 public:
   // Type specifier for reflection on class
@@ -77,13 +79,13 @@ public:
    * @param op
    *   Input operator
    */
-  inline set(tensor_impl_t<T, RANK> &out, const Op op) : out_(out), op_(op)
+  inline set(tensor_impl_t<T, RANK, Desc> &out, const Op op) : out_(out), op_(op)
   {
     MATX_STATIC_ASSERT(get_rank<Op>() == -1 || Rank() == get_rank<Op>(),
                        matxInvalidDim);
     if constexpr (RANK > 0) {
       for (int i = 0; i < RANK; i++) {
-        index_t size = get_expanded_size<Rank()>(op_, i);
+        typename Desc::shape_type size = get_expanded_size<Rank()>(op_, i);
         size_[i] = out_.Size(i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
@@ -107,7 +109,7 @@ public:
     return out_();
   }
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i))>) {
@@ -120,7 +122,7 @@ public:
     return out_(i);
   }
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j))>) {
@@ -133,7 +135,7 @@ public:
     return out_(i, j);
   }
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j, typename Desc::shape_type k) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j, k))>) {
@@ -146,8 +148,8 @@ public:
     return out_(i, j, k);
   }
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(index_t i, index_t j, index_t k,
-                                    index_t l) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j, typename Desc::shape_type k,
+                                    typename Desc::shape_type l) noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(get_value(op_, i, j, k, l))>) {
@@ -177,7 +179,7 @@ public:
    *   Size of dimension
    */
   template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  inline __MATX_HOST__ __MATX_DEVICE__ typename Desc::shape_type Size(uint32_t dim) const
   {
     return size_[dim];
   }

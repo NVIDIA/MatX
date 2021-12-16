@@ -118,11 +118,11 @@ using namespace pybind11::literals;
  *slow-path function, so this is not a critical component to speed up. Currently
  *1D and 2D tensors are supported only.
  **/
-template <typename T, int RANK>
-void ReadCSV(tensor_t<T, RANK> &t, const std::string fname,
+template <typename TensorType>
+void ReadCSV(const TensorType &t, const std::string fname,
              const std::string delimiter, bool header = true)
 {
-  if (RANK != 1 && RANK != 2) {
+  if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
   }
@@ -143,17 +143,17 @@ void ReadCSV(tensor_t<T, RANK> &t, const std::string fname,
  *slow-path function, so this is not a critical component to speed up. Currently
  *1D and 2D tensors are supported only.
  **/
-template <typename T, int RANK>
-void WriteCSV(tensor_t<T, RANK> &t, const std::string fname,
+template <typename TensorType>
+void WriteCSV(const TensorType &t, const std::string fname,
               const std::string delimiter)
 {
-  if (RANK != 1 && RANK != 2) {
+  if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
   py::list ndims;
-  for (int i = 0; i < RANK; i++) {
+  for (int i = 0; i < TensorType::Rank(); i++) {
     ndims.append(t.Size(i));
   }
 

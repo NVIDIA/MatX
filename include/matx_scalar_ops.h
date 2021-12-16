@@ -96,7 +96,7 @@ template <typename T1, typename F> class UnOp {
 public:
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1) { return F::op(v1); }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) { return op(v1); }
+  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) const { return op(v1); }
 
   using scalar_type = std::invoke_result_t<decltype(op), T1>;
 };
@@ -108,7 +108,7 @@ public:
     return F::op(v1, v2);
   }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2) const
   {
     return op(v1, v2);
   }
@@ -119,12 +119,12 @@ public:
 template <typename T1, typename T2, typename T3, typename F> class TerOp {
 public:
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2,
-                                            const T3 &v3)
+                                            const T3 &v3) 
   {
     return F::op(v1, v2, v3);
   }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2, const T3 &v3)
+  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2, const T3 &v3) const
   {
     return op(v1, v2, v3);
   }

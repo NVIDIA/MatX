@@ -44,14 +44,15 @@
 
 namespace matx {
 
-template <typename T, int RANK, typename InType, typename FilterType>
-inline void matxDirectConv1DInternal(tensor_impl_t<T, RANK> o, InType i,
-                                     FilterType filter, matxConvCorrMode_t mode,
+template <typename OutputType, typename InType, typename FilterType>
+inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
+                                     const FilterType &filter, matxConvCorrMode_t mode,
                                      cudaStream_t stream)
 {
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
-  MATX_STATIC_ASSERT(RANK == InType::Rank(), matxInvalidDim);
+  using shape_type = typename OutputType::shape_type;
+  MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
 
 #ifdef __CUDACC__  
@@ -66,30 +67,35 @@ inline void matxDirectConv1DInternal(tensor_impl_t<T, RANK> o, InType i,
 
   auto shmsize = filter_shm + sizeof(strip_input_t) * (filter.Size(0) + BLOCK_SIZE_NON_RECURSIVE);
 
-  index_t sig_len = i.Size(RANK - 1);
+  shape_type sig_len = i.Size(OutputType::Rank() - 1);
   float work_per_block =
       static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(0) + 1);
   uint32_t num_blocks = static_cast<uint32_t>(std::ceil(
       static_cast<float>(sig_len + filter.Size(0) - 1) / work_per_block));
 
-  if constexpr (RANK == 1) {
+  if constexpr (OutputType::Rank() == 1) {
     dim3 gsize(num_blocks, 1);
     Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
           o, i, filter, sig_len, filter.Size(0), mode);
   }
-  else if constexpr (RANK == 2) {
+  else if constexpr (OutputType::Rank() == 2) {
     dim3 gsize(num_blocks, static_cast<int>(i.Size(0)));
     Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-            o, i, filter, sig_len, filter.Size(0), mode);
+            o, 
+            i, 
+            filter, 
+            sig_len, 
+            filter.Size(0), 
+            mode);
   }
-  else if constexpr (RANK == 3) {
+  else if constexpr (OutputType::Rank() == 3) {
     dim3 gsize(num_blocks, static_cast<int>(i.Size(1)),
                static_cast<int>(i.Size(0)));
     Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
             o, i, filter, sig_len, filter.Size(0), mode);
   }
   else {
-    static_assert(RANK == 4);
+    static_assert(OutputType::Rank() == 4);
     dim3 gsize(num_blocks, static_cast<int>(i.Size(2)),
                static_cast<int>(i.Size(0) * i.Size(1)));
     Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
@@ -101,19 +107,19 @@ inline void matxDirectConv1DInternal(tensor_impl_t<T, RANK> o, InType i,
 // Entry point that allows swappable inputs, and also optimizes shared memory by
 // passing in the shortest signal as the filter. Note the swap parameter does
 // not do anything for convolution, so we never swap unless it's a correlation
-template <typename T, int RANK, typename In1Type, typename In2Type>
-inline void conv1d(tensor_t<T, RANK> o, In1Type i1, In2Type i2,
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv1d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
-  tensor_impl_t<T,RANK> &o_base = o;
-  typename base_type<In1Type>::type &in1_base = i1;
-  typename base_type<In2Type>::type &in2_base = i2;
+  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  const typename base_type<In1Type>::type &in1_base = i1;
+  const typename base_type<In2Type>::type &in2_base = i2;
 
   if constexpr (In1Type::Rank() < In2Type::Rank()) {
     matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
   }
   else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_STATIC_ASSERT(RANK == 1, matxInvalidDim);
+    MATX_STATIC_ASSERT(OutputType::Rank() == 1, matxInvalidDim);
     if (i1.Size(0) < i2.Size(0)) {
       matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
     }
@@ -126,30 +132,30 @@ inline void conv1d(tensor_t<T, RANK> o, In1Type i1, In2Type i2,
   }
 }
 
-template <typename T, int RANK, typename InType, typename FilterType>
-void matxDirectConv2DInternal(tensor_impl_t<T, RANK> &o, InType &i,
+template <typename OutputType, typename InType, typename FilterType>
+void matxDirectConv2DInternal(OutputType &o, InType &i,
                               FilterType &filter, matxConvCorrMode_t mode,
                               cudaStream_t stream)
 {
-  MATX_STATIC_ASSERT(RANK == InType::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(FilterType::Rank() == 2, matxInvalidDim);
 
   using strip_input_t = typename InType::scalar_type;
   auto shmsize = sizeof(strip_input_t) * filter.Size(0) * filter.Size(1);
 
 #ifdef __CUDACC__  
-  if constexpr (RANK == 1) {
+  if constexpr (OutputType::Rank() == 1) {
     MATX_THROW(matxInvalidDim,
                "matxDirectConv2D not supported on Rank 1 Tensors");
   }
-  else if constexpr (RANK == 2) {
+  else if constexpr (OutputType::Rank() == 2) {
     dim3 gsize(
         static_cast<int>(std::ceil(static_cast<double>(o.Size(1)) / 32.0)),
         static_cast<int>(std::ceil(static_cast<double>(o.Size(0)) / 32.0)), 1);
     dim3 bsize(32, 32);
     Conv2D<<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
   }
-  else if constexpr (RANK == 3) {
+  else if constexpr (OutputType::Rank() == 3) {
     dim3 gsize(static_cast<unsigned int>(
                    std::ceil(static_cast<double>(o.Size(2)) / 32.0)),
                static_cast<unsigned int>(
@@ -159,7 +165,7 @@ void matxDirectConv2DInternal(tensor_impl_t<T, RANK> &o, InType &i,
     Conv2D<<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
   }
   else {
-    static_assert(RANK == 4);
+    static_assert(OutputType::Rank() == 4);
     dim3 gsize(static_cast<unsigned int>(
                    std::ceil(static_cast<double>(o.Size(2)) / 32.0)),
                static_cast<unsigned int>(
@@ -173,19 +179,19 @@ void matxDirectConv2DInternal(tensor_impl_t<T, RANK> &o, InType &i,
 
 // Entry point that allows swappable inputs, and also optimizes shared memory by
 // passing in the shortest signal as the filter
-template <typename T, int RANK, typename In1Type, typename In2Type>
-inline void conv2d(tensor_t<T, RANK> o, In1Type i1, In2Type i2,
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
-  tensor_impl_t<T,RANK> &o_base = o;
-  typename base_type<In1Type>::type &in1_base = i1;
-  typename base_type<In2Type>::type &in2_base = i2;
+  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  const typename base_type<In1Type>::type &in1_base = i1;
+  const typename base_type<In2Type>::type &in2_base = i2;
 
   if constexpr (In1Type::Rank() < In2Type::Rank()) {
     matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
   }
   else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_STATIC_ASSERT(RANK == 2, matxInvalidDim);
+    MATX_STATIC_ASSERT(OutputType::Rank() == 2, matxInvalidDim);
     if (i1.Size(0) * i1.Size(1) < i2.Size(0) * i2.Size(1)) {
       matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
     }

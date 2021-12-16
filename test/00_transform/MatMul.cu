@@ -81,7 +81,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
@@ -107,7 +107,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
@@ -132,7 +132,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRect)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,

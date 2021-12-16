@@ -30,11 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "matx.h"
+#include "matx_type_utils.h"
+#include "matx_tensor.h"
 #include "matx_conv.h"
 #include <cassert>
 #include <cstdio>
-#include <cuda/std/ccomplex>
 
 using namespace matx;
 
@@ -44,9 +44,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   typedef cuda::std::complex<float> complex;
 
   uint32_t iterations = 10;
-  index_t numSamples = 16384000;
+  constexpr index_t numSamples = 16384000;
   constexpr index_t filterLen = 10;
-  index_t batches = 100;
+  constexpr index_t batches = 100;
   float time_ms;
 
   std::cout << "Iterations: " << iterations << std::endl;
@@ -66,10 +66,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using FilterType = float;
 
   // Create data objects
-  tensor_t<InType, 2> inView({batches, numSamples});
-  tensor_t<InType, 2> outView({batches, numSamples + filterLen - 1});
+  auto inView = make_static_tensor<InType, batches, numSamples>();
+  auto outView = make_static_tensor<OutType, batches, numSamples + filterLen - 1>();
   // tensor_t<InType, 1> solData({numSamples});
-  tensor_t<FilterType, 1> filterView({filterLen});
+  auto filterView = make_static_tensor<FilterType, filterLen >();
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {
@@ -132,7 +132,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // out2DData.PrefetchDevice(stream);
 
   // Measure recursive runtime
-  cudaEventRecord(start, stream);
+  // cudaEventRecord(start, stream);
 
   // for (auto i = 0; i < iterations; i++)
   // {
@@ -142,22 +142,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //   }
   // }
 
-  cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
-  cudaEventElapsedTime(&time_ms, start, stop);
-  time_ms /= static_cast<float>(iterations);
+  // cudaEventRecord(stop, stream);
+  // cudaStreamSynchronize(stream);
+  // cudaEventElapsedTime(&time_ms, start, stop);
+  // time_ms /= static_cast<float>(iterations);
 
-  printf("2D Convolution kernel time = %.2fus (%.2fGB/s), %.2f billion/s\n",
-         time_ms * 1e3,
-         static_cast<double>(inView.Size(0) * inView.Size(1) * sizeof(InType) *
-                             2) /
-             1e9 / (time_ms / 1e3),
-         static_cast<double>(inView.Size(0) * inView.Size(1)) / 1e9 /
-             (time_ms / 1e3));
+  // printf("2D Convolution kernel time = %.2fus (%.2fGB/s), %.2f billion/s\n",
+  //        time_ms * 1e3,
+  //        static_cast<double>(inView.Size(0) * inView.Size(1) * sizeof(InType) *
+  //                            2) /
+  //            1e9 / (time_ms / 1e3),
+  //        static_cast<double>(inView.Size(0) * inView.Size(1)) / 1e9 /
+  //            (time_ms / 1e3));
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
-  cudaStreamDestroy(stream);
+  // cudaEventDestroy(start);
+  // cudaEventDestroy(stop);
+  // cudaStreamDestroy(stream);
 
   matxPrintMemoryStatistics();
 

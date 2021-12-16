@@ -9,14 +9,11 @@
 #include <stdio.h>
 #include <vector>
 
-namespace matx {
-template <typename T, int RANK> class tensor_t;
-}
 
 namespace matx {
 
-template <typename T, int RANK, typename ... Args>
-__global__ void PrintKernel(tensor_t<T, RANK> v, Args ...dims)
+template <typename Tensor, typename ... Args>
+__global__ void PrintKernel(Tensor v, Args ...dims)
 {
   v.InternalPrint(dims...);
 }

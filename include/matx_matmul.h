@@ -98,10 +98,17 @@ struct MatMulParams_t {
   cublasOperation_t opB;
 };
 
-template <typename T1, typename T2, typename T3, int RANK,
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 class matxMatMulHandle_t {
 public:
+  using T1 = typename TensorTypeC::scalar_type;
+  using T2 = typename TensorTypeA::scalar_type;
+  using T3 = typename TensorTypeB::scalar_type;
+  static constexpr int RANK = TensorTypeC::Rank();
+  static_assert(TensorTypeC::Rank() == TensorTypeB::Rank());
+  static_assert(TensorTypeC::Rank() == TensorTypeA::Rank());
+
   /**
    * Construct a GEMM handle
    *
@@ -115,13 +122,11 @@ public:
    * used by creating multiple handles.
    *
    * @tparam T1
-   *    Data type of C matrix
+   *    Type of C matrix
    * @tparam T2
-   *    Data type of A matrix
+   *    Type of A matrix
    * @tparam T3
-   *    Data type of B matrix
-   * @tparam RANK
-   *    Rank of A/B/C matrices
+   *    Type of B matrix
    * @tparam PROV
    *    Provider type chosen from MatXMatMulProvider_t type
    *
@@ -133,18 +138,13 @@ public:
    *   B matrix view
    *
    */
-#ifdef DOXYGEN_ONLY
-  matxMatMulHandle_t(tensor_t c, tensor_t a, tensor_t b)
+  matxMatMulHandle_t(TensorTypeC &c, const TensorTypeA &a,
+                     const TensorTypeB &b)
   {
-#else
-  matxMatMulHandle_t(tensor_t<T1, RANK> c, tensor_t<T2, RANK> a,
-                     tensor_t<T3, RANK> b)
-  {
-#endif
-
     MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || ENABLE_CUTLASS, matxMatMulError,
                   "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
-
+    static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
+    static_assert(TensorTypeA::Rank() == TensorTypeC::Rank());
     static_assert(RANK >= 2);
     MATX_ASSERT(a.Size(RANK - 1) == b.Size(RANK - 2), matxInvalidSize);
     MATX_ASSERT(c.Size(RANK - 1) == b.Size(RANK - 1), matxInvalidSize);
@@ -205,9 +205,8 @@ public:
     }
   }
 
-  static MatMulParams_t GetGemmParams(tensor_t<T1, RANK> &c,
-                                      const tensor_t<T2, RANK> &a,
-                                      const tensor_t<T3, RANK> &b)
+  static MatMulParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
+                     const TensorTypeB &b)
   {
     MatMulParams_t params;
     params.dtype = TypeToInt<T1>();
@@ -344,17 +343,10 @@ public:
  *   Beta value
  *
  */
-#ifdef DOXYGEN_ONLY
-  inline void Exec(tensor_t &c, const tensor_t &a,
-                   const tensor_t &b, cudaStream_t stream, float alpha,
-                   float beta)
-  {
-#else
-  inline void Exec(tensor_t<T1, RANK> &c, const tensor_t<T2, RANK> &a,
-                   const tensor_t<T3, RANK> &b, cudaStream_t stream,
+  inline void Exec(TensorTypeC &c, const TensorTypeA &a,
+                   const TensorTypeB &b, cudaStream_t stream,
                    float alpha = 1.0f, float beta = 0.0f)
   {
-#endif
 
     // Reorder C/A to match cutlass API
     MatMulDispatchA(a, b, c, stream, alpha, beta);
@@ -516,8 +508,8 @@ private:
   // TODO: Fix the unused parameters once we support mixes of col/row on cublas
   template <MemOrder_t OrderA, MemOrder_t OrderB, MemOrder_t OrderC>
   inline void
-  MatMulLaunch(const tensor_t<T1, RANK> &a, const tensor_t<T2, RANK> &b,
-               tensor_t<T3, RANK> &c, cudaStream_t stream,
+  MatMulLaunch(const TensorTypeA &a, const TensorTypeB &b,
+               TensorTypeC &c, cudaStream_t stream,
                [[maybe_unused]] float alpha, [[maybe_unused]] float beta)
   {
 
@@ -536,9 +528,9 @@ private:
     }
     // Make copies of each tensor in case we have to do a transformation before
     // the GEMM
-    [[maybe_unused]] tensor_t<T1, RANK> a_adj { a };
-    [[maybe_unused]] tensor_t<T2, RANK> b_adj { b };
-    [[maybe_unused]] tensor_t<T3, RANK> c_adj { c };
+    [[maybe_unused]] TensorTypeA a_adj { a };
+    [[maybe_unused]] TensorTypeB b_adj { b };
+    [[maybe_unused]] TensorTypeC c_adj { c };
 
     // If the tensors are complex half precision, we need to do a planar
     // transform since all libraries expect this format at the moment.
@@ -555,20 +547,20 @@ private:
                 MATX_ASYNC_DEVICE_MEMORY, stream);
 
       auto a_shape = a.Shape();
-      a_shape.SetSize(a.Rank() - 2, a.Size(a.Rank() - 2) * 2);
-      tensor_t<typename T1::value_type, RANK> a_planar(A, a_shape);
+      *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
+      auto a_planar = make_tensor<typename T1::value_type>(A, a_shape);
 
       auto b_shape = b.Shape();
-      b_shape.SetSize(b.Rank() - 2, b.Size(b.Rank() - 2) * 2);
-      tensor_t<typename T2::value_type, RANK> b_planar(B, b_shape);
+      *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
+      auto b_planar = make_tensor<typename T1::value_type>(B, b_shape);
 
       // Convert A/B to planar layout
       (a_planar = planar(a)).run(stream);
       (b_planar = planar(b)).run(stream);
 
-      a_adj.SetData(reinterpret_cast<T1 *>(A));
-      b_adj.SetData(reinterpret_cast<T2 *>(B));
-      c_adj.SetData(reinterpret_cast<T3 *>(C));
+      a_adj.Reset(reinterpret_cast<T1 *>(A));
+      b_adj.Reset(reinterpret_cast<T2 *>(B));
+      c_adj.Reset(reinterpret_cast<T3 *>(C));
     }
 
     // For cuBLASLt most of the parameters have already been set in the
@@ -762,22 +754,19 @@ private:
     // interleaved format and free all temporary buffers
     if constexpr (is_complex_half_v<T1>) {
       auto c_shape = c.Shape();
-      c_shape.SetSize(c.Rank() - 2, c.Size(c.Rank() - 2) * 2);
-      tensor_t<typename T3::value_type, RANK> c_planar(
+      *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
+      auto c_planar = make_tensor<typename T3::value_type>(
           reinterpret_cast<typename T3::value_type *>(c_adj.Data()), c_shape);
 
       // Convert A/B to planar layout
       (c = interleaved(c_planar)).run(stream);
-      matxFree(a_adj.Data());
-      matxFree(b_adj.Data());
-      matxFree(c_adj.Data());
     }
   }
 
   template <MemOrder_t OrderA, MemOrder_t OrderB>
-  inline void MatMulDispatchC(const tensor_t<T1, RANK> &a,
-                              const tensor_t<T2, RANK> &b,
-                              tensor_t<T3, RANK> &c, cudaStream_t stream,
+  inline void MatMulDispatchC(const TensorTypeA &a,
+                              const TensorTypeB &b,
+                              TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
     if (c.Stride(RANK - 1) == 1) {
@@ -801,9 +790,9 @@ private:
   };
 
   template <MemOrder_t OrderA>
-  inline void MatMulDispatchB(const tensor_t<T1, RANK> &a,
-                              const tensor_t<T2, RANK> &b,
-                              tensor_t<T3, RANK> &c, cudaStream_t stream,
+  inline void MatMulDispatchB(const TensorTypeA &a,
+                              const TensorTypeB &b,
+                              TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
     if (b.Stride(RANK - 1) == 1) {
@@ -826,9 +815,9 @@ private:
     }
   }
 
-  inline void MatMulDispatchA(const tensor_t<T1, RANK> &a,
-                              const tensor_t<T2, RANK> &b,
-                              tensor_t<T3, RANK> &c, cudaStream_t stream,
+  inline void MatMulDispatchA(const TensorTypeA &a,
+                              const TensorTypeB &b,
+                              TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
     if (a.Stride(RANK - 1) == 1) {
@@ -920,21 +909,21 @@ static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
  * @param beta
  *   Scalar multiplier to apply to matrix C on input
  */
-template <typename T1, typename T2, typename T3, int RANK,
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-void matmul(tensor_t<T1, RANK> c, const tensor_t<T2, RANK> &a,
-            const tensor_t<T3, RANK> &b, cudaStream_t stream = 0,
+void matmul(TensorTypeC &c, const TensorTypeA &a,
+            const TensorTypeB &b, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
   // Get parameters required by these tensors
   auto params =
-      matxMatMulHandle_t<T1, T2, T3, RANK, PROV>::GetGemmParams(c, a, b);
+      matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);
   params.stream = stream;
 
   // Get cache or new GEMM plan if it doesn't exist
   auto ret = gemm_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxMatMulHandle_t<T1, T2, T3, RANK, PROV>{c, a, b};
+    auto tmp = new matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
     gemm_cache.Insert(params, static_cast<void *>(tmp));
 
     // Set the stream on this plan once on creation
@@ -942,7 +931,7 @@ void matmul(tensor_t<T1, RANK> c, const tensor_t<T2, RANK> &a,
   }
   else {
     auto gemm_type =
-        static_cast<matxMatMulHandle_t<T1, T2, T3, RANK, PROV> *>(ret.value());
+        static_cast<matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV> *>(ret.value());
     gemm_type->Exec(c, a, b, stream, alpha, beta);
   }
 }

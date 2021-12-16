@@ -80,7 +80,7 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
   // eigenvectors corresponding to the eigenvalue lambda.
   for (index_t i = 0; i < dim_size; i++) {
     auto v = this->Evv.template Slice<2>({0, i}, {matxEnd, i + 1});
-    copy(this->Wv, v, 0);
+    matx::copy(this->Wv, v, 0);
 
     // Compute lambda*v
     (this->Lvv = v * this->Wov(i)).run();

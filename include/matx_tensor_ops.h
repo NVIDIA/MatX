@@ -45,24 +45,277 @@
 namespace matx
 {
 
-  // Doxygen doesn't recognize the syntax of these
-  template <typename T, typename S>
-  inline
-      typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                                cuda::std::complex<T>>
-          __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
-  {
-    return c * T(n);
-  }
+// Helper functions for multiplying complex numbers by scalars
+template <typename T, typename S>
+inline
+    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
+                              cuda::std::complex<T>>
+        __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
+{
+  return c * T(n);
+}
 
-  template <typename T, typename S>
-  inline
-      typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-                                cuda::std::complex<T>>
-          __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
+template <typename T, typename S>
+inline
+    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
+                              cuda::std::complex<T>>
+        __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
+{
+  return T(n) * c;
+}
+
+
+/**
+ * Concatenate two tensors
+ *
+ * Class for concatening two tensors along a single dimension. Sizes of the tensors not
+ * being concatenated must be the same, and the new tensor has dimensions equal to the original
+ * tensors on non-index dimension, and the sum of sizes along the index dimension.
+ */
+  template <int Dim, typename Op1, typename Op2>
+  class Concatenate: public BaseOp<Concatenate<Dim, Op1, Op2>>
   {
-    return T(n) * c;
+    static_assert(Op1::Rank() == Op2::Rank(), "Ranks of concatenating tensors must match");
+    static_assert(Dim < Op1::Rank(), "Dimension to concatenate must be within range"); 
+    static_assert(Dim < Op2::Rank(), "Dimension to concatenate must be within range");
+
+  public:
+    // Scalar type of operation
+    using scalar_type = void;
+
+    inline __MATX_DEVICE__ __MATX_HOST__ Concatenate(Op1 op1, Op2 op2) : op1_(op1), op2_(op2)
+    {
+
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0));
+        }
+        else {
+          return get_value(op1_, i);
+        }
+      }
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j);
+        }
+        else {
+          return get_value(op1_, i, j);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1));
+        }
+        else {
+          return get_value(op1_, i, j);
+        }        
+      }
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j, k);
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1), k);
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }
+      else if constexpr (Dim == 2) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k - op1_.Size(2));
+        }
+        else {
+          return get_value(op1_, i, j, k);
+        }        
+      }      
+    }
+
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    {
+      if constexpr (Dim == 0) {
+        if (i >= op1_.Size(0)) {
+          return get_value(op2_, i - op1_.Size(0), j, k, l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }
+      else if constexpr (Dim == 1) {
+        if (j >= op1_.Size(1)) {
+          return get_value(op2_, i, j - op1_.Size(1), k, l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }
+      else if constexpr (Dim == 2) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k - op1_.Size(2), l);
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      } 
+      else if constexpr (Dim == 3) {
+        if (j >= op1_.Size(2)) {
+          return get_value(op2_, i, j, k, l - op1_.Size(3));
+        }
+        else {
+          return get_value(op1_, i, j, k, l);
+        }        
+      }       
+    }
+
+    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+    {
+      return get_rank<Op1>();
+    }
+
+    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+    {
+      if (dim == Dim) {
+        return op1_.Size(dim) + op2_.Size(dim);
+      }
+      else {
+        return op1_.Size(dim);
+      }
+    }
+
+  private:
+      typename base_type<Op1>::type op1_;
+      typename base_type<Op2>::type op2_;    
+  };  
+
+  /**
+   * @brief Concatenate two tensors
+   * 
+   * @tparam Dim dimension to concatenate
+   * @tparam T1 First tensor type
+   * @tparam T2 Second tensor type
+   * @param t1 First tensor
+   * @param t2 Second tensor
+   * @return Concatenation operator 
+   */
+  template <int Dim, typename T1, typename T2, std::enable_if_t<is_matx_op<T1>() && is_matx_op<T2>(), bool> = true>
+  __MATX_INLINE__ __MATX_HOST__  auto concat(T1 &t1, T2 &t2)
+  {
+    return Concatenate<Dim, T1, T2>{t1, t2};
   }  
+
+//   /**
+//  * Chain multiple operator statements
+//  *
+//  * Takes a variable list of operator statements to execute concurrently.
+//  * Chaining may improve performance over executing each operation separately.
+//  */
+//   template <typename... Ts>
+//   class Concatenate: public BaseOp<Concatenate<Ts...>>
+//   {
+//   private:
+//     std::tuple<Ts...> ops_;
+//     std::array<index_t, get_rank<T1>()> size_;
+//     int ldim_;
+
+//   public:
+//     // Scalar type of operation
+//     using scalar_type = void;
+
+//     inline Concatenate(int ldim, Ts... ts) : ops_(ts...), ldim_(ldim)
+//     {
+//       using first = std::tuple_element_t<0, decltype(ops_)>;
+//       constexpr auto rank = first::Rank();
+//       static_assert(rank > 0, "Cannot concatenate rank-0 tensors");
+//       static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
+//       static_assert((... && (Ts::Rank() == rank)));
+
+//       MATX_ASSERT_STR(ldim < rank, "Dimension to concatenate must be within range");
+
+//       auto tsum = [&](int dim, auto ...args){ return (args.Size(dim) + ...); };
+//       for (int32_t i = 0; i < rank; i++) {
+//         size_[i] = tsum(i, ts);
+
+//         // if (i != ldim) {
+//         //   #pragma unroll
+//         //   for (int t = 1; t < sizeof...(Ts); t++) {
+//         //     MATX_ASSERT_STR(std::get<t-1>(ts).Size(i) == std::get<t>(ts).Size(i), matxInvalidDim, 
+//         //       "All dimensions not being concatenate must match in size");
+//         //   }
+//         // }
+//       }
+
+//       // int dim = 0;
+//       // std::apply([&](const auto &... t){ ((main_dim_size_[dim++] = t.Size(ldim_)), ...); }, ops_);      
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+//     {
+//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
+//       std::apply(
+//         [&](Ts const&... targs){(
+//           (
+//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
+//           ), ...);
+//         }, ops_
+//       );
+
+//       return res;
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
+//     {
+//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
+//       std::apply(
+//         [&](Ts const&... targs){(
+//           (
+//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
+//           ), ...);
+//         }, ops_
+//       );
+
+//       return res;
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
+//     {
+//       get_value(op_, i, j, k);
+//       args_.operator()(i, j, k);
+//     }
+
+//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+//     {
+//       get_value(op_, i, j, k, l);
+//       args_.operator()(i, j, k, l);
+//     }
+
+//     static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+//     {
+//       return get_rank<T1>();
+//     }
+
+//     index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+//     {
+//       return size_[dim];
+//     }
+//   };
+
 
 /**
  * Chain multiple operator statements
@@ -141,13 +394,11 @@ namespace matx
  * @param stream
  *   CUDA stream to operate in
  */
-  template <class T, int Rank>
-  __MATX_INLINE__ void copy(tensor_impl_t<T, Rank> out, const tensor_impl_t<T, Rank> &in,
+  template <typename OutputTensor, typename InputTensor>
+  __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
                    const cudaStream_t stream)
   {
-    constexpr int rank = Rank;
-
-    for (int i = 0; i < rank; i++)
+    for (int i = 0; i < OutputTensor::Rank(); i++)
     {
       MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
     }
@@ -174,12 +425,12 @@ namespace matx
  *   CUDA stream to operate in
  *
  */
-  template <class T, int RANK>
-  __MATX_INLINE__ void transpose(tensor_impl_t<T, RANK> &out,
-                        const tensor_impl_t<T, RANK> &in,
+  template <typename OutputTensor, typename InputTensor>
+  __MATX_INLINE__ void transpose(OutputTensor &out,
+                        const InputTensor &in,
                         const cudaStream_t stream)
   {
-
+    constexpr int RANK = OutputTensor::Rank();
     if constexpr (RANK <= 1)
     {
       return;
@@ -191,7 +442,7 @@ namespace matx
     }
 
 #ifdef __CUDACC__  
-    size_t shm = sizeof(T) * TILE_DIM * (TILE_DIM + 1);
+    size_t shm = sizeof(typename OutputTensor::scalar_type) * TILE_DIM * (TILE_DIM + 1);
     if constexpr (RANK == 2)
     {
       dim3 block(TILE_DIM, TILE_DIM);
@@ -269,7 +520,7 @@ namespace matx
     using scalar_type = void;
     __MATX_INLINE__ IF(T1 cond, T2 op) : cond_(cond), op_(op)
     {
-      static_assert((!is_tensor_view_t<T2>()),
+      static_assert((!is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IF. Tensor views are "
                     "not allowed");
       constexpr index_t rank1 = get_rank<T1>();
@@ -351,7 +602,7 @@ namespace matx
     using scalar_type = void;
     __MATX_INLINE__ IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
     {
-      static_assert((!is_tensor_view_t<T1>() && !is_tensor_view_t<T2>()),
+      static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IFELSE. Tensor views "
                     "are not allowed");
       constexpr int32_t rank0 = get_rank<C1>();
@@ -442,7 +693,7 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()() { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()()  { return op_(); }
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
     {
       if constexpr (DIM == 0)
@@ -1134,26 +1385,26 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ FFTShift1DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = j;
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1201,26 +1452,26 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ FFTShift2DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = (i + (Size(0) + 1) / 2) % Size(0);
       j = (j + (Size(1) + 1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = (j + (Size(1) + 1) / 2) % Size(1);
       k = (k + (Size(2) + 1) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1269,26 +1520,26 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ IFFTShift1DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = j;
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1337,26 +1588,26 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ IFFTShift2DOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       i = (i + Size(0) / 2) % Size(0);
       return op_(i);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       i = (i + Size(0) / 2) % Size(0);
       j = (j + Size(1) / 2) % Size(1);
       return op_(i, j);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       i = i;
       j = (j + Size(1) / 2) % Size(1);
       k = (k + Size(2) / 2) % Size(2);
       return op_(i, j, k);
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       i = i;
       j = j;
@@ -1418,27 +1669,27 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()() const
     {
       auto i1 = get_value(in1_);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i) const
     {
       auto i1 = get_value(in1_, i);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j) const
     {
       auto i1 = get_value(in1_, i, j);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k) const
     {
       auto i1 = get_value(in1_, i, j, k);
       return op_(i1);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, uint32_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, uint32_t j, index_t k, index_t l) const
     {
       auto i1 = get_value(in1_, i, j, k, l);
       return op_(i1);
@@ -1467,8 +1718,8 @@ namespace matx
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ComplexPlanarOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       if (i >= op_.Size(0))
       {
@@ -1476,7 +1727,7 @@ namespace matx
       }
       return op_(i).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       if (i >= op_.Size(0))
       {
@@ -1484,7 +1735,7 @@ namespace matx
       }
       return op_(i, j).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       if (j >= op_.Size(1))
       {
@@ -1492,7 +1743,7 @@ namespace matx
       }
       return op_(i, j, k).real();
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       if (k >= op_.Size(2))
       {
@@ -1557,20 +1808,20 @@ namespace matx
                                             cuda::std::complex<scalar_type>>;
 
     __MATX_INLINE__ ComplexInterleavedOp(T1 op) : op_(op){};
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() { return op_(); }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()() const { return op_(); }
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i) const
     {
       return complex_type{op_(i), op_(op_.Size(0) / 2 + i)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j) const
     {
       return complex_type{op_(i, j), op_(op_.Size(0) / 2 + i, j)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k) const
     {
       return {op_(i, j, k), op_(i, j + op_.Size(1) / 2, k)};
     }
-    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_INLINE__ __MATX_DEVICE__  __MATX_HOST__  auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       return {op_(i, j, k, l), op_(i, j, k + op_.Size(2) / 2, l)};
     }
@@ -1644,35 +1895,35 @@ namespace matx
       }
     }
 
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()()
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()() const
     {
       // Rank 0
       auto i1 = get_value(in1_);
       auto i2 = get_value(in2_);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i) const
     {
       // Rank 1
       auto i1 = get_value(in1_, i);
       auto i2 = get_value(in2_, i);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j) const
     {
       // Rank 2
       auto i1 = get_value(in1_, i, j);
       auto i2 = get_value(in2_, i, j);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k) const
     {
       // Rank 3
       auto i1 = get_value(in1_, i, j, k);
       auto i2 = get_value(in2_, i, j, k);
       return op_(i1, i2);
     }
-    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l)
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t i, index_t j, index_t k, index_t l) const
     {
       // Rank 4
       auto i1 = get_value(in1_, i, j, k, l);
@@ -1691,20 +1942,6 @@ namespace matx
     }
 };
 
-
-
-// Returns an address of a pointer of type T aligned to new address
-template <typename T>
-constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
-{
-  if (((uint64_t)addr % std::alignment_of_v<T>) != 0) {
-    return reinterpret_cast<T *>(
-        ((uint64_t)addr + (std::alignment_of_v<T> - 1)) /
-        std::alignment_of_v<T> * std::alignment_of_v<T>);
-  }
-
-  return reinterpret_cast<T *>(addr);
-}  
 
 #define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
   template <typename I1,                                            \

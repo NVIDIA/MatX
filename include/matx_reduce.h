@@ -592,13 +592,15 @@ __MATX_DEVICE__ inline T warpReduceOp(T val, Op op, uint32_t size)
 }
 
 
-template <typename T, int RANK, typename InType, typename ReduceOp>
-__global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
+template <typename TensorType, typename InType, typename ReduceOp>
+__global__ void matxReduceKernel(TensorType dest, InType in,
                                  ReduceOp red)
 {
-
+  constexpr int RANK = TensorType::Rank();
   constexpr int DRANK = InType::Rank() - RANK;
   using scalar_type = typename InType::scalar_type;
+  using T = typename TensorType::scalar_type;
+  
   // This is for 2 stage reduction
 
   // nvcc limitation here.  we have to declare shared memory with the same type
@@ -730,13 +732,15 @@ __global__ void matxReduceKernel(tensor_t<T, RANK> dest, InType in,
   }
 }
 
-template <typename T, int RANK, typename InType>
-__global__ void matxIndexKernel(tensor_t<index_t, RANK> idest, tensor_t<T, RANK> dest, InType in)
+template <typename TensorType, typename TensorIndexType, typename InType>
+__global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType in)
 {
   typename InType::scalar_type in_val;
+  constexpr int RANK = TensorIndexType::Rank();
   [[maybe_unused]] index_t idx, idy, idz, idw;
   constexpr int DRANK = InType::Rank() - RANK;
   index_t abs_idx;
+  using T = typename TensorIndexType::scalar_type;
 
   if constexpr (InType::Rank() == 1) {
     idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -881,23 +885,21 @@ __global__ void matxIndexKernel(tensor_t<index_t, RANK> idest, tensor_t<T, RANK>
  *   otherwise the values in the destination will be included
  *   in the reduction.
  */
-template <typename T, int RANK, typename InType, typename ReduceOp>
-void inline reduce(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, ReduceOp op,
+template <typename TensorType, typename TensorIndexType, typename InType, typename ReduceOp,
+  std::enable_if_t<is_matx_reduction_v<ReduceOp>, bool> = true>
+void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InType in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
 #ifdef __CUDACC__  
   using scalar_type = typename InType::scalar_type;
+  using T = typename TensorType::scalar_type;
 
-  static_assert(RANK < InType::Rank());
-  if (idest.Data() != nullptr) {
-    MATX_ASSERT_STR(is_matx_index_reduction_v<ReduceOp>, matxInvalidParameter, "Must use a reduction operator capable of saving indices");
-  }
-
+  static_assert(TensorType::Rank() < InType::Rank());
   static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");    
 
 
-  if constexpr (RANK > 0) {
-    for (uint32_t i = 0; i < RANK; i++) {
+  if constexpr (TensorType::Rank() > 0) {
+    for (int i = 0; i < TensorType::Rank(); i++) {
       MATX_ASSERT(dest.Size(i) == in.Size(i), matxInvalidDim);
     }
   }
@@ -924,7 +926,7 @@ void inline reduce(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType
       dest, in, ReduceOp());
 
   // If we need the indices too, launch that kernel
-  if (idest.Data() != nullptr) {
+  if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
     (idest = std::numeric_limits<index_t>::max()).run(stream);
     matxIndexKernel<<<blocks, threads, 0, stream>>>(
         idest, dest, in);     
@@ -972,12 +974,12 @@ void inline reduce(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType
  *   otherwise the values in the destination will be included
  *   in the reduction.
  */
-template <typename T, int RANK, typename InType, typename ReduceOp>
-void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
+template <typename TensorType, typename InType, typename ReduceOp>
+void inline reduce(TensorType &dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
-  auto tmp = tensor_t<index_t, RANK>{nullptr, dest.Shape()};
-  reduce(dest, tmp, in, op, stream, init);
+  //auto tmp = tensor_t<index_t, TensorType::Rank(), typename TensorType::storage_type, typename TensorType::desc_type>{nullptr, dest.Shape()};
+  reduce(dest, std::nullopt, in, op, stream, init);
 }
 
 /**
@@ -1003,18 +1005,18 @@ void inline reduce(tensor_t<T, RANK> dest, InType in, ReduceOp op,
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline mean(tensor_t<T, RANK> &dest, const InType &in,
+template <typename TensorType, typename InType>
+void inline mean(TensorType &dest, const InType &in,
                  cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__  
   float scale = 1.0;
 
-  reduce(dest, in, reduceOpSum<T>(), stream);
+  reduce(dest, in, reduceOpSum<typename TensorType::scalar_type>(), stream);
 
   // The reduction is performed over the difference in ranks between input and
   // output. This loop computes the number of elements it was performed over.
-  for (int i = 1; i <= InType::Rank() - RANK; i++) {
+  for (int i = 1; i <= InType::Rank() - TensorType::Rank(); i++) {
     scale *= static_cast<float>(in.Size(InType::Rank() - i));
   }
 
@@ -1046,18 +1048,20 @@ void inline mean(tensor_t<T, RANK> &dest, const InType &in,
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, int RANK_IN>
-void inline median(tensor_t<T, RANK> &dest,
-                   const tensor_t<T, RANK_IN> &in, cudaStream_t stream = 0)
+template <typename TensorType, typename TensorInType>
+void inline median(TensorType &dest,
+                   const TensorInType &in, cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
-  static_assert(RANK_IN <= 2 && (RANK_IN == RANK + 1));
+#ifdef __CUDACC__  
+  using T = typename TensorType::scalar_type;
+  constexpr int RANK_IN = TensorInType::Rank();
+  static_assert(RANK_IN <= 2 && (RANK_IN == TensorType::Rank() + 1));
 
-  tensor_t<T, RANK_IN> tmp_sort(in.Shape());
+  auto tmp_sort = make_tensor<T>(in.Shape());
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
-    matxCubPlan_t<T, T, RANK_IN, CUB_OP_RADIX_SORT> splan{
+    matxCubPlan_t<decltype(tmp_sort), TensorInType, CUB_OP_RADIX_SORT> splan{
         tmp_sort, in, {}, stream};
 
     splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
@@ -1066,7 +1070,7 @@ void inline median(tensor_t<T, RANK> &dest,
     if (tmp_sort.Lsize() & 1) {
       auto middlev =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
-      copy(dest, middlev, stream);
+      matx::copy(dest, middlev, stream);
     }
     else {
       auto middle1v =
@@ -1079,7 +1083,7 @@ void inline median(tensor_t<T, RANK> &dest,
   else if (RANK_IN == 2) {
     MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
 
-    matxCubPlan_t<T, T, RANK_IN, CUB_OP_RADIX_SORT> splan{
+    matxCubPlan_t<decltype(tmp_sort), TensorInType, CUB_OP_RADIX_SORT> splan{
         tmp_sort, in, {}, stream};
     splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
 
@@ -1118,11 +1122,11 @@ void inline median(tensor_t<T, RANK> &dest,
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline sum(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpSum<T>(), stream, true);
+  reduce(dest, in, reduceOpSum<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1145,11 +1149,11 @@ void inline sum(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline prod(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline prod(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpProd<T>(), stream, true);
+  reduce(dest, in, reduceOpProd<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1175,11 +1179,11 @@ void inline prod(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpMax<T>(), stream, true);
+  reduce(dest, in, reduceOpMax<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1204,11 +1208,11 @@ void inline rmax(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline argmax(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename TensorIndexType, typename InType>
+void inline argmax(TensorType &dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, reduceOpMax<T>(), stream, true);
+  reduce(dest, idest, in, reduceOpMax<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1234,11 +1238,11 @@ void inline argmax(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpMin<T>(), stream, true);
+  reduce(dest, in, reduceOpMin<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1263,11 +1267,12 @@ void inline rmin(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline argmin(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename TensorIndexType, typename InType>
+void inline argmin(TensorType &dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
+  static_assert(TensorType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, reduceOpMin<T>(), stream, true);
+  reduce(dest, idest, in, reduceOpMin<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1292,11 +1297,11 @@ void inline argmin(tensor_t<T, RANK> dest, tensor_t<index_t, RANK> idest, InType
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline any(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline any(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpAny<T>(), stream, true);
+  reduce(dest, in, reduceOpAny<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1321,11 +1326,11 @@ void inline any(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline all(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline all(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpAll<T>(), stream, true);
+  reduce(dest, in, reduceOpAll<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1349,14 +1354,13 @@ void inline all(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
-  T *tmps;
+  typename TensorType::scalar_type *tmps;
   matxAlloc((void **)&tmps, dest.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tmpv = tensor_t<T, RANK>(dest);
-  tmpv.SetData(tmps);
+  auto tmpv = make_tensor(tmps, dest.Descriptor());
 
   // Compute mean of each dimension
   mean(tmpv, in, stream);
@@ -1367,14 +1371,12 @@ void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
   // The length of what we are taking the variance over is equal to the product
   // of the outer dimensions covering the different in input/output ranks
   index_t N = in.Size(in.Rank() - 1);
-  for (int i = 2; i <= in.Rank() - RANK; i++) {
+  for (int i = 2; i <= in.Rank() - TensorType::Rank(); i++) {
     N *= in.Size(in.Rank() - i);
   }
 
   // Sample variance for an unbiased estimate
   (dest = dest / static_cast<double>(N - 1)).run(stream);
-
-  matxFree(tmps);
 #endif  
 }
 
@@ -1398,8 +1400,8 @@ void inline var(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename T, int RANK, typename InType>
-void inline stdd(tensor_t<T, RANK> dest, InType in, cudaStream_t stream = 0)
+template <typename TensorType, typename InType>
+void inline stdd(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
   var(dest, in, stream);

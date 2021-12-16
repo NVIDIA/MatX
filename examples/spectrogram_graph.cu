@@ -78,16 +78,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 
-  tensorShape_t<1> num_samps({N});
-  tensorShape_t<1> half_win({nfft / 2 + 1});
-  tensorShape_t<1> s_time_shape({(N - noverlap) / nstep});
+  std::array<index_t, 1> num_samps{N};
+  std::array<index_t, 1> half_win{nfft / 2 + 1};
+  std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
 
   tensor_t<float, 1> time({N});
   tensor_t<float, 1> modulation({N});
   tensor_t<float, 1> carrier({N});
   tensor_t<float, 1> noise({N});
   tensor_t<float, 1> x({N});
-  tensor_t<float, 1> freqs(half_win);
+  auto freqs = make_tensor<float, 1>(half_win);
   tensor_t<complex, 2> fftStackedMatrix(
       {(N - noverlap) / nstep, nfft / 2 + 1});
   tensor_t<float, 1> s_time({(N - noverlap) / nstep});

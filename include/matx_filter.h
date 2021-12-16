@@ -45,13 +45,16 @@
 
 namespace matx {
 
-template <size_t num_recursive, size_t num_non_recursive, int RANK,
+template <size_t num_recursive, size_t num_non_recursive, 
           typename OutType, typename InType, typename FilterType>
 class matxFilter_t {
+  static constexpr int RANK = OutType::Rank();
+  using filter_tensor = tensor_t<FilterType, 1>;
+
 public:
-  matxFilter_t([[maybe_unused]] tensor_t<OutType, RANK> &o, InType &i,
-               tensor_t<FilterType, 1> &h_rec,
-               tensor_t<FilterType, 1> &h_nonrec)
+  matxFilter_t([[maybe_unused]] OutType &o, const InType &i,
+               const filter_tensor &h_rec,
+               const filter_tensor &h_nonrec)
       : h_nonr_copy(h_nonrec)
   {
 
@@ -90,8 +93,8 @@ public:
     Alloc(h_nonrec, h_rec);
   }
 
-  int Alloc(tensor_t<FilterType, 1> &h_nonrec,
-            tensor_t<FilterType, 1> &h_rec)
+  int Alloc(const filter_tensor &h_nonrec,
+            const filter_tensor &h_rec)
   {
     MATX_ASSERT(h_rec.Size(0) == num_recursive, matxInvalidSize);
     MATX_ASSERT(h_nonrec.Size(0) == num_non_recursive, matxInvalidSize);
@@ -146,7 +149,7 @@ public:
     }
   }
 
-  void Exec(tensor_t<OutType, RANK> &o, InType &i, cudaStream_t stream)
+  void Exec(OutType &o, const InType &i, cudaStream_t stream)
   {
     if (num_recursive > 0) {
       auto grid =
@@ -155,8 +158,9 @@ public:
                     (BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD - 1)) /
                    BLOCK_SIZE_RECURSIVE / RECURSIVE_VALS_PER_THREAD),
                static_cast<int>(batches));
+      // Fix this to support different R/N types later
       RecursiveFilter<num_recursive, num_non_recursive,
-                      tensor_t<OutType, RANK>, InType, FilterType>
+                      OutType, InType, FilterType>
           <<<grid, BLOCK_SIZE_RECURSIVE, 0, stream>>>(
               o, i, d_nrec, d_corr, d_full_carries, d_part_carries, sig_len,
               d_status, d_last_carries);
@@ -312,13 +316,13 @@ private:
  * @param h_nonrec
  *   1D input tensor of recursive filter coefficients
  **/
-template <size_t NR, size_t NNR, int RANK, typename OutType, typename InType,
+template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-static auto matxMakeFilter(tensor_t<OutType, RANK> &o, InType &i,
+static auto matxMakeFilter(OutType &o, const InType &i,
                            tensor_t<FilterType, 1> &h_rec,
                            tensor_t<FilterType, 1> &h_nonrec)
 {
-  return matxFilter_t<NR, NNR, RANK, OutType, InType, FilterType>{o, i, h_rec,
+  return matxFilter_t<NR, NNR, OutType, InType, FilterType>{o, i, h_rec,
                                                                   h_nonrec};
 }
 
@@ -360,9 +364,9 @@ static auto matxMakeFilter(tensor_t<OutType, RANK> &o, InType &i,
  * @param h_nonrec
  *   Vector of non-recursive coefficients
  **/
-template <size_t NR, size_t NNR, int RANK, typename OutType, typename InType,
+template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-static auto matxMakeFilter(tensor_t<OutType, RANK> &o, InType &i,
+static auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NR> &h_rec,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
@@ -377,7 +381,7 @@ static auto matxMakeFilter(tensor_t<OutType, RANK> &o, InType &i,
     nonrec_v(static_cast<index_t>(j)) = h_nonrec[j];
   }
 
-  return new matxFilter_t<NR, NNR, RANK, OutType, InType, FilterType>{
+  return new matxFilter_t<NR, NNR, OutType, InType, FilterType>{
       o, i, rec_v, nonrec_v};
 }
 
@@ -476,9 +480,10 @@ static matxCache_t<FilterParams_t, FilterParamsKeyHash, FilterParamsKeyEq>
  *   CUDA stream
  *
  **/
-template <size_t NR, size_t NNR, int RANK, typename OutType, typename InType,
+// TODO: Update later once we support compile-time shapes
+template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-void filter(tensor_t<OutType, RANK> o, InType i,
+void filter(OutType &o, const InType &i,
             const std::array<FilterType, NR> h_rec,
             const std::array<FilterType, NNR> h_nonrec, cudaStream_t stream = 0)
 {
@@ -494,14 +499,14 @@ void filter(tensor_t<OutType, RANK> o, InType i,
     params.nonrec.push_back(h_nonrec[j]);
   }
 
-  params.dtype = TypeToInt<InType>();
-  params.ftype = TypeToInt<FilterType>();
+  params.dtype = TypeToInt<typename InType::scalar_type>();
+  params.ftype = TypeToInt<FilterType>(); // Update when we support different types
   params.hash = rhash + nrhash;
 
   // Get cache or new FFT plan if it doesn't exist
   auto ret = filter_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = matxMakeFilter<NR, NNR, RANK, OutType, InType, FilterType>(
+    auto tmp = matxMakeFilter<NR, NNR, OutType, InType, FilterType>(
         o, i, h_rec, h_nonrec);
     filter_cache.Insert(params, static_cast<void *>(tmp));
 
@@ -509,7 +514,7 @@ void filter(tensor_t<OutType, RANK> o, InType i,
   }
   else {
     auto filter_type =
-        static_cast<matxFilter_t<NR, NNR, RANK, OutType, InType, FilterType> *>(
+        static_cast<matxFilter_t<NR, NNR, OutType, InType, FilterType> *>(
             ret.value());
     filter_type->Exec(o, i, stream);
   }
