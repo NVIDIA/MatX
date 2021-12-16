@@ -228,6 +228,60 @@ private:
 };
 
 /**
+ * @brief Tensor descriptor for compile-time sizes
+ * 
+ * @tparam I First size
+ * @tparam Is Parameter pack of sizes
+ */
+template <index_t I, index_t... Is> 
+class static_tensor_desc_t {
+public:
+  using shape_container = std::array<index_t, sizeof...(Is)+1>;
+  using stride_container = std::array<index_t, sizeof...(Is)+1>;
+  using shape_type  = index_t;
+  using stride_type = index_t;
+  using matx_descriptor = bool;
+
+  /**
+   * Check if a descriptor is linear in memory for all elements in the view
+   *
+   * @return
+   *    True is descriptor is linear, or false otherwise
+   */
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsLinear() const noexcept
+  {
+    return true;
+  }
+
+  static constexpr auto Size(int dim) { return shape_[dim]; }
+  static constexpr auto Stride(int dim) { return strides_[dim]; }
+  static constexpr int Rank() { return shape_.size(); }
+  static constexpr auto Shape() { return shape_; }
+  static constexpr auto TotalSize() {
+      return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
+  }  
+
+private:
+  static constexpr auto make_shape(){
+      return std::array{I, Is...};
+  }    
+
+  static constexpr auto make_strides(){
+      std::array<index_t, 1 + sizeof...(Is)> m{};
+      m[m.size()-1] = 1;
+      if constexpr (m.size() > 1) {
+        for (int i = m.size()-2; i >= 0; i--) {
+            m[i] = m[i+1] * Size(i + 1);
+        }
+      }
+      return m;
+  }
+
+  static constexpr shape_container shape_ = make_shape();
+  static constexpr stride_container strides_ = make_strides();  
+};
+
+/**
  * @brief Constant rank, dynamic size, dynamic strides
  *
  */
