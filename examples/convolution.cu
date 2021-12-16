@@ -44,9 +44,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   typedef cuda::std::complex<float> complex;
 
   uint32_t iterations = 10;
-  index_t numSamples = 16384000;
+  constexpr index_t numSamples = 16384000;
   constexpr index_t filterLen = 10;
-  index_t batches = 100;
+  constexpr index_t batches = 100;
   float time_ms;
 
   std::cout << "Iterations: " << iterations << std::endl;
@@ -66,10 +66,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using FilterType = float;
 
   // Create data objects
-  tensor_t<InType, 2> inView({batches, numSamples});
-  tensor_t<InType, 2> outView({batches, numSamples + filterLen - 1});
+  auto inView = make_static_tensor<InType, batches, numSamples>();
+  auto outView = make_static_tensor<OutType, batches, numSamples + filterLen - 1>();
   // tensor_t<InType, 1> solData({numSamples});
-  tensor_t<FilterType, 1> filterView({filterLen});
+  auto filterView = make_static_tensor<FilterType, filterLen >();
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {

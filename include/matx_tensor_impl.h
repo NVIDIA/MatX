@@ -135,6 +135,7 @@ class tensor_impl_t {
     using type = T; // TODO is this necessary
     using scalar_type = T;
     using tensor_view = bool;
+    using desc_type = Desc;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
 

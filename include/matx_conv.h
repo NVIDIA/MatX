@@ -111,7 +111,7 @@ template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
-  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank()> &o_base = o;
+  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
   const typename base_type<In1Type>::type &in1_base = i1;
   const typename base_type<In2Type>::type &in2_base = i2;
 
@@ -183,7 +183,7 @@ template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
-  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank()> &o_base = o;
+  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
   const typename base_type<In1Type>::type &in1_base = i1;
   const typename base_type<In2Type>::type &in2_base = i2;
 
