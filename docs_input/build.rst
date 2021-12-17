@@ -5,8 +5,8 @@ Building MatX
 
 Requirements
 ------------
-- CUDA 11.4
-- g++ 9.0 or above
+- CUDA 11.2+
+- g++ 9.0+
 
 Unit tests
 **********
