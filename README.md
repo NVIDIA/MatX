@@ -6,7 +6,7 @@
 
 **MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs. Near-native performance can be achieved while using a simple syntax common in higher-level languages such as Python or MATLAB.
 
-![FFT resampler](docs/img/fft_resamp.PNG)
+![FFT resampler](docs_input/img/fft_resamp.PNG)
 
 The above image shows the Python (Numpy) version of an FFT resampler next to the MatX version. The total runtimes of the NumPy version, CuPy version,
 and MatX version are shown below:
