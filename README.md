@@ -141,14 +141,13 @@ MatX may add other optional targets in the future inside the matx:: namespace as
 Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. Building documentation requires the following to be installed:
 doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, flex, bison
 
+- Current documentation can be [found here](https://nvidia.github.io/MatX)
 - A quick start guide can be [found here](docs/quickstart.rst)
 - Current library limitations are [listed here](docs/limitations.rst)
 - A conversion from MATLAB and Python syntax is [found here](docs/matlabpython.rst)
 - A self-guided Jupyer notebook training can be [found here](docs/notebooks)
 
-A hosting site for documentation is coming soon. 
-
-We are currently using semantic versioning and reserve the right to introduce breaking API changes on major releases.
+MatX uses semantic versioning and reserve the right to introduce breaking API changes on major releases.
 
 ### Supported Data Types
 MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
