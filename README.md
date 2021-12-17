@@ -46,7 +46,7 @@ are necessary
 
 
 ## Requirements
-MatX is using bleeding edge features in C++17 and the CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.2 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
+MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.2 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
 MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. We currently do not support the Jetson embedded GPUs, as JetPack currently ships with CUDA 10.2. CPU support should work
 on any CPU that will compile the code.
