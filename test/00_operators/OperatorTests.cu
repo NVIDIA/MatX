@@ -1208,11 +1208,12 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
 {
   MATX_ENTER_HANDLER();
 
-  index_t i,j;
+  index_t i, j;
 
   auto t11 = make_tensor<TypeParam>({10});
   auto t12 = make_tensor<TypeParam>({5});
   auto t1o = make_tensor<TypeParam>({15});
+  auto t1o1 = make_tensor<TypeParam>({30});
 
   t11.SetVals({0,1,2,3,4,5,6,7,8,9});
   t12.SetVals({0,1,2,3,4});
@@ -1229,6 +1230,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     }
   }
 
+  // 2D tensors
   auto t21 = make_tensor<TypeParam>({4, 4});
   auto t22 = make_tensor<TypeParam>({3, 4});
   auto t23 = make_tensor<TypeParam>({4, 3});
@@ -1275,6 +1277,13 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     }
   }  
 
+  // Concatenating 3 tensors
+  (t1o1 = concat<0>(t11, t11, t11)).run();
+  cudaStreamSynchronize(0);
+
+  for (i = 0; i < t1o1.Size(0); i++) {
+    ASSERT_EQ(t1o1(i), t11(i % t11.Size(0)));
+  }
   
   MATX_EXIT_HANDLER();
 }

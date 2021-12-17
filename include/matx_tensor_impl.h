@@ -50,6 +50,7 @@ class BaseOp
 {
 public:
   using matxop = bool;
+  using value_type = T;
 
   // Launch work in the stream
   void run(cudaStream_t stream = 0) noexcept
@@ -75,6 +76,7 @@ class BaseOpCustom
 {
 public:
   using matxop = bool;
+  using value_type = T;
   std::array<index_t, RankOp::Rank()> size_;
 
   BaseOpCustom() = delete;
@@ -134,6 +136,7 @@ class tensor_impl_t {
     // Type specifier for reflection on class
     using type = T; // TODO is this necessary
     using scalar_type = T;
+    using value_type = T;
     using tensor_view = bool;
     using desc_type = Desc;
     using shape_type = typename Desc::shape_type;

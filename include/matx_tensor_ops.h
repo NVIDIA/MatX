@@ -66,256 +66,160 @@ inline
 
 
 /**
- * Concatenate two tensors
+ * Concatenate operators
  *
- * Class for concatening two tensors along a single dimension. Sizes of the tensors not
- * being concatenated must be the same, and the new tensor has dimensions equal to the original
- * tensors on non-index dimension, and the sum of sizes along the index dimension.
+ * Class for concatening operators along a single dimension. Sizes of the operators not
+ * being concatenated must be the same, and the new operator has dimensions equal to the original
+ * operator on non-index dimension, and the sum of sizes along the index dimension.
  */
-  template <int Dim, typename Op1, typename Op2>
-  class Concatenate: public BaseOp<Concatenate<Dim, Op1, Op2>>
+  template <int Dim, typename... Ts>
+  class Concatenate : public BaseOp<Concatenate<Dim, Ts...>>
   {
-    static_assert(Op1::Rank() == Op2::Rank(), "Ranks of concatenating tensors must match");
-    static_assert(Dim < Op1::Rank(), "Dimension to concatenate must be within range"); 
-    static_assert(Dim < Op2::Rank(), "Dimension to concatenate must be within range");
+    using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
+    static constexpr int RANK = first_type::Rank();
 
   public:
     // Scalar type of operation
     using scalar_type = void;
 
-    inline __MATX_DEVICE__ __MATX_HOST__ Concatenate(Op1 op1, Op2 op2) : op1_(op1), op2_(op2)
+    inline Concatenate(Ts... ts) : ops_(ts...)
     {
+      
+      static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
+      static_assert(sizeof...(Ts) > 0, "Must have more than one tensor to concatenate");
+      static_assert((... && (RANK == ts.Rank())));
 
-    }
-
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
-    {
-      if constexpr (Dim == 0) {
-        if (i >= op1_.Size(0)) {
-          return get_value(op2_, i - op1_.Size(0));
-        }
-        else {
-          return get_value(op1_, i);
-        }
+      auto tsum = [&](int d, auto ...args){ return (args.Size(d) + ...); };
+      for (int32_t i = 0; i < RANK; i++) {
+        size_[i] = (i == Dim) ? tsum(i, ts...) : pp_get<0>(ts...).Size(i);
       }
     }
 
+    // base cases
+    template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) {
+      return static_cast<typename first_type::value_type>(0);
+    }
+    template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j) {
+      return static_cast<typename first_type::value_type>(0);
+    }
+    template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k) {
+      return static_cast<typename first_type::value_type>(0);
+    }
+    template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l) {
+      return static_cast<typename first_type::value_type>(0);
+    }            
+
+    template <size_t I = 0, std::enable_if_t<I < sizeof...(Ts), bool> = true>
+    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
+    {
+      if (i < std::get<I>(ops_).Size(0)) {
+        return std::get<I>(ops_).operator()(i);
+      }
+      return operator()<I + 1>(i - std::get<I>(ops_).Size(0));
+    }
+
+    template <size_t I = 0, std::enable_if_t<I < sizeof...(Ts), bool> = true>
     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
     {
       if constexpr (Dim == 0) {
-        if (i >= op1_.Size(0)) {
-          return get_value(op2_, i - op1_.Size(0), j);
+        if (i < std::get<I>(ops_).Size(0)) {
+          return std::get<I>(ops_).operator()(i, j);
         }
-        else {
-          return get_value(op1_, i, j);
-        }        
+        return operator()<I + 1>(i - std::get<I>(ops_).Size(0), j);
       }
-      else if constexpr (Dim == 1) {
-        if (j >= op1_.Size(1)) {
-          return get_value(op2_, i, j - op1_.Size(1));
+      else {
+        if (j < std::get<I>(ops_).Size(1)) {
+          return std::get<I>(ops_).operator()(i, j);
         }
-        else {
-          return get_value(op1_, i, j);
-        }        
+        return operator()<I + 1>(i, j - std::get<I>(ops_).Size(1));        
       }
     }
 
+    template <size_t I = 0, std::enable_if_t<I < sizeof...(Ts), bool> = true>
     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
     {
       if constexpr (Dim == 0) {
-        if (i >= op1_.Size(0)) {
-          return get_value(op2_, i - op1_.Size(0), j, k);
+        if (i < std::get<I>(ops_).Size(0)) {
+          return std::get<I>(ops_).operator()(i, j, k);
         }
-        else {
-          return get_value(op1_, i, j, k);
-        }        
+        return operator()<I + 1>(i - std::get<I>(ops_).Size(0), j, k);
       }
       else if constexpr (Dim == 1) {
-        if (j >= op1_.Size(1)) {
-          return get_value(op2_, i, j - op1_.Size(1), k);
+        if (j < std::get<I>(ops_).Size(1)) {
+          return std::get<I>(ops_).operator()(i, j, k);
         }
-        else {
-          return get_value(op1_, i, j, k);
-        }        
+        return operator()<I + 1>(i, j - std::get<I>(ops_).Size(1), k);        
       }
-      else if constexpr (Dim == 2) {
-        if (j >= op1_.Size(2)) {
-          return get_value(op2_, i, j, k - op1_.Size(2));
+      else {
+        if (k < std::get<I>(ops_).Size(2)) {
+          return std::get<I>(ops_).operator()(i, j, k);
         }
-        else {
-          return get_value(op1_, i, j, k);
-        }        
+        return operator()<I + 1>(i, j, k - std::get<I>(ops_).Size(2));        
       }      
     }
 
+    template <size_t I = 0, std::enable_if_t<I < sizeof...(Ts), bool> = true>
     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
     {
       if constexpr (Dim == 0) {
-        if (i >= op1_.Size(0)) {
-          return get_value(op2_, i - op1_.Size(0), j, k, l);
+        if (i < std::get<I>(ops_).Size(0)) {
+          return std::get<I>(ops_).operator()(i, j, k, l);
         }
-        else {
-          return get_value(op1_, i, j, k, l);
-        }        
+        return operator()<I + 1>(i - std::get<I>(ops_).Size(0), j, k, l);
       }
       else if constexpr (Dim == 1) {
-        if (j >= op1_.Size(1)) {
-          return get_value(op2_, i, j - op1_.Size(1), k, l);
+        if (j < std::get<I>(ops_).Size(1)) {
+          return std::get<I>(ops_).operator()(i, j, k, l);
         }
-        else {
-          return get_value(op1_, i, j, k, l);
-        }        
+        return operator()<I + 1>(i, j - std::get<I>(ops_).Size(1), k, l);        
       }
       else if constexpr (Dim == 2) {
-        if (j >= op1_.Size(2)) {
-          return get_value(op2_, i, j, k - op1_.Size(2), l);
+        if (k < std::get<I>(ops_).Size(2)) {
+          return std::get<I>(ops_).operator()(i, j, k, l);
         }
-        else {
-          return get_value(op1_, i, j, k, l);
-        }        
-      } 
+        return operator()<I + 1>(i, j, k - std::get<I>(ops_).Size(2), l);        
+      }      
       else if constexpr (Dim == 3) {
-        if (j >= op1_.Size(2)) {
-          return get_value(op2_, i, j, k, l - op1_.Size(3));
+        if (k < std::get<I>(ops_).Size(3)) {
+          return std::get<I>(ops_).operator()(i, j, k, l);
         }
-        else {
-          return get_value(op1_, i, j, k, l);
-        }        
-      }       
-    }
-
+        return operator()<I + 1>(i, j, k, l - std::get<I>(ops_).Size(3));        
+      }          
+    }           
+    
     static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
     {
-      return get_rank<Op1>();
+      return RANK;
     }
 
     index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
     {
-      if (dim == Dim) {
-        return op1_.Size(dim) + op2_.Size(dim);
-      }
-      else {
-        return op1_.Size(dim);
-      }
+      return size_[dim];
     }
 
-  private:
-      typename base_type<Op1>::type op1_;
-      typename base_type<Op2>::type op2_;    
-  };  
+    private:
+      std::tuple<Ts...> ops_;
+
+      std::array<index_t, RANK> size_;    
+  };
 
   /**
-   * @brief Concatenate two tensors
+   * @brief Concatenate multiple operators along a dimension
    * 
    * @tparam Dim dimension to concatenate
-   * @tparam T1 First tensor type
-   * @tparam T2 Second tensor type
-   * @param t1 First tensor
-   * @param t2 Second tensor
-   * @return Concatenation operator 
+   * @tparam Ts operator types
+   * @param ts operators
+   * @return concatenated operator 
    */
-  template <int Dim, typename T1, typename T2, std::enable_if_t<is_matx_op<T1>() && is_matx_op<T2>(), bool> = true>
-  __MATX_INLINE__ __MATX_HOST__  auto concat(T1 &t1, T2 &t2)
+  template <int Dim, typename... Ts>
+  __MATX_INLINE__ __MATX_HOST__  auto concat(Ts... ts)
   {
-    return Concatenate<Dim, T1, T2>{t1, t2};
+    return Concatenate<Dim, Ts...>{ts...};
   }  
-
-//   /**
-//  * Chain multiple operator statements
-//  *
-//  * Takes a variable list of operator statements to execute concurrently.
-//  * Chaining may improve performance over executing each operation separately.
-//  */
-//   template <typename... Ts>
-//   class Concatenate: public BaseOp<Concatenate<Ts...>>
-//   {
-//   private:
-//     std::tuple<Ts...> ops_;
-//     std::array<index_t, get_rank<T1>()> size_;
-//     int ldim_;
-
-//   public:
-//     // Scalar type of operation
-//     using scalar_type = void;
-
-//     inline Concatenate(int ldim, Ts... ts) : ops_(ts...), ldim_(ldim)
-//     {
-//       using first = std::tuple_element_t<0, decltype(ops_)>;
-//       constexpr auto rank = first::Rank();
-//       static_assert(rank > 0, "Cannot concatenate rank-0 tensors");
-//       static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
-//       static_assert((... && (Ts::Rank() == rank)));
-
-//       MATX_ASSERT_STR(ldim < rank, "Dimension to concatenate must be within range");
-
-//       auto tsum = [&](int dim, auto ...args){ return (args.Size(dim) + ...); };
-//       for (int32_t i = 0; i < rank; i++) {
-//         size_[i] = tsum(i, ts);
-
-//         // if (i != ldim) {
-//         //   #pragma unroll
-//         //   for (int t = 1; t < sizeof...(Ts); t++) {
-//         //     MATX_ASSERT_STR(std::get<t-1>(ts).Size(i) == std::get<t>(ts).Size(i), matxInvalidDim, 
-//         //       "All dimensions not being concatenate must match in size");
-//         //   }
-//         // }
-//       }
-
-//       // int dim = 0;
-//       // std::apply([&](const auto &... t){ ((main_dim_size_[dim++] = t.Size(ldim_)), ...); }, ops_);      
-//     }
-
-//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i)
-//     {
-//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
-//       std::apply(
-//         [&](Ts const&... targs){(
-//           (
-//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
-//           ), ...);
-//         }, ops_
-//       );
-
-//       return res;
-//     }
-
-//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j)
-//     {
-//       std::result_of<get_value(decltype(std::get<0>(ops_)), decltype(i))>::type res; 
-//       std::apply(
-//         [&](Ts const&... targs){(
-//           (
-//             (i >= targs.Size(ldim_)) ? (i -= targs.Size(ldim_)) : (res = get_value(targs, i))
-//           ), ...);
-//         }, ops_
-//       );
-
-//       return res;
-//     }
-
-//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k)
-//     {
-//       get_value(op_, i, j, k);
-//       args_.operator()(i, j, k);
-//     }
-
-//     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i, index_t j, index_t k, index_t l)
-//     {
-//       get_value(op_, i, j, k, l);
-//       args_.operator()(i, j, k, l);
-//     }
-
-//     static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
-//     {
-//       return get_rank<T1>();
-//     }
-
-//     index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
-//     {
-//       return size_[dim];
-//     }
-//   };
-
 
 /**
  * Chain multiple operator statements
