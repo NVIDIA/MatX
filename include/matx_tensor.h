@@ -287,6 +287,8 @@ public:
    * Lazy assignment operator-=. Used to create a "set" object for deferred
    * execution on a device
    *
+   * @tparam T2
+   *   Type of operator
    * @param op
    *   Operator or scalar type to assign
    *
@@ -814,11 +816,12 @@ public:
    * resetting the data pointer. If refcnt is not nullptr, the count is
    * incremented.
    *
+   * @tparam ShapeType
+   *   Shape type
    * @param data
    *   Data pointer to set
-   * @param refcnt
-   *   Optional reference count for new memory or nullptr if not tracked
-   *
+   * @param shape
+   *   Shape of tensor
    */
   template <typename ShapeType, 
       std::enable_if_t<!std::is_pointer_v<typename remove_cvref<ShapeType>::type>, bool> = true>  
@@ -839,8 +842,6 @@ public:
    *
    * @param data
    *   Data pointer to set
-   * @param refcnt
-   *   Optional reference count for new memory or nullptr if not tracked
    *
    */
   __MATX_HOST__ __MATX_INLINE__ void

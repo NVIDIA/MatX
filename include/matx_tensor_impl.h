@@ -257,21 +257,17 @@ class tensor_impl_t {
 
 
     /**
-     * Constructor for creating a view with only a descriptor
+     * Constructor for creating a view with a descriptor and user-provided pointer
      *
      * If not reference counted, it is the caller's responsibility to manage the
      * data pointer, including allocation and freeing.
      *
-     * @param data
-     *   Base data pointer (allocated address)
+     * @tparam DescriptorType
+     *   Descriptor type
+     * @param desc
+     *   Tensor descriptor
      * @param ldata
-     *   Offset data pointer (start of view)
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     * @param strides
-     *   Tensor strides
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
+     *   Data type
      */
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
@@ -283,19 +279,12 @@ class tensor_impl_t {
     /**
      * Constructor for creating a view with only a descriptor
      *
-     * If not reference counted, it is the caller's responsibility to manage the
-     * data pointer, including allocation and freeing.
+     * Descriptor must confirm to all descriptor semantics. See documentation for details
      *
-     * @param data
-     *   Base data pointer (allocated address)
-     * @param ldata
-     *   Offset data pointer (start of view)
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     * @param strides
-     *   Tensor strides
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
+     * @tparam DescriptorType
+     *   Descriptor type
+     * @param desc
+     *   Tensor descriptor
      */
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
