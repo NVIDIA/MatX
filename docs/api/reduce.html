@@ -1,0 +1,564 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Reductions &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Sorting" href="sort.html" />
+    <link rel="prev" title="Filtering (IIR and FIR)" href="filter.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="class.html">Tensor Class Reference</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="transformations.html">Tensor Transformations</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="fft.html">FFT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="matmul.html">Matrix Multiply (GEMM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="solver.html">Linear Solvers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="inverse.html">Matrix Inverse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="filter.html">Filtering (IIR and FIR)</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Reductions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sort.html">Sorting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tensorops.html">Tensor Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensorgenerators.html">Generator Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="random.html">Random Number Generation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Example Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">API Reference</a> &raquo;</li>
+        
+          <li><a href="transformations.html">Tensor Transformations</a> &raquo;</li>
+        
+      <li>Reductions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/api/reduce.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="reductions">
+<h1>Reductions<a class="headerlink" href="#reductions" title="Permalink to this headline">¶</a></h1>
+<p>The reductions API provides functions for reducing data from a higher rank to a lower rank.</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb">
+<span id="_CPPv3I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceE10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb"></span><span id="_CPPv2I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceE10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ReduceOp</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">is_matx_reduction_v</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="matx::reduce::ReduceOp"><span class="n"><span class="pre">ReduceOp</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a362628a204a8699513e6ff7a41c0a604"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reduce</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="matx::reduce::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="pre">[[maybe_unused]]</span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="matx::reduce::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">idest</span></span>, <a class="reference internal" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="matx::reduce::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">in</span></span>, <a class="reference internal" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="matx::reduce::ReduceOp"><span class="n"><span class="pre">ReduceOp</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">init</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0000_NSt11enable_if_tI19is_matx_reduction_vI8ReduceOpEbEEEN4matx6reduceEv10TensorType15TensorIndexType6InType8ReduceOp12cudaStream_tb" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a reduction and preserves indices</p>
+<p>Performs a reduction from tensor “in” into values tensor “dest” and index tensor idest using reduction operation ReduceOp. The output tensor rank dictates which elements the reduction is performed over. In general, the reductions are performed over the innermost dimensions, where the number of dimensions is the difference between the input and output tensor ranks. For example, for a 0D (scalar) output tensor, the reduction is performed over the entire tensor. For anything higher, the reduction is performed across the number of ranks below the input tensor that the output tensor is. For example, if the input tensor is a 4D tensor and the output is a 1D tensor, the reduction is performed across the innermost dimension of the input. If the output is a 2D tensor, the reduction is performed across the two innermost dimensions of the input, and so on.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>TensorType</strong> – Output data type </p></li>
+<li><p><strong>TensorIndexType</strong> – Output index type </p></li>
+<li><p><strong>InType</strong> – Input data type </p></li>
+<li><p><strong>ReduceOp</strong> – Reduction operator to apply</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of values reduced </p></li>
+<li><p><strong>idest</strong> – Destination view of indices </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>op</strong> – Reduction operator </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>init</strong> – if true dest will be initialized with ReduceOp::Init() otherwise the values in the destination will be included in the reduction. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx6reduceEvR10TensorTypeRK6InType8ReduceOp12cudaStream_tb">
+<span id="_CPPv3I000EN4matx6reduceER10TensorTypeRK6InType8ReduceOp12cudaStream_tb"></span><span id="_CPPv2I000EN4matx6reduceER10TensorTypeRK6InType8ReduceOp12cudaStream_tb"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ReduceOp</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1acc63d2a21206e028c78c6ac1a0d747d8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reduce</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx6reduceEvR10TensorTypeRK6InType8ReduceOp12cudaStream_tb" title="matx::reduce::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx6reduceEvR10TensorTypeRK6InType8ReduceOp12cudaStream_tb" title="matx::reduce::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx6reduceEvR10TensorTypeRK6InType8ReduceOp12cudaStream_tb" title="matx::reduce::ReduceOp"><span class="n"><span class="pre">ReduceOp</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">init</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx6reduceEvR10TensorTypeRK6InType8ReduceOp12cudaStream_tb" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a reduction</p>
+<p>Performs a reduction from tensor “in” into tensor “dest” using reduction operation ReduceOp. The output tensor dictates which elements the reduction is performed over. In general, the reductions are performed over the innermost dimensions, where the number of dimensions is the difference between the input and output tensor ranks. For example, for a 0D (scalar) output tensor, the reduction is performed over the entire tensor. For anything higher, the reduction is performed across the number of ranks below the input tensor that the output tensor is. For example, if the input tensor is a 4D tensor and the output is a 1D tensor, the reduction is performed across the innermost dimension of the input. If the output is a 2D tensor, the reduction is performed across the two innermost dimensions of the input, and so on.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>TensorType</strong> – Output data type </p></li>
+<li><p><strong>InType</strong> – Input data type </p></li>
+<li><p><strong>ReduceOp</strong> – Reduction operator to apply</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>op</strong> – Reduction operator </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>init</strong> – if true dest will be initialized with ReduceOp::Init() otherwise the values in the destination will be included in the reduction. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3anyEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx3anyER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx3anyER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a144b6af7aa238c134f8e62dc5b2880ca"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">any</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3anyEvR10TensorTypeRK6InType12cudaStream_t" title="matx::any::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3anyEvR10TensorTypeRK6InType12cudaStream_t" title="matx::any::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3anyEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Find if any value is != 0</p>
+<p>Returns a boolean value indicating whether any value in the set of inputs are non-zero. The same aggregation rules apply for input vs output tensor size and what type of reduction is done.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3allEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx3allER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx3allER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a1922098d8fa75876a07ea2eb2e0d10cb"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3allEvR10TensorTypeRK6InType12cudaStream_t" title="matx::all::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3allEvR10TensorTypeRK6InType12cudaStream_t" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3allEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Find if all values are != 0</p>
+<p>Returns a boolean value indicating whether all values in the set of inputs are non-zero. The same aggregation rules apply for input vs output tensor size and what type of reduction is done.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4rminEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4rminER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4rminER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a8864fcbfb27d47b8539e0178f1e0c46c"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">rmin</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4rminEvR10TensorTypeRK6InType12cudaStream_t" title="matx::rmin::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4rminEvR10TensorTypeRK6InType12cudaStream_t" title="matx::rmin::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4rminEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute min reduction of a tensor</p>
+<p>Returns a vector representing the min of all numbers in the reduction</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function uses the name rmin instead of min to not collide with the element-wise operator min.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4rmaxEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4rmaxER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4rmaxER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1afcde13b560c0d4ae6053b1bfd9acf1a9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">rmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4rmaxEvR10TensorTypeRK6InType12cudaStream_t" title="matx::rmax::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4rmaxEvR10TensorTypeRK6InType12cudaStream_t" title="matx::rmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4rmaxEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute max reduction of a tensor</p>
+<p>Returns a vector representing the max of all numbers in the reduction</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function uses the name rmax instead of max to not collide with the element-wise operator max.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3sumEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx3sumER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx3sumER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a67fb2760d2879f6080a7468a160c2331"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">sum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3sumEvR10TensorTypeRK6InType12cudaStream_t" title="matx::sum::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3sumEvR10TensorTypeRK6InType12cudaStream_t" title="matx::sum::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3sumEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute sum of numbers</p>
+<p>Returns a vector representing the sum of all numbers in the reduction</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4meanER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4meanER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae3abdc94633bfdfe277f5c7767212e61"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">mean</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="matx::mean::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="matx::mean::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Calculate the mean of values in a tensor</p>
+<p>Performs a sum reduction from tensor “in” into tensor “dest” , followed by a division by the number of elements in the reduction. Similar to the reduce function, the type of reduction is dependent on the rank of the output tensor. A single value denotes a reduction over the entire input, a 1D tensor denotes a reduction over each row independently, etc.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t">
+<span id="_CPPv3I00EN4matx6medianER10TensorTypeRK12TensorInType12cudaStream_t"></span><span id="_CPPv2I00EN4matx6medianER10TensorTypeRK12TensorInType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorInType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ad31f21b1811b138c0013b6f0685c3ba3"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">median</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="matx::median::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="matx::median::TensorInType"><span class="n"><span class="pre">TensorInType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Calculate the median of values in a tensor</p>
+<p>Calculates the median of rows in a tensor. The median is computed by sorting the data into a temporary tensor, then picking the middle element of each row. For an even number of items, the mean of the two middle elements is selected. Currently only works on tensor views as input since it uses CUB sorting as a backend, and the tensor views must be rank 2 reducing to rank 1, or rank 1 reducing to rank 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>RANK_IN</strong> – Input rank</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx3varER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx3varER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aa54fe5f0d4606e54835d8cbac0e60c3f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="matx::var::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute a variance reduction</p>
+<p>Computes the variance of the input according to the output tensor rank and size</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4stddER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4stddER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1acd1c4fcd12c1ea0591809cd82db53dd1"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">stdd</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="matx::stdd::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="matx::stdd::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute a standard deviation reduction</p>
+<p>Computes the standard deviation of the input according to the output tensor rank and size</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx6argminEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I000EN4matx6argminER10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I000EN4matx6argminER10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1adfc091aca8799269548d8841092d0b80"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmin</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx6argminEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmin::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx6argminEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmin::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">idest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx6argminEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmin::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx6argminEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute min reduction of a tensor and returns value + index</p>
+<p>Returns a tensor with minimums and indices</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction values </p></li>
+<li><p><strong>idest</strong> – Destination view of reduction indices </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx6argmaxEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I000EN4matx6argmaxER10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I000EN4matx6argmaxER10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a25770d3a20ba30759ade04ce43d00293"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmax::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmax::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">idest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx6argmaxEvR10TensorTypeR15TensorIndexTypeRK6InType12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Compute maxn reduction of a tensor and returns value + index</p>
+<p>Returns a tensor with maximums and indices</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction values </p></li>
+<li><p><strong>idest</strong> – Destination view of reduction indices </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="sort.html" class="btn btn-neutral float-right" title="Sorting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="filter.html" class="btn btn-neutral float-left" title="Filtering (IIR and FIR)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>

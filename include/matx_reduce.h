@@ -861,10 +861,10 @@ __global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType i
  * the reduction is performed across the two innermost dimensions of the input,
  * and so on.
  *
- * @tparam T
+ * @tparam TensorType
  *   Output data type
- * @param RANK
- *   Rank of output value tensor
+ * @tparam TensorIndexType
+ *   Output index type
  * @tparam InType
  *   Input data type
  * @tparam ReduceOp
@@ -952,10 +952,8 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
  * the reduction is performed across the two innermost dimensions of the input,
  * and so on.
  *
- * @tparam T
+ * @tparam TensorType
  *   Output data type
- * @param RANK
- *   Rank of output value tensor
  * @tparam InType
  *   Input data type
  * @tparam ReduceOp

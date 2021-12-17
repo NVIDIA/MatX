@@ -89,19 +89,15 @@ public:
    * single dimension, or batched across a dimension (rows of a matrix, for
    * example).
    *
-   * @tparam T1
-   *   Data type of A matrix
-   * @tparam RANK
-   *   Rank of A matrix
-   * @tparam op
-   *   CUB operation to perform
    *
    * @param a
    *   Input tensor view
    * @param a_out
    *   Sorted output
-   * @param params
+   * @param cparams
    *   Parameter structure specific to the operation
+   * @param stream
+   *   CUDA stream
    *
    */
   matxCubPlan_t(OutputTensor &a_out, const InputTensor &a,

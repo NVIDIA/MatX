@@ -44,7 +44,7 @@
 
 namespace matx {
 
-  
+
 template <typename T>
 class BaseOp
 {
@@ -197,14 +197,12 @@ class tensor_impl_t {
      * Constructor for a rank-1 and above tensor using a user pointer and shape
      * input
      *
-     * @param data
-     *   Base data pointer (allocated address)
+     * @tparam ShapeType
+     *   Type of shape
      * @param ldata
      *   Offset data pointer (start of view)
      * @param shape
      *   Sizes for each dimension. Length of sizes must match RANK
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
      */
     template <typename ShapeType, std::enable_if_t<!is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(T *const ldata, ShapeType &&shape)
@@ -212,40 +210,20 @@ class tensor_impl_t {
     {
     }
 
-    // /**
-    //  * Constructor for creating a view with a user-defined data pointer.
-    //  *
-    //  * If not reference counted, it is the caller's responsibility to manage the
-    //  * data pointer, including allocation and freeing.
-    //  *
-    //  * @param data
-    //  *   Pointer to data
-    //  *
-    //  * @param shape
-    //  *   Sizes for each dimension. Length of sizes must match RANK
-    //  */
-    // __MATX_INLINE__ tensor_impl_t(T *const data, const index_t (&shape)[RANK]) noexcept
-    //     : tensor_impl_t(data, tensorShape_t<RANK>{static_cast<index_t const *>(shape)})
-    // {
-    // }
-    
 
     /**
      * Constructor for creating a view with a user-defined data pointer.
      *
-     * If not reference counted, it is the caller's responsibility to manage the
-     * data pointer, including allocation and freeing.
-     *
-     * @param data
-     *   Base data pointer (allocated address)
+     * @tparam ShapeType
+     *   Type of shape
+     * @tparam StrideType
+     *   Type of stride
      * @param ldata
      *   Offset data pointer (start of view)
      * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
+     *   Sizes for each dimension. 
      * @param strides
      *   Tensor strides
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
      */
     template <typename ShapeType, typename StrideType>    
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
@@ -257,21 +235,17 @@ class tensor_impl_t {
 
 
     /**
-     * Constructor for creating a view with only a descriptor
+     * Constructor for creating a view with a descriptor and user-provided pointer
      *
      * If not reference counted, it is the caller's responsibility to manage the
      * data pointer, including allocation and freeing.
      *
-     * @param data
-     *   Base data pointer (allocated address)
+     * @tparam DescriptorType
+     *   Descriptor type
+     * @param desc
+     *   Tensor descriptor
      * @param ldata
-     *   Offset data pointer (start of view)
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     * @param strides
-     *   Tensor strides
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
+     *   Data type
      */
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
@@ -283,19 +257,12 @@ class tensor_impl_t {
     /**
      * Constructor for creating a view with only a descriptor
      *
-     * If not reference counted, it is the caller's responsibility to manage the
-     * data pointer, including allocation and freeing.
+     * Descriptor must confirm to all descriptor semantics. See documentation for details
      *
-     * @param data
-     *   Base data pointer (allocated address)
-     * @param ldata
-     *   Offset data pointer (start of view)
-     * @param shape
-     *   Sizes for each dimension. Length of sizes must match RANK
-     * @param strides
-     *   Tensor strides
-     * @param refcnt
-     *   Reference counter or nullptr if not tracked
+     * @tparam DescriptorType
+     *   Descriptor type
+     * @param desc
+     *   Tensor descriptor
      */
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)

@@ -1,0 +1,353 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>FFT Convolution &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Limitations" href="../limitations.html" />
+    <link rel="prev" title="Example Applications" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html#a-quick-primer-on-matx-types">A quick primer on MatX types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html#matx-storage">MatX Storage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html#tensor-descriptors">Tensor Descriptors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html#creating-tensors">Creating Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Example Applications</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">FFT Convolution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setup">Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#execution">Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#verification">Verification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Example Applications</a> &raquo;</li>
+        
+      <li>FFT Convolution</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/examples/fftconv.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="fft-convolution">
+<h1>FFT Convolution<a class="headerlink" href="#fft-convolution" title="Permalink to this headline">¶</a></h1>
+<p>This example shows how to perform a convolution in the frequency domain using the convolution theorem:</p>
+<div class="math notranslate nohighlight">
+\[h*x \leftrightarrow H \cdot X\]</div>
+<p>The output of the FFT convolution is verified against MatX’s built-in direct convolution to ensure the
+results match.</p>
+<p>The source code for this example can be found in examples/fft_conv.cu.</p>
+<section id="background">
+<h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
+<p>FFT convolution is generally preferred over direct convolution for sequences larger than a given size. This
+size depends on the underlying hardware, but in general, a signal longer than a few thousand points will typically
+be faster with an FFT convolution. However, FFT convolution requires setting up several intermediate buffers
+that are not required for direct convolution. This is typically not a problem when the signal and filter size
+are not changing since these can be allocated once on startup.</p>
+</section>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Permalink to this headline">¶</a></h2>
+<p>The first step for FFT convolution is allocating the intermediate buffers needed for each stage of the convolution. Assuming
+the input signal and filter are in the time domain, the required buffers are:</p>
+<ol class="arabic simple">
+<li><p>Time domain input signal of length M (signalTimeData)</p></li>
+<li><p>Time domain input filter of length L (filterTimeData)</p></li>
+<li><p>Time domain output filtered signal of length M + L - 1 (timeOutData)</p></li>
+<li><p>Frequency domain input signal of length M + L - 1 (signalFreqData)</p></li>
+<li><p>Frequency domain input filter of length M + L - 1 (filterFreqData)</p></li>
+</ol>
+<p>For this example the FFT size used is the same as the output signal length. Typically this may be rounded up to a
+power of two FFT for performance reasons, but this example is not attempting to optimize for performance:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Create</span> <span class="n">time</span> <span class="n">domain</span> <span class="n">buffers</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="nb">complex</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">sig_time</span><span class="p">({</span><span class="n">signal_size</span><span class="p">});</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="nb">complex</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">filt_time</span><span class="p">({</span><span class="n">filter_size</span><span class="p">});</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="nb">complex</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">time_out</span><span class="p">({</span><span class="n">filtered_size</span><span class="p">});</span>
+
+<span class="o">//</span> <span class="n">Frequency</span> <span class="n">domain</span> <span class="n">buffers</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="nb">complex</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">sig_freq</span><span class="p">({</span><span class="n">filtered_size</span><span class="p">});</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="nb">complex</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">filt_freq</span><span class="p">({</span><span class="n">filtered_size</span><span class="p">});</span>
+</pre></div>
+</div>
+<p>The next step initializes the data in both the signal and the filter to give reproducible results:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Fill</span> <span class="n">the</span> <span class="n">time</span> <span class="n">domain</span> <span class="n">signals</span> <span class="k">with</span> <span class="n">data</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">index_t</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">signal_size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">sig_time</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">=</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">i</span><span class="o">%</span><span class="mi">2</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">i</span><span class="o">%</span><span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mf">10.0</span><span class="n">f</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.1</span><span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="p">((</span><span class="n">i</span><span class="o">%</span><span class="mi">2</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">i</span><span class="o">%</span><span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mf">5.0</span><span class="n">f</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.1</span><span class="n">f</span><span class="p">};</span>
+<span class="p">}</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">index_t</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">filter_size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">filt_time</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">=</span> <span class="p">{(</span><span class="nb">float</span><span class="p">)</span><span class="n">i</span><span class="o">/</span><span class="n">filter_size</span><span class="p">,</span> <span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">-</span><span class="n">i</span><span class="o">/</span><span class="n">filter_size</span> <span class="o">+</span> <span class="mf">0.5</span><span class="n">f</span><span class="p">};</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that both <code class="docutils literal notranslate"><span class="pre">sig_time</span></code> and <code class="docutils literal notranslate"><span class="pre">filt_time</span></code> are views on the data objects using operator() to assign values on the host.</p>
+<p>Once the data is initialized, we prefetch it onto the device to avoid the page fault when the kernel is launched:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Prefetch</span> <span class="n">the</span> <span class="n">data</span> <span class="n">we</span> <span class="n">just</span> <span class="n">created</span>
+<span class="n">sig_time</span><span class="o">.</span><span class="n">PrefetchDevice</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="n">filt_time</span><span class="o">.</span><span class="n">PrefetchDevice</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Since the expected output size of the full filtering operation is signal_len + filter_len - 1, both the filter and
+signal time domain inputs are shorter than the output. This would normally require a separate stage of allocating buffers
+of the appropriate size, zeroing them out, copying the time domain data to the buffers, and performing the FFT. However, MatX
+has an API to do all of this automatically in the library using asynchronous allocations. This makes the call have a noticeable
+performance hit on the first call, but subsequent calls will be close to the time without allocation.</p>
+<p>To recognize that automatic padding is wanted, MatX uses the output tensor size compared to the input tensor size to determine
+whether to pad the input with zeros. In this case the output signal (sig_time and filt_time) are shorter than the output tensors
+(sig_freq and filt_freq), so it will automatically zero-pad the input.</p>
+</section>
+<section id="execution">
+<span id="id1"></span><h2>Execution<a class="headerlink" href="#execution" title="Permalink to this headline">¶</a></h2>
+<p>With the setup complete, the actual convolution can be performed by an FFT, element-wise multiply, then IFFT:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Perform</span> <span class="n">the</span> <span class="n">FFT</span> <span class="ow">in</span><span class="o">-</span><span class="n">place</span> <span class="n">on</span> <span class="n">both</span> <span class="n">signal</span> <span class="ow">and</span> <span class="nb">filter</span>
+<span class="n">fft</span><span class="p">(</span><span class="n">sig_freq</span><span class="p">,</span>  <span class="n">sig_freq</span><span class="p">);</span>
+<span class="n">fft</span><span class="p">(</span><span class="n">filt_freq</span><span class="p">,</span> <span class="n">filt_freq</span><span class="p">);</span>
+
+<span class="o">//</span> <span class="n">Perform</span> <span class="n">the</span> <span class="n">pointwise</span> <span class="n">multiply</span><span class="o">.</span> <span class="n">Overwrite</span> <span class="n">signal</span> <span class="n">buffer</span> <span class="k">with</span> <span class="n">result</span>
+<span class="p">(</span><span class="n">sig_freq</span> <span class="o">=</span> <span class="n">sig_freq</span> <span class="o">*</span> <span class="n">filt_freq</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">();</span>
+
+<span class="o">//</span> <span class="n">IFFT</span> <span class="ow">in</span><span class="o">-</span><span class="n">place</span>
+<span class="n">ifft</span><span class="p">(</span><span class="n">sig_freq</span><span class="p">,</span> <span class="n">sig_freq</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that for the multiply we’re using the MatX multiply operator <cite>*</cite> that multiplies two tensors of equal size
+and rank together, and stores the results in sig_freq. Because there is a 1:1 mapping of input and output elements,
+there are no race conditions when writing into the same buffer.</p>
+</section>
+<section id="verification">
+<h2>Verification<a class="headerlink" href="#verification" title="Permalink to this headline">¶</a></h2>
+<p>The last step is verifying the results against a direct convolution. The results will likely not be identical when comparing
+directly using floating point numbers because of the different operations and ordering involved with FFT versus direct
+convolution. Instead, we compare the values with a small enough epsilon (0.001) for the magnitude of our output data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Now</span> <span class="n">the</span> <span class="n">sig_freq</span> <span class="n">view</span> <span class="n">contains</span> <span class="n">the</span> <span class="n">full</span> <span class="n">convolution</span> <span class="n">result</span><span class="o">.</span> <span class="n">Verify</span> <span class="n">against</span> <span class="n">a</span> <span class="n">direct</span> <span class="n">convolution</span>
+<span class="n">matxDirectConv1D</span><span class="p">(</span><span class="n">time_out</span><span class="p">,</span> <span class="n">sig_time</span><span class="p">,</span> <span class="n">filt_time</span><span class="p">,</span> <span class="n">matxConvCorrMode_t</span><span class="p">::</span><span class="n">MATX_C_MODE_FULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+<span class="n">cudaStreamSynchronize</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+
+<span class="o">//</span> <span class="n">Compare</span> <span class="n">signals</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">index_t</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">filtered_size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span>  <span class="n">fabs</span><span class="p">(</span><span class="n">time_out</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="p">()</span> <span class="o">-</span> <span class="n">sig_freq</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mf">0.001</span> <span class="o">||</span>
+        <span class="n">fabs</span><span class="p">(</span><span class="n">time_out</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">imag</span><span class="p">()</span> <span class="o">-</span> <span class="n">sig_freq</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">imag</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mf">0.001</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">printf</span><span class="p">(</span><span class="s2">&quot;Verification failed at item %lld. Direct=</span><span class="si">%f%+.2f</span><span class="s2">j, FFT=</span><span class="si">%f%+.2f</span><span class="s2">j</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span>
+        <span class="n">time_out</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="p">(),</span> <span class="n">time_out</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">imag</span><span class="p">(),</span> <span class="n">sig_freq</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="p">(),</span> <span class="n">sig_freq</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">imag</span><span class="p">());</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<p>While this example showed a single FFT convolution, filtering is commonly performed on a streaming set of data. By preparing
+all of the buffers ahead of time, only the <a class="reference internal" href="#execution"><span class="std std-ref">Execution</span></a> part of this example would need to be performed in the data path. This
+allows for highly-optimized code using the simple syntax above.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="../limitations.html" class="btn btn-neutral float-right" title="Limitations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Example Applications" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>

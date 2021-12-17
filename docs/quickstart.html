@@ -1,0 +1,590 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Quick start &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Constructing Tensors" href="creation.html" />
+    <link rel="prev" title="Building MatX" href="build.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building MatX</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#adding-matx-to-your-project">Adding MatX to your project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tensor-views">Tensor Views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#getting-shapes-and-sizes">Getting shapes and sizes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#slicing-and-dicing">Slicing and dicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#permuting">Permuting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reshaping">Reshaping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#increasing-dimensionality">Increasing dimensionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-view-from-an-existing-pointer">Creating a view from an existing pointer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#operator-expressions">Operator expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#a-quick-note-about-assignment">A quick note about assignment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#initialization-of-operators-and-generators">Initialization of operators and generators</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#executors">Executors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#random-numbers">Random numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#that-s-it">That’s it!</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#a-quick-primer-on-matx-types">A quick primer on MatX types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#matx-storage">MatX Storage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#tensor-descriptors">Tensor Descriptors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#creating-tensors">Creating Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Example Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Quick start</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="quick-start">
+<h1>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
+<p>This guide walks through a quick introduction to MatX to get familiar with the types and basic functionality. For more extensive documentation, please
+look at the following sources:</p>
+<ol class="arabic simple">
+<li><p>Example and API documentation</p></li>
+<li><p>Example code in the examples/ directory</p></li>
+<li><p>DLI training (if available)</p></li>
+</ol>
+<section id="adding-matx-to-your-project">
+<h2>Adding MatX to your project<a class="headerlink" href="#adding-matx-to-your-project" title="Permalink to this headline">¶</a></h2>
+<p>MatX is currently a single header file to include in your project called <code class="docutils literal notranslate"><span class="pre">matx.h</span></code>. Simply add the matx/include directory to your compiler’s
+include search path, and add the proper #include. All MatX functions are in a top-level <code class="docutils literal notranslate"><span class="pre">matx</span></code> namespace, while more specific functions have
+a nested namespace. For example, the visualization pieces of MatX are under <code class="docutils literal notranslate"><span class="pre">matx::viz</span></code>.</p>
+</section>
+<section id="tensor-views">
+<h2>Tensor Views<a class="headerlink" href="#tensor-views" title="Permalink to this headline">¶</a></h2>
+<p>The most fundamental data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any
+underlying GPU or host memory. While dynamically-typed languages like Python or MATLAB will implicitly allocate and manage data for the user,
+MatX requires either a one-time explicit memory allocation, or a user-provided device-side buffer. This gives more control over the lifetime of the data, and
+allows reusing memory regions for different operations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For more information about creating tensors, see the “Creating Tensors” documentation</p>
+</div>
+<p>A tensor is created using the following syntax:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">tensor_t</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span> <span class="mi">2</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+</pre></div>
+</div>
+<p>The constructor takes two required template parameters: the data type and the rank of the tensor. In this case we request a floating point
+tensor with rank 2 (2D array). The constructor arguments specify the shape of the tensor (10x20), or the size of each dimension. The number of elements
+in the list must match the rank of the tensor.  Currently MatX supports ranks from 0 (scalar) up to 4 (4D array).</p>
+<p>To avoid the redundant rank and constructor arguments, the same tensor can be created using the <code class="docutils literal notranslate"><span class="pre">make_tensor</span></code> function:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+</pre></div>
+</div>
+<p>In this case only the type is required as a template parameter, and the rank is deduced from the number of arguments in the dimension list.</p>
+<p>If the shape of the tensor is known at compile time, a static tensor can be created for a performance improvement when accessing elements of the
+tensor:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="o">&gt;</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Note that for a static tensor the shape is moved to the template parameters instead of function arguments.</p>
+<p>After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
+pass their own pointers in a different form of the constructor which will leave allocation and freeing of the memory to the caller (see
+<em>Creating a view from an existing pointer</em> below). Note that MatX treats the initial tensor view as the owner of the memory. When this view is
+destructed, whether by going out of scope or manually, all memory is freed. If there were other views still pointing to this memory, it is no
+longer valid and the behavior is undefined.</p>
+<p>With our view <code class="docutils literal notranslate"><span class="pre">t</span></code> created above, we now have managed memory allocated sufficiently large to hold our values, but at this point the data
+in the tensor is undefined. To set individual values in a view, we can use <code class="docutils literal notranslate"><span class="pre">operator()</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">t</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span> <span class="o">=</span> <span class="mf">5.5</span><span class="p">;</span>
+<span class="n">t</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">)</span> <span class="o">=</span> <span class="mi">-10</span><span class="n">f</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>The same operator can be used to get values:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">float</span> <span class="n">f</span> <span class="o">=</span> <span class="n">t</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span> <span class="c1">// f is now 5.5</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">operator()</span></code> takes as many parameters as the rank of the tensor:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">f0</span> <span class="o">=</span> <span class="n">t0</span><span class="p">();</span>  <span class="c1">// t0 is a rank-0 tensor (scalar)</span>
+<span class="k">auto</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">t1</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span> <span class="c1">// t1 is a rank-1 tensor (scalar)</span>
+</pre></div>
+</div>
+<p>Tensors can also be initialized using initializer list syntax using the <code class="docutils literal notranslate"><span class="pre">SetVals</span></code> function:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">myT</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">});</span>
+<span class="n">myT</span><span class="p">.</span><span class="n">SetVals</span><span class="p">({</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">},</span> <span class="p">{</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">},</span> <span class="p">{</span><span class="mi">7</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">}</span> <span class="p">});</span>
+</pre></div>
+</div>
+<p>In other languages it’s very common to initialize a tensor with a set of values on creation (ones, zeros, ranges). This will be covered later
+in the tutorial when we discuss operators, and it should become clear why we initialize this way.</p>
+</section>
+<section id="getting-shapes-and-sizes">
+<h2>Getting shapes and sizes<a class="headerlink" href="#getting-shapes-and-sizes" title="Permalink to this headline">¶</a></h2>
+<p>The dimensions of the tensor are stored internally in a type named tensorShape_t. This tensor shape contains the rank and dimensions of the
+tensor view, but does not contain any information about type or storage. The shape can be retrieved using the <code class="docutils literal notranslate"><span class="pre">Shape</span></code> call:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Shape</span><span class="p">();</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Shape()</span></code> is similar to NumPy’s <code class="docutils literal notranslate"><span class="pre">shape</span></code> attribute.</p>
+<p>The number of dimensions in a tensor can be retrieved using the <code class="docutils literal notranslate"><span class="pre">Rank()</span></code> member. Since the rank is known at compile time, this function
+uses the <code class="docutils literal notranslate"><span class="pre">constexpr</span></code> modifier:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">r</span> <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Rank</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>The size of each individual dimension can be fetched using <code class="docutils literal notranslate"><span class="pre">Size()</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t1size</span> <span class="o">=</span> <span class="n">t1</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="c1">// Size of vector t1</span>
+<span class="k">auto</span> <span class="n">t2rows</span> <span class="o">=</span> <span class="n">t2</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="c1">// Rows in t2</span>
+<span class="k">auto</span> <span class="n">t2cols</span> <span class="o">=</span> <span class="n">t2</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span> <span class="c1">// Cols in t2</span>
+</pre></div>
+</div>
+</section>
+<section id="slicing-and-dicing">
+<h2>Slicing and dicing<a class="headerlink" href="#slicing-and-dicing" title="Permalink to this headline">¶</a></h2>
+<p>As the name implies, <code class="docutils literal notranslate"><span class="pre">t</span></code> is a view into a region of memory. When the initial view is created and memory is allocated, the tensor view is
+of the entire 10x20 contiguous block of memory. Often we don’t want to see the entire block of memory, but only want to view a subset of the
+underlying data. To do this, we use the <code class="docutils literal notranslate"><span class="pre">Slice</span></code> member function of the view class:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">tCube</span>  <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Slice</span><span class="p">({</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">},</span> <span class="p">{</span><span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">});</span>                      <span class="c1">// Cube of t using rows 3-5 and cols 5-7</span>
+<span class="k">auto</span> <span class="n">tRectS</span> <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Slice</span><span class="p">({</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">},</span> <span class="p">{</span><span class="n">matxEnd</span><span class="p">,</span> <span class="n">matxEnd</span><span class="p">},</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">});</span>  <span class="c1">// Rectangle with stride of 2 in both dimensions</span>
+<span class="k">auto</span> <span class="n">tCol</span>   <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Slice</span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">},</span> <span class="p">{</span><span class="n">matxEnd</span><span class="p">,</span> <span class="n">matxDropDim</span><span class="p">});</span>   <span class="c1">// Create a 1D tensor with only column 5</span>
+<span class="k">auto</span> <span class="n">tRow</span>   <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Slice</span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">},</span> <span class="p">{</span><span class="n">matxDropDim</span><span class="p">,</span> <span class="n">matxEnd</span><span class="p">});</span>   <span class="c1">// Create a 1D tensor with only row 5</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Slice</span></code> returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
+light-weight views into memory, none of these variants modify the data; they return an object with new parameters describing
+how the data is viewed. The resulting variables can be used exactly as the original view above:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">cubeRows</span> <span class="o">=</span> <span class="n">tCube</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="c1">// 3</span>
+<span class="k">auto</span> <span class="n">cubeCols</span> <span class="o">=</span> <span class="n">tCube</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span> <span class="c1">// 3</span>
+<span class="k">auto</span> <span class="n">colSize</span>  <span class="o">=</span> <span class="n">tCol</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>  <span class="c1">// 10 since the original tensor had 10 rows</span>
+<span class="k">auto</span> <span class="n">rowSize</span>  <span class="o">=</span> <span class="n">tRow</span><span class="p">.</span><span class="n">Size</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>  <span class="c1">// 20 since the original tensor had 20 columns</span>
+</pre></div>
+</div>
+<p>All view functions can be used on any type of existing view:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">tCubeP</span>  <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Slice</span><span class="p">({</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">},</span> <span class="p">{</span><span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">}).</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">});</span>
+</pre></div>
+</div>
+<p>The above code takes the same cube as before, but permutes the cube view by swapping the two dimensions.</p>
+</section>
+<section id="permuting">
+<h2>Permuting<a class="headerlink" href="#permuting" title="Permalink to this headline">¶</a></h2>
+<p>Permuting a tensor is done using the <code class="docutils literal notranslate"><span class="pre">Permute</span></code> member function of a view:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">tp</span> <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">});</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tp</span></code> is now a view into <code class="docutils literal notranslate"><span class="pre">t</span></code> where the rows and columns are swapped (transpose). <code class="docutils literal notranslate"><span class="pre">Permute</span></code> is not limited to matrices, though:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t4</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">tp4</span> <span class="o">=</span> <span class="n">t</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">});</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">t4p</span></code> is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list.</p>
+<p>Note that since no data is moved, permuting a tensor can be detrimental to performance, depending on the context. Permuting usually
+changes the strides of dimensions such that the memory access patterns are no longer optimal, and accessing the permuted view
+continuously can be very slow. If a permuted view will be accessed repeatedly, it’s recommended to copy the permuted view into
+a new tensor so that the new layout is contiguous. Using the variables from above:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t4pc</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">tp4</span><span class="p">.</span><span class="n">Shape</span><span class="p">());</span>
+<span class="n">copy</span><span class="p">(</span><span class="n">t4pc</span><span class="p">,</span> <span class="n">t4p</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">t4pc</span></code> will now contain the permuted data, but in contiguous memory.</p>
+</section>
+<section id="reshaping">
+<h2>Reshaping<a class="headerlink" href="#reshaping" title="Permalink to this headline">¶</a></h2>
+<p>Ultimately memory is always laid out linearly regardless of how we choose to view it. We can take advantage of this property by allowing
+a reshaped view of an existing view. This is commonly done when we want to take a tensor of one rank and view the data as if it were
+a tensor of a different rank. The product of dimensions in one rank must equal the product of dimensions in the other rank. For example,
+to take a 1D tensor of size 16 and reshape into a 2D tensor of shape 4x4:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">auto</span> <span class="n">t1</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="nb">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">16</span><span class="p">});</span>
+<span class="n">auto</span> <span class="n">t2</span> <span class="o">=</span> <span class="n">t1</span><span class="o">.</span><span class="n">View</span><span class="p">({</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">});</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">t2</span></code> is now a view into the same memory as <code class="docutils literal notranslate"><span class="pre">t1</span></code>, but viewed as a different rank. Any modifications to one tensor will be seen in the
+other since no data was copied.</p>
+</section>
+<section id="increasing-dimensionality">
+<h2>Increasing dimensionality<a class="headerlink" href="#increasing-dimensionality" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes it’s useful to increase the rank of an existing view to match the dimensions of another tensor. For example, to add a vector onto
+all rows in a matrix, you can clone the tensor to a higher rank to match the other tensor:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t1</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">16</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">t2</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">});</span>
+<span class="c1">// ... Initialize tensors</span>
+
+<span class="k">auto</span> <span class="n">t1c</span> <span class="o">=</span> <span class="n">t1</span><span class="p">.</span><span class="n">Clone</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">16</span><span class="p">,</span> <span class="n">matxKeepDim</span><span class="p">});</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">t1c</span></code> is now a new tensor view where each row is a replica of the tensor <code class="docutils literal notranslate"><span class="pre">t1</span></code>. Again, this is just a view and no data was modified or
+allocated, so modifying a row/column in either of these tensors will affect the other.</p>
+<p>The keyword <code class="docutils literal notranslate"><span class="pre">matxKeepDim</span></code> tells MatX which dimensions should be kept from the original tensor and where it should be in the new tensor.
+In this example we used it in the columns place of the shape, but we also could have used <code class="docutils literal notranslate"><span class="pre">{matxKeepDim,</span> <span class="pre">16}</span></code> and we would have a 2D
+view where all columns of <code class="docutils literal notranslate"><span class="pre">t1c</span></code> matches <code class="docutils literal notranslate"><span class="pre">t1</span></code>.</p>
+<p>Note in some cases MatX’s <em>broadcasting</em> feature can be used instead of <code class="docutils literal notranslate"><span class="pre">Clone</span></code>. This allows an implicit expansion of ranks during an
+element-wise operation. For example, adding a 4D tensor to a 1D tensor will work as long as the outer dimension of the 4D tensor matches
+that of the 1D tensor. Broadcasting is covered in the documentation. <code class="docutils literal notranslate"><span class="pre">Clone</span></code> is much more powerful since it gives more control over which
+dimensions are cloned instead of assuming the outer dimensions.</p>
+</section>
+<section id="creating-a-view-from-an-existing-pointer">
+<h2>Creating a view from an existing pointer<a class="headerlink" href="#creating-a-view-from-an-existing-pointer" title="Permalink to this headline">¶</a></h2>
+<p>While using tensor views with CUDA managed memory is very convenient, there are situations where managed memory is not ideal. Integrating
+MatX into an existing codebase, or wanting more control over the memory copies are both times when using standard CUDA memory allocations
+is a better option. All constructors in the tensor_t class also allow a manually-allocated pointer to be passed in. MatX will not
+attempt to allocate or free any memory when this constructor is used, and it is up to the caller to manage the memory lifecycle:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">float</span> <span class="o">*</span><span class="n">my_device_ptr</span><span class="p">;</span>  <span class="c1">// Assume my_device_ptr is allocated somewhere</span>
+<span class="k">auto</span> <span class="n">t2</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">my_device_ptr</span><span class="p">,</span> <span class="p">{</span><span class="mi">20</span><span class="p">,</span><span class="mi">100</span><span class="p">});</span>
+<span class="n">t2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span> <span class="c1">// Error! Don&#39;t do this!</span>
+</pre></div>
+</div>
+<p>In the example above, <code class="docutils literal notranslate"><span class="pre">t2</span></code> is a new view pointing to the existing device-allocated memory. Unlike with managed memory, <code class="docutils literal notranslate"><span class="pre">operator()</span></code>
+cannot be used on <code class="docutils literal notranslate"><span class="pre">t2</span></code> from the host side or the code may crash.</p>
+</section>
+<section id="operator-expressions">
+<h2>Operator expressions<a class="headerlink" href="#operator-expressions" title="Permalink to this headline">¶</a></h2>
+<p>Tensors aren’t much use by themselves if all we can do is view them in various ways. MatX provides two main ways to perform computations on
+tensor views: <em>operator expressions</em> and <em>executors</em>.</p>
+<p>Operator expressions provide a way to use algebraic expressions using tensor views and operators to generate an element-wise GPU kernel at compile-time.
+For example:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">a</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">b</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">c</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">});</span>
+<span class="p">(</span><span class="n">c</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Ignoring that the data is unitialized, the first three lines simply create three 3D tensors with the same dimensions, while the last line runs an
+operator for the equation c = a + b. In MatX terminology, an operator is a type that creates a CUDA kernel at compile-time to perform the
+element-wise operation c = a + b. The = operator is used as a deferred assignment operator expressions to avoid ambiguity with the regular assignment
+operator <code class="docutils literal notranslate"><span class="pre">=</span></code>. The <code class="docutils literal notranslate"><span class="pre">run</span></code> method takes an optional stream parameter, and executes the operation in the CUDA stream specified. Operators can use
+expressions of any length, and normal precedence rules apply.</p>
+<p>Tensor views can be mixed with scalars and operator functions:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">op</span> <span class="o">=</span> <span class="p">(</span><span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">+</span> <span class="n">abs</span><span class="p">(</span><span class="n">a</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>This expression squares each element in <code class="docutils literal notranslate"><span class="pre">a</span></code>, divides each element in <code class="docutils literal notranslate"><span class="pre">b</span></code> by 2, adds the result to <code class="docutils literal notranslate"><span class="pre">a</span></code>, and finally adds the resulting
+tensor to the absolute value of every element in <code class="docutils literal notranslate"><span class="pre">a</span></code>. The result of the computation will be stored in the tensor view <code class="docutils literal notranslate"><span class="pre">c</span></code>.
+Again, the entire expression is generated at compile time and a kernel is stored in the variable <code class="docutils literal notranslate"><span class="pre">op</span></code>, but the kernel is not launched on the device.
+To launch the operator in a CUDA stream, we use the <code class="docutils literal notranslate"><span class="pre">run</span></code> function:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">op</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">run</span></code> can be thought of as a way to launch the operator/kernel into a CUDA stream, similar to the traditional triple angle bracket notation (&lt;&lt;&lt;&gt;&gt;&gt;).
+In MatX terminology, this is called an executor since it causes work to be executed on the device. It’s often not necessary to store the operator at
+all if the execution is immediate, the two lines above can be combined:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">+</span> <span class="n">abs</span><span class="p">(</span><span class="n">a</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Sometimes the data we are using in an expression can be generated on-the-fly rather than coming from memory. Window functions, diagonal matrices, and
+the identity matrix are all examples of this. MatX provides “generators” that can be used inside of expressions to generate data:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="n">ones</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">Shape</span><span class="p">())).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The example above uses the <code class="docutils literal notranslate"><span class="pre">ones</span></code> generator to create a tensor with only the value <code class="docutils literal notranslate"><span class="pre">1</span></code> matching the shape of a (10x20x5). <code class="docutils literal notranslate"><span class="pre">ones</span></code> simply returns the
+value <code class="docutils literal notranslate"><span class="pre">1</span></code> any time an element of it is requested, and no data is ever loaded from memory.</p>
+<p>Implicit in the <code class="docutils literal notranslate"><span class="pre">run</span></code> call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
+To run the same code on the host, a <code class="docutils literal notranslate"><span class="pre">SingleThreadHostExecutor</span></code> can be passed into <code class="docutils literal notranslate"><span class="pre">run</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="n">ones</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">Shape</span><span class="p">())).</span><span class="n">run</span><span class="p">(</span><span class="n">SingleThreadHostExecutor</span><span class="p">{});</span>
+</pre></div>
+</div>
+<p>Instead of a CUDA stream, we pass an executor to <code class="docutils literal notranslate"><span class="pre">run</span></code> that instructs MatX to execute the code on the host instead of the device using a single CPU thread.
+Unlike CUDA calls, host executors are synchronous, and the line above will block until finished executing.</p>
+</section>
+<section id="a-quick-note-about-assignment">
+<h2>A quick note about assignment<a class="headerlink" href="#a-quick-note-about-assignment" title="Permalink to this headline">¶</a></h2>
+<p>MatX heavily relies on a deferred or lazy execution model where expressions are not executed at the time of assignment. This allows the library to
+closely match the programming model of the GPU so that there are no surprises as to when code is executed. To facilitate the asynchronous model,
+MatX overloads the assignment operator (=) to indicate a deferred execution. The deferred assignment can be executed using the <code class="docutils literal notranslate"><span class="pre">run()</span></code> method on
+the expression. A statement as simple as the following:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">A</span> <span class="o">=</span> <span class="n">B</span><span class="p">).</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>should be viewed as a deferred assignment of tensor B into tensor A (deep copy) that executes on the device when <code class="docutils literal notranslate"><span class="pre">run()</span></code> happens. The result of the
+lazy assignment expression can also be assigned into a temporary variable:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">op</span> <span class="o">=</span> <span class="p">(</span><span class="n">A</span> <span class="o">=</span> <span class="n">B</span> <span class="o">+</span> <span class="n">C</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>In the code above, the <code class="docutils literal notranslate"><span class="pre">=</span></code> on the right side indicates lazy assignment, while the <code class="docutils literal notranslate"><span class="pre">=</span></code> on the left side executes the copy constructor on the new
+variable <code class="docutils literal notranslate"><span class="pre">op</span></code>. The pattern above is expected to be infrequently used since expressions are typically executed on the same line as the definition,
+but sometimes it’s useful for debugging purposes to look at the type of the expression. More complex expressions follow the same rules:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">IFELSE</span><span class="p">(</span><span class="n">A</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="n">A</span><span class="p">,</span> <span class="n">C</span> <span class="o">=</span> <span class="n">B</span><span class="p">).</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Remember that since the assignment operator is deferred in both cases above, none of these assignments will happen until <code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">&gt;</span> <span class="pre">5</span></code> is executed on the
+device, at which point only <em>one</em> of these assignments will occur.</p>
+<section id="initialization-of-operators-and-generators">
+<h3>Initialization of operators and generators<a class="headerlink" href="#initialization-of-operators-and-generators" title="Permalink to this headline">¶</a></h3>
+<p>As mentioned above, it’s common in high-level languages to initialize a tensor/array with a known set of values. For example, generating a range of linearly-
+spaced values, all ones, or a diagonal matrix. These are all operations that do not need to be generated and stored in memory before using since they are
+all generated from a formula. MatX calls these types of operators a <em>generator</em>, indicating that they generate data without storage.</p>
+<p>Similar to high-level languages, generators can store their values in existing tensors like so:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t1</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">});</span>
+<span class="p">(</span><span class="n">t1</span> <span class="o">=</span> <span class="n">linspace_x</span><span class="p">(</span><span class="n">t1</span><span class="p">.</span><span class="n">Shape</span><span class="p">(),</span> <span class="mf">1.0f</span><span class="p">,</span> <span class="mf">100.0f</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Similar to the <code class="docutils literal notranslate"><span class="pre">set</span></code> calls above, instead of an algebraic equation we are storing the output of generator <code class="docutils literal notranslate"><span class="pre">linspace_x</span></code> into the tensor <code class="docutils literal notranslate"><span class="pre">t1</span></code>.
+<code class="docutils literal notranslate"><span class="pre">linspace_x</span></code> takes 3 parameters: the shape of the tensor (in this case we match t1), the start value, and the stop value. Since there are 100 elements
+in our tensor, it will generate a sequence of 1.0, 2.0, 3.0, etc, and store it in <code class="docutils literal notranslate"><span class="pre">t1</span></code>.</p>
+<p>Why not just make a shorthand version of <code class="docutils literal notranslate"><span class="pre">linspace_x</span></code> that stores directly in a tensor? The reason is that generators can be used as part of a larger
+expression and are not limited to simply assigning to a tensor. Expanding on our last example:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t1</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">});</span>
+<span class="p">(</span><span class="n">t1</span> <span class="o">=</span> <span class="n">ones</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">t1</span><span class="p">.</span><span class="n">Shape</span><span class="p">())</span> <span class="o">+</span> <span class="n">linspace_x</span><span class="p">(</span><span class="n">t1</span><span class="p">.</span><span class="n">Shape</span><span class="p">(),</span> <span class="mf">1.0f</span><span class="p">,</span> <span class="mf">100.0f</span><span class="p">)</span> <span class="o">*</span> <span class="mf">5.0</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Instead of setting <code class="docutils literal notranslate"><span class="pre">t1</span></code> to a range, we multiply the range by 5.0, and add that range to a vector of ones using the <code class="docutils literal notranslate"><span class="pre">ones</span></code> generator. Without any
+intermediate storage, we combined two generators, a multiply, and an add operator into a single kernel.</p>
+</section>
+</section>
+<section id="executors">
+<h2>Executors<a class="headerlink" href="#executors" title="Permalink to this headline">¶</a></h2>
+<p>As mentioned above, the <code class="docutils literal notranslate"><span class="pre">exec</span></code> function is an executor for launching operators onto the device. <code class="docutils literal notranslate"><span class="pre">exec</span></code> is a special type of executor since it can take
+either views or operators as inputs and transform them in an element-wise kernel. Often the type of operation we are trying to do cannot be expressed as
+an MatX element-wise operator, so <code class="docutils literal notranslate"><span class="pre">exec</span></code> cannot be used. Other types of executors exist for this purpose. These executors typically do more complex
+transformations on the data compared to an element-wise kernel, and often use optimized libraries on the back-end to execute. Some examples are fft (Fast
+Fourier Transform), matmul (Matrix Multiply), and sort.</p>
+<p>MatX provides an easy-to-use API for executing complex functions, like those mentioned above. These executors currently cannot be part of an operator
+expression and must be executed as their own statement:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">fft</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">fft</span></code> executor above performs a 1D FFT on the tensor <code class="docutils literal notranslate"><span class="pre">A</span></code>, and stores it in <code class="docutils literal notranslate"><span class="pre">B</span></code>. All executors use the same calling convention where the outputs
+are listed first, followed by inputs, and finally an optional stream. Except for <code class="docutils literal notranslate"><span class="pre">exec</span></code>, executors can only operate on tensor views, and not
+on generators or operators. For instance, you cannot take an fft of <code class="docutils literal notranslate"><span class="pre">ones()</span></code>.</p>
+<p>Unless documented otherwise, executors work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
+a 1D tensor (vector), etc. If the dimension of the tensor is higher than the expected dimension, all higher dimensions will be batched. In the FFT
+call above, if <code class="docutils literal notranslate"><span class="pre">A</span></code> and <code class="docutils literal notranslate"><span class="pre">B</span></code> are 4D tensors, the inner 3 dimensions will launch a batched 1D FFT with no change in syntax.</p>
+<p>As mentioned above, the same tensor views can be used in operator expressions before or after executors:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">2</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The code above executes a kernel to store the result of <code class="docutils literal notranslate"><span class="pre">b</span> <span class="pre">+</span> <span class="pre">2</span></code> into <code class="docutils literal notranslate"><span class="pre">a</span></code>, then subsequently performs the matrix multiply <code class="docutils literal notranslate"><span class="pre">C</span> <span class="pre">=</span> <span class="pre">A</span> <span class="pre">*</span> <span class="pre">B</span></code>. Since
+the operator and matrix multiply are launched in the same CUDA stream, they will be executed serially.</p>
+<p>Common reduction executors are also available, such as <code class="docutils literal notranslate"><span class="pre">sum()</span></code>, <code class="docutils literal notranslate"><span class="pre">mean()</span></code>, <code class="docutils literal notranslate"><span class="pre">max()</span></code>, etc:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t4</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">t0</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="n">sum</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span> <span class="n">t4</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The above code performs an optimized sum reduction of <code class="docutils literal notranslate"><span class="pre">t4</span></code> into <code class="docutils literal notranslate"><span class="pre">t0</span></code>. Currently reduction type exectors <em>can</em> take operators as an input. Please
+see the documentation for a list of which ones are compatible.</p>
+</section>
+<section id="random-numbers">
+<h2>Random numbers<a class="headerlink" href="#random-numbers" title="Permalink to this headline">¶</a></h2>
+<p>MatX can generate random numbers using the cuRAND library as the backend. Random number generation consumes memory on the device, so the construction
+is slightly different than other types above:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">});</span>
+<span class="n">randomGenerator_t</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span> <span class="n">randData</span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">TotalSize</span><span class="p">(),</span> <span class="mi">0</span><span class="p">);</span>
+<span class="k">auto</span> <span class="n">randTensor</span> <span class="o">=</span> <span class="n">randData</span><span class="p">.</span><span class="n">GetTensorView</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span><span class="mi">50</span><span class="p">},</span> <span class="n">NORMAL</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The code above constructs a random tensor view inside of <code class="docutils literal notranslate"><span class="pre">randTensor</span></code> that can be used in expressions as a random-valued tensor. The first line where
+the <code class="docutils literal notranslate"><span class="pre">randomGenerator_t</span></code> type is constructed allocates enough memory on the device to provide random numbers for a 100x50 tensor. The second line
+gets a view from the generator. These two steps are important because you typically want to limit how many generators you create due to their memory
+consumption, and instead create views from a small set of generators.</p>
+<p>Using the random tensor view above in an expression is the same as any other view:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t2</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">});</span>
+<span class="p">(</span><span class="n">t2</span> <span class="o">=</span> <span class="n">randTensor</span><span class="o">*</span><span class="mi">5</span> <span class="o">+</span> <span class="n">randTensor</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Unlike normal views, <code class="docutils literal notranslate"><span class="pre">randTensor</span></code> will give a new random value every time it is accessed. Not only will every element in the first multiply get A
+different random number, but when it’s access again to add to the previous value, a new random number is generated for every element.</p>
+</section>
+<section id="that-s-it">
+<h2>That’s it!<a class="headerlink" href="#that-s-it" title="Permalink to this headline">¶</a></h2>
+<p>This quick start guide was intended to give a very brief introduction to the concepts behind MatX, and how these concepts apply to the code. There’s a lot
+more to explore in MatX and far more functions than could be listed here. For more examples we recommend browsing through the examples to see how to perform
+real tasks using MatX, and the API guide to see an exhaustive list of functions and operators.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="creation.html" class="btn btn-neutral float-right" title="Constructing Tensors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="build.html" class="btn btn-neutral float-left" title="Building MatX" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>

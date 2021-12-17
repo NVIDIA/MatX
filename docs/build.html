@@ -1,0 +1,323 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Building MatX &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick start" href="quickstart.html" />
+    <link rel="prev" title="Welcome to MatX’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Building MatX</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#unit-tests">Unit tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#multi-gpu">Multi GPU</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">Building</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id2">Unit tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#benchmarks">Benchmarks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#multi-gpu-support">Multi-GPU Support</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#a-quick-primer-on-matx-types">A quick primer on MatX types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#matx-storage">MatX Storage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#tensor-descriptors">Tensor Descriptors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creation.html#creating-tensors">Creating Tensors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Example Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Building MatX</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/build.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="building-matx">
+<span id="building"></span><h1>Building MatX<a class="headerlink" href="#building-matx" title="Permalink to this headline">¶</a></h1>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>CUDA 11.4</p></li>
+<li><p>g++ 9.0 or above</p></li>
+</ul>
+<section id="unit-tests">
+<h3>Unit tests<a class="headerlink" href="#unit-tests" title="Permalink to this headline">¶</a></h3>
+<p>pybind11 source build and installed
+Python3 includes (python3-dev package)</p>
+</section>
+<section id="multi-gpu">
+<h3>Multi GPU<a class="headerlink" href="#multi-gpu" title="Permalink to this headline">¶</a></h3>
+<p>NvSHMEM</p>
+</section>
+</section>
+<section id="id1">
+<h2>Building<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>While the MatX library does not require compiling, building unit tests, benchmarks, or examples must be compiled.
+To build all components, issue the standard cmake build commands in a cloned repo:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir build <span class="o">&amp;&amp;</span> <span class="nb">cd</span> build
+cmake ..
+make -j
+</pre></div>
+</div>
+<p>Unit tests and examples are built by default. Documentation building is disabled by default. To disable specific builds,
+use the cmake properties with the OFF flag:
+BUILD_EXAMPLES
+BUILD_TESTS
+For example, to disable unit test building:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir build <span class="o">&amp;&amp;</span> <span class="nb">cd</span> build
+cmake -DBUILD_TESTS<span class="o">=</span>OFF ..
+make -j
+</pre></div>
+</div>
+<p>To build documentation use the cmake flag <code class="docutils literal notranslate"><span class="pre">-DBUILD_DOCS=ON</span></code></p>
+</section>
+<section id="id2">
+<h2>Unit tests<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>MatX contains a suite of unit tests to test functionality of the primitive functions, plus other signal processing pipelines.
+Due to the nature of certain unit tests, the amount of data used as input and output for comparison can get quite large, and
+as a result, test vectors are generated dynamically using Python. Version 2.6.2 of the pybind11 library is required to be built
+and installed before building the MatX unit tests. Once built, the MatX build system will try to find pybind11 in common installation
+directories. If it cannot be found, it may be specified manually by passing the pybind11_DIR CMake parameter:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>cmake -Dpybind11_DIR<span class="o">=</span>/matx_libs/pybind11
+</pre></div>
+</div>
+<p>To run the unit tests, from the cmake build directory run:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>make -j <span class="nb">test</span>
+</pre></div>
+</div>
+<p>This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
+may run test/matx_test directly with parameters defined by Google Test (<a class="reference external" href="https://github.com/google/googletest">https://github.com/google/googletest</a>). To run matx_test
+directly, you must be inside the build/test directory for the correct paths to be set. For example,
+to run only tests with the name FFT:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> build/test
+./matx_test --gtest_filter<span class="o">=</span><span class="s2">&quot;*FFT*&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="benchmarks">
+<h2>Benchmarks<a class="headerlink" href="#benchmarks" title="Permalink to this headline">¶</a></h2>
+<p>MatX uses the NVBench software for the benchmarking framework. To run the benchmarks, you must have NVBench downloaded from
+<a class="reference external" href="https://github.com/NVIDIA/nvbench">https://github.com/NVIDIA/nvbench</a>. When specifying the CMake parameters benchmarks can be enabled by:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>cmake .. -DNVBENCH_DIR<span class="o">=</span>/my/nvbench/dir -DBUILD_BENCHMARKS<span class="o">=</span>ON
+</pre></div>
+</div>
+<p>NVBench has a small library that will be compiled on the first <cite>make</cite> run. A binary called <cite>matx_bench</cite> will be produced
+inside of build/bench, and all parameters to the binary can be found in the NVBench documentation.</p>
+</section>
+<section id="multi-gpu-support">
+<h2>Multi-GPU Support<a class="headerlink" href="#multi-gpu-support" title="Permalink to this headline">¶</a></h2>
+<p>MatX examples and unit tests can be compiled with multi-GPU support using the NVSHMEM library. NVSHMEM must be compiled and/or
+installed before building MatX with multi-GPU support. The build system will look in common locations for NVSHMEM libraries and
+include files, but the installation directory can be overridden on the cmake configuration:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>cmake -DMULTI_GPU<span class="o">=</span>ON -DNVSHMEM_DIR<span class="o">=</span>/usr/local/nvshmem ..
+</pre></div>
+</div>
+<p>If nvshmem is detected properly, you will see a message similar to the following during cmake:</p>
+<p><code class="docutils literal notranslate"><span class="pre">--</span> <span class="pre">Found</span> <span class="pre">Nvshmem:</span> <span class="pre">/usr/local/nvshmem/lib/libnvshmem.a</span></code></p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to MatX’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>

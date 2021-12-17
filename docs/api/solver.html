@@ -1,0 +1,528 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Linear Solvers &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Matrix Inverse" href="inverse.html" />
+    <link rel="prev" title="Matrix Multiply (GEMM)" href="matmul.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="class.html">Tensor Class Reference</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="transformations.html">Tensor Transformations</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="fft.html">FFT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="matmul.html">Matrix Multiply (GEMM)</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Linear Solvers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cached-api">Cached API</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#non-cached-api">Non-Cached API</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="inverse.html">Matrix Inverse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="filter.html">Filtering (IIR and FIR)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reduce.html">Reductions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sort.html">Sorting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tensorops.html">Tensor Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensorgenerators.html">Generator Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="random.html">Random Number Generation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Example Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">API Reference</a> &raquo;</li>
+        
+          <li><a href="transformations.html">Tensor Transformations</a> &raquo;</li>
+        
+      <li>Linear Solvers</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/api/solver.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="linear-solvers">
+<h1>Linear Solvers<a class="headerlink" href="#linear-solvers" title="Permalink to this headline">¶</a></h1>
+<p>The linear solver interface provides methods for users to run a linear solver using either cuBLAS or
+cuSolver as the backend.</p>
+<section id="cached-api">
+<h2>Cached API<a class="headerlink" href="#cached-api" title="Permalink to this headline">¶</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4cholEvR12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t">
+<span id="_CPPv3I00EN4matx4cholER12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t"></span><span id="_CPPv2I00EN4matx4cholER12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aebb9b71229d37a348d1b6a712961a591"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">chol</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4cholEvR12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t" title="matx::chol::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4cholEvR12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t" title="matx::chol::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4cholEvR12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a Cholesky decomposition using a cached plan</p>
+<p>See documentation of <a class="reference internal" href="#classmatx_1_1matxDnCholSolverPlan__t"><span class="std std-ref">matxDnCholSolverPlan_t</span></a> for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a Cholesky decomposition from only the matrix A. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of matrix A </p></li>
+<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>out</strong> – Output tensor </p></li>
+<li><p><strong>a</strong> – Input tensor </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>uplo</strong> – Part of matrix to fill </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t">
+<span id="_CPPv3I000EN4matx2luER12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t"></span><span id="_CPPv2I000EN4matx2luER12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PivotTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a596cd5fea0e992f6d3b0cb86754776f3"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">lu</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t" title="matx::lu::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t" title="matx::lu::PivotTensor"><span class="n"><span class="pre">PivotTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">piv</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t" title="matx::lu::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a LU decomposition using a cached plan</p>
+<p>See documentation of <a class="reference internal" href="#classmatx_1_1matxDnLUSolverPlan__t"><span class="std std-ref">matxDnLUSolverPlan_t</span></a> for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform an LU decomposition from only the matrix A. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of matrix A </p></li>
+<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>out</strong> – Output tensor view </p></li>
+<li><p><strong>piv</strong> – Output of pivot indices </p></li>
+<li><p><strong>a</strong> – Input matrix A </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx2qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t">
+<span id="_CPPv3I000EN4matx2qrER9OutTensorR9TauTensorRK7ATensor12cudaStream_t"></span><span id="_CPPv2I000EN4matx2qrER9OutTensorR9TauTensorRK7ATensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TauTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ab4995f533dba0349289592dcd507b960"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">qr</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx2qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t" title="matx::qr::OutTensor"><span class="n"><span class="pre">OutTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx2qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t" title="matx::qr::TauTensor"><span class="n"><span class="pre">TauTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">tau</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx2qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t" title="matx::qr::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx2qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a QR decomposition using a cached plan</p>
+<p>See documentation of <a class="reference internal" href="#classmatx_1_1matxDnQRSolverPlan__t"><span class="std std-ref">matxDnQRSolverPlan_t</span></a> for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a QR decomposition from only the matrix A. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of matrix A </p></li>
+<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>out</strong> – Output tensor view </p></li>
+<li><p><strong>tau</strong> – Output of reflection scalar values </p></li>
+<li><p><strong>a</strong> – Input tensor A </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc">
+<span id="_CPPv3I0000EN4matx3svdER7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc"></span><span id="_CPPv2I0000EN4matx3svdER7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">UTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">STensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a34b34776863370d0b29dbb632306eb1e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">svd</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::UTensor"><span class="n"><span class="pre">UTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::STensor"><span class="n"><span class="pre">STensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">s</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::VTensor"><span class="n"><span class="pre">VTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">v</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobu</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobvt</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a SVD decomposition using a cached plan</p>
+<p>See documentation of matxDnSVDSolverPlan_t for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a SVD decomposition from only the matrix A.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of matrix A </p></li>
+<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>u</strong> – U matrix output </p></li>
+<li><p><strong>s</strong> – Sigma matrix output </p></li>
+<li><p><strong>v</strong> – V matrix output </p></li>
+<li><p><strong>a</strong> – Input matrix A </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>jobu</strong> – Specifies options for computing all or part of the matrix U: = ‘A’. See cuSolver documentation for more info </p></li>
+<li><p><strong>jobvt</strong> – specifies options for computing all or part of the matrix V**T. See cuSolver documentation for more info </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t">
+<span id="_CPPv3I000EN4matx3eigER12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t"></span><span id="_CPPv2I000EN4matx3eigER12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a62e9817e2c3e2e2e388ccb2b30754f76"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">eig</span></span></span><span class="sig-paren">(</span><span class="pre">[[maybe_unused]]</span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::WTensor"><span class="n"><span class="pre">WTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">w</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="n"><span class="pre">cusolverEigMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobz</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUSOLVER_EIG_MODE_VECTOR</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Perform a Eig decomposition using a cached plan</p>
+<p>See documentation of <a class="reference internal" href="#classmatx_1_1matxDnEigSolverPlan__t"><span class="std std-ref">matxDnEigSolverPlan_t</span></a> for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a eigen decomposition from only the matrix A. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of matrix A </p></li>
+<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>out</strong> – Output tensor view </p></li>
+<li><p><strong>w</strong> – Eigenvalues output </p></li>
+<li><p><strong>a</strong> – Input matrix A </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>jobz</strong> – CUSOLVER_EIG_MODE_VECTOR to compute eigenvectors or CUSOLVER_EIG_MODE_NOVECTOR to not compute </p></li>
+<li><p><strong>uplo</strong> – Where to store data in A </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="non-cached-api">
+<h2>Non-Cached API<a class="headerlink" href="#non-cached-api" title="Permalink to this headline">¶</a></h2>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx22matxDnCholSolverPlan_tE">
+<span id="_CPPv3I00EN4matx22matxDnCholSolverPlan_tE"></span><span id="_CPPv2I00EN4matx22matxDnCholSolverPlan_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxDnCholSolverPlan__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxDnCholSolverPlan_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxDnSolver_t</span></span><a class="headerlink" href="#_CPPv4I00EN4matx22matxDnCholSolverPlan_tE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx22matxDnCholSolverPlan_t22matxDnCholSolverPlan_tERK7ATensor16cublasFillMode_t">
+<span id="_CPPv3N4matx22matxDnCholSolverPlan_t22matxDnCholSolverPlan_tERK7ATensor16cublasFillMode_t"></span><span id="_CPPv2N4matx22matxDnCholSolverPlan_t22matxDnCholSolverPlan_tERK7ATensor16cublasFillMode_t"></span><span id="matx::matxDnCholSolverPlan_t::matxDnCholSolverPlan_t__ATensorCR.cublasFillMode_t"></span><span class="target" id="classmatx_1_1matxDnCholSolverPlan__t_1a184c0b6df22c03853249d3dc09e99368"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxDnCholSolverPlan_t</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx22matxDnCholSolverPlan_tE" title="matx::matxDnCholSolverPlan_t::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx22matxDnCholSolverPlan_t22matxDnCholSolverPlan_tERK7ATensor16cublasFillMode_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Plan for solving <span class="math notranslate nohighlight">\(\textbf{A} = \textbf{L} * \textbf{L^{H}}\)</span> or <span class="math notranslate nohighlight">\(\textbf{A} = \textbf{U} * \textbf{U^{H}}\)</span> using the Cholesky method</p>
+<p>Creates a handle for solving the factorization of A = M * M^H of a dense matrix using the Cholesky method, where M is either the upper or lower triangular portion of A. Input matrix A must be a square Hermitian matrix positive-definite where only the upper or lower triangle is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of A matrix </p></li>
+<li><p><strong>RANK</strong> – Rank of A matrix</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>a</strong> – Input tensor view </p></li>
+<li><p><strong>uplo</strong> – Use upper or lower triangle for computation </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx22matxDnCholSolverPlan_tD0Ev">
+<span id="_CPPv3N4matx22matxDnCholSolverPlan_tD0Ev"></span><span id="_CPPv2N4matx22matxDnCholSolverPlan_tD0Ev"></span><span id="matx::matxDnCholSolverPlan_t::~matxDnCholSolverPlan_t"></span><span class="target" id="classmatx_1_1matxDnCholSolverPlan__t_1abb4570e7f222ce07291d839e7b252ff9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~matxDnCholSolverPlan_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx22matxDnCholSolverPlan_tD0Ev" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Cholesky solver handle destructor</p>
+<p>Destroys any helper data used for provider type and any workspace memory created </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx20matxDnLUSolverPlan_tE">
+<span id="_CPPv3I000EN4matx20matxDnLUSolverPlan_tE"></span><span id="_CPPv2I000EN4matx20matxDnLUSolverPlan_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PivotTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxDnLUSolverPlan__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxDnLUSolverPlan_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxDnSolver_t</span></span><a class="headerlink" href="#_CPPv4I000EN4matx20matxDnLUSolverPlan_tE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx20matxDnLUSolverPlan_t20matxDnLUSolverPlan_tER11PivotTensorRK7ATensor">
+<span id="_CPPv3N4matx20matxDnLUSolverPlan_t20matxDnLUSolverPlan_tER11PivotTensorRK7ATensor"></span><span id="_CPPv2N4matx20matxDnLUSolverPlan_t20matxDnLUSolverPlan_tER11PivotTensorRK7ATensor"></span><span id="matx::matxDnLUSolverPlan_t::matxDnLUSolverPlan_t__PivotTensorR.ATensorCR"></span><span class="target" id="classmatx_1_1matxDnLUSolverPlan__t_1ace3d702baa5ffb73b252e7a66872be46"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxDnLUSolverPlan_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx20matxDnLUSolverPlan_tE" title="matx::matxDnLUSolverPlan_t::PivotTensor"><span class="n"><span class="pre">PivotTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">piv</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx20matxDnLUSolverPlan_tE" title="matx::matxDnLUSolverPlan_t::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx20matxDnLUSolverPlan_t20matxDnLUSolverPlan_tER11PivotTensorRK7ATensor" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Plan for factoring A such that <span class="math notranslate nohighlight">\(\textbf{P} * \textbf{A} = \textbf{L} * \textbf{U}\)</span></p>
+<p>Creates a handle for factoring matrix A into the format above. Matrix must not be singular.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of A matrix </p></li>
+<li><p><strong>RANK</strong> – Rank of A matrix</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>piv</strong> – Pivot indices </p></li>
+<li><p><strong>a</strong> – Input tensor view </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx20matxDnLUSolverPlan_tD0Ev">
+<span id="_CPPv3N4matx20matxDnLUSolverPlan_tD0Ev"></span><span id="_CPPv2N4matx20matxDnLUSolverPlan_tD0Ev"></span><span id="matx::matxDnLUSolverPlan_t::~matxDnLUSolverPlan_t"></span><span class="target" id="classmatx_1_1matxDnLUSolverPlan__t_1afdec89f92baa127248508531b0669087"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~matxDnLUSolverPlan_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx20matxDnLUSolverPlan_tD0Ev" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>LU solver handle destructor</p>
+<p>Destroys any helper data used for provider type and any workspace memory created </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx20matxDnQRSolverPlan_tE">
+<span id="_CPPv3I000EN4matx20matxDnQRSolverPlan_tE"></span><span id="_CPPv2I000EN4matx20matxDnQRSolverPlan_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TauTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxDnQRSolverPlan__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxDnQRSolverPlan_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxDnSolver_t</span></span><a class="headerlink" href="#_CPPv4I000EN4matx20matxDnQRSolverPlan_tE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx20matxDnQRSolverPlan_t20matxDnQRSolverPlan_tER9TauTensorRK7ATensor">
+<span id="_CPPv3N4matx20matxDnQRSolverPlan_t20matxDnQRSolverPlan_tER9TauTensorRK7ATensor"></span><span id="_CPPv2N4matx20matxDnQRSolverPlan_t20matxDnQRSolverPlan_tER9TauTensorRK7ATensor"></span><span id="matx::matxDnQRSolverPlan_t::matxDnQRSolverPlan_t__TauTensorR.ATensorCR"></span><span class="target" id="classmatx_1_1matxDnQRSolverPlan__t_1addf2d1ce2d70dbc4fef5b12b21d5ef5f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxDnQRSolverPlan_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx20matxDnQRSolverPlan_tE" title="matx::matxDnQRSolverPlan_t::TauTensor"><span class="n"><span class="pre">TauTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">tau</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx20matxDnQRSolverPlan_tE" title="matx::matxDnQRSolverPlan_t::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx20matxDnQRSolverPlan_t20matxDnQRSolverPlan_tER9TauTensorRK7ATensor" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Plan for factoring A such that <span class="math notranslate nohighlight">\(\textbf{A} = \textbf{Q} * \textbf{R}\)</span></p>
+<p>Creates a handle for factoring matrix A into the format above. QR decomposition in cuBLAS/cuSolver does not return the Q matrix directly, and it must be computed separately used the Householder reflections in the tau output, along with the overwritten A matrix input. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of A matrix </p></li>
+<li><p><strong>RANK</strong> – Rank of A matrix</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>tau</strong> – Scaling factors for reflections </p></li>
+<li><p><strong>a</strong> – Input tensor view </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx20matxDnQRSolverPlan_tD0Ev">
+<span id="_CPPv3N4matx20matxDnQRSolverPlan_tD0Ev"></span><span id="_CPPv2N4matx20matxDnQRSolverPlan_tD0Ev"></span><span id="matx::matxDnQRSolverPlan_t::~matxDnQRSolverPlan_t"></span><span class="target" id="classmatx_1_1matxDnQRSolverPlan__t_1ac73ccbe146176958e3fd598cb3e0fc1b"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~matxDnQRSolverPlan_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx20matxDnQRSolverPlan_tD0Ev" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>QR solver handle destructor</p>
+<p>Destroys any helper data used for provider type and any workspace memory created </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx21matxDnEigSolverPlan_tE">
+<span id="_CPPv3I000EN4matx21matxDnEigSolverPlan_tE"></span><span id="_CPPv2I000EN4matx21matxDnEigSolverPlan_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxDnEigSolverPlan__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxDnEigSolverPlan_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxDnSolver_t</span></span><a class="headerlink" href="#_CPPv4I000EN4matx21matxDnEigSolverPlan_tE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx21matxDnEigSolverPlan_t21matxDnEigSolverPlan_tER7WTensorRK7ATensor17cusolverEigMode_t16cublasFillMode_t">
+<span id="_CPPv3N4matx21matxDnEigSolverPlan_t21matxDnEigSolverPlan_tER7WTensorRK7ATensor17cusolverEigMode_t16cublasFillMode_t"></span><span id="_CPPv2N4matx21matxDnEigSolverPlan_t21matxDnEigSolverPlan_tER7WTensorRK7ATensor17cusolverEigMode_t16cublasFillMode_t"></span><span id="matx::matxDnEigSolverPlan_t::matxDnEigSolverPlan_t__WTensorR.ATensorCR.cusolverEigMode_t.cublasFillMode_t"></span><span class="target" id="classmatx_1_1matxDnEigSolverPlan__t_1ac165453c0b66f4a8bd857db83edc234a"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxDnEigSolverPlan_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx21matxDnEigSolverPlan_tE" title="matx::matxDnEigSolverPlan_t::WTensor"><span class="n"><span class="pre">WTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">w</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx21matxDnEigSolverPlan_tE" title="matx::matxDnEigSolverPlan_t::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cusolverEigMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobz</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUSOLVER_EIG_MODE_VECTOR</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx21matxDnEigSolverPlan_t21matxDnEigSolverPlan_tER7WTensorRK7ATensor17cusolverEigMode_t16cublasFillMode_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Plan computing eigenvalues/vectors on A such that:</p>
+<p><span class="math notranslate nohighlight">\(\textbf{A} * textbf{V} = \textbf{V} * \textbf{\Lambda}\)</span></p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T1</strong> – Data type of A matrix </p></li>
+<li><p><strong>T2</strong> – Data type of W matrix </p></li>
+<li><p><strong>RANK</strong> – Rank of A matrix</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>w</strong> – Eigenvalues of A </p></li>
+<li><p><strong>a</strong> – Input tensor view </p></li>
+<li><p><strong>jobz</strong> – CUSOLVER_EIG_MODE_VECTOR to compute eigenvectors or CUSOLVER_EIG_MODE_NOVECTOR to not compute </p></li>
+<li><p><strong>uplo</strong> – Where to store data in A </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx21matxDnEigSolverPlan_tD0Ev">
+<span id="_CPPv3N4matx21matxDnEigSolverPlan_tD0Ev"></span><span id="_CPPv2N4matx21matxDnEigSolverPlan_tD0Ev"></span><span id="matx::matxDnEigSolverPlan_t::~matxDnEigSolverPlan_t"></span><span class="target" id="classmatx_1_1matxDnEigSolverPlan__t_1a7aa992f9f1ec600fef5ca0e9a30d5144"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~matxDnEigSolverPlan_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx21matxDnEigSolverPlan_tD0Ev" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Eigen solver handle destructor</p>
+<p>Destroys any helper data used for provider type and any workspace memory created </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="inverse.html" class="btn btn-neutral float-right" title="Matrix Inverse" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="matmul.html" class="btn btn-neutral float-left" title="Matrix Multiply (GEMM)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>
