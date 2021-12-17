@@ -1,0 +1,362 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Filtering (IIR and FIR) &mdash; matx  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Reductions" href="reduce.html" />
+    <link rel="prev" title="Matrix Inverse" href="inverse.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> matx
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="class.html">Tensor Class Reference</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="transformations.html">Tensor Transformations</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="fft.html">FFT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="matmul.html">Matrix Multiply (GEMM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="solver.html">Linear Solvers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="inverse.html">Matrix Inverse</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Filtering (IIR and FIR)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cached-api">Cached API</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#non-cached-api">Non-Cached API</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="reduce.html">Reductions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sort.html">Sorting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tensorops.html">Tensor Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensorgenerators.html">Generator Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="random.html">Random Number Generation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Example Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">matx</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">API Reference</a> &raquo;</li>
+        
+          <li><a href="transformations.html">Tensor Transformations</a> &raquo;</li>
+        
+      <li>Filtering (IIR and FIR)</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/api/filter.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="filtering-iir-and-fir">
+<h1>Filtering (IIR and FIR)<a class="headerlink" href="#filtering-iir-and-fir" title="Permalink to this headline">¶</a></h1>
+<p>The filter transformation API provides functions for executing IIR and FIR filters on tensor_t objects.</p>
+<section id="cached-api">
+<h2>Cached API<a class="headerlink" href="#cached-api" title="Permalink to this headline">¶</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t">
+<span id="_CPPv3I_6size_t_6size_t000EN4matx6filterER7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t"></span><span id="_CPPv2I_6size_t_6size_t000EN4matx6filterER7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NNR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FilterType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1af1eddc5b51b22f681a853e619555fbd5"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">filter</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::NR"><span class="n"><span class="pre">NR</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">h_rec</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="matx::filter::NNR"><span class="n"><span class="pre">NNR</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">h_nonrec</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>FIR and IIR filtering without a plan</p>
+<p>matxFilter_t<p>provides an interface for executing recursive (IIR) and non-recursive (FIR) filters. The IIR filter uses the algorithm from “S. Maleki</p>
+<p>and M. Burtscher. “Automatic Hierarchical Parallelization of Linear Recurrences.” 23rd ACM International Conference on Architectural Support for</p>
+<p>Programming Languages and Operating Systems. March 2018.” for an optimized implementation on highly-parallel processors. While the IIR implementation is fast for recursive filters, it is inefficient for non-recursive filtering. If the number of recursive coefficients is 0, the filter operation will revert to use an algorithm optimized for non-recursive filters.</p>
+</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you are only using non-recursive filters, it’s advised to use the convolution API directly instead since it can be easier to use.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>NR</strong> – Number of recursive coefficients </p></li>
+<li><p><strong>NNR</strong> – Number of non-recursive coefficients </p></li>
+<li><p><strong>RANK</strong> – Rank of input and output signal </p></li>
+<li><p><strong>OutType</strong> – Ouput type </p></li>
+<li><p><strong>InType</strong> – Input type </p></li>
+<li><p><strong>FilterType</strong> – Filter type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>o</strong> – Output tensor </p></li>
+<li><p><strong>i</strong> – Input tensor </p></li>
+<li><p><strong>h_rec</strong> – Vector of recursive coefficients </p></li>
+<li><p><strong>h_nonrec</strong> – Vector of non-recursive coefficients </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="non-cached-api">
+<h2>Non-Cached API<a class="headerlink" href="#non-cached-api" title="Permalink to this headline">¶</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE">
+<span id="_CPPv3I_6size_t_6size_t000EN4matx14matxMakeFilterER7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE"></span><span id="_CPPv2I_6size_t_6size_t000EN4matx14matxMakeFilterER7OutTypeRK6InTypeR8tensor_tI10FilterTypeX1EER8tensor_tI10FilterTypeX1EE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NNR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FilterType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1af1bf4add06a9629e7aa63b07609a3000"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxMakeFilter</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE" title="matx::matxMakeFilter::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE" title="matx::matxMakeFilter::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <a class="reference internal" href="tensorview.html#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t"><span class="n"><span class="pre">tensor_t</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE" title="matx::matxMakeFilter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">h_rec</span></span>, <a class="reference internal" href="tensorview.html#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t"><span class="n"><span class="pre">tensor_t</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE" title="matx::matxMakeFilter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">h_nonrec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeR8tensor_tI10FilterTypeXL1EEER8tensor_tI10FilterTypeXL1EEE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>FIR and IIR filtering</p>
+<p>matxFilter_t<p>provides an interface for executing recursive (IIR) and non-recursive (FIR) filters. The IIR filter uses the algorithm from “S. Maleki</p>
+<p>and M. Burtscher. “Automatic Hierarchical Parallelization of Linear Recurrences.” 23rd ACM International Conference on Architectural Support for</p>
+<p>Programming Languages and Operating Systems. March 2018.” for an optimized implementation on highly-parallel processors. While the IIR implementation is fast for recursive filters, it is inefficient for non-recursive filtering. If the number of recursive coefficients is 0, the filter operation will revert to use an algorithm optimized for non-recursive filters.</p>
+</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you are only using non-recursive filters, it’s advised to use the convolution API directly instead since it can be easier to use.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>NR</strong> – Number of recursive coefficients </p></li>
+<li><p><strong>NNR</strong> – Number of non-recursive coefficients </p></li>
+<li><p><strong>RANK</strong> – Rank of input and output signal </p></li>
+<li><p><strong>OutType</strong> – Ouput type </p></li>
+<li><p><strong>InType</strong> – Input type </p></li>
+<li><p><strong>FilterType</strong> – Filter type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>o</strong> – Output tensor </p></li>
+<li><p><strong>i</strong> – Input tensor </p></li>
+<li><p><strong>h_rec</strong> – 1D input tensor of recursive filter coefficients </p></li>
+<li><p><strong>h_nonrec</strong> – 1D input tensor of recursive filter coefficients </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE">
+<span id="_CPPv3I_6size_t_6size_t000EN4matx14matxMakeFilterER7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE"></span><span id="_CPPv2I_6size_t_6size_t000EN4matx14matxMakeFilterER7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NNR</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FilterType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0311950391bafbe29c4725a4fb46b522"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxMakeFilter</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::NR"><span class="n"><span class="pre">NR</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">h_rec</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::FilterType"><span class="n"><span class="pre">FilterType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="matx::matxMakeFilter::NNR"><span class="n"><span class="pre">NNR</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">h_nonrec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_6size_t_6size_t000EN4matx14matxMakeFilterEDaR7OutTypeRK6InTypeRKNSt5arrayI10FilterType2NREERKNSt5arrayI10FilterType3NNREE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>FIR and IIR filtering</p>
+<p>matxFilter_t<p>provides an interface for executing recursive (IIR) and non-recursive (FIR) filters. The IIR filter uses the algorithm from “S. Maleki</p>
+<p>and M. Burtscher. “Automatic Hierarchical Parallelization of Linear Recurrences.” 23rd ACM International Conference on Architectural Support for</p>
+<p>Programming Languages and Operating Systems. March 2018.” for an optimized implementation on highly-parallel processors. While the IIR implementation is fast for recursive filters, it is inefficient for non-recursive filtering. If the number of recursive coefficients is 0, the filter operation will revert to use an algorithm optimized for non-recursive filters.</p>
+</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you are only using non-recursive filters, it’s advised to use the convolution API directly instead since it can be easier to use.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>NR</strong> – Number of recursive coefficients </p></li>
+<li><p><strong>NNR</strong> – Number of non-recursive coefficients </p></li>
+<li><p><strong>RANK</strong> – Rank of input and output signal </p></li>
+<li><p><strong>OutType</strong> – Ouput type </p></li>
+<li><p><strong>InType</strong> – Input type </p></li>
+<li><p><strong>FilterType</strong> – Filter type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>o</strong> – Output tensor </p></li>
+<li><p><strong>i</strong> – Input tensor </p></li>
+<li><p><strong>h_rec</strong> – Vector of recursive coefficients </p></li>
+<li><p><strong>h_nonrec</strong> – Vector of non-recursive coefficients </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="reduce.html" class="btn btn-neutral float-right" title="Reductions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="inverse.html" class="btn btn-neutral float-left" title="Matrix Inverse" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Nvidia.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+
+</body>
+</html>

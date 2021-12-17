@@ -6,9 +6,8 @@ to pick up the syntax quickly without understanding the underlying architecture.
 it lacks flexibility and can prevent your code from running at the highest performance possible. This document walks through the
 different ways to construct tensors, and when you should use certain methods over others.
 
-A quick primer on MatX types
-==============================
-
+A Quick Primer On MatX Types
+----------------------------
 The basic type of tensor used in most examples and tests is the ``tensor_t`` object. ``tensor_t`` is the highest-level tensor class, and
 provides all of the abstractions for viewing and modifying data, holding storage, and any other metadata needed by a tensor. Because of
 their relatively large size, ``tensor_t`` objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler Error
@@ -33,7 +32,7 @@ To convert between a ``tensor_t`` and ``tensor_impl_t`` a type trait called ``ba
 where ``in`` is the ``tensor_t`` object and ``in1_`` will be a ``tensor_impl_t``.
 
 MatX Storage
-============
+------------
 Within the ``tensor_t`` class is an abstract template parameter called ``Storage``. ``Storage`` objects are always created from a ``basic_storage``
 class, which provides all accessor functions common to the underlying storage. ``basic_storage`` can wrap raw pointers using the ``raw_pointer_buffer``
 class, smart pointers using the ``smart_pointer_buffer`` class, or any RAII object that provides the required interface. If no user-defined storage
@@ -52,7 +51,7 @@ and deallocate memory when the last tensor using the memory goes out of scope. B
 perform any reference counting or deallocations when out of scope.
 
 Tensor Descriptors
-==================
+------------------
 Tensor descriptors are a template type inside ``tensor_impl_t`` that provide information about the size and strides of the tensor. While descriptors
 are a simply concept, the implementation can have a large impact on performance if not tuned properly. Both the sizes and strides of the tensor are
 a template class supporting iterators to access the metadata directly, and utility functions for accessing and computing other values from the metadata.
@@ -77,7 +76,7 @@ runtime of a kernel
 
 
 Creating Tensors
-================
+----------------
 With the tensor terminology out of the way, it's time to discuss how to create tensors. If there's one thing to take from this article, it's that you
 should use ``make_tensor`` or ``make_static_tensor`` wherever possible.
 
@@ -98,7 +97,7 @@ spelling out the types themselves. For examples of this, see the simple_pipeline
 
 All make functions take the data type as the first template parameter.
 
-Make variants
+Make Variants
 #############
 There are currently 4 different variants of the ``make_`` helper functions:
 - ``make_`` for creating a tensor with a dynamic descriptor and returning by value

@@ -79,6 +79,7 @@ public:
    * @brief Constructor with just shape for non-C-style arrays
    * 
    * @param shape 
+   *   Shape of tensor
    */
   template <typename S2, std::enable_if_t<!std::is_array_v<typename remove_cvref<S2>::type> && !is_matx_descriptor_v<typename remove_cvref<S2>::type>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t(S2 &&shape) 
@@ -90,6 +91,7 @@ public:
    * @brief Constructor with just shape for C-style arrays
    * 
    * @param shape 
+   *   Shape of tensor
    */
   template <int M = RANK>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const index_t (&shape)[M])
@@ -104,6 +106,9 @@ public:
    * @brief Constructor with perfect-forwarded shape and C array of strides
    * 
    * @param shape 
+   *   Shape of tensor
+   * @param strides
+   *   Strides of tensor
    */
   template <std::enable_if_t<!std::is_array_v<ShapeType>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeType &&shape, const stride_type (&strides)[RANK]) : 
@@ -119,6 +124,9 @@ public:
    * @brief Constructor with perfect-forwarded shape and C array of strides
    * 
    * @param shape 
+   *   Shape of tensor
+   * @param strides
+   *   Strides of tensor
    */
   template <std::enable_if_t<!std::is_array_v<StrideType>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideType &&strides) : 
@@ -131,9 +139,12 @@ public:
   }  
 
   /**
-   * @brief Constructor with perfect-forwarded shape and C array of strides
+   * @brief Constructor with C-style array shape and strides
    * 
    * @param shape 
+   *   Shape of tensor
+   * @param strides
+   *   Strides of tensor
    */
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], const stride_type (&strides)[RANK]) {
     for (int i = 0; i < RANK; i++) {
