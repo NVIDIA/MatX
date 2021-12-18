@@ -216,6 +216,7 @@ public:
 template <typename T, int RANK> class randomTensorView_t {
 private:
   tensorShape_t<RANK> shape_;
+  std::array<index_t, RANK> strides_;
   curandStatePhilox4_32_10_t *states_;
   Distribution_t dist_;
   T alpha_, beta_;
@@ -233,98 +234,41 @@ public:
   {
     dist_ = dist;
     states_ = states;
+
+    if constexpr (RANK >= 1) {
+      strides_[RANK-1] = 1;
+    }
+
+    #pragma unroll
+    for (int i = RANK - 2; i >= 0; i--) {
+      strides_[i] = Stride(i+1) * Size(i+1);
+    }
   }
 
-  /**
-   * Retrieve a value from a rank-0 random view
-   */
-#ifndef DOXYGEN_ONLY  
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-#endif  
-  inline __MATX_DEVICE__ T operator()() const
-  {
-    T val;
-    get_random(val, &states_[0], dist_);
-    return alpha_ * val + beta_;
-  };
+  template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...>) const {
+    return 0;
+  }    
+
+  template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...> tup) const {
+    return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*Stride(I);
+  }     
 
   /**
-   * Retrieve a value from a rank-1 random view
-   *
-   * @param i
-   *   First index
+   * Retrieve a value from a random view
    */
-#ifndef DOXYGEN_ONLY    
-  template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-#endif    
-  inline __MATX_DEVICE__ T operator()(index_t i) const
+  template <typename... Is>
+  inline __MATX_DEVICE__ T operator()(Is... indices) const
   {
     T val;
-    get_random(val, &states_[i], dist_);
-    return alpha_ * val + beta_;
-  };
+    if constexpr (RANK == 0) {
+      get_random(val, &states_[0], dist_);      
+    }
+    else {
+      get_random(val, &states_[GetValC<0, Is...>(std::make_tuple(indices...))], dist_);
+    }
 
-  /**
-   * Retrieve a value from a rank-2 random view
-   *
-   * @param i
-   *   First index
-   * @param j
-   *   Second index
-   */
-#ifndef DOXYGEN_ONLY    
-  template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-#endif    
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
-  {
-    T val;
-    get_random(val, &states_[(index_t)i * Size(1) + j], dist_);
-    return alpha_ * val + beta_;
-  };
-
-  /**
-   * Retrieve a value from a rank-3 random view
-   *
-   * @param i
-   *   First index
-   * @param j
-   *   Second index
-   * @param k
-   *   Third index
-   */
-#ifndef DOXYGEN_ONLY    
-  template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-#endif    
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k) const
-  {
-    T val;
-    get_random(val, &states_[(index_t)i * Size(1) * Size(2) + j * Size(2) + k],
-               dist_);
-    return alpha_ * val + beta_;
-  };
-
-  /**
-   * Retrieve a value from a rank-4 random view
-   *
-   * @param i
-   *   First index
-   * @param j
-   *   Second index
-   * @param k
-   *   Third index
-   * @param l
-   *   Fourth index
-   */
-#ifndef DOXYGEN_ONLY    
-  template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-#endif    
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l) const
-  {
-    T val;
-    get_random(val,
-               &states_[i * Size(1) * Size(2) * Size(3) +
-                        j * Size(2) * Size(3) + k * Size(3) + l],
-               dist_);
     return alpha_ * val + beta_;
   };
 
@@ -334,6 +278,11 @@ public:
   {
     return shape_.Size(dim);
   }
+
+  index_t inline __MATX_HOST__ __MATX_DEVICE__ Stride(int dim) const
+  {
+    return strides_[dim];
+  }  
 };
 
 /**

@@ -32,6 +32,9 @@
 
 #pragma once
 
+#include <cuda/std/tuple>
+#include <functional>
+
 namespace matx
 {
 
@@ -106,220 +109,49 @@ namespace matx
     return size;
   }
 
-  // get_matx_value is a work around some compiler bugs
-  // it only works with matxop types.  It should only be
-  // called from get_value below.
-  // We also have to do this recursively to get around bug
-  // We also have to invert logic and repeat to get around bug
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, index_t idx)
-  {
-    if constexpr (T::Rank() == 1)
-    {
-      return i(idx);
-    }
-    else
-    {
-      return i();
-    }
 
-    // Bug WAR
-    if constexpr (T::Rank() != 1)
-    {
-      return i();
+
+  /**
+   * @brief Get the matx value object using broadcasting
+   * 
+   * @tparam T type of operator
+   * @tparam Is type of indices
+   * @param i operator
+   * @param indices indices
+   * @return Value after broadcasting
+   */
+  template <class T, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, Is... indices)
+  {
+    if constexpr (T::Rank() == sizeof...(Is)) {
+      return i(indices...);
     }
     else
     {
-      return i(idx);
+      // Construct an integer sequence of the length of the tuple, but only using the last indices
+      using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
+      auto tup = cuda::std::make_tuple(indices...);
+      auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
+      return mapply([&](auto... args) {
+        return i(args...);
+      }, sliced_tup);
     }
   }
 
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, index_t idy, index_t idx)
-  {
-    if constexpr (T::Rank() == 2)
-    {
-      return i(idy, idx);
-    }
-    else
-    {
-      return get_matx_value(i, idx);
-    }
 
-    // Bug WAR
-    if constexpr (T::Rank() != 2)
+  template <class T, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, Is... indices)
+  {
+    if constexpr (is_matx_op<T>())
     {
-      return get_matx_value(i, idx);
+      return get_matx_value(i, indices...);
     }
     else
     {
-      return i(idy, idx);
+      return i;
     }
   }
 
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, index_t idz, index_t idy,
-                                        index_t idx)
-  {
-    if constexpr (T::Rank() == 3)
-    {
-      return i(idz, idy, idx);
-    }
-    else
-    {
-      return get_matx_value(i, idy, idx);
-    }
-
-    // Bug WAR
-    if constexpr (T::Rank() != 3)
-    {
-      return get_matx_value(i, idy, idx);
-    }
-    else
-    {
-      return i(idz, idy, idx);
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, index_t idw, index_t idz,
-                                        index_t idy, index_t idx)
-  {
-    if constexpr (T::Rank() == 4)
-    {
-      return i(idw, idz, idy, idx);
-    }
-    else
-    {
-      return get_matx_value(i, idz, idy, idx);
-    }
-
-    // Bug WAR
-    if constexpr (T::Rank() != 4)
-    {
-      return get_matx_value(i, idz, idy, idx);
-    }
-    else
-    {
-      return i(idw, idz, idy, idx);
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i)
-  {
-    if constexpr (is_matx_op<M>())
-    {
-      return i();
-    }
-    else
-    {
-      return i;
-    }
-
-    // Bug WAR
-    if constexpr (!is_matx_op<M>())
-    {
-      return i;
-    }
-    else
-    {
-      return i();
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, [[maybe_unused]] index_t idx)
-  {
-    if constexpr (is_matx_op<M>())
-    {
-      return get_matx_value(i, idx);
-    }
-    else
-    {
-      return i;
-    }
-
-    // Bug WAR
-    if constexpr (!is_matx_op<M>())
-    {
-      return i;
-    }
-    else
-    {
-      return get_matx_value(i, idx);
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, [[maybe_unused]] index_t idy, [[maybe_unused]] index_t idx)
-  {
-    if constexpr (is_matx_op<M>())
-    {
-      return get_matx_value(i, idy, idx);
-    }
-    else
-    {
-      return i;
-    }
-
-    // Bug WAR
-    if constexpr (!is_matx_op<M>())
-    {
-      return i;
-    }
-    else
-    {
-      return get_matx_value(i, idy, idx);
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, [[maybe_unused]] index_t idz, [[maybe_unused]] index_t idy, [[maybe_unused]] index_t idx)
-  {
-    if constexpr (is_matx_op<M>())
-    {
-      return get_matx_value(i, idz, idy, idx);
-    }
-    else
-    {
-      return i;
-    }
-
-    // Bug WAR
-    if constexpr (!is_matx_op<M>())
-    {
-      return i;
-    }
-    else
-    {
-      return get_matx_value(i, idz, idy, idx);
-    }
-  }
-
-  template <class T, class M = T>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, [[maybe_unused]] index_t idw, [[maybe_unused]] index_t idz, [[maybe_unused]] index_t idy,
-                                   index_t idx)
-  {
-    if constexpr (is_matx_op<M>())
-    {
-      return get_matx_value(i, idw, idz, idy, idx);
-    }
-    else
-    {
-      return i;
-    }
-
-    // Bug WAR
-    if constexpr (!is_matx_op<M>())
-    {
-      return i;
-    }
-    else
-    {
-      return get_matx_value(i, idw, idz, idy, idx);
-    }
-  }
 
   // Returns an address of a pointer of type T aligned to new address
   template <typename T>
@@ -332,5 +164,59 @@ namespace matx
     }
 
     return reinterpret_cast<T *>(addr);
+  }
+
+  template <typename T, typename I, int32_t R>
+  void UpdateIndices(const T& op, std::array<I, R> &idx, int res) {
+    for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
+      idx[r]++;
+      if (idx[r] == op.Size(r)) {
+        idx[r] = 0;
+      }
+      else {
+        return;
+      }
+    }
+  }
+
+  // Work around cuda::std::apply not working
+  template <typename Func, typename Tuple, size_t... S>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
+    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+      return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
+    }
+    else {
+      return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
+    }
+  }
+
+  template <class Func, class Tuple>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t) 
+  {
+    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+      return apply_impl(
+          std::forward<Func>(f), std::forward<Tuple>(t),
+          std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+    } 
+    else {
+      return apply_impl(
+          std::forward<Func>(f), std::forward<Tuple>(t),
+          std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+    }
+  }  
+
+  template <class Func, class Tuple>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t) 
+  {
+    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+      return apply_impl(
+          std::forward<Func>(f), std::forward<Tuple>(t),
+          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+    }
+    else {
+      return apply_impl(
+          std::forward<Func>(f), std::forward<Tuple>(t),
+          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});      
+    }
   }    
 }

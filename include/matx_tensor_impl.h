@@ -33,6 +33,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cuda/std/functional>
 #include "matx_error.h"
 #include "matx_set.h"
 #include "matx_defines.h"
@@ -69,6 +70,7 @@ public:
   void run (Ex ex) {
     exec(*static_cast<T *>(this), ex);
   }
+
 };
 
 template <typename T, typename RankOp>
@@ -640,7 +642,13 @@ class tensor_impl_t {
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    __MATX_INLINE__ auto Descriptor() const noexcept { return this->desc_; }      
+    __MATX_INLINE__ auto Descriptor() const noexcept { return this->desc_; }     
+
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
+    {
+      return ldata_ + GetValC<0, Is...>(std::make_tuple(indices...));
+    }    
 
     /**
      * Check if a tensor is linear in memory for all elements in the view
@@ -653,190 +661,56 @@ class tensor_impl_t {
       return desc_.IsLinear();
     }
 
-    /**
-     * Rank-0 operator() getter
-     *
-     * @returns value in tensor
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()() const noexcept
-    {
-      return *ldata_;
+    template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal(std::tuple<Is...>)  {
+      return 0;
+    }    
+
+    template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal(std::tuple<Is...> tup)  {
+      return GetVal<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
     }
 
-    /**
-     * Rank-0 operator() setter
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()() noexcept
-    {   
-      return *ldata_;
-    }
+    template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC(const std::tuple<Is...>) const {
+      return 0;
+    }    
+
+    template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC(const std::tuple<Is...> tup) const {
+      return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+    }    
 
     /**
-     * Rank-1 operator() getter
+     * operator() getter
      *
-     * @param id0
-     *   Index into first dimension
+     * @param indices
+     *   Indices of tensor
      *
      * @returns value at given index
      *
      */
-    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0) const noexcept
+    template <int M = RANK, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(Is... indices) const noexcept
     {
-      return *(ldata_ + desc_.Stride(0) * id0);
+      return *(ldata_ + GetValC<0, Is...>(std::make_tuple(indices...)));
     }
 
     /**
-     * Rank-1 operator() setter
+     * operator() getter
      *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0) noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0);
-    }
-
-    /**
-     * Rank-2 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
+     * @param indices
+     *   Indices of tensor
      *
      * @returns value at given index
      *
      */
-    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0,
-                                                  shape_type id1) const noexcept
+    template <int M = RANK, typename... Is, 
+      std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(Is... indices) noexcept
     {
-      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1);
-    }
-
-    /**
-     * Rank-2 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 2, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1) noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1);
-    }
-
-    /**
-     * Rank-3 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(shape_type id0, shape_type id1,
-                                                  shape_type id2) const noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2);
-    }
-
-    /**
-     * Rank-3 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 3, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1,
-                                            shape_type id2) noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0 +desc_.Stride(1) * id1 + desc_.Stride(2) * id2);
-    }
-
-    /**
-     * Rank-4 operator() getter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @param id3
-     *   Index into fourth dimension
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &
-    operator()(shape_type id0, shape_type id1, shape_type id2, shape_type id3) const noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2 + desc_.Stride(3) * id3);
-    }
-
-    /**
-     * Rank-4 operator() setter
-     *
-     * @param id0
-     *   Index into first dimension
-     *
-     * @param id1
-     *   Index into second dimension
-     *
-     * @param id2
-     *   Index into third dimension
-     *
-     * @param id3
-     *   Index into fourth dimension
-     *
-     * @returns reference to value at given index
-     *
-     */
-    template <int M = RANK, std::enable_if_t<M == 4, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(shape_type id0, shape_type id1,
-                                            shape_type id2, shape_type id3) noexcept
-    {
-      return *(ldata_ + desc_.Stride(0) * id0 + desc_.Stride(1) * id1 + desc_.Stride(2) * id2 + desc_.Stride(3) * id3);
-    }  
+      return *(ldata_ + GetVal<0, Is...>(std::make_tuple(indices...)));
+    }    
 
     /**
      * operator() getter with an array index
@@ -844,21 +718,11 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(const std::array<index_t, RANK> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T operator()(const std::array<index_t, RANK> &idx) const noexcept
     {
-      if constexpr (RANK == 1) {
-        return this->operator()(idx[0]);
-      }
-      else if constexpr (RANK == 2) {
-        return this->operator()(idx[0], idx[1]);
-      }
-      else if constexpr (RANK == 3) {
-        return this->operator()(idx[0], idx[1], idx[2]);
-      }
-      else {
-        return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-      }
+      return std::apply([&](auto &&...args) -> T {
+          return this->operator()(args...);
+        }, idx);      
     }  
 
     /**
@@ -867,22 +731,22 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
-    {
-      if constexpr (RANK == 1) {
-        return this->operator()(idx[0]);
-      }
-      else if constexpr (RANK == 2) {
-        return this->operator()(idx[0], idx[1]);
-      }
-      else if constexpr (RANK == 3) {
-        return this->operator()(idx[0], idx[1], idx[2]);
-      }
-      else {
-        return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-      }
-    }      
+    // template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
+    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    // {
+    //   if constexpr (RANK == 1) {
+    //     return this->operator()(idx[0]);
+    //   }
+    //   else if constexpr (RANK == 2) {
+    //     return this->operator()(idx[0], idx[1]);
+    //   }
+    //   else if constexpr (RANK == 3) {
+    //     return this->operator()(idx[0], idx[1], idx[2]);
+    //   }
+    //   else {
+    //     return this->operator()(idx[0], idx[1], idx[2], idx[3]);
+    //   }
+    // }      
 
     /**
      * Get the rank of the tensor
@@ -1015,7 +879,7 @@ class tensor_impl_t {
     __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
     {
       MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
-
+      MATX_STATIC_ASSERT(RANK <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
       if constexpr (sizeof...(Args) == 0) {
         PrintVal(this->operator()());
         printf("\n");

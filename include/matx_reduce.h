@@ -594,12 +594,14 @@ __MATX_DEVICE__ inline T warpReduceOp(T val, Op op, uint32_t size)
 
 template <typename TensorType, typename InType, typename ReduceOp>
 __global__ void matxReduceKernel(TensorType dest, InType in,
-                                 ReduceOp red)
+                                 ReduceOp red, [[maybe_unused]] index_t mult)
 {
-  constexpr int RANK = TensorType::Rank();
-  constexpr int DRANK = InType::Rank() - RANK;
+  constexpr uint32_t RANK = TensorType::Rank();
+  constexpr uint32_t DRANK = InType::Rank() - RANK;
+  std::array<index_t, InType::Rank()> indices;
   using scalar_type = typename InType::scalar_type;
   using T = typename TensorType::scalar_type;
+  bool valid;
   
   // This is for 2 stage reduction
 
@@ -625,62 +627,63 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
 
   // Read input
   typename InType::scalar_type in_val = red.Init();
-  [[maybe_unused]] index_t idx, idy, idz, idw;
 
   if constexpr (InType::Rank() == 1) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx < in.Size(0)) {
-      in_val = in(idx);
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (indices[InType::Rank()-1] < in.Size(0)) {
+      in_val = in(indices[InType::Rank()-1]);
     }
   }
   else if constexpr (InType::Rank() == 2) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    if (idy < in.Size(0) && idx < in.Size(1)) {
-      in_val = in(idy, idx);
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (indices[InType::Rank()-2] < in.Size(0) && indices[InType::Rank()-1] < in.Size(1)) {
+      in_val = in(indices[InType::Rank()-2], indices[InType::Rank()-1]);
     }
   }
   else if constexpr (InType::Rank() == 3) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-    if (idz < in.Size(0) && idy < in.Size(1) && idx < in.Size(2)) {
-      in_val = in(idz, idy, idx);
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    indices[InType::Rank()-3] = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
+    if (indices[InType::Rank()-3] < in.Size(0) && indices[InType::Rank()-2] < in.Size(1) && indices[InType::Rank()-1] < in.Size(2)) {
+      in_val = in(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
     }
   }
   else if constexpr (InType::Rank() == 4) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    idy = nmy % in.Size(2);
-    idz = nmy / in.Size(2);
-    idw = blockIdx.z * blockDim.z + threadIdx.z;
-    if (idw < in.Size(0) && idz < in.Size(1) && idy < in.Size(2) &&
-        idx < in.Size(3)) {
-      in_val = in(idw, idz, idy, idx);
+    indices[InType::Rank()-2] = nmy % in.Size(2);
+    indices[InType::Rank()-3] = nmy / in.Size(2);
+    indices[InType::Rank()-4] = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (indices[InType::Rank()-4] < in.Size(0) && indices[InType::Rank()-3] < in.Size(1) && indices[InType::Rank()-2] < in.Size(2) &&
+        indices[InType::Rank()-1] < in.Size(3)) {
+      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);   
     }
   }
+  else {
+    // Compute the index into the operator for this thread. N-D tensors require more computations
+    // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
+    // our index.
+    index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    index_t ttl = mult * in.Size(RANK-1);
+    valid = x_abs < ttl;
+    #pragma unroll
+    for (int r = 0; r < InType::Rank(); r++) {
+      indices[r] = x_abs / mult;
+      x_abs -= indices[r] * mult;      
+      mult /= in.Size(r+1); 
+    }    
+
+    if (valid) {
+      in_val = in(indices);  
+    }
+  }  
 
   // Compute offset index based on rank difference
-  if constexpr (DRANK == 1) {
-    // Shift ranks by 1
-    if constexpr (InType::Rank() >= 2)
-      idx = idy;
-    if constexpr (InType::Rank() >= 3)
-      idy = idz;
-    if constexpr (InType::Rank() >= 4)
-      idz = idw;
-  }
-  else if constexpr (DRANK == 2) {
-    // Shift ranks by 2
-    if constexpr (InType::Rank() >= 3)
-      idx = idz;
-    if constexpr (InType::Rank() >= 4)
-      idy = idw;
-  }
-  else if constexpr (DRANK == 3) {
-    // shift ranks by 3
-    if constexpr (InType::Rank() >= 4)
-      idx = idw;
+  #pragma unroll
+  for (int r = 0; r < InType::Rank() - DRANK; r++) {
+    indices[InType::Rank() - r - 1] = indices[InType::Rank() - (DRANK + 1 + r)];
   }
 
   // Compute output location
@@ -691,17 +694,29 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
     out = &dest();
   }
   else if constexpr (RANK == 1) {
-    if (idx < dest.Size(0))
-      out = &dest(idx);
+    if (indices[InType::Rank()-1] < dest.Size(0))
+      out = &dest(indices[InType::Rank()-1]);
   }
   else if constexpr (RANK == 2) {
-    if (idx < dest.Size(1) && idy < dest.Size(0))
-      out = &dest(idy, idx);
+    if (indices[InType::Rank()-1] < dest.Size(1) && indices[InType::Rank()-2] < dest.Size(0))
+      out = &dest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
   }
   else if constexpr (RANK == 3) {
-    if (idx < dest.Size(2) && idy < dest.Size(1) && idz < dest.Size(0))
-      out = &dest(idz, idy, idx);
+    if (indices[InType::Rank()-1] < dest.Size(2) && indices[InType::Rank()-2] < dest.Size(1) && indices[InType::Rank()-3] < dest.Size(0))
+      out = &dest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
   }
+  else {
+    // Calculate valid here
+    valid = true;
+    for (int r = RANK-1; r >= 0; r++) {
+      if (indices[r] >= dest.Size(r)) {
+        valid = false;
+      }
+    }
+    if (valid) {
+      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
+    }   
+  }  
 
   // reduce along x dim (warp)
   in_val = warpReduceOp(in_val, red, blockDim.x);
@@ -733,80 +748,80 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
 }
 
 template <typename TensorType, typename TensorIndexType, typename InType>
-__global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType in)
+__global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType in, [[maybe_unused]] index_t mult)
 {
   typename InType::scalar_type in_val;
-  constexpr int RANK = TensorIndexType::Rank();
-  [[maybe_unused]] index_t idx, idy, idz, idw;
-  constexpr int DRANK = InType::Rank() - RANK;
+  constexpr uint32_t RANK = TensorIndexType::Rank();
+  constexpr uint32_t DRANK = InType::Rank() - RANK;  
+  std::array<index_t, InType::Rank()> indices;
   index_t abs_idx;
+  bool valid = false;
   using T = typename TensorIndexType::scalar_type;
 
   if constexpr (InType::Rank() == 1) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx < in.Size(0)) {
-      in_val = in(idx);
-      abs_idx = idx;
+    indices[0] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (indices[InType::Rank()-1] < in.Size(0)) {
+      in_val = in(indices[0]);
+      abs_idx = indices[InType::Rank()-1];
     }
   }
   else if constexpr (InType::Rank() == 2) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    if (idy < in.Size(0) && idx < in.Size(1)) {
-      in_val = in(idy, idx);
-      abs_idx = idy*in.Size(1) + idx;
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (indices[InType::Rank()-2] < in.Size(0) && indices[InType::Rank()-1] < in.Size(1)) {
+      in_val = in(indices[InType::Rank()-2], indices[InType::Rank()-1]);
+      abs_idx = indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
     }
   }
   else if constexpr (InType::Rank() == 3) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-    if (idz < in.Size(0) && idy < in.Size(1) && idx < in.Size(2)) {
-      in_val = in(idz, idy, idx);
-      abs_idx = idz*in.Size(0)*in.Size(1) + idy*in.Size(1) + idx;
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    indices[InType::Rank()-3] = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
+    if (indices[InType::Rank()-3] < in.Size(0) && indices[InType::Rank()-2] < in.Size(1) && indices[InType::Rank()-1] < in.Size(2)) {
+      in_val = in(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
+      abs_idx = indices[InType::Rank()-3]*in.Size(0)*in.Size(1) + indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
     }
   }
   else if constexpr (InType::Rank() == 4) {
-    idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    idy = nmy % in.Size(2);
-    idz = nmy / in.Size(2);
-    idw = blockIdx.z * blockDim.z + threadIdx.z;
-    if (idw < in.Size(0) && idz < in.Size(1) && idy < in.Size(2) &&
-        idx < in.Size(3)) {
-      in_val = in(idw, idz, idy, idx);
-      abs_idx = idw*in.Size(0)*in.Size(1)*in.Size(2) + idz*in.Size(0)*in.Size(1) + idy*in.Size(1) + idx;
+    indices[InType::Rank()-2] = nmy % in.Size(2);
+    indices[InType::Rank()-3] = nmy / in.Size(2);
+    indices[InType::Rank()-4] = blockIdx.z * blockDim.z + threadIdx.z;
+    if (indices[InType::Rank()-4] < in.Size(0) && indices[InType::Rank()-3] < in.Size(1) && indices[InType::Rank()-2] < in.Size(2) &&
+        indices[InType::Rank()-1] < in.Size(3)) {
+      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
+      abs_idx = indices[InType::Rank()-4]*in.Size(0)*in.Size(1)*in.Size(2) + indices[InType::Rank()-3]*in.Size(0)*in.Size(1) + indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
+    }
+  }
+  else {
+    // Compute the index into the operator for this thread. N-D tensors require more computations
+    // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
+    // our index.
+    index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    abs_idx = x_abs;
+    index_t ttl = mult * in.Size(0);
+    valid = x_abs < ttl;
+    #pragma unroll
+    for (int r = 0; r < InType::Rank(); r++) {
+      indices[r] = x_abs / mult;
+      x_abs -= indices[r] * mult;      
+      mult /= in.Size(r+1); 
+    }    
+
+    if (valid) {
+      in_val = in(indices);  
     }
   }
 
-  // Compare value to reduced
-  // Compute offset index based on rank difference
-  if constexpr (DRANK == 1) {
-    // Shift ranks by 1
-    if constexpr (InType::Rank() >= 2)
-      idx = idy;
-    if constexpr (InType::Rank() >= 3)
-      idy = idz;
-    if constexpr (InType::Rank() >= 4)
-      idz = idw;
-  }
-  else if constexpr (DRANK == 2) {
-    // Shift ranks by 2
-    if constexpr (InType::Rank() >= 3)
-      idx = idz;
-    if constexpr (InType::Rank() >= 4)
-      idy = idw;
-  }
-  else if constexpr (DRANK == 3) {
-    // shift ranks by 3
-    if constexpr (InType::Rank() >= 4)
-      idx = idw;
+  #pragma unroll
+  for (int r = 0; r < InType::Rank() - DRANK; r++) {
+    indices[InType::Rank() - r - 1] = indices[InType::Rank() - (DRANK + 1 + r)];
   }
 
   // Compute output location
   T *out = nullptr;
   index_t *iout = nullptr;
-  bool valid = false;
 
   // compute output offsets
   if constexpr (RANK == 0) {
@@ -815,23 +830,36 @@ __global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType i
     valid = true;
   }
   else if constexpr (RANK == 1) {
-    if (idx < dest.Size(0)) {
-      out = &dest(idx);
-      iout = &idest(idx);
+    if (indices[InType::Rank()-1] < dest.Size(0)) {
+      out = &dest(indices[InType::Rank()-1]);
+      iout = &idest(indices[InType::Rank()-1]);
       valid = true;
     }
   }
   else if constexpr (RANK == 2) {
-    if (idx < dest.Size(1) && idy < dest.Size(0))
-      out = &dest(idy, idx);
-      iout = &idest(idy, idx);
+    if (indices[InType::Rank()-1] < dest.Size(1) && indices[InType::Rank()-2] < dest.Size(0))
+      out = &dest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
+      iout = &idest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
       valid = true;
   }
   else if constexpr (RANK == 3) {
-    if (idx < dest.Size(2) && idy < dest.Size(1) && idz < dest.Size(0))
-      out = &dest(idz, idy, idx);
-      iout = &idest(idz, idy, idx);
+    if (indices[InType::Rank()-1] < dest.Size(2) && indices[InType::Rank()-2] < dest.Size(1) && indices[InType::Rank()-3] < dest.Size(0))
+      out = &dest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
+      iout = &idest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
       valid = true;
+  }
+  else {
+    // Calculate valid here
+    valid = true;
+    for (int r = RANK-1; r >= 0; r++) {
+      if (indices[r] >= dest.Size(r)) {
+        valid = false;
+      }
+    }
+    if (valid) {
+      iout = mapply([&](auto... param) { return idest.GetPointer(param...); }, indices);
+      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
+    }   
   }
 
   if (valid) {  
@@ -904,32 +932,27 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
     }
   }
   dim3 blocks, threads;
+  std::array<index_t, in.Rank()> sizes;
+  for (int i = 0; i < in.Rank(); i++) {
+    sizes[i] = in.Size(i);
+  }   
 
-  if constexpr (InType::Rank() == 1) {
-    get_grid_dims(blocks, threads, {in.Size(0)});
-  }
-  else if constexpr (InType::Rank() == 2) {
-    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1)});
-  }
-  else if constexpr (InType::Rank() == 3) {
-    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1), in.Size(2)});
-  }
-  else if constexpr (InType::Rank() == 4) {
-    get_grid_dims(blocks, threads, {in.Size(0), in.Size(1), in.Size(2),
-                  in.Size(3)});
-  }
+  get_grid_dims<in.Rank()>(blocks, threads, sizes);
+  
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
 
+  auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
+
   matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
-      dest, in, ReduceOp());
+      dest, in, ReduceOp(), mult);
 
   // If we need the indices too, launch that kernel
   if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
     (idest = std::numeric_limits<index_t>::max()).run(stream);
     matxIndexKernel<<<blocks, threads, 0, stream>>>(
-        idest, dest, in);     
+        idest, dest, in, mult);     
   }
 #endif  
 }

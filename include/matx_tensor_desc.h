@@ -263,7 +263,7 @@ public:
   }
 
   static constexpr auto Size(int dim) { return shape_[dim]; }
-  static constexpr auto Stride(int dim) { return strides_[dim]; }
+  static constexpr auto Stride(int dim) { return stride_[dim]; }
   static constexpr int Rank() { return shape_.size(); }
   static constexpr auto Shape() { return shape_; }
   static constexpr auto TotalSize() {
@@ -287,7 +287,7 @@ private:
   }
 
   static constexpr shape_container shape_ = make_shape();
-  static constexpr stride_container strides_ = make_strides();  
+  static constexpr stride_container stride_ = make_strides();  
 };
 
 /**

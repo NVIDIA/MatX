@@ -223,35 +223,25 @@ public:
           static_cast<int>(a_out.Lsize() + 1), lower, upper,
           static_cast<int>(a.Lsize()), stream);
     }
-    else if constexpr (RANK == 2) {
-      for (index_t i = 0; i < a.Size(0); i++) {
+    else { // Batch higher dims
+      using shape_type = typename InputTensor::desc_type::shape_type;
+      int batch_offset = 2;
+      std::array<shape_type, InputTensor::Rank()> idx{0};
+      auto a_shape = a.Shape();
+      // Get total number of batches
+      size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + InputTensor::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      for (size_t iter = 0; iter < total_iter; iter++) {
+        auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+        auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
         cub::DeviceHistogram::HistogramEven(
-            d_temp, temp_storage_bytes, &a(i, 0), &a_out(i, 0),
+            d_temp, temp_storage_bytes, ap, aop,
             static_cast<int>(a_out.Lsize() + 1), lower, upper,
             static_cast<int>(a.Lsize()), stream);
-      }
-    }
-    else if constexpr (RANK == 3) {
-      for (index_t i = 0; i < a.Size(0); i++) {
-        for (index_t j = 0; j < a.Size(1); j++) {
-          cub::DeviceHistogram::HistogramEven(
-              d_temp, temp_storage_bytes, &a(i, j, 0), &a_out(i, j, 0),
-              static_cast<int>(a_out.Lsize() + 1), lower, upper,
-              static_cast<int>(a.Lsize()), stream);
-        }
-      }
-    }
-    else if constexpr (RANK == 4) {
-      for (index_t i = 0; i < a.Size(0); i++) {
-        for (index_t j = 0; j < a.Size(1); j++) {
-          for (index_t k = 0; k < a.Size(2); k++) {
-            cub::DeviceHistogram::HistogramEven(
-                d_temp, temp_storage_bytes, &a(i, j, k, 0), &a_out(i, j, k, 0),
-                static_cast<int>(a_out.Lsize() + 1), lower, upper,
-                static_cast<int>(a.Lsize()), stream);
-          }
-        }
-      }
+
+        // Update all but the last 2 indices
+        UpdateIndices<InputTensor, shape_type, InputTensor::Rank()>(a, idx, batch_offset);
+      }      
     }
 #endif    
   }
@@ -281,32 +271,24 @@ public:
                                     a_out.Data(), static_cast<int>(a.Lsize()),
                                     stream);
     }
-    else if constexpr (RANK == 2) {
-      for (index_t i = 0; i < a.Size(0); i++) {
-        cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, &a(i, 0),
-                                      &a_out(i, 0), static_cast<int>(a.Lsize()),
+    else {
+      using shape_type = typename InputTensor::desc_type::shape_type;
+      int batch_offset = 1;
+      std::array<shape_type, InputTensor::Rank()> idx{};
+      auto a_shape = a.Shape();
+      // Get total number of batches
+      size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + InputTensor::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      for (size_t iter = 0; iter < total_iter; iter++) {
+        auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+        auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+        cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes,ap,
+                                      aop, static_cast<int>(a.Lsize()),
                                       stream);
-      }
-    }
-    else if constexpr (RANK == 3) {
-      for (index_t i = 0; i < a.Size(0); i++) {
-        for (index_t j = 0; j < a.Size(1); j++) {
-          cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, &a(i, j, 0),
-                                        &a_out(i, j, 0),
-                                        static_cast<int>(a.Lsize()), stream);
-        }
-      }
-    }
-    else if constexpr (RANK == 4) {
-      for (index_t i = 0; i < a.Size(0); i++) {
-        for (index_t j = 0; j < a.Size(1); j++) {
-          for (index_t k = 0; k < a.Size(2); k++) {
-            cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes,
-                                          &a(i, j, k, 0), &a_out(i, j, k, 0),
-                                          static_cast<int>(a.Lsize()), stream);
-          }
-        }
-      }
+
+        // Update all but the last 2 indices
+        UpdateIndices<InputTensor, shape_type, InputTensor::Rank()>(a, idx, batch_offset);
+      }        
     }
 #endif    
   }
@@ -345,9 +327,8 @@ public:
             d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
             static_cast<int>(a.Lsize()), 0, sizeof(T1) * 8, stream);
       }
-    }
-    else {
-      if constexpr (RANK == 2) {
+    }        
+    else if constexpr (RANK == 2) {
         if (dir == SORT_DIR_ASC) {
           cub::DeviceSegmentedRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -360,42 +341,33 @@ public:
               static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
               d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
         }
-      }
-      else if constexpr (RANK == 3) {
-        for (index_t i = 0; i < a.Size(0); i++) {
-          if (dir == SORT_DIR_ASC) {
-            cub::DeviceSegmentedRadixSort::SortKeys(
-                d_temp, temp_storage_bytes, &a(i, 0, 0), &a_out(i, 0, 0),
-                static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
-                d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
-          }
-          else {
-            cub::DeviceSegmentedRadixSort::SortKeysDescending(
-                d_temp, temp_storage_bytes, &a(i, 0, 0), &a_out(i, 0, 0),
-                static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
-                d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
-          }
+    }
+    else {
+      using shape_type = typename InputTensor::desc_type::shape_type;
+      int batch_offset = 2;
+      std::array<shape_type, InputTensor::Rank()> idx{0};
+      auto a_shape = a.Shape();
+      // Get total number of batches
+      size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + InputTensor::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      for (size_t iter = 0; iter < total_iter; iter++) {
+        auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+        auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+        if (dir == SORT_DIR_ASC) {
+          cub::DeviceSegmentedRadixSort::SortKeys(
+              d_temp, temp_storage_bytes, ap, aop,
+              static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+              d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
         }
-      }
-      else if constexpr (RANK == 4) {
-        for (index_t i = 0; i < a.Size(0); i++) {
-          for (index_t j = 0; j < a.Size(1); j++) {
-            if (dir == SORT_DIR_ASC) {
-              cub::DeviceSegmentedRadixSort::SortKeys(
-                  d_temp, temp_storage_bytes, &a(i, j, 0, 0),
-                  &a_out(i, j, 0, 0), static_cast<int>(a.Lsize()),
-                  static_cast<int>(a.Size(RANK - 2)), d_offsets, d_offsets + 1,
-                  0, sizeof(T1) * 8, stream);
-            }
-            else {
-              cub::DeviceSegmentedRadixSort::SortKeysDescending(
-                  d_temp, temp_storage_bytes, &a(i, j, 0, 0),
-                  &a_out(i, j, 0, 0), static_cast<int>(a.Lsize()),
-                  static_cast<int>(a.Size(RANK - 2)), d_offsets, d_offsets + 1,
-                  0, sizeof(T1) * 8, stream);
-            }
-          }
+        else {
+          cub::DeviceSegmentedRadixSort::SortKeysDescending(
+              d_temp, temp_storage_bytes, ap, aop,
+              static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+              d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
         }
+          
+        // Update all but the last 2 indices
+        UpdateIndices<InputTensor, shape_type, InputTensor::Rank()>(a, idx, batch_offset);        
       }
     }
 #endif    

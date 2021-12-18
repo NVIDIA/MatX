@@ -37,7 +37,7 @@ namespace matx {
 
 
 template <int RANK>
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, const index_t(&sizes)[RANK],
+inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
                           int max_cta_size = 1024)
 {
   int nt = 1;
@@ -46,24 +46,33 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const index_t(&sizes)[RAN
   threads.z = 1;
   // Dynamic logic to pick thread block size.
   //   Fill in order x, y, z up to 1024 threads
-  if constexpr (RANK == 4) {
+  if constexpr (RANK == 1) {
     while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[3]) {
+      if (static_cast<index_t>(threads.x) < sizes[0]) {
         threads.x *= 2;
-      }
-      else if (static_cast<index_t>(threads.y) < sizes[1] * sizes[2]) {
-        threads.y *= 2;
-      }
-      else if (static_cast<index_t>(threads.z) < sizes[0]) {
-        threads.z *= 2;
       }
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[3] + threads.x - 1) / threads.x);
-    blocks.y = static_cast<int>((sizes[1] * sizes[2] + threads.y - 1) / threads.y);
-    blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
+    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    blocks.y = 1;
+    blocks.z = 1;  
   }
+  else if constexpr (RANK == 2) {
+    while (nt < max_cta_size) {
+      if (static_cast<index_t>(threads.x) < sizes[1]) {
+        threads.x *= 2;
+      }
+      else if (static_cast<index_t>(threads.y) < sizes[0]) {
+        threads.y *= 2;
+      }
+      nt *= 2;
+    }
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
+    blocks.z = 1;  
+  }  
   else if constexpr (RANK == 3) {
     while (nt < max_cta_size) {
       if (static_cast<index_t>(threads.x) < sizes[2]) {
@@ -81,33 +90,33 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const index_t(&sizes)[RAN
     blocks.x = static_cast<int>((sizes[2] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[1] + threads.y - 1) / threads.y);
     blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
-  }
-  else if constexpr (RANK == 2) {
+  }  
+  else if constexpr (RANK == 4) {
     while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[1]) {
+      if (static_cast<index_t>(threads.x) < sizes[3]) {
         threads.x *= 2;
       }
-      else if (static_cast<index_t>(threads.y) < sizes[0]) {
+      else if (static_cast<index_t>(threads.y) < sizes[1] * sizes[2]) {
         threads.y *= 2;
       }
-      nt *= 2;
-    }
-    // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
-    blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
-    blocks.z = 1;  
-  }
-  else if constexpr (RANK == 1) {
-    while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[0]) {
-        threads.x *= 2;
+      else if (static_cast<index_t>(threads.z) < sizes[0]) {
+        threads.z *= 2;
       }
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    blocks.x = static_cast<int>((sizes[3] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<int>((sizes[1] * sizes[2] + threads.y - 1) / threads.y);
+    blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
+  }  
+  else {
+    size_t dims = std::accumulate(std::begin(sizes), std::end(sizes), 1, std::multiplies<index_t>());
+    threads.x = std::min((int)dims, max_cta_size);
+
+    // launch as many blocks as necessary
+    blocks.x = static_cast<int>((dims + threads.x - 1) / threads.x);
     blocks.y = 1;
-    blocks.z = 1;  
-  }
+    blocks.z = 1;
+  }  
 }
 } // end namespace matx

@@ -83,18 +83,22 @@ public:
     if constexpr (TensorType::Rank() == 2) {
       batch_a_ptrs.push_back(&a(0, 0));
     }
-    else if constexpr (TensorType::Rank() == 3) {
-      for (int i = 0; i < a.Size(0); i++) {
-        batch_a_ptrs.push_back(&a(i, 0, 0));
-      }
-    }
     else {
-      for (int i = 0; i < a.Size(0); i++) {
-        for (int j = 0; j < a.Size(1); j++) {
-          batch_a_ptrs.push_back(&a(i, j, 0, 0));
-        }
+      using shape_type = typename TensorType::desc_type::shape_type;
+      int batch_offset = 3;
+      std::array<shape_type, TensorType::Rank()> idx{0};
+      auto a_shape = a.Shape();
+      // Get total number of batches
+      size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      for (size_t iter = 0; iter < total_iter; iter++) {
+        auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+        batch_a_ptrs.push_back(ap);
+
+        // Update all but the last 2 indices
+        UpdateIndices<TensorType, shape_type, TensorType::Rank()>(a, idx, batch_offset);
       }
     }
+
   }
 
   /**

@@ -108,6 +108,32 @@ __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size
     }      
   }
 }
+
+template <class Op>
+__global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> sizes, index_t mult) {
+  std::array<index_t, Op::Rank()> indices;
+  
+  // Compute the index into the operator for this thread. N-D tensors require more computations
+  // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
+  // our index.
+  index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  bool valid = x_abs < mult*sizes[0];
+  #pragma unroll
+  for (int r = 0; r < Op::Rank(); r++) {
+    indices[r] = x_abs / mult;
+    x_abs -= indices[r] * mult;      
+    mult /= sizes[r+1]; 
+  }
+
+  if (valid) {
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(indices); 
+    }
+    else {
+      op(indices);
+    }      
+  }
+}
 #endif
 
 /**
@@ -131,42 +157,37 @@ class CUDADeviceExecutor {
       // need to error out and have them break up the statement
       MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
         "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
-
+      
       if constexpr (op.Rank() == 0) {
         threads = 1;
         blocks = 1;
         matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
       }
-      else if constexpr (op.Rank() == 1) {
-        index_t size0 = op.Size(0);
-
-        get_grid_dims(blocks, threads, {size0}, 256);
-        matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, size0);      
-      }
-      else if constexpr (op.Rank() == 2) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-
-        get_grid_dims(blocks, threads, {size0, size1}, 256);
-        matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1);
-      }
-      else if constexpr (op.Rank() == 3) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
-
-        get_grid_dims(blocks, threads, {size0, size1, size2}, 256);
-        matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2);
-      }
       else {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
-        index_t size3 = op.Size(3);
+        std::array<index_t, op.Rank()> sizes;
+        for (int i = 0; i < op.Rank(); i++) {
+          sizes[i] = op.Size(i);
+        }        
 
-        get_grid_dims(blocks, threads, {size0, size1, size2, size3}, 256);
-        matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, size0, size1, size2, size3);
-      } 
+        get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
+
+        if constexpr (op.Rank() == 1) {
+          matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);      
+        }
+        else if constexpr (op.Rank() == 2) {
+          matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+        }
+        else if constexpr (op.Rank() == 3) {
+          matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+        }
+        else if constexpr (op.Rank() == 4) {
+          matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+        }        
+        else {
+          index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
+          matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+        } 
+      }
   #else
       MATX_THROW(matxNotSupported, "Cannot execute device function from host compiler");    
   #endif    
