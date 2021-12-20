@@ -216,19 +216,17 @@ public:
   void __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ SetSize(int dim, shape_type size) { *(shape_.begin() + dim) = size; }
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size([[maybe_unused]] int dim) const { 
     if constexpr (RANK == 0) {
-      return 1;
+      return static_cast<shape_type>(1);
     }
-    else {
-      return *(shape_.begin() + dim); 
-    }
+
+    return *(shape_.begin() + dim); 
   }
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Stride([[maybe_unused]] int dim) const { 
     if constexpr (RANK == 0) {
-      return 0;
+      return static_cast<stride_type>(0);
     }
-    else {
-      return *(stride_.begin() + dim); 
-    }
+
+    return *(stride_.begin() + dim); 
   }
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Shape() const { return shape_; }
   static auto constexpr Rank() { return RANK; }
