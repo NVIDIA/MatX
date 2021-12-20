@@ -10,16 +10,16 @@ look at the following sources:
 
 Adding MatX to your project
 ---------------------------
-MatX is currently a single header file to include in your project called ``matx.h``. Simply add the matx/include directory to your compiler's
-include search path, and add the proper #include. All MatX functions are in a top-level ``matx`` namespace, while more specific functions have
+MatX is a single header file to include in your project called ``matx.h``. Simply add the matx/include directory to your compiler's
+include search path, and add "#include "matx.h". All core MatX functions are in a top-level ``matx`` namespace, while more specific functions have
 a nested namespace. For example, the visualization pieces of MatX are under ``matx::viz``.
 
 Tensor Views
 ------------
-The most fundamental data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any 
+The most common data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any 
 underlying GPU or host memory. While dynamically-typed languages like Python or MATLAB will implicitly allocate and manage data for the user, 
-MatX requires either a one-time explicit memory allocation, or a user-provided device-side buffer. This gives more control over the lifetime of the data, and
-allows reusing memory regions for different operations.
+MatX requires either a one-time explicit memory allocation, or various ways of providing your own buffer. This gives more control over the lifetime 
+of the data, and allows reusing memory regions for different operations.
 
 .. note::
 
@@ -48,15 +48,13 @@ tensor:
 
 .. code-block:: cpp
 
-    auto t = make_tensor<float, 10, 20>();
+    auto t = make_static_tensor<float, 10, 20>();
 
 Note that for a static tensor the shape is moved to the template parameters instead of function arguments.
 
 After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
-pass their own pointers in a different form of the constructor which will leave allocation and freeing of the memory to the caller (see 
-*Creating a view from an existing pointer* below). Note that MatX treats the initial tensor view as the owner of the memory. When this view is
-destructed, whether by going out of scope or manually, all memory is freed. If there were other views still pointing to this memory, it is no
-longer valid and the behavior is undefined.
+pass their own pointers in a different for of the ``make_`` family of functions to allow for more control over buffer types and ownership
+semantics.
 
 With our view ``t`` created above, we now have managed memory allocated sufficiently large to hold our values, but at this point the data
 in the tensor is undefined. To set individual values in a view, we can use ``operator()``:
