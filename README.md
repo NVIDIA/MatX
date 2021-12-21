@@ -11,7 +11,7 @@
 The above image shows the Python (Numpy) version of an FFT resampler next to the MatX version. The total runtimes of the NumPy version, CuPy version,
 and MatX version are shown below:
 
-* Python/Numpy: **4500ms** (Xeon(R) CPU E5-2698 v4 @ 2.20GHz)
+* Python/Numpy: **5360ms** (Xeon(R) CPU E5-2698 v4 @ 2.20GHz)
 * CuPy: **10.6ms**  (A100)
 * MatX: **2.54ms** (A100)
 
