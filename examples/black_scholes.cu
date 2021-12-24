@@ -112,7 +112,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using dtype = double;
 
   index_t input_size = 100000000;
-  constexpr uint32_t num_iterations = 100;
+  constexpr uint32_t num_iterations = 1;
   float time_ms;
 
   tensor_t<dtype, 1> K_tensor{{input_size}};

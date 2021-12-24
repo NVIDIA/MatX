@@ -526,6 +526,7 @@ private:
       MATX_THROW(matxInvalidType,
                  "A/B/C types must all be half complex if any of them are");
     }
+
     // Make copies of each tensor in case we have to do a transformation before
     // the GEMM
     [[maybe_unused]] TensorTypeA a_adj { a };
@@ -563,6 +564,17 @@ private:
       c_adj.Reset(reinterpret_cast<T3 *>(C));
     }
 
+    // Prep for batch looping
+    using shape_type = typename TensorTypeA::desc_type::shape_type;
+    [[maybe_unused]] std::array<shape_type, TensorTypeA::Rank()> idx{0};
+    [[maybe_unused]] auto a_shape = a.Shape();    
+    [[maybe_unused]] size_t total_iter = 1;
+    
+    if constexpr (RANK > 3) {
+      // Get total number of batches
+      total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - 3, 1, std::multiplies<shape_type>());
+    }
+
     // For cuBLASLt most of the parameters have already been set in the
     // configure stage
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
@@ -597,14 +609,21 @@ private:
         MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
       }
       else {
-        for (index_t i = 0; i < a.Size(0); i++) {
+        for (size_t iter = 0; iter < total_iter; iter++) {
+          // Get pointers into A/B/C for this round
+          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
+          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
+          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
           auto res = cublasLtMatmul(
-                  ltHandle, operationDesc, &salpha, (void *)&a_adj(i, 0, 0, 0),
-                  Adesc, (void *)&b_adj(i, 0, 0, 0), Bdesc, &sbeta,
-                  (void *)&c_adj(i, 0, 0, 0), Cdesc, (void *)&c_adj(i, 0, 0, 0),
+                  ltHandle, operationDesc, &salpha, (void *)ap,
+                  Adesc, (void *)&bp, Bdesc, &sbeta,
+                  (void *)&cp, Cdesc, (void *)&cp,
                   Cdesc, &heuristicResult.algo, workspace, workspaceSize,
                   stream);
           MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+          // Update all but the last 2 indices
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
         }
       }
     }
@@ -674,25 +693,34 @@ private:
           CutlassCOrder>; // Layout of C matrix
 #endif
 
-      if constexpr (RANK == 3) {
+      if constexpr (RANK > 3) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #if ENABLE_CUTLASS
+        for (size_t iter = 0; iter < total_iter; iter++) {
+          // Get pointers into A/B/C for this round
+          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
+          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
+          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+
           typename CutlassGemm::Arguments args(
               {static_cast<int>(params_.m), static_cast<int>(params_.n),
-               static_cast<int>(params_.k)}, // Gemm Problem dimensions
-              {a_adj.Data(),
-               static_cast<int>(params_.lda)}, // Tensor-ref for source matrix A
-              a_adj.Stride(RANK - 3),          // Batch Stride A
-              {b_adj.Data(),
-               static_cast<int>(params_.ldb)}, // Tensor-ref for source matrix B
-              b_adj.Stride(RANK - 3),          // Batch Stride B
-              {c.Data(),
-               static_cast<int>(params_.ldc)}, // Tensor-ref for source matrix C
-              c_adj.Stride(RANK - 3),          // Batch Stride C
-              {c_adj.Data(),
-               static_cast<int>(
-                   params_.ldc)}, // Tensor-ref for destination matrix D (may be
-                                  // different memory than source C matrix)
+                static_cast<int>(params_.k)}, // Gemm Problem dimensions
+              {ap,
+                static_cast<int>(
+                    params_.lda)},     // Tensor-ref for source matrix A
+              a_adj.Stride(RANK - 3), // Batch Stride A
+              {bp,
+                static_cast<int>(
+                    params_.ldb)},     // Tensor-ref for source matrix B
+              b_adj.Stride(RANK - 3), // Batch Stride B
+              {cp,
+                static_cast<int>(
+                    params_.ldc)},     // Tensor-ref for source matrix C
+              c_adj.Stride(RANK - 3), // Batch Stride C
+              {cp,
+                static_cast<int>(
+                    params_.ldc)}, // Tensor-ref for destination matrix D (may
+                                  // be different memory than source C matrix)
               c_adj.Stride(RANK - 3), // Batch Stride C
               {alpha, beta},
               params_.batch // Batch Dimension
@@ -701,51 +729,16 @@ private:
           CutlassGemm gemm_operator;
           cutlass::Status status = gemm_operator(args, nullptr, stream);
           MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
+
+          // Update all but the last 2 indices
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
+        }
 #else
           MATX_THROW(matxNotSupported, "CUTLASS not enabled!");
 #endif
         }
         else {
           MATX_STATIC_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Invalid MatMul provider");
-        }
-      }
-      else { // Rank 4
-        MATX_STATIC_ASSERT(RANK == 4, matxInvalidDim);
-        if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if ENABLE_CUTLASS
-          // Loop over outer dimension and launch multiple batches
-          for (index_t i = 0; i < a.Size(0); i++) {
-            typename CutlassGemm::Arguments args(
-                {static_cast<int>(params_.m), static_cast<int>(params_.n),
-                 static_cast<int>(params_.k)}, // Gemm Problem dimensions
-                {&a_adj(i, 0, 0, 0),
-                 static_cast<int>(
-                     params_.lda)},     // Tensor-ref for source matrix A
-                a_adj.Stride(RANK - 3), // Batch Stride A
-                {&b_adj(i, 0, 0, 0),
-                 static_cast<int>(
-                     params_.ldb)},     // Tensor-ref for source matrix B
-                b_adj.Stride(RANK - 3), // Batch Stride B
-                {&c_adj(i, 0, 0, 0),
-                 static_cast<int>(
-                     params_.ldc)},     // Tensor-ref for source matrix C
-                c_adj.Stride(RANK - 3), // Batch Stride C
-                {&c_adj(i, 0, 0, 0),
-                 static_cast<int>(
-                     params_.ldc)}, // Tensor-ref for destination matrix D (may
-                                    // be different memory than source C matrix)
-                c_adj.Stride(RANK - 3), // Batch Stride C
-                {alpha, beta},
-                params_.batch // Batch Dimension
-            );                // Scalars used in the Epilogue
-
-            CutlassGemm gemm_operator;
-            cutlass::Status status = gemm_operator(args, nullptr, stream);
-            MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
-          }
-#else
-          MATX_THROW(matxNotSupported, "CUTLASS not enabled!");
-#endif
         }
       }
     }

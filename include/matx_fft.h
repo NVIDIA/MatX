@@ -73,7 +73,8 @@ public:
   using index_type = typename OutTensorType::shape_type;
   using T1    = typename OutTensorType::scalar_type;
   using T2    = typename InTensorType::scalar_type;
-  static constexpr int RANK = OutTensorType::Rank();    
+  static constexpr auto RANK = OutTensorType::Rank();    
+  static_assert(OutTensorType::Rank() == InTensorType::Rank(), "Input and output FFT ranks must match");
 
   /**
    * Execute an FFT in a stream
@@ -136,64 +137,20 @@ public:
     params.input_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetInputType();
     params.output_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetOutputType();
     params.exec_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetExecType();
+    params.fft_rank =  fft_rank;
 
     if (fft_rank == 1) {
-      if constexpr (o.Rank() == 1 && i.Rank() == 1) {
-        params.n[0] = (params.transform_type == CUFFT_C2R ||
-                       params.transform_type == CUFFT_Z2D)
-                          ? o.Size(0)
-                          : i.Size(0);
-        params.fft_rank = 1;
-        params.batch = 1;
-        params.inembed[0] = i.Size(0); // Unused
-        params.onembed[0] = o.Size(0); // Unused
-        params.istride = i.Stride(0);
-        params.ostride = o.Stride(0);
-        params.idist = i.Size(0);
-        params.odist = o.Size(0);
-      }
-      else if constexpr (o.Rank() == 2 && i.Rank() == 2) {
-        params.n[0] = (params.transform_type == CUFFT_C2R ||
-                       params.transform_type == CUFFT_Z2D)
-                          ? o.Size(1)
-                          : i.Size(1);
-        params.fft_rank = 1;
-        params.batch = i.Size(0);
-        params.inembed[0] = i.Size(1); // Unused
-        params.onembed[0] = o.Size(1); // Unused
-        params.istride = i.Stride(1);
-        params.ostride = o.Stride(1);
-        params.idist = i.Stride(0);
-        params.odist = o.Stride(0);
-      }
-      else if constexpr (o.Rank() == 3 && i.Rank() == 3) {
-        params.n[0] = (params.transform_type == CUFFT_C2R ||
-                       params.transform_type == CUFFT_Z2D)
-                          ? o.Size(2)
-                          : i.Size(2);
-        params.fft_rank = 1;
-        params.batch = i.Size(1);
-        params.inembed[0] = i.Size(2); // Unused
-        params.onembed[0] = o.Size(2); // Unused
-        params.istride = i.Stride(2);
-        params.ostride = o.Stride(2);
-        params.idist = i.Stride(1);
-        params.odist = o.Stride(1);
-      }
-      else if constexpr (o.Rank() == 4 && i.Rank() == 4) {
-        params.n[0] = (params.transform_type == CUFFT_C2R ||
-                       params.transform_type == CUFFT_Z2D)
-                          ? o.Size(3)
-                          : i.Size(3);
-        params.fft_rank = 1;
-        params.batch = i.Size(2);
-        params.inembed[0] = i.Size(3); // Unused
-        params.onembed[0] = o.Size(3); // Unused
-        params.istride = i.Stride(3);
-        params.ostride = o.Stride(3);
-        params.idist = i.Stride(2);
-        params.odist = o.Stride(2);
-      }
+      params.n[0] = (params.transform_type == CUFFT_C2R ||
+                      params.transform_type == CUFFT_Z2D)
+                        ? o.Size(RANK - 1)
+                        : i.Size(RANK - 1);
+      params.batch = (RANK == 1) ? 1 : i.Size(RANK-2);
+      params.inembed[0] = i.Size(RANK - 1); // Unused
+      params.onembed[0] = o.Size(RANK - 1); // Unused
+      params.istride = i.Stride(RANK - 1);
+      params.ostride = o.Stride(RANK - 1);
+      params.idist = (RANK == 1) ? i.Size(0) : i.Stride(RANK - 2);
+      params.odist = (RANK == 1) ? o.Size(0) : o.Stride(RANK - 2);
 
       if constexpr (is_complex_half_v<T1> || is_complex_half_v<T1>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0) {
@@ -203,65 +160,23 @@ public:
       }
     }
     else if (fft_rank == 2) {
-      if constexpr (o.Rank() == 2 && i.Rank() == 2) {
-        if (params.transform_type == CUFFT_C2R ||
-            params.transform_type == CUFFT_Z2D) {
-          params.n[0] = o.Size(1);
-          params.n[1] = o.Size(0);
-        }
-        else {
-          params.n[0] = i.Size(1);
-          params.n[1] = i.Size(0);
-        }
-        params.batch = 1;
-        params.fft_rank = 2;
-        params.inembed[1] = o.Size(1);
-        params.onembed[1] = i.Size(1); //??
-        params.istride = i.Stride(1);
-        params.ostride = o.Stride(1);
-        params.idist = i.Size(0) * i.Size(1);
-        params.odist = o.Size(0) * o.Size(1);
+      if (params.transform_type == CUFFT_C2R ||
+          params.transform_type == CUFFT_Z2D) {
+        params.n[0] = o.Size(RANK-1U);
+        params.n[1] = o.Size(RANK-2U);
       }
-      else if constexpr (o.Rank() == 3 && i.Rank() == 3) {
-        if (params.transform_type == CUFFT_C2R ||
-            params.transform_type == CUFFT_Z2D) {
-          params.n[0] = o.Size(2);
-          params.n[1] = o.Size(1);
-        }
-        else {
-          params.n[0] = i.Size(2);
-          params.n[1] = i.Size(1);
-        }
+      else {
+        params.n[0] = i.Size(RANK-1U);
+        params.n[1] = i.Size(RANK-2U);
+      }
 
-        params.batch = i.Size(0);
-        params.fft_rank = 2;
-        params.inembed[1] = o.Size(2);
-        params.onembed[1] = i.Size(2);
-        params.istride = i.Stride(2);
-        params.ostride = o.Stride(2);
-        params.idist = i.Size(1) * i.Size(2);
-        params.odist = o.Size(1) * o.Size(2);
-      }
-      else if constexpr (o.Rank() == 4 && i.Rank() == 4) {
-        if (params.transform_type == CUFFT_C2R ||
-            params.transform_type == CUFFT_Z2D) {
-          params.n[0] = o.Size(3);
-          params.n[1] = o.Size(2);
-        }
-        else {
-          params.n[0] = i.Size(3);
-          params.n[1] = i.Size(2);
-        }
-
-        params.batch = i.Size(0) * i.Size(1);
-        params.fft_rank = 2;
-        params.inembed[1] = o.Size(3);
-        params.onembed[1] = i.Size(3);
-        params.istride = i.Stride(3);
-        params.ostride = o.Stride(3);
-        params.idist = i.Size(2) * i.Size(3);
-        params.odist = o.Size(2) * o.Size(3);
-      }
+      params.batch = (RANK == 2) ? 1 : i.Size(RANK - 3U);
+      params.inembed[1] = o.Size(RANK-1U);
+      params.onembed[1] = i.Size(RANK-1U);
+      params.istride = i.Stride(RANK-1U);
+      params.ostride = o.Stride(RANK-1U);
+      params.idist = i.Size(RANK-2U) * i.Size(RANK-1U);
+      params.odist = o.Size(RANK-2U) * o.Size(RANK-1U);
 
       if constexpr (is_complex_half_v<T1> || is_complex_half_v<T1>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0 ||
@@ -504,20 +419,24 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
     this->InternalExec(static_cast<const void *>(i.Data()),
                       static_cast<void *>(o.Data()), dir);
   }
-  else if constexpr (OutTensorType::Rank() == 3) {
-    for (index_t z = 0; z < o.Size(0); z++) {
-      this->InternalExec(static_cast<const void *>(&i(z, 0, 0)),
-                        static_cast<void *>(&o(z, 0, 0)), dir);
+  else {
+    using shape_type = typename InTensorType::desc_type::shape_type;
+    int batch_offset = 2;
+    std::array<shape_type, InTensorType::Rank()> idx{0};
+    auto i_shape = i.Shape();
+    // Get total number of batches
+    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+    for (size_t iter = 0; iter < total_iter; iter++) {
+      auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
+      auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
+
+      this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
+
+      // Update all but the last 2 indices
+      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, batch_offset);
     }
   }
-  else if constexpr (OutTensorType::Rank() == 4) {
-    for (index_t z = 0; z < o.Size(0); z++) {
-      for (index_t y = 0; y < o.Size(1); y++) {
-        this->InternalExec(static_cast<const void *>(&i(z, y, 0, 0)),
-                          static_cast<void *>(&o(z, y, 0, 0)), dir);
-      }
-    }
-  }      
+   
 }
 
 }; 
@@ -640,11 +559,22 @@ private:
       this->InternalExec(static_cast<const void *>(i.Data()),
                          static_cast<void *>(o.Data()), dir);
     }
-    else if constexpr (RANK == 4) {
-      for (index_t z = 0; z < o.Size(0); z++) {
-        this->InternalExec(static_cast<const void *>(&i(z, 0, 0, 0)),
-                          static_cast<void *>(&o(z, 0, 0, 0)), dir);
-      }      
+    else  {
+      using shape_type = typename InTensorType::desc_type::shape_type;
+      int batch_offset = 3;
+      std::array<shape_type, InTensorType::Rank()> idx{0};
+      auto i_shape = i.Shape();
+      // Get total number of batches
+      size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      for (size_t iter = 0; iter < total_iter; iter++) {
+        auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
+        auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
+
+        this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
+
+        // Update all but the last 2 indices
+        UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, batch_offset);
+      }    
     }
 
 }

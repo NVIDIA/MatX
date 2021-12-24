@@ -248,6 +248,24 @@ TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, NDOperatorFuncs)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
+  auto b = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
+  (a = ones(a.Shape())).run();
+  cudaDeviceSynchronize();
+  (b = ones(b.Shape())).run();
+  cudaDeviceSynchronize();
+  (a = a + b).run();
+
+  auto t0 = make_tensor<TypeParam>();
+  sum(t0, a);
+  cudaStreamSynchronize(0);
+  ASSERT_EQ(t0(), 2 * a.TotalSize());
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumericNonComplex, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
@@ -900,7 +918,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
     (t4o = t4i * t0).run();
     cudaStreamSynchronize(0);
-
+  
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
@@ -934,272 +952,272 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-  }
-  {
-    tensor_t<TypeParam, 1> t1({4});
-    tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-    tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  // }
+  // {
+  //   tensor_t<TypeParam, 1> t1({4});
+  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
 
-    for (index_t i = 0; i < t1.Size(0); i++) {
-      t1(i) = static_cast<value_promote_t<TypeParam>>(i);
-    }
+  //   for (index_t i = 0; i < t1.Size(0); i++) {
+  //     t1(i) = static_cast<value_promote_t<TypeParam>>(i);
+  //   }
 
-    for (index_t i = 0; i < t4i.Size(0); i++) {
-      for (index_t j = 0; j < t4i.Size(1); j++) {
-        for (index_t k = 0; k < t4i.Size(2); k++) {
-          for (index_t l = 0; l < t4i.Size(3); l++) {
-            t4i(i, j, k, l) =
-                static_cast<value_promote_t<TypeParam>>(i + j + k + l);
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4i.Size(0); i++) {
+  //     for (index_t j = 0; j < t4i.Size(1); j++) {
+  //       for (index_t k = 0; k < t4i.Size(2); k++) {
+  //         for (index_t l = 0; l < t4i.Size(3); l++) {
+  //           t4i(i, j, k, l) =
+  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t4i * t1).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t4i * t1).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t4i(i, j, k, l) * (double)t1(l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t1(l));
-            }
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t4i(i, j, k, l) * (double)t1(l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t1(l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t1 * t4i).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t1 * t4i).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t1(l) * (double)t4i(i, j, k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t1(l) * t4i(i, j, k, l));
-            }
-          }
-        }
-      }
-    }
-  }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t1(l) * (double)t4i(i, j, k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t1(l) * t4i(i, j, k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  {
-    tensor_t<TypeParam, 2> t2({3, 4});
-    tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-    tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  // {
+  //   tensor_t<TypeParam, 2> t2({3, 4});
+  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
 
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
-      }
-    }
+  //   for (index_t i = 0; i < t2.Size(0); i++) {
+  //     for (index_t j = 0; j < t2.Size(1); j++) {
+  //       t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
+  //     }
+  //   }
 
-    for (index_t i = 0; i < t4i.Size(0); i++) {
-      for (index_t j = 0; j < t4i.Size(1); j++) {
-        for (index_t k = 0; k < t4i.Size(2); k++) {
-          for (index_t l = 0; l < t4i.Size(3); l++) {
-            t4i(i, j, k, l) =
-                static_cast<value_promote_t<TypeParam>>(i + j + k + l);
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4i.Size(0); i++) {
+  //     for (index_t j = 0; j < t4i.Size(1); j++) {
+  //       for (index_t k = 0; k < t4i.Size(2); k++) {
+  //         for (index_t l = 0; l < t4i.Size(3); l++) {
+  //           t4i(i, j, k, l) =
+  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t4i * t2).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t4i * t2).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t4i(i, j, k, l) * (double)t2(k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t2(k, l));
-            }
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t4i(i, j, k, l) * (double)t2(k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t2(k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t2 * t4i).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t2 * t4i).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t2(k, l) * (double)t4i(i, j, k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t2(k, l) * t4i(i, j, k, l));
-            }
-          }
-        }
-      }
-    }
-  }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t2(k, l) * (double)t4i(i, j, k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t2(k, l) * t4i(i, j, k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  {
-    tensor_t<TypeParam, 3> t3({2, 3, 4});
-    tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-    tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  // {
+  //   tensor_t<TypeParam, 3> t3({2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
 
-    for (index_t i = 0; i < t3.Size(0); i++) {
-      for (index_t j = 0; j < t3.Size(1); j++) {
-        for (index_t k = 0; k < t3.Size(2); k++) {
-          t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t3.Size(0); i++) {
+  //     for (index_t j = 0; j < t3.Size(1); j++) {
+  //       for (index_t k = 0; k < t3.Size(2); k++) {
+  //         t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
+  //       }
+  //     }
+  //   }
 
-    for (index_t i = 0; i < t4i.Size(0); i++) {
-      for (index_t j = 0; j < t4i.Size(1); j++) {
-        for (index_t k = 0; k < t4i.Size(2); k++) {
-          for (index_t l = 0; l < t4i.Size(3); l++) {
-            t4i(i, j, k, l) =
-                static_cast<value_promote_t<TypeParam>>(i + j + k + l);
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4i.Size(0); i++) {
+  //     for (index_t j = 0; j < t4i.Size(1); j++) {
+  //       for (index_t k = 0; k < t4i.Size(2); k++) {
+  //         for (index_t l = 0; l < t4i.Size(3); l++) {
+  //           t4i(i, j, k, l) =
+  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t4i * t3).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t4i * t3).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t4i(i, j, k, l) * (double)t3(j, k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t3(j, k, l));
-            }
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t4i(i, j, k, l) * (double)t3(j, k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t3(j, k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t3 * t4i).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t3 * t4i).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t3(j, k, l) * (double)t4i(i, j, k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t3(j, k, l) * t4i(i, j, k, l));
-            }
-          }
-        }
-      }
-    }
-  }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t3(j, k, l) * (double)t4i(i, j, k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t3(j, k, l) * t4i(i, j, k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  {
-    tensor_t<TypeParam, 0> t0;
-    tensor_t<TypeParam, 1> t1({4});
-    tensor_t<TypeParam, 2> t2({3, 4});
-    tensor_t<TypeParam, 3> t3({2, 3, 4});
-    tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-    tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  // {
+  //   tensor_t<TypeParam, 0> t0;
+  //   tensor_t<TypeParam, 1> t1({4});
+  //   tensor_t<TypeParam, 2> t2({3, 4});
+  //   tensor_t<TypeParam, 3> t3({2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
 
-    t0() = (TypeParam)200.0f;
+  //   t0() = (TypeParam)200.0f;
 
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      t1(i) = static_cast<value_promote_t<TypeParam>>(i);
-    }
+  //   for (index_t i = 0; i < t2.Size(0); i++) {
+  //     t1(i) = static_cast<value_promote_t<TypeParam>>(i);
+  //   }
 
-    for (index_t i = 0; i < t2.Size(0); i++) {
-      for (index_t j = 0; j < t2.Size(1); j++) {
-        t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
-      }
-    }
+  //   for (index_t i = 0; i < t2.Size(0); i++) {
+  //     for (index_t j = 0; j < t2.Size(1); j++) {
+  //       t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
+  //     }
+  //   }
 
-    for (index_t i = 0; i < t3.Size(0); i++) {
-      for (index_t j = 0; j < t3.Size(1); j++) {
-        for (index_t k = 0; k < t3.Size(2); k++) {
-          t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t3.Size(0); i++) {
+  //     for (index_t j = 0; j < t3.Size(1); j++) {
+  //       for (index_t k = 0; k < t3.Size(2); k++) {
+  //         t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
+  //       }
+  //     }
+  //   }
 
-    for (index_t i = 0; i < t4i.Size(0); i++) {
-      for (index_t j = 0; j < t4i.Size(1); j++) {
-        for (index_t k = 0; k < t4i.Size(2); k++) {
-          for (index_t l = 0; l < t4i.Size(3); l++) {
-            t4i(i, j, k, l) =
-                static_cast<value_promote_t<TypeParam>>(i + j + k + l);
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4i.Size(0); i++) {
+  //     for (index_t j = 0; j < t4i.Size(1); j++) {
+  //       for (index_t k = 0; k < t4i.Size(2); k++) {
+  //         for (index_t l = 0; l < t4i.Size(3); l++) {
+  //           t4i(i, j, k, l) =
+  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t4i + t3 + t2 + t1 + t0).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t4i + t3 + t2 + t1 + t0).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t4i(i, j, k, l) + (double)t3(j, k, l) +
-                                 (double)t2(k, l) + (double)t1(l) +
-                                 (double)(double)t0());
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) + t3(j, k, l) +
-                                                  t2(k, l) + t1(l) + t0());
-            }
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t4i(i, j, k, l) + (double)t3(j, k, l) +
+  //                                (double)t2(k, l) + (double)t1(l) +
+  //                                (double)(double)t0());
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) + t3(j, k, l) +
+  //                                                 t2(k, l) + t1(l) + t0());
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    (t4o = t0 + t1 + t2 + t3 + t4i).run();
-    cudaStreamSynchronize(0);
+  //   (t4o = t0 + t1 + t2 + t3 + t4i).run();
+  //   cudaStreamSynchronize(0);
 
-    for (index_t i = 0; i < t4o.Size(0); i++) {
-      for (index_t j = 0; j < t4o.Size(1); j++) {
-        for (index_t k = 0; k < t4o.Size(2); k++) {
-          for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
-              MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t0() + (double)t1(l) + (double)t2(k, l) +
-                                 (double)t3(j, k, l) + (double)t4i(i, j, k, l));
-            }
-            else {
-              MATX_ASSERT_EQ(t4o(i, j, k, l), t0() + t1(l) + t2(k, l) +
-                                                  t3(j, k, l) +
-                                                  t4i(i, j, k, l));
-            }
-          }
-        }
-      }
-    }
+  //   for (index_t i = 0; i < t4o.Size(0); i++) {
+  //     for (index_t j = 0; j < t4o.Size(1); j++) {
+  //       for (index_t k = 0; k < t4o.Size(2); k++) {
+  //         for (index_t l = 0; l < t4o.Size(3); l++) {
+  //           if constexpr (IsHalfType<TypeParam>()) {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l),
+  //                            (double)t0() + (double)t1(l) + (double)t2(k, l) +
+  //                                (double)t3(j, k, l) + (double)t4i(i, j, k, l));
+  //           }
+  //           else {
+  //             MATX_ASSERT_EQ(t4o(i, j, k, l), t0() + t1(l) + t2(k, l) +
+  //                                                 t3(j, k, l) +
+  //                                                 t4i(i, j, k, l));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
   }
   MATX_EXIT_HANDLER();
 }
@@ -1287,3 +1305,350 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   
   MATX_EXIT_HANDLER();
 }
+
+
+TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 100;
+  index_t count1 = 200;
+  tensor_t<TypeParam, 2> t2({count0, count1});
+  tensor_t<TypeParam, 2> t2s({count1, count0});
+  for (index_t i = 0; i < count0; i++) {
+    for (index_t j = 0; j < count1; j++) {
+      TypeParam tmp = {(float)i, (float)-j};
+      t2(i, j) = tmp;
+    }
+  }
+
+  (t2s = hermitianT(t2)).run();
+  cudaStreamSynchronize(0);
+
+  for (index_t i = 0; i < count0; i++) {
+    for (index_t j = 0; j < count1; j++) {
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(static_cast<double>(t2s(j, i).real()),
+                                     static_cast<double>(t2(i, j).real())));
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(-static_cast<double>(t2s(j, i).imag()),
+                                     static_cast<double>(t2(i, j).imag())));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsComplex, PlanarTransform)
+{
+  MATX_ENTER_HANDLER();
+  index_t m = 10;
+  index_t k = 20;
+  tensor_t<TypeParam, 2> t2({m, k});
+  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < k; j++) {
+      TypeParam tmp = {(float)i, (float)-j};
+      t2(i, j) = tmp;
+    }
+  }
+
+  (t2p = planar(t2)).run();
+  cudaStreamSynchronize(0);
+
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < k; j++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j))) << i << " " << j << "\n";
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
+{
+  MATX_ENTER_HANDLER();
+  index_t m = 10;
+  index_t k = 20;
+  tensor_t<TypeParam, 2> t2({m, k});
+  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
+  for (index_t i = 0; i < 2 * m; i++) {
+    for (index_t j = 0; j < k; j++) {
+      if (i >= m) {
+        t2p(i, j) = 2.0f;
+      }
+      else {
+        t2p(i, j) = -1.0f;
+      }
+    }
+  }
+
+  (t2 = interleaved(t2p)).run();
+  cudaStreamSynchronize(0);
+
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < k; j++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j)));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsAll, RepMat)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 4;
+  index_t count1 = 4;
+  index_t same_reps = 10;
+  tensor_t<TypeParam, 2> t2({count0, count1});
+  tensor_t<TypeParam, 2> t2s({count0 * same_reps, count1 * same_reps});
+
+  for (index_t i = 0; i < count0; i++) {
+    for (index_t j = 0; j < count1; j++) {
+      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i);
+    }
+  }
+
+  auto repop = repmat(t2, same_reps);
+  ASSERT_TRUE(repop.Size(0) == same_reps * t2.Size(0));
+  ASSERT_TRUE(repop.Size(1) == same_reps * t2.Size(1));
+
+  (t2s = repop).run();
+  cudaStreamSynchronize(0);
+
+  for (index_t i = 0; i < count0 * same_reps; i++) {
+    for (index_t j = 0; j < count1 * same_reps; j++) {
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(t2s(i, j), t2(i % count0, j % count1)));
+    }
+  }
+
+  // Now a rectangular repmat
+  tensor_t<TypeParam, 2> t2r({count0 * same_reps, count1 * same_reps * 2});
+
+  auto rrepop = repmat(t2, {same_reps, same_reps * 2});
+  ASSERT_TRUE(rrepop.Size(0) == same_reps * t2.Size(0));
+  ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
+
+  (t2r = rrepop).run();
+  cudaStreamSynchronize(0);
+
+  for (index_t i = 0; i < count0 * same_reps; i++) {
+    for (index_t j = 0; j < count1 * same_reps * 2; j++) {
+      EXPECT_TRUE(
+          MatXUtils::MatXTypeCompare(t2r(i, j), t2(i % count0, j % count1)));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumeric, Shift)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 100;
+  index_t count1 = 201;
+  tensor_t<TypeParam, 2> t2({count0, count1});
+  tensor_t<TypeParam, 2> t2s({count0, count1});
+  tensor_t<TypeParam, 2> t2s2({count0, count1});
+
+  for (index_t i = 0; i < count0; i++) {
+    for (index_t j = 0; j < count1; j++) {
+      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
+    }
+  }
+
+  {
+    (t2s = shift0(t2, 5)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
+      }
+    }
+  }
+
+  {
+    (t2s = shift1(t2, 5)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, (j + 5) % count1)));
+      }
+    }
+  }
+
+  {
+    (t2s = shift0(shift1(t2, 5), 6)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+            t2s(i, j), t2((i + 6) % count0, (j + 5) % count1)));
+      }
+    }
+  }
+
+  {
+    (t2s = fftshift2D(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+            t2s(i, j), t2((i + (count0 + 1) / 2) % count0,
+                          (j + (count1 + 1) / 2) % count1)));
+      }
+    }
+  }
+
+  {
+    (t2s = ifftshift2D(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+            t2s(i, j),
+            t2((i + (count0) / 2) % count0, (j + (count1) / 2) % count1)));
+      }
+    }
+  }
+
+  // Negative shifts
+  {
+    (t2s = shift0(t2, -5)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        index_t idim = i < 5 ? (t2.Size(0) - 5 + i) : (i - 5);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
+      }
+    }
+  }
+
+  {
+    (t2s = shift1(t2, -5)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        index_t jdim = j < 5 ? (t2.Size(1) - 5 + j) : (j - 5);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
+      }
+    }
+  }
+
+  // Large shifts
+  {
+    (t2s = shift0(t2, t2.Size(0) * 4)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
+      }
+    }
+  }
+
+  {
+    // Shift 4 times the size back, minus one. This should be equivalent to
+    // simply shifting by -1
+    (t2s = shift0(t2, -t2.Size(0) * 4 - 1)).run();
+    (t2s2 = shift0(t2, -1)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumeric, Reverse)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 100;
+  index_t count1 = 200;
+  tensor_t<TypeParam, 2> t2({count0, count1});
+  tensor_t<TypeParam, 2> t2r({count0, count1});
+
+  for (index_t i = 0; i < count0; i++) {
+    for (index_t j = 0; j < count1; j++) {
+      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
+    }
+  }
+
+  {
+    (t2r = reverseY(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
+      }
+    }
+  }
+
+  {
+    (t2r = reverseX(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
+      }
+    }
+  }
+
+  {
+    (t2r = reverseX(reverseY(t2))).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+            t2r(i, j), t2(count0 - i - 1, count1 - j - 1)));
+      }
+    }
+  }
+
+  // Flip versions
+  {
+    (t2r = flipud(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
+      }
+    }
+  }
+
+  {
+    (t2r = fliplr(t2)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        EXPECT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+

@@ -53,14 +53,9 @@ public:
 
   ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
-  inline __MATX_DEVICE__ T operator()() const { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t) const { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t) const { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t) const { return v_; };
-  inline __MATX_DEVICE__ T operator()(index_t, index_t, index_t, index_t) const
-  {
-    return v_;
-  };
+  template <typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
+    return v_; };
 
   inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
@@ -131,37 +126,20 @@ public:
   using matxop = bool;
   using scalar_type = T;
 
-  Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val){};
+  Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
+  {
+    static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");
+  };
 
-  inline __MATX_DEVICE__ T operator()() const { return T(val_); };
-  inline __MATX_DEVICE__ T operator()(index_t i) const
-  {
-    if (i == 0)
-      return val_;
-    else
-      return T(0.0f);
-  };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
-  {
-    if (i == j)
+  template <typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+    if (((pp_get<0>(indices...) == indices) && ...)) {
       return T(val_);
-    else
+    }
+    else {
       return T(0.0f);
-  };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k) const
-  {
-    if (i == j && i == k)
-      return T(val_);
-    else
-      return T(0.0f);
-  };
-  inline __MATX_DEVICE__ T operator()(index_t i, index_t j, index_t k, index_t l) const
-  {
-    if (i == j && k == l && i == k)
-      return T(val_);
-    else
-      return T(0.0f);
-  };
+    }
+  }
 
   inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {
@@ -225,49 +203,11 @@ public:
   static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
   matxGenerator1D_t(ShapeType &&s, Generator1D f) : f_(f), s_(std::forward<ShapeType>(s)) {}
-  inline __MATX_DEVICE__ auto operator()(int i) const  { return f_(i); };
-  inline __MATX_DEVICE__ auto operator()(int i, int j) const
-  {
-    if constexpr (Dim == 0) {
-      return f_(i);
-    }
-    else {
-      return f_(j);
-    }
-    // BUG WAR
-    return scalar_type(0);
-  };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k) const 
-  {
-    if constexpr (Dim == 0) {
-      return f_(i);
-    }
-    else if constexpr (Dim == 1) {
-      return f_(j);
-    }
-    else {
-      return f_(k);
-    }
-    // BUG WAR
-    return scalar_type(0);
-  };
-  inline __MATX_DEVICE__ auto operator()(int i, int j, int k, int l) const 
-  {
-    if constexpr (Dim == 0) {
-      return f_(i);
-    }
-    else if constexpr (Dim == 1) {
-      return f_(j);
-    }
-    else if constexpr (Dim == 2) {
-      return f_(k);
-    }
-    else {
-      return f_(l);
-    }
-    // BUG WAR
-    return scalar_type(0);
-  };
+
+  template <typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+    return f_(pp_get<Dim>(indices...));
+  }
 
   inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
   {

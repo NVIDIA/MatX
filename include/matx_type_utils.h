@@ -40,6 +40,7 @@
 #include <complex>
 #include <cublas_v2.h>
 #include <cuda/std/complex>
+#include <cuda/std/tuple>
 #include <type_traits>
 
 /**
@@ -300,6 +301,10 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 template <typename T>
 using extract_scalar_type_t = typename extract_scalar_type_impl<T>::scalar_type;
 
+template <typename> struct is_std_tuple: std::false_type {};
+template <typename ...T> struct is_std_tuple<std::tuple<T...>>: std::true_type {};
+template <typename T> struct is_std_array : std::false_type {};
+template <typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 
 
 // Get the n-th element from a parameter pack
@@ -308,7 +313,32 @@ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) pp_get(Ts&&... ts) {
   return std::get<I>(std::forward_as_tuple(ts...));
 }
 
+template <std::size_t ... Is>
+constexpr auto index_sequence_rev(std::index_sequence<Is...> const &)
+   -> decltype( std::index_sequence<sizeof...(Is) -1U - Is...>{} );
 
+template <std::size_t N>
+using make_index_sequence_rev
+   = decltype(index_sequence_rev(std::make_index_sequence<N>{}));
+
+
+// Taken from Ramond Chen's blog entries on tuple tricks
+template<std::size_t N, typename Seq> struct offset_sequence;
+
+template<std::size_t N, std::size_t... Ints>
+struct offset_sequence<N, std::index_sequence<Ints...>>
+{
+ using type = std::index_sequence<Ints + N...>;
+};
+template<std::size_t N, typename Seq>
+using offset_sequence_t = typename offset_sequence<N, Seq>::type;
+
+template<typename Tuple, std::size_t... Ints>
+__MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, std::index_sequence<Ints...>)
+{
+ return cuda::std::tuple<cuda::std::tuple_element_t<Ints, Tuple>...>(
+    cuda::std::get<Ints>(std::forward<Tuple>(tuple))...);
+}
 
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes

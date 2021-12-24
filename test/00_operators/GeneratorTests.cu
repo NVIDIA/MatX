@@ -380,27 +380,22 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   MATX_ENTER_HANDLER();
   index_t count = 100;
 
-  tensor_t<TypeParam, 1> t1({count});
   tensor_t<TypeParam, 2> t2({count, count});
   tensor_t<TypeParam, 3> t3({count, count, count});
   tensor_t<TypeParam, 4> t4({count, count, count, count});
 
-  t1.PrefetchDevice(0);
   t2.PrefetchDevice(0);
   t3.PrefetchDevice(0);
   t4.PrefetchDevice(0);
-
-  auto eye1 = eye<TypeParam>({count});
+ 
   auto eye2 = eye<TypeParam>({count, count});
   auto eye3 = eye<TypeParam>({count, count, count});
   auto eye4 = eye<TypeParam>({count, count, count, count});
 
-  (t1 = eye1).run();
   (t2 = eye2).run();
   (t3 = eye3).run();
   (t4 = eye4).run();
 
-  t1.PrefetchHost(0);
   t2.PrefetchHost(0);
   t3.PrefetchHost(0);
   t4.PrefetchHost(0);
@@ -409,13 +404,6 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   TypeParam zero = 0.0f;
 
   cudaDeviceSynchronize();
-
-  for (index_t i = 0; i < count; i++) {
-    if (i == 0)
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), one));
-    else
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), zero));
-  }
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -458,27 +446,22 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   index_t count = 100;
   TypeParam c = GenerateData<TypeParam>();
 
-  tensor_t<TypeParam, 1> t1({count});
   tensor_t<TypeParam, 2> t2({count, count});
   tensor_t<TypeParam, 3> t3({count, count, count});
   tensor_t<TypeParam, 4> t4({count, count, count, count});
 
-  t1.PrefetchDevice(0);
   t2.PrefetchDevice(0);
   t3.PrefetchDevice(0);
   t4.PrefetchDevice(0);
 
-  auto diag1 = diag<TypeParam>({count}, c);
   auto diag2 = diag<TypeParam>({count, count}, c);
   auto diag3 = diag<TypeParam>({count, count, count}, c);
   auto diag4 = diag<TypeParam>({count, count, count, count}, c);
 
-  (t1 = diag1).run();
   (t2 = diag2).run();
   (t3 = diag3).run();
   (t4 = diag4).run();
 
-  t1.PrefetchHost(0);
   t2.PrefetchHost(0);
   t3.PrefetchHost(0);
   t4.PrefetchHost(0);
@@ -486,13 +469,6 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   TypeParam zero = 0.0f;
 
   cudaDeviceSynchronize();
-
-  for (index_t i = 0; i < count; i++) {
-    if (i == 0)
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), c));
-    else
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), zero));
-  }
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -529,349 +505,4 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   MATX_EXIT_HANDLER();
 }
 
-
-TYPED_TEST(BasicGeneratorTestsComplex, HermitianTranspose)
-{
-  MATX_ENTER_HANDLER();
-  index_t count0 = 100;
-  index_t count1 = 200;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count1, count0});
-  for (index_t i = 0; i < count0; i++) {
-    for (index_t j = 0; j < count1; j++) {
-      TypeParam tmp = {(float)i, (float)-j};
-      t2(i, j) = tmp;
-    }
-  }
-
-  (t2s = hermitianT(t2)).run();
-  cudaStreamSynchronize(0);
-
-  for (index_t i = 0; i < count0; i++) {
-    for (index_t j = 0; j < count1; j++) {
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(static_cast<double>(t2s(j, i).real()),
-                                     static_cast<double>(t2(i, j).real())));
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(-static_cast<double>(t2s(j, i).imag()),
-                                     static_cast<double>(t2(i, j).imag())));
-    }
-  }
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(BasicGeneratorTestsComplex, PlanarTransform)
-{
-  MATX_ENTER_HANDLER();
-  index_t m = 10;
-  index_t k = 20;
-  tensor_t<TypeParam, 2> t2({m, k});
-  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
-  for (index_t i = 0; i < m; i++) {
-    for (index_t j = 0; j < k; j++) {
-      TypeParam tmp = {(float)i, (float)-j};
-      t2(i, j) = tmp;
-    }
-  }
-
-  (t2p = planar(t2)).run();
-  cudaStreamSynchronize(0);
-
-  for (index_t i = 0; i < m; i++) {
-    for (index_t j = 0; j < k; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j)));
-    }
-  }
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(BasicGeneratorTestsComplex, InterleavedTransform)
-{
-  MATX_ENTER_HANDLER();
-  index_t m = 10;
-  index_t k = 20;
-  tensor_t<TypeParam, 2> t2({m, k});
-  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
-  for (index_t i = 0; i < 2 * m; i++) {
-    for (index_t j = 0; j < k; j++) {
-      if (i >= m) {
-        t2p(i, j) = 2.0f;
-      }
-      else {
-        t2p(i, j) = -1.0f;
-      }
-    }
-  }
-
-  (t2 = interleaved(t2p)).run();
-  cudaStreamSynchronize(0);
-
-  for (index_t i = 0; i < m; i++) {
-    for (index_t j = 0; j < k; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j)));
-    }
-  }
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(BasicGeneratorTestsAll, RepMat)
-{
-  MATX_ENTER_HANDLER();
-  index_t count0 = 4;
-  index_t count1 = 4;
-  index_t same_reps = 10;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count0 * same_reps, count1 * same_reps});
-
-  for (index_t i = 0; i < count0; i++) {
-    for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i);
-    }
-  }
-
-  auto repop = repmat(t2, same_reps);
-  ASSERT_TRUE(repop.Size(0) == same_reps * t2.Size(0));
-  ASSERT_TRUE(repop.Size(1) == same_reps * t2.Size(1));
-
-  (t2s = repop).run();
-  cudaStreamSynchronize(0);
-
-  for (index_t i = 0; i < count0 * same_reps; i++) {
-    for (index_t j = 0; j < count1 * same_reps; j++) {
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2s(i, j), t2(i % count0, j % count1)));
-    }
-  }
-
-  // Now a rectangular repmat
-  tensor_t<TypeParam, 2> t2r({count0 * same_reps, count1 * same_reps * 2});
-
-  auto rrepop = repmat(t2, {same_reps, same_reps * 2});
-  ASSERT_TRUE(rrepop.Size(0) == same_reps * t2.Size(0));
-  ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
-
-  (t2r = rrepop).run();
-  cudaStreamSynchronize(0);
-
-  for (index_t i = 0; i < count0 * same_reps; i++) {
-    for (index_t j = 0; j < count1 * same_reps * 2; j++) {
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2r(i, j), t2(i % count0, j % count1)));
-    }
-  }
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(BasicGeneratorTestsNumeric, Shift)
-{
-  MATX_ENTER_HANDLER();
-  index_t count0 = 100;
-  index_t count1 = 201;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count0, count1});
-  tensor_t<TypeParam, 2> t2s2({count0, count1});
-
-  for (index_t i = 0; i < count0; i++) {
-    for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
-    }
-  }
-
-  {
-    (t2s = shift0(t2, 5)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
-      }
-    }
-  }
-
-  {
-    (t2s = shift1(t2, 5)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, (j + 5) % count1)));
-      }
-    }
-  }
-
-  {
-    (t2s = shift0(shift1(t2, 5), 6)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-            t2s(i, j), t2((i + 6) % count0, (j + 5) % count1)));
-      }
-    }
-  }
-
-  {
-    (t2s = fftshift2D(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-            t2s(i, j), t2((i + (count0 + 1) / 2) % count0,
-                          (j + (count1 + 1) / 2) % count1)));
-      }
-    }
-  }
-
-  {
-    (t2s = ifftshift2D(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-            t2s(i, j),
-            t2((i + (count0) / 2) % count0, (j + (count1) / 2) % count1)));
-      }
-    }
-  }
-
-  // Negative shifts
-  {
-    (t2s = shift0(t2, -5)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        index_t idim = i < 5 ? (t2.Size(0) - 5 + i) : (i - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
-      }
-    }
-  }
-
-  {
-    (t2s = shift1(t2, -5)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        index_t jdim = j < 5 ? (t2.Size(1) - 5 + j) : (j - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
-      }
-    }
-  }
-
-  // Large shifts
-  {
-    (t2s = shift0(t2, t2.Size(0) * 4)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
-      }
-    }
-  }
-
-  {
-    // Shift 4 times the size back, minus one. This should be equivalent to
-    // simply shifting by -1
-    (t2s = shift0(t2, -t2.Size(0) * 4 - 1)).run();
-    (t2s2 = shift0(t2, -1)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
-      }
-    }
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(BasicGeneratorTestsNumeric, Reverse)
-{
-  MATX_ENTER_HANDLER();
-  index_t count0 = 100;
-  index_t count1 = 200;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2r({count0, count1});
-
-  for (index_t i = 0; i < count0; i++) {
-    for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
-    }
-  }
-
-  {
-    (t2r = reverseY(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
-      }
-    }
-  }
-
-  {
-    (t2r = reverseX(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
-      }
-    }
-  }
-
-  {
-    (t2r = reverseX(reverseY(t2))).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-            t2r(i, j), t2(count0 - i - 1, count1 - j - 1)));
-      }
-    }
-  }
-
-  // Flip versions
-  {
-    (t2r = flipud(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
-      }
-    }
-  }
-
-  {
-    (t2r = fliplr(t2)).run();
-    cudaStreamSynchronize(0);
-
-    for (index_t i = 0; i < count0; i++) {
-      for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
-            MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
-      }
-    }
-  }
-
-  MATX_EXIT_HANDLER();
-}
 

@@ -62,7 +62,7 @@ template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc, typename Op>
 class set : public BaseOp<set<T, RANK, Desc, Op>> {
 private:
-  tensor_impl_t<T, RANK, Desc> out_;
+  mutable tensor_impl_t<T, RANK, Desc> out_;
   typename base_type<Op>::type op_;
   std::array<typename Desc::shape_type, RANK> size_;
 
@@ -96,70 +96,38 @@ public:
 
   set &operator=(const set &) = delete;
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()() noexcept
+  template <typename... Is>
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(Is... indices) const noexcept
   {
     if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_))>) {
-      out_() = static_cast<float>(get_value(op_));
+                  std::is_integral_v<decltype(get_value(op_, indices...))>) {
+      out_(indices...) = static_cast<float>(get_value(op_, indices...));
     }
     else {
-      out_() = get_value(op_);
+      out_(indices...) = get_value(op_, indices...);
     }
 
-    return out_();
-  }
+    return out_(indices...);
+  }  
 
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<typename Desc::shape_type, RANK> idx) const noexcept
   {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i))>) {
-      out_(i) = static_cast<float>(get_value(op_, i));
-    }
-    else {
-      out_(i) = get_value(op_, i);
-    }
+    auto res = mapply([&](auto &&...args)  {
+        if constexpr (is_matx_half_v<T> &&
+                      std::is_integral_v<decltype(get_value(op_, args...))>) {   
+          auto r = static_cast<float>(get_value(op_, args...));
+          out_(args...) = r;
+          return r;
+        }
+        else {      
+          auto r = get_value(op_, args...);
+          out_(args...) = r; 
+          return r;
+        }       
+      }, idx
+    );  
 
-    return out_(i);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j))>) {
-      out_(i, j) = static_cast<float>(get_value(op_, i, j));
-    }
-    else {
-      out_(i, j) = get_value(op_, i, j);
-    }
-
-    return out_(i, j);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j, typename Desc::shape_type k) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j, k))>) {
-      out_(i, j, k) = static_cast<float>(get_value(op_, i, j, k));
-    }
-    else {
-      out_(i, j, k) = get_value(op_, i, j, k);
-    }
-
-    return out_(i, j, k);
-  }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(typename Desc::shape_type i, typename Desc::shape_type j, typename Desc::shape_type k,
-                                    typename Desc::shape_type l) noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, i, j, k, l))>) {
-      out_(i, j, k, l) = static_cast<float>(get_value(op_, i, j, k, l));
-    }
-    else {
-      out_(i, j, k, l) = get_value(op_, i, j, k, l);
-    }
-
-    return out_(i, j, k, l);
+    return res;
   }
 
   /**
