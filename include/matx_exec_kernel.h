@@ -109,6 +109,14 @@ __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size
   }
 }
 
+/**
+ * @brief Launch an operator with rank N
+ * 
+ * @tparam Op operator type
+ * @param op operator
+ * @param sizes sizes of each dimension
+ * @param mult Product of sizes of all but first dimension
+ */
 template <class Op>
 __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> sizes, index_t mult) {
   std::array<index_t, Op::Rank()> indices;
