@@ -41,6 +41,7 @@ are necessary
     * [Supported Data Types](#supported-data-types)
 * [Unit Tests](#unit-tests)
 * [Quick Start Guide](#quick-start-guide)
+* [Release History](#release-history)
 * [Filing Issues](#filing-issues)
 * [Contributing Guide](#contributing-guide)
 
@@ -191,6 +192,14 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - A set of MatX [notebooks](docs/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
+## Release History
+*v0.2.2*:
+* Arbitrary tensor ranks
+   
+*v0.2.1*:
+* Generic storage and descriptor types
+* Static tensor dimensions for compile-time sizes and strides
+* Slew of new ``make_`` helper functions and documentation
 
 ## Filing Issues
 We welcome and encourage the [creation of issues](https://github.com/NVIDIA/MatX/issues/new) against MatX. When creating a new issue, please use the following syntax in the title of your submission to help us prioritize responses and planned work.
