@@ -661,24 +661,24 @@ class tensor_impl_t {
       return desc_.IsLinear();
     }
 
-    template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal(std::tuple<Is...>)  {
-      return 0;
-    }    
-
-    template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal(std::tuple<Is...> tup)  {
-      return GetVal<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+    template <int I = 0, typename ...Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] std::tuple<Is...> tup)  {
+      if constexpr (I < sizeof...(Is)) {
+        return GetVal<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+      }
+      else {
+        return 0;
+      }
     }
 
-    template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC(const std::tuple<Is...>) const {
-      return 0;
-    }    
-
-    template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC(const std::tuple<Is...> tup) const {
-      return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+    template <int I = 0, typename ...Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const std::tuple<Is...> tup) const {
+      if constexpr (I < sizeof...(Is)) {
+        return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+      }
+      else {
+        return 0;
+      }      
     }    
 
     /**
