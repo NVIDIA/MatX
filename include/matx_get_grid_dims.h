@@ -111,7 +111,7 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
   }  
   else {
     size_t dims = std::accumulate(std::begin(sizes), std::end(sizes), 1, std::multiplies<index_t>());
-    threads.x = std::min((int)dims, max_cta_size);
+    threads.x = std::min(((int)dims + 31)/32 * 32, max_cta_size);
 
     // launch as many blocks as necessary
     blocks.x = static_cast<int>((dims + threads.x - 1) / threads.x);

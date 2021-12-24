@@ -666,18 +666,18 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
     // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
     // our index.
     index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    index_t ttl = mult * in.Size(RANK-1);
+    index_t ttl = mult * in.Size(0);
     valid = x_abs < ttl;
     #pragma unroll
     for (int r = 0; r < InType::Rank(); r++) {
       indices[r] = x_abs / mult;
       x_abs -= indices[r] * mult;      
       mult /= in.Size(r+1); 
-    }    
-
+    }
+    
     if (valid) {
       in_val = in(indices);  
-    }
+    }     
   }  
 
   // Compute offset index based on rank difference
@@ -708,11 +708,12 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
   else {
     // Calculate valid here
     valid = true;
-    for (int r = RANK-1; r >= 0; r++) {
+    for (int r = 0; r < RANK - 1; r++) {
       if (indices[r] >= dest.Size(r)) {
         valid = false;
       }
     }
+
     if (valid) {
       out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
     }   
@@ -944,7 +945,6 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
   }
 
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
-
   matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp(), mult);
 
