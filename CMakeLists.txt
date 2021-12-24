@@ -47,7 +47,7 @@ endif()
 project(MATX
         LANGUAGES CUDA CXX
         DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
-        VERSION 0.1.1
+        VERSION 0.2.2
         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
 
 if (NOT CMAKE_CUDA_ARCHITECTURES)
