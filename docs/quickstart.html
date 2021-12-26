@@ -110,10 +110,6 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="creation.html">Constructing Tensors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creation.html#a-quick-primer-on-matx-types">A quick primer on MatX types</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creation.html#matx-storage">MatX Storage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creation.html#tensor-descriptors">Tensor Descriptors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creation.html#creating-tensors">Creating Tensors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="matlabpython.html">MATLAB/Python To MatX Translation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/index.html">Example Applications</a></li>
@@ -186,7 +182,7 @@
            <div itemprop="articleBody">
             
   <section id="quick-start">
-<h1>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
+<span id="quickstart"></span><h1>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
 <p>This guide walks through a quick introduction to MatX to get familiar with the types and basic functionality. For more extensive documentation, please
 look at the following sources:</p>
 <ol class="arabic simple">
@@ -196,16 +192,16 @@ look at the following sources:</p>
 </ol>
 <section id="adding-matx-to-your-project">
 <h2>Adding MatX to your project<a class="headerlink" href="#adding-matx-to-your-project" title="Permalink to this headline">¶</a></h2>
-<p>MatX is currently a single header file to include in your project called <code class="docutils literal notranslate"><span class="pre">matx.h</span></code>. Simply add the matx/include directory to your compiler’s
-include search path, and add the proper #include. All MatX functions are in a top-level <code class="docutils literal notranslate"><span class="pre">matx</span></code> namespace, while more specific functions have
+<p>MatX is a single header file to include in your project called <code class="docutils literal notranslate"><span class="pre">matx.h</span></code>. Simply add the matx/include directory to your compiler’s
+include search path, and add “#include “matx.h”. All core MatX functions are in a top-level <code class="docutils literal notranslate"><span class="pre">matx</span></code> namespace, while more specific functions have
 a nested namespace. For example, the visualization pieces of MatX are under <code class="docutils literal notranslate"><span class="pre">matx::viz</span></code>.</p>
 </section>
 <section id="tensor-views">
 <h2>Tensor Views<a class="headerlink" href="#tensor-views" title="Permalink to this headline">¶</a></h2>
-<p>The most fundamental data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any
+<p>The most common data type in MatX is the tensor (tensor_t). The tensor is used for both viewing and managing any
 underlying GPU or host memory. While dynamically-typed languages like Python or MATLAB will implicitly allocate and manage data for the user,
-MatX requires either a one-time explicit memory allocation, or a user-provided device-side buffer. This gives more control over the lifetime of the data, and
-allows reusing memory regions for different operations.</p>
+MatX requires either a one-time explicit memory allocation, or various ways of providing your own buffer. This gives more control over the lifetime
+of the data, and allows reusing memory regions for different operations.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>For more information about creating tensors, see the “Creating Tensors” documentation</p>
@@ -224,15 +220,13 @@ in the list must match the rank of the tensor.  Currently MatX supports ranks fr
 <p>In this case only the type is required as a template parameter, and the rank is deduced from the number of arguments in the dimension list.</p>
 <p>If the shape of the tensor is known at compile time, a static tensor can be created for a performance improvement when accessing elements of the
 tensor:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="o">&gt;</span><span class="p">();</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_static_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="o">&gt;</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>Note that for a static tensor the shape is moved to the template parameters instead of function arguments.</p>
 <p>After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
-pass their own pointers in a different form of the constructor which will leave allocation and freeing of the memory to the caller (see
-<em>Creating a view from an existing pointer</em> below). Note that MatX treats the initial tensor view as the owner of the memory. When this view is
-destructed, whether by going out of scope or manually, all memory is freed. If there were other views still pointing to this memory, it is no
-longer valid and the behavior is undefined.</p>
+pass their own pointers in a different for of the <code class="docutils literal notranslate"><span class="pre">make_</span></code> family of functions to allow for more control over buffer types and ownership
+semantics.</p>
 <p>With our view <code class="docutils literal notranslate"><span class="pre">t</span></code> created above, we now have managed memory allocated sufficiently large to hold our values, but at this point the data
 in the tensor is undefined. To set individual values in a view, we can use <code class="docutils literal notranslate"><span class="pre">operator()</span></code>:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">t</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span> <span class="o">=</span> <span class="mf">5.5</span><span class="p">;</span>

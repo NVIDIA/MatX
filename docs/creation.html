@@ -100,7 +100,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#creating-tensors">Creating Tensors</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#make-variants">Make variants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#make-variants">Make Variants</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#creating-from-c-array-or-a-brace-enclosed-list">Creating From C Array Or a Brace-Enclosed list</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#creating-from-a-conforming-shape">Creating From A Conforming Shape</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#creating-from-a-descriptor">Creating From A Descriptor</a></li>
@@ -193,7 +193,7 @@ different ways to construct tensors, and when you should use certain methods ove
 <h2>A Quick Primer On MatX Types<a class="headerlink" href="#a-quick-primer-on-matx-types" title="Permalink to this headline">¶</a></h2>
 <p>The basic type of tensor used in most examples and tests is the <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> object. <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> is the highest-level tensor class, and
 provides all of the abstractions for viewing and modifying data, holding storage, and any other metadata needed by a tensor. Because of
-their relatively large size, <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler Error
+their relatively large size, <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler error
 since <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> uses types that are not available on the device at this time.</p>
 <p>Within a <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> there is an abstract object called <code class="docutils literal notranslate"><span class="pre">Storage</span></code> (more on that later), and another inherited class called <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code>.
 <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> is a lightweight class containing only the minimum amount of member variables needed to access the data from a GPU kernel. Currently the
@@ -203,7 +203,7 @@ member variables are a tensor descriptor and a data pointer. Tensor descriptors 
 is the type that is passed into GPU kernels, and only contains types that are compatible with CUDA. Furthermore, the total size of the <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code>
 object is as small as possible since these objects can be replicated many times within a single complex expression. Reducing the size of
 <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> allows for fastest memory accesses, smaller copies before a kernel launch, and makes extending the code easier.</p>
-<p>To convert between a <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> and <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> a type trait called <code class="docutils literal notranslate"><span class="pre">base_type</span></code> is available and is used like the follow:</p>
+<p>To convert between a <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> and <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> a type trait called <code class="docutils literal notranslate"><span class="pre">base_type</span></code> is available and is used like the following:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typename</span> <span class="nc">base_type</span><span class="o">&lt;</span><span class="n">I1</span><span class="o">&gt;::</span><span class="n">type</span> <span class="n">in1_</span> <span class="o">=</span> <span class="n">in</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -269,7 +269,7 @@ the member variable must be specified in the member list. In these scenaries it�
 spelling out the types themselves. For examples of this, see the simple_pipeline files.</p>
 <p>All make functions take the data type as the first template parameter.</p>
 <section id="make-variants">
-<h3>Make variants<a class="headerlink" href="#make-variants" title="Permalink to this headline">¶</a></h3>
+<h3>Make Variants<a class="headerlink" href="#make-variants" title="Permalink to this headline">¶</a></h3>
 <p>There are currently 4 different variants of the <code class="docutils literal notranslate"><span class="pre">make_</span></code> helper functions:
 - <code class="docutils literal notranslate"><span class="pre">make_</span></code> for creating a tensor with a dynamic descriptor and returning by value
 - <code class="docutils literal notranslate"><span class="pre">make_static_</span></code> for creating a tensor with a static descriptor and returning by value

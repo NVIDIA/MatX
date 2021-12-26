@@ -19,8 +19,8 @@ libraries. Tensors can be any rank, and virtually any data type. Types that are 
 for specific hardware will use the accelerated features if present. For example, tensor
 cores will be used when fp16 or bf16 inputs are used in a GEMM operation.
 
-To get started with MatX, please read the quickstart_ guide, and for a complete API
-overview visit the api_ index.
+To get started with MatX, please read the :ref:`quickstart` guide, and for a complete API
+overview visit the :ref:`api` index.
 
 
 Table of Contents
