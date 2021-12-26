@@ -20,7 +20,7 @@ set(SPHINX_CFG_OUT ${CMAKE_CURRENT_BINARY_DIR}/conf.py)
 # Cache used by Sphinx
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_static)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_templates)
-configure_file(${PROJECT_SOURCE_DIR}/docs/_templates/layout.html ${CMAKE_CURRENT_BINARY_DIR}/_templates/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/docs_input/_templates/layout.html ${CMAKE_CURRENT_BINARY_DIR}/_templates/ COPYONLY)
 
 #Replace variables inside @@ with the current values
 configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)

@@ -20,7 +20,7 @@ option(EN_CUTLASS OFF)
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (BUILD_DOCS)
     project(MATX_DOCS)
-    add_subdirectory(docs)
+    add_subdirectory(docs_input)
     return()
 endif()
 
