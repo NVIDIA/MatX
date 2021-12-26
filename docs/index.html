@@ -168,10 +168,17 @@
 </div>
 <p>This site contains all documentation for MatX, including API docs, tutorials,
 and example code.</p>
-<p>MatX is a header-only C++17 library for viewing and manipulating data on a GPU
-with signal processing primitives. MatX strives to have a user-friendly API that
-Python and MATLAB users could pick up quickly. To allow this, a compiler supporting
-C++17 is a requirement and MatX will not build with anything older.</p>
+<p>MatX is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs.
+Near-native performance can be achieved while using a simple syntax common in
+higher-level languages such as Python or MATLAB. To achieve this performance,
+MatX uses a combination of compile-time optimizations and existing CUDA libraries
+to hide complexity from the developer.</p>
+<p>A single data type (tensor_t) is used by both algebraic expressions and backend CUDA
+libraries. Tensors can be any rank, and virtually any data type. Types that are optimized
+for specific hardware will use the accelerated features if present. For example, tensor
+cores will be used when fp16 or bf16 inputs are used in a GEMM operation.</p>
+<p>To get started with MatX, please read the <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> guide, and for a complete API
+overview visit the <a class="reference internal" href="api/index.html#api"><span class="std std-ref">API Reference</span></a> index.</p>
 <section id="table-of-contents">
 <h2>Table of Contents<a class="headerlink" href="#table-of-contents" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">

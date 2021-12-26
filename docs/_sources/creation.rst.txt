@@ -10,7 +10,7 @@ A Quick Primer On MatX Types
 ----------------------------
 The basic type of tensor used in most examples and tests is the ``tensor_t`` object. ``tensor_t`` is the highest-level tensor class, and
 provides all of the abstractions for viewing and modifying data, holding storage, and any other metadata needed by a tensor. Because of
-their relatively large size, ``tensor_t`` objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler Error
+their relatively large size, ``tensor_t`` objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler error
 since ``tensor_t`` uses types that are not available on the device at this time. 
 
 Within a ``tensor_t`` there is an abstract object called ``Storage`` (more on that later), and another inherited class called ``tensor_impl_t``.
@@ -23,7 +23,7 @@ is the type that is passed into GPU kernels, and only contains types that are co
 object is as small as possible since these objects can be replicated many times within a single complex expression. Reducing the size of 
 ``tensor_impl_t`` allows for fastest memory accesses, smaller copies before a kernel launch, and makes extending the code easier.
 
-To convert between a ``tensor_t`` and ``tensor_impl_t`` a type trait called ``base_type`` is available and is used like the follow:
+To convert between a ``tensor_t`` and ``tensor_impl_t`` a type trait called ``base_type`` is available and is used like the following:
 
 .. code-block:: cpp
 
@@ -97,7 +97,7 @@ spelling out the types themselves. For examples of this, see the simple_pipeline
 
 All make functions take the data type as the first template parameter.
 
-Make variants
+Make Variants
 #############
 There are currently 4 different variants of the ``make_`` helper functions:
 - ``make_`` for creating a tensor with a dynamic descriptor and returning by value

@@ -253,7 +253,7 @@ Generate random numbers based on a size and seed. Uses the Philox 4x32 generator
 
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx18randomTensorView_tE">
-<span id="_CPPv3I0_iEN4matx18randomTensorView_tE"></span><span id="_CPPv2I0_iEN4matx18randomTensorView_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomTensorView__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">randomTensorView_t</span></span></span><a class="headerlink" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I0_iEN4matx18randomTensorView_tE"></span><span id="_CPPv2I0_iEN4matx18randomTensorView_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomTensorView__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">randomTensorView_t</span></span></span><a class="headerlink" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Random number generator view</p>
 <p>
 Provides a view into a previously-allocated <a class="reference internal" href="#classmatx_1_1randomGenerator__t"><span class="std std-ref">randomGenerator_t</span></a> <dl class="field-list simple">
@@ -265,71 +265,6 @@ Provides a view into a previously-allocated <a class="reference internal" href="
 </dd>
 </dl>
 </p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx18randomTensorView_tclEv">
-<span id="_CPPv3NK4matx18randomTensorView_tclEv"></span><span id="_CPPv2NK4matx18randomTensorView_tclEv"></span><span id="matx::randomTensorView_t::call-operatorC"></span><span class="target" id="classmatx_1_1randomTensorView__t_1ad38f450ed97465e96da900de6ab52774"></span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx18randomTensorView_tclEv" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Retrieve a value from a rank-0 random view </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx18randomTensorView_tclE7index_t">
-<span id="_CPPv3NK4matx18randomTensorView_tclE7index_t"></span><span id="_CPPv2NK4matx18randomTensorView_tclE7index_t"></span><span id="matx::randomTensorView_t::call-operator__index_tC"></span><span class="target" id="classmatx_1_1randomTensorView__t_1aa0ee7e7a999f242ab83a1825c79c20da"></span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx18randomTensorView_tclE7index_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Retrieve a value from a rank-1 random view</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>i</strong> – First index </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t">
-<span id="_CPPv3NK4matx18randomTensorView_tclE7index_t7index_t"></span><span id="_CPPv2NK4matx18randomTensorView_tclE7index_t7index_t"></span><span id="matx::randomTensorView_t::call-operator__index_t.index_tC"></span><span class="target" id="classmatx_1_1randomTensorView__t_1a0580f7fa3bf85f51ec644844be7f0cbf"></span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">j</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Retrieve a value from a rank-2 random view</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>i</strong> – First index </p></li>
-<li><p><strong>j</strong> – Second index </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t7index_t">
-<span id="_CPPv3NK4matx18randomTensorView_tclE7index_t7index_t7index_t"></span><span id="_CPPv2NK4matx18randomTensorView_tclE7index_t7index_t7index_t"></span><span id="matx::randomTensorView_t::call-operator__index_t.index_t.index_tC"></span><span class="target" id="classmatx_1_1randomTensorView__t_1ae81aa7239090bc3ba8666facdfb20e49"></span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">j</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t7index_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Retrieve a value from a rank-3 random view</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>i</strong> – First index </p></li>
-<li><p><strong>j</strong> – Second index </p></li>
-<li><p><strong>k</strong> – Third index </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t7index_t7index_t">
-<span id="_CPPv3NK4matx18randomTensorView_tclE7index_t7index_t7index_t7index_t"></span><span id="_CPPv2NK4matx18randomTensorView_tclE7index_t7index_t7index_t7index_t"></span><span id="matx::randomTensorView_t::call-operator__index_t.index_t.index_t.index_tC"></span><span class="target" id="classmatx_1_1randomTensorView__t_1a50b11577e3e39c3c4b60ca351bfb7d6c"></span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">j</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">l</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx18randomTensorView_tclE7index_t7index_t7index_t7index_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Retrieve a value from a rank-4 random view</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>i</strong> – First index </p></li>
-<li><p><strong>j</strong> – Second index </p></li>
-<li><p><strong>k</strong> – Third index </p></li>
-<li><p><strong>l</strong> – Fourth index </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-</div>
 </dd></dl>
 
 </section>
