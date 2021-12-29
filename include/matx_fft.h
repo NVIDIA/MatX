@@ -36,7 +36,6 @@
 #include <cufftXt.h>
 
 #include "matx_cache.h"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_make.h"
 #include "matx_tensor.h"
@@ -46,6 +45,7 @@
 #include <optional>
 
 namespace matx {
+namespace detail {
 
 static constexpr int MAX_FFT_RANK = 2;
 
@@ -699,6 +699,8 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
   return i;
 }
 
+} // end namespace detail
+
 /**
  * Run a 1D FFT with a cached plan
  *
@@ -728,21 +730,21 @@ void fft(OutputTensor &o, const InputTensor &i,
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
-  auto i_new = GetFFTInputView(o, i, stream);
+  auto i_new = detail::GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
+  auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
-  auto ret = cache_1d.Lookup(params);
+  auto ret = detail::cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
-    cache_1d.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
+    detail::cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Forward(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
+    auto fft_type = static_cast<detail::matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Forward(o, i_new, stream);
   }
   
@@ -782,21 +784,21 @@ void ifft(OutputTensor &o, const InputTensor &i,
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
 
-  auto i_new = GetFFTInputView(o, i, stream);
+  auto i_new = detail::GetFFTInputView(o, i, stream);
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
+  auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
-  auto ret = cache_1d.Lookup(params);
+  auto ret = detail::cache_1d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
-    cache_1d.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxFFTPlan1D_t<OutputTensor, InputTensor>{o, i_new};
+    detail::cache_1d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i_new, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
+    auto fft_type = static_cast<detail::matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Inverse(o, i_new, stream);
   }
 
@@ -834,18 +836,18 @@ void fft2(OutputTensor &o, const InputTensor &i,
     "Input and output tensor ranks must match");
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
+  auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
-  auto ret = cache_2d.Lookup(params);
+  auto ret = detail::cache_2d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
-    cache_2d.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
+    detail::cache_2d.Insert(params, static_cast<void *>(tmp));
     tmp->Forward(o, i, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
+    auto fft_type = static_cast<detail::matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Forward(o, i, stream);
   }
 }
@@ -878,18 +880,18 @@ void ifft2(OutputTensor &o, const InputTensor &i,
     "Input and output tensor ranks must match");
 
   // Get parameters required by these tensors
-  auto params = matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
+  auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
-  auto ret = cache_2d.Lookup(params);
+  auto ret = detail::cache_2d.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
-    cache_2d.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxFFTPlan2D_t<OutputTensor, InputTensor>{o, i};
+    detail::cache_2d.Insert(params, static_cast<void *>(tmp));
     tmp->Inverse(o, i, stream);
   }
   else {
-    auto fft_type = static_cast<matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
+    auto fft_type = static_cast<detail::matxFFTPlan2D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Inverse(o, i, stream);
   }
 }

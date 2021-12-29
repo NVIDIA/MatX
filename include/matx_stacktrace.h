@@ -49,8 +49,8 @@
 #include <string>
 
 namespace matx {
+namespace detail{
 
-/*! \cond MATXINTERNAL */
 /** Print a demangled stack backtrace of the caller function to FILE* out. */
 static inline void printStackTrace(std::ostream &eout = std::cerr,
                                    unsigned int max_frames = 63)
@@ -135,5 +135,5 @@ static inline void printStackTrace(std::ostream &eout = std::cerr,
 #endif
 }
 
-/*! \endcond MATXINTERNAL */
+}
 } // end namespace matx

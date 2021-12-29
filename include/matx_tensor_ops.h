@@ -46,7 +46,15 @@
 namespace matx
 {
 
-// Helper functions for multiplying complex numbers by scalars
+/**
+ * @brief Utility operator for multiplying scalars by a complex value
+ * 
+ * @tparam T Complex type
+ * @tparam S Scalar type
+ * @param n Scalar value
+ * @param c Complex value
+ * @return Product result
+ */
 template <typename T, typename S>
 inline
     typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
@@ -56,6 +64,15 @@ inline
   return c * T(n);
 }
 
+/**
+ * @brief Utility operator for multiplying scalars by a complex value
+ * 
+ * @tparam T Complex type
+ * @tparam S Scalar type
+ * @param n Scalar value
+ * @param c Complex value
+ * @return Product result
+ */
 template <typename T, typename S>
 inline
     typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
@@ -73,6 +90,7 @@ inline
  * being concatenated must be the same, and the new operator has dimensions equal to the original
  * operator on non-index dimension, and the sum of sizes along the index dimension.
  */
+  namespace detail {  
   template <int Dim, typename... Ts>
   class Concatenate : public BaseOp<Concatenate<Dim, Ts...>>
   {
@@ -140,6 +158,7 @@ inline
       cuda::std::tuple<Ts...> ops_;
       std::array<index_t, RANK> size_;    
   };
+  }
 
   /**
    * @brief Concatenate multiple operators along a dimension
@@ -152,7 +171,7 @@ inline
   template <int Dim, typename... Ts>
   __MATX_INLINE__ __MATX_HOST__  auto concat(Ts... ts)
   {
-    return Concatenate<Dim, Ts...>{ts...};
+    return detail::Concatenate<Dim, Ts...>{ts...};
   }  
 
 /**
@@ -161,6 +180,7 @@ inline
  * Takes a variable list of operator statements to execute concurrently.
  * Chaining may improve performance over executing each operation separately.
  */
+  namespace detail {
   template<class Op1, class Op2>
   class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
       public:
@@ -188,11 +208,21 @@ inline
         typename base_type<Op1>::type op1_;
         typename base_type<Op2>::type op2_;
   };  
+  }
 
+  /**
+   * @brief Comma operator for evaluating multiple operators
+   * 
+   * @tparam T Left operator type
+   * @tparam S Right operator type
+   * @param l Left operator value
+   * @param r Right operator value
+   * @return Result of comma operator
+   */
   template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator,(T l, S r)
   {
-    return CommaOp(l, r);
+    return detail::CommaOp(l, r);
   }
 
   /**
@@ -305,7 +335,7 @@ inline
  *
  */
   template <class T, int Rank>
-  __MATX_INLINE__ void permute(tensor_impl_t<T, Rank> &out, const tensor_impl_t<T, Rank> &in,
+  __MATX_INLINE__ void permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in,
                       const std::initializer_list<uint32_t> &dims,
                       const cudaStream_t stream)
   {
@@ -331,19 +361,26 @@ inline
   class IF : public BaseOp<IF<T1, T2>>
   {
   private:
-    typename base_type<T1>::type cond_;
-    typename base_type<T2>::type op_;
-    std::array<index_t, MAX(get_rank<T1>(), get_rank<T2>())> size_;
+    typename detail::base_type<T1>::type cond_;
+    typename detail::base_type<T2>::type op_;
+    std::array<index_t, detail::MAX(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
   public:
-    using scalar_type = void;
+    using scalar_type = void; ///< Scalar type for type extraction
+
+    /**
+     * @brief Constructor for an IF statement
+     * 
+     * @param cond Condition to perform the IF/ELSE on
+     * @param op Operator if conditional branch is true
+     */    
     __MATX_INLINE__ IF(T1 cond, T2 op) : cond_(cond), op_(op)
     {
       static_assert((!is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IF. Tensor views are "
                     "not allowed");
-      constexpr index_t rank1 = get_rank<T1>();
-      constexpr index_t rank2 = get_rank<T2>();
+      constexpr index_t rank1 = detail::get_rank<T1>();
+      constexpr index_t rank2 = detail::get_rank<T2>();
       static_assert(rank1 == -1 || rank1 == Rank());
       static_assert(rank2 == -1 || rank2 == Rank());
 
@@ -351,26 +388,44 @@ inline
       {
         for (int i = 0; i < Rank(); i++)
         {
-          index_t size1 = get_expanded_size<Rank()>(cond_, i);
-          index_t size2 = get_expanded_size<Rank()>(op_, i);
+          index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
+          index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
-          size_[i] = MAX(size1, size2);
+          size_[i] = detail::MAX(size1, size2);
         }
       }
     }
 
+    /**
+     * @brief Operator() for getting values of an if operator
+     * 
+     * @tparam Is Index types
+     * @param indices Index values
+     */
     template <typename... Is>
     auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
       if (get_value(cond_, indices...)) {
         get_value(op_, indices...);
       }
     }   
-    
+
+    /**
+     * @brief Rank of IF operator
+     * 
+     * @return Rank
+     */    
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return MAX(get_rank<T1>(), get_rank<T2>());
+      return detail::MAX(detail::get_rank<T1>(), detail::get_rank<T2>());
     }
+
+    /**
+     * @brief Size of dimension of operator
+     * 
+     * @param dim Dimension to get size of
+     * @return Size of dimension 
+     */    
     index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
@@ -392,21 +447,29 @@ inline
   class IFELSE : public BaseOp<IFELSE<C1, T1, T2>>
   {
   private:
-    typename base_type<C1>::type cond_;
-    typename base_type<T1>::type op1_;
-    typename base_type<T2>::type op2_;    
-    std::array<index_t, MAX(get_rank<C1>(), get_rank<T1>(), get_rank<T2>())> size_;
+    typename detail::base_type<C1>::type cond_;
+    typename detail::base_type<T1>::type op1_;
+    typename detail::base_type<T2>::type op2_;    
+    std::array<index_t, detail::MAX(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
   public:
-    using scalar_type = void;
+    using scalar_type = void; ///< Scalar type for type extraction
+
+    /**
+     * @brief Constructor for an IFELSE statement
+     * 
+     * @param cond Condition to perform the IF/ELSE on
+     * @param op1 Operator if conditional branch is true
+     * @param op2 Operator if conditional branch is false
+     */
     __MATX_INLINE__ IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
     {
       static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
                     "Only operator emmitters are allowed in IFELSE. Tensor views "
                     "are not allowed");
-      constexpr int32_t rank0 = get_rank<C1>();
-      constexpr int32_t rank1 = get_rank<T1>();
-      constexpr int32_t rank2 = get_rank<T2>();
+      constexpr int32_t rank0 = detail::get_rank<C1>();
+      constexpr int32_t rank1 = detail::get_rank<T1>();
+      constexpr int32_t rank2 = detail::get_rank<T2>();
       static_assert(rank0 == -1 || rank0 == Rank());
       static_assert(rank1 == -1 || rank1 == Rank());
       static_assert(rank2 == -1 || rank2 == Rank());
@@ -415,10 +478,10 @@ inline
       {
         for (int i = 0; i < Rank(); i++)
         {
-          index_t size0 = get_expanded_size<Rank()>(cond_, i);
-          index_t size1 = get_expanded_size<Rank()>(op1, i);
-          index_t size2 = get_expanded_size<Rank()>(op2, i);
-          size_[i] = MAX(size0, size1, size2);
+          index_t size0 = detail::get_expanded_size<Rank()>(cond_, i);
+          index_t size1 = detail::get_expanded_size<Rank()>(op1, i);
+          index_t size2 = detail::get_expanded_size<Rank()>(op2, i);
+          size_[i] = detail::MAX(size0, size1, size2);
           MATX_ASSERT(size0 == 0 || size0 == Size(i), matxInvalidSize);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);          
@@ -426,6 +489,12 @@ inline
       }
     }
 
+    /**
+     * @brief Operator() for getting values of an if/else
+     * 
+     * @tparam Is Index types
+     * @param indices Index values
+     */
     template <typename... Is>
     auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
       if (get_value(cond_, indices...)) {
@@ -436,11 +505,22 @@ inline
       }
     }      
 
+    /**
+     * @brief Rank of IF/ELSE operator
+     * 
+     * @return Rank
+     */
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return MAX(get_rank<C1>(), get_rank<T1>(), get_rank<T2>());
+      return detail::MAX(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>());
     }
 
+    /**
+     * @brief Size of dimension of operator
+     * 
+     * @param dim Dimension to get size of
+     * @return Size of dimension 
+     */
     index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
@@ -455,6 +535,7 @@ inline
  * second to last, etc.
  *
  */
+  namespace detail {
   template <typename T1, int DIM>
   class ReverseOp : public BaseOp<ReverseOp<T1, DIM>>
   {
@@ -483,13 +564,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Helper function to reverse the indexing of the last dimension of a tensor
@@ -500,7 +582,7 @@ inline
   auto __MATX_INLINE__ reverseX(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 0, matxInvalidDim);
-    return ReverseOp<T1, T1::Rank() - 1>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 1>(t);
   };
 
   /**
@@ -513,7 +595,7 @@ inline
   auto __MATX_INLINE__ reverseY(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 1, matxInvalidDim);
-    return ReverseOp<T1, T1::Rank() - 2>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 2>(t);
   };
 
   /**
@@ -526,7 +608,7 @@ inline
   auto __MATX_INLINE__ reverseZ(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 2, matxInvalidDim);
-    return ReverseOp<T1, T1::Rank() - 3>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 3>(t);
   };
 
   /**
@@ -538,7 +620,7 @@ inline
   auto __MATX_INLINE__ reverseW(T1 t)
   {
     MATX_STATIC_ASSERT(T1::Rank() > 3, matxInvalidDim);
-    return ReverseOp<T1, T1::Rank() - 4>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 4>(t);
   };
 
   /**
@@ -549,10 +631,10 @@ inline
   {
     if constexpr (T1::Rank() == 1)
     {
-      return ReverseOp<T1, T1::Rank() - 1>(t);
+      return detail::ReverseOp<T1, T1::Rank() - 1>(t);
     }
 
-    return ReverseOp<T1, T1::Rank() - 2>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 2>(t);
   };
 
   /**
@@ -563,10 +645,10 @@ inline
   {
     if constexpr (T1::Rank() == 1)
     {
-      return ReverseOp<T1, T1::Rank() - 1>(t);
+      return detail::ReverseOp<T1, T1::Rank() - 1>(t);
     }
 
-    return ReverseOp<T1, T1::Rank() - 1>(t);
+    return detail::ReverseOp<T1, T1::Rank() - 1>(t);
   };
 
   /**
@@ -575,6 +657,7 @@ inline
  * This operation allows a user to perform a Hermitian operator using a
  * single operator instead of Permute followed by a conj() operator.
  */
+  namespace detail {
   template <typename T1, int DIM>
   class HermitianTransOp : public BaseOp<HermitianTransOp<T1, DIM>>
   {
@@ -596,13 +679,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(Rank() - dim - 1);
     }
   };
+  }
 
   /**
  * Helper function for creating a hermitian transpose from an operator/View
@@ -610,7 +694,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ hermitianT(T1 t)
   {
-    return HermitianTransOp<T1, T1::Rank()>(t);
+    return detail::HermitianTransOp<T1, T1::Rank()>(t);
   }
 
   /**
@@ -621,6 +705,7 @@ inline
  * input operator. The last dimension is always sized to be the minimum of the
  * last two dimension of the input operator
  */
+  namespace detail {
   template <typename T1, int RANK>
   class DiagOp : public BaseOp<DiagOp<T1, RANK>>
   {
@@ -659,6 +744,7 @@ inline
       }
     }
   };
+  }
 
   /**
  * Get the elements on the diagonal
@@ -667,7 +753,7 @@ inline
  *   Input operator
  */
   template <typename T1>
-  auto __MATX_INLINE__ diag(T1 t) { return DiagOp<T1, T1::Rank()>(t); }
+  auto __MATX_INLINE__ diag(T1 t) { return detail::DiagOp<T1, T1::Rank()>(t); }
 
   /**
  * Kronecker tensor product
@@ -676,6 +762,7 @@ inline
  * (MxN) and B (PxQ), A is repeated and multiplied by each element in B to
  * create a new matrix of size M*P x N*Q.
  */
+  namespace detail {
   template <typename T1, typename T2, int DIM>
   class KronOp : public BaseOp<KronOp<T1, T2, DIM>>
   {
@@ -708,13 +795,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op1_.Size(dim) * op2_.Size(dim);
     }
   };
+  }
 
   /**
  * Kronecker tensor product
@@ -738,7 +826,7 @@ inline
   template <typename T1, typename T2>
   auto __MATX_INLINE__ kron(T1 a, T2 b)
   {
-    return KronOp<T1, T2, T1::Rank()>(a, b);
+    return detail::KronOp<T1, T2, T1::Rank()>(a, b);
   };
 
   /**
@@ -750,6 +838,7 @@ inline
  * every dimension, whereas the array version scales independently by each
  * dimension.
  */
+  namespace detail {
   template <typename T1, int DIM>
   class RepMatOp : public BaseOp<RepMatOp<T1, DIM>>
   {
@@ -809,13 +898,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim) * reps_[dim];
     }
   };
+  }
 
   /**
  * Repeat a matrix an equal number of times in each dimension
@@ -833,7 +923,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ repmat(T1 t, index_t reps)
   {
-    return RepMatOp<T1, T1::Rank()>(t, reps);
+    return detail::RepMatOp<T1, T1::Rank()>(t, reps);
   };
 
   /**
@@ -852,7 +942,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ repmat(T1 t, const index_t (&reps)[])
   {
-    return RepMatOp<T1, T1::Rank()>(t, reps);
+    return detail::RepMatOp<T1, T1::Rank()>(t, reps);
   };
 
   /**
@@ -871,7 +961,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ repmat(T1 t, const index_t *reps)
   {
-    return RepMatOp<T1, T1::Rank()>(t, reps);
+    return detail::RepMatOp<T1, T1::Rank()>(t, reps);
   };
 
   /**
@@ -880,6 +970,7 @@ inline
  * Returns the values of itself. This is useful when converting a type like a
  * tensor view into an operator
  */
+  namespace detail {
   template <typename T1, int DIM>
   class SelfOp : public BaseOp<SelfOp<T1, DIM>>
   {
@@ -900,16 +991,18 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
-  /**
- * Returns itself as an operator
+ /**
+ * Returns the values of itself. This is useful when converting a type like a
+ * tensor view into an operator
  *
  * @tparam T1
  *   Type of operator or view
@@ -920,7 +1013,7 @@ inline
  *   Operator of input
  */
   template <typename T1>
-  auto self(T1 t) { return SelfOp<T1, T1::Rank()>(t); };
+  auto self(T1 t) { return detail::SelfOp<T1, T1::Rank()>(t); };
 
   /**
  * Shifts the indexing of an operator or View by a given amount
@@ -932,6 +1025,7 @@ inline
  * Negative shifts are allowed, and have the effect of moving back from the end
  * of the tensor.
  */
+  namespace detail {
   template <typename T1, int DIM>
   class ShiftOp : public BaseOp<ShiftOp<T1, DIM>>
   {
@@ -974,13 +1068,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Helper function to shift dimension 0 by a given amount
@@ -998,7 +1093,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ shift0(T1 t, index_t s)
   {
-    return ShiftOp<T1, 0>(t, s);
+    return detail::ShiftOp<T1, 0>(t, s);
   };
 
   /**
@@ -1017,7 +1112,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ shift1(T1 t, index_t s)
   {
-    return ShiftOp<T1, 1>(t, s);
+    return detail::ShiftOp<T1, 1>(t, s);
   };
 
   /**
@@ -1036,7 +1131,7 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ shift2(T1 t, index_t s)
   {
-    return ShiftOp<T1, 2>(t, s);
+    return detail::ShiftOp<T1, 2>(t, s);
   };
 
   /**
@@ -1055,9 +1150,10 @@ inline
   template <typename T1>
   auto __MATX_INLINE__ shift3(T1 t, index_t s)
   {
-    return ShiftOp<T1, 3>(t, s);
+    return detail::ShiftOp<T1, 3>(t, s);
   };
 
+  namespace detail {
   template <typename T1>
   class FFTShift1DOp : public BaseOp<FFTShift1DOp<T1>>
   {
@@ -1082,13 +1178,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Perform an FFTShift operation on the last dimension of a tensor
@@ -1106,8 +1203,9 @@ inline
  *
  */
   template <typename T1>
-  auto fftshift1D(T1 t) { return FFTShift1DOp<T1>(t); }
+  auto fftshift1D(T1 t) { return detail::FFTShift1DOp<T1>(t); }
 
+  namespace detail {
   template <typename T1>
   class FFTShift2DOp : public BaseOp<FFTShift2DOp<T1>>
   {
@@ -1133,13 +1231,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Perform an IFFTShift operation on a 2D tensor swapping the first quadrant
@@ -1158,8 +1257,9 @@ inline
  *
  */
   template <typename T1>
-  auto fftshift2D(T1 t) { return FFTShift2DOp<T1>(t); }
+  auto fftshift2D(T1 t) { return detail::FFTShift2DOp<T1>(t); }
 
+  namespace detail {
   template <typename T1>
   class IFFTShift1DOp : public BaseOp<IFFTShift1DOp<T1>>
   {
@@ -1184,13 +1284,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Perform an IFFTShift operation on the last dimension of a tensor
@@ -1209,8 +1310,9 @@ inline
  *
  */
   template <typename T1>
-  auto ifftshift1D(T1 t) { return IFFTShift1DOp<T1>(t); }
+  auto ifftshift1D(T1 t) { return detail::IFFTShift1DOp<T1>(t); }
 
+  namespace detail {
   template <typename T1>
   class IFFTShift2DOp : public BaseOp<IFFTShift2DOp<T1>>
   {
@@ -1236,13 +1338,14 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
       return op_.Size(dim);
     }
   };
+  }
 
   /**
  * Perform an IFFTShift operation on a 2D tensor swapping the first quadrant
@@ -1262,9 +1365,10 @@ inline
  *
  */
   template <typename T1>
-  auto ifftshift2D(T1 t) { return IFFTShift2DOp<T1>(t); }
+  auto ifftshift2D(T1 t) { return detail::IFFTShift2DOp<T1>(t); }
 
 
+  namespace detail {
   template <typename T1>
   class ComplexPlanarOp : public BaseOp<ComplexPlanarOp<T1>>
   {
@@ -1295,7 +1399,7 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
@@ -1308,6 +1412,7 @@ inline
                                                         : op_.Size(dim);
     }
   };
+  }
 
   /**
    * Perform a planar layout shift on a complex interleaved input
@@ -1328,9 +1433,11 @@ inline
   template <typename T1>
   auto planar(T1 t)
   {
-    return ComplexPlanarOp<T1>(t);
+    return detail::ComplexPlanarOp<T1>(t);
   }
 
+
+  namespace detail {
   template <typename T1>
   class ComplexInterleavedOp : public BaseOp<ComplexInterleavedOp<T1>>
   {
@@ -1365,7 +1472,7 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<T1>();
+      return detail::get_rank<T1>();
     }
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
     {
@@ -1378,6 +1485,7 @@ inline
                                                         : op_.Size(dim);
     }
   };
+  }
 
   /**
  * Perform an interleaved layout shift from a complex planar input
@@ -1401,16 +1509,17 @@ inline
       std::enable_if_t<!is_complex_v<extract_scalar_type_t<T1>>, bool> = true>
   auto interleaved(T1 t)
   {
-    return ComplexInterleavedOp<T1>(t);
+    return detail::ComplexInterleavedOp<T1>(t);
   }
 
+  namespace detail {
   template <class I1, class Op>
   class matxUnaryOp
   {
   private:
     typename base_type<I1>::type in1_;
     typename base_type<Op>::type op_;
-    std::array<index_t, get_rank<I1>()> size_;
+    std::array<index_t, detail::get_rank<I1>()> size_;
 
   public:
     // dummy type to signal this is a matxop
@@ -1434,7 +1543,7 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return get_rank<I1>();
+      return detail::get_rank<I1>();
     }
 
     index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
@@ -1443,6 +1552,7 @@ inline
     }
   };
 
+
   template <class I1, class I2, class Op>
   class matxBinaryOp
   {
@@ -1450,7 +1560,7 @@ inline
     typename base_type<I1>::type in1_;
     typename base_type<I2>::type in2_;
     typename base_type<Op>::type op_;
-    std::array<index_t, MAX(get_rank<I1>(), get_rank<I2>())> size_;
+    std::array<index_t, detail::MAX(detail::get_rank<I1>(), detail::get_rank<I2>())> size_;
 
   public:
     // dummy type to signal this is a matxop
@@ -1462,9 +1572,9 @@ inline
       {
         for (int32_t i = 0; i < Rank(); i++)
         {
-          index_t size1 = get_expanded_size<Rank()>(in1_, i);
-          index_t size2 = get_expanded_size<Rank()>(in2_, i);
-          size_[i] = MAX(size1, size2);
+          index_t size1 = detail::get_expanded_size<Rank()>(in1_, i);
+          index_t size2 = detail::get_expanded_size<Rank()>(in2_, i);
+          size_[i] = detail::MAX(size1, size2);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
         }
@@ -1482,7 +1592,7 @@ inline
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return MAX(get_rank<I1>(), get_rank<I2>());
+      return detail::MAX(detail::get_rank<I1>(), detail::get_rank<I2>());
     }
 
     index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
@@ -1490,6 +1600,7 @@ inline
       return size_[dim];
     }
 };
+}
 
 
 #define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
@@ -1499,7 +1610,7 @@ inline
   {                                                                 \
     using I1Type = extract_scalar_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
-    return matxUnaryOp(i1, Op());                           \
+    return detail::matxUnaryOp(i1, Op());                           \
   }
 
 #define DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
@@ -1511,7 +1622,7 @@ inline
     using I1Type = extract_scalar_type_t<I1>;                        \
     using I2Type = extract_scalar_type_t<I2>;                        \
     using Op = TENSOR_OP<I1Type, I2Type>;                            \
-    return matxBinaryOp(i1, i2, Op());                   \
+    return detail::matxBinaryOp(i1, i2, Op());                   \
   }
 
 #ifdef DOXYGEN_ONLY
@@ -1867,57 +1978,57 @@ inline
  */
   Op operator||(Op t, Op t2) {}
 #else
-  DEFINE_UNARY_OP(sqrt, SqrtOp);
-  DEFINE_UNARY_OP(exp, ExpOp);
-  DEFINE_UNARY_OP(expj, ExpjOp);
-  DEFINE_UNARY_OP(log10, Log10Op);
-  DEFINE_UNARY_OP(log2, Log2Op);
-  DEFINE_UNARY_OP(log, LogOp);
-  DEFINE_UNARY_OP(loge, LogOp);
-  DEFINE_UNARY_OP(conj, ConjOp);
-  DEFINE_UNARY_OP(norm, NormOp);
-  DEFINE_UNARY_OP(abs, AbsOp);
-  DEFINE_UNARY_OP(sin, SinOp);
-  DEFINE_UNARY_OP(cos, CosOp);
-  DEFINE_UNARY_OP(tan, TanOp);
-  DEFINE_UNARY_OP(asin, AsinOp);
-  DEFINE_UNARY_OP(acos, AcosOp);
-  DEFINE_UNARY_OP(atan, AtanOp);
-  DEFINE_UNARY_OP(sinh, SinhOp);
-  DEFINE_UNARY_OP(cosh, CoshOp);
-  DEFINE_UNARY_OP(tanh, TanhOp);
-  DEFINE_UNARY_OP(asinh, AsinhOp);
-  DEFINE_UNARY_OP(acosh, AcoshOp);
-  DEFINE_UNARY_OP(atanh, AtanhOp);
-  DEFINE_UNARY_OP(angle, AngleOp);
-  DEFINE_UNARY_OP(atan2, AngleOp);
-  DEFINE_UNARY_OP(floor, FloorOp);
-  DEFINE_UNARY_OP(ceil, CeilOp);
-  DEFINE_UNARY_OP(round, RoundOp);
-  DEFINE_UNARY_OP(normcdf, NormCdfOp);
+  DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
+  DEFINE_UNARY_OP(exp, detail::ExpOp);
+  DEFINE_UNARY_OP(expj, detail::ExpjOp);
+  DEFINE_UNARY_OP(log10, detail::Log10Op);
+  DEFINE_UNARY_OP(log2, detail::Log2Op);
+  DEFINE_UNARY_OP(log, detail::LogOp);
+  DEFINE_UNARY_OP(loge, detail::LogOp);
+  DEFINE_UNARY_OP(conj, detail::ConjOp);
+  DEFINE_UNARY_OP(norm, detail::NormOp);
+  DEFINE_UNARY_OP(abs, detail::AbsOp);
+  DEFINE_UNARY_OP(sin, detail::SinOp);
+  DEFINE_UNARY_OP(cos, detail::CosOp);
+  DEFINE_UNARY_OP(tan, detail::TanOp);
+  DEFINE_UNARY_OP(asin, detail::AsinOp);
+  DEFINE_UNARY_OP(acos, detail::AcosOp);
+  DEFINE_UNARY_OP(atan, detail::AtanOp);
+  DEFINE_UNARY_OP(sinh, detail::SinhOp);
+  DEFINE_UNARY_OP(cosh, detail::CoshOp);
+  DEFINE_UNARY_OP(tanh, detail::TanhOp);
+  DEFINE_UNARY_OP(asinh, detail::AsinhOp);
+  DEFINE_UNARY_OP(acosh, detail::AcoshOp);
+  DEFINE_UNARY_OP(atanh, detail::AtanhOp);
+  DEFINE_UNARY_OP(angle, detail::AngleOp);
+  DEFINE_UNARY_OP(atan2, detail::AngleOp);
+  DEFINE_UNARY_OP(floor, detail::FloorOp);
+  DEFINE_UNARY_OP(ceil, detail::CeilOp);
+  DEFINE_UNARY_OP(round, detail::RoundOp);
+  DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
   // DEFINE_UNARY_OP( operator-, SubNegOp );
 
-  DEFINE_BINARY_OP(operator+, AddOp);
-  DEFINE_BINARY_OP(operator-, SubOp);
-  DEFINE_BINARY_OP(operator*, MulOp);
-  DEFINE_BINARY_OP(mul, MulOp);
-  DEFINE_BINARY_OP(operator/, DivOp);
-  DEFINE_BINARY_OP(operator%, ModOp);
-  DEFINE_BINARY_OP(operator|, OrOp);
-  DEFINE_BINARY_OP(operator&, AndOp);
-  DEFINE_BINARY_OP(operator^, XorOp);
-  DEFINE_BINARY_OP(pow, PowOp);
-  DEFINE_BINARY_OP(max, MaxOp);
-  DEFINE_BINARY_OP(min, MinOp);
-  DEFINE_BINARY_OP(operator<, LTOp);
-  DEFINE_BINARY_OP(operator>, GTOp);
-  DEFINE_BINARY_OP(operator<=, LTEOp);
-  DEFINE_BINARY_OP(operator>=, GTEOp);
-  DEFINE_BINARY_OP(operator==, EQOp);
-  DEFINE_BINARY_OP(operator!=, NEOp);
-  DEFINE_BINARY_OP(operator&&, AndAndOp);
-  DEFINE_BINARY_OP(operator||, OrOrOp);
-  DEFINE_UNARY_OP(operator!, NotOp);
+  DEFINE_BINARY_OP(operator+, detail::AddOp);
+  DEFINE_BINARY_OP(operator-, detail::SubOp);
+  DEFINE_BINARY_OP(operator*, detail::MulOp);
+  DEFINE_BINARY_OP(mul, detail::MulOp);
+  DEFINE_BINARY_OP(operator/, detail::DivOp);
+  DEFINE_BINARY_OP(operator%, detail::ModOp);
+  DEFINE_BINARY_OP(operator|, detail::OrOp);
+  DEFINE_BINARY_OP(operator&, detail::AndOp);
+  DEFINE_BINARY_OP(operator^, detail::XorOp);
+  DEFINE_BINARY_OP(pow, detail::PowOp);
+  DEFINE_BINARY_OP(max, detail::MaxOp);
+  DEFINE_BINARY_OP(min, detail::MinOp);
+  DEFINE_BINARY_OP(operator<, detail::LTOp);
+  DEFINE_BINARY_OP(operator>, detail::GTOp);
+  DEFINE_BINARY_OP(operator<=, detail::LTEOp);
+  DEFINE_BINARY_OP(operator>=, detail::GTEOp);
+  DEFINE_BINARY_OP(operator==, detail::EQOp);
+  DEFINE_BINARY_OP(operator!=, detail::NEOp);
+  DEFINE_BINARY_OP(operator&&, detail::AndAndOp);
+  DEFINE_BINARY_OP(operator||, detail::OrOrOp);
+  DEFINE_UNARY_OP(operator!, detail::NotOp);
 #endif
 
   // Doxygen doesn't recognize macros generating functions, so we need to fake

@@ -1,4 +1,6 @@
-Constructing Tensors
+.. _creating:
+
+Creating Tensors
 ====================
 
 Basic construction of tensors in MatX is intended to be very simple with minimal parameters. This allows users of other languages

@@ -46,6 +46,10 @@
 
 namespace matx {
 
+/**
+ * @brief Space where memory is stored (also called Kind in some contexts)
+ * 
+ */
 enum matxMemorySpace_t {
   MATX_MANAGED_MEMORY,
   MATX_HOST_MEMORY,
@@ -55,6 +59,7 @@ enum matxMemorySpace_t {
   MATX_INVALID_MEMORY
 };
 
+namespace detail {
 struct matxMemoryStats_t {
   size_t currentBytesAllocated;
   size_t totalBytesAllocated;
@@ -70,22 +75,46 @@ struct matxPointerAttr_t {
   matxMemorySpace_t kind = MATX_INVALID_MEMORY;
   cudaStream_t stream;
 };
+}
 
-inline matxMemoryStats_t matxMemoryStats;
-inline std::shared_mutex memory_mtx;
-inline std::unordered_map<void *, matxPointerAttr_t> allocationMap;
+inline detail::matxMemoryStats_t matxMemoryStats; ///< Statistics object
+inline std::shared_mutex memory_mtx; ///< Mutex protecting updates from map
+inline std::unordered_map<void *, detail::matxPointerAttr_t> allocationMap; ///< Map recording allocations
 
+/**
+ * @brief Determine if a pointer is printable by the host
+ * 
+ * Pointers are printable if they're either a managed or pinned memory pointer
+ * 
+ * @param mem Memory space
+ * @return True is pointer can be printed from the host
+ */
 inline bool HostPrintable(matxMemorySpace_t mem)
 {
   return (mem == MATX_MANAGED_MEMORY || mem == MATX_HOST_MEMORY);
 }
 
+/**
+ * @brief Determine if a pointer is printable by the device
+ * 
+ * Pointers are printable if they're either a managed or device memory pointer
+ * 
+ * @param mem Memory space
+ * @return True is pointer can be printed from the device
+ */
 inline bool DevicePrintable(matxMemorySpace_t mem)
 {
   return (mem == MATX_MANAGED_MEMORY || mem == MATX_DEVICE_MEMORY ||
           mem == MATX_ASYNC_DEVICE_MEMORY);
 }
 
+/**
+ * @brief Get memory statistics
+ * 
+ * @param current Current memory usage
+ * @param total Total memory usage
+ * @param max Maximum memory usage
+ */
 inline void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
 {
   // std::shared_lock lck(memory_mtx);
@@ -94,7 +123,12 @@ inline void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
   *max = matxMemoryStats.maxBytesAllocated;
 }
 
-/* Check if a pointer was allocated */
+/**
+ * @brief Check if a pointer was allocated
+ * 
+ * @param ptr Pointer
+ * @return True if allocator
+ */
 inline bool IsAllocated(void *ptr) {
   if (ptr == nullptr) {
     return false;
@@ -154,6 +188,10 @@ inline matxMemorySpace_t GetPointerKind(void *ptr)
   return MATX_INVALID_MEMORY;
 }
 
+/**
+ * @brief Print memory statistics to stdout
+ * 
+ */
 inline void matxPrintMemoryStatistics()
 {
   size_t current, total, max;
@@ -166,6 +204,16 @@ inline void matxPrintMemoryStatistics()
          static_cast<double>(max) / 1e9, allocationMap.size());
 }
 
+/**
+ * @brief Allocate memory
+ * 
+ * Can be used for managed, pinned, malloced, device, and async device allocations
+ * 
+ * @param ptr Pointer to store allocated pointer
+ * @param bytes Bytes to allocate
+ * @param space Memory space
+ * @param stream CUDA stream (for stream allocations)
+ */
 inline void matxAlloc(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0)
@@ -206,6 +254,11 @@ inline void matxAlloc(void **ptr, size_t bytes,
   allocationMap[*ptr] = {bytes, space, stream};
 }
 
+/**
+ * @brief Free previously-allocated pointer
+ * 
+ * @param ptr Pointer to free
+ */
 inline void matxFree(void *ptr)
 {
   if (ptr == nullptr) {
@@ -245,9 +298,18 @@ inline void matxFree(void *ptr)
   allocationMap.erase(iter);
 }
 
-// Follows PMR allocator interface in C++17. Will adapt for streams in future release
+/**
+ * @brief Allocator following the PMR interface using the internal MatX allocator/deallocator
+ * 
+ */
 template <typename T>
 struct matx_allocator {
+  /**
+   * @brief Allocate memory of at least ``size`` bytes
+   * 
+   * @param size Size of allocation in bytes
+   * @return Pointer to allocated memory, or nullptr on error
+   */
   inline T* allocate(size_t size)
   {
     T *tmp;
@@ -255,6 +317,12 @@ struct matx_allocator {
     return tmp;
   }
 
+  /**
+   * @brief Deallocate memory of at least ``size`` bytes
+   * 
+   * @param ptr Pointer to allocated data
+   * @param size Size of previously-allocated memory in bytes
+   */
   inline void deallocate(void *ptr, [[maybe_unused]] size_t size)
   {
     matxFree(ptr);

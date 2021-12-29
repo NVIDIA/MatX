@@ -45,7 +45,7 @@ template <typename T> class LUSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_solver", "lu", "run", {m, n});
     pb->NumpyToTensorView(Av, "A");
     pb->NumpyToTensorView(Lv, "L");
@@ -54,7 +54,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Av{{m, n}};
   tensor_t<T, 2> Atv{{n, m}};
   tensor_t<int64_t, 1> PivV{{std::min(m, n)}};

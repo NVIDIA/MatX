@@ -1,6 +1,6 @@
 .. _quickstart:
 
-Quick start
+Quick Start
 ===========
 
 This guide walks through a quick introduction to MatX to get familiar with the types and basic functionality. For more extensive documentation, please
@@ -8,7 +8,7 @@ look at the following sources:
 
 1) Example and API documentation
 2) Example code in the examples/ directory
-3) DLI training (if available)
+3) X-Lab training (if available)
 
 Adding MatX to your project
 ---------------------------
@@ -23,27 +23,15 @@ underlying GPU or host memory. While dynamically-typed languages like Python or 
 MatX requires either a one-time explicit memory allocation, or various ways of providing your own buffer. This gives more control over the lifetime 
 of the data, and allows reusing memory regions for different operations.
 
-.. note::
-
-    For more information about creating tensors, see the "Creating Tensors" documentation
-
 A tensor is created using the following syntax:
-
-.. code-block:: cpp
-
-    auto t = tensor_t<float, 2>({10, 20});
-
-The constructor takes two required template parameters: the data type and the rank of the tensor. In this case we request a floating point
-tensor with rank 2 (2D array). The constructor arguments specify the shape of the tensor (10x20), or the size of each dimension. The number of elements 
-in the list must match the rank of the tensor.  Currently MatX supports ranks from 0 (scalar) up to 4 (4D array).
-
-To avoid the redundant rank and constructor arguments, the same tensor can be created using the ``make_tensor`` function:
 
 .. code-block:: cpp
 
     auto t = make_tensor<float>({10, 20});
 
-In this case only the type is required as a template parameter, and the rank is deduced from the number of arguments in the dimension list. 
+In this example we request a floating point tensor with rank 2 (2D array). The constructor arguments specify the shape of the tensor (10x20), 
+or the size of each dimension. The number of elements in the list determines the rank of the tensor. MatX supports any arbitrary rank tensor, so the 
+dimensions can be as long as you wish.
 
 If the shape of the tensor is known at compile time, a static tensor can be created for a performance improvement when accessing elements of the
 tensor:
@@ -88,6 +76,9 @@ Tensors can also be initialized using initializer list syntax using the ``SetVal
 
 In other languages it's very common to initialize a tensor with a set of values on creation (ones, zeros, ranges). This will be covered later 
 in the tutorial when we discuss operators, and it should become clear why we initialize this way.
+
+.. note::
+   For more information about creating tensors, including advanced usage, see the :ref:`creating` documentation
 
 Getting shapes and sizes
 ------------------------

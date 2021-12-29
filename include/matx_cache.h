@@ -39,6 +39,7 @@
 #include <unordered_map>
 
 namespace matx {
+namespace detail {
 
 /**
  * Generic caching object for caching parameters. This class is used for
@@ -105,4 +106,5 @@ inline size_t PodArrayToHash(std::array<T, len> c)
   return hash;
 }
 
+}  // namespace detail
 }; // namespace matx

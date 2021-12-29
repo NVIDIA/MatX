@@ -33,7 +33,6 @@
 
 #pragma once
 
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_matmul.h"
 #include "matx_tensor.h"
@@ -42,7 +41,7 @@
 #include <numeric>
 
 namespace matx {
-
+namespace detail {
 /**
  * Parameters needed to compute a covariance matrix. For the most part, these
  * are very similar to that of a standard cov call
@@ -180,10 +179,10 @@ public:
 
   private:
     // Member variables
-    tensor_t<T1, 2> *onesM;
-    tensor_t<T1, RANK> *means;
-    tensor_t<T1, RANK> *devs;
-    tensor_t<T1, RANK> *devsT;  
+    matx::tensor_t<T1, 2> *onesM;
+    matx::tensor_t<T1, RANK> *means;
+    matx::tensor_t<T1, RANK> *devs;
+    matx::tensor_t<T1, RANK> *devsT;  
     CovParams_t params_;
 };
 
@@ -214,6 +213,7 @@ struct CovParamsKeyEq {
 // Static caches of covariance matrices
 static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
 
+} // end namespace detail
 /**
  * Compute a covariance matrix without a plan
  *
@@ -240,19 +240,19 @@ void cov(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
   // Get parameters required by these tensors
-  auto params = matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a);
+  auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a);
   params.stream = stream;
 
   // Get cache or new cov plan if it doesn't exist
-  auto ret = cov_cache.Lookup(params);
+  auto ret = detail::cov_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxCovHandle_t<TensorTypeC, TensorTypeA>{c, a};
-    cov_cache.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxCovHandle_t<TensorTypeC, TensorTypeA>{c, a};
+    detail::cov_cache.Insert(params, static_cast<void *>(tmp));
 
     tmp->Exec(c, a, stream);
   }
   else {
-    auto cov_type = static_cast<matxCovHandle_t<TensorTypeC, TensorTypeA> *>(ret.value());
+    auto cov_type = static_cast<detail::matxCovHandle_t<TensorTypeC, TensorTypeA> *>(ret.value());
     cov_type->Exec(c, a, stream);
   }
 }

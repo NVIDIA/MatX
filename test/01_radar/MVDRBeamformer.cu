@@ -53,7 +53,7 @@ TEST(Radar, MVDRBeamformer)
 
   mvdr.Prefetch(0);
 
-  auto pb = std::make_unique<MatXPybind>();
+  auto pb = std::make_unique<detail::MatXPybind>();
   pb->InitAndRunTVGenerator<complex>("mvdr_beamformer", "mvdr_beamformer",
                                      "run", {data_len, num_beams, num_el});
 

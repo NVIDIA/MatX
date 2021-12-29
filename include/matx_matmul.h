@@ -33,7 +33,6 @@
 #pragma once
 
 #include "cublas_v2.h"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 #include <cublasLt.h>
@@ -61,6 +60,8 @@ typedef enum {
   PROVIDER_TYPE_SENTINEL ///< Sentinel value. Do not use
 } MatXMatMulProvider_t;
 
+
+namespace detail {
 typedef enum {
   MEM_ORDER_ROW_MAJOR = 0,
   MEM_ORDER_COL_MAJOR = 1,
@@ -205,10 +206,10 @@ public:
     }
   }
 
-  static MatMulParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
+  static detail::MatMulParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
-    MatMulParams_t params;
+    detail::MatMulParams_t params;
     params.dtype = TypeToInt<T1>();
     params.prov = PROV;
 
@@ -221,9 +222,9 @@ public:
       params.batch = static_cast<int32_t>(a.Size(RANK - 3));
     }
 
-    tensor_t<T2, RANK> a_comp{a};
-    tensor_t<T2, RANK> b_comp{b};
-    tensor_t<T2, RANK> c_comp{c};
+    matx::tensor_t<T2, RANK> a_comp{a};
+    matx::tensor_t<T2, RANK> b_comp{b};
+    matx::tensor_t<T2, RANK> c_comp{c};
 
     // If the user wants C transposed (as a permuted view), we need the output
     // matrix to still be MxN in memory. The reason is the permuted view will
@@ -372,7 +373,7 @@ private:
   cublasLtMatmulHeuristicResult_t heuristicResult = {};
   size_t workspaceSize = 1 << 25UL; // 16MB buffer suggested by cuBLAS team
   void *workspace = nullptr;
-  MatMulParams_t params_;
+  detail::MatMulParams_t params_;
 
   void ConfigureCublasLt()
   {
@@ -832,6 +833,7 @@ private:
   }
 };
 
+
 /**
  * Crude hash on GEMM to get a reasonably good delta for collisions. This
  * doesn't need to be perfect, but fast enough to not slow down lookups, and
@@ -869,6 +871,7 @@ struct MatMulParamsKeyEq {
 static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
     gemm_cache;
 
+}
 /**
  * Run a GEMM without a plan
  *
@@ -910,21 +913,21 @@ void matmul(TensorTypeC &c, const TensorTypeA &a,
 {
   // Get parameters required by these tensors
   auto params =
-      matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);
+      detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);
   params.stream = stream;
 
   // Get cache or new GEMM plan if it doesn't exist
-  auto ret = gemm_cache.Lookup(params);
+  auto ret = detail::gemm_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
-    gemm_cache.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
+    detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
 
     // Set the stream on this plan once on creation
     tmp->Exec(c, a, b, stream, alpha, beta);
   }
   else {
     auto gemm_type =
-        static_cast<matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV> *>(ret.value());
+        static_cast<detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV> *>(ret.value());
     gemm_type->Exec(c, a, b, stream, alpha, beta);
   }
 }

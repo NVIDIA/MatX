@@ -39,6 +39,7 @@
 
 namespace matx {
 
+namespace detail {
 template <typename T, typename ShapeType> class ConstVal {
   static constexpr int RANK = std::tuple_size<typename remove_cvref<ShapeType>::type>::value;
 
@@ -63,6 +64,7 @@ public:
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
+}
 
 /**
  * Return zero for all elements
@@ -80,13 +82,25 @@ template <typename T = int, typename ShapeType,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 inline auto zeros(ShapeType &&s)
 {
-  return ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
+  return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
 }
 
+/**
+ * Return zero for all elements
+ *
+ * Zeros is used as an operator that always returns a 0 type for all
+ * elements. It can be used in place of memset to zero a block of memory.
+ *
+ * @tparam T
+ *   Data type
+ *
+ * @param s
+ *   Shape of tensor
+ */
 template <typename T = int, int RANK>
 inline auto zeros(const index_t (&s)[RANK])
 {
-  return zeros(to_array(s));
+  return zeros(detail::to_array(s));
 }
 
 /**
@@ -105,15 +119,28 @@ template <typename T = int, typename ShapeType,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 inline auto ones(ShapeType &&s)
 {
-  return ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));
+  return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));
 }
 
+/**
+ * Return one for all elements
+ *
+ * Ones is used as an operator that always returns a 1 type for all
+ * elements. It can be used in place of memset to set all values to 1.
+ *
+ * @tparam T
+ *   Data type
+ *
+ * @param s
+ *   Shape of tensor
+ */
 template <typename T = int, int RANK> 
 inline auto ones(const index_t (&s)[RANK])
 {
-  return ones(to_array(s));
+  return ones(detail::to_array(s));
 }
 
+namespace detail {
 template <typename T, typename ShapeType> class Diag {
   static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
@@ -147,6 +174,7 @@ public:
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 };
+}
 
 /**
  * Creates a diagonal tensor with a given value on the diagonals
@@ -163,13 +191,24 @@ template <typename T = int, typename ShapeType,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 inline auto diag(ShapeType &&s, T val)
 {
-  return Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
+  return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
 }
 
+/**
+ * Creates a diagonal tensor with a given value on the diagonals
+ *
+ * diag returns a given value on all elements on the diagonals of a tensor, and
+ * 0 otherwise. In other words, if the index of every dimension is the same, the
+ * value is returned, otherwise a zero is returned.
+ *
+ * @tparam T
+ *   Data type
+ *
+ */
 template <typename T = int, int RANK>
 inline auto diag(const index_t (&s)[RANK], T val)
 {
-  return diag(to_array(s), val);
+  return diag(detail::to_array(s), val);
 }
 
 /**
@@ -187,14 +226,26 @@ template <typename T = int, typename ShapeType,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 inline auto eye(ShapeType &&s)
 {
-  return Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
+  return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
 }
 
+/**
+ * Creates an identity patterns on the tensor
+ *
+ * eye returns 1 on all elements on the diagonals of a tensor, and 0 otherwise.
+ * In other words, if the index of every dimension is the same, a 1 is returned,
+ * otherwise a zero is returned.
+ *
+ * @tparam T
+ *   Data type
+ *
+ */
 template <typename T = int, int RANK> inline auto eye(const index_t (&s)[RANK])
 {
-  return eye(to_array(s));
+  return eye(detail::to_array(s));
 }
 
+namespace detail {
 template <typename Generator1D, int Dim, typename ShapeType> class matxGenerator1D_t {
 public:
   // dummy type to signal this is a matxop
@@ -202,7 +253,8 @@ public:
   using scalar_type = typename Generator1D::scalar_type;
   static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
-  matxGenerator1D_t(ShapeType &&s, Generator1D f) : f_(f), s_(std::forward<ShapeType>(s)) {}
+  template <typename S>
+  matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
@@ -219,7 +271,9 @@ private:
   Generator1D f_;
   ShapeType s_;
 };
+}
 
+namespace detail {
 template <typename T> class Hamming {
 private:
   index_t size_;
@@ -234,16 +288,17 @@ public:
     return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1));
   }
 };
+}
 
-/// @name HammingWindows
-/// @{
+
 /**
  * Creates a Hamming window operator of shape s with the
- * window applies along the x, y, z, or w dimension
+ * window applies along the specified dimension
  *
  * @tparam T
  *   Data type
- *
+ * @tparam Dim
+ *   Dimension to create window over
  * @tparam RANK
  *   The RANK of the shape, can be deduced from shape
  *
@@ -252,67 +307,40 @@ public:
  *
  * Returns values for a Hamming window across the selected dimension.
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float, 
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hamming_x(ShapeType &&s)
+inline auto hamming(ShapeType &&s)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  Hamming<T> h( *(s.begin() + RANK - 1));
-  return matxGenerator1D_t<Hamming<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hamming_x(const index_t (&s)[RANK])
-{
-  return hamming_x(to_array(s));
+  static_assert(RANK > Dim);
+  detail::Hamming<T> h( *(s.begin() + Dim));
+  return detail::matxGenerator1D_t<detail::Hamming<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hamming_y(ShapeType &&s)
+/**
+ * Creates a Hamming window operator of C-array shape s with the
+ * window applies along the specified dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape, can be deduced from shape
+ *
+ * @param s
+ *   C array representing shape of the tensor
+ *
+ * Returns values for a Hamming window across the selected dimension.
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto hamming(const index_t (&s)[RANK])
 {
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  Hamming<T> h( *(s.begin() + RANK - 2));
-  return matxGenerator1D_t<Hamming<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hamming_y(const index_t (&s)[RANK])
-{
-  return hamming_y(to_array(s));
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hamming_z(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  Hamming<T> h( *(s.begin() + RANK - 3));
-  return matxGenerator1D_t<Hamming<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hamming_z(const index_t (&s)[RANK])
-{
-  return hamming_z(to_array(s));
+  return hamming<Dim>(detail::to_array(s));
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hamming_w(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  Hamming<T> h( *(s.begin() + RANK - 4));
-  return matxGenerator1D_t<Hamming<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hamming_w(const index_t (&s)[RANK])
-{
-  return hamming_w(to_array(s));
-}
 
-/// @}
+namespace detail {
 template <typename T> class Hanning {
 private:
   index_t size_;
@@ -326,16 +354,16 @@ public:
     return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1)));
   }
 };
+}
 
-/// @name HanningWindows
-/// @{
 /**
  * Creates a Hanning window operator of shape s with the
  * window applies along the x, y, z, or w dimension
  *
  * @tparam T
  *   Data type
- *
+ * @tparam Dim
+ *   Dimension to create window over
  * @tparam RANK
  *   The RANK of the shape
  *
@@ -344,66 +372,40 @@ public:
  *
  * Returns values for a Hanning window across the selected dimension.
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hanning_x(ShapeType &&s)
+inline auto hanning(ShapeType &&s)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  Hanning<T> h( *(s.begin() + RANK - 1));
-  return matxGenerator1D_t<Hanning<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hanning_x(const index_t (&s)[RANK])
-{
-  return hanning_x(to_array(s));
+  static_assert(RANK > Dim);
+  detail::Hanning<T> h( *(s.begin() + Dim));
+  return detail::matxGenerator1D_t<detail::Hanning<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hanning_y(ShapeType &&s)
+/**
+ * Creates a Hanning window operator of shape s with the
+ * window applies along the x, y, z, or w dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape
+ *
+ * @param s
+ *   The C-array shape of the tensor
+ *
+ * Returns values for a Hanning window across the selected dimension.
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto hanning(const index_t (&s)[RANK])
 {
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  Hanning<T> h( *(s.begin() + RANK - 2));
-  return matxGenerator1D_t<Hanning<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hanning_y(const index_t (&s)[RANK])
-{
-  return hanning_y(to_array(s));
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hanning_z(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  Hanning<T> h( *(s.begin() + RANK - 3));
-  return matxGenerator1D_t<Hanning<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hanning_z(const index_t (&s)[RANK])
-{
-  return hanning_z(to_array(s));
+  return hanning<Dim>(detail::to_array(s));
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto hanning_w(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  Hanning<T> h( *(s.begin() + RANK - 4));
-  return matxGenerator1D_t<Hanning<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto hanning_w(const index_t (&s)[RANK])
-{
-  return hanning_w(to_array(s));
-}
 
+namespace detail {
 template <typename T> class Blackman {
 private:
   index_t size_;
@@ -421,6 +423,7 @@ public:
                                      T(size_ - 1)));
   }
 };
+}
 
 /**
  * Creates a Blackman window operator of shape s with the
@@ -428,7 +431,8 @@ public:
  *
  * @tparam T
  *   Data type
- *
+ * @tparam Dim
+ *   Dimension to create window over
  * @tparam RANK
  *   The RANK of the shape
  *
@@ -437,66 +441,39 @@ public:
  *
  * Returns values for a Blackman window across the selected dimension.
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto blackman_x(ShapeType &&s)
+inline auto blackman(ShapeType &&s)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  Blackman<T> h( *(s.begin() + RANK - 1));
-  return matxGenerator1D_t<Blackman<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto blackman_x(const index_t (&s)[RANK])
-{
-  return blackman_x(to_array(s));
+  static_assert(RANK > Dim);
+  detail::Blackman<T> h( *(s.begin() + Dim));
+  return detail::matxGenerator1D_t<detail::Blackman<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto blackman_y(ShapeType &&s)
+/**
+ * Creates a Blackman window operator of shape s with the
+ * window applies along the x, y, z, or w dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape
+ *
+ * @param s
+ *   The shape of the tensor
+ *
+ * Returns values for a Blackman window across the selected dimension.
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto blackman(const index_t (&s)[RANK])
 {
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  Blackman<T> h( *(s.begin() + RANK - 2));
-  return matxGenerator1D_t<Blackman<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto blackman_y(const index_t (&s)[RANK])
-{
-  return blackman_y(to_array(s));
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto blackman_z(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  Blackman<T> h( *(s.begin() + RANK - 3));
-  return matxGenerator1D_t<Blackman<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto blackman_z(const index_t (&s)[RANK])
-{
-  return blackman_z(to_array(s));
+  return blackman<Dim>(detail::to_array(s));
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto blackman_w(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  Blackman<T> h( *(s.begin() + RANK - 4));
-  return matxGenerator1D_t<Blackman<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto blackman_w(const index_t (&s)[RANK])
-{
-  return blackman_w(to_array(s));
-}
-
+namespace detail {
 template <typename T> class Bartlett {
 private:
   index_t size_;
@@ -512,6 +489,7 @@ public:
             cuda::std::abs(T(i) - ((T(size_) - 1) / T(2))));
   }
 };
+}
 
 /**
  * Creates a Bartlett window operator of shape s with the
@@ -519,7 +497,8 @@ public:
  *
  * @tparam T
  *   Data type
- *
+ * @tparam Dim
+ *   Dimension to create window over
  * @tparam RANK
  *   The RANK of the shape
  *
@@ -528,66 +507,41 @@ public:
  *
  * Returns values for a Bartlett window across the selected dimension.
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto bartlett_x(ShapeType &&s)
+inline auto bartlett(ShapeType &&s)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  Bartlett<T> h( *(s.begin() + RANK - 1));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto bartlett_x(const index_t (&s)[RANK])
-{
-  return bartlett_x(to_array(s));
+  static_assert(RANK > Dim);
+  detail::Bartlett<T> h( *(s.begin() + Dim));
+  return detail::matxGenerator1D_t<detail::Bartlett<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto bartlett_y(ShapeType &&s)
+/**
+ * Creates a Bartlett window operator of shape s with the
+ * window applies along the x, y, z, or w dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape
+ *
+ * @param s
+ *   The C array shape of the tensor
+ *
+ * Returns values for a Bartlett window across the selected dimension.
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto bartlett(const index_t (&s)[RANK])
 {
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  Bartlett<T> h( *(s.begin() + RANK - 2));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto bartlett_y(const index_t (&s)[RANK])
-{
-  return bartlett_y(to_array(s));
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto bartlett_z(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  Bartlett<T> h( *(s.begin() + RANK - 3));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto bartlett_z(const index_t (&s)[RANK])
-{
-  return bartlett_z(to_array(s));
+  return bartlett<Dim>(detail::to_array(s));
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto bartlett_w(ShapeType &&s)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  Bartlett<T> h( *(s.begin() + RANK - 4));
-  return matxGenerator1D_t<Bartlett<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), h);
-}
-template <typename T = float, int RANK>
-inline auto bartlett_w(const index_t (&s)[RANK])
-{
-  return bartlett_w(to_array(s));
-}
 
+
+namespace detail {
 template <class T> class Range {
 private:
   T first_;
@@ -617,29 +571,6 @@ public:
     }
   }
 };
-
-/**
- * Create a range of values along the x dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto range_x(ShapeType &&s, T first, T step)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
@@ -656,38 +587,18 @@ inline auto range_x(ShapeType &&s, T first, T step)
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_x(const index_t (&s)[RANK], T first, T step)
-{
-  return range_x(to_array(s), first, step);
-}
-
-/**
- * Create a range of values along the y dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto range_y(ShapeType &&s, T first, T step)
+inline auto range(ShapeType &&s, T first, T step)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), r);
+  static_assert(RANK > Dim);
+  detail::Range<T> r(first, step);
+  return detail::matxGenerator1D_t<detail::Range<T>, Dim, ShapeType>(std::forward<ShapeType>(s), r);
 }
 
 /**
- * Create a range of values along the y dimension
+ * Create a range of values along the x dimension
  *
  * Creates a range of values of type T with a start and step size.
  * Value is determined by the index in operator()
@@ -700,100 +611,14 @@ inline auto range_y(ShapeType &&s, T first, T step)
  *   Step size
  *
  */
-template <typename T = float, int RANK>
-inline auto range_y(const index_t (&s)[RANK], T first, T step)
+template <int Dim, int RANK, typename T = float>
+inline auto range(const index_t (&s)[RANK], T first, T step)
 {
-  return range_y(to_array(s), first, step);
+  return range<Dim>(detail::to_array(s), first, step);
 }
 
-/**
- * Create a range of values along the z dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto range_z(ShapeType &&s, T first, T step)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), r);
-}
 
-/**
- * Create a range of values along the z dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, int RANK>
-inline auto range_z(const index_t (&s)[RANK], T first, T step)
-{
-  return range_z(to_array(s), first, step);
-}
-
-/**
- * Create a range of values along the w dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto range_w(ShapeType &&s, T first, T step)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  Range<T> r(first, step);
-  return matxGenerator1D_t<Range<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), r);
-}
-
-/**
- * Create a range of values along the w dimension
- *
- * Creates a range of values of type T with a start and step size.
- * Value is determined by the index in operator()
- *
- * @param s
- *   Tensor shape
- * @param first
- *   Starting value
- * @param step
- *   Step size
- *
- */
-template <typename T = float, int RANK>
-inline auto range_w(const index_t (&s)[RANK], T first, T step)
-{
-  return range_w(to_array(s), first, step);
-}
-
+namespace detail {
 template <class T> class Linspace {
 private:
   Range<T> range_;
@@ -820,81 +645,57 @@ public:
 
   __MATX_DEVICE__ inline T operator()(index_t idx) const { return range_(idx); }
 };
+}
 
-/// @name Linspace
-/// @{
+
 /**
- * Create a linearly-spaced range of values
+ * @brief Create a linearly-spaced range of values
  *
  * Creates a set of values using a start and end that are linearly-
  * spaced apart over the set of values. Distance is determined
  * by the shape and selected dimension.
- *
+ * 
+ * @tparam T Operator type
+ * @tparam Dim Dimension to operate over
+ * @tparam ShapeType Shape type
+ * @param s Shape object
+ * @param first First value
+ * @param last Last value
+ * @return Operator with linearly-spaced values 
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto linspace_x(ShapeType &&s, T first, T last)
+inline auto linspace(ShapeType &&s, T first, T last)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  auto count =  *(s.begin() + RANK - 1);
-  Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto linspace_x(const index_t (&s)[RANK], T first, T last)
-{
-  return linspace_x(to_array(s), first, last);
+  static_assert(RANK > Dim);
+  auto count =  *(s.begin() + Dim);
+  detail::Linspace<T> l(first, last, count);
+  return detail::matxGenerator1D_t<detail::Linspace<T>, Dim, ShapeType>(std::forward<ShapeType>(s), l);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto linspace_y(ShapeType &&s, T first, T last)
+/**
+ * @brief Create a linearly-spaced range of values
+ *
+ * Creates a set of values using a start and end that are linearly-
+ * spaced apart over the set of values. Distance is determined
+ * by the shape and selected dimension.
+ * 
+ * @tparam T Operator type
+ * @tparam Dim Dimension to operate over
+ * @tparam ShapeType Shape type
+ * @param s Shape object
+ * @param first First value
+ * @param last Last value
+ * @return Operator with linearly-spaced values 
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto linspace(const index_t (&s)[RANK], T first, T last)
 {
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  auto count =  *(s.begin() + RANK - 2);
-  Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto linspace_y(const index_t (&s)[RANK], T first, T last)
-{
-  return linspace_y(to_array(s), first, last);
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto linspace_z(ShapeType &&s, T first, T last)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  auto count =  *(s.begin() + RANK - 3);
-  Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto linspace_z(const index_t (&s)[RANK], T first, T last)
-{
-  return linspace_z(to_array(s), first, last);
+  return linspace<Dim>(detail::to_array(s), first, last);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto linspace_w(ShapeType &&s, T first, T last)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  auto count =  *(s.begin() + RANK - 4);
-  Linspace<T> l(first, last, count);
-  return matxGenerator1D_t<Linspace<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto linspace_w(const index_t (&s)[RANK], T first, T last)
-{
-  return linspace_w(to_array(s), first, last);
-}
-
+namespace detail {
 template <class T> class Logspace {
 private:
   Range<T> range_;
@@ -944,82 +745,58 @@ public:
     }
   }
 };
+}
 
-/// @name Linspace
-/// @{
+
 /**
- * Create a log-10-spaced range of values
+ * @brief Create a log10-spaced range of values
  *
- * Creates a set of values using a start and end that are log-10-
+ * Creates a set of values using a start and end that are log10-
  * spaced apart over the set of values. Distance is determined
  * by the shape and selected dimension.
- *
+ * 
+ * @tparam T Operator type
+ * @tparam Dim Dimension to operate over
+ * @tparam ShapeType Shape type
+ * @param s Shape object
+ * @param first First value
+ * @param last Last value
+ * @return Operator with log10-spaced values 
  */
-template <typename T = float, typename ShapeType,
+template <int Dim, typename ShapeType, typename T = float,
   std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto logspace_x(ShapeType &&s, T first, T last)
+inline auto logspace(ShapeType &&s, T first, T last)
 {
   constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 1);
-  auto count = *(s.begin() + RANK - 1);
-  Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 1, ShapeType>(std::forward<ShapeType>(s), l);
+  static_assert(RANK > Dim);
+  auto count = *(s.begin() + Dim);
+  detail::Logspace<T> l(first, last, count);
+  return detail::matxGenerator1D_t<detail::Logspace<T>, Dim, ShapeType>(std::forward<ShapeType>(s), l);
 }
 
-template <typename T = float, int RANK>
-inline auto logspace_x(const index_t (&s)[RANK], T first, T last)
+/**
+ * @brief Create a log10-spaced range of values
+ *
+ * Creates a set of values using a start and end that are log10-
+ * spaced apart over the set of values. Distance is determined
+ * by the shape and selected dimension.
+ * 
+ * @tparam T Operator type
+ * @tparam Dim Dimension to operate over
+ * @tparam ShapeType Shape type
+ * @param s Shape object
+ * @param first First value
+ * @param last Last value
+ * @return Operator with log10-spaced values 
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto logspace(const index_t (&s)[RANK], T first, T last)
 {
-  return logspace_x(to_array(s), first, last);
+  return logspace<Dim>(detail::to_array(s), first, last);
 }
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto logspace_y(ShapeType &&s, T first, T last)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 2);
-  auto count = *(s.begin() + RANK - 2);
-  Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 2, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto logspace_y(const index_t (&s)[RANK], T first, T last)
-{
-  return logspace_y(to_array(s), first, last);
-}
 
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto logspace_z(ShapeType &&s, T first, T last)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 3);
-  auto count = *(s.begin() + RANK - 3);
-  Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 3, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto logspace_z(const index_t (&s)[RANK], T first, T last)
-{
-  return logspace_z(to_array(s), first, last);
-}
-
-template <typename T = float, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-inline auto logspace_w(ShapeType &&s, T first, T last)
-{
-  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-  static_assert(RANK >= 4);
-  auto count = *(s.begin() + RANK - 4);
-  Logspace<T> l(first, last, count);
-  return matxGenerator1D_t<Logspace<T>, RANK - 4, ShapeType>(std::forward<ShapeType>(s), l);
-}
-template <typename T = float, int RANK>
-inline auto logspace_w(const index_t (&s)[RANK], T first, T last)
-{
-  return logspace_w(to_array(s), first, last);
-}
-
+namespace detail {
 template <typename T> class Meshgrid_X {
 private:
   std::array<T, 3> x_;
@@ -1067,6 +844,8 @@ public:
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 2; }
 };
+}
+
 /**
  * Creates an mesh grid X matrix
  *
@@ -1078,7 +857,7 @@ public:
 template <typename T = int>
 inline auto meshgrid_x(const std::array<T, 3> &x, const std::array<T, 3> &y)
 {
-  return Meshgrid_X<T>(x, y);
+  return detail::Meshgrid_X<T>(x, y);
 }
 
 /**
@@ -1092,7 +871,6 @@ inline auto meshgrid_x(const std::array<T, 3> &x, const std::array<T, 3> &y)
 template <typename T = int>
 inline auto meshgrid_y(const std::array<T, 3> &x, const std::array<T, 3> &y)
 {
-  return Meshgrid_Y<T>(x, y);
+  return detail::Meshgrid_Y<T>(x, y);
 }
-/// @}
 } // end namespace matx

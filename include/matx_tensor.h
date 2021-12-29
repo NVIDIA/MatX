@@ -90,17 +90,17 @@ template <typename T,
           int RANK, 
           typename Storage = DefaultStorage<T>, 
           typename Desc = DefaultDescriptor<RANK>> 
-class tensor_t : public tensor_impl_t<T,RANK,Desc> {
+class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
 public:
   // Type specifier for reflection on class
-  using type = T; // TODO is this necessary
-  using scalar_type = T;
+  using type = T; ///< Type of traits
+  using scalar_type = T; ///< Type of traits
 
   // Type specifier for signaling this is a matx operation or tensor view
-  using matxop = bool;
-  using tensor_view = bool;
-  using storage_type = Storage;
-  using desc_type = Desc;
+  using matxop = bool; ///< Indicate this is a MatX operator
+  using tensor_view = bool; ///< Indicate this is a MatX tensor view
+  using storage_type = Storage; ///< Storage type trait
+  using desc_type = Desc; ///< Descriptor type trait
 
 
   // /**
@@ -111,20 +111,34 @@ public:
   //   return tensor_t<T, RANK, Storage, Desc>{ldata_, shape_, s_};
   // }
 
+  /**
+   * @brief Construct a new 0-D tensor t object
+   * 
+   */
   tensor_t() :
-    tensor_impl_t<T, RANK, Desc>{}, 
+    detail::tensor_impl_t<T, RANK, Desc>{}, 
     storage_{typename Storage::container{sizeof(T)}}
   {
     this->SetLocalData(storage_.data());
     //static_assert(RANK == 0, "Default tensor constructor only works for rank-0 tensors.");
   }
 
+  /**
+   * @brief Copy constructor
+   * 
+   * @param rhs Object to copy from
+   */
   __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
-      : tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
       { }
 
+  /**
+   * @brief Move constructor
+   * 
+   * @param rhs Object to move from
+   */
   __MATX_HOST__ tensor_t(tensor_t &&rhs) noexcept
-      : tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
   { }
 
   /** Perform a shallow copy of a tensor view
@@ -146,10 +160,18 @@ public:
   __MATX_INLINE__  ~tensor_t() = default;
 
 
+  /**
+   * @brief Construct a new tensor t object from an arbitrary shape and descriptor
+   * 
+   * @tparam S2 Shape type
+   * @tparam D2 Descriptor type
+   * @param s Shape object
+   * @param desc Descriptor object
+   */
   template <typename S2 = Storage, typename D2 = Desc, 
             std::enable_if_t<is_matx_storage_v<typename remove_cvref<S2>::type> && is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
   tensor_t(S2 &&s, D2 &&desc) :
-    tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
+    detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
     storage_{std::forward<S2>(s)}
   {
     this->SetLocalData(storage_.data());
@@ -165,7 +187,7 @@ public:
    * @param ldata 
    */
   tensor_t(Storage s, Desc &&desc, T* ldata) :
-    tensor_impl_t<T, RANK, Desc>{std::forward<Desc>(desc)},
+    detail::tensor_impl_t<T, RANK, Desc>{std::forward<Desc>(desc)},
     storage_{std::move(s)}
   {
     this->SetLocalData(ldata);
@@ -183,7 +205,7 @@ public:
   template <typename D2 = Desc, typename = 
     typename std::enable_if_t<is_matx_descriptor_v<D2>>>
   __MATX_INLINE__ tensor_t(Desc &&desc) :
-    tensor_impl_t<T, RANK, Desc>{std::forward<Desc>(desc)},
+    detail::tensor_impl_t<T, RANK, Desc>{std::forward<Desc>(desc)},
     storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
   {
     this->SetLocalData(storage_.data());
@@ -197,7 +219,7 @@ public:
    *   Tensor shape
    */
   __MATX_INLINE__ tensor_t(const typename Desc::shape_type (&shape)[RANK]) :
-    tensor_impl_t<T, RANK, Desc>(shape),
+    detail::tensor_impl_t<T, RANK, Desc>(shape),
     storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
   {    
     this->SetLocalData(storage_.data());
@@ -217,7 +239,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, op);
+      return detail::set(*this, op);
   }
   /**
    * Lazy assignment operator=. Used to create a "set" object for deferred
@@ -232,8 +254,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, op_base);
   }
 
   /**
@@ -248,7 +270,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator+=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this + op);
+      return detail::set(*this, *this + op);
   }
 
   /**
@@ -264,8 +286,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator+=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this + op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this + op_base);
   }
 
   /**
@@ -280,7 +302,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator-=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this - op);
+      return detail::set(*this, *this - op);
   }
 
   /**
@@ -298,8 +320,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator-=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this - op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this - op_base);
   }
 
   /**
@@ -314,7 +336,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator*=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this * op);
+      return detail::set(*this, *this * op);
   }
 
   /**
@@ -330,8 +352,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator*=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this * op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this * op_base);
   }
 
   /**
@@ -346,7 +368,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator/=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this / op);
+      return detail::set(*this, *this / op);
   }
 
   /**
@@ -362,8 +384,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator/=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this / op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this / op_base);
   }
 
   /**
@@ -378,7 +400,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator<<=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this << op);
+      return detail::set(*this, *this << op);
   }
 
   /**
@@ -394,8 +416,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator<<=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this << op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this << op_base);
   }
 
   /**
@@ -410,7 +432,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator>>=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this >> op);
+      return detail::set(*this, *this >> op);
   }
 
   /**
@@ -426,8 +448,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator>>=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this >> op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this >> op_base);
   }
 
   /**
@@ -442,7 +464,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator|=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this | op);
+      return detail::set(*this, *this | op);
   }
 
   /**
@@ -458,8 +480,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator|=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this | op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this | op_base);
   }
 
   /**
@@ -474,7 +496,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator&=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this & op);
+      return detail::set(*this, *this & op);
   }
 
   /**
@@ -490,8 +512,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator&=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this & op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this & op_base);
   }
 
   /**
@@ -506,7 +528,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator^=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this ^ op);
+      return detail::set(*this, *this ^ op);
   }
 
   /**
@@ -522,8 +544,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator^=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-    return set(*this, *this ^ op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+    return detail::set(*this, *this ^ op_base);
   }
 
   /**
@@ -538,7 +560,7 @@ public:
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator%=(const tensor_t<T, RANK, Storage, Desc> &op)
   {
-      return set(*this, *this % op);
+      return detail::set(*this, *this % op);
   }
 
   /**
@@ -554,8 +576,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator%=(const T2 &op)
   {
-    const typename base_type<T2>::type &op_base = op;
-      return set(*this, *this % op_base);
+    const typename detail::base_type<T2>::type &op_base = op;
+      return detail::set(*this, *this % op_base);
   }
 
   /**
@@ -607,6 +629,42 @@ public:
     return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
   }
 
+  /**
+   * Get a view of the tensor from the underlying data using a custom shape
+   *
+   * Returns a view based on the shape passed in. Both the rank and the
+   * dimensions can be increased or decreased from the original data object as
+   * long as they fit within the bounds of the memory allocation. This function
+   * only allows a contiguous view of memory, regardless of the shape passed in.
+   * For example, if the original shape is {8, 2} and a view of {2, 1} is
+   * requested, the data in the new view would be the last two elements of the
+   * last dimension of the original data.
+   *
+   * The function is similar to MATLAB and Python's reshape(), except it does
+   * NOT make a copy of the data, whereas those languages may, depending on the
+   * context. It is up to the user to understand any existing views on the
+   * underlying data that may conflict with other views.
+   *
+   * While this function is similar to Slice(), it does not allow slicing a
+   * particular start and end point as slicing does, and slicing also does not
+   * allow increasing the rank of a tensor as View(shape) does.
+   *
+   * Note that the type of the data type of the tensor can also change from the
+   * original data. This may be useful in situations where a union of data types
+   * could be used in different ways. For example, a complex<float> could be
+   * reshaped into a float tensor that has twice as many elements, and
+   * operations can be done on floats instead of complex types.
+   *
+   * @tparam ShapeIntType
+   *   Type of integer shape array
+   * @tparam NRANK
+   *   New rank of tensor
+   * @param shape
+   *   New shape of tensor
+   *
+   * @return
+   *    A view of the data with the appropriate strides and dimensions set
+   */
   template <typename ShapeIntType, int NRANK>
   __MATX_INLINE__ auto View(const ShapeIntType (&shape)[NRANK])
   {
@@ -621,9 +679,7 @@ public:
   /**
    * @brief Make a copy of a tensor and maintain all refcounts
    * 
-   * @tparam M 
-   * @tparam R 
-   * @return __MATX_INLINE__ 
+   * @return Copy of view
    */
   __MATX_INLINE__ auto View()
   {
@@ -1369,7 +1425,5 @@ private:
   Storage storage_;
 };
 
-template <typename Storage, typename Desc>
-using tensor_impl_adv_t = tensor_t<typename Storage::T, Desc::Rank(), Storage, Desc>;
 
 } // end namespace matx

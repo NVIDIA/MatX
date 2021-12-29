@@ -46,7 +46,7 @@ template <typename T> class MatMulTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>(); // Half precision needs a bit more
+    pb = std::make_unique<detail::MatXPybind>(); // Half precision needs a bit more
                                          // tolerance when compared to fp32
     if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
       thresh = 0.5f;
@@ -55,7 +55,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   float thresh = 0.01f;
 };
 

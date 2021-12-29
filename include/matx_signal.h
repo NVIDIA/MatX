@@ -45,6 +45,7 @@ namespace matx {
 namespace signal {
 
 /* Operator for perfoming the 2*exp(-j*pi*k/(2N)) part of the DCT */
+namespace detail {
 template <typename O, typename I> class dctOp : public BaseOp<dctOp<O, I>> {
 private:
   O out_;
@@ -71,6 +72,7 @@ public:
     return O::Rank();
   }
 };
+}
 
 /**
  * Discrete Cosine Transform
@@ -102,7 +104,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
   fft(tmp, in);
   auto s = tmp.Slice({0}, {N});
-  dctOp(out, s, N).run(stream);
+  detail::dctOp(out, s, N).run(stream);
 }
 
 }; // namespace signal

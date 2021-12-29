@@ -39,10 +39,12 @@
 #include "matx_tensor_utils.h"
 
 namespace matx {
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
+template <typename T> class BaseOp; ///< Base operator type
 
-template <typename T> class BaseOp;
-template <typename T, int RANK, typename Desc> class tensor_impl_t;
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+namespace detail {
+
+template <typename T, int RANK, typename Desc> class tensor_impl_t; ///< Tensor implementation type
 
 
 /**
@@ -81,11 +83,11 @@ public:
    */
   inline set(tensor_impl_t<T, RANK, Desc> &out, const Op op) : out_(out), op_(op)
   {
-    MATX_STATIC_ASSERT(get_rank<Op>() == -1 || Rank() == get_rank<Op>(),
+    MATX_STATIC_ASSERT(detail::get_rank<Op>() == -1 || Rank() == detail::get_rank<Op>(),
                        matxInvalidDim);
     if constexpr (RANK > 0) {
       for (int i = 0; i < RANK; i++) {
-        typename Desc::shape_type size = get_expanded_size<Rank()>(op_, i);
+        typename Desc::shape_type size = detail::get_expanded_size<Rank()>(op_, i);
         size_[i] = out_.Size(i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
@@ -100,11 +102,11 @@ public:
   __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(Is... indices) const noexcept
   {
     if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(get_value(op_, indices...))>) {
-      out_(indices...) = static_cast<float>(get_value(op_, indices...));
+                  std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
+      out_(indices...) = static_cast<float>(detail::get_value(op_, indices...));
     }
     else {
-      out_(indices...) = get_value(op_, indices...);
+      out_(indices...) = detail::get_value(op_, indices...);
     }
 
     return out_(indices...);
@@ -114,13 +116,13 @@ public:
   {
     auto res = mapply([&](auto &&...args)  {
         if constexpr (is_matx_half_v<T> &&
-                      std::is_integral_v<decltype(get_value(op_, args...))>) {   
-          auto r = static_cast<float>(get_value(op_, args...));
+                      std::is_integral_v<decltype(detail::get_value(op_, args...))>) {   
+          auto r = static_cast<float>(detail::get_value(op_, args...));
           out_(args...) = r;
           return r;
         }
         else {      
-          auto r = get_value(op_, args...);
+          auto r = detail::get_value(op_, args...);
           out_(args...) = r; 
           return r;
         }       
@@ -153,4 +155,5 @@ public:
   }
 };
 
+}
 }

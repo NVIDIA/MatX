@@ -44,7 +44,7 @@ template <typename T> class CholSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_solver", "cholesky", "run", {dim_size});
     pb->NumpyToTensorView(Bv, "B");
     pb->NumpyToTensorView(Lv, "L");
@@ -52,7 +52,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Bv{{dim_size, dim_size}};
   tensor_t<T, 2> Lv{{dim_size, dim_size}};
 };

@@ -33,7 +33,6 @@
 #pragma once
 
 #include "cublas_v2.h"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 #include <cstdio>
@@ -41,10 +40,15 @@
 
 namespace matx {
 
+/**
+ * @brief Algorithm to use for matrix inverse
+ * 
+ */
 typedef enum {
   MAT_INVERSE_ALGO_LU,
 } MatInverseAlgo_t;
 
+namespace detail {
 /**
  * Parameters needed to execute a matrix inverse. Since the matrix inverse
  * reuses internally-allocated memory and overwrites the A array with the
@@ -156,8 +160,8 @@ public:
     }
   }
 
-  static InverseParams_t GetInverseParams(tensor_t<T1, RANK> a_inv,
-                                          tensor_t<T1, RANK> a)
+  static InverseParams_t GetInverseParams(TensorTypeAInv &a_inv,
+                                          const TensorTypeA &a)
   {
     InverseParams_t params;
     params.A = a.Data();
@@ -330,6 +334,18 @@ struct InverseParamsKeyEq {
 static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
     inv_cache;
 
+}
+
+/**
+ * @brief Perform a matrix inverse
+ * 
+ * @tparam TensorTypeAInv Inverse type
+ * @tparam TensorTypeA Input type
+ * @tparam ALGO Algorithm to use
+ * @param a_inv Inverse tensor
+ * @param a Input tensor
+ * @param stream CUDA stream
+ */
 template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
@@ -337,19 +353,19 @@ void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
   using T1 = typename TensorTypeAInv::scalar_type;
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
-  auto params = matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
+  auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
   params.stream = stream;
 
   // Get cache or new inverse plan if it doesn't exist
-  auto ret = inv_cache.Lookup(params);
+  auto ret = detail::inv_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxInversePlan_t{a_inv, a};
-    inv_cache.Insert(params, static_cast<void *>(tmp));
+    auto tmp = new detail::matxInversePlan_t{a_inv, a};
+    detail::inv_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(stream);
   }
   else {
     auto inv_type =
-        static_cast<matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
+        static_cast<detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
     inv_type->Exec(stream);
   }
 }

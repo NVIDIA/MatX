@@ -37,7 +37,7 @@
 
 namespace matx
 {
-
+namespace detail {
   template <typename T>
   __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ T MAX(T a)
   {
@@ -218,5 +218,6 @@ namespace matx
           std::forward<Func>(f), std::forward<Tuple>(t),
           make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});      
     }
-  }    
+  }  
+}  
 }

@@ -40,7 +40,6 @@
 
 namespace matx {
 
-
 /**
  * @brief Type-erased generic tensor descriptor for strides and sizes
  *
@@ -50,17 +49,39 @@ namespace matx {
 template <typename ShapeType, typename StrideType, int RANK> 
 class tensor_desc_t {
 public:
-  using shape_type  = typename ShapeType::value_type;
-  using stride_type = typename StrideType::value_type;
-  using shape_container = ShapeType;
-  using stride_container = StrideType;
-  using matx_descriptor = bool;
+  using shape_type  = typename ShapeType::value_type; ///< Type trait of shape type
+  using stride_type = typename StrideType::value_type; ///< Type trait of stride type
+  using shape_container = ShapeType; ///< Type trait of shape container
+  using stride_container = StrideType; ///< Type trait of stride container
+  using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
 
+  /**
+   * @brief Default copy constructor
+   */
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t<ShapeType, StrideType, RANK>(const tensor_desc_t& ) = default;
+
+  /**
+   * @brief Default move constructor
+   */  
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
+
+  /**
+   * @brief Default const copy assignment constructor
+   */  
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(const tensor_desc_t&) = default;
+
+  /**
+   * @brief Default copy assignment constructor
+   */    
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
+  /**
+   * @brief Construct a tensor_desc_t from a generic shape and stride
+   * 
+   * @tparam S Unused
+   * @param shape Shape object
+   * @param stride Stride object
+   */
   template <typename S = ShapeType, std::enable_if_t<!std::is_array_v<ShapeType> && !std::is_array_v<StrideType>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeType &&shape, StrideType &&stride)
       : shape_(std::forward<ShapeType>(shape)),
@@ -71,13 +92,17 @@ public:
                        "Rank parameter must match array size");                       
   }
 
-  // 0D tensors
+  /**
+   * @brief Construct a tensor_desc_t for a 0D tensor
+   * 
+   */
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t() {
   } 
 
   /**
    * @brief Constructor with just shape for non-C-style arrays
    * 
+   * @tparam S2 Unused
    * @param shape 
    *   Shape of tensor
    */
@@ -90,6 +115,8 @@ public:
   /**
    * @brief Constructor with just shape for C-style arrays
    * 
+   * @tparam M 
+   *   Unused
    * @param shape 
    *   Shape of tensor
    */
@@ -180,8 +207,7 @@ public:
    *
    * @return
    *    The size of all dimensions combined. Note that this does not include the
-   *    size of the data type itself, but only the product of the lengths of
-   * each dimension
+   *    size of the data type itself, but only the product of the lengths of each dimension
    */
   inline __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept
   {
@@ -193,6 +219,12 @@ public:
     return size;
   }  
 
+  /**
+   * @brief Initialize descriptor from existing shape
+   * 
+   * @tparam S2 Shape type
+   * @param shape Shape object
+   */
   template <typename S2>
   void __MATX_INLINE__ __MATX_HOST__ InitFromShape(S2 &&shape) {
     shape_ = std::forward<S2>(shape);
@@ -213,7 +245,21 @@ public:
     
   }  
 
+  /**
+   * @brief Set the Size object
+   * 
+   * @param dim Dimension to size
+   * @param size Size to set dimension to
+   * 
+   */
   void __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ SetSize(int dim, shape_type size) { *(shape_.begin() + dim) = size; }
+
+  /**
+   * @brief Return size of descriptor on a single dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Size of dimension
+   */
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size([[maybe_unused]] int dim) const { 
     if constexpr (RANK == 0) {
       return static_cast<shape_type>(1);
@@ -221,6 +267,13 @@ public:
 
     return *(shape_.begin() + dim); 
   }
+
+  /**
+   * @brief Return stride of descriptor on a single dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Stride of dimension
+   */
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Stride([[maybe_unused]] int dim) const { 
     if constexpr (RANK == 0) {
       return static_cast<stride_type>(0);
@@ -228,7 +281,19 @@ public:
 
     return *(stride_.begin() + dim); 
   }
+
+  /**
+   * @brief Return shape object
+   * 
+   * @return Shape object 
+   */
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Shape() const { return shape_; }
+
+  /**
+   * @brief Get rank of descriptor
+   * 
+   * @return Rank of descriptor
+   */
   static auto constexpr Rank() { return RANK; }
 
 private:
@@ -237,7 +302,7 @@ private:
 };
 
 /**
- * @brief Tensor descriptor for compile-time sizes
+ * @brief Tensor descriptor for compile-time descriptors
  * 
  * @tparam I First size
  * @tparam Is Parameter pack of sizes
@@ -245,11 +310,11 @@ private:
 template <index_t I, index_t... Is> 
 class static_tensor_desc_t {
 public:
-  using shape_container = std::array<index_t, sizeof...(Is)+1>;
-  using stride_container = std::array<index_t, sizeof...(Is)+1>;
-  using shape_type  = index_t;
-  using stride_type = index_t;
-  using matx_descriptor = bool;
+  using shape_container = std::array<index_t, sizeof...(Is)+1>;  ///< Type trait of shape type
+  using stride_container = std::array<index_t, sizeof...(Is)+1>; ///< Type trait of stride type
+  using shape_type  = index_t; ///< Type trait of shape container
+  using stride_type = index_t; ///< Type trait of stride container
+  using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
 
   /**
    * Check if a descriptor is linear in memory for all elements in the view
@@ -262,10 +327,41 @@ public:
     return true;
   }
 
+  /**
+   * @brief Get size of dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Size of dimension
+   */
   static constexpr auto Size(int dim) { return shape_[dim]; }
+
+  /**
+   * @brief Get stride of dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Stride of dimension
+   */  
   static constexpr auto Stride(int dim) { return stride_[dim]; }
+
+  /**
+   * @brief Get rank of descriptor
+   * 
+   * @return Descriptor rank
+   */  
   static constexpr int Rank() { return shape_.size(); }
+
+  /**
+   * @brief Get underlying shape object
+   * 
+   * @return Shape object
+   */  
   static constexpr auto Shape() { return shape_; }
+
+  /**
+   * @brief Get total size of descriptor
+   * 
+   * @return Product of all sizes
+   */  
   static constexpr auto TotalSize() {
       return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
   }  
@@ -293,40 +389,57 @@ private:
 /**
  * @brief Constant rank, dynamic size, dynamic strides
  *
+ * @tparam ShapeType Type of shape
+ * @tparam StrideType Type of stride container
+ * @tparam RANK Rank of shape
  */
 template <typename ShapeType, typename StrideType, int RANK>
 using tensor_desc_cr_ds_t =
     tensor_desc_t<std::array<ShapeType, RANK>, std::array<StrideType, RANK>,
                   RANK>;
 
-// 32-bit size and strides
+/**
+ * @brief 32-bit size and stride descriptor
+ *
+ * @tparam RANK Rank of shape
+ */
 template <int RANK>
 using tensor_desc_cr_ds_32_32_t =
     tensor_desc_cr_ds_t<int32_t, int32_t, RANK>;
 
-// 64-bit size and strides
+/**
+ * @brief 64-bit size and stride descriptor
+ *
+ * @tparam RANK Rank of shape
+ */
 template <int RANK>
 using tensor_desc_cr_ds_64_64_t =
     tensor_desc_cr_ds_t<long long int, long long int, RANK>;
 
-// 32-bit size and 64-bit strides
+/**
+ * @brief 32-bit size and 64-bit stride descriptor
+ *
+ * @tparam RANK Rank of shape
+ */
 template <int RANK>
 using tensor_desc_cr_ds_32_64_t =
     tensor_desc_cr_ds_t<int32_t, long long int, RANK>;
 
-// index_t based size and stride
+/**
+ * @brief index_t size and stride descriptor
+ *
+ * @tparam RANK Rank of shape
+ */
 template <int RANK>
 using tensor_desc_cr_disi_dist = tensor_desc_cr_ds_t<index_t, index_t, RANK>;
 
+/**
+ * @brief Default descriptor type
+ *
+ * @tparam RANK Rank of shape
+ */
 template <int RANK>
 using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
 
-// template <typename ShapeIntType, typename StrideIntType, int RANK>
-// struct DescriptorType {
-//   using type = tensor_desc_cr_ds_t<ShapeType, StrideType, RANK>;
-// }
-
-// template <typename ShapeIntType, typename StrideIntType, int RANK>
-// class DescriptorType<int32_t, StrideIntType, RANK>
 
 }; // namespace matx

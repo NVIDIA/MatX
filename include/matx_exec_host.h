@@ -38,11 +38,20 @@
 
 namespace matx 
 {
-
+/**
+ * @brief Executor for running an operator on a single host thread
+ * 
+ */
 class SingleThreadHostExecutor {
   public:
-    using matx_executor = bool;
+    using matx_executor = bool; ///< Type trait indicating this is an executor
     
+    /**
+     * @brief Execute an operator
+     * 
+     * @tparam Op Operator type
+     * @param op Operator to execute
+     */
     template <typename Op>
     void Exec(Op &op) const noexcept {
       if constexpr (op.Rank() == 0) {
@@ -95,6 +104,5 @@ class SingleThreadHostExecutor {
       }        
     }
 };
-
 
 }

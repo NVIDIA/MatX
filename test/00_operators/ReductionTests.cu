@@ -93,7 +93,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
 {
   MATX_ENTER_HANDLER();
 
-  auto pb = std::make_unique<MatXPybind>();
+  auto pb = std::make_unique<detail::MatXPybind>();
   constexpr index_t size = 100;
   pb->InitAndRunTVGenerator<TypeParam>("00_operators", "stats", "run", {size});
 
@@ -465,7 +465,7 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
     tensor_t<TypeParam, 2> t2{s2};
     TypeParam t1p = (TypeParam)1;
     for (int i = 0; i < t1.Size(0); i++) {
-      t1(i) = static_cast<value_promote_t<TypeParam>>((float)rand() /
+      t1(i) = static_cast<detail::value_promote_t<TypeParam>>((float)rand() /
                                                       (float)INT_MAX * 2.0f);
       t1p *= t1(i);
     }
@@ -473,7 +473,7 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
     TypeParam t2p = (TypeParam)1;
     for (int i = 0; i < t2.Size(0); i++) {
       for (int j = 0; j < t2.Size(1); j++) {
-        t2(i, j) = static_cast<value_promote_t<TypeParam>>(
+        t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(
             (float)rand() / (float)INT_MAX * 2.0f);
         t2p *= t2(i, j);
       }

@@ -99,51 +99,51 @@ TYPED_TEST(OperatorTestsFloat, TrigFuncs)
   (tov0 = sin(tiv0)).run();
   return;
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_sin(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
 
   (tov0 = cos(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_cos(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
 
   (tov0 = tan(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_tan(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
 
   (tov0 = asin(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_asin(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
 
   (tov0 = acos(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_acos(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
 
   (tov0 = atan(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_atan(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
 
   (tov0 = sinh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_sinh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
 
   (tov0 = cosh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_cosh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
 
   (tov0 = tanh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_tanh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
 
   (tov0 = asinh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_asinh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
 
   (tov0 = acosh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_acosh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
 
   (tov0 = atanh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_atanh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -159,7 +159,7 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
 
   (tov0 = angle(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_angle(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -223,27 +223,27 @@ TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
 
   (tov0 = log10(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_log10(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
 
   (tov0 = log(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_log(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
 
   (tov0 = log2(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_log2(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
 
   (tov0 = floor(tiv0)).run();   
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_floor(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
 
   (tov0 = ceil(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_ceil(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
 
   (tov0 = round(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_round(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -339,7 +339,7 @@ TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
-  IF(tiv0 == tiv0, set(tov0, c)).run();
+  IF(tiv0 == tiv0, tov0 = c).run();
 
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
@@ -347,7 +347,7 @@ TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
   TypeParam p = 2.0f;
   (tov0 = pow(tiv0, p)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_pow(c, p)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
   TypeParam three = 3.0f;
 
@@ -415,21 +415,21 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
 
   (tov0 = exp(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_exp(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
 
   (tov0 = conj(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), _internal_conj(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
   // abs and norm take a complex and output a floating point value
   tensor_t<typename TypeParam::value_type, 0> tdd0;
   (tdd0 = norm(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), _internal_norm(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
 
   (tdd0 = abs(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), _internal_abs(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -444,8 +444,8 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
   tensor_t<TypeParam, 1> c({count});
 
   for (index_t i = 0; i < count; i++) {
-    a(i) = static_cast<value_promote_t<TypeParam>>(i);
-    b(i) = static_cast<value_promote_t<TypeParam>>(i + 100);
+    a(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
+    b(i) = static_cast<detail::value_promote_t<TypeParam>>(i + 100);
   }
 
   {
@@ -454,7 +454,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
     }
@@ -466,7 +466,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
     }
@@ -477,7 +477,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
     }
@@ -489,7 +489,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
     }
@@ -508,14 +508,14 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
   tensor_t<TypeParam, 1> c({count});
 
   for (index_t i = 0; i < count; i++) {
-    a(i) = static_cast<value_promote_t<TypeParam>>(i);
-    b(i) = static_cast<value_promote_t<TypeParam>>(i + 100);
+    a(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
+    b(i) = static_cast<detail::value_promote_t<TypeParam>>(i + 100);
   }
 
   {
     (c = a + b).run(SingleThreadHostExecutor{});
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
     }
@@ -525,7 +525,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
     (c = a * b).run(SingleThreadHostExecutor{});
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
     }
@@ -535,7 +535,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
     (c = a * b + a).run(SingleThreadHostExecutor{});
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
     }
@@ -546,7 +546,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
     (c = a * b + a * (TypeParam)4.0f).run(SingleThreadHostExecutor{});
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
     }
@@ -633,71 +633,71 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
   // Multiply by scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i);
-    dview(i) = {static_cast<value_promote_t<TypeParam>>(i),
-                static_cast<value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
+                static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
   (dview = dview * fview).run();
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<value_promote_t<TypeParam>>(i * i));
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<value_promote_t<TypeParam>>(i * i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TypeParam>>(i * i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TypeParam>>(i * i));
   }
 
   // Divide by scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = i == 0 ? static_cast<float>(1) : static_cast<float>(i);
-    dview(i) = {static_cast<value_promote_t<TypeParam>>(i),
-                static_cast<value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
+                static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
   (dview = dview / fview).run();
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).real()),
-              i == 0 ? static_cast<value_promote_t<TypeParam>>(0)
-                     : static_cast<value_promote_t<TypeParam>>(1));
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).imag()),
-              i == 0 ? static_cast<value_promote_t<TypeParam>>(0)
-                     : static_cast<value_promote_t<TypeParam>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
+              i == 0 ? static_cast<detail::value_promote_t<TypeParam>>(0)
+                     : static_cast<detail::value_promote_t<TypeParam>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
+              i == 0 ? static_cast<detail::value_promote_t<TypeParam>>(0)
+                     : static_cast<detail::value_promote_t<TypeParam>>(1));
   }
 
   // Add scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i);
-    dview(i) = {static_cast<value_promote_t<TypeParam>>(i),
-                static_cast<value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
+                static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
   (dview = dview + fview).run();
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<value_promote_t<TypeParam>>(i + i));
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<value_promote_t<TypeParam>>(i + i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TypeParam>>(i + i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TypeParam>>(i + i));
   }
 
   // Subtract scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i + 1);
-    dview(i) = {static_cast<value_promote_t<TypeParam>>(i),
-                static_cast<value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
+                static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
   (dview = dview - fview).run();
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<value_promote_t<TypeParam>>(-1));
-    ASSERT_EQ(static_cast<value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<value_promote_t<TypeParam>>(-1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TypeParam>>(-1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TypeParam>>(-1));
   }
 
   MATX_EXIT_HANDLER();
@@ -712,7 +712,7 @@ TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count + j);
     }
   }
 
@@ -757,7 +757,7 @@ TYPED_TEST(OperatorTestsNumeric, NonSquareTranspose)
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count + j);
     }
   }
 
@@ -847,10 +847,10 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
       for (index_t k = 0; k < t4.Size(2); k++) {
         for (index_t l = 0; l < t4.Size(3); l++) {
           t4(i, j, k, l) =
-              static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+              static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
           t1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
              i * t4.Size(3) * t4.Size(2) * t4.Size(1)) =
-              static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+              static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
         }
       }
     }
@@ -910,7 +910,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         for (index_t k = 0; k < t4i.Size(2); k++) {
           for (index_t l = 0; l < t4i.Size(3); l++) {
             t4i(i, j, k, l) =
-                static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+                static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
           }
         }
       }
@@ -959,7 +959,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
 
   //   for (index_t i = 0; i < t1.Size(0); i++) {
-  //     t1(i) = static_cast<value_promote_t<TypeParam>>(i);
+  //     t1(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
   //   }
 
   //   for (index_t i = 0; i < t4i.Size(0); i++) {
@@ -967,7 +967,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -1019,7 +1019,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
   //     for (index_t j = 0; j < t2.Size(1); j++) {
-  //       t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
+  //       t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i + j);
   //     }
   //   }
 
@@ -1028,7 +1028,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -1081,7 +1081,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //   for (index_t i = 0; i < t3.Size(0); i++) {
   //     for (index_t j = 0; j < t3.Size(1); j++) {
   //       for (index_t k = 0; k < t3.Size(2); k++) {
-  //         t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
+  //         t3(i, j, k) = static_cast<detail::value_promote_t<TypeParam>>(i + j + k);
   //       }
   //     }
   //   }
@@ -1091,7 +1091,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -1147,19 +1147,19 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //   t0() = (TypeParam)200.0f;
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
-  //     t1(i) = static_cast<value_promote_t<TypeParam>>(i);
+  //     t1(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
   //   }
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
   //     for (index_t j = 0; j < t2.Size(1); j++) {
-  //       t2(i, j) = static_cast<value_promote_t<TypeParam>>(i + j);
+  //       t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i + j);
   //     }
   //   }
 
   //   for (index_t i = 0; i < t3.Size(0); i++) {
   //     for (index_t j = 0; j < t3.Size(1); j++) {
   //       for (index_t k = 0; k < t3.Size(2); k++) {
-  //         t3(i, j, k) = static_cast<value_promote_t<TypeParam>>(i + j + k);
+  //         t3(i, j, k) = static_cast<detail::value_promote_t<TypeParam>>(i + j + k);
   //       }
   //     }
   //   }
@@ -1169,7 +1169,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -1406,7 +1406,7 @@ TYPED_TEST(OperatorTestsAll, RepMat)
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i);
+      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i);
     }
   }
 
@@ -1454,7 +1454,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count1 + j);
     }
   }
 
@@ -1584,7 +1584,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<value_promote_t<TypeParam>>(i * count1 + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count1 + j);
     }
   }
 

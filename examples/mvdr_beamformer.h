@@ -38,12 +38,22 @@
 
 using namespace matx;
 
+/**
+ * @brief MVDR beamformer object
+ * 
+ * See https://www.vocal.com/beamforming-2/minimum-variance-distortionless-response-mvdr-beamformer/
+ */
 class MVDRBeamformer {
 public:
-  using complex = cuda::std::complex<float>;
+  using complex = cuda::std::complex<float>; ///< Complex type
+
   /**
-   * Constructs and MVDRBeamformer object, and allocates all handles needed to
-   * beamform.
+   * @brief Constructs and MVDRBeamformer object, and allocates all handles needed to beamform.
+   * 
+   * @param num_beams Number of beams
+   * @param num_el Number of elements
+   * @param data_len Data length
+   * @param snap_len Snap length
    */
   MVDRBeamformer(index_t num_beams, index_t num_el, index_t data_len,
                  index_t snap_len)
@@ -68,6 +78,8 @@ public:
 
   /**
    * Prefetch all data onto the device
+   * 
+   *  @param stream CUDA stream
    */
   void Prefetch(cudaStream_t stream)
   {
@@ -86,6 +98,8 @@ public:
 
   /**
    *  Run the entire beamformer
+   * 
+   *  @param stream CUDA stream
    */
   void Run(cudaStream_t stream)
   {
@@ -113,10 +127,39 @@ public:
     matmul(*abfWeightsView, *abfBView, *abfAInvView, stream);
   }
 
+  /**
+   * @brief Get the inVecView object
+   * 
+   * @return tensor_t view 
+   */
   auto GetInVec() { return *inVecView; }
+
+  /**
+   * @brief Get the cbfView object
+   * 
+   * @return tensor_t view 
+   */  
   auto GetCBFView() { return *cbfView; }
+
+  /**
+   * @brief Get the vView object
+   * 
+   * @return tensor_t view 
+   */  
   auto GetV() { return *vView; }
+
+  /**
+   * @brief Get the covMatView object
+   * 
+   * @return tensor_t view 
+   */
   auto GetCovMatView() { return *covMatView; }
+
+  /**
+   * @brief Get the invCovMatView object
+   * 
+   * @return tensor_t view 
+   */  
   auto GetCovMatInvView() { return *invCovMatView; }
 
 private:

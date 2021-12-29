@@ -36,9 +36,8 @@
 #include "matx_error.h"
 #include "matx_get_grid_dims.h"
 
-constexpr int CUDA_MAX_VAL_PARAM = 4096;
-
 namespace matx {
+namespace detail {
 
 #ifdef __CUDACC__  
 template <class Op> __global__ void matxOpT0Kernel(Op op) { 
@@ -143,6 +142,9 @@ __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> size
   }
 }
 #endif
+}
+
+constexpr int CUDA_MAX_VAL_PARAM = 4096; ///< Parameter size limit for single kernel
 
 /**
  * @brief Executes operators on the host on a CUDA-enabled device
@@ -152,10 +154,26 @@ __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> size
  */
 class CUDADeviceExecutor {
   public:
-    using matx_executor = bool;
+    using matx_executor = bool; ///< Type trait indicating this is an executor
+    /**
+     * @brief Construct a new CUDADeviceExecutor with a stream
+     * 
+     * @param stream CUDA stream
+     */
     CUDADeviceExecutor(cudaStream_t stream) : stream_(stream) {}
+
+    /**
+     * @brief Construct a new CUDADeviceExecutor object using the default stream
+     * 
+     */
     CUDADeviceExecutor() : stream_(0) {}
 
+    /**
+     * Execute an operator on a device
+     * 
+     * @tparam Op Operator type
+     * @param op value
+     **/
     template <typename Op>
     void Exec(Op &op) const noexcept {
   #ifdef __CUDACC__      
@@ -169,7 +187,7 @@ class CUDADeviceExecutor {
       if constexpr (op.Rank() == 0) {
         threads = 1;
         blocks = 1;
-        matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+        detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
       }
       else {
         std::array<index_t, op.Rank()> sizes;
@@ -177,23 +195,23 @@ class CUDADeviceExecutor {
           sizes[i] = op.Size(i);
         }        
 
-        get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
+        detail::get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
 
         if constexpr (op.Rank() == 1) {
-          matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);      
+          detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);      
         }
         else if constexpr (op.Rank() == 2) {
-          matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+          detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
         }
         else if constexpr (op.Rank() == 3) {
-          matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+          detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
         }
         else if constexpr (op.Rank() == 4) {
-          matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+          detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
         }        
         else {
           index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
-          matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+          detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
         } 
       }
   #else
@@ -204,6 +222,5 @@ class CUDADeviceExecutor {
   private:
     cudaStream_t stream_;
 };
-
 
 } // end namespace matx

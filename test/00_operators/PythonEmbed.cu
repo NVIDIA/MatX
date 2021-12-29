@@ -38,7 +38,7 @@ using namespace matx;
 
 TEST(BasicPythonTest, Print)
 {
-  auto pb = MatXPybind{};
+  auto pb = detail::MatXPybind{};
   pb.InitAndRunTVGenerator<int>("00_python_tests", "matx_python_tests", "run",
                                 {});
 }

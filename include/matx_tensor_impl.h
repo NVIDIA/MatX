@@ -45,27 +45,46 @@
 
 namespace matx {
 
-
+/**
+ * @brief Provides a base class with functions common to all operators
+ * 
+ * @tparam T Type of operator
+ */
 template <typename T>
 class BaseOp
 {
 public:
-  using matxop = bool;
-  using value_type = T;
+  using matxop = bool;  ///< Is a MatX custom operator
+  using value_type = T; ///< Value type for type traits
 
-  // Launch work in the stream
+  /**
+   * @brief Launch kernel in a GPU stream
+   * 
+   * @param stream CUDA stream
+   */
   void run(cudaStream_t stream = 0) noexcept
   {
     exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
   }
 
-  // Record an event after the work
+  /**
+   * @brief Launch work in a GPU stream and record an event
+   * 
+   * @param ev CUDA event
+   * @param stream CUDA stream
+   */
   void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
   {
     exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
     cudaEventRecord(ev, stream);
   }
 
+  /**
+   * @brief Launch work in an arbitrary executor
+   * 
+   * @tparam Ex Executor type
+   * @param ex Executor
+   */
   template <typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true>
   void run (Ex ex) {
     exec(*static_cast<T *>(this), ex);
@@ -73,41 +92,47 @@ public:
 
 };
 
+/**
+ * @brief Pprovides a base class for reducing the boilerplate code needed
+ * when defining an operator. This is particularly useful in user code with
+ * many custom operators that don't want to repeat the Size and Rank functions.
+ * 
+ * @tparam T Type of operator
+ * @tparam RankOp Type of operator providing rank information
+ */
 template <typename T, typename RankOp>
-class BaseOpCustom
+class BaseOpCustom : public BaseOp<T>
 {
 public:
-  using matxop = bool;
-  using value_type = T;
-  std::array<index_t, RankOp::Rank()> size_;
+  using matxop = bool;  ///< Type trait to indicate this is an operator
+  using value_type = T; ///< Type trait of operator type
+  std::array<index_t, RankOp::Rank()> size_; ///< Size of each dimension
 
   BaseOpCustom() = delete;
+
+  /**
+   * @brief Construct a new Base Op Custom object
+   * 
+   * @param size Size of each dimension
+   */
   BaseOpCustom(const std::array<index_t, RankOp::Rank()> &size) :
     size_(size) {}
 
-  // Launch work in the stream
-  void run(cudaStream_t stream = 0) noexcept
-  {
-    exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
-  }
-
-  // Record an event after the work
-  void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
-  {
-    exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
-    cudaEventRecord(ev, stream);
-  }
-
-  template <typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true>
-  void run (Ex ex) {
-    exec(*static_cast<T *>(this), ex);
-  }
-
+  /**
+   * @brief Return rank of operator
+   * 
+   * @return Operator rank
+   */
   static inline constexpr int32_t Rank()
   {
     return RankOp::Rank();
   }  
 
+  /**
+   * @brief Return size of operator on a given dimension
+   * 
+   * @return Operator size on dimension dim
+   */
   index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
     return size_[dim];
@@ -115,6 +140,7 @@ public:
 };
 
 
+namespace detail {
 
 /**
  * @brief Bare implementation of tensor class
@@ -885,7 +911,7 @@ class tensor_impl_t {
         printf("\n");
       }
       else if constexpr (sizeof...(Args) == 1) {
-        auto& k = pp_get<0>(dims...);
+        auto& k =detail:: pp_get<0>(dims...);
         for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
           printf("%06lld: ", _k);
           PrintVal(this->operator()(_k));
@@ -893,8 +919,8 @@ class tensor_impl_t {
         }
       }
       else if constexpr (sizeof...(Args) == 2) {
-        auto& k = pp_get<0>(dims...);
-        auto& l = pp_get<1>(dims...);
+        auto& k = detail::pp_get<0>(dims...);
+        auto& l = detail::pp_get<1>(dims...);
         for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
           for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(1) : l); _l++) {
             if (_l == 0)
@@ -906,9 +932,9 @@ class tensor_impl_t {
         }
       }
       else if constexpr (sizeof...(Args) == 3) {
-        auto& j = pp_get<0>(dims...);
-        auto& k = pp_get<1>(dims...);
-        auto& l = pp_get<2>(dims...);
+        auto& j = detail::pp_get<0>(dims...);
+        auto& k = detail::pp_get<1>(dims...);
+        auto& l = detail::pp_get<2>(dims...);
         for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(0) : j); _j++) {
           printf("[%06lld,:,:]\n", _j);
           for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(1) : k); _k++) {
@@ -924,10 +950,10 @@ class tensor_impl_t {
         }      
       }
       else if constexpr (sizeof...(Args) == 4) {
-        auto& i = pp_get<0>(dims...);
-        auto& j = pp_get<1>(dims...);
-        auto& k = pp_get<2>(dims...);
-        auto& l = pp_get<3>(dims...); 
+        auto& i = detail::pp_get<0>(dims...);
+        auto& j = detail::pp_get<1>(dims...);
+        auto& k = detail::pp_get<2>(dims...);
+        auto& l = detail::pp_get<3>(dims...); 
         for (typename Desc::shape_type _i = 0; _i < ((i == 0) ? this->Size(0) : i); _i++) {
           for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(1) : j); _j++) {
             printf("[%06lld,%06lld,:,:]\n", _i, _j);
@@ -994,4 +1020,5 @@ class tensor_impl_t {
     Desc desc_;
 };
 
+}
 };

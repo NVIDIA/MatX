@@ -56,6 +56,15 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 };
 #endif
 
+/**
+ * @brief Get a random number
+ * 
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ * @param dist Distribution
+ * @return __inline__ 
+ */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
                                       Distribution_t dist)
@@ -68,6 +77,15 @@ __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
   }
 };
 
+/**
+ * @brief Get a random number
+ * 
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ * @param dist Distribution
+ * @return __inline__ 
+ */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
                                       Distribution_t dist)
@@ -80,6 +98,15 @@ __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
   }
 };
 
+/**
+ * @brief Get a random number
+ * 
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ * @param dist Distribution
+ * @return __inline__ 
+ */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
                                       Gen *state, Distribution_t dist)
@@ -95,6 +122,15 @@ __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
   }
 };
 
+/**
+ * @brief Get a random number
+ * 
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ * @param dist Distribution
+ * @return __inline__ 
+ */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
                                       Gen *state, Distribution_t dist)
@@ -222,11 +258,20 @@ private:
   T alpha_, beta_;
 
 public:
-  using type = T;
-  using scalar_type = T;
+  using type = T; ///< Type trait to get type
+  using scalar_type = T; ///< Type trait to get type
   // dummy type to signal this is a matxop
-  using matxop = bool;
+  using matxop = bool; ///< Type trait to indicate this is an operator
 
+  /**
+   * @brief Construct a new randomTensorView t object
+   * 
+   * @param shape Shape of view
+   * @param states States of RNG
+   * @param dist RNG distribution
+   * @param alpha Alpha value
+   * @param beta Beta value
+   */
   randomTensorView_t(const tensorShape_t<RANK> shape,
                          curandStatePhilox4_32_10_t *states,
                          Distribution_t dist, T alpha, T beta)
@@ -245,6 +290,13 @@ public:
     }
   }
 
+  /**
+   * Get the random number at an index
+   * 
+   * @tparam I Unused
+   * @tparam Is Index types
+   * @return Value at index
+   */
   template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...>) const {
     return 0;
@@ -253,10 +305,13 @@ public:
   template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...> tup) const {
     return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*Stride(I);
-  }     
+  }        
 
   /**
    * Retrieve a value from a random view
+   * 
+   * @tparam Is Index type
+   * @param indices Index values
    */
   template <typename... Is>
   inline __MATX_DEVICE__ T operator()(Is... indices) const
@@ -272,13 +327,30 @@ public:
     return alpha_ * val + beta_;
   };
 
+  /**
+   * Get rank of random view
+   * 
+   * @return Rank of view
+   */
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
+  /**
+   *  Get size of a dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Size of dimension 
+   */
   index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
     return shape_.Size(dim);
   }
 
+  /**
+   * Get stride of a dimension
+   * 
+   * @param dim Dimension to retrieve
+   * @return Stride of dimension 
+   */
   index_t inline __MATX_HOST__ __MATX_DEVICE__ Stride(int dim) const
   {
     return strides_[dim];
