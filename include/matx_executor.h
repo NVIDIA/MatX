@@ -38,6 +38,7 @@
 
 namespace matx
 {  
+namespace detail {
   /* Executors define how an operator is executed. Currently supported types are
      CUDA device and single-threaded host
   */
@@ -61,5 +62,5 @@ namespace matx
   {
     ex.Exec(op);
   }  
-
+}
 };

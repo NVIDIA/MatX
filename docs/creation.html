@@ -1,196 +1,391 @@
 
-
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
-<head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <title>Constructing Tensors &mdash; matx  documentation</title>
-  
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-
-  
-  
-
-  
-  
-
-  
-
-  
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
+    <title>Creating Tensors &#8212; matx  documentation</title>
     
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
+  <link href="_static/css/theme.css" rel="stylesheet">
+  <link href="_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
 
     
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    
+  <link rel="preload" as="script" href="_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="API Reference" href="api/index.html" />
-    <link rel="prev" title="Quick start" href="quickstart.html" /> 
-</head>
-
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
+    <link rel="prev" title="Quick Start" href="quickstart.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
     
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
 
-          
-            <a href="index.html" class="icon icon-home"> matx
-          
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
 
-          
-          </a>
+    
 
+    <div class="container-xl">
+      <div class="row">
           
-            
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building MatX</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Constructing Tensors</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#a-quick-primer-on-matx-types">A Quick Primer On MatX Types</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#matx-storage">MatX Storage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#tensor-descriptors">Tensor Descriptors</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#dynamic-descriptors">Dynamic Descriptors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#static-descriptors">Static Descriptors</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#creating-tensors">Creating Tensors</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#make-variants">Make Variants</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#creating-from-c-array-or-a-brace-enclosed-list">Creating From C Array Or a Brace-Enclosed list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#creating-from-a-conforming-shape">Creating From A Conforming Shape</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#creating-from-a-descriptor">Creating From A Descriptor</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#d-tensors">0-D Tensors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#custom-storage-descriptors-and-allocators">Custom Storage, Descriptors, and Allocators</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#storage">Storage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#descriptors">Descriptors</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a></li>
-<li class="toctree-l1"><a class="reference internal" href="matlabpython.html">MATLAB/Python To MatX Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Example Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="limitations.html">Limitations</a></li>
-</ul>
-
-            
-          
-        </div>
-        
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="index.html">
       
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">matx</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
-      <li>Constructing Tensors</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-          
-            <a href="_sources/creation.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
+      
+      
+      <h1 class="site-logo" id="site-title">matx  documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="build.html">
+   Building MatX
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="quickstart.html">
+   Quick Start
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Creating Tensors
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="api/index.html">
+   API Reference
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="api/class.html">
+     Tensor Class Reference
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/tensorview.html">
+       tensor_t
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/tensorshape.html">
+       tensorShape_t
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="api/transformations.html">
+     Tensor Transformations
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+    <label for="toctree-checkbox-3">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/fft.html">
+       FFT
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/matmul.html">
+       Matrix Multiply (GEMM)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/solver.html">
+       Linear Solvers
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/inverse.html">
+       Matrix Inverse
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/filter.html">
+       Filtering (IIR and FIR)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/reduce.html">
+       Reductions
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="api/sort.html">
+       Sorting
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/tensorops.html">
+     Tensor Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/tensorgenerators.html">
+     Generator Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/stats.html">
+     Statistics
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/random.html">
+     Random Number Generation
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/utilities.html">
+     Utilities
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/type_traits.html">
+     Type Traits
+    </a>
+   </li>
   </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="matlabpython.html">
+   MATLAB/Python To MatX Translation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="examples/index.html">
+   Example Applications
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
+  <label for="toctree-checkbox-4">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="examples/fftconv.html">
+     FFT Convolution
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="limitations.html">
+   Limitations
+  </a>
+ </li>
+</ul>
 
-  
-  <hr/>
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
             
-  <section id="constructing-tensors">
-<h1>Constructing Tensors<a class="headerlink" href="#constructing-tensors" title="Permalink to this headline">¶</a></h1>
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/creation.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-quick-primer-on-matx-types">
+   A Quick Primer On MatX Types
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-storage">
+   MatX Storage
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#tensor-descriptors">
+   Tensor Descriptors
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#dynamic-descriptors">
+     Dynamic Descriptors
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#static-descriptors">
+     Static Descriptors
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#id1">
+   Creating Tensors
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#make-variants">
+     Make Variants
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#creating-from-c-array-or-a-brace-enclosed-list">
+     Creating From C Array Or a Brace-Enclosed list
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#creating-from-a-conforming-shape">
+     Creating From A Conforming Shape
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#creating-from-a-descriptor">
+     Creating From A Descriptor
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#d-tensors">
+     0-D Tensors
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#custom-storage-descriptors-and-allocators">
+     Custom Storage, Descriptors, and Allocators
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#storage">
+   Storage
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#descriptors">
+   Descriptors
+  </a>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <section id="creating-tensors">
+<span id="creating"></span><h1>Creating Tensors<a class="headerlink" href="#creating-tensors" title="Permalink to this headline"></a></h1>
 <p>Basic construction of tensors in MatX is intended to be very simple with minimal parameters. This allows users of other languages
 to pick up the syntax quickly without understanding the underlying architecture. While using the simple API provides good performance,
 it lacks flexibility and can prevent your code from running at the highest performance possible. This document walks through the
 different ways to construct tensors, and when you should use certain methods over others.</p>
 <section id="a-quick-primer-on-matx-types">
-<h2>A Quick Primer On MatX Types<a class="headerlink" href="#a-quick-primer-on-matx-types" title="Permalink to this headline">¶</a></h2>
+<h2>A Quick Primer On MatX Types<a class="headerlink" href="#a-quick-primer-on-matx-types" title="Permalink to this headline"></a></h2>
 <p>The basic type of tensor used in most examples and tests is the <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> object. <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> is the highest-level tensor class, and
 provides all of the abstractions for viewing and modifying data, holding storage, and any other metadata needed by a tensor. Because of
 their relatively large size, <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> objects are not meant to be passed to GPU devices. In fact, doing so will lead to a compiler error
@@ -204,13 +399,13 @@ is the type that is passed into GPU kernels, and only contains types that are co
 object is as small as possible since these objects can be replicated many times within a single complex expression. Reducing the size of
 <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> allows for fastest memory accesses, smaller copies before a kernel launch, and makes extending the code easier.</p>
 <p>To convert between a <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> and <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> a type trait called <code class="docutils literal notranslate"><span class="pre">base_type</span></code> is available and is used like the following:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typename</span> <span class="nc">base_type</span><span class="o">&lt;</span><span class="n">I1</span><span class="o">&gt;::</span><span class="n">type</span> <span class="n">in1_</span> <span class="o">=</span> <span class="n">in</span><span class="p">;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typename</span> <span class="nc">base_type</span><span class="o">&lt;</span><span class="n">I1</span><span class="o">&gt;::</span><span class="n">type</span><span class="w"> </span><span class="n">in1_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">in</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <p>where <code class="docutils literal notranslate"><span class="pre">in</span></code> is the <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> object and <code class="docutils literal notranslate"><span class="pre">in1_</span></code> will be a <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code>.</p>
 </section>
 <section id="matx-storage">
-<h2>MatX Storage<a class="headerlink" href="#matx-storage" title="Permalink to this headline">¶</a></h2>
+<h2>MatX Storage<a class="headerlink" href="#matx-storage" title="Permalink to this headline"></a></h2>
 <p>Within the <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code> class is an abstract template parameter called <code class="docutils literal notranslate"><span class="pre">Storage</span></code>. <code class="docutils literal notranslate"><span class="pre">Storage</span></code> objects are always created from a <code class="docutils literal notranslate"><span class="pre">basic_storage</span></code>
 class, which provides all accessor functions common to the underlying storage. <code class="docutils literal notranslate"><span class="pre">basic_storage</span></code> can wrap raw pointers using the <code class="docutils literal notranslate"><span class="pre">raw_pointer_buffer</span></code>
 class, smart pointers using the <code class="docutils literal notranslate"><span class="pre">smart_pointer_buffer</span></code> class, or any RAII object that provides the required interface. If no user-defined storage
@@ -226,13 +421,13 @@ and deallocate memory when the last tensor using the memory goes out of scope. B
 perform any reference counting or deallocations when out of scope.</p>
 </section>
 <section id="tensor-descriptors">
-<h2>Tensor Descriptors<a class="headerlink" href="#tensor-descriptors" title="Permalink to this headline">¶</a></h2>
+<h2>Tensor Descriptors<a class="headerlink" href="#tensor-descriptors" title="Permalink to this headline"></a></h2>
 <p>Tensor descriptors are a template type inside <code class="docutils literal notranslate"><span class="pre">tensor_impl_t</span></code> that provide information about the size and strides of the tensor. While descriptors
 are a simply concept, the implementation can have a large impact on performance if not tuned properly. Both the sizes and strides of the tensor are
 a template class supporting iterators to access the metadata directly, and utility functions for accessing and computing other values from the metadata.
 Descriptors are commonly stored as <code class="docutils literal notranslate"><span class="pre">std::array</span></code> types given its compile-time features, but any class meeting the accessor properties can be used.</p>
 <section id="dynamic-descriptors">
-<h3>Dynamic Descriptors<a class="headerlink" href="#dynamic-descriptors" title="Permalink to this headline">¶</a></h3>
+<h3>Dynamic Descriptors<a class="headerlink" href="#dynamic-descriptors" title="Permalink to this headline"></a></h3>
 <p>Dynamic descriptors use storage in memory to describe the shapes and strides of a tensor. They can have lower performance than static descriptors
 since more memory accesses and offset calculations are needed when accessing tensors, but have higher flexibility given the data is only needed at runtime.</p>
 <p>Dynamic descriptors should be used when either the sizes are not known at compile-time, or when interoperating with existing code. As mentioned in the
@@ -241,21 +436,21 @@ shape and size can vary depending on the size of the tensor parameters. While sh
 used to store them can be different. This is useful in scenarios where the shape can be expressed as a smaller type than the strides.</p>
 </section>
 <section id="static-descriptors">
-<h3>Static Descriptors<a class="headerlink" href="#static-descriptors" title="Permalink to this headline">¶</a></h3>
+<h3>Static Descriptors<a class="headerlink" href="#static-descriptors" title="Permalink to this headline"></a></h3>
 <p>If the shapes and strides are known at compile time, static descriptors should be used. Static descriptors compute and store the shape and strides in
 constexpr variables, and provide constexpr functions to access both values. When used in a GPU kernel, calling either <code class="docutils literal notranslate"><span class="pre">Size()</span></code> or <code class="docutils literal notranslate"><span class="pre">Stride()</span></code> emits
 an immediate rvalue that the compiler can use for address calculations. This removes all loads and complex pointer arithmetic that could affect the
 runtime of a kernel</p>
 </section>
 </section>
-<section id="creating-tensors">
-<h2>Creating Tensors<a class="headerlink" href="#creating-tensors" title="Permalink to this headline">¶</a></h2>
+<section id="id1">
+<h2>Creating Tensors<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
 <p>With the tensor terminology out of the way, it’s time to discuss how to create tensors. If there’s one thing to take from this article, it’s that you
 should use <code class="docutils literal notranslate"><span class="pre">make_tensor</span></code> or <code class="docutils literal notranslate"><span class="pre">make_static_tensor</span></code> wherever possible.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Prefer <code class="docutils literal notranslate"><span class="pre">make_tensor</span></code> or <code class="docutils literal notranslate"><span class="pre">make_static_tensor</span></code> over constructing tensors directly</p>
-</div>
+</aside>
 <p>Using these helper functions has many benefits:</p>
 <ul class="simple">
 <li><p>They remove the need to specify the rank of a tensor in the template parameters</p></li>
@@ -269,7 +464,7 @@ the member variable must be specified in the member list. In these scenaries it�
 spelling out the types themselves. For examples of this, see the simple_pipeline files.</p>
 <p>All make functions take the data type as the first template parameter.</p>
 <section id="make-variants">
-<h3>Make Variants<a class="headerlink" href="#make-variants" title="Permalink to this headline">¶</a></h3>
+<h3>Make Variants<a class="headerlink" href="#make-variants" title="Permalink to this headline"></a></h3>
 <p>There are currently 4 different variants of the <code class="docutils literal notranslate"><span class="pre">make_</span></code> helper functions:
 - <code class="docutils literal notranslate"><span class="pre">make_</span></code> for creating a tensor with a dynamic descriptor and returning by value
 - <code class="docutils literal notranslate"><span class="pre">make_static_</span></code> for creating a tensor with a static descriptor and returning by value
@@ -282,73 +477,73 @@ is passed to MatX rather than having the allocation done when the tensor is crea
 <p>Each of these 4 variants can be used with all of the construction types when applicable.</p>
 </section>
 <section id="creating-from-c-array-or-a-brace-enclosed-list">
-<h3>Creating From C Array Or a Brace-Enclosed list<a class="headerlink" href="#creating-from-c-array-or-a-brace-enclosed-list" title="Permalink to this headline">¶</a></h3>
+<h3>Creating From C Array Or a Brace-Enclosed list<a class="headerlink" href="#creating-from-c-array-or-a-brace-enclosed-list" title="Permalink to this headline"></a></h3>
 <p>Tensors can be created using a C-style shape array from an lvalue, or a brace-enclosed list as an rvalue. The following call the same <code class="docutils literal notranslate"><span class="pre">make_</span></code> call:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span> <span class="n">array</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">};</span>
-<span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">array</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">array</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">};</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">array</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>and</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">});</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">});</span><span class="w"></span>
 </pre></div>
 </div>
 <p>In the former case the array is an lvalue that can be modified in memory before calling, whereas the latter case uses rvalues. When the sizes are known
 at compile time the static version of <code class="docutils literal notranslate"><span class="pre">make_</span></code> should be used:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_static_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="o">&gt;</span><span class="p">();</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_static_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="o">&gt;</span><span class="p">();</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Notice the sizes are now template parameters instead of function parameters. Both ways can be used interchangeable in MatX code, but the static version
 can lead to higher performance.</p>
 <p>Similarly, all variants can be called with a user-defined pointer:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ptr</span><span class="p">,</span> <span class="p">{</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">});</span> <span class="c1">// ptr is a valid device pointer</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ptr</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">});</span><span class="w"> </span><span class="c1">// ptr is a valid device pointer</span>
 </pre></div>
 </div>
 <p>All cases shown above use the default stride parameters. If the strides are not linear in memory, they can be passed in as well:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span> <span class="n">shape</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">};</span>
-<span class="kt">int</span> <span class="n">strides</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1200</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">2</span><span class="p">};</span>
-<span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">strides</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">shape</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">};</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">strides</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1200</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">};</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">strides</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
 <section id="creating-from-a-conforming-shape">
-<h3>Creating From A Conforming Shape<a class="headerlink" href="#creating-from-a-conforming-shape" title="Permalink to this headline">¶</a></h3>
+<h3>Creating From A Conforming Shape<a class="headerlink" href="#creating-from-a-conforming-shape" title="Permalink to this headline"></a></h3>
 <p>As mentioned in the descriptor section, any type that conforms to the shape semantics can be used inside of a descriptor, and can also be passed into the
 <code class="docutils literal notranslate"><span class="pre">make_</span></code> functions:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">array</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span> <span class="mi">3</span><span class="o">&gt;</span> <span class="o">=</span> <span class="p">{</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">};</span>
-<span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">array</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">array</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">};</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">array</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
 <section id="creating-from-a-descriptor">
-<h3>Creating From A Descriptor<a class="headerlink" href="#creating-from-a-descriptor" title="Permalink to this headline">¶</a></h3>
+<h3>Creating From A Descriptor<a class="headerlink" href="#creating-from-a-descriptor" title="Permalink to this headline"></a></h3>
 <p>Descriptors (both shapes and sizes) can be used to construct tensors. This is useful when taking an existing tensor descriptor and creating a new tensor from it:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">d</span> <span class="o">=</span> <span class="n">existingTensor</span><span class="p">.</span><span class="n">Descriptor</span><span class="p">();</span>
-<span class="k">auto</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">d</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">existingTensor</span><span class="p">.</span><span class="n">Descriptor</span><span class="p">();</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">d</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">t</span></code> is now a tensor with the same shapes and strides of <code class="docutils literal notranslate"><span class="pre">existingTensor</span></code>.</p>
 </section>
 <section id="d-tensors">
-<h3>0-D Tensors<a class="headerlink" href="#d-tensors" title="Permalink to this headline">¶</a></h3>
+<h3>0-D Tensors<a class="headerlink" href="#d-tensors" title="Permalink to this headline"></a></h3>
 <p>0-D tensors are different than higher ranks since they have no meaningful shape or strides, and therefor don’t need those parameters. Empty versions of the
 <code class="docutils literal notranslate"><span class="pre">make_</span></code> helpers existing to create these:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="n">t0</span>  <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">();</span>
-<span class="k">auto</span> <span class="n">t01</span> <span class="o">=</span> <span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ptr</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t0</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">();</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t01</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ptr</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
 <section id="custom-storage-descriptors-and-allocators">
-<h3>Custom Storage, Descriptors, and Allocators<a class="headerlink" href="#custom-storage-descriptors-and-allocators" title="Permalink to this headline">¶</a></h3>
+<h3>Custom Storage, Descriptors, and Allocators<a class="headerlink" href="#custom-storage-descriptors-and-allocators" title="Permalink to this headline"></a></h3>
 <p>Within most of the <code class="docutils literal notranslate"><span class="pre">make_</span></code> functions, there are choices in the template parameters for custom storage, descriptor, and allocator types.</p>
 </section>
 </section>
 <section id="storage">
-<h2>Storage<a class="headerlink" href="#storage" title="Permalink to this headline">¶</a></h2>
+<h2>Storage<a class="headerlink" href="#storage" title="Permalink to this headline"></a></h2>
 <p>Storage types can be created by wrapping a container object in the <code class="docutils literal notranslate"><span class="pre">basic_storage</span></code> class. MatX has a container type built-in for both raw pointers and smart
 pointers, but this can be extended to use any conforming container type. The <code class="docutils literal notranslate"><span class="pre">basic_storage</span></code> class does not know about any underlying data structures or ownership;
 this is encapsulated inside of the template type <code class="docutils literal notranslate"><span class="pre">C</span></code>. For example, to create a custom storage object to wrap a raw pointer:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">raw_pointer_buffer</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">owning</span><span class="p">,</span> <span class="n">matx_allocator</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&gt;</span> <span class="n">rp</span><span class="p">{</span><span class="n">ptr</span><span class="p">,</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">desc</span><span class="p">.</span><span class="n">TotalSize</span><span class="p">()</span><span class="o">*</span><span class="k">sizeof</span><span class="p">(</span><span class="n">T</span><span class="p">))};</span>
-<span class="n">basic_storage</span><span class="o">&lt;</span><span class="k">decltype</span><span class="p">(</span><span class="n">rp</span><span class="p">)</span><span class="o">&gt;</span> <span class="n">s</span><span class="p">{</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">rp</span><span class="p">)};</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">raw_pointer_buffer</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">owning</span><span class="p">,</span><span class="w"> </span><span class="n">matx_allocator</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">rp</span><span class="p">{</span><span class="n">ptr</span><span class="p">,</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">desc</span><span class="p">.</span><span class="n">TotalSize</span><span class="p">()</span><span class="o">*</span><span class="k">sizeof</span><span class="p">(</span><span class="n">T</span><span class="p">))};</span><span class="w"></span>
+<span class="n">basic_storage</span><span class="o">&lt;</span><span class="k">decltype</span><span class="p">(</span><span class="n">rp</span><span class="p">)</span><span class="o">&gt;</span><span class="w"> </span><span class="n">s</span><span class="p">{</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">rp</span><span class="p">)};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>The code above creates a new <code class="docutils literal notranslate"><span class="pre">raw_pointer_buffer</span></code> object with ownership semantics and the <code class="docutils literal notranslate"><span class="pre">matx_allocator</span></code> allocator. A constructor taking a pointer and a
@@ -356,7 +551,7 @@ size will not allocate any new data, but track the pointer internally using a sm
 pointer would not be tracked or freed. With the container created, the next line passes the container into a <code class="docutils literal notranslate"><span class="pre">basic_storage</span></code> object for use inside <code class="docutils literal notranslate"><span class="pre">tensor_t</span></code>.</p>
 </section>
 <section id="descriptors">
-<h2>Descriptors<a class="headerlink" href="#descriptors" title="Permalink to this headline">¶</a></h2>
+<h2>Descriptors<a class="headerlink" href="#descriptors" title="Permalink to this headline"></a></h2>
 <p>Creating a descriptor can be done by using any conforming descriptor type (See descriptor explanation above). Within MatX, <code class="docutils literal notranslate"><span class="pre">std::array</span></code> is used by default
 when creating dynamic descriptors. Because of the variable size of the stride and shape, MatX provides helper types for creating descriptors of common types:</p>
 <ul class="simple">
@@ -369,8 +564,8 @@ when creating dynamic descriptors. Because of the variable size of the stride an
 <li><p><code class="docutils literal notranslate"><span class="pre">static_tensor_desc_t&lt;size_t</span> <span class="pre">I,</span> <span class="pre">Size_t</span> <span class="pre">Is...&gt;</span></code> is a static-sized descriptor with the shape and stride created at compile time</p></li>
 </ul>
 <p>To create a descriptor:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span> <span class="n">index_t</span> <span class="n">arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">};</span>
-<span class="n">DefaultDescriptor</span><span class="o">&lt;</span><span class="n">RANK</span><span class="o">&gt;</span> <span class="n">desc</span><span class="p">{</span><span class="n">arr</span><span class="p">};</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="n">index_t</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">};</span><span class="w"></span>
+<span class="n">DefaultDescriptor</span><span class="o">&lt;</span><span class="n">RANK</span><span class="o">&gt;</span><span class="w"> </span><span class="n">desc</span><span class="p">{</span><span class="n">arr</span><span class="p">};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>In this case we create a default descriptor (based on <code class="docutils literal notranslate"><span class="pre">index_t</span></code> sizes) using a C-style array.</p>
@@ -378,51 +573,47 @@ when creating dynamic descriptors. Because of the variable size of the stride an
 </section>
 
 
-           </div>
-           
-          </div>
-          <footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="api/index.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quick start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &#169; Copyright 2021, Nvidia.
-
-    </p>
-  </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
+              </div>
+              
+        
+            <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="quickstart.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Quick Start</p>
         </div>
+    </a>
+    <a class='right-next' id="next-link" href="api/index.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">API Reference</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer">
+    <div class="container">
+      <p>
+        
+          By Nvidia<br/>
+        
+            &copy; Copyright 2021, Nvidia.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
       </div>
-
-    </section>
-
-  </div>
+    </div>
   
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-    
+  <script src="_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+ 
 
   <style>
          .wy-nav-content { max-width: 1600px; }
@@ -432,6 +623,5 @@ when creating dynamic descriptors. Because of the variable size of the stride an
   </style>
 
 
-
-</body>
+  </body>
 </html>

@@ -49,7 +49,7 @@ add_custom_command(OUTPUT ${SPHINX_INDEX_FILE}
                      ${SPHINX_EXECUTABLE} -b html
                      -c ${CMAKE_CURRENT_BINARY_DIR}
                      # Tell Breathe where to find the Doxygen output
-                     -Dbreathe_projects.matx=${DOXYGEN_OUTPUT_DIR}/xml
+                     -Dbreathe_projects.MatX=${DOXYGEN_OUTPUT_DIR}/xml
                    ${SPHINX_SOURCE} ${SPHINX_BUILD}
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                    DEPENDS

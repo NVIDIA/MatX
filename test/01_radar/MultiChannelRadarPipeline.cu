@@ -44,7 +44,7 @@ protected:
   {
     assert(numSamples > waveformLength);
 
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitTVGenerator<T>("01_radar", "simple_pipeline",
                            {numPulses, numSamples, waveformLength});
 
@@ -64,7 +64,7 @@ protected:
   index_t waveformLength = 1000;
   index_t numSamplesRnd = 16384;
   index_t numCompressedSamples = numSamples - waveformLength + 1;
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
 };
 
 template <typename TensorType>

@@ -48,7 +48,7 @@ class CorrelationConvolutionTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitTVGenerator<T>("00_transforms", "conv_operators", {a_len, b_len});
 
     // Half precision needs a bit more tolerance when compared to
@@ -60,7 +60,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 1> av{{a_len}};
   tensor_t<T, 1> bv{{b_len}};
   tensor_t<T, 1> cv{{c_len}};

@@ -97,7 +97,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
-  (time = linspace_x(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
+  (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
       .run(stream);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
   (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(stream);
@@ -118,7 +118,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     // DFT Sample Frequencies (rfftfreq)
     (freqs = (1.0 / (static_cast<float>(nfft) * 1 / fs)) *
-               linspace_x(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
+               linspace<0>(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
         .run(stream);
 
     // Create overlapping matrix of segments.
@@ -132,7 +132,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
 
     // Spectral time axis
-    (s_time = linspace_x(s_time_shape, static_cast<float>(nperseg) / 2.0f,
+    (s_time = linspace<0>(s_time_shape, static_cast<float>(nperseg) / 2.0f,
                            static_cast<float>(N - nperseg) / 2.0f + 1) /
                 fs)
         .run(stream);

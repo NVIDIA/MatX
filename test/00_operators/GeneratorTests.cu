@@ -92,23 +92,23 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 {
   MATX_ENTER_HANDLER();
 
-  auto pb = std::make_unique<MatXPybind>();
+  auto pb = std::make_unique<detail::MatXPybind>();
   const index_t win_size = 100;
   pb->InitAndRunTVGenerator<TypeParam>("00_operators", "window", "run",
                                        {win_size});
   std::array<index_t, 1> shape({win_size});
   auto ov = make_tensor<TypeParam>(shape);
 
-  (ov = hanning_x(shape)).run();
+  (ov = hanning<0>(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hanning", 0.01);
 
-  (ov = hamming_x(shape)).run();
+  (ov = hamming<0>(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hamming", 0.01);
 
-  (ov = bartlett_x(shape)).run();
+  (ov = bartlett<0>(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "bartlett", 0.01);
 
-  (ov = blackman_x(shape)).run();
+  (ov = blackman<0>(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "blackman", 0.01);
   MATX_EXIT_HANDLER();
 }
@@ -125,7 +125,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 
         // The half precision headers define competing constructors for
         // double/float, so we need to cast
-        TypeParam val(static_cast<value_promote_t<TypeParam>>(i * 10 + j));
+        TypeParam val(static_cast<detail::value_promote_t<TypeParam>>(i * 10 + j));
         tc(i, j) = val;
       }
     }
@@ -148,7 +148,7 @@ TEST(OperatorTests, Kron)
 {
   MATX_ENTER_HANDLER();
   using dtype = int;
-  auto pb = std::make_unique<MatXPybind>();
+  auto pb = std::make_unique<detail::MatXPybind>();
   pb->InitTVGenerator<dtype>("00_operators", "kron_operator", {});
   pb->RunTVGenerator("run");
 
@@ -175,7 +175,7 @@ TEST(OperatorTests, MeshGrid)
 {
   MATX_ENTER_HANDLER();
   using dtype = int;
-  auto pb = std::make_unique<MatXPybind>();
+  auto pb = std::make_unique<detail::MatXPybind>();
   constexpr index_t xd = 3;
   constexpr index_t yd = 5;
   pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run",
@@ -244,7 +244,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
   index_t count = 100;
   tensor_t<TypeParam, 1> t1{{count}};
 
-  (t1 = range_x(t1.Shape(), 1, 1)).run();
+  (t1 = range<0>(t1.Shape(), 1, 1)).run();
   cudaStreamSynchronize(0);
 
   TypeParam one = 1;
@@ -252,7 +252,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
   TypeParam three = 1;
 
   for (index_t i = 0; i < count; i++) {
-    TypeParam it = static_cast<value_promote_t<TypeParam>>(i);
+    TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), it + one));
   }
 
@@ -261,7 +261,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (it + one) * (it + one)));
     }
   }
@@ -271,7 +271,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(t1(i), ((it + one) * (it + one)) * two));
     }
@@ -282,7 +282,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<value_promote_t<TypeParam>>(i);
+      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), ((it + one) * (it + one)) *
                                                         two * three));
     }
@@ -297,7 +297,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   index_t count = 100;
   tensor_t<TypeParam, 1> t1{{count}};
   auto s = t1.Shape();
-  (t1 = linspace_x(s, (TypeParam)1, (TypeParam)100)).run();
+  (t1 = linspace<0>(s, (TypeParam)1, (TypeParam)100)).run();
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
@@ -343,7 +343,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
   TypeParam start = 1.0f;
   TypeParam stop = 2.0f;
   auto s = t1.Shape();
-  (t1 = logspace_x(s, start, stop)).run();
+  (t1 = logspace<0>(s, start, stop)).run();
 
   cudaStreamSynchronize(0);
 
@@ -378,7 +378,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
   MATX_ENTER_HANDLER();
-  index_t count = 100;
+  index_t count = 10;
 
   tensor_t<TypeParam, 2> t2({count, count});
   tensor_t<TypeParam, 3> t3({count, count, count});
@@ -443,7 +443,7 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 {
   MATX_ENTER_HANDLER();
-  index_t count = 100;
+  index_t count = 10;
   TypeParam c = GenerateData<TypeParam>();
 
   tensor_t<TypeParam, 2> t2({count, count});

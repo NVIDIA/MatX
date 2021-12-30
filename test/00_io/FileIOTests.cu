@@ -44,13 +44,13 @@ template <typename T> class FileIoTests : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_file_io", "csv", "run", {});
   }
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   const std::string small_csv = "../test/00_io/small_csv_comma_nh.csv";
   tensor_t<float, 2> Av{{10, 2}};
 };

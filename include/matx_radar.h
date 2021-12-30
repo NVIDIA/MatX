@@ -42,13 +42,18 @@
 #include "matx_type_utils.h"
 
 namespace matx {
-namespace signal {
-
+namespace signal{
 typedef enum {
   AMGBFUN_CUT_TYPE_2D,
   AMGBFUN_CUT_TYPE_DELAY,
   AMGBFUN_CUT_TYPE_DOPPLER,
 } AMBGFunCutType_t;
+};
+};
+
+namespace matx {
+namespace detail {
+
 
 template <class O, class I1, class I2>
 class newYNorm : public BaseOp<newYNorm<O, I1, I2>> {
@@ -155,7 +160,7 @@ public:
 template <typename AMFTensor, typename XTensor>
 void InternalAmbgFun(AMFTensor &amf, XTensor &x,
                      std::optional<XTensor> &y,
-                     [[maybe_unused]] double fs, AMBGFunCutType_t cut,
+                     [[maybe_unused]] double fs, ::matx::signal::AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
   constexpr int RANK = XTensor::Rank();
@@ -177,7 +182,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   auto x_normdiv_v = make_tensor<T1>(x_normdiv, x.Shape());
   auto x_norm_v = make_tensor<float>(x_norm);
 
-  reduce(x_norm_v, norm(x), reduceOpSum<float>(), 0);
+  matx::reduce(x_norm_v, norm(x), reduceOpSum<float>(), 0);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
   (x_normdiv_v = x / x_norm_v).run(stream);
 
@@ -193,7 +198,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     y_normdiv_v.Reset(y_normdiv, ry.Shape());
     auto y_norm_v = make_tensor<float>(y_norm);
 
-    reduce(y_norm_v, norm(ry), reduceOpSum<float>(), 0);
+    matx::reduce(y_norm_v, norm(ry), reduceOpSum<float>(), 0);
     (y_normdiv_v = ry / y_norm_v).run(stream);
   }
 
@@ -202,7 +207,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
       powf(2.0, static_cast<float>(std::ceil(std::log2(len_seq - 1)))));
   index_t xlen = x_normdiv_v.Size(RANK - 1);
 
-  if (cut == AMGBFUN_CUT_TYPE_2D) {
+  if (cut == ::matx::signal::AMGBFUN_CUT_TYPE_2D) {
     T1 *new_ynorm;
     matxAlloc(reinterpret_cast<void **>(&new_ynorm),
               sizeof(T1) * (len_seq - 1) * xlen, MATX_ASYNC_DEVICE_MEMORY,
@@ -235,7 +240,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     (amf_tmp_v = (float)nfreq * abs(fftshift1D(fullfft))).run(stream);
     matx::copy(amf, amf_tmp_v.RealView(), stream);
   }
-  else if (cut == AMGBFUN_CUT_TYPE_DELAY) {
+  else if (cut == ::matx::signal::AMGBFUN_CUT_TYPE_DELAY) {
     T1 *fft_data_x, *fft_data_y, *amf_tmp;
     matxAlloc(reinterpret_cast<void **>(&fft_data_x),
               sizeof(*fft_data_x) * nfreq, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -271,7 +276,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
     matx::copy(amf, amfv.RealView(), stream);
   }
-  else if (cut == AMGBFUN_CUT_TYPE_DOPPLER) {
+  else if (cut == ::matx::signal::AMGBFUN_CUT_TYPE_DOPPLER) {
     T1 *fft_data_x, *fft_data_y, *amf_tmp;
     matxAlloc(reinterpret_cast<void **>(&fft_data_x),
               sizeof(*fft_data_x) * (len_seq - 1), MATX_ASYNC_DEVICE_MEMORY,
@@ -310,12 +315,13 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
     matx::copy(amf, amfv.RealView(), stream);
   }
-
-  // if (y) {
-  //   matxFree(y_normdiv);
-  //   matxFree(y_norm);
-  // }
 }
+
+}
+}
+
+namespace matx {
+namespace signal {
 
 /**
  * Cross-ambiguity function
@@ -356,7 +362,7 @@ inline void ambgfun(AMFTensor &amf, XTensor &x,
                     YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0, cudaStream_t stream = 0)
 {
-  InternalAmbgFun(amf, x, std::make_optional(y), fs, cut, cut_val, stream);
+  detail::InternalAmbgFun(amf, x, std::make_optional(y), fs, cut, cut_val, stream);
 }
 
 /**
@@ -398,7 +404,9 @@ inline void ambgfun(AMFTensor &amf, XTensor &x,
   static_assert(AMFTensor::Rank() == 2, "Output tensor of ambgfun must be 2D");
   
   std::optional<XTensor> nil = std::nullopt;
-  InternalAmbgFun(amf, x, nil, fs, cut, cut_val, stream);
+  ::matx::detail::InternalAmbgFun(amf, x, nil, fs, cut, cut_val, stream);
 }
+
+
 }; // namespace signal
 }; // namespace matx

@@ -49,22 +49,45 @@ namespace matx {
  *
  */
 template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
-  using value_type = T;
+  using value_type = T; ///< Type trait to get type
 
+  /**
+   * @brief Constructor a half complex object with defaults of zero
+   * 
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex() : x(0.0f), y(0.0f) {}
 
+  /**
+   * @brief Copy constructor from a complex float
+   * 
+   * @param x_ Object to copy from
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
   matxHalfComplex(const cuda::std::complex<float> &x_) noexcept
       : x(x_.real()), y(x_.imag())
   {
   }
 
+  /**
+   * @brief Copy constructor from scalar value. Sets real type to scalar and imaginary to zero
+   * 
+   * @tparam T2 Type of scalar
+   * @param x_ Value of scalar
+   */
   template <typename T2>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_) noexcept
       : x(static_cast<float>(x_)), y(0.0f)
   {
   }
 
+  /**
+   * @brief Construct a half complex from two scalars
+   * 
+   * @tparam T2 Real scalar type
+   * @tparam T3 Imaginary scalar type
+   * @param x_ Real value
+   * @param y_ Imaginary value
+   */
   template <typename T2, typename T3>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_,
                                                       const T3 &y_) noexcept
@@ -72,33 +95,69 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
   {
   }
 
+  /**
+   * @brief Default destructor
+   * 
+   */
   __MATX_INLINE__ ~matxHalfComplex() = default;
 
+  /**
+   * @brief Cast operator to cuCOmplex
+   * 
+   * @return cuComplex value
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator cuComplex()
   {
     return make_cuFloatComplex(x, y);
   }
 
+  /**
+   * @brief cuda::std::complex<float> cast operator
+   * 
+   * @return cuda::std::complex<float> value
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator cuda::std::complex<float>()
   {
     return {x, y};
   }
 
+  /**
+   * @brief cuda::std::complex<double> cast operator
+   * 
+   * @return cuda::std::complex<double> value
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator cuda::std::complex<double>()
   {
     return {x, y};
   }
 
+  /**
+   * @brief std::complex<float> cast operator
+   * 
+   * @return std::complex<float> value
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator std::complex<float>()
   {
     return {x, y};
   }
 
+  /**
+   * @brief std::complex<double> cast operator
+   * 
+   * @return std::complex<double> value
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator std::complex<double>()
   {
     return {x, y};
   }
 
+  /**
+   * @brief Copy assignment operator
+   * 
+   * @tparam X Type of complex to copy from
+   * @param rhs Value to copy from
+   * @return Reference to copied object
+   */
   template <typename X>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator=(const matxHalfComplex<X> &rhs)
@@ -108,6 +167,13 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     return *this;
   }
 
+  /**
+   * @brief Increment and assign operator
+   * 
+   * @tparam X Type of source
+   * @param rhs Value of source
+   * @return Reference to object
+   */
   template <typename X>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator+=(const matxHalfComplex<X> &rhs)
@@ -116,6 +182,13 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     return *this;
   }
 
+  /**
+   * @brief Decrement and assign operator
+   * 
+   * @tparam X Type of source
+   * @param rhs Value of source
+   * @return Reference to object
+   */
   template <typename X>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator-=(const matxHalfComplex<X> &rhs)
@@ -124,6 +197,13 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     return *this;
   }
 
+  /**
+   * @brief Multiply and assign operator
+   * 
+   * @tparam X Type of source
+   * @param rhs Value of source
+   * @return Reference to object
+   */
   template <typename X>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator*=(const matxHalfComplex<X> &rhs)
@@ -132,6 +212,13 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     return *this;
   }
 
+  /**
+   * @brief Divide and assign operator
+   * 
+   * @tparam X Type of source
+   * @param rhs Value of source
+   * @return Reference to object
+   */
   template <typename X>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator/=(const matxHalfComplex<X> &rhs)
@@ -140,27 +227,70 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     return *this;
   }
 
+  /**
+   * @brief Increment and assign operator for floats
+   * 
+   * @param f Value of source
+   * @return Reference to object
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator+=(float f) const
   {
     return {x + f, y + f};
   }
 
+  /**
+   * @brief Decrement and assign operator for floats
+   * 
+   * @param f Value of source
+   * @return Reference to object
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator-=(float f) const
   {
     return {x + f, y + f};
   }
 
+  /**
+   * @brief Set real part
+   * 
+   * @param r Value to set 
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ void real(T r) { x = r; }
+
+  /**
+   * @brief Set imaginary part
+   * 
+   * @param i Value to set 
+   */  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ void imag(T i) { y = i; }
+
+  /**
+   * @brief Get real part
+   * 
+   * @return Real part
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr T real() const { return x; }
+
+  /**
+   * @brief Get imaginary part
+   * 
+   * @return Imaginary part
+   */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr T imag() const { return y; }
 
-  T x;
-  T y;
+  T x; ///< Real part
+  T y; ///< Imaginary part
 };
 
+/**
+ * @brief Addition operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of addition 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator+(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -169,6 +299,14 @@ operator+(const matxHalfComplex<T> &lhs, const T &rhs)
   return lhs + rhs;
 }
 
+/**
+ * @brief Addition operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of addition 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator+(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -177,6 +315,14 @@ operator+(const T &lhs, const matxHalfComplex<T> &rhs)
   return lhs + rhs;
 }
 
+/**
+ * @brief Subtraction operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -185,6 +331,14 @@ operator-(const matxHalfComplex<T> &lhs, const T &rhs)
   return lhs - rhs;
 }
 
+/**
+ * @brief Subtraction operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -193,6 +347,14 @@ operator-(const T &lhs, const matxHalfComplex<T> &rhs)
   return lhs - rhs;
 }
 
+/**
+ * @brief Multiply operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator*(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -201,6 +363,15 @@ operator*(const matxHalfComplex<T> &lhs, const T &rhs)
   return lhs * rhs;
 }
 
+
+/**
+ * @brief Multiply operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator*(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -209,6 +380,14 @@ operator*(const T &lhs, const matxHalfComplex<T> &rhs)
   return lhs * rhs;
 }
 
+/**
+ * @brief Multiply operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T1, typename T2>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T2>
 operator*(const T1 &lhs, const matxHalfComplex<T2> &rhs)
@@ -217,6 +396,14 @@ operator*(const T1 &lhs, const matxHalfComplex<T2> &rhs)
   return lhs * rhs;
 }
 
+/**
+ * @brief Multiply operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T1, typename T2>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T1>
 operator*(const matxHalfComplex<T1> &lhs, const T2 &rhs)
@@ -225,6 +412,14 @@ operator*(const matxHalfComplex<T1> &lhs, const T2 &rhs)
   return lhs * rhs;
 }
 
+/**
+ * @brief Division operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator/(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -233,6 +428,14 @@ operator/(const matxHalfComplex<T> &lhs, const T &rhs)
   return lhs / rhs;
 }
 
+/**
+ * @brief Division operator
+ * 
+ * @tparam T RHS type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator/(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -241,6 +444,14 @@ operator/(const T &lhs, const matxHalfComplex<T> &rhs)
   return lhs / rhs;
 }
 
+
+/**
+ * @brief Negation operator
+ * 
+ * @tparam T Type of complex
+ * @param l Value to negate
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const matxHalfComplex<T> &l)
@@ -248,6 +459,14 @@ operator-(const matxHalfComplex<T> &l)
   return {-l.x, -l.y};
 }
 
+/**
+ * @brief Equality operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator==(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -255,6 +474,14 @@ operator==(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
   return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
+/**
+ * @brief Equality operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator==(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -263,6 +490,14 @@ operator==(const matxHalfComplex<T> &lhs, const T &rhs)
   return lhs == tmp;
 }
 
+/**
+ * @brief Equality operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator==(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -271,6 +506,14 @@ operator==(const T &lhs, const matxHalfComplex<T> &rhs)
   return lhs == tmp;
 }
 
+/**
+ * @brief Not equals operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator!=(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -278,6 +521,14 @@ operator!=(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
   return !(lhs == rhs);
 }
 
+/**
+ * @brief Not equals operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator!=(const matxHalfComplex<T> &lhs, const T &rhs)
@@ -286,6 +537,14 @@ operator!=(const matxHalfComplex<T> &lhs, const T &rhs)
   return !(lhs == tmp);
 }
 
+/**
+ * @brief Not equals operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator!=(const T &lhs, const matxHalfComplex<T> &rhs)
@@ -293,6 +552,7 @@ operator!=(const T &lhs, const matxHalfComplex<T> &rhs)
   matxHalfComplex<T> tmp{lhs};
   return !(lhs == tmp);
 }
+
 
 template <typename T>
 bool operator>(const matxHalfComplex<T> &lhs,
@@ -307,6 +567,15 @@ template <typename T>
 bool operator<=(const matxHalfComplex<T> &lhs,
                 const matxHalfComplex<T> &rhs) = delete;
 
+
+/**
+ * @brief Addition operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator+(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -314,6 +583,14 @@ operator+(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
   return {lhs.x + rhs.x, lhs.y + rhs.y};
 }
 
+/**
+ * @brief Subtraction operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -321,6 +598,15 @@ operator-(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
   return {lhs.x - rhs.x, lhs.y - rhs.y};
 }
 
+
+/**
+ * @brief Multiplication operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator*(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -328,6 +614,14 @@ operator*(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
   return {lhs.x * rhs.x - lhs.y * rhs.y, lhs.x * rhs.y + lhs.y * rhs.x};
 }
 
+/**
+ * @brief Division operator
+ * 
+ * @tparam T Underlying type
+ * @param lhs LHS value
+ * @param rhs RHS value
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator/(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
@@ -356,6 +650,13 @@ operator/(const matxHalfComplex<T> &lhs, const matxHalfComplex<T> &rhs)
 #endif
 }
 
+/**
+ * @brief Conjugate operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value to conjugate
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 conj(const matxHalfComplex<T> &x)
@@ -363,6 +664,13 @@ conj(const matxHalfComplex<T> &x)
   return {x.real(), -static_cast<float>(x.imag())};
 }
 
+/**
+ * @brief Sbsolute value operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T abs(const matxHalfComplex<T> &x)
 {
@@ -374,6 +682,13 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T abs(const matxHalfComplex<T> &x)
 #endif
 }
 
+/**
+ * @brief Argument operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T arg(const matxHalfComplex<T> &x)
 {
@@ -381,6 +696,13 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T arg(const matxHalfComplex<T> &x)
                                          static_cast<float>(x.imag())));
 }
 
+/**
+ * @brief Arctangent operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T atan2(const matxHalfComplex<T> &x)
 {
@@ -388,6 +710,14 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T atan2(const matxHalfComplex<T> &
                                          static_cast<float>(x.real())));
 }
 
+/**
+ * @brief Arctangent operator
+ * 
+ * @tparam T Underlying type
+ * @param x Denominator input
+ * @param y Numerator input
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T atan2(const T &x, const T &y)
 {
@@ -395,6 +725,13 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T atan2(const T &x, const T &y)
       cuda::std::atan2(static_cast<float>(y), static_cast<float>(x)));
 }
 
+/**
+ * @brief Norm operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T norm(const matxHalfComplex<T> &x)
 {
@@ -406,6 +743,13 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T norm(const matxHalfComplex<T> &x
   return x.real() * x.real() + x.imag() * x.imag();
 }
 
+/**
+ * @brief Natural log operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 log(const matxHalfComplex<T> &x)
@@ -413,6 +757,14 @@ log(const matxHalfComplex<T> &x)
   return {log(abs(x)), arg(x)};
 }
 
+
+/**
+ * @brief Log base 10 operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 log10(const matxHalfComplex<T> &x)
@@ -420,6 +772,13 @@ log10(const matxHalfComplex<T> &x)
   return log(x) / log(static_cast<T>(10.0f));
 }
 
+/**
+ * @brief Exponential operator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 exp(const matxHalfComplex<T> &x)
@@ -430,6 +789,14 @@ exp(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Power perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @param y value of exponent
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 pow(const matxHalfComplex<T> &x, const matxHalfComplex<T> &y)
@@ -442,6 +809,14 @@ pow(const matxHalfComplex<T> &x, const matxHalfComplex<T> &y)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Power perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @param y value of exponent
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 pow(const matxHalfComplex<T> &x, const T &y)
@@ -452,6 +827,14 @@ pow(const matxHalfComplex<T> &x, const T &y)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Power perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @param y value of exponent
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 pow(const T &x, const matxHalfComplex<T> &y)
@@ -462,7 +845,13 @@ pow(const T &x, const matxHalfComplex<T> &y)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
-// Trig functions
+/**
+ * @brief Sine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 sin(const matxHalfComplex<T> &x)
@@ -470,6 +859,13 @@ sin(const matxHalfComplex<T> &x)
   return sinh(matxHalfComplex<T>{-static_cast<float>(x.imag()), x.real()});
 }
 
+/**
+ * @brief Cosine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 cos(const matxHalfComplex<T> &x)
@@ -477,6 +873,13 @@ cos(const matxHalfComplex<T> &x)
   return cosh(matxHalfComplex<T>{-static_cast<float>(x.imag()), x.real()});
 }
 
+/**
+ * @brief Tangent perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 tan(const matxHalfComplex<T> &x)
@@ -484,6 +887,13 @@ tan(const matxHalfComplex<T> &x)
   return tanh(matxHalfComplex<T>{-static_cast<float>(x.imag()), x.real()});
 }
 
+/**
+ * @brief Hyperbolic arcsine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 asinh(const matxHalfComplex<T> &x)
@@ -494,6 +904,13 @@ asinh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Hyperbolic arccosine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 acosh(const matxHalfComplex<T> &x)
@@ -504,6 +921,13 @@ acosh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Hyperbolic arctangent perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 atanh(const matxHalfComplex<T> &x)
@@ -514,6 +938,13 @@ atanh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Arcsin perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 asin(const matxHalfComplex<T> &x)
@@ -524,6 +955,13 @@ asin(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Arccos perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 acos(const matxHalfComplex<T> &x)
@@ -534,6 +972,13 @@ acos(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Arctangent perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 atan(const matxHalfComplex<T> &x)
@@ -544,6 +989,13 @@ atan(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Hyperbolic sine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 sinh(const matxHalfComplex<T> &x)
@@ -554,6 +1006,13 @@ sinh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Hyperbolic cosine perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 cosh(const matxHalfComplex<T> &x)
@@ -564,6 +1023,13 @@ cosh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
+/**
+ * @brief Hyperbolic tangent perator
+ * 
+ * @tparam T Underlying type
+ * @param x Value of input
+ * @return Result of operation 
+ */
 template <class T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 tanh(const matxHalfComplex<T> &x)
@@ -574,7 +1040,7 @@ tanh(const matxHalfComplex<T> &x)
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 
-using matxFp16Complex = matxHalfComplex<matxFp16>;
-using matxBf16Complex = matxHalfComplex<matxBf16>;
+using matxFp16Complex = matxHalfComplex<matxFp16>; ///< Alias for a MatX fp16 complex wrapper
+using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 complex wrapper
 
 }; // namespace matx

@@ -59,18 +59,13 @@ Binary Operators
 
 Advanced Operators
 ------------------
-.. doxygenclass:: matx::set
-.. doxygenfunction:: copy
-.. doxygenclass:: matx::CommaOp
-.. doxygenclass:: matx::Concatenate
+
 .. doxygenclass:: matx::IF 
 .. doxygenclass:: matx::IFELSE
-.. doxygenclass:: matx::ReverseOp
 .. doxygenfunction:: reverseX
 .. doxygenfunction:: reverseY
 .. doxygenfunction:: reverseZ
 .. doxygenfunction:: reverseW
-.. doxygenclass:: matx::ShiftOp
 .. doxygenfunction:: shift0
 .. doxygenfunction:: shift1
 .. doxygenfunction:: shift2

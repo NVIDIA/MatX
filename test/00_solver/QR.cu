@@ -46,7 +46,7 @@ protected:
   using dtype = float;
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_solver", "qr", "run", {m, n});
     pb->NumpyToTensorView(Av, "A");
     pb->NumpyToTensorView(Qv, "Q");
@@ -55,7 +55,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Av{{m, n}};
   tensor_t<T, 2> Atv{{n, m}};
   tensor_t<T, 1> TauV{{std::min(m, n)}};

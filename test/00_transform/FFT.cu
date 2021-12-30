@@ -44,7 +44,7 @@ template <typename T> class FFTTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
 
     // Half precision needs a bit more tolerance when compared to fp32
     if constexpr (is_complex_half_v<T>) {
@@ -54,7 +54,7 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   float thresh = 0.01f;
 };
 

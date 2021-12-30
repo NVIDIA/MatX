@@ -34,14 +34,13 @@
 
 #include "cublas_v2.h"
 #include "cusolverDn.h"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 #include <cstdio>
 #include <numeric>
 
 namespace matx {
-
+namespace detail {
 /**
  * Dense solver base class that all dense solver types inherit common methods
  * and structures from. The dense solvers used in the 64-bit cuSolver API all
@@ -298,69 +297,6 @@ struct DnCholParamsKeyEq {
 static matxCache_t<DnCholParams_t, DnCholParamsKeyHash, DnCholParamsKeyEq>
     dnchol_cache;
 
-/**
- * Perform a Cholesky decomposition using a cached plan
- *
- * See documentation of matxDnCholSolverPlan_t for a description of how the
- * algorithm works. This function provides a simple interface to the cuSolver
- * library by deducing all parameters needed to perform a Cholesky decomposition
- * from only the matrix A. The input and output parameters may be the same
- * tensor. In that case, the input is destroyed and the output is stored
- * in-place.
- *
- * @tparam T1
- *   Data type of matrix A
- * @tparam RANK
- *   Rank of matrix A
- *
- * @param out
- *   Output tensor
- * @param a
- *   Input tensor
- * @param stream
- *   CUDA stream
- * @param uplo
- *   Part of matrix to fill
- */
-template <typename OutputTensor, typename ATensor>
-void chol(OutputTensor &out, const ATensor &a,
-          cudaStream_t stream = 0,
-          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
-{
-  using T1 = typename OutputTensor::scalar_type;
-
-  /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
-  */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
-
-  // Get parameters required by these tensors
-  auto params = matxDnCholSolverPlan_t<OutputTensor, ATensor>::GetCholParams(tv, uplo);
-  params.uplo = uplo;
-
-  // Get cache or new inverse plan if it doesn't exist
-  auto ret = dnchol_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new matxDnCholSolverPlan_t<OutputTensor, ATensor>{tv, uplo};
-    dnchol_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tv, tv, stream, uplo);
-  }
-  else {
-    auto chol_type =
-        static_cast<matxDnCholSolverPlan_t<OutputTensor, ATensor> *>(ret.value());
-    chol_type->Exec(tv, tv, stream, uplo);
-  }
-
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  matx::copy(out, tv.PermuteMatrix(), stream);
-}
 
 /***************************************** LU FACTORIZATION
  * *********************************************/
@@ -526,112 +462,6 @@ struct DnLUParamsKeyEq {
 // Static caches of LU handles
 static matxCache_t<DnLUParams_t, DnLUParamsKeyHash, DnLUParamsKeyEq> dnlu_cache;
 
-/**
- * Perform a LU decomposition using a cached plan
- *
- * See documentation of matxDnLUSolverPlan_t for a description of how the
- * algorithm works. This function provides a simple interface to the cuSolver
- * library by deducing all parameters needed to perform an LU decomposition from
- * only the matrix A. The input and output parameters may be the same tensor. In
- * that case, the input is destroyed and the output is stored in-place.
- *
- * @tparam T1
- *   Data type of matrix A
- * @tparam RANK
- *   Rank of matrix A
- *
- * @param out
- *   Output tensor view
- * @param piv
- *   Output of pivot indices
- * @param a
- *   Input matrix A
- * @param stream
- *   CUDA stream
- */
-template <typename OutputTensor, typename PivotTensor, typename ATensor>
-void lu(OutputTensor &out, PivotTensor &piv,
-        const ATensor &a, const cudaStream_t stream = 0)
-{
-  constexpr int RANK = OutputTensor::Rank();
-  using T1 = typename OutputTensor::scalar_type;
-
-  /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
-  */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
-  auto tvt = tv.PermuteMatrix();
-
-  // Get parameters required by these tensors
-  auto params = matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>::GetLUParams(piv, tvt);
-
-  // Get cache or new LU plan if it doesn't exist
-  auto ret = dnlu_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>{piv, tvt};
-
-    dnlu_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tvt, piv, tvt, stream);
-  }
-  else {
-    auto lu_type = static_cast<matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor> *>(ret.value());
-    lu_type->Exec(tvt, piv, tvt, stream);
-  }
-
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  matx::copy(out, tv.PermuteMatrix(), stream);
-}
-
-/**
- * Compute the determinant of a matrix
- *
- * Computes the terminant of a matrix by first computing the LU composition,
- * then reduces the product of the diagonal elements of U. The input and output
- * parameters may be the same tensor. In that case, the input is destroyed and
- * the output is stored in-place.
- *
- * @tparam T1
- *   Data type of matrix A
- * @tparam RANK
- *   Rank of matrix A
- *
- * @param out
- *   Output tensor view
- * @param a
- *   Input matrix A
- * @param stream
- *   CUDA stream
- */
-template <typename OutputTensor, typename InputTensor>
-void det(OutputTensor &out, const InputTensor &a,
-         const cudaStream_t stream = 0)
-{
-  static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
-  constexpr int RANK = InputTensor::Rank();
-
-  // Get parameters required by these tensors
-  tensorShape_t<RANK - 1> s;
-
-  // Set batching dimensions of piv
-  for (int i = 0; i < RANK - 2; i++) {
-    s.SetSize(i, a.Size(i));
-  }
-
-  s.SetSize(RANK - 2, std::min(a.Size(RANK - 1), a.Size(RANK - 2)));
-
-  auto piv = make_tensor<int64_t>(s);
-  auto ac = make_tensor<typename OutputTensor::scalar_type>(a.Shape());
-
-  lu(ac, piv, a, stream);
-  prod(out, diag(ac), stream);
-}
 
 /***************************************** QR FACTORIZATION
  * *********************************************/
@@ -805,68 +635,6 @@ struct DnQRParamsKeyEq {
 // Static caches of QR handles
 static matxCache_t<DnQRParams_t, DnQRParamsKeyHash, DnQRParamsKeyEq> dnqr_cache;
 
-/**
- * Perform a QR decomposition using a cached plan
- *
- * See documentation of matxDnQRSolverPlan_t for a description of how the
- * algorithm works. This function provides a simple interface to the cuSolver
- * library by deducing all parameters needed to perform a QR decomposition from
- * only the matrix A. The input and output parameters may be the same tensor. In
- * that case, the input is destroyed and the output is stored in-place.
- *
- * @tparam T1
- *   Data type of matrix A
- * @tparam RANK
- *   Rank of matrix A
- *
- * @param out
- *   Output tensor view
- * @param tau
- *   Output of reflection scalar values
- * @param a
- *   Input tensor A
- * @param stream
- *   CUDA stream
- */
-template <typename OutTensor, typename TauTensor, typename ATensor>
-void qr(OutTensor &out, TauTensor &tau,
-        const ATensor &a, cudaStream_t stream = 0)
-{
-  using T1 = typename OutTensor::scalar_type;
-  constexpr int RANK = OutTensor::Rank();
-
-  /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
-  */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
-  auto tvt = tv.PermuteMatrix();
-
-  // Get parameters required by these tensors
-  auto params = matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>::GetQRParams(tau, tvt);
-
-  // Get cache or new QR plan if it doesn't exist
-  auto ret = dnqr_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>{tau, tvt};
-
-    dnqr_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tvt, tau, tvt, stream);
-  }
-  else {
-    auto qr_type = static_cast<matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor> *>(ret.value());
-    qr_type->Exec(tvt, tau, tvt, stream);
-  }
-
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  matx::copy(out, tv.PermuteMatrix(), stream);
-}
 
 /********************************************** SVD
  * *********************************************/
@@ -1051,7 +819,7 @@ private:
   std::vector<T1 *> batch_s_ptrs;
   std::vector<T1 *> batch_v_ptrs;
   std::vector<T1 *> batch_u_ptrs;
-  tensor_t<T1, RANK> *scratch = nullptr;
+  matx::tensor_t<T1, RANK> *scratch = nullptr;
   DnSVDParams_t params;
 };
 
@@ -1083,78 +851,6 @@ struct DnSVDParamsKeyEq {
 static matxCache_t<DnSVDParams_t, DnSVDParamsKeyHash, DnSVDParamsKeyEq>
     dnsvd_cache;
 
-/**
- * Perform a SVD decomposition using a cached plan
- *
- * See documentation of matxDnSVDSolverPlan_t for a description of how the
- * algorithm works. This function provides a simple interface to the cuSolver
- * library by deducing all parameters needed to perform a SVD decomposition from
- * only the matrix A.
- *
- * @tparam T1
- *   Data type of matrix A
- * @tparam RANK
- *   Rank of matrix A
- *
- * @param u
- *   U matrix output
- * @param s
- *   Sigma matrix output
- * @param v
- *   V matrix output
- * @param a
- *   Input matrix A
- * @param stream
- *   CUDA stream
- * @param jobu
- *   Specifies options for computing all or part of the matrix U: = 'A'. See
- * cuSolver documentation for more info
- * @param jobvt
- *   specifies options for computing all or part of the matrix V**T. See
- * cuSolver documentation for more info
- *
- */
-template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
-void svd(UTensor &u, STensor &s,
-         VTensor &v, const ATensor &a,
-         cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
-{
-  using T1 = typename ATensor::scalar_type;
-  using T2 = typename UTensor::scalar_type;
-  using T3 = typename STensor::scalar_type;
-  using T4 = typename VTensor::scalar_type;
-  constexpr int RANK = UTensor::Rank();
-
-  /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
-  */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
-  auto tvt = tv.PermuteMatrix();
-
-  // Get parameters required by these tensors
-  auto params = matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor>::GetSVDParams(
-      u, s, v, tvt, jobu, jobvt);
-
-  // Get cache or new QR plan if it doesn't exist
-  auto ret = dnsvd_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new matxDnSVDSolverPlan_t{u, s, v, tvt, jobu, jobvt};
-
-    dnsvd_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(u, s, v, tvt, jobu, jobvt, stream);
-  }
-  else {
-    auto svd_type =
-        static_cast<matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor> *>(ret.value());
-    svd_type->Exec(u, s, v, tvt, jobu, jobvt, stream);
-  }
-}
 
 /*************************************** Eigenvalues and eigenvectors
  * *************************************/
@@ -1345,6 +1041,318 @@ struct DnEigParamsKeyEq {
 // Static caches of Eig handles
 static matxCache_t<DnEigParams_t, DnEigParamsKeyHash, DnEigParamsKeyEq>
     dneig_cache;
+}
+
+/**
+ * Perform a Cholesky decomposition using a cached plan
+ *
+ * See documentation of matxDnCholSolverPlan_t for a description of how the
+ * algorithm works. This function provides a simple interface to the cuSolver
+ * library by deducing all parameters needed to perform a Cholesky decomposition
+ * from only the matrix A. The input and output parameters may be the same
+ * tensor. In that case, the input is destroyed and the output is stored
+ * in-place.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param out
+ *   Output tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ * @param uplo
+ *   Part of matrix to fill
+ */
+template <typename OutputTensor, typename ATensor>
+void chol(OutputTensor &out, const ATensor &a,
+          cudaStream_t stream = 0,
+          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
+{
+  using T1 = typename OutputTensor::scalar_type;
+
+  /* Temporary WAR
+     cuSolver doesn't support row-major layouts. Since we want to make the
+     library appear as though everything is row-major, we take a performance hit
+     to transpose in and out of the function. Eventually this may be fixed in
+     cuSolver.
+  */
+  T1 *tp;
+  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a, stream);
+
+  // Get parameters required by these tensors
+  auto params = detail::matxDnCholSolverPlan_t<OutputTensor, ATensor>::GetCholParams(tv, uplo);
+  params.uplo = uplo;
+
+  // Get cache or new inverse plan if it doesn't exist
+  auto ret = detail::dnchol_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxDnCholSolverPlan_t<OutputTensor, ATensor>{tv, uplo};
+    detail::dnchol_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->Exec(tv, tv, stream, uplo);
+  }
+  else {
+    auto chol_type =
+        static_cast<detail::matxDnCholSolverPlan_t<OutputTensor, ATensor> *>(ret.value());
+    chol_type->Exec(tv, tv, stream, uplo);
+  }
+
+  /* Temporary WAR
+   * Copy and free async buffer for transpose */
+  matx::copy(out, tv.PermuteMatrix(), stream);
+}
+
+
+/**
+ * Perform a LU decomposition using a cached plan
+ *
+ * See documentation of matxDnLUSolverPlan_t for a description of how the
+ * algorithm works. This function provides a simple interface to the cuSolver
+ * library by deducing all parameters needed to perform an LU decomposition from
+ * only the matrix A. The input and output parameters may be the same tensor. In
+ * that case, the input is destroyed and the output is stored in-place.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param out
+ *   Output tensor view
+ * @param piv
+ *   Output of pivot indices
+ * @param a
+ *   Input matrix A
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename PivotTensor, typename ATensor>
+void lu(OutputTensor &out, PivotTensor &piv,
+        const ATensor &a, const cudaStream_t stream = 0)
+{
+  constexpr int RANK = OutputTensor::Rank();
+  using T1 = typename OutputTensor::scalar_type;
+
+  /* Temporary WAR
+     cuSolver doesn't support row-major layouts. Since we want to make the
+     library appear as though everything is row-major, we take a performance hit
+     to transpose in and out of the function. Eventually this may be fixed in
+     cuSolver.
+  */
+  T1 *tp;
+  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a, stream);
+  auto tvt = tv.PermuteMatrix();
+
+  // Get parameters required by these tensors
+  auto params = detail::matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>::GetLUParams(piv, tvt);
+
+  // Get cache or new LU plan if it doesn't exist
+  auto ret = detail::dnlu_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor>{piv, tvt};
+
+    detail::dnlu_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->Exec(tvt, piv, tvt, stream);
+  }
+  else {
+    auto lu_type = static_cast<detail::matxDnLUSolverPlan_t<OutputTensor, PivotTensor, ATensor> *>(ret.value());
+    lu_type->Exec(tvt, piv, tvt, stream);
+  }
+
+  /* Temporary WAR
+   * Copy and free async buffer for transpose */
+  matx::copy(out, tv.PermuteMatrix(), stream);
+}
+
+
+/**
+ * Compute the determinant of a matrix
+ *
+ * Computes the terminant of a matrix by first computing the LU composition,
+ * then reduces the product of the diagonal elements of U. The input and output
+ * parameters may be the same tensor. In that case, the input is destroyed and
+ * the output is stored in-place.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param out
+ *   Output tensor view
+ * @param a
+ *   Input matrix A
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename InputTensor>
+void det(OutputTensor &out, const InputTensor &a,
+         const cudaStream_t stream = 0)
+{
+  static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
+  constexpr int RANK = InputTensor::Rank();
+
+  // Get parameters required by these tensors
+  tensorShape_t<RANK - 1> s;
+
+  // Set batching dimensions of piv
+  for (int i = 0; i < RANK - 2; i++) {
+    s.SetSize(i, a.Size(i));
+  }
+
+  s.SetSize(RANK - 2, std::min(a.Size(RANK - 1), a.Size(RANK - 2)));
+
+  auto piv = make_tensor<int64_t>(s);
+  auto ac = make_tensor<typename OutputTensor::scalar_type>(a.Shape());
+
+  lu(ac, piv, a, stream);
+  prod(out, diag(ac), stream);
+}
+
+
+/**
+ * Perform a QR decomposition using a cached plan
+ *
+ * See documentation of matxDnQRSolverPlan_t for a description of how the
+ * algorithm works. This function provides a simple interface to the cuSolver
+ * library by deducing all parameters needed to perform a QR decomposition from
+ * only the matrix A. The input and output parameters may be the same tensor. In
+ * that case, the input is destroyed and the output is stored in-place.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param out
+ *   Output tensor view
+ * @param tau
+ *   Output of reflection scalar values
+ * @param a
+ *   Input tensor A
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutTensor, typename TauTensor, typename ATensor>
+void qr(OutTensor &out, TauTensor &tau,
+        const ATensor &a, cudaStream_t stream = 0)
+{
+  using T1 = typename OutTensor::scalar_type;
+  constexpr int RANK = OutTensor::Rank();
+
+  /* Temporary WAR
+     cuSolver doesn't support row-major layouts. Since we want to make the
+     library appear as though everything is row-major, we take a performance hit
+     to transpose in and out of the function. Eventually this may be fixed in
+     cuSolver.
+  */
+  T1 *tp;
+  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a, stream);
+  auto tvt = tv.PermuteMatrix();
+
+  // Get parameters required by these tensors
+  auto params = detail::matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>::GetQRParams(tau, tvt);
+
+  // Get cache or new QR plan if it doesn't exist
+  auto ret = detail::dnqr_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor>{tau, tvt};
+
+    detail::dnqr_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->Exec(tvt, tau, tvt, stream);
+  }
+  else {
+    auto qr_type = static_cast<detail::matxDnQRSolverPlan_t<OutTensor, TauTensor, ATensor> *>(ret.value());
+    qr_type->Exec(tvt, tau, tvt, stream);
+  }
+
+  /* Temporary WAR
+   * Copy and free async buffer for transpose */
+  matx::copy(out, tv.PermuteMatrix(), stream);
+}
+
+
+/**
+ * Perform a SVD decomposition using a cached plan
+ *
+ * See documentation of matxDnSVDSolverPlan_t for a description of how the
+ * algorithm works. This function provides a simple interface to the cuSolver
+ * library by deducing all parameters needed to perform a SVD decomposition from
+ * only the matrix A.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param u
+ *   U matrix output
+ * @param s
+ *   Sigma matrix output
+ * @param v
+ *   V matrix output
+ * @param a
+ *   Input matrix A
+ * @param stream
+ *   CUDA stream
+ * @param jobu
+ *   Specifies options for computing all or part of the matrix U: = 'A'. See
+ * cuSolver documentation for more info
+ * @param jobvt
+ *   specifies options for computing all or part of the matrix V**T. See
+ * cuSolver documentation for more info
+ *
+ */
+template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
+void svd(UTensor &u, STensor &s,
+         VTensor &v, const ATensor &a,
+         cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
+{
+  using T1 = typename ATensor::scalar_type;
+  using T2 = typename UTensor::scalar_type;
+  using T3 = typename STensor::scalar_type;
+  using T4 = typename VTensor::scalar_type;
+  constexpr int RANK = UTensor::Rank();
+
+  /* Temporary WAR
+     cuSolver doesn't support row-major layouts. Since we want to make the
+     library appear as though everything is row-major, we take a performance hit
+     to transpose in and out of the function. Eventually this may be fixed in
+     cuSolver.
+  */
+  T1 *tp;
+  matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a, stream);
+  auto tvt = tv.PermuteMatrix();
+
+  // Get parameters required by these tensors
+  auto params = detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor>::GetSVDParams(
+      u, s, v, tvt, jobu, jobvt);
+
+  // Get cache or new QR plan if it doesn't exist
+  auto ret = detail::dnsvd_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxDnSVDSolverPlan_t{u, s, v, tvt, jobu, jobvt};
+
+    detail::dnsvd_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->Exec(u, s, v, tvt, jobu, jobvt, stream);
+  }
+  else {
+    auto svd_type =
+        static_cast<detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor> *>(ret.value());
+    svd_type->Exec(u, s, v, tvt, jobu, jobvt, stream);
+  }
+}
 
 /**
  * Perform a Eig decomposition using a cached plan
@@ -1393,23 +1401,23 @@ void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
   T1 *tp;
   matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
             stream);
-  auto tv = matxDnSolver_t::TransposeCopy(tp, a, stream);
+  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a, stream);
 
   // Get parameters required by these tensors
   auto params =
-      matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>::GetEigParams(w, tv, jobz, uplo);
+      detail::matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>::GetEigParams(w, tv, jobz, uplo);
 
   // Get cache or new eigen plan if it doesn't exist
-  auto ret = dneig_cache.Lookup(params);
+  auto ret = detail::dneig_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>{w, tv, jobz, uplo};
+    auto tmp = new detail::matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor>{w, tv, jobz, uplo};
 
-    dneig_cache.Insert(params, static_cast<void *>(tmp));
+    detail::dneig_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tv, w, tv, jobz, uplo, stream);
   }
   else {
     auto eig_type =
-        static_cast<matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor> *>(ret.value());
+        static_cast<detail::matxDnEigSolverPlan_t<OutputTensor, WTensor, ATensor> *>(ret.value());
     eig_type->Exec(tv, w, tv, jobz, uplo, stream);
   }
 

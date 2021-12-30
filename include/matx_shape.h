@@ -50,7 +50,7 @@ namespace matx {
  */
 template <int RANK> class tensorShape_t {
 public:
-  using matx_shape = bool;
+  using matx_shape = bool; ///< Type trait to indicate shape
 
   tensorShape_t(){};
 
@@ -168,6 +168,15 @@ private:
   std::array<index_t, RANK> n_;
 };
 
+/**
+ * @brief Shape equality
+ * 
+ * @tparam RANK1 Rank of first tensor
+ * @tparam RANK2 Rank of second tensor
+ * @param lhs Left shape
+ * @param rhs Right shape
+ * @return True if shapes are equal
+ */
 template <int RANK1, int RANK2>
 __MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool
 operator==(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
@@ -185,6 +194,15 @@ operator==(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
   return true;
 }
 
+/**
+ * @brief Shape inequality
+ * 
+ * @tparam RANK1 Rank of first tensor
+ * @tparam RANK2 Rank of second tensor
+ * @param lhs Left shape
+ * @param rhs Right shape
+ * @return True if shapes are not equal
+ */
 template <int RANK1, int RANK2>
 __MATX_HOST__ __MATX_DEVICE__ __forceinline__ bool
 operator!=(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)

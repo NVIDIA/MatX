@@ -42,6 +42,10 @@
 namespace matx
 {
 
+  /**
+   * @brief MatX error codes
+   * 
+   */
   enum matxError_t
   {
     matxSuccess,
@@ -115,22 +119,32 @@ namespace matx
     };
   }
 
+  namespace detail {
   struct matxException : public std::exception
   {
     matxError_t e;
     char str[400];
     std::stringstream stack;
 
+    /**
+     * @brief Throw an exception and print a stack trace
+     * 
+     * @param error 
+     * @param s 
+     * @param file 
+     * @param line 
+     */
     matxException(matxError_t error, const char *s, const char *file, int line)
         : e(error)
     {
       snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
                matxErrorString(error), s, file, line);
-      printStackTrace(stack);
+      detail::printStackTrace(stack);
     }
 
     const char *what() const throw() { return str; }
   };
+  }
 
 #define MATX_ENTER_HANDLER() \
   try                        \
@@ -138,7 +152,7 @@ namespace matx
 
 #define MATX_EXIT_HANDLER()                                     \
   }                                                             \
-  catch (matxException & e)                                     \
+  catch (detail::matxException & e)                                     \
   {                                                             \
     fprintf(stderr, "%s\n", e.what());                          \
     fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str()); \
@@ -147,7 +161,7 @@ namespace matx
 
 #define MATX_THROW(e, str)                           \
   {                                                  \
-    throw matxException(e, str, __FILE__, __LINE__); \
+    throw detail::matxException(e, str, __FILE__, __LINE__); \
   }
 
 #ifndef NDEBUG

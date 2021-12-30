@@ -45,7 +45,7 @@ protected:
   void SetUp() override
   {
 
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<complex>("01_radar", "ambgfun", "run",
                                        {sig_size});
 
@@ -56,7 +56,7 @@ protected:
 
   index_t sig_size = 16;
   tensor_t<complex, 1> xv{{sig_size}};
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
 };
 
 TEST_F(RadarAmbiguityFunction, Cut2D)

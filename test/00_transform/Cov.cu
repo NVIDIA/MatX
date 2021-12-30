@@ -45,7 +45,7 @@ protected:
   const index_t cov_dim = 4;
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim});
 
     // Half precision needs a bit more tolerance when compared to
@@ -61,7 +61,7 @@ protected:
   tensor_t<T, 2> cv{{cov_dim, cov_dim}};
 
   float thresh = 0.01f;
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
 };
 
 template <typename TensorType>

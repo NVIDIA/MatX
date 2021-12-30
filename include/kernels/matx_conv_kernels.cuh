@@ -50,7 +50,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   if constexpr (std::alignment_of_v < intype_strip >>
                 std::alignment_of_v<ftype_strip>) {
     s_data =
-        matx::AlignAddr<intype_strip>((uint8_t *)&s_exch[static_cast<index_t>(
+        matx::detail::AlignAddr<intype_strip>((uint8_t *)&s_exch[static_cast<index_t>(
             filter_len * filt_size_adj)]); // Start data portion after 2x the
                                            // filter to remove conditionals and
                                            // multiply by 0

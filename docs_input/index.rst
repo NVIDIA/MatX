@@ -1,26 +1,32 @@
 Welcome to MatX's documentation!
-======================================================
+================================
 
-.. toctree::
-    :maxdepth: 2
-    :caption: Contents:
+**MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and limited support for CPUs. The main
+features include:
 
-This site contains all documentation for MatX, including API docs, tutorials, 
-and example code. 
+* Compile-time expression evaluation for generating GPU kernels
+* Near-native performance for GPU kernels while using a syntax similar to Python or MATLAB
+* Easy frontend API to many popular CUDA libraries
+* Header-only without need for compilation
+* Single data type used across entire API
+* Intuitive error messages
 
-MatX is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs. 
-Near-native performance can be achieved while using a simple syntax common in 
-higher-level languages such as Python or MATLAB. To achieve this performance,
-MatX uses a combination of compile-time optimizations and existing CUDA libraries
-to hide complexity from the developer.
+To start building tests, examples, and benchmarks, visit the :ref:`building` guide. This page also lists the 
+requirements for each type of build.
 
-A single data type (tensor_t) is used by both algebraic expressions and backend CUDA
-libraries. Tensors can be any rank, and virtually any data type. Types that are optimized
-for specific hardware will use the accelerated features if present. For example, tensor
-cores will be used when fp16 or bf16 inputs are used in a GEMM operation.
+If you're new to MatX and want to jump right in, we recommend starting with the :ref:`quickstart` guide. This
+guide walks through the MatX concepts and primary API functions to give you the tools to make your first 
+application using MatX. 
 
-To get started with MatX, please read the :ref:`quickstart` guide, and for a complete API
-overview visit the :ref:`api` index.
+If you prefer learning by looking directly at complete examples, take a look in the ``examples`` directory. Some 
+examples have full walk-throughs in the :ref:`examples` section of the documentation.
+
+Lastly, an :ref:`api` guide is available for every function in MatX. 
+
+License
+-------
+MatX is released under the BSD-3-Clause license. Several external packages are used optionally and may have different
+license requirements. Please see the :ref:`building` guide for a list of external requirements.
 
 
 Table of Contents

@@ -33,16 +33,15 @@
 #pragma once
 
 #include "matx_error.h"
-#include "matx_dim.h"
 #include "matx_tensor.h"
 #include "matx_pybind.h"
 #include <cstdio>
 #include <numeric>
 
 namespace matx {
-namespace viz{
+namespace viz {
 
-using namespace pybind11::literals;
+using namespace ::pybind11::literals;
 
 /**
  * Create a line plot from a tensor view
@@ -72,14 +71,14 @@ void line(const TensorType &ten,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  std::unique_ptr<MatXPybind> pb;  
-  auto px = py::module_::import("plotly.express");   
-  auto np = py::module_::import("numpy");   
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto px = pybind11::module_::import("plotly.express");   
+  auto np = pybind11::module_::import("numpy");   
 
-  auto np_ten = MatXPybind::GetEmptyNumpy(ten);
+  auto np_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(ten);
   pb->TensorViewToNumpy(np_ten, ten);
 
-  auto labels = py::dict("index"_a=xlabel, "value"_a=ylabel);
+  auto labels = pybind11::dict("index"_a=xlabel, "value"_a=ylabel);
   auto fig = px.attr("line")(np_ten, "labels"_a = labels, "title"_a = title);  
   if (out_fname == "") {
     fig.attr("show")();
@@ -120,19 +119,19 @@ void scatter(const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  std::unique_ptr<MatXPybind> pb;  
-  auto px = py::module_::import("plotly.express");   
-  auto np = py::module_::import("numpy");   
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto px = pybind11::module_::import("plotly.express");   
+  auto np = pybind11::module_::import("numpy");   
 
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
-  auto np_x_ten = MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = MatXPybind::GetEmptyNumpy(y);
+  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
+  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
   pb->TensorViewToNumpy(np_x_ten, x);
   pb->TensorViewToNumpy(np_y_ten, y);  
 
-  auto labels = py::dict("index"_a=xlabel, "value"_a=ylabel);
+  auto labels = pybind11::dict("index"_a=xlabel, "value"_a=ylabel);
   auto fig = px.attr("scatter")("x"_a=np_x_ten, "y"_a=np_y_ten,"labels"_a = labels, "title"_a = title);  
   if (out_fname == "") {
     fig.attr("show")();
@@ -167,16 +166,16 @@ void bar(const TensorType &y,
           const std::string &title,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  std::unique_ptr<MatXPybind> pb;  
-  auto px = py::module_::import("plotly.express");   
-  auto np = py::module_::import("numpy");   
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto px = pybind11::module_::import("plotly.express");   
+  auto np = pybind11::module_::import("numpy");   
 
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
 
-  auto np_y_ten = MatXPybind::GetEmptyNumpy(y);
+  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
   pb->TensorViewToNumpy(np_y_ten, y);
 
-  auto labels = py::dict("y"_a=ylabel);
+  auto labels = pybind11::dict("y"_a=ylabel);
   auto fig = px.attr("bar")("y"_a=np_y_ten, "labels"_a = labels, "title"_a = title);  
   
   if (out_fname == "") {
@@ -218,19 +217,19 @@ void bar( const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  std::unique_ptr<MatXPybind> pb;  
-  auto px = py::module_::import("plotly.express");   
-  auto np = py::module_::import("numpy");   
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto px = pybind11::module_::import("plotly.express");   
+  auto np = pybind11::module_::import("numpy");   
 
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
-  auto np_x_ten = MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = MatXPybind::GetEmptyNumpy(y);
+  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
+  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
   pb->TensorViewToNumpy(np_x_ten, x);
   pb->TensorViewToNumpy(np_y_ten, y);
 
-  auto labels = py::dict("x"_a=xlabel, "y"_a=ylabel);
+  auto labels = pybind11::dict("x"_a=xlabel, "y"_a=ylabel);
   auto fig = px.attr("bar")("x"_a=np_x_ten, "y"_a=np_y_ten,"labels"_a = labels, "title"_a = title);  
   if (out_fname == "") {
     fig.attr("show")();
@@ -269,13 +268,13 @@ void contour( const T1 &x,
               const std::string &out_fname = "") {
   MATX_STATIC_ASSERT_STR(T1::Rank() == T2::Rank()-1, matxInvalidDim, "X/Y rank must be one less than Z rank");
 
-  std::unique_ptr<MatXPybind> pb;  
-  auto go = py::module_::import("plotly.graph_objects");   
-  auto np = py::module_::import("numpy");   
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto go = pybind11::module_::import("plotly.graph_objects");   
+  auto np = pybind11::module_::import("numpy");   
 
-  auto np_x_ten = MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = MatXPybind::GetEmptyNumpy(y);
-  auto np_z_ten = MatXPybind::GetEmptyNumpy(z);
+  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
+  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
+  auto np_z_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(z);
   pb->TensorViewToNumpy(np_x_ten, x);
   pb->TensorViewToNumpy(np_y_ten, y);
   pb->TensorViewToNumpy(np_z_ten, z);

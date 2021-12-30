@@ -38,11 +38,11 @@
 #include <type_traits>
 
 #include "kernels/matx_conv_kernels.cuh"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 
 namespace matx {
+namespace detail {
 
 template <typename OutputType, typename InType, typename FilterType>
 inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
@@ -104,33 +104,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 #endif  
 }
 
-// Entry point that allows swappable inputs, and also optimizes shared memory by
-// passing in the shortest signal as the filter. Note the swap parameter does
-// not do anything for convolution, so we never swap unless it's a correlation
-template <typename OutputType, typename In1Type, typename In2Type>
-inline void conv1d(OutputType &o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, cudaStream_t stream)
-{
-  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
-  const typename base_type<In1Type>::type &in1_base = i1;
-  const typename base_type<In2Type>::type &in2_base = i2;
-
-  if constexpr (In1Type::Rank() < In2Type::Rank()) {
-    matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
-  }
-  else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_STATIC_ASSERT(OutputType::Rank() == 1, matxInvalidDim);
-    if (i1.Size(0) < i2.Size(0)) {
-      matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
-    }
-    else {
-      matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
-    }
-  }
-  else {
-    matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
-  }
-}
 
 template <typename OutputType, typename InType, typename FilterType>
 void matxDirectConv2DInternal(OutputType &o, InType &i,
@@ -176,31 +149,80 @@ void matxDirectConv2DInternal(OutputType &o, InType &i,
   }
 #endif  
 }
+}
 
-// Entry point that allows swappable inputs, and also optimizes shared memory by
-// passing in the shortest signal as the filter
+/**
+ * @brief 1D convolution
+ * 
+ * @tparam OutputType Type of output
+ * @tparam In1Type Type of first input
+ * @tparam In2Type Type of second input
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * @param mode Convolution mode
+ * @param stream CUDA stream
+ */
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv1d(OutputType &o, const In1Type &i1, const In2Type &i2,
+                   matxConvCorrMode_t mode, cudaStream_t stream)
+{
+  detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  const typename detail::base_type<In1Type>::type &in1_base = i1;
+  const typename detail::base_type<In2Type>::type &in2_base = i2;
+
+  if constexpr (In1Type::Rank() < In2Type::Rank()) {
+    detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
+  }
+  else if constexpr (In1Type::Rank() == In2Type::Rank()) {
+    MATX_STATIC_ASSERT(OutputType::Rank() == 1, matxInvalidDim);
+    if (i1.Size(0) < i2.Size(0)) {
+      detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
+    }
+    else {
+      detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
+    }
+  }
+  else {
+    detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
+  }
+}
+
+
+/**
+ * @brief 2D convolution
+ * 
+ * @tparam OutputType Type of output
+ * @tparam In1Type Type of first input
+ * @tparam In2Type Type of second input
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * @param mode Convolution mode
+ * @param stream CUDA stream
+ */
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
-  tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
-  const typename base_type<In1Type>::type &in1_base = i1;
-  const typename base_type<In2Type>::type &in2_base = i2;
+  detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  const typename detail::base_type<In1Type>::type &in1_base = i1;
+  const typename detail::base_type<In2Type>::type &in2_base = i2;
 
   if constexpr (In1Type::Rank() < In2Type::Rank()) {
-    matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
+    detail::matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
   }
   else if constexpr (In1Type::Rank() == In2Type::Rank()) {
     MATX_STATIC_ASSERT(OutputType::Rank() == 2, matxInvalidDim);
     if (i1.Size(0) * i1.Size(1) < i2.Size(0) * i2.Size(1)) {
-      matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
+      detail::matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
     }
     else {
-      matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
+      detail::matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
     }
   }
   else {
-    matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
+    detail::matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
   }
 }
 

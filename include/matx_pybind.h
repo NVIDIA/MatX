@@ -37,20 +37,6 @@
 
 namespace matx {
 
-namespace py = pybind11;
-using namespace pybind11::literals;
-
-const static std::string GENERATORS_PATH = "/test/test_vectors/generators/";
-
-template <typename T> struct TestFailResult {
-  using my_type = T;
-  std::string index;
-  std::string fname;
-  T computed;
-  T filedat;
-  double thresh;
-};
-
 #define MATX_TEST_ASSERT_NEAR(__x, __y, __t)                                   \
   if constexpr (IsHalfType<decltype(__x)>())                                   \
     if (fabs(static_cast<float>(__x) - static_cast<float>(__y)) > __t)         \
@@ -73,6 +59,23 @@ template <typename T> struct TestFailResult {
   else                                                                         \
     ASSERT_EQ((a), (b));
 
+namespace detail{
+
+using namespace pybind11::literals;
+
+const static std::string GENERATORS_PATH = "/test/test_vectors/generators/";
+
+template <typename T> struct TestFailResult {
+  using my_type = T;
+  std::string index;
+  std::string fname;
+  T computed;
+  T filedat;
+  double thresh;
+};
+
+
+
 class MatXPybind {
 public:
   MatXPybind() { Init(); }
@@ -81,7 +84,7 @@ public:
 
   void AddPath(const std::string &path)
   {
-    sys = py::module_::import("sys");
+    sys = pybind11::module_::import("sys");
     sys.attr("path").attr("append")(path);
   }
 
@@ -94,8 +97,8 @@ public:
   void InitTVGenerator(const std::string mname, const std::string cname,
                        const std::vector<index_t> &sizes)
   {
-    mod = py::module_::import(mname.c_str());
-    py::array_t<index_t> arr{static_cast<index_t>(sizes.size())};
+    mod = pybind11::module_::import(mname.c_str());
+    pybind11::array_t<index_t> arr{static_cast<index_t>(sizes.size())};
     for (size_t i = 0; i < sizes.size(); i++) {
       arr.mutable_at(i) = sizes[i];
     }
@@ -144,11 +147,11 @@ public:
   }
 
   template <typename TensorType>
-  static py::object GetEmptyNumpy(const TensorType &ten)
+  static pybind11::object GetEmptyNumpy(const TensorType &ten)
   {
     using T = typename TensorType::scalar_type;
-    auto np = py::module_::import("numpy");
-    py::list dims;
+    auto np = pybind11::module_::import("numpy");
+    pybind11::list dims;
 
     // Set up dims of numpy tensor
     for (int i = 0; i < TensorType::Rank(); i++) {
@@ -162,7 +165,7 @@ public:
 
   void PrintTensor(const std::string name)
   {
-    py::print(res_dict[name.c_str()]);
+    pybind11::print(res_dict[name.c_str()]);
   }
 
   auto GetTensor(const std::string name) { return res_dict[name.c_str()]; }
@@ -257,7 +260,7 @@ public:
   const T &at(const std::string fname, Ix... index) const
   {
     auto resobj = res_dict[fname.c_str()];
-    auto ften = py::array_t<T>(resobj);
+    auto ften = pybind11::array_t<T>(resobj);
     return ften.at(std::forward<Ix>(index)...);
   }
 
@@ -290,7 +293,7 @@ public:
     using T = typename TensorType::scalar_type;
     constexpr int RANK = TensorType::Rank();
     using ntype = matx_convert_complex_type<T>;
-    auto ften = py::array_t<ntype>(np_ten);
+    auto ften = pybind11::array_t<ntype>(np_ten);
 
     for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
       if constexpr (RANK > 1) {
@@ -325,7 +328,7 @@ public:
     constexpr int RANK = TensorType::Rank();
 
     using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
-    auto ften = py::array_t<ntype>(np_ten);
+    auto ften = pybind11::array_t<ntype>(np_ten);
 
     for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
       if constexpr (RANK > 1) {
@@ -362,7 +365,7 @@ public:
   {
     using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
     auto resobj = res_dict[fname.c_str()];
-    auto ften = py::array_t<ntype>(resobj);
+    auto ften = pybind11::array_t<ntype>(resobj);
     constexpr int RANK = TensorType::Rank();
 
     cudaDeviceSynchronize();
@@ -426,13 +429,14 @@ public:
     return std::nullopt;
   }
 
-  static void InitGIL() { auto gil = new py::scoped_interpreter(); }
+  static void InitGIL() { auto gil = new pybind11::scoped_interpreter(); }
 
 private:
   pybind11::module_ mod;
   pybind11::object res_dict;
   pybind11::object sx_obj;
-  py::module_ sys;
+  pybind11::module_ sys;
 };
 
+}; //namespace detail
 }; // namespace matx

@@ -44,14 +44,14 @@ template <typename T> class EigenSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_solver", "eig", "run", {dim_size});
     pb->NumpyToTensorView(Bv, "B");
   }
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Bv{{dim_size, dim_size}};
   tensor_t<T, 2> Btv{{dim_size, dim_size}};
   tensor_t<T, 2> Evv{{dim_size, dim_size}};

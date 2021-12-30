@@ -34,7 +34,7 @@
 
 
 namespace matx {
-
+namespace detail {
 
 template <int RANK>
 inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
@@ -119,4 +119,5 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     blocks.z = 1;
   }  
 }
+} // end namespace detail
 } // end namespace matx

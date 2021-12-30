@@ -47,7 +47,7 @@ protected:
   void SetUp() override
   {
 
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<complex>("01_signal", "dct", "run", {sig_size});
 
     pb->NumpyToTensorView(xv, "x");
@@ -56,7 +56,7 @@ protected:
   void TearDown() { pb.reset(); }
 
   tensor_t<float, 1> xv{{sig_size}};
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
 };
 
 /* Real 1D DCT with N=100 */

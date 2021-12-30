@@ -35,6 +35,7 @@
 #include <type_traits>
 
 namespace matx {
+namespace detail {
 
 // This file defines operators on a scalar
 
@@ -260,6 +261,7 @@ template <typename T> using AngleOp = UnOp<T, Angle<T>>;
 // template<typename T> using SubNegOp = UnOp<T,SubNegF<T> >;
 
 // Binary Operators
+
 template <typename T1, typename T2> struct AddF {
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
@@ -296,6 +298,7 @@ template <typename T1, typename T2> struct AddF {
   }
 };
 template <typename T1, typename T2> using AddOp = BinOp<T1, T2, AddF<T1, T2>>;
+
 
 template <typename T1, typename T2> struct SubF {
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
@@ -517,4 +520,5 @@ template <typename T1, typename T2> struct XorF {
 };
 template <typename T1, typename T2> using XorOp = BinOp<T1, T2, XorF<T1, T2>>;
 
+} // end namespace detail
 } // end namespace matx

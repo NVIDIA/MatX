@@ -38,14 +38,24 @@
 #include <type_traits>
 
 #include "matx_conv.h"
-#include "matx_dim.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 
 namespace matx {
 
-// Entry point that allows swappable inputs, and also optimizes shared memory by
-// passing in the shortest signal as the filter
+/**
+ * @brief Correlate two input operators
+ * 
+ * @tparam OutputTensor Output tensor type
+ * @tparam In1Type First input operator type
+ * @tparam In2Type Second input operator type
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * @param mode Mode of correlation
+ * @param method Method for correlation
+ * @param stream CUDA stream
+ */
 template <typename OutputTensor, typename In1Type, typename In2Type>
 void corr(OutputTensor &o, const In1Type &i1, const In2Type &i2,
           matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,

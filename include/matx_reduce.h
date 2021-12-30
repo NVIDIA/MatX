@@ -394,6 +394,7 @@ __MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<double> *addr,
 #endif
 
 namespace matx {
+namespace detail {
 
 #ifdef __CUDACC__  
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal();
@@ -874,6 +875,8 @@ __global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType i
 }
 #endif
 
+} // namespace detail
+
 /**
  * Perform a reduction and preserves indices
  *
@@ -938,20 +941,20 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
     sizes[i] = in.Size(i);
   }   
 
-  get_grid_dims<in.Rank()>(blocks, threads, sizes);
+  detail::get_grid_dims<in.Rank()>(blocks, threads, sizes);
   
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
 
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
-  matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
+  detail::matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp(), mult);
 
   // If we need the indices too, launch that kernel
   if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
     (idest = std::numeric_limits<index_t>::max()).run(stream);
-    matxIndexKernel<<<blocks, threads, 0, stream>>>(
+    detail::matxIndexKernel<<<blocks, threads, 0, stream>>>(
         idest, dest, in, mult);     
   }
 #endif  
@@ -1033,7 +1036,7 @@ void inline mean(TensorType &dest, const InType &in,
 #ifdef __CUDACC__  
   float scale = 1.0;
 
-  reduce(dest, in, reduceOpSum<typename TensorType::scalar_type>(), stream);
+  reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream);
 
   // The reduction is performed over the difference in ranks between input and
   // output. This loop computes the number of elements it was performed over.
@@ -1082,7 +1085,7 @@ void inline median(TensorType &dest,
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
-    matxCubPlan_t<decltype(tmp_sort), TensorInType, CUB_OP_RADIX_SORT> splan{
+    detail::matxCubPlan_t<decltype(tmp_sort), TensorInType, detail::CUB_OP_RADIX_SORT> splan{
         tmp_sort, in, {}, stream};
 
     splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
@@ -1104,7 +1107,7 @@ void inline median(TensorType &dest,
   else if (RANK_IN == 2) {
     MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
 
-    matxCubPlan_t<decltype(tmp_sort), TensorInType, CUB_OP_RADIX_SORT> splan{
+   detail::matxCubPlan_t<decltype(tmp_sort), TensorInType, detail::CUB_OP_RADIX_SORT> splan{
         tmp_sort, in, {}, stream};
     splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
 
@@ -1147,7 +1150,7 @@ template <typename TensorType, typename InType>
 void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpSum<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1174,7 +1177,7 @@ template <typename TensorType, typename InType>
 void inline prod(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpProd<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpProd<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1204,7 +1207,7 @@ template <typename TensorType, typename InType>
 void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1233,7 +1236,7 @@ template <typename TensorType, typename TensorIndexType, typename InType>
 void inline argmax(TensorType &dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1263,7 +1266,7 @@ template <typename TensorType, typename InType>
 void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1293,7 +1296,7 @@ void inline argmin(TensorType &dest, TensorIndexType &idest, const InType &in, c
 {
   static_assert(TensorType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1322,7 +1325,7 @@ template <typename TensorType, typename InType>
 void inline any(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpAny<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAny<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1351,7 +1354,7 @@ template <typename TensorType, typename InType>
 void inline all(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, reduceOpAll<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAll<typename TensorType::scalar_type>(), stream, true);
 #endif  
 }
 

@@ -13,13 +13,11 @@ Some general rules to keep in mind about these three tools:
 
 1. The Python column assumes both Numpy and Scipy are being used for certain library calls.
 2. Both Python and MATLAB use the term "multi-dimensional array". MatX calls these tensors.
-3. The MatX syntax for most operations show only what would be in the ``set`` call. For example, multiplying two tensors might look like: ``set(a, a*b);``. 
-   Since operations can be chained, the MatX operation is only intended to show what would be in the right hand set of the ``set`` call.
-4. MATLAB uses 1-based indexing while Python and MatX use 0-based indexing.
-5. MATLAB uses inclusive ranges on indexing, while Python and MatX use exclusive ranges.
-6. MATLAB and Python may or may not make a copy of a tensor behind-the-scenes to improve performance. MatX makes this explicit.
+3. MATLAB uses 1-based indexing while Python and MatX use 0-based indexing.
+4. MATLAB uses inclusive ranges on indexing, while Python and MatX use exclusive ranges.
+5. MATLAB and Python may or may not make a copy of a tensor behind-the-scenes to improve performance. MatX makes this explicit.
    by never making a copy unless the function call mentions that it copies.
-7. MATLAB uses column-major (FORTRAN) memory order, while Python and MatX use row-major (C). When converting optimized MATLAB scripts, it may
+6. MATLAB uses column-major (FORTRAN) memory order, while Python and MatX use row-major (C). When converting optimized MATLAB scripts, it may
    be beneficial to transpose the dimension so the fastest changing dimension is the inner-most dimension.
 
 

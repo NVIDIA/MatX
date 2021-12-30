@@ -44,14 +44,14 @@ template <typename T> class DetSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
-    pb = std::make_unique<MatXPybind>();
+    pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<T>("00_solver", "det", "run", {m});
     pb->NumpyToTensorView(Av, "A");
   }
 
   void TearDown() { pb.reset(); }
 
-  std::unique_ptr<MatXPybind> pb;
+  std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Av{{m, m}};
   tensor_t<T, 2> Atv{{m, m}};
   tensor_t<T, 0> detv{};

@@ -47,8 +47,23 @@
 
 namespace matx {
 
+/**
+ * @brief Utilities for unit tests
+ * 
+ */
 class MatXUtils {
 public:
+
+  /**
+   * @brief Compare two types with a specified delta
+   * 
+   * @tparam T1 First type
+   * @tparam T2 Second type
+   * @param a First value
+   * @param b Second value
+   * @param delta Delta between values
+   * @return Assertion result
+   */
   template <typename T1, typename T2>
   static ::testing::AssertionResult MatXTypeCompare(const T1 &a, const T2 &b,
                                                     double delta = 0.01)
@@ -80,15 +95,6 @@ public:
     }
 
     return ::testing::AssertionSuccess();
-  }
-
-  static const std::string VectorPath(const std::string file)
-  {
-    return std::string(TEST_VECTOR_PATH) + file;
-  }
-
-  template <typename T, int RANK> static void FillRand(tensor_t<T, RANK> t)
-  {
   }
 };
 } // end namespace matx
