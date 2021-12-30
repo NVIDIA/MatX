@@ -1,212 +1,318 @@
 
-
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
-<head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <title>FFT &mdash; matx  documentation</title>
-  
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-
-  
-  
-
-  
-  
-
-  
-
-  
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
+    <title>FFT &#8212; matx  documentation</title>
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  <link href="../_static/css/theme.css" rel="stylesheet">
+  <link href="../_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
 
     
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    
+  <link rel="preload" as="script" href="../_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Matrix Multiply (GEMM)" href="matmul.html" />
-    <link rel="prev" title="Tensor Transformations" href="transformations.html" /> 
-</head>
-
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
+    <link rel="prev" title="Tensor Transformations" href="transformations.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
     
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
 
-          
-            <a href="../index.html" class="icon icon-home"> matx
-          
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
 
-          
-          </a>
+    
 
+    <div class="container-xl">
+      <div class="row">
           
-            
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="class.html">Tensor Class Reference</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="transformations.html">Tensor Transformations</a><ul class="current">
-<li class="toctree-l3 current"><a class="current reference internal" href="#">FFT</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#cached-api">Cached API</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#non-cached-api">Non-Cached API</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="matmul.html">Matrix Multiply (GEMM)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="solver.html">Linear Solvers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="inverse.html">Matrix Inverse</a></li>
-<li class="toctree-l3"><a class="reference internal" href="filter.html">Filtering (IIR and FIR)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="reduce.html">Reductions</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sort.html">Sorting</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="tensorops.html">Tensor Operators</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tensorgenerators.html">Generator Operators</a></li>
-<li class="toctree-l2"><a class="reference internal" href="stats.html">Statistics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="random.html">Random Number Generation</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Example Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
-</ul>
-
-            
-          
-        </div>
-        
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
       
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">matx</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-        
-          <li><a href="index.html">API Reference</a> &raquo;</li>
-        
-          <li><a href="transformations.html">Tensor Transformations</a> &raquo;</li>
-        
-      <li>FFT</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-          
-            <a href="../_sources/api/fft.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
+      
+      
+      <h1 class="site-logo" id="site-title">matx  documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../build.html">
+   Building MatX
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../quickstart.html">
+   Quick Start
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../creation.html">
+   Creating Tensors
+  </a>
+ </li>
+ <li class="toctree-l1 current active has-children">
+  <a class="reference internal" href="index.html">
+   API Reference
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="class.html">
+     Tensor Class Reference
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="tensorview.html">
+       tensor_t
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="tensorshape.html">
+       tensorShape_t
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 current active has-children">
+    <a class="reference internal" href="transformations.html">
+     Tensor Transformations
+    </a>
+    <input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+    <label for="toctree-checkbox-3">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul class="current">
+     <li class="toctree-l3 current active">
+      <a class="current reference internal" href="#">
+       FFT
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="matmul.html">
+       Matrix Multiply (GEMM)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="solver.html">
+       Linear Solvers
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="inverse.html">
+       Matrix Inverse
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="filter.html">
+       Filtering (IIR and FIR)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="reduce.html">
+       Reductions
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="sort.html">
+       Sorting
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorops.html">
+     Tensor Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorgenerators.html">
+     Generator Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="stats.html">
+     Statistics
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="random.html">
+     Random Number Generation
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="utilities.html">
+     Utilities
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="type_traits.html">
+     Type Traits
+    </a>
+   </li>
   </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../matlabpython.html">
+   MATLAB/Python To MatX Translation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../examples/index.html">
+   Example Applications
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
+  <label for="toctree-checkbox-4">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../examples/fftconv.html">
+     FFT Convolution
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../limitations.html">
+   Limitations
+  </a>
+ </li>
+</ul>
 
-  
-  <hr/>
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
             
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../_sources/api/fft.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
   <section id="fft">
-<h1>FFT<a class="headerlink" href="#fft" title="Permalink to this headline">¶</a></h1>
+<h1>FFT<a class="headerlink" href="#fft" title="Permalink to this headline"></a></h1>
 <p>The API below provides transformations for Fast Fourier Transforms (FFTs) of both 1D and 2D types with batching.</p>
-<section id="cached-api">
-<h2>Cached API<a class="headerlink" href="#cached-api" title="Permalink to this headline">¶</a></h2>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t">
-<span id="_CPPv3I00EN4matx3fftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx3fftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a1757165aad81ee665ccdb98398b327a6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">fft</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx3fftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx3fftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a1757165aad81ee665ccdb98398b327a6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">fft</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3fftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Run a 1D FFT with a cached plan</p>
 <p>Creates a new FFT plan in the cache if none exists, and uses that to execute the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Output view data type </p></li>
 <li><p><strong>T2</strong> – Input view data type </p></li>
 <li><p><strong>RANK</strong> – Rank of input and output tensors </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>o</strong> – Output tensor. The length of the fastest-changing dimension dictates the size of FFT. If this size is longer than the length of the input tensor, the tensor will potentially be copied and zero-padded to a new block of memory. Future releases may remove this restriction to where there is no copy. </p></li>
 <li><p><strong>i</strong> – input tensor </p></li>
@@ -218,18 +324,18 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t">
-<span id="_CPPv3I00EN4matx4ifftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx4ifftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0e6aa752cec29b58957ec776f640b22c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx4ifftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx4ifftER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0e6aa752cec29b58957ec776f640b22c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4ifftEvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Run a 1D IFFT with a cached plan</p>
 <p>Creates a new FFT plan in the cache if none exists, and uses that to execute the 1D IFFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Output view data type </p></li>
 <li><p><strong>T2</strong> – Input view data type </p></li>
 <li><p><strong>RANK</strong> – Rank of input and output tensors </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>o</strong> – Output tensor. The length of the fastest-changing dimension dictates the size of FFT. If this size is longer than the length of the input tensor, the tensor will potentially be copied and zero-padded to a new block of memory. Future releases may remove this restriction to where there is no copy. </p></li>
 <li><p><strong>i</strong> – input tensor </p></li>
@@ -241,18 +347,18 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t">
-<span id="_CPPv3I00EN4matx4fft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx4fft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aba773997c422bb79c6915dcc9871b877"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">fft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx4fft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx4fft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aba773997c422bb79c6915dcc9871b877"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">fft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::fft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4fft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Run a 2D FFT with a cached plan</p>
 <p>Creates a new FFT plan in the cache if none exists, and uses that to execute the 2D FFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Output view data type </p></li>
 <li><p><strong>T2</strong> – Input view data type </p></li>
 <li><p><strong>RANK</strong> – Rank of input and output tensors </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>o</strong> – Output tensor </p></li>
 <li><p><strong>i</strong> – input tensor </p></li>
@@ -264,18 +370,18 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t">
-<span id="_CPPv3I00EN4matx5ifft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx5ifft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a546cbadbc3af58cb4dde405057d5303b"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx5ifft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx5ifft2ER12OutputTensorRK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a546cbadbc3af58cb4dde405057d5303b"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="matx::ifft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5ifft2EvR12OutputTensorRK11InputTensor12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Run a 2D IFFT with a cached plan</p>
 <p>Creates a new FFT plan in the cache if none exists, and uses that to execute the 2D IFFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Output view data type </p></li>
 <li><p><strong>T2</strong> – Input view data type </p></li>
 <li><p><strong>RANK</strong> – Rank of input and output tensors </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>o</strong> – Output tensor </p></li>
 <li><p><strong>i</strong> – input tensor </p></li>
@@ -287,17 +393,17 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t">
-<span id="_CPPv3I00EN4matx6signal3dctER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="_CPPv2I00EN4matx6signal3dctER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="matx__signal_8h_1adea636a00ccedae7ef6dcd52390e6d65"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">signal</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">dct</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::signal::dct::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::signal::dct::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx6signal3dctER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="_CPPv2I00EN4matx6signal3dctER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="matx__signal_8h_1adea636a00ccedae7ef6dcd52390e6d65"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">signal</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">dct</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::signal::dct::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::signal::dct::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6signal3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Discrete Cosine Transform</p>
 <p>Computes the DCT of input sequence “in”. The input and output ranks must be 1, and the sizes must match.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T</strong> – Input data type </p></li>
 <li><p><strong>RANK</strong> – Rank of input and output tensor. Must be 1</p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>out</strong> – Output tensor </p></li>
 <li><p><strong>in</strong> – Input tensor </p></li>
@@ -308,125 +414,49 @@
 </dd></dl>
 
 </section>
-<section id="non-cached-api">
-<h2>Non-Cached API<a class="headerlink" href="#non-cached-api" title="Permalink to this headline">¶</a></h2>
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx15matxFFTPlan1D_tE">
-<span id="_CPPv3I00EN4matx15matxFFTPlan1D_tE"></span><span id="_CPPv2I00EN4matx15matxFFTPlan1D_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutTensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InTensorType</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="matx::matxFFTPlan1D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxFFTPlan1D__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxFFTPlan1D_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxFFTPlan_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="matx::matxFFTPlan1D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="matx::matxFFTPlan1D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Create a 1D FFT plan</p>
-<p>An FFT plan is used to set up all parameters and memory needed to execute an FFT. All parameters of the FFT normally needed when using cuFFT directly are deduced by matx using the View classes passed in. Because MatX uses cuFFT directly, all limitations and properties of cuFFT must be adhered to. Please see the cuFFT documentation to see these limitations. Once the plan has been created, FFTs can be executed as many times as needed using the Exec() functions. It is not necessary to pass in the same views as were used to create the plans as long as the rank and dimensions are idential.</p>
-<p>If a tensor larger than rank 1 is passed, all other dimensions are batch dimensions</p>
-<p><dl class="field-list simple">
-<dt class="field-odd">tparam T1</dt>
-<dd class="field-odd"><p>Output view data type </p>
-</dd>
-<dt class="field-even">tparam T2</dt>
-<dd class="field-even"><p>Input view data type </p>
-</dd>
-</dl>
-</p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx15matxFFTPlan1D_t15matxFFTPlan1D_tER13OutTensorTypeRK12InTensorType">
-<span id="_CPPv3N4matx15matxFFTPlan1D_t15matxFFTPlan1D_tER13OutTensorTypeRK12InTensorType"></span><span id="_CPPv2N4matx15matxFFTPlan1D_t15matxFFTPlan1D_tER13OutTensorTypeRK12InTensorType"></span><span id="matx::matxFFTPlan1D_t::matxFFTPlan1D_t__OutTensorTypeR.InTensorTypeCR"></span><span class="target" id="classmatx_1_1matxFFTPlan1D__t_1ae5c9367efab0687f29c425b15b8a4136"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxFFTPlan1D_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="matx::matxFFTPlan1D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan1D_tE" title="matx::matxFFTPlan1D_t::InTensorType"><span class="n"><span class="pre">InTensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx15matxFFTPlan1D_t15matxFFTPlan1D_tER13OutTensorTypeRK12InTensorType" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Construct a 1D FFT plan</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>o</strong> – Output view </p></li>
-<li><p><strong>i</strong> – Input view </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-</div>
-</dd></dl>
-
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx15matxFFTPlan2D_tE">
-<span id="_CPPv3I00EN4matx15matxFFTPlan2D_tE"></span><span id="_CPPv2I00EN4matx15matxFFTPlan2D_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutTensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InTensorType</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="matx::matxFFTPlan2D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxFFTPlan2D__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxFFTPlan2D_t</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">matxFFTPlan_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="matx::matxFFTPlan2D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="matx::matxFFTPlan2D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Create a 2D FFT plan</p>
-<p>An FFT plan is used to set up all parameters and memory needed to execute an FFT. All parameters of the FFT normally needed when using cuFFT directly are deduced by matx using the View classes passed in. Because MatX uses cuFFT directly, all limitations and properties of cuFFT must be adhered to. Please see the cuFFT documentation to see these limitations. Once the plan has been created, FFTs can be executed as many times as needed using the Exec() functions. It is not necessary to pass in the same views as were used to create the plans as long as the rank and dimensions are idential.</p>
-<p>If a tensor larger than rank 2 is passed, all other dimensions are batch dimensions</p>
-<p><dl class="field-list simple">
-<dt class="field-odd">tparam T1</dt>
-<dd class="field-odd"><p>Output view data type </p>
-</dd>
-<dt class="field-even">tparam T2</dt>
-<dd class="field-even"><p>Input view data type </p>
-</dd>
-</dl>
-</p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx15matxFFTPlan2D_t15matxFFTPlan2D_tER13OutTensorTypeRK12InTensorType">
-<span id="_CPPv3N4matx15matxFFTPlan2D_t15matxFFTPlan2D_tER13OutTensorTypeRK12InTensorType"></span><span id="_CPPv2N4matx15matxFFTPlan2D_t15matxFFTPlan2D_tER13OutTensorTypeRK12InTensorType"></span><span id="matx::matxFFTPlan2D_t::matxFFTPlan2D_t__OutTensorTypeR.InTensorTypeCR"></span><span class="target" id="classmatx_1_1matxFFTPlan2D__t_1a733cd8f34f0cf931dd7f9c840803353a"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxFFTPlan2D_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="matx::matxFFTPlan2D_t::OutTensorType"><span class="n"><span class="pre">OutTensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx15matxFFTPlan2D_tE" title="matx::matxFFTPlan2D_t::InTensorType"><span class="n"><span class="pre">InTensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">i</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx15matxFFTPlan2D_t15matxFFTPlan2D_tER13OutTensorTypeRK12InTensorType" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Construct a 2D FFT plan</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>o</strong> – Output view </p></li>
-<li><p><strong>i</strong> – Input view </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-</div>
-</dd></dl>
-
-</section>
-</section>
 
 
-           </div>
-           
-          </div>
-          <footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="matmul.html" class="btn btn-neutral float-right" title="Matrix Multiply (GEMM)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="transformations.html" class="btn btn-neutral float-left" title="Tensor Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &#169; Copyright 2021, Nvidia.
-
-    </p>
-  </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
+              </div>
+              
+        
+            <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="transformations.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Tensor Transformations</p>
         </div>
+    </a>
+    <a class='right-next' id="next-link" href="matmul.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Matrix Multiply (GEMM)</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer">
+    <div class="container">
+      <p>
+        
+          By Nvidia<br/>
+        
+            &copy; Copyright 2021, Nvidia.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
       </div>
-
-    </section>
-
-  </div>
+    </div>
   
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-    
+  <script src="../_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+ 
 
   <style>
          .wy-nav-content { max-width: 1600px; }
@@ -436,6 +466,5 @@
   </style>
 
 
-
-</body>
+  </body>
 </html>

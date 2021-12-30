@@ -12,3 +12,5 @@ API Reference
    tensorgenerators.rst
    stats.rst
    random.rst
+   utilities.rst
+   type_traits.rst

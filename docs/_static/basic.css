@@ -55,7 +55,7 @@ div.sphinxsidebarwrapper {
 
 div.sphinxsidebar {
     float: left;
-    width: 230px;
+    width: 270px;
     margin-left: -100%;
     font-size: 90%;
     word-wrap: break-word;
@@ -731,8 +731,9 @@ dl.glossary dt {
 
 .classifier:before {
     font-style: normal;
-    margin: 0.5em;
+    margin: 0 0.5em;
     content: ":";
+    display: inline-block;
 }
 
 abbr, acronym {

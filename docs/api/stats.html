@@ -1,201 +1,317 @@
 
-
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
-<head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <title>Statistics &mdash; matx  documentation</title>
-  
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-
-  
-  
-
-  
-  
-
-  
-
-  
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
+    <title>Statistics &#8212; matx  documentation</title>
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  <link href="../_static/css/theme.css" rel="stylesheet">
+  <link href="../_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
 
     
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    
+  <link rel="preload" as="script" href="../_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Random Number Generation" href="random.html" />
-    <link rel="prev" title="Generator Operators" href="tensorgenerators.html" /> 
-</head>
-
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
+    <link rel="prev" title="Generator Operators" href="tensorgenerators.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
     
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
 
-          
-            <a href="../index.html" class="icon icon-home"> matx
-          
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
 
-          
-          </a>
+    
 
+    <div class="container-xl">
+      <div class="row">
           
-            
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../build.html">Building MatX</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../creation.html">Constructing Tensors</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="class.html">Tensor Class Reference</a></li>
-<li class="toctree-l2"><a class="reference internal" href="transformations.html">Tensor Transformations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tensorops.html">Tensor Operators</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tensorgenerators.html">Generator Operators</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Statistics</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#cached-api">Cached API</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#non-cached-api">Non-Cached API</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="random.html">Random Number Generation</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="../matlabpython.html">MATLAB/Python To MatX Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Example Applications</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../limitations.html">Limitations</a></li>
-</ul>
-
-            
-          
-        </div>
-        
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
       
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">matx</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-        
-          <li><a href="index.html">API Reference</a> &raquo;</li>
-        
-      <li>Statistics</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-          
-            <a href="../_sources/api/stats.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
+      
+      
+      <h1 class="site-logo" id="site-title">matx  documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../build.html">
+   Building MatX
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../quickstart.html">
+   Quick Start
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../creation.html">
+   Creating Tensors
+  </a>
+ </li>
+ <li class="toctree-l1 current active has-children">
+  <a class="reference internal" href="index.html">
+   API Reference
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="class.html">
+     Tensor Class Reference
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="tensorview.html">
+       tensor_t
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="tensorshape.html">
+       tensorShape_t
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="transformations.html">
+     Tensor Transformations
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+    <label for="toctree-checkbox-3">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="fft.html">
+       FFT
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="matmul.html">
+       Matrix Multiply (GEMM)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="solver.html">
+       Linear Solvers
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="inverse.html">
+       Matrix Inverse
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="filter.html">
+       Filtering (IIR and FIR)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="reduce.html">
+       Reductions
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="sort.html">
+       Sorting
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorops.html">
+     Tensor Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorgenerators.html">
+     Generator Operators
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Statistics
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="random.html">
+     Random Number Generation
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="utilities.html">
+     Utilities
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="type_traits.html">
+     Type Traits
+    </a>
+   </li>
   </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../matlabpython.html">
+   MATLAB/Python To MatX Translation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../examples/index.html">
+   Example Applications
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
+  <label for="toctree-checkbox-4">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../examples/fftconv.html">
+     FFT Convolution
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../limitations.html">
+   Limitations
+  </a>
+ </li>
+</ul>
 
-  
-  <hr/>
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
             
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../_sources/api/stats.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
   <section id="statistics">
-<h1>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline">¶</a></h1>
-<p>The API below provides methods for statistics functions. Note that some non-cached plans use a generic handle for
-CUB, and just pass in the appropriate operation.</p>
-<section id="cached-api">
-<h2>Cached API<a class="headerlink" href="#cached-api" title="Permalink to this headline">¶</a></h2>
+<span id="id1"></span><h1>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline"></a></h1>
+<p>The API below provides methods for statistics functions.</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t">
-<span id="_CPPv3I00EN4matx6cumsumER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="_CPPv2I00EN4matx6cumsumER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a7011e2abced387361ac74a41cf4e08ee"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">cumsum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::cumsum::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::cumsum::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx6cumsumER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="_CPPv2I00EN4matx6cumsumER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a7011e2abced387361ac74a41cf4e08ee"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">cumsum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::cumsum::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="matx::cumsum::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Compute a cumulative sum (prefix sum) of rows of a tensor</p>
 <p>Computes an exclusive cumulative sum over rows in a tensor. For example, and input tensor of [1, 2, 3, 4] would give the output [1, 3, 6, 10].</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Type of data to sort </p></li>
 <li><p><strong>RANK</strong> – Rank of tensor </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>a_out</strong> – Sorted tensor </p></li>
 <li><p><strong>a</strong> – Input tensor </p></li>
@@ -207,17 +323,17 @@ CUB, and just pass in the appropriate operation.</p>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t">
-<span id="_CPPv3I00EN4matx4histER12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t"></span><span id="_CPPv2I00EN4matx4histER12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a6dc4c9f42b8c1a40bf2780b2294d4b15"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">hist</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">lower</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">upper</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
+<span id="_CPPv3I00EN4matx4histER12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t"></span><span id="_CPPv2I00EN4matx4histER12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a6dc4c9f42b8c1a40bf2780b2294d4b15"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">hist</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">lower</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="matx::hist::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">upper</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4histEvR12OutputTensorRK11InputTensorKN11InputTensor11scalar_typeEKN11InputTensor11scalar_typeEK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Compute a histogram of rows in a tensor</p>
 <p>Computes a histogram with the given number of levels and upper/lower limits. The number of levels is one greater than the number of bins generated, and is determined by the size of the last dimension of the output tensor. Each bin contains elements falling within idx*(upper-lower)/a.out.Lsize(). In other words, each bin is as large as the different between the upper and lower bounds and the number of bins</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>T1</strong> – Type of data to sort </p></li>
 <li><p><strong>RANK</strong> – Rank of tensor </p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><strong>a_out</strong> – Sorted tensor </p></li>
 <li><p><strong>a</strong> – Input tensor </p></li>
@@ -229,56 +345,23 @@ CUB, and just pass in the appropriate operation.</p>
 </dl>
 </dd></dl>
 
-</section>
-<section id="non-cached-api">
-<h2>Non-Cached API<a class="headerlink" href="#non-cached-api" title="Permalink to this headline">¶</a></h2>
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE">
-<span id="_CPPv3I00_14CUBOperation_tEN4matx13matxCubPlan_tE"></span><span id="_CPPv2I00_14CUBOperation_tEN4matx13matxCubPlan_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N4matx14CUBOperation_tE" title="matx::CUBOperation_t"><span class="n"><span class="pre">CUBOperation_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">op</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1matxCubPlan__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matxCubPlan_t</span></span></span><a class="headerlink" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13matxCubPlan_t13matxCubPlan_tER12OutputTensorRK11InputTensorRKNSt3anyEK12cudaStream_t">
-<span id="_CPPv3N4matx13matxCubPlan_t13matxCubPlan_tER12OutputTensorRK11InputTensorRKNSt3anyEK12cudaStream_t"></span><span id="_CPPv2N4matx13matxCubPlan_t13matxCubPlan_tER12OutputTensorRK11InputTensorRKNSt3anyEK12cudaStream_t"></span><span id="matx::matxCubPlan_t::matxCubPlan_t__OutputTensorR.InputTensorCR.std::anyCR.cudaStream_tC"></span><span class="target" id="classmatx_1_1matxCubPlan__t_1aa73449e4afff8ee808407e9cc1a9f9b8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxCubPlan_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">any</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cparams</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13matxCubPlan_t13matxCubPlan_tER12OutputTensorRK11InputTensorRKNSt3anyEK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Construct a handle for CUB operations</p>
-<p>Creates a handle for performing a CUB operation. Currently supported operations are sorting and prefix sum (cumsum). Operations can either be a single dimension, or batched across a dimension (rows of a matrix, for example).</p>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4meanER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4meanER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae3abdc94633bfdfe277f5c7767212e61"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">mean</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="matx::mean::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="matx::mean::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4meanEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Calculate the mean of values in a tensor</p>
+<p>Performs a sum reduction from tensor “in” into tensor “dest” , followed by a division by the number of elements in the reduction. Similar to the reduce function, the type of reduction is dependent on the rank of the output tensor. A single value denotes a reduction over the entire input, a 1D tensor denotes a reduction over each row independently, etc.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>a</strong> – Input tensor view </p></li>
-<li><p><strong>a_out</strong> – Sorted output </p></li>
-<li><p><strong>cparams</strong> – Parameter structure specific to the operation </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
 </ul>
 </dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13matxCubPlan_tD0Ev">
-<span id="_CPPv3N4matx13matxCubPlan_tD0Ev"></span><span id="_CPPv2N4matx13matxCubPlan_tD0Ev"></span><span id="matx::matxCubPlan_t::~matxCubPlan_t"></span><span class="target" id="classmatx_1_1matxCubPlan__t_1a70e36742bc4ee3d41b53ff7c10ea8221"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~matxCubPlan_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13matxCubPlan_tD0Ev" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Sort destructor</p>
-<p>Destroys any helper data used for provider type and any workspace memory created </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13matxCubPlan_t12ExecHistEvenER12OutputTensorRK11InputTensorK2T1K2T1K12cudaStream_t">
-<span id="_CPPv3N4matx13matxCubPlan_t12ExecHistEvenER12OutputTensorRK11InputTensorK2T1K2T1K12cudaStream_t"></span><span id="_CPPv2N4matx13matxCubPlan_t12ExecHistEvenER12OutputTensorRK11InputTensorK2T1K2T1K12cudaStream_t"></span><span id="matx::matxCubPlan_t::ExecHistEven__OutputTensorR.InputTensorCR.T1C.T1C.cudaStream_tC"></span><span class="target" id="classmatx_1_1matxCubPlan__t_1ac1a2e95add5216e0a2bc9a4b119506c9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ExecHistEven</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">T1</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">lower</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">T1</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">upper</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13matxCubPlan_t12ExecHistEvenER12OutputTensorRK11InputTensorK2T1K2T1K12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Execute an inclusive prefix sum on a tensor</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Views being passed must be in row-major order</p>
-</div>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of tensor </p>
-</dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>a_out</strong> – Output tensor (must be an integer type) </p></li>
-<li><p><strong>a</strong> – Input tensor </p></li>
-<li><p><strong>lower</strong> – Lower bound on histogram </p></li>
-<li><p><strong>upper</strong> – Upper bound on histogram </p></li>
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>stream</strong> – CUDA stream </p></li>
 </ul>
 </dd>
@@ -286,21 +369,22 @@ CUB, and just pass in the appropriate operation.</p>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13matxCubPlan_t16ExecPrefixScanExER12OutputTensorRK11InputTensorK12cudaStream_t">
-<span id="_CPPv3N4matx13matxCubPlan_t16ExecPrefixScanExER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="_CPPv2N4matx13matxCubPlan_t16ExecPrefixScanExER12OutputTensorRK11InputTensorK12cudaStream_t"></span><span id="matx::matxCubPlan_t::ExecPrefixScanEx__OutputTensorR.InputTensorCR.cudaStream_tC"></span><span class="target" id="classmatx_1_1matxCubPlan__t_1aea0e8acd3f91e2b3aedc95d542b49367"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ExecPrefixScanEx</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13matxCubPlan_t16ExecPrefixScanExER12OutputTensorRK11InputTensorK12cudaStream_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Execute an inclusive prefix sum on a tensor</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Views being passed must be in row-major order</p>
-</div>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t">
+<span id="_CPPv3I00EN4matx6medianER10TensorTypeRK12TensorInType12cudaStream_t"></span><span id="_CPPv2I00EN4matx6medianER10TensorTypeRK12TensorInType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorInType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ad31f21b1811b138c0013b6f0685c3ba3"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">median</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="matx::median::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="matx::median::TensorInType"><span class="n"><span class="pre">TensorInType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6medianEvR10TensorTypeRK12TensorInType12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Calculate the median of values in a tensor</p>
+<p>Calculates the median of rows in a tensor. The median is computed by sorting the data into a temporary tensor, then picking the middle element of each row. For an even number of items, the mean of the two middle elements is selected. Currently only works on tensor views as input since it uses CUB sorting as a backend, and the tensor views must be rank 2 reducing to rank 1, or rank 1 reducing to rank 0.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of tensor </p>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>RANK_IN</strong> – Input rank</p></li>
+</ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>a_out</strong> – Output tensor </p></li>
-<li><p><strong>a</strong> – Input tensor </p></li>
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>stream</strong> – CUDA stream </p></li>
 </ul>
 </dd>
@@ -308,102 +392,95 @@ CUB, and just pass in the appropriate operation.</p>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13matxCubPlan_t8ExecSortER12OutputTensorRK11InputTensorK12cudaStream_tK15SortDirection_t">
-<span id="_CPPv3N4matx13matxCubPlan_t8ExecSortER12OutputTensorRK11InputTensorK12cudaStream_tK15SortDirection_t"></span><span id="_CPPv2N4matx13matxCubPlan_t8ExecSortER12OutputTensorRK11InputTensorK12cudaStream_tK15SortDirection_t"></span><span id="matx::matxCubPlan_t::ExecSort__OutputTensorR.InputTensorCR.cudaStream_tC.SortDirection_tC"></span><span class="target" id="classmatx_1_1matxCubPlan__t_1a20f7809cda6713d0908234901e0a72f7"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ExecSort</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_14CUBOperation_tEN4matx13matxCubPlan_tE" title="matx::matxCubPlan_t::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">SortDirection_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dir</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">SORT_DIR_ASC</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13matxCubPlan_t8ExecSortER12OutputTensorRK11InputTensorK12cudaStream_tK15SortDirection_t" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Execute a sort on a tensor</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Views being passed must be in row-major order</p>
-</div>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx3varER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx3varER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aa54fe5f0d4606e54835d8cbac0e60c3f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="matx::var::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3varEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Compute a variance reduction</p>
+<p>Computes the variance of the input according to the output tensor rank and size</p>
 <dl class="field-list simple">
-<dt class="field-odd">Template Parameters</dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of tensor </p>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
 </dd>
-<dt class="field-even">Parameters</dt>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>a_out</strong> – Output tensor </p></li>
-<li><p><strong>a</strong> – Input tensor </p></li>
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>stream</strong> – CUDA stream </p></li>
-<li><p><strong>dir</strong> – Sort order (SORT_DIR_ASC or SORT_DIR_DESC) </p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
-</div>
-</dd></dl>
-
-<dl class="cpp enum">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx14CUBOperation_tE">
-<span id="_CPPv3N4matx14CUBOperation_tE"></span><span id="_CPPv2N4matx14CUBOperation_tE"></span><span class="target" id="namespacematx_1a94a4efca0dd4404c08a28163377d10be"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">CUBOperation_t</span></span></span><a class="headerlink" href="#_CPPv4N4matx14CUBOperation_tE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Parameters needed to execute a sort operation. </p>
-<p><em>Values:</em></p>
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx14CUBOperation_t17CUB_OP_RADIX_SORTE">
-<span id="_CPPv3N4matx14CUBOperation_t17CUB_OP_RADIX_SORTE"></span><span id="_CPPv2N4matx14CUBOperation_t17CUB_OP_RADIX_SORTE"></span><span class="target" id="namespacematx_1a94a4efca0dd4404c08a28163377d10beafc9374a10f55573b188b83c161661331"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CUB_OP_RADIX_SORT</span></span></span><a class="headerlink" href="#_CPPv4N4matx14CUBOperation_t17CUB_OP_RADIX_SORTE" title="Permalink to this definition">¶</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx14CUBOperation_t14CUB_OP_INC_SUME">
-<span id="_CPPv3N4matx14CUBOperation_t14CUB_OP_INC_SUME"></span><span id="_CPPv2N4matx14CUBOperation_t14CUB_OP_INC_SUME"></span><span class="target" id="namespacematx_1a94a4efca0dd4404c08a28163377d10beab95595a84e71bc67fe27d9e847d94f85"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CUB_OP_INC_SUM</span></span></span><a class="headerlink" href="#_CPPv4N4matx14CUBOperation_t14CUB_OP_INC_SUME" title="Permalink to this definition">¶</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx14CUBOperation_t16CUB_OP_HIST_EVENE">
-<span id="_CPPv3N4matx14CUBOperation_t16CUB_OP_HIST_EVENE"></span><span id="_CPPv2N4matx14CUBOperation_t16CUB_OP_HIST_EVENE"></span><span class="target" id="namespacematx_1a94a4efca0dd4404c08a28163377d10bea176aa3986b721a3938904dbf69c213fb"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CUB_OP_HIST_EVEN</span></span></span><a class="headerlink" href="#_CPPv4N4matx14CUBOperation_t16CUB_OP_HIST_EVENE" title="Permalink to this definition">¶</a><br /></dt>
-<dd></dd></dl>
-
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx4stddER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx4stddER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1acd1c4fcd12c1ea0591809cd82db53dd1"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">stdd</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="matx::stdd::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="matx::stdd::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4stddEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Compute a standard deviation reduction</p>
+<p>Computes the standard deviation of the input according to the output tensor rank and size</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </section>
-</section>
 
 
-           </div>
-           
-          </div>
-          <footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="random.html" class="btn btn-neutral float-right" title="Random Number Generation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="tensorgenerators.html" class="btn btn-neutral float-left" title="Generator Operators" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &#169; Copyright 2021, Nvidia.
-
-    </p>
-  </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
+              </div>
+              
+        
+            <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="tensorgenerators.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Generator Operators</p>
         </div>
+    </a>
+    <a class='right-next' id="next-link" href="random.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Random Number Generation</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer">
+    <div class="container">
+      <p>
+        
+          By Nvidia<br/>
+        
+            &copy; Copyright 2021, Nvidia.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
       </div>
-
-    </section>
-
-  </div>
+    </div>
   
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-    
+  <script src="../_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+ 
 
   <style>
          .wy-nav-content { max-width: 1600px; }
@@ -413,6 +490,5 @@ CUB, and just pass in the appropriate operation.</p>
   </style>
 
 
-
-</body>
+  </body>
 </html>

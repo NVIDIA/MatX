@@ -1,102 +1,122 @@
 .. _building:
 
 Building MatX
-======================================================
+=============
 
-Requirements
-------------
-- CUDA 11.2+
-- g++ 9.0+
+As MatX is a header-only library, using it in your own projects is as simple as including only the core ``matx.h`` file. 
+The ``matx.h`` include file is intended to give full functionality of all MatX features that do not require downloading or
+including separate libraries. This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS, 
+CUB, cuSolver, cuRAND). Optional features of MatX that require downloading separate libraries use additional include files to
+be explicit about their requirements.
 
-Unit tests
-**********
-pybind11 source build and installed
-Python3 includes (python3-dev package)
+The MatX CMake build configuration is intented to help download any libraries for both the required and optional features.
+The CPM_ build system is used to help with package management and version control. By default, CPM will fetch other packages
+from the internet. Alternatively, the option ``CPM_USE_LOCAL_PACKAGES`` can be used to point to local downloads in an air-gapped
+or offline environment. Choosing local versions of packages uses the typical ``find_packages`` CMake search methods. Please see 
+the CPM_ documentation or the documentation for each package for more information.
 
-Multi GPU
-*********
-NvSHMEM
+.. _CPM: https://github.com/cpm-cmake/CPM.cmake
+.. _GoogleTest: https://github.com/google/googletest
+.. _pybind11: https://github.com/pybind/pybind11
 
-Building
---------
-While the MatX library does not require compiling, building unit tests, benchmarks, or examples must be compiled.
-To build all components, issue the standard cmake build commands in a cloned repo:
+Core Requirements
+-----------------
+MatX requires **CUDA 11.2** or higher, and **g++ 9.3** or higher for the host compiler. Clang may work as well, but it's currently 
+untested. Other requirements for optional components are listed below.
 
-.. code-block:: shell
+.. warning:: Using MatX will an unsupported compiler may result in compiler and/or runtime errors.
 
-    mkdir build && cd build
-    cmake ..
-    make -j
+Build Choices
+=============
+MatX provides 4 different types of build types, and can each be configured independently:
 
-Unit tests and examples are built by default. Documentation building is disabled by default. To disable specific builds, 
-use the cmake properties with the OFF flag:
-BUILD_EXAMPLES
-BUILD_TESTS
-For example, to disable unit test building:
+.. list-table::
+  :widths: 60 40
+  :header-rows: 1
 
-.. code-block:: shell
+  * - Type
+    - CMake Option
+  * - Unit Tests
+    - ``-DBUILD_TESTS=ON`` 
+  * - Benchmarks
+    - ``-DBUILD_BENCHMARKS=ON`` 
+  * - Examples
+    - ``-DBUILD_EXAMPLES=ON`` 
+  * - Documentation
+    - ``-DBUILD_DOCS=ON``             
 
-    mkdir build && cd build
-    cmake -DBUILD_TESTS=OFF ..
-    make -j
 
-To build documentation use the cmake flag ``-DBUILD_DOCS=ON``
-
+Everything but documentation requires building MatX source code, and all requirements in the first section of this document apply.
+Building documentation will be covered later in this document.
 
 Unit tests
 ----------
-MatX contains a suite of unit tests to test functionality of the primitive functions, plus other signal processing pipelines.
-Due to the nature of certain unit tests, the amount of data used as input and output for comparison can get quite large, and
-as a result, test vectors are generated dynamically using Python. Version 2.6.2 of the pybind11 library is required to be built
-and installed before building the MatX unit tests. Once built, the MatX build system will try to find pybind11 in common installation
-directories. If it cannot be found, it may be specified manually by passing the pybind11_DIR CMake parameter:
+MatX unit tests are compiled using **Google Test** as the test framework, and **pybind11** for verification. pybind11 provides an interface
+to compare common Numpy and Scipy results with MatX without reimplementing complex functionality in C++. Required versions for these 
+libraries are:
 
-.. code-block:: shell
+**Google test**: 1.11+
 
-    cmake -Dpybind11_DIR=/matx_libs/pybind11
-    
+**pybind11**: 2.6.2
 
-To run the unit tests, from the cmake build directory run:
+Both Google Test and pybind11 will be automatically downloaded by CPM when unit tests are enabled. If an offline copy of them exists, 
+``CPM_USE_LOCAL_PACKAGES`` can be used to override the download. 
+
+To build unit tests, pass the argument ``-DBUILD_TESTS=ON`` to CMake to configure the build environment, then issue:
 
 .. code-block:: shell
 
     make -j test
 
-This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
-may run test/matx_test directly with parameters defined by Google Test (https://github.com/google/googletest). To run matx_test
-directly, you must be inside the build/test directory for the correct paths to be set. For example,
-to run only tests with the name FFT:
+This will compile and run all unit tests. For more control over which tests to run, you may run test/matx_test directly with parameters 
+defined by Google Test (https://github.com/google/googletest). To run matx_test directly, you must be inside the build/test directory 
+for the correct paths to be set. For example, to run only tests with the name FFT:
 
 .. code-block:: shell
 
-    cd build/test
-    ./matx_test --gtest_filter="*FFT*"
+    test/matx_test --gtest_filter="*FFT*"
+
+Examples
+--------
+
+MatX provides several example applications that show different capabilities of MatX. When the ``-DBUILD_EXAMPLES=ON`` CMake argument
+is specified the ``build/examples`` directory will contain a separate binary file for each example. Each example can be run by simply
+executing the binary.
 
 
 Benchmarks
 ----------
-MatX uses the NVBench software for the benchmarking framework. To run the benchmarks, you must have NVBench downloaded from 
-https://github.com/NVIDIA/nvbench. When specifying the CMake parameters benchmarks can be enabled by:
+MatX uses the NVBench software for the benchmarking framework. Like other packages, NVBench will be download using CPM according to
+the methods mentioned above.
 
-.. code-block:: shell
+NVBench has a small library that will be compiled on the first `make` run. Benchmarks can be run using the ``bench/matx_bench`` executable,
+and all options to filter or modify benchmark runs can be found in the nvbench_ project documentation.
 
-    cmake .. -DNVBENCH_DIR=/my/nvbench/dir -DBUILD_BENCHMARKS=ON
-
-NVBench has a small library that will be compiled on the first `make` run. A binary called `matx_bench` will be produced
-inside of build/bench, and all parameters to the binary can be found in the NVBench documentation.
+.. _nvbench: https://github.com/NVIDIA/nvbench
 
 
-Multi-GPU Support
------------------
-MatX examples and unit tests can be compiled with multi-GPU support using the NVSHMEM library. NVSHMEM must be compiled and/or
-installed before building MatX with multi-GPU support. The build system will look in common locations for NVSHMEM libraries and
-include files, but the installation directory can be overridden on the cmake configuration:
+Documentation
+-------------
 
-.. code-block:: shell
+Building documentation has a separete list of requirements from all other build types. MatX requires the following packages to build
+documentation:
 
-    cmake -DMULTI_GPU=ON -DNVSHMEM_DIR=/usr/local/nvshmem ..
+**Breate**: 4.31.0
 
-If nvshmem is detected properly, you will see a message similar to the following during cmake:
+**Doxygen**: 1.9.1
 
-``-- Found Nvshmem: /usr/local/nvshmem/lib/libnvshmem.a``
+**Sphinx**: 4.3.1
+
+**sphinx-book-theme**: 0.1.7
+
+**libjs-mathjax**
+
+**texlive-font-utils**
+
+Building documentation must be done separately from other build options as to minimize the requirements needed. After configuring CMake with
+``-DBUILD_DOCS=ON`` and typing ``make``, Doxygen, Sphinx, and Breathe will parse the source to build the documentation. Once complete, a 
+directory ``build/docs_input/sphinx`` will be created containing all documentation files, and an ``index.html`` entry point that can be used
+to browse the documentation. Note that the most recent version of the documentation is also hosted at:
+
+https://nvidia.github.io/MatX/
 
