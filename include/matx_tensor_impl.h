@@ -85,8 +85,9 @@ public:
    * @tparam Ex Executor type
    * @param ex Executor
    */
-  template <typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true>
+  template <typename Ex>
   void run (Ex ex) {
+    static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
     exec(*static_cast<T *>(this), ex);
   }
 
@@ -195,8 +196,9 @@ class tensor_impl_t {
      * @param data
      *   Data pointer
      */
-    template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
-    tensor_impl_t(T *const data) : ldata_(data) { }
+    tensor_impl_t(T *const data) : ldata_(data) { 
+      static_assert(RANK == 0, "tensor_impl_t with single pointer parameter must be a rank 0 tensor");
+    }
 
     /**
      * Constructor for a rank-1 and above tensor.
