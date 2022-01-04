@@ -144,9 +144,9 @@ Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS
 doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, flex, bison
 
 - Current documentation can be [found here](https://nvidia.github.io/MatX)
-- A quick start guide can be [found here](docs/quickstart.rst)
-- Current library limitations are [listed here](docs/limitations.rst)
-- A conversion from MATLAB and Python syntax is [found here](docs/matlabpython.rst)
+- A quick start guide can be [found here](https://nvidia.github.io/MatX/quickstart.html)
+- Current library limitations are [listed here](https://nvidia.github.io/MatX/limitations.html)
+- A conversion from MATLAB and Python syntax is [found here](https://nvidia.github.io/MatX/matlabpython.html)
 - A self-guided Jupyer notebook training can be [found here](docs/notebooks)
 
 MatX uses semantic versioning and reserve the right to introduce breaking API changes on major releases.
