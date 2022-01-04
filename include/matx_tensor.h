@@ -102,15 +102,6 @@ public:
   using storage_type = Storage; ///< Storage type trait
   using desc_type = Desc; ///< Descriptor type trait
 
-
-  // /**
-  //  * @brief Conversion to basic tensor implementation
-  //  * 
-  //  */
-  // operator tensor_t<T, RANK, Storage, Desc>() {
-  //   return tensor_t<T, RANK, Storage, Desc>{ldata_, shape_, s_};
-  // }
-
   /**
    * @brief Construct a new 0-D tensor t object
    * 
@@ -1083,9 +1074,9 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val) noexcept
   {
+    static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
     this->operator()() = val;
   }
 
@@ -1098,11 +1089,10 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 1) ||
-                                               (is_cuda_complex_v<T> && M == 0),
-                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals) noexcept
   {
+    static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
+      "Single initializer list on SetVals only for non-complex rank 1 tensor or complex rank 0 tensors");
     for (size_t i = 0; i < vals.size(); i++) {
       if constexpr (is_cuda_complex_v<T>) {
         typename T::value_type real = (vals.begin() + i)->real();
@@ -1124,13 +1114,12 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 2) ||
-                                               (is_cuda_complex_v<T> && M == 1),
-                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<T>>
               &vals) noexcept
   {
+    static_assert(((!is_cuda_complex_v<T> && RANK == 2) || (is_cuda_complex_v<T> && RANK == 1)),
+      "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         if constexpr (is_cuda_complex_v<T>) {
@@ -1157,14 +1146,13 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 3) ||
-                                               (is_cuda_complex_v<T> && M == 2),
-                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<T>>>
               vals) noexcept
   {
+    static_assert(((!is_cuda_complex_v<T> && RANK == 3) || (is_cuda_complex_v<T> && RANK == 2)),
+      "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");       
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1194,14 +1182,13 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 4) ||
-                                               (is_cuda_complex_v<T> && M == 3),
-                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>
               &vals) noexcept
   {
+    static_assert(((!is_cuda_complex_v<T> && RANK == 4) || (is_cuda_complex_v<T> && RANK == 3)),
+      "Quad initializer list on SetVals only for non-complex rank 4 tensor or complex rank 3 tensors");
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1240,14 +1227,14 @@ public:
    * @returns reference to view
    *
    */
-  template <int M = RANK,
-            std::enable_if_t<is_cuda_complex_v<T> && M == 4, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>>
               &vals) noexcept
   {
+    static_assert((is_cuda_complex_v<T> && RANK == 4),
+          "Quintuple initializer list on SetVals only for complex rank 3 tensors");    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {

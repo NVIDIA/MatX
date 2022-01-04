@@ -137,10 +137,10 @@ inline
       return static_cast<first_value_type>(GetVal<I + 1, Is...>(tup));
     }    
 
-    template <size_t I = 0, typename... Is, std::enable_if_t<I < sizeof...(Ts), bool> = true>
+    template <typename... Is>
     inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
     {
-      return static_cast<first_value_type>(GetVal<I, Is...>(cuda::std::make_tuple(is...)));
+      return static_cast<first_value_type>(GetVal<0, Is...>(cuda::std::make_tuple(is...)));
     }
    
     
@@ -1433,6 +1433,7 @@ inline
   template <typename T1>
   auto planar(T1 t)
   {
+    static_assert(is_complex_v<extract_scalar_type_t<T1>>, "Input to interleaved operator must be complex-valued");
     return detail::ComplexPlanarOp<T1>(t);
   }
 
@@ -1504,11 +1505,10 @@ inline
  *   View/Op to shift
  *
  */
-  template <
-      typename T1,
-      std::enable_if_t<!is_complex_v<extract_scalar_type_t<T1>>, bool> = true>
+  template <typename T1>
   auto interleaved(T1 t)
   {
+    static_assert(!is_complex_v<extract_scalar_type_t<T1>>, "Input to interleaved operator must be real-valued");
     return detail::ComplexInterleavedOp<T1>(t);
   }
 

@@ -247,10 +247,11 @@ static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
     return cuda::std::atan2(v1.imag(), v1.real());
   }
 }
-template <typename T, std::enable_if_t<is_complex_v<T>, bool> = true>
+template <typename T>
 struct Angle {
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
+    static_assert(is_complex_v<T>, "Angle operator must have complex value as input");
     return _internal_angle(v1);
   }
 };
