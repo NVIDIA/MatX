@@ -142,9 +142,16 @@ endif()
 if (EN_CUTENSOR)
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
+    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=1)
     
     target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
     target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)
+
+    # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
+    # We switch to that format here for compatibility
+    target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+else()
+    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=0)
 endif()
 
 if (MULTI_GPU)

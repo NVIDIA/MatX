@@ -7,6 +7,7 @@ set (test_sources
     00_tensor/VizTests.cu
     00_tensor/ShapeTests.cu
     00_tensor/TensorCreationTests.cu
+    00_tensor/ContractionTests.cu
     00_operators/OperatorTests.cu
     00_operators/GeneratorTests.cu
     00_operators/ReductionTests.cu

@@ -68,3 +68,18 @@ class stats:
             'var': var,
             'std': std
         }
+
+class contraction:
+    def __init__(self, dtype: str, size: List[int]):
+        pass
+
+    def run(self) -> Dict[str, np.array]:
+        a1 = np.arange(60.).reshape(3,4,5)
+        b1 = np.arange(24.).reshape(4,3,2)
+        c1 = np.einsum('ijk,jil->kl', a1, b1)
+
+        return {
+            'a_float3d': a1,
+            'b_float3d': b1,
+            'c_float3d': c1
+        }

@@ -62,7 +62,8 @@ namespace matx
     matxInvalidType,
     matxLUError,
     matxInverseError,
-    matxSolverError
+    matxSolverError,
+    matxcuTensorError
   };
 
   static constexpr const char *matxErrorString(matxError_t e)
@@ -113,6 +114,9 @@ namespace matx
       break;
     case matxSolverError:
       return "matxSolverError";
+      break;
+    case matxcuTensorError:
+      return "matxcuTensorError";
       break;
     default:
       return "Unknown";
@@ -180,6 +184,16 @@ namespace matx
       MATX_THROW(error, #a ": " str);  \
     }                                  \
   }
+
+  #define MATX_ASSERT_STR_EXP(a, expected, error, str) \
+  {                                    \
+    auto tmp = a;                      \
+    if ((tmp != expected))                   \
+    {                                  \
+      std::cout << #a ": " << str << "(" << tmp << " != " << expected << ")\n";\
+      MATX_THROW(error, "");  \
+    }                                  \
+  }  
   
 #else
   #define MATX_ASSERT(a, error) {}
