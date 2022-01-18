@@ -542,17 +542,17 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
 {
   MATX_ENTER_HANDLER();
   index_t count = 1500;
-  index_t end = 10;
+  TypeParam end = 10;
   TypeParam f0 = -200;
   TypeParam f1 = 300;
   
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->template InitAndRunTVGenerator<TypeParam>(
-      "01_signal", "chirp", "run", {count, end, static_cast<index_t>((float)f0), static_cast<index_t>((float)f1)});  
+      "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
 
   auto t1 = make_tensor<TypeParam>({count});
   (t1 = signal::chirp(count, end, f0, end, f1)).run();
-  t1.Print(0);
+  MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
   pb.reset();
   MATX_EXIT_HANDLER();

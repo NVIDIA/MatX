@@ -963,6 +963,7 @@ public:
   inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
   {
     if constexpr (Method == ChirpMethod::CHIRP_METHOD_LINEAR) {
+     // printf("%lld %lld %f %f %lld %f\n", i, sop_(i), f0_, f1_, t1_, cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i))));
       return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
     }
   }
@@ -1027,10 +1028,10 @@ inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, Freq
  * @returns The chirp operator
  */
 template <typename TimeType, typename FreqType, ChirpMethod Method = ChirpMethod::CHIRP_METHOD_LINEAR>
-inline auto chirp(TimeType num, TimeType last, FreqType f0, TimeType t1, FreqType f1)
+inline auto chirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1)
 {
-  std::array<TimeType, 1> shape = {num};
-  auto space = linspace<0>(std::move(shape), (index_t)0, last);
+  std::array<index_t, 1> shape = {num};
+  auto space = linspace<0>(std::move(shape), (TimeType)0, last);
   return detail::Chirp<decltype(space), FreqType, Method>(space, f0, t1, f1);
 }
 }
