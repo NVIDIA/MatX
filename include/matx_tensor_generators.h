@@ -935,6 +935,108 @@ inline auto logspace(const index_t (&s)[RANK], T first, T last)
 }
 
 
+enum class ChirpMethod {
+  CHIRP_METHOD_LINEAR
+};
+namespace detail {
+template <typename SpaceOp, typename FreqType, ChirpMethod Method> 
+class Chirp {
+  using space_type = typename SpaceOp::scalar_type;
+
+  static_assert(Method == ChirpMethod::CHIRP_METHOD_LINEAR, "Only linear chirps supported at this time");
+private:
+  SpaceOp sop_;
+  FreqType f0_;
+  FreqType f1_;
+  space_type t1_;
+
+public:
+  using scalar_type = FreqType;
+  using matxop = bool;
+  inline __MATX_HOST__ __MATX_DEVICE__ Chirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1) : 
+      sop_(sop),
+      f0_(f0),
+      t1_(t1),
+      f1_(f1)
+        {}
+
+  inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+  {
+    if constexpr (Method == ChirpMethod::CHIRP_METHOD_LINEAR) {
+      return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
+    }
+  }
+
+  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
+  {
+    return sop_.Size(0);
+  }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }  
+};
+}
+
+namespace signal {
+/**
+ * Creates a chirp signal (swept-frequency cosine)
+ *
+ * @tparam FreqType
+ *   Frequency data type
+ * @tparam SpaceOp
+ *   Operator type of spacer
+ * @tparam Method
+ *   Chirp method (CHIRP_METHOD_LINEAR)
+ *
+ * @param t
+ *   Vector representing values in time
+ * @param f0
+ *   Instantenous frequency at time 0
+ * @param t1
+ *   Time for f1
+ * @param f1
+ *   Frequency (Hz) at time t1
+ *
+ * @returns The chirp operator
+ */
+template <typename SpaceOp, typename FreqType, ChirpMethod Method = ChirpMethod::CHIRP_METHOD_LINEAR>
+inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1)
+{
+  return detail::Chirp<SpaceOp, FreqType, Method>(t, f0, t1, f1);
+}
+
+/**
+ * Creates a chirp signal (swept-frequency cosine)
+ *
+ * @tparam FreqType
+ *   Frequency data type
+ * @tparam TimeType
+ *   Type of time vector
+ * @tparam Method
+ *   Chirp method (CHIRP_METHOD_LINEAR)
+ *
+ * @param num
+ *   Number of time samples
+ * @param last
+ *   Last time sample value
+ * @param f0
+ *   Instantenous frequency at time 0
+ * @param t1
+ *   Time for f1
+ * @param f1
+ *   Frequency (Hz) at time t1
+ *
+ * @returns The chirp operator
+ */
+template <typename TimeType, typename FreqType, ChirpMethod Method = ChirpMethod::CHIRP_METHOD_LINEAR>
+inline auto chirp(TimeType num, TimeType last, FreqType f0, TimeType t1, FreqType f1)
+{
+  std::array<TimeType, 1> shape = {num};
+  auto space = linspace<0>(std::move(shape), (index_t)0, last);
+  return detail::Chirp<decltype(space), FreqType, Method>(space, f0, t1, f1);
+}
+}
+
+
+
 namespace detail {
 template <typename T> class Meshgrid_X {
 private:
