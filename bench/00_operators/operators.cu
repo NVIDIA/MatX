@@ -20,11 +20,11 @@ void vector_add(nvbench::state &state, nvbench::type_list<ValueType>)
   tensor_t<ValueType, 1> xv{{x_len}};
   tensor_t<ValueType, 1> xv2{{x_len}};
   xv.PrefetchDevice(0);
-  exec(set(xv, xv + xv2), 0);
+  (xv = xv + xv2).run();
 
   state.exec( 
     [&xv, &xv2](nvbench::launch &launch) {
-      exec(set(xv, xv + xv2), launch.get_stream());
+      (xv = xv + xv2).run((cudaStream_t)launch.get_stream());
     });
 
 }
