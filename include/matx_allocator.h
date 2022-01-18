@@ -33,6 +33,7 @@
 
 #include <cstdio>
 #include <shared_mutex>
+#include <mutex>
 #include <unordered_map>
 #include <utility>
 #ifndef __CUDA_CC__
