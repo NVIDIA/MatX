@@ -554,6 +554,9 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
   (t1 = signal::chirp(count, end, f0, end, f1)).run();
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
+  auto t1c = make_tensor<cuda::std::complex<TypeParam>>({count});
+  (t1c = signal::cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
+
   pb.reset();
   MATX_EXIT_HANDLER();
 }
