@@ -190,6 +190,11 @@
      Type Traits
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/einsum.html">
+     einsum
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toctree-l1">
@@ -330,6 +335,8 @@
 </li>
       <li><a href="api/stats.html#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t">matx::cumsum (C++ function)</a>
 </li>
+      <li><a href="api/einsum.html#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">matx::cutensor::einsum (C++ function)</a>
+</li>
       <li><a href="api/tensorgenerators.html#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx4diagEDaRR9ShapeType1T">matx::diag (C++ function)</a>, <a href="api/tensorgenerators.html#_CPPv4I0_iEN4matx4diagEDaRA4RANK_K7index_t1T">[1]</a>
 </li>
       <li><a href="api/solver.html#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t">matx::eig (C++ function)</a>
@@ -460,10 +467,10 @@
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matxeqE2Op2Op">matx::operator== (C++ function)</a>
 </li>
-      <li><a href="api/tensorops.html#_CPPv4N4matxgtE2Op2Op">matx::operator&gt; (C++ function)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/tensorops.html#_CPPv4N4matxgtE2Op2Op">matx::operator&gt; (C++ function)</a>
+</li>
       <li><a href="api/tensorops.html#_CPPv4N4matxgeE2Op2Op">matx::operator&gt;= (C++ function)</a>
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matxooE2Op2Op">matx::operator|| (C++ function)</a>
@@ -600,7 +607,7 @@
 </li>
       <li><a href="api/tensorview.html#_CPPv4N4matx8tensor_t11scalar_typeE">matx::tensor_t::scalar_type (C++ type)</a>
 </li>
-      <li><a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXaa17is_cuda_complex_vI1TEeq1ML4EEbEEEN4matx8tensor_t7SetValsEvRKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE">matx::tensor_t::SetVals (C++ function)</a>, <a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXeq1ML0EEbEEEN4matx8tensor_t7SetValsEvRK1T">[1]</a>, <a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXooaant17is_cuda_complex_vI1TEeq1ML1Eaa17is_cuda_complex_vI1TEeq1ML0EEbEEEN4matx8tensor_t7SetValsEvRKNSt16initializer_listI1TEE">[2]</a>, <a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXooaant17is_cuda_complex_vI1TEeq1ML2Eaa17is_cuda_complex_vI1TEeq1ML1EEbEEEN4matx8tensor_t7SetValsEvRKNSt16initializer_listIKNSt16initializer_listI1TEEEE">[3]</a>, <a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXooaant17is_cuda_complex_vI1TEeq1ML3Eaa17is_cuda_complex_vI1TEeq1ML2EEbEEEN4matx8tensor_t7SetValsEvKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE">[4]</a>, <a href="api/tensorview.html#_CPPv4I_i_NSt11enable_if_tIXooaant17is_cuda_complex_vI1TEeq1ML4Eaa17is_cuda_complex_vI1TEeq1ML3EEbEEEN4matx8tensor_t7SetValsEvRKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE">[5]</a>
+      <li><a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsEKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE">matx::tensor_t::SetVals (C++ function)</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsERK1T">[1]</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listI1TEE">[2]</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listI1TEEEE">[3]</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE">[4]</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE">[5]</a>
 </li>
       <li><a href="api/tensorview.html#_CPPv4N4matx8tensor_t7ShallowERK8tensor_tI1T4RANK7Storage4DescE">matx::tensor_t::Shallow (C++ function)</a>
 </li>
