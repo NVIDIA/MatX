@@ -14,3 +14,4 @@ API Reference
    random.rst
    utilities.rst
    type_traits.rst
+   einsum.rst

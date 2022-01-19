@@ -490,6 +490,12 @@ __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, s
     cuda::std::get<Ints>(std::forward<Tuple>(tuple))...);
 }
 
+template <typename... T, std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
+constexpr bool TensorTypesMatch() {
+  using first_type = std::tuple_element_t<0, std::tuple<T...>>;
+  return ((std::is_same_v<typename first_type::scalar_type, typename T::scalar_type>) && ...);
+}
+
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes
 typedef enum {

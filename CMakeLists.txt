@@ -16,6 +16,10 @@ option(BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MULTI_GPU "Multi-GPU support" OFF)
 option(EN_VISUALIZATION "Enable visualization support" OFF)
 option(EN_CUTLASS OFF)
+option(EN_CUTENSOR OFF)
+set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
+set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
+
 
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (BUILD_DOCS)
@@ -132,6 +136,22 @@ if (EN_CUTLASS)
 else()
     set (CUTLASS_INC "")
     target_compile_definitions(matx INTERFACE ENABLE_CUTLASS=0)
+endif()
+
+# Get the tensor libraries if we need them
+if (EN_CUTENSOR)
+    include(cmake/FindcuTENSOR.cmake)
+    include(cmake/FindcuTensorNet.cmake)
+    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=1)
+    
+    target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
+    target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)
+
+    # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
+    # We switch to that format here for compatibility
+    target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+else()
+    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=0)
 endif()
 
 if (MULTI_GPU)

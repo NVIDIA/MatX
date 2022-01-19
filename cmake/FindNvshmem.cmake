@@ -35,7 +35,7 @@
 # NVSHMEM_LIBRARY_PATH -- Library path
 # NVSHMEM_LIBRARY -- Library to link against
 
-set(HINT_PATH /usr/local/nvshmem/ ${NSHMEM_DIR})
+set(HINT_PATH /usr/local/nvshmem/ ${NVSHMEM_DIR})
 
 find_path(NVSHMEM_INCLUDE_DIR nvshmem.h HINTS ${HINT_PATH} PATH_SUFFIXES include)
 find_path(NVSHMEM_LIBRARY_PATH libnvshmem.a HINTS ${HINT_PATH} PATH_SUFFIXES lib)
