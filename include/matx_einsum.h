@@ -33,13 +33,18 @@
 
 #pragma once
 
+#if ENABLE_CUTENSOR
+#include <cstdio>
+#include <numeric>
 #include "matx_error.h"
 #include "matx_tensor.h"
 
+
 #include <cutensornet.h>
 #include <cutensor.h>
-#include <cstdio>
-#include <numeric>
+
+
+
 
 namespace matx {
 namespace detail {
@@ -419,3 +424,5 @@ namespace cutensor {
 }
 
 } // end namespace matx
+
+#endif

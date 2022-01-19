@@ -96,7 +96,7 @@ TYPED_TEST_SUITE(ContractionTestsIntegral, MatXAllIntegralTypes);
 TYPED_TEST_SUITE(ContractionTestsNumericNonComplex, MatXNumericNonComplexTypes);
 TYPED_TEST_SUITE(ContractionTestsBoolean, MatXBoolTypes);
 
-#ifdef ENABLE_CUTENSOR
+#if ENABLE_CUTENSOR
 TEST(ContractionTests, BasicRealFloat)
 {
   MATX_ENTER_HANDLER();
