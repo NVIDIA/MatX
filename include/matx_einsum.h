@@ -83,7 +83,7 @@ public:
   {
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
-cutensornetLoggerSetLevel(5);
+    //cutensornetLoggerSetLevel(5);
     // Convert all parameter structures
     int32_t *modes[sizeof...(InT) + 1];
     int64_t *extents[sizeof...(InT) + 1];

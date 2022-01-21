@@ -522,3 +522,23 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
 
 //   MATX_EXIT_HANDLER();
 // }
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Trace)
+{
+  MATX_ENTER_HANDLER();
+  index_t count = 10;
+  TypeParam c = GenerateData<TypeParam>();
+
+  tensor_t<TypeParam, 2> t2({count, count});
+  auto t0 = make_tensor<TypeParam>();
+
+  (t2 = ones(t2.Shape())).run();
+  trace(t0, t2);
+
+  cudaDeviceSynchronize();
+
+  ASSERT_EQ(t0(), count);
+  MATX_EXIT_HANDLER();
+}
+
+
