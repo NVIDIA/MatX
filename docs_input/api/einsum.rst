@@ -16,14 +16,17 @@ While many of these operations are possible using other methods in MatX, ``einsu
 shorter syntax, and is sometimes more optimized than a direct version of the operation. 
 
 As of now, MatX only supports a limited set of ``einsum`` operations that would be supported in
-the NumPy version. Specifically only tensor contractions and GEMMs are supported and tested at
-this time. MatX also does not support broadcast '...' notation at this time. Since ``einsum``
-requires an output tensor parameter, only *explicit* mode is supported using the ``->`` operator.
-This allows type and size checking on the output tensor at the cost of extra verbosity.
+the NumPy version. Specifically only tensor contractions, inner products, and GEMMs are supported 
+and tested at this time. MatX also does not support broadcast '...' notation and has no plans to. While
+the broadcast notation is useful for high-rank tensors, it doesn't add any new features and
+isn't compatible in all expressions inside NumPy. We feel listing out the dimensions makes the 
+syntax more clear without giving up any features. Since ``einsum`` requires an output tensor parameter, 
+only *explicit* mode is supported using the ``->`` operator. This allows type and size checking on the 
+output tensor at the cost of extra verbosity.
 
 For tensor contractions, MatX uses cuTENSOR and cuTensorNet as the optimized backend libraries. Since
-neither of these libraries are included with CUDA, and not all users need contractions, tensor contractions
-are an opt-in feature when configuring MatX. To add support, add the following CMake line:
+neither of these libraries are included with CUDA, and not all users need ``einsum`` functionality, ``einsum``
+is an opt-in feature when configuring MatX. To add support, add the following CMake line:
 
 .. code-block:: shell
 
