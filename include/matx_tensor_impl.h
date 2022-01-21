@@ -176,9 +176,9 @@ class tensor_impl_t {
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
-    __MATX_HOST__ tensor_impl_t(const tensor_impl_t &) = default;
-    __MATX_HOST__ tensor_impl_t(tensor_impl_t &&) = default;
-    __MATX_HOST__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
+    tensor_impl_t(const tensor_impl_t &) = default;
+    tensor_impl_t(tensor_impl_t &&) = default;
+    tensor_impl_t& operator=(tensor_impl_t &&) = default;
 
 
     __MATX_INLINE__ ~tensor_impl_t() = default;
