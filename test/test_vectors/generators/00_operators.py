@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import scipy.signal as ss
 from typing import Dict, List
 
 
@@ -45,12 +46,14 @@ class window:
         self.hanning = np.hanning(self.win_size)
         self.blackman = np.blackman(self.win_size)
         self.bartlett = np.bartlett(self.win_size)
+        self.flattop = ss.flattop(self.win_size)
 
         return {
             'hamming': self.hamming,
             'hanning': self.hanning,
             'blackman': self.blackman,
-            'bartlett': self.bartlett
+            'bartlett': self.bartlett,
+            'flattop': self.flattop
         }
 
 
