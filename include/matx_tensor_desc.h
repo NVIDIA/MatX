@@ -58,22 +58,22 @@ public:
   /**
    * @brief Default copy constructor
    */
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t<ShapeType, StrideType, RANK>(const tensor_desc_t& ) = default;
+  __MATX_INLINE__  tensor_desc_t<ShapeType, StrideType, RANK>(const tensor_desc_t& ) = default;
 
   /**
    * @brief Default move constructor
    */  
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
+  __MATX_INLINE__  tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
 
   /**
    * @brief Default const copy assignment constructor
    */  
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(const tensor_desc_t&) = default;
+  __MATX_INLINE__  tensor_desc_t& operator=(const tensor_desc_t&) = default;
 
   /**
    * @brief Default copy assignment constructor
    */    
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
+  __MATX_INLINE__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
   /**
    * @brief Construct a tensor_desc_t from a generic shape and stride
