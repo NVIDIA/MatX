@@ -406,6 +406,82 @@ inline auto hanning(const index_t (&s)[RANK])
 
 
 namespace detail {
+template <typename T> class FlatTop {
+private:
+  index_t size_;
+
+  static constexpr T a0 = 0.21557895;
+  static constexpr T a1 = 0.41663158;
+  static constexpr T a2 = 0.277263158;
+  static constexpr T a3 = 0.083578947;
+  static constexpr T a4 = 0.006947368;  
+
+public:
+
+  using scalar_type = T;
+  inline __MATX_HOST__ __MATX_DEVICE__ FlatTop(index_t size) : size_(size){};
+
+  inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
+  {
+    return  a0  
+            - a1 * cuda::std::cos(2*M_PI*i / (size_ - 1))
+            + a2 * cuda::std::cos(4*M_PI*i / (size_ - 1))
+            - a3 * cuda::std::cos(6*M_PI*i / (size_ - 1))
+            + a4 * cuda::std::cos(8*M_PI*i / (size_ - 1));
+  }
+};
+}
+
+/**
+ * Creates a Flattop window operator of shape s with the
+ * window applies along the x, y, z, or w dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape
+ *
+ * @param s
+ *   The shape of the tensor
+ *
+ * Returns values for a Flattop window across the selected dimension.
+ */
+template <int Dim, typename ShapeType, typename T = float,
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+inline auto flattop(ShapeType &&s)
+{
+  constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
+  static_assert(RANK > Dim);
+  detail::FlatTop<T> h( *(s.begin() + Dim));
+  return detail::matxGenerator1D_t<detail::FlatTop<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
+}
+
+/**
+ * Creates a Flattop window operator of shape s with the
+ * window applies along the x, y, z, or w dimension
+ *
+ * @tparam T
+ *   Data type
+ * @tparam Dim
+ *   Dimension to create window over
+ * @tparam RANK
+ *   The RANK of the shape
+ *
+ * @param s
+ *   The shape of the tensor
+ *
+ * Returns values for a Flattop window across the selected dimension.
+ */
+template <int Dim, int RANK, typename T = float>
+inline auto flattop(const index_t (&s)[RANK])
+{
+  return flattop<Dim>(detail::to_array(s));
+}
+
+
+namespace detail {
 template <typename T> class Blackman {
 private:
   index_t size_;

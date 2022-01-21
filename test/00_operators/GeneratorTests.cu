@@ -110,7 +110,12 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 
   (ov = blackman<0>(shape)).run();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "blackman", 0.01);
-  MATX_EXIT_HANDLER();
+
+  (ov = flattop<0>(shape)).run();  
+  MATX_TEST_ASSERT_COMPARE(pb, ov, "flattop", 0.01);
+
+
+  MATX_EXIT_HANDLER();  
 }
 
 TYPED_TEST(BasicGeneratorTestsAll, Diag)

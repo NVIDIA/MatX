@@ -20,6 +20,8 @@ since their only purpose is to compute a single value at a particular location b
 .. doxygenfunction:: matx::bartlett(const index_t (&s)[RANK])
 .. doxygenfunction:: matx::blackman(ShapeType &&s)
 .. doxygenfunction:: matx::blackman(const index_t (&s)[RANK])
+.. doxygenfunction:: matx::flattop(ShapeType &&s)
+.. doxygenfunction:: matx::flattop(const index_t (&s)[RANK])
 .. doxygenfunction:: matx::range(ShapeType &&s, T first, T step)
 .. doxygenfunction:: matx::range(const index_t (&s)[RANK], T first, T step)
 .. doxygenfunction:: matx::linspace(ShapeType &&s, T first, T last)
