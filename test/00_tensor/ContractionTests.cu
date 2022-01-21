@@ -100,22 +100,82 @@ TYPED_TEST_SUITE(ContractionTestsBoolean, MatXBoolTypes);
 TEST(ContractionTests, BasicRealFloat)
 {
   MATX_ENTER_HANDLER();
+  using TypeParam = float;
+
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->template InitAndRunTVGenerator<float>(
       "00_operators", "contraction", "run", {});  
 
-  auto a1 = make_tensor<float>({60});
-  auto b1 = make_tensor<float>({24});
-  auto c2 = make_tensor<float>({5,2});
+  {
+    // 3D contraction on two dimensions
+    auto a1 = make_tensor<float>({60});
+    auto b1 = make_tensor<float>({24});
+    auto c2 = make_tensor<float>({5,2});
 
-  (a1 = linspace<0>(a1.Shape(), 0.0f, static_cast<float>(a1.Size(0) - 1))).run();
-  (b1 = linspace<0>(b1.Shape(), 0.0f, static_cast<float>(b1.Size(0) - 1))).run();
-  auto a = a1.View({3,4,5});
-  auto b = b1.View({4,3,2});
+    (a1 = linspace<0>(a1.Shape(), 0.0f, static_cast<float>(a1.Size(0) - 1))).run();
+    (b1 = linspace<0>(b1.Shape(), 0.0f, static_cast<float>(b1.Size(0) - 1))).run();
+    auto a = a1.View({3,4,5});
+    auto b = b1.View({4,3,2});
 
-  cutensor::einsum(c2, "ijk,jil->kl", 0, a, b);
-  cudaStreamSynchronize(0);
-  MATX_TEST_ASSERT_COMPARE(pb, c2, "c_float3d", 0.01);
+    cutensor::einsum(c2, "ijk,jil->kl", 0, a, b);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, c2, "c_float3d", 0.01);
+  }
+
+  {
+    // Dot
+    auto a1 = make_tensor<float>({60});
+    auto b1 = make_tensor<float>({60});
+    auto c0 = make_tensor<float>();
+    (a1 = ones(a1.Shape()) * 2).run();
+    (b1 = ones(b1.Shape()) * 2).run(); 
+    cutensor::einsum(c0, "i,i->", 0, a1, b1);   
+    cudaStreamSynchronize(0);
+    MATX_ASSERT_EQ(c0(), 4 * a1.Size(0));
+  }
+
+  {
+    // GEMM
+    auto a2 = make_tensor<float>({10,20});
+    auto b2 = make_tensor<float>({20,10});
+    auto c2 = make_tensor<float>({10,10});    
+    auto c22 = make_tensor<float>({10,10});   
+    (a2 = ones(a2.Shape())).run();
+    (b2 = ones(b2.Shape())).run(); 
+
+    cutensor::einsum(c2, "mk,kn->mn", 0, a2, b2);
+    matmul(c22, a2, b2);
+    cudaStreamSynchronize(0);
+
+    for (auto i = 0; i < c2.Size(0); i++) {
+      for (auto j = 0; j < c2.Size(1); j++) {
+        MATX_ASSERT_EQ(c2(i,j), c22(i,j));
+      }
+    }
+  }
+
+  {
+    // GEMM with transpose
+    auto a2 = make_tensor<float>({5,20});
+    auto b2 = make_tensor<float>({20,10});
+    auto c2 = make_tensor<float>({10,5});    
+    auto c22 = make_tensor<float>({5,10});   
+    (a2 = ones(a2.Shape())).run();
+    (b2 = ones(b2.Shape())).run(); 
+
+    cutensor::einsum(c2, "mk,kn->nm", 0, a2, b2);
+    matmul(c22, a2, b2);
+    cudaStreamSynchronize(0);
+
+    auto c22t = c22.Permute({1,0}); // Permute to match cutensor
+
+    for (auto i = 0; i < c2.Size(0); i++) {
+      for (auto j = 0; j < c2.Size(1); j++) {
+        MATX_ASSERT_EQ(c2(i,j), c22t(i,j));
+      }
+    }
+  } 
+
 
   MATX_EXIT_HANDLER();
 }

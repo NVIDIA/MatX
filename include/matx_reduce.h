@@ -1433,4 +1433,32 @@ void inline stdd(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 #endif  
 }
 
+/**
+ * Computes the trace of a tensor
+ *
+ * Computes the trace of a square matrix by summing the diagonal
+ *
+ * @tparam T
+ *   Output data type
+ * @tparam RANK
+ *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param stream
+ *   CUDA stream
+ */
+template <typename TensorType, typename InType>
+void inline trace(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  auto d = diag(in);
+  sum(dest, d, stream);
+#endif  
+}
+
 } // end namespace matx

@@ -83,7 +83,7 @@ public:
   {
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
-
+    //cutensornetLoggerSetLevel(5);
     // Convert all parameter structures
     int32_t *modes[sizeof...(InT) + 1];
     int64_t *extents[sizeof...(InT) + 1];
@@ -208,6 +208,7 @@ public:
    * @return true if tokenized successfully, or false otherwise 
    */
   static bool ParseEinsum(const std::string &str, std::vector<std::string> &out) {
+    // Find output separator
     auto iout = str.find("->");
     if (iout == std::string::npos) {
       return false;
@@ -226,6 +227,7 @@ public:
       start += sep - start + 1;
     }
 
+    // Nothing after the output separator -> indicates this is a 0D output
     out.push_back(str.substr(iout + 2));
 
     return true;
@@ -257,13 +259,23 @@ public:
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
-        sizes.push_back(t.Size(s));
+        if constexpr (t.Rank() > 0) {
+          sizes.push_back(t.Size(s));
+        }
+        else {
+          sizes.push_back(1);
+        }
       }
     };
 
     auto set_strides = [](auto &t, std::vector<int64_t> &strides) {
-      for (int32_t s = 0; s < t.Rank(); s++) {
-        strides.push_back(t.Stride(s));
+      if constexpr (t.Rank() > 0) {
+        for (int32_t s = 0; s < t.Rank(); s++) {
+          strides.push_back(t.Stride(s));
+        }
+      }
+      else {
+        strides.push_back(1);
       }
     }; 
 

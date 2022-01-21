@@ -18,7 +18,7 @@ shorter syntax, and is sometimes more optimized than a direct version of the ope
 As of now, MatX only supports a limited set of ``einsum`` operations that would be supported in
 the NumPy version. Specifically only tensor contractions and GEMMs are supported and tested at
 this time. MatX also does not support broadcast '...' notation at this time. Since ``einsum``
-requires an output tensor parameter, the output format ``->`` is also required in the subscript string.
+requires an output tensor parameter, only *explicit* mode is supported using the ``->`` operator.
 This allows type and size checking on the output tensor at the cost of extra verbosity.
 
 For tensor contractions, MatX uses cuTENSOR and cuTensorNet as the optimized backend libraries. Since
