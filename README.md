@@ -15,7 +15,7 @@ and MatX version are shown below:
 * CuPy: **10.6ms**  (A100)
 * MatX: **2.54ms** (A100)
 
-While the code complexity and length are roughly the same, the MatX version shows a **1771x** over the Numpy version, and over **4x** faster than
+While the code complexity and length are roughly the same, the MatX version shows a **2100x** over the Numpy version, and over **4x** faster than
 the CuPy version on the same GPU. 
 
 Key features include:
