@@ -386,7 +386,7 @@ Common reduction executors are also available, such as ``sum()``, ``mean()``, ``
     auto t0 = make_tensor<float>();
     sum(t0, t4);
 
-The above code performs an optimized sum reduction of ``t4`` into ``t0``. Currently reduction type exectors *can* take operators as an input. Please
+The above code performs an optimized sum reduction of ``t4`` into ``t0``. Currently reduction type executors *can* take operators as an input. Please
 see the documentation for a list of which ones are compatible.
 
 Random numbers
