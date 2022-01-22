@@ -184,5 +184,28 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
     }
 }
 
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
+{
+  auto a = make_tensor<TypeParam>({5,20,4,3});
+  auto b = make_tensor<TypeParam>({20,3,4,5});  
+  auto b2 = make_tensor<TypeParam>({20,3,4,5});  
+  (a = ones(a.Shape())).run();
+  (b = ones(b.Shape())).run(); 
+
+  cutensor::einsum(b, "ijkl->jlki", 0, a);
+  (b2 = a.Permute({1,3,2,0})).run();
+  cudaStreamSynchronize(0);
+
+  for (auto i = 0; i < b.Size(0); i++) {
+    for (auto j = 0; j < b.Size(1); j++) {
+      for (auto k = 0; k < b.Size(2); k++) {
+        for (auto l = 0; l < b.Size(3); l++) {
+          MATX_ASSERT_EQ(b(i,j,k,l), b2(i,j,k,l));
+        }
+      }
+    }
+  }
+}
+
 
 #endif
