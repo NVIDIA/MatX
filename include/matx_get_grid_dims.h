@@ -40,7 +40,7 @@ template <int RANK>
 inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
                           int max_cta_size = 1024)
 {
-  int nt = 1;
+  [[maybe_unused]] int nt = 1;
   threads.x = 1;
   threads.y = 1;
   threads.z = 1;

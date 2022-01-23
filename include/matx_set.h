@@ -112,20 +112,39 @@ public:
     return out_(indices...);
   }  
 
+  // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
+  // functions, so we have to make a separate one.
+  template <typename... Ts>
+  __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
+    if constexpr (is_matx_half_v<T> &&
+                  std::is_integral_v<decltype(detail::get_value(op_, args...))>) {   
+      auto r = static_cast<float>(detail::get_value(op_, args...));
+      out_(args...) = r;
+      return r;
+    }
+    else {      
+      auto r = detail::get_value(op_, args...);
+      out_(args...) = r; 
+      return r;
+    }  
+
+    if constexpr (!(is_matx_half_v<T> &&
+                  std::is_integral_v<decltype(detail::get_value(op_, args...))>)) {   
+      auto r = detail::get_value(op_, args...);
+      out_(args...) = r; 
+      return r;
+    }
+    else {      
+      auto r = static_cast<float>(detail::get_value(op_, args...));
+      out_(args...) = r;
+      return r;
+    }    
+  }
+
   __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<typename Desc::shape_type, RANK> idx) const noexcept
   {
     auto res = mapply([&](auto &&...args)  {
-        if constexpr (is_matx_half_v<T> &&
-                      std::is_integral_v<decltype(detail::get_value(op_, args...))>) {   
-          auto r = static_cast<float>(detail::get_value(op_, args...));
-          out_(args...) = r;
-          return r;
-        }
-        else {      
-          auto r = detail::get_value(op_, args...);
-          out_(args...) = r; 
-          return r;
-        }       
+        return _internal_mapply(args...);       
       }, idx
     );  
 

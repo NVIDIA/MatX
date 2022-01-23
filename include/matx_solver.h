@@ -1135,7 +1135,6 @@ template <typename OutputTensor, typename PivotTensor, typename ATensor>
 void lu(OutputTensor &out, PivotTensor &piv,
         const ATensor &a, const cudaStream_t stream = 0)
 {
-  constexpr int RANK = OutputTensor::Rank();
   using T1 = typename OutputTensor::scalar_type;
 
   /* Temporary WAR
@@ -1245,7 +1244,6 @@ void qr(OutTensor &out, TauTensor &tau,
         const ATensor &a, cudaStream_t stream = 0)
 {
   using T1 = typename OutTensor::scalar_type;
-  constexpr int RANK = OutTensor::Rank();
 
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
@@ -1321,7 +1319,6 @@ void svd(UTensor &u, STensor &s,
   using T2 = typename UTensor::scalar_type;
   using T3 = typename STensor::scalar_type;
   using T4 = typename VTensor::scalar_type;
-  constexpr int RANK = UTensor::Rank();
 
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
@@ -1396,7 +1393,6 @@ void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
      cuSolver.
   */
   using T1 = typename OutputTensor::scalar_type;
-  constexpr int RANK = OutputTensor::Rank();
 
   T1 *tp;
   matxAlloc(reinterpret_cast<void **>(&tp), a.Bytes(), MATX_ASYNC_DEVICE_MEMORY,

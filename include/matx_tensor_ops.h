@@ -560,6 +560,15 @@ inline
         cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
         return mapply(op_, tup);
       }
+
+      if constexpr (Rank() != 0) {
+        auto tup = cuda::std::make_tuple(indices...);
+        cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
+        return mapply(op_, tup);
+      } 
+      else {
+        return op_();
+      }      
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -894,6 +903,15 @@ inline
         UpdateIndex(tup);
         return mapply(op_, tup);
       }
+
+      if constexpr (Rank() != 0) {
+        auto tup = cuda::std::make_tuple(indices...);
+        UpdateIndex(tup);
+        return mapply(op_, tup);
+      }
+      else {
+        return op_();
+      }      
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
