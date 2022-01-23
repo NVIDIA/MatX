@@ -602,7 +602,7 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
   std::array<index_t, InType::Rank()> indices;
   using scalar_type = typename InType::scalar_type;
   using T = typename TensorType::scalar_type;
-  bool valid;
+  [[maybe_unused]] bool valid;
   
   // This is for 2 stage reduction
 

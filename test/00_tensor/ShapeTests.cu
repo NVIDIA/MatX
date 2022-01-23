@@ -37,17 +37,17 @@
 
 using namespace matx;
 
-TEST(ShapeTests, Equality)
-{
-  tensorShape_t<1> t1a{{10}};
-  tensorShape_t<1> t1b{{10}};
-  tensorShape_t<1> t1c{{20}};
-  tensorShape_t<2> t2a{{20, 10}};
-  tensorShape_t<2> t2b{{20, 10}};
-  tensorShape_t<2> t2c{{20, 5}};
+// TEST(ShapeTests, Equality)
+// {
+//   tensorShape_t<1> t1a{{10}};
+//   tensorShape_t<1> t1b{{10}};
+//   tensorShape_t<1> t1c{{20}};
+//   tensorShape_t<2> t2a{{20, 10}};
+//   tensorShape_t<2> t2b{{20, 10}};
+//   tensorShape_t<2> t2c{{20, 5}};
 
-  ASSERT_TRUE(t1a == t1b);
-  ASSERT_TRUE(t1a != t1c);
-  ASSERT_TRUE(t2a == t2b);
-  ASSERT_TRUE(t2a != t2c);
-}
+//   ASSERT_TRUE(t1a == t1b);
+//   ASSERT_TRUE(t1a != t1c);
+//   ASSERT_TRUE(t2a == t2b);
+//   ASSERT_TRUE(t2a != t2c);
+// }
