@@ -13,7 +13,7 @@ look at the following sources:
 Adding MatX to your project
 ---------------------------
 MatX is a single header file to include in your project called ``matx.h``. Simply add the matx/include directory to your compiler's
-include search path, and add "#include "matx.h". All core MatX functions are in a top-level ``matx`` namespace, while more specific functions have
+include search path, and add ``#include "matx.h"``. All core MatX functions are in a top-level ``matx`` namespace, while more specific functions have
 a nested namespace. For example, the visualization pieces of MatX are under ``matx::viz``.
 
 Tensor Views
