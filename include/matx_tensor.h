@@ -103,6 +103,7 @@ public:
   using desc_type = Desc; ///< Descriptor type trait
   static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
+
   /**
    * @brief Construct a new 0-D tensor t object
    * 
