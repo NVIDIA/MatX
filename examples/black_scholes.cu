@@ -40,7 +40,7 @@ using namespace matx;
 
 /**
  * MatX uses C++ expression templates to build arithmetic expressions that compile into a lazily-evaluated
- * type that for executing on the device. Currently nvcc cannot see certain optimizations
+ * type for executing on the device. Currently, nvcc cannot see certain optimizations
  * when building the expression tree that would be obvious by looking at the code. Specifically any code reusing
  * the same tensor multiple times appears to the compiler as separate tensors, and it may issue multiple load
  * instructions. While caching helps, this can have a slight performance impact when compared to native CUDA
