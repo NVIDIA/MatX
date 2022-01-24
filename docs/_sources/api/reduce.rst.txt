@@ -14,3 +14,4 @@ are listed in the :ref:`statistics` API guide section. Note that to avoid collis
 .. doxygenfunction:: sum  
 .. doxygenfunction:: argmin
 .. doxygenfunction:: argmax
+.. doxygenfunction:: trace

@@ -529,6 +529,29 @@ are listed in the <a class="reference internal" href="stats.html#statistics"><sp
 </dl>
 </dd></dl>
 
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5traceEvR10TensorTypeRK6InType12cudaStream_t">
+<span id="_CPPv3I00EN4matx5traceER10TensorTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx5traceER10TensorTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3ef02f9eb121d91e7e522eb372900624"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">trace</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5traceEvR10TensorTypeRK6InType12cudaStream_t" title="matx::trace::TensorType"><span class="n"><span class="pre">TensorType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5traceEvR10TensorTypeRK6InType12cudaStream_t" title="matx::trace::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5traceEvR10TensorTypeRK6InType12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Computes the trace of a tensor</p>
+<p>Computes the trace of a square matrix by summing the diagonal</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – Output data type </p></li>
+<li><p><strong>RANK</strong> – Rank of output tensor </p></li>
+<li><p><strong>InType</strong> – Input data type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dest</strong> – Destination view of reduction </p></li>
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>stream</strong> – CUDA stream </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 
 

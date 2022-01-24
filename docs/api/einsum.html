@@ -328,13 +328,16 @@ of <code class="docutils literal notranslate"><span class="pre">einsum</span></c
 <p>While many of these operations are possible using other methods in MatX, <code class="docutils literal notranslate"><span class="pre">einsum</span></code> typically has a
 shorter syntax, and is sometimes more optimized than a direct version of the operation.</p>
 <p>As of now, MatX only supports a limited set of <code class="docutils literal notranslate"><span class="pre">einsum</span></code> operations that would be supported in
-the NumPy version. Specifically only tensor contractions and GEMMs are supported and tested at
-this time. MatX also does not support broadcast ‘…’ notation at this time. Since <code class="docutils literal notranslate"><span class="pre">einsum</span></code>
-requires an output tensor parameter, the output format <code class="docutils literal notranslate"><span class="pre">-&gt;</span></code> is also required in the subscript string.
-This allows type and size checking on the output tensor at the cost of extra verbosity.</p>
+the NumPy version. Specifically only tensor contractions, inner products, and GEMMs are supported
+and tested at this time. MatX also does not support broadcast ‘…’ notation and has no plans to. While
+the broadcast notation is useful for high-rank tensors, it doesn’t add any new features and
+isn’t compatible in all expressions inside NumPy. We feel listing out the dimensions makes the
+syntax more clear without giving up any features. Since <code class="docutils literal notranslate"><span class="pre">einsum</span></code> requires an output tensor parameter,
+only <em>explicit</em> mode is supported using the <code class="docutils literal notranslate"><span class="pre">-&gt;</span></code> operator. This allows type and size checking on the
+output tensor at the cost of extra verbosity.</p>
 <p>For tensor contractions, MatX uses cuTENSOR and cuTensorNet as the optimized backend libraries. Since
-neither of these libraries are included with CUDA, and not all users need contractions, tensor contractions
-are an opt-in feature when configuring MatX. To add support, add the following CMake line:</p>
+neither of these libraries are included with CUDA, and not all users need <code class="docutils literal notranslate"><span class="pre">einsum</span></code> functionality, <code class="docutils literal notranslate"><span class="pre">einsum</span></code>
+is an opt-in feature when configuring MatX. To add support, add the following CMake line:</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>-DEN_CUTENSOR<span class="o">=</span>ON
 </pre></div>
 </div>
@@ -360,31 +363,10 @@ only paid on the first call of input tensors with that signature, and subsequent
 contraction step.</p>
 <section id="api">
 <h2>API<a class="headerlink" href="#api" title="Permalink to this headline"></a></h2>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">
-<span id="_CPPv3I0DpEN4matx8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span id="_CPPv2I0DpEN4matx8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">InT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="matx__einsum_8h_1a9e5fb0181482cf1fec38ecf338c6999d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">cutensor</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">einsum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="matx::cutensor::einsum::OutputType"><span class="n"><span class="pre">OutputType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">subscripts</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span>, <a class="reference internal" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="matx::cutensor::einsum::InT"><span class="n"><span class="pre">InT</span></span></a><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tensors</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Evaluates the Einstein summation on the operands. </p>
-<p>einsum() is a multi-purpose tool capable of performing various operations on tensors in a compact syntax. A non-exhaustive list of operations are: tensor contractions, GEMMs, dot products, and tranposes. Because einsum is extremely powerful, not all features are supported or tested in MatX yet. Currently only tensor contractions are tested. Other operations may work, but they’re not tested yet.</p>
-<p>MatX uses a syntax very similar to NumPy’s einsum syntax: <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.einsum.html">https://numpy.org/doc/stable/reference/generated/numpy.einsum.html</a></p>
-<p>Ellipses are not supported yet, but a variadic list of tensors for contraction is supported. The output operator ‘-&gt;’ is required in MatX currently, and serves to provide error checking on the output tensor size.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutputType</strong> – Output tensor type </p></li>
-<li><p><strong>InT</strong> – Types of input tensors </p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>out</strong> – Output tensor </p></li>
-<li><p><strong>subscripts</strong> – String containing Einstein notation of operation to perform </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-<li><p><strong>tensors</strong> – List of input tensors </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>doxygenfunction: Cannot find function “einsum” in doxygen xml output for project “MatX” from directory: /repro/MatX/build/docs_input/doxygen/xml</p>
+</aside>
 </section>
 </section>
 
