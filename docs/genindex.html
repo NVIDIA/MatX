@@ -335,8 +335,6 @@
 </li>
       <li><a href="api/stats.html#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK11InputTensorK12cudaStream_t">matx::cumsum (C++ function)</a>
 </li>
-      <li><a href="api/einsum.html#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">matx::cutensor::einsum (C++ function)</a>
-</li>
       <li><a href="api/tensorgenerators.html#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx4diagEDaRR9ShapeType1T">matx::diag (C++ function)</a>, <a href="api/tensorgenerators.html#_CPPv4I0_iEN4matx4diagEDaRA4RANK_K7index_t1T">[1]</a>
 </li>
       <li><a href="api/solver.html#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t">matx::eig (C++ function)</a>
@@ -356,6 +354,8 @@
       <li><a href="api/tensorops.html#_CPPv4I0EN4matx10fftshift2DEDa2T1">matx::fftshift2D (C++ function)</a>
 </li>
       <li><a href="api/filter.html#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t">matx::filter (C++ function)</a>
+</li>
+      <li><a href="api/tensorgenerators.html#_CPPv4I_i00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx7flattopEDaRR9ShapeType">matx::flattop (C++ function)</a>, <a href="api/tensorgenerators.html#_CPPv4I_i_i0EN4matx7flattopEDaRA4RANK_K7index_t">[1]</a>
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matx5floorE2Op">matx::floor (C++ function)</a>
 </li>
@@ -467,14 +467,14 @@
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matxeqE2Op2Op">matx::operator== (C++ function)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/tensorops.html#_CPPv4N4matxgtE2Op2Op">matx::operator&gt; (C++ function)</a>
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matxgeE2Op2Op">matx::operator&gt;= (C++ function)</a>
 </li>
       <li><a href="api/tensorops.html#_CPPv4N4matxooE2Op2Op">matx::operator|| (C++ function)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/tensorops.html#_CPPv4N4matx3powE2Op2Op">matx::pow (C++ function)</a>
 </li>
       <li><a href="api/type_traits.html#_CPPv4I0EN4matx14promote_half_tE">matx::promote_half_t (C++ type)</a>
@@ -567,6 +567,8 @@
 </li>
       <li><a href="api/tensorview.html#_CPPv4I0ENK4matx8tensor_t8ImagViewEDav">matx::tensor_t::ImagView (C++ function)</a>
 </li>
+      <li><a href="api/tensorview.html#_CPPv4IDpENK4matx8tensor_t13InternalPrintEvDp4Args">matx::tensor_t::InternalPrint (C++ function)</a>
+</li>
       <li><a href="api/tensorview.html#_CPPv4N4matx8tensor_t6matxopE">matx::tensor_t::matxop (C++ type)</a>
 </li>
       <li><a href="api/tensorview.html#_CPPv4I0EN4matx8tensor_trMEDaRK2T2">matx::tensor_t::operator%= (C++ function)</a>, <a href="api/tensorview.html#_CPPv4N4matx8tensor_trMERK8tensor_tI1T4RANK7Storage4DescE">[1]</a>
@@ -600,6 +602,12 @@
       <li><a href="api/tensorview.html#_CPPv4NK4matx8tensor_t14PrefetchDeviceEK12cudaStream_t">matx::tensor_t::PrefetchDevice (C++ function)</a>
 </li>
       <li><a href="api/tensorview.html#_CPPv4NK4matx8tensor_t12PrefetchHostEK12cudaStream_t">matx::tensor_t::PrefetchHost (C++ function)</a>
+</li>
+      <li><a href="api/tensorview.html#_CPPv4IDp_NSt11enable_if_tIXfraaNSt13is_integral_vI4ArgsEEEbEEENK4matx8tensor_t5PrintEvDp4Args">matx::tensor_t::Print (C++ function)</a>, <a href="api/tensorview.html#_CPPv4I_iENK4matx8tensor_t5PrintEvRA5NRANK_K7index_tRA5NRANK_K7index_t">[1]</a>, <a href="api/tensorview.html#_CPPv4I_iENK4matx8tensor_t5PrintEvRA5NRANK_K7index_tRA5NRANK_K7index_tRA5NRANK_K7index_t">[2]</a>
+</li>
+      <li><a href="api/tensorview.html#_CPPv4N4matx8tensor_t15PRINT_ON_DEVICEE">matx::tensor_t::PRINT_ON_DEVICE (C++ member)</a>
+</li>
+      <li><a href="api/tensorview.html#_CPPv4NK4matx8tensor_t8PrintValERK1T">matx::tensor_t::PrintVal (C++ function)</a>
 </li>
       <li><a href="api/tensorview.html#_CPPv4I0ENK4matx8tensor_t8RealViewEDav">matx::tensor_t::RealView (C++ function)</a>
 </li>
@@ -640,6 +648,8 @@
       <li><a href="api/tensorshape.html#_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T">matx::tensorShape_t::tensorShape_t (C++ function)</a>, <a href="api/tensorshape.html#_CPPv4I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t">[1]</a>, <a href="api/tensorshape.html#_CPPv4N4matx13tensorShape_t13tensorShape_tEPCK7index_t">[2]</a>
 </li>
       <li><a href="api/tensorshape.html#_CPPv4NK4matx13tensorShape_t9TotalSizeEv">matx::tensorShape_t::TotalSize (C++ function)</a>
+</li>
+      <li><a href="api/reduce.html#_CPPv4I00EN4matx5traceEvR10TensorTypeRK6InType12cudaStream_t">matx::trace (C++ function)</a>
 </li>
       <li><a href="api/utilities.html#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensorK12cudaStream_t">matx::transpose (C++ function)</a>
 </li>

@@ -21,7 +21,7 @@ the CPM_ documentation or the documentation for each package for more informatio
 
 Core Requirements
 -----------------
-MatX requires **CUDA 11.2** or higher, and **g++ 9.3** or higher for the host compiler. Clang may work as well, but it's currently 
+MatX requires **CUDA 11.4** or higher, and **g++ 9.3** or higher for the host compiler. Clang may work as well, but it's currently 
 untested. Other requirements for optional components are listed below.
 
 .. warning:: Using MatX will an unsupported compiler may result in compiler and/or runtime errors.
