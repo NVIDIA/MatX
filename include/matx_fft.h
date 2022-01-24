@@ -187,6 +187,8 @@ public:
       }
     }
 
+    MATX_ASSERT_STR(params.idist > 0, matxInvalidDim, "FFTs do not support batch strides of 0 (no cloned views)");
+
     return params;
   }
 
@@ -390,12 +392,13 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
   size_t workspaceSize;
   cufftCreate(&this->plan_);
   cufftResult error;
-  cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
+
+  MATX_ASSERT(cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
                       this->params_.ostride, this->params_.odist,
                       this->params_.output_type, this->params_.batch,
-                      &workspaceSize, this->params_.exec_type);
+                      &workspaceSize, this->params_.exec_type) == CUFFT_SUCCESS, matxCufftError);
 
   matxAlloc((void **)&this->workspace_, workspaceSize);
   cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
@@ -686,7 +689,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                 sizeof(T1) * desc.TotalSize(), MATX_ASYNC_DEVICE_MEMORY,
                 stream);
 
-      auto i_new = make_tensor(i_pad, desc);
+      auto i_new = make_tensor<T2>(i_pad, desc);
       ends[RANK - 1] = i.Lsize();
       auto i_pad_part_v = i_new.Slice(starts, ends);
 
