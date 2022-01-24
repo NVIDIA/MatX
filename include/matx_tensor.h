@@ -101,6 +101,7 @@ public:
   using tensor_view = bool; ///< Indicate this is a MatX tensor view
   using storage_type = Storage; ///< Storage type trait
   using desc_type = Desc; ///< Descriptor type trait
+  static constexpr bool PRINT_ON_DEVICE = false;      
 
   /**
    * @brief Construct a new 0-D tensor t object
@@ -1407,6 +1408,236 @@ public:
 
     return indices;
   }
+
+  /**
+   * Print a value
+   *
+   * Type-agnostic function to print a value to stdout
+   *
+   * @param val
+   */
+  __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) const noexcept
+  {
+    if constexpr (is_complex_v<T>) {
+      printf("%.4f%+.4fj ", static_cast<float>(val.real()),
+            static_cast<float>(val.imag()));
+    }
+    else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
+      printf("%.4f ", static_cast<float>(val));
+    }
+    else if constexpr (std::is_floating_point_v<T>) {
+      printf("%.4f ", val);
+    }
+    else if constexpr (std::is_same_v<T, long long int>) {
+      printf("%lld ", val);
+    }
+    else if constexpr (std::is_same_v<T, int64_t>) {
+      printf("%" PRId64 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, int32_t>) {
+      printf("%" PRId32 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, int16_t>) {
+      printf("%" PRId16 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, int8_t>) {
+      printf("%" PRId8 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, uint64_t>) {
+      printf("%" PRIu64 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, uint32_t>) {
+      printf("%" PRIu32 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, uint16_t>) {
+      printf("%" PRIu16 " ", val);
+    }
+    else if constexpr (std::is_same_v<T, uint8_t>) {
+      printf("%" PRIu8 " ", val);
+    }
+  }
+
+  /**
+   * Print a tensor
+   *
+   * Type-agnostic function to print a tensor to stdout
+   *
+   */
+  template <typename ... Args>
+  __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
+  {
+    MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
+    MATX_STATIC_ASSERT(RANK <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
+    if constexpr (sizeof...(Args) == 0) {
+      PrintVal(this->operator()());
+      printf("\n");
+    }
+    else if constexpr (sizeof...(Args) == 1) {
+      auto& k =detail:: pp_get<0>(dims...);
+      for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
+        printf("%06lld: ", _k);
+        PrintVal(this->operator()(_k));
+        printf("\n");
+      }
+    }
+    else if constexpr (sizeof...(Args) == 2) {
+      auto& k = detail::pp_get<0>(dims...);
+      auto& l = detail::pp_get<1>(dims...);
+      for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(0) : k); _k++) {
+        for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(1) : l); _l++) {
+          if (_l == 0)
+            printf("%06lld: ", _k);
+
+          PrintVal(this->operator()(_k, _l));
+        }
+        printf("\n");
+      }
+    }
+    else if constexpr (sizeof...(Args) == 3) {
+      auto& j = detail::pp_get<0>(dims...);
+      auto& k = detail::pp_get<1>(dims...);
+      auto& l = detail::pp_get<2>(dims...);
+      for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(0) : j); _j++) {
+        printf("[%06lld,:,:]\n", _j);
+        for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(1) : k); _k++) {
+          for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(2) : l); _l++) {
+            if (_l == 0)
+              printf("%06lld: ", _k);
+
+            PrintVal(this->operator()(_j, _k, _l));
+          }
+          printf("\n");
+        }
+        printf("\n");
+      }      
+    }
+    else if constexpr (sizeof...(Args) == 4) {
+      auto& i = detail::pp_get<0>(dims...);
+      auto& j = detail::pp_get<1>(dims...);
+      auto& k = detail::pp_get<2>(dims...);
+      auto& l = detail::pp_get<3>(dims...); 
+      for (typename Desc::shape_type _i = 0; _i < ((i == 0) ? this->Size(0) : i); _i++) {
+        for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(1) : j); _j++) {
+          printf("[%06lld,%06lld,:,:]\n", _i, _j);
+          for (typename Desc::shape_type _k = 0; _k < ((k == 0) ? this->Size(2) : k); _k++) {
+            for (typename Desc::shape_type _l = 0; _l < ((l == 0) ? this->Size(3) : l); _l++) {
+              if (_l == 0)
+                printf("%06lld: ", _k);
+
+              PrintVal(this->operator()(_i, _j, _k, _l));
+            }
+            printf("\n");
+          }
+          printf("\n");
+        }
+      }
+    }
+  } 
+
+  /**
+   * @brief Print a tensor's values to stdout
+   * 
+   * This form of `Print()` takes integral values for each index, and prints that as many values
+   * in each dimension as the arguments specify. For example:
+   * 
+   * `a.Print(2, 3, 2);`
+   * 
+   * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
+   * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
+   * 0 can be used if the entire tensor should be printed:
+   * 
+   * `a.Print(0, 0, 0);` // Prints the whole tensor
+   * 
+   * For more fine-grained printing, see the over `Print()` overloads.
+   * 
+   * @tparam Args Integral argument types
+   * @param dims Number of values to print for each dimension
+   */
+  template <typename ... Args, std::enable_if_t<((std::is_integral_v<Args>) && ...), bool> = true>
+  void Print(Args ...dims) const
+  {
+#ifdef __CUDACC__    
+    auto kind = GetPointerKind(this->ldata_);
+    cudaDeviceSynchronize();
+    if (HostPrintable(kind)) {
+      InternalPrint(dims...);
+    }
+    else if (DevicePrintable(kind)) {
+      if constexpr (PRINT_ON_DEVICE) {
+        PrintKernel<<<1, 1>>>(*this, dims...);
+      }
+      else {
+        auto tmpv = make_tensor<T>(this->desc_);
+        typename detail::base_type<decltype(tmpv)>::type tmpd = tmpv;
+
+        cudaMemcpy(tmpd.Data(), Data(), tmpd.Bytes(),
+                  cudaMemcpyDeviceToHost);
+        tmpd.Print(dims...);
+      }
+    }
+#else
+    InternalPrint(dims...);
+#endif    
+  }      
+
+
+  /**
+   * @brief Print a tensor's values to stdout using start/end parameters
+   * 
+   * This form of `Print()` takes two array-like lists for the start and end indices, respectively. For
+   * example:
+   * 
+   * `a.Print({2, 3}, {matxEnd, 5});`
+   * 
+   * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end, and
+   * the second index starting at 3 and ending at 5 (exlusive). The format is identical to calling
+   * `Slice()` to get a sliced view, followed by `Print()` with the indices.
+   * 
+   * @tparam NRANK Automatically-deduced rank of tensor
+   * @param start Start indices to print from
+   * @param end End indices to stop
+   */
+  template <int NRANK>
+  void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK]) const
+  {
+    auto s = this->Slice(start, end);
+    std::array<index_t, NRANK> arr = {0};
+    auto tup = std::tuple_cat(arr);
+    std::apply(
+      [&](auto&&... args) {
+        s.InternalPrint(args...);
+      }, tup);
+  }
+
+  /**
+   * @brief Print a tensor's values to stdout using start/end/stride
+   * 
+   * This form of `Print()` takes three array-like lists for the start, end, and stride indices, respectively. For
+   * example:
+   * 
+   * `a.Print({2, 3}, {matxEnd, 5}, {1, 2});`
+   * 
+   * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end with a 
+   * stride of 1, and the second index starting at 3 and ending at 5 (exlusive) with a stride of 2. The format is 
+   * identical to calling `Slice()` to get a sliced view, followed by `Print()` with the indices.
+   * 
+   * @tparam NRANK Automatically-deduced rank of tensor
+   * @param start Start indices to print from
+   * @param end End indices to stop
+   * @param strides Strides of each dimension
+   */
+  template <int NRANK>
+  void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK], const index_t (&strides)[NRANK]) const
+  {
+    auto s = this->Slice(start, end, strides);
+    std::array<index_t, NRANK> arr = {0};
+    auto tup = std::tuple_cat(arr);
+    std::apply(
+      [&](auto&&... args) {
+        s.InternalPrint(args...);
+      }, tup);
+  }   
+
 
 private:
   Storage storage_;
