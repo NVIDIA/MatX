@@ -681,15 +681,16 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
       // advantage of that without changing the API.
 
       // Create a new shape where n is the size of the last dimension
-      auto desc = i.Descriptor();
-      desc.SetSize(RANK - 1, act_fft_size);
+      auto shape = i.Shape();
+      *(shape.end() - 1) = act_fft_size;
+      auto tot = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<typename decltype(shape)::value_type>());
 
       // Make a new buffer large enough for our input
       matxAlloc(reinterpret_cast<void **>(&i_pad),
-                sizeof(T1) * desc.TotalSize(), MATX_ASYNC_DEVICE_MEMORY,
+                sizeof(T1) * tot, MATX_ASYNC_DEVICE_MEMORY,
                 stream);
 
-      auto i_new = make_tensor<T2>(i_pad, desc);
+      auto i_new = make_tensor<T2>(i_pad, shape);
       ends[RANK - 1] = i.Lsize();
       auto i_pad_part_v = i_new.Slice(starts, ends);
 
