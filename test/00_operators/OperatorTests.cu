@@ -159,7 +159,27 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
 
   (tov0 = angle(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsComplex, RealImagOp)
+{
+  MATX_ENTER_HANDLER();
+  tensor_t<TypeParam, 0> tiv0;
+  tensor_t<typename TypeParam::value_type, 0> tov0;
+
+  TypeParam c = GenerateData<TypeParam>();
+  tiv0() = c;
+
+  (tov0 = real(tiv0)).run();
+  cudaStreamSynchronize(0);
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.real()));  
+
+  (tov0 = imag(tiv0)).run();
+  cudaStreamSynchronize(0);
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.imag()));   
 
   MATX_EXIT_HANDLER();
 }
