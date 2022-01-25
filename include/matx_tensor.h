@@ -1553,9 +1553,11 @@ public:
    * @tparam Args Integral argument types
    * @param dims Number of values to print for each dimension
    */
-  template <typename ... Args, std::enable_if_t<((std::is_integral_v<Args>) && ...), bool> = true>
-  void Print(Args ...dims) const
-  {
+  template <typename... Args,
+            std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
+                                 (RANK == 0 || sizeof...(Args) > 0),
+                             bool> = true>
+  void Print(Args... dims) const {
 #ifdef __CUDACC__    
     auto kind = GetPointerKind(this->ldata_);
     cudaDeviceSynchronize();
@@ -1577,9 +1579,26 @@ public:
     }
 #else
     InternalPrint(dims...);
-#endif    
-  }      
+#endif
+  }
 
+  /**
+   * @brief Print a tensor's all values to stdout
+   *
+   * This form of `Print()` is an alias of `Print(0)`, `Print(0, 0)`,
+   * `Print(0, 0, 0)` and `Print(0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
+   * respectively. It passes the proper number of zeros to `Print(...)`
+   * automatically according to the rank of this tensor. The user only have to
+   * invoke `.Print()` to print the whole tensor, instead of passing zeros
+   * manually.
+   */
+  template <typename... Args,
+            std::enable_if_t<(RANK > 0 && sizeof...(Args) == 0), bool> = true>
+  void Print(Args... dims) const {
+    std::array<int, RANK> arr = {0};
+    auto tp = std::tuple_cat(arr);
+    std::apply([&](auto &&...args) { this->Print(args...); }, tp);
+  }
 
   /**
    * @brief Print a tensor's values to stdout using start/end parameters
