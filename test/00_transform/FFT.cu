@@ -101,7 +101,6 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
-
   MATX_EXIT_HANDLER();
 }
 
