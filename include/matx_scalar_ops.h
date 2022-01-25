@@ -222,6 +222,7 @@ MATX_UNARY_OP_GEN(asinh, Asinh);
 MATX_UNARY_OP_GEN(acosh, Acosh);
 MATX_UNARY_OP_GEN(atanh, Atanh);
 
+
 template <typename T> static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
   return normcdf(v1);
@@ -230,6 +231,19 @@ template <typename T> struct NormCdfF {
   static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_normcdf(v1); }
 };
 template <typename T> using NormCdfOp = UnOp<T, NormCdfF<T>>;
+
+
+template <typename T> struct RealF {
+  static_assert(is_complex_v<T>, "real() must have complex input");
+  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.real(); }
+};
+template <typename T> using RealOp = UnOp<T, RealF<T>>;
+
+template <typename T> struct ImagF {
+  static_assert(is_complex_v<T>, "imag() must have complex input");
+  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.imag(); }
+};
+template <typename T> using ImagOp = UnOp<T, ImagF<T>>;
 
 template <typename T>
 static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)

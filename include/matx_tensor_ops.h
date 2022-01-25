@@ -2024,6 +2024,8 @@ inline
   DEFINE_UNARY_OP(ceil, detail::CeilOp);
   DEFINE_UNARY_OP(round, detail::RoundOp);
   DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
+  DEFINE_UNARY_OP(real, detail::RealOp);
+  DEFINE_UNARY_OP(imag, detail::ImagOp);  
   // DEFINE_UNARY_OP( operator-, SubNegOp );
 
   DEFINE_BINARY_OP(operator+, detail::AddOp);
