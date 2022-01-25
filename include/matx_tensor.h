@@ -1194,7 +1194,7 @@ public:
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
           for (size_t l = 0;
-               l < (((vals.begin() + i)->begin() + j)->begin + k)->size();
+               l < (((vals.begin() + i)->begin() + j)->begin() + k)->size();
                l++) {
             if constexpr (is_cuda_complex_v<T>) {
               typename T::value_type real =
