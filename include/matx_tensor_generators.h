@@ -995,7 +995,7 @@ private:
   ChirpMethod method_;
 
 public:
-  using scalar_type = FreqType;
+  using scalar_type = cuda::std::complex<FreqType>;
   using matxop = bool;
   inline __MATX_HOST__ __MATX_DEVICE__ ComplexChirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
       sop_(sop),
@@ -1008,9 +1008,9 @@ public:
   inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
   {
     if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
-      auto real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
-      auto imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i) + 90.0/360.0));
-      return cuda::std::complex<decltype(real)>{real, imag};
+      FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
+      FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i) + 90.0/360.0));
+      return cuda::std::complex<FreqType>{real, imag};
     }
   }
 
