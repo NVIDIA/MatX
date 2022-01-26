@@ -538,4 +538,27 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
+{
+  MATX_ENTER_HANDLER();
+  index_t count = 1500;
+  TypeParam end = 10;
+  TypeParam f0 = -200;
+  TypeParam f1 = 300;
+  
+  auto pb = std::make_unique<detail::MatXPybind>();
+  pb->template InitAndRunTVGenerator<TypeParam>(
+      "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
+
+  auto t1 = make_tensor<TypeParam>({count});
+  (t1 = signal::chirp(count, end, f0, end, f1)).run();
+  MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
+
+  auto t1c = make_tensor<cuda::std::complex<TypeParam>>({count});
+  (t1c = signal::cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
+
+  pb.reset();
+  MATX_EXIT_HANDLER();
+}
+
 
