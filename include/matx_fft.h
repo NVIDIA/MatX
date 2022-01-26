@@ -393,12 +393,13 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
   cufftCreate(&this->plan_);
   cufftResult error;
 
-  MATX_ASSERT(cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
+  error = cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
                       this->params_.ostride, this->params_.odist,
                       this->params_.output_type, this->params_.batch,
-                      &workspaceSize, this->params_.exec_type) == CUFFT_SUCCESS, matxCufftError);
+                      &workspaceSize, this->params_.exec_type);
+  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
 
   matxAlloc((void **)&this->workspace_, workspaceSize);
   cudaMemPrefetchAsync(this->workspace_, workspaceSize, dev, 0);
