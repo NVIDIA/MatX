@@ -1223,6 +1223,7 @@ inline
   template <typename T1>
   auto fftshift1D(T1 t) { return detail::FFTShift1DOp<T1>(t); }
 
+
   namespace detail {
   template <typename T1>
   class FFTShift2DOp : public BaseOp<FFTShift2DOp<T1>>
@@ -1384,6 +1385,69 @@ inline
  */
   template <typename T1>
   auto ifftshift2D(T1 t) { return detail::IFFTShift2DOp<T1>(t); }
+
+  
+  namespace detail {
+  template <typename T1>
+  class R2COp : public BaseOp<R2COp<T1>>
+  {
+  private:
+    typename base_type<T1>::type op_;
+    index_t orig_size_;
+
+  public:
+    using matxop = bool;
+    using scalar_type = typename T1::scalar_type; 
+
+    __MATX_INLINE__ R2COp(T1 op, index_t orig) : op_(op), orig_size_(orig) {
+      static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
+    };
+
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+    {
+      auto tup = cuda::std::make_tuple(indices...);
+
+      // If we're on the upper part of the spectrum, return the conjugate of the first half
+      if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
+        cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
+        return cuda::std::conj(mapply(op_, tup));
+      }
+
+      return mapply(op_, tup);
+    }   
+
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return detail::get_rank<T1>();
+    }
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    {
+      if (dim == (uint32_t)(Rank() - 1)) {
+        return orig_size_;
+      }
+      else {
+        return op_.Size(dim);
+      }
+    }
+  };
+  }
+
+/**
+ * Returns the full spectrum from an R2C transform
+ *
+ * cuFFT's R2C FFTs only return half the spectrum since the other half is the complex
+ * conjugate of the first half. This operator returns the full spectrum from the output
+ * of an R2C FFT.
+ *
+ * @tparam T1
+ *   Type of View/Op
+ * @param t
+ *   View/Op to shift
+ *
+ */
+  template <typename T1>
+  auto r2cop(T1 t, index_t orig) { return detail::R2COp<T1>(t, orig); }
 
 
   namespace detail {

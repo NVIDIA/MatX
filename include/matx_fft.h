@@ -648,7 +648,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                 (std::is_same_v<T2, matxFp16> &&
                  std::is_same_v<T1, matxFp16Complex>)) { // R2C
     nom_fft_size = in_size / 2 + 1;
-    act_fft_size = (o.Lsize() - 1) * 2;
+    act_fft_size = o.Lsize();
   }
   else if constexpr ((std::is_same_v<T1, float> &&
                       std::is_same_v<T2, cuda::std::complex<float>>) ||
@@ -659,7 +659,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                      (std::is_same_v<T1, matxFp16> &&
                       std::is_same_v<T2, matxFp16Complex>)) { // C2R
     nom_fft_size = (in_size - 1) * 2;
-    act_fft_size = (o.Lsize() / 2) + 1;
+    act_fft_size = o.Lsize();
   }
 
   // Set up new shape if transform size doesn't match tensor
