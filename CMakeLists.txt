@@ -191,7 +191,7 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     # Visualization requires Python libraries
     if (MATX_EN_VISUALIZATION) 
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=1)
-        check_python_libs("plotly")
+        check_python_libs("plotly.express")
     else()
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=0)
     endif()    

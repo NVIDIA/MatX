@@ -32,9 +32,12 @@
 #pragma once
 
 #include "matx.h"
-#include <pybind11/embed.h>
-#include <pybind11/numpy.h>
 
+
+#include <pybind11/embed.h>
+#include <pybind11/numpy.h> 
+
+#if MATX_ENABLE_PYBIND11
 namespace matx {
 
 #define MATX_TEST_ASSERT_NEAR(__x, __y, __t)                                   \
@@ -80,7 +83,11 @@ class MatXPybind {
 public:
   MatXPybind() { Init(); }
 
-  void Init() { AddPath(std::string(MATX_ROOT) + GENERATORS_PATH); }
+  void Init() { 
+    static pybind11::scoped_interpreter gil{};
+
+    AddPath(std::string(MATX_ROOT) + GENERATORS_PATH); 
+  }
 
   void AddPath(const std::string &path)
   {
@@ -429,8 +436,6 @@ public:
     return std::nullopt;
   }
 
-  static void InitGIL() { auto gil = new pybind11::scoped_interpreter(); }
-
 private:
   pybind11::module_ mod;
   pybind11::object res_dict;
@@ -440,3 +445,5 @@ private:
 
 }; //namespace detail
 }; // namespace matx
+
+#endif

@@ -73,7 +73,7 @@ void line(const TensorType &ten,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  auto gil = pybind11::scoped_interpreter{};
+
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
 
   auto px = pybind11::module_::import("plotly.express");   
@@ -123,7 +123,7 @@ void scatter(const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  auto gil = pybind11::scoped_interpreter{};            
+         
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
 
   auto px = pybind11::module_::import("plotly.express");   
@@ -172,7 +172,7 @@ void bar(const TensorType &y,
           const std::string &title,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  auto gil = pybind11::scoped_interpreter{};
+
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
 
   auto px = pybind11::module_::import("plotly.express");   
@@ -225,7 +225,6 @@ void bar( const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  auto gil = pybind11::scoped_interpreter{};
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
   
   auto px = pybind11::module_::import("plotly.express");   

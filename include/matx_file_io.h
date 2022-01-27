@@ -110,6 +110,7 @@ using namespace pybind11::literals;
 //   t.Print();
 // }
 
+
 /**
  * Read a CSV file into a tensor view
  *
@@ -127,7 +128,6 @@ void ReadCSV(const TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
-  auto gil = pybind11::scoped_interpreter{};
   std::unique_ptr<detail::MatXPybind> pb;
 
   auto np = pybind11::module_::import("numpy");
@@ -154,7 +154,6 @@ void WriteCSV(const TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
-  auto gil = pybind11::scoped_interpreter{};
   pybind11::list ndims;
   for (int i = 0; i < TensorType::Rank(); i++) {
     ndims.append(t.Size(i));
