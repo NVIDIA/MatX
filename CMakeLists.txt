@@ -17,9 +17,12 @@ option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
+option(MATX_EN_FILEIO OFF)
+
+set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
+
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
-
 
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (MATX_BUILD_DOCS)
@@ -62,8 +65,8 @@ message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 rapids_cmake_write_version_file(include/version_config.h)
 
 # MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set (CMAKE_CXX_STANDARD 17)
-set (CUDA_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+set(CUDA_CXX_STANDARD 17)
 
 # CPM is required for all package management
 include(cmake/GetCPM.cmake)
@@ -132,17 +135,17 @@ endif()
 if (MATX_EN_CUTLASS)
     include(cmake/GetCUTLASS.cmake)
     set (CUTLASS_INC ${cutlass_SOURCE_DIR}/include/ ${cutlass_SOURCE_DIR}/tools/util/include/)
-    target_compile_definitions(matx INTERFACE ENABLE_CUTLASS=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
 else()
     set (CUTLASS_INC "")
-    target_compile_definitions(matx INTERFACE ENABLE_CUTLASS=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
 endif()
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
-    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=1)
     
     target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
     target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)
@@ -151,7 +154,7 @@ if (MATX_EN_CUTENSOR)
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
 else()
-    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=0)
 endif()
 
 if (MATX_MULTI_GPU)
@@ -164,7 +167,13 @@ endif()
 target_compile_options(matx INTERFACE -isystem=${CUDAToolkit_INCLUDE_DIRS})
 
 # Find python3 and pybind11 for generating unit tests and benchmarks
-if (MATX_BUILD_BENCHMARKS OR MATX_BUILD_TESTS OR MATX_EN_VISUALIZATION OR MATX_BUILD_EXAMPLES)
+if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EXAMPLES OR MATX_BUILD_TESTS OR MATX_BUILD_BENCHMARKS)
+    message(STATUS "Enabling pybind11 support")
+    set(MATX_EN_PYBIND11 ON)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO=1)
+    target_compile_options(matx INTERFACE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
+
     include(cmake/GetPyBind11.cmake)
     find_package(Python3  REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 REQUIRED)
@@ -181,8 +190,15 @@ if (MATX_BUILD_BENCHMARKS OR MATX_BUILD_TESTS OR MATX_EN_VISUALIZATION OR MATX_B
 
     # Visualization requires Python libraries
     if (MATX_EN_VISUALIZATION) 
-        check_python_libs("plotly" "pandas")
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=1)
+        check_python_libs("plotly")
+    else()
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=0)
     endif()    
+else()
+    message(WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO=0)
 endif()
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target

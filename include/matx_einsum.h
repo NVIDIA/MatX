@@ -33,7 +33,7 @@
 
 #pragma once
 
-#if ENABLE_CUTENSOR
+#if MATX_ENABLE_CUTENSOR
 #include <cstdio>
 #include <numeric>
 #include "matx_error.h"

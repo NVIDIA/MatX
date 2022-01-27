@@ -127,7 +127,9 @@ void ReadCSV(const TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
+  auto gil = pybind11::scoped_interpreter{};
   std::unique_ptr<detail::MatXPybind> pb;
+
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")(fname, "delimiter"_a = delimiter,
                                    "skip_header"_a = header ? 1 : 0);
@@ -152,6 +154,7 @@ void WriteCSV(const TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
+  auto gil = pybind11::scoped_interpreter{};
   pybind11::list ndims;
   for (int i = 0; i < TensorType::Rank(); i++) {
     ndims.append(t.Size(i));
