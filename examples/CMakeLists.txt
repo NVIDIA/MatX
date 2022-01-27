@@ -33,7 +33,6 @@ if (MSVC)
 else()
     target_compile_options(example_lib INTERFACE ${WARN_FLAGS})
     target_compile_options(example_lib INTERFACE ${MATX_CUDA_FLAGS})
-    target_compile_options(example_lib INTERFACE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
 endif()  
 
 if (MULTI_GPU)

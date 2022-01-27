@@ -55,8 +55,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
-  auto gil = pybind11::scoped_interpreter{};
-
   using complex = cuda::std::complex<float>;
   cudaGraph_t graph;
   cudaGraphExec_t instance;
@@ -141,8 +139,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       cudaStreamEndCapture(stream, &graph);
       cudaGraphInstantiate(&instance, graph, NULL, NULL, 0);
 
+#if MATX_ENABLE_VIZ
       // Generate a spectrogram visualization using a contour plot
       viz::contour(time, freqs, Sxx);
+#else
+      printf("Not outputting plot since visualizations disabled\n");
+#endif            
     }
   }
 

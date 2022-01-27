@@ -51,7 +51,6 @@ if (MSVC)
     target_compile_options(matx_test  PRIVATE /W4 /WX)
 else()
     target_compile_options(matx_test PRIVATE ${WARN_FLAGS})
-    target_compile_options(matx_test PRIVATE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
     target_compile_options(matx_test PRIVATE ${MATX_CUDA_FLAGS})
 endif() 
 

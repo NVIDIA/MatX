@@ -65,7 +65,6 @@
 int main(int argc, char **argv) 
 {
   printf("Running MatX unit tests. Press Ctrl+\\ (SIGQUIT) to kill tests\n");
-  auto gil = pybind11::scoped_interpreter{}; 
 
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

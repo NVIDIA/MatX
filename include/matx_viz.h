@@ -38,6 +38,8 @@
 #include <cstdio>
 #include <numeric>
 
+#if MATX_ENABLE_VIZ
+
 namespace matx {
 namespace viz {
 
@@ -71,7 +73,9 @@ void line(const TensorType &ten,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
+
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
+
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -119,7 +123,9 @@ void scatter(const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
+         
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
+
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -166,7 +172,9 @@ void bar(const TensorType &y,
           const std::string &title,
           const std::string &ylabel,
           const std::string &out_fname = "") {
+
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
+
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -218,6 +226,7 @@ void bar( const TensorType &x,
           const std::string &ylabel,
           const std::string &out_fname = "") {
   std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -292,3 +301,5 @@ void contour( const T1 &x,
 
 }; // viz
 }; // matx
+
+#endif

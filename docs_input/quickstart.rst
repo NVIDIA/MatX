@@ -8,7 +8,7 @@ look at the following sources:
 
 1) Example and API documentation
 2) Example code in the examples/ directory
-3) X-Lab training (if available)
+3) Jupyter notebook tutorials in the docs_input/notebooks/ directory
 
 Adding MatX to your project
 ---------------------------

@@ -37,7 +37,7 @@
 #include "matx_tensor.h"
 #include <cublasLt.h>
 
-#if ENABLE_CUTLASS == 1
+#if MATX_ENABLE_CUTLASS == 1
 #include "cutlass/gemm/device/gemm.h"
 #include "cutlass/gemm/device/gemm_batched.h"
 #endif
@@ -142,7 +142,7 @@ public:
   matxMatMulHandle_t(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
-    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || ENABLE_CUTLASS, matxMatMulError,
+    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
                   "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
     static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
     static_assert(TensorTypeA::Rank() == TensorTypeC::Rank());
@@ -631,7 +631,7 @@ private:
 
     if constexpr (RANK == 2) {
       if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if ENABLE_CUTLASS
+#if MATX_ENABLE_CUTLASS
         using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
@@ -675,7 +675,7 @@ private:
     }
     else {
       static_assert(RANK > 2);
-#if ENABLE_CUTLASS
+#if MATX_ENABLE_CUTLASS
       using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
@@ -696,7 +696,7 @@ private:
 
       if constexpr (RANK > 3) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if ENABLE_CUTLASS
+#if MATX_ENABLE_CUTLASS
         for (size_t iter = 0; iter < total_iter; iter++) {
           // Get pointers into A/B/C for this round
           auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);

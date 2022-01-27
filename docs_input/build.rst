@@ -37,13 +37,13 @@ MatX provides 4 different types of build types, and can each be configured indep
   * - Type
     - CMake Option
   * - Unit Tests
-    - ``-DBUILD_TESTS=ON`` 
+    - ``-DMATX_BUILD_TESTS=ON`` 
   * - Benchmarks
-    - ``-DBUILD_BENCHMARKS=ON`` 
+    - ``-DMATX_BUILD_BENCHMARKS=ON`` 
   * - Examples
-    - ``-DBUILD_EXAMPLES=ON`` 
+    - ``-DMATX_BUILD_EXAMPLES=ON`` 
   * - Documentation
-    - ``-DBUILD_DOCS=ON``             
+    - ``-DMATX_BUILD_DOCS=ON``             
 
 
 Everything but documentation requires building MatX source code, and all requirements in the first section of this document apply.
@@ -62,7 +62,7 @@ libraries are:
 Both Google Test and pybind11 will be automatically downloaded by CPM when unit tests are enabled. If an offline copy of them exists, 
 ``CPM_USE_LOCAL_PACKAGES`` can be used to override the download. 
 
-To build unit tests, pass the argument ``-DBUILD_TESTS=ON`` to CMake to configure the build environment, then issue:
+To build unit tests, pass the argument ``-DMATX_BUILD_TESTS=ON`` to CMake to configure the build environment, then issue:
 
 .. code-block:: shell
 
@@ -79,7 +79,7 @@ for the correct paths to be set. For example, to run only tests with the name FF
 Examples
 --------
 
-MatX provides several example applications that show different capabilities of MatX. When the ``-DBUILD_EXAMPLES=ON`` CMake argument
+MatX provides several example applications that show different capabilities of MatX. When the ``-DMATX_BUILD_EXAMPLES=ON`` CMake argument
 is specified the ``build/examples`` directory will contain a separate binary file for each example. Each example can be run by simply
 executing the binary.
 
@@ -114,7 +114,7 @@ documentation:
 **texlive-font-utils**
 
 Building documentation must be done separately from other build options as to minimize the requirements needed. After configuring CMake with
-``-DBUILD_DOCS=ON`` and typing ``make``, Doxygen, Sphinx, and Breathe will parse the source to build the documentation. Once complete, a 
+``-DMATX_BUILD_DOCS=ON`` and typing ``make``, Doxygen, Sphinx, and Breathe will parse the source to build the documentation. Once complete, a 
 directory ``build/docs_input/sphinx`` will be created containing all documentation files, and an ``index.html`` entry point that can be used
 to browse the documentation. Note that the most recent version of the documentation is also hosted at:
 

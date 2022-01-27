@@ -8,21 +8,24 @@ else()
 endif()
 
 # Command line options
-option(BUILD_EXAMPLES "Build examples" OFF)
-option(BUILD_TESTS "Build unit tests" OFF)
-option(BUILD_BENCHMARKS "Build benchmarks" OFF)
-option(BUILD_DOCS "Build documentation. Mutually exclusive with all other options" OFF)
-option(BUILD_32_BIT "Build with 32-bit indexing support" OFF)
-option(MULTI_GPU "Multi-GPU support" OFF)
-option(EN_VISUALIZATION "Enable visualization support" OFF)
-option(EN_CUTLASS OFF)
-option(EN_CUTENSOR OFF)
+option(MATX_BUILD_EXAMPLES "Build examples" OFF)
+option(MATX_BUILD_TESTS "Build unit tests" OFF)
+option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MATX_BUILD_DOCS "Build documentation. Mutually exclusive with all other options" OFF)
+option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
+option(MATX_MULTI_GPU "Multi-GPU support" OFF)
+option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
+option(MATX_EN_CUTLASS OFF)
+option(MATX_EN_CUTENSOR OFF)
+option(MATX_EN_FILEIO OFF)
+
+set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
+
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 
-
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
-if (BUILD_DOCS)
+if (MATX_BUILD_DOCS)
     project(MATX_DOCS)
     add_subdirectory(docs_input)
     return()
@@ -47,7 +50,7 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     rapids_cuda_init_architectures(MATX)
 endif()
 
-# This needs to go after BUILD_DOCS check so it doesn't look for CUDA if we're just building docs
+# This needs to go after MATX_BUILD_DOCS check so it doesn't look for CUDA if we're just building docs
 project(MATX
         LANGUAGES CUDA CXX
         DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
@@ -62,8 +65,8 @@ message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 rapids_cmake_write_version_file(include/version_config.h)
 
 # MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set (CMAKE_CXX_STANDARD 17)
-set (CUDA_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+set(CUDA_CXX_STANDARD 17)
 
 # CPM is required for all package management
 include(cmake/GetCPM.cmake)
@@ -129,20 +132,20 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 # CUTLASS slows down compile times when used, so leave it as optional for now
-if (EN_CUTLASS)
+if (MATX_EN_CUTLASS)
     include(cmake/GetCUTLASS.cmake)
     set (CUTLASS_INC ${cutlass_SOURCE_DIR}/include/ ${cutlass_SOURCE_DIR}/tools/util/include/)
-    target_compile_definitions(matx INTERFACE ENABLE_CUTLASS=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
 else()
     set (CUTLASS_INC "")
-    target_compile_definitions(matx INTERFACE ENABLE_CUTLASS=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
 endif()
 
 # Get the tensor libraries if we need them
-if (EN_CUTENSOR)
+if (MATX_EN_CUTENSOR)
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
-    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=1)
     
     target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
     target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)
@@ -151,10 +154,10 @@ if (EN_CUTENSOR)
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
 else()
-    target_compile_definitions(matx INTERFACE ENABLE_CUTENSOR=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=0)
 endif()
 
-if (MULTI_GPU)
+if (MATX_MULTI_GPU)
     include(cmake/FindNvshmem.cmake)
     find_package(Nvshmem REQUIRED)
 endif()
@@ -164,7 +167,13 @@ endif()
 target_compile_options(matx INTERFACE -isystem=${CUDAToolkit_INCLUDE_DIRS})
 
 # Find python3 and pybind11 for generating unit tests and benchmarks
-if (BUILD_BENCHMARKS OR BUILD_TESTS OR EN_VISUALIZATION OR BUILD_EXAMPLES)
+if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EXAMPLES OR MATX_BUILD_TESTS OR MATX_BUILD_BENCHMARKS)
+    message(STATUS "Enabling pybind11 support")
+    set(MATX_EN_PYBIND11 ON)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11=1)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO=1)
+    target_compile_options(matx INTERFACE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
+
     include(cmake/GetPyBind11.cmake)
     find_package(Python3  REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 REQUIRED)
@@ -180,9 +189,16 @@ if (BUILD_BENCHMARKS OR BUILD_TESTS OR EN_VISUALIZATION OR BUILD_EXAMPLES)
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries
-    if (EN_VISUALIZATION) 
-        check_python_libs("plotly" "pandas")
+    if (MATX_EN_VISUALIZATION) 
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=1)
+        check_python_libs("plotly.express")
+    else()
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=0)
     endif()    
+else()
+    message(WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11=0)
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO=0)
 endif()
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
@@ -221,7 +237,7 @@ endif()
 
 
 
-if (BUILD_32_BIT)
+if (MATX_BUILD_32_BIT)
     add_definitions(-DINDEX_32_BIT)
     target_compile_definitions(matx INTERFACE INDEX_32_BIT)
 else()
@@ -229,16 +245,16 @@ else()
     target_compile_definitions(matx INTERFACE INDEX_64_BIT)
 endif()
 
-if (BUILD_EXAMPLES)
+if (MATX_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-if (BUILD_BENCHMARKS)
+if (MATX_BUILD_BENCHMARKS)
     include(cmake/GetNVBench.cmake)
     add_subdirectory(bench)
 endif()
 
-if (BUILD_TESTS)
+if (MATX_BUILD_TESTS)
     include(cmake/GetGTest.cmake)
     add_subdirectory(test)
 endif()

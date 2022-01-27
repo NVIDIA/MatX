@@ -110,6 +110,7 @@ using namespace pybind11::literals;
 //   t.Print();
 // }
 
+
 /**
  * Read a CSV file into a tensor view
  *
@@ -128,6 +129,7 @@ void ReadCSV(const TensorType &t, const std::string fname,
   }
 
   std::unique_ptr<detail::MatXPybind> pb;
+
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")(fname, "delimiter"_a = delimiter,
                                    "skip_header"_a = header ? 1 : 0);
