@@ -70,7 +70,7 @@ To build all components, issue the standard cmake build commands in a cloned rep
 
 ```
 mkdir build && cd build
-cmake -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=ON -DBUILD_EXAMPLES=ON -DBUILD_DOCS=OFF ..
+cmake -DMATX_BUILD_TESTS=ON -DMATX_BUILD_BENCHMARKS=ON -DMATX_BUILD_EXAMPLES=ON -DMATX_BUILD_DOCS=OFF ..
 make -j
 ```
 
@@ -84,16 +84,16 @@ cmake .. -CMAKE_CUDA_ARCHITECTURES="60;70"
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
 
 ```
-BUILD_TESTS
-BUILD_BENCHMARKS
-BUILD_EXAMPLES
-BUILD_DOCS
+MATX_BUILD_TESTS
+MATX_BUILD_BENCHMARKS
+MATX_BUILD_EXAMPLES
+MATX_BUILD_DOCS
 ```
 
 For example, to enable unit test building:
 ```
 mkdir build && cd build
-cmake -DBUILD_TESTS=ON ..
+cmake -DMATX_BUILD_TESTS=ON ..
 make -j
 ```
 
