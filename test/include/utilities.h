@@ -65,7 +65,7 @@ public:
    * @return Assertion result
    */
   template <typename T1, typename T2>
-  static ::testing::AssertionResult MatXTypeCompare(const T1 &a, const T2 &b,
+  static __MATX_INLINE__ ::testing::AssertionResult MatXTypeCompare(const T1 &a, const T2 &b,
                                                     double delta = 0.01)
   {
     if constexpr (matx::is_complex_v<T1>) {
@@ -97,4 +97,20 @@ public:
     return ::testing::AssertionSuccess();
   }
 };
+
+template <typename T>
+__MATX_INLINE__ void CheckTestTypeSupport() {
+  auto cc = detail::GetComputeCapabilityMajor();
+  if constexpr (is_bf16_type_v<T>) {
+    if (cc < AMPERE_CC) {
+      GTEST_SKIP();
+    }
+  }
+  else if constexpr (is_fp16_type_v<T>) {
+    if (cc < VOLTA_CC) {
+      GTEST_SKIP();
+    }
+  }
+}
+
 } // end namespace matx

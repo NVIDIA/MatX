@@ -212,6 +212,34 @@ template <> struct is_complex<matxBf16Complex> : std::true_type {
  */
 template <class T> inline constexpr bool is_complex_v = detail::is_complex<T>::value;
 
+
+namespace detail {
+template <typename T> struct is_bf16_type : std::false_type {};
+template <> struct is_bf16_type<matxBf16Complex> : std::true_type {};
+template <> struct is_bf16_type<matxBf16> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a BF16 type
+ * 
+ * @tparam T Type to test
+ */
+template <class T> inline constexpr bool is_bf16_type_v = detail::is_bf16_type<T>::value;
+
+namespace detail {
+template <typename T> struct is_fp16_type : std::false_type {};
+template <> struct is_fp16_type<matxBf16Complex> : std::true_type {};
+template <> struct is_fp16_type<matxBf16> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is an FF16 type
+ * 
+ * @tparam T Type to test
+ */
+template <class T> inline constexpr bool is_fp16_type_v = detail::is_fp16_type<T>::value;
+
+
 namespace detail {
 template <typename T, typename = void>
 struct is_matx_shape : std::false_type {

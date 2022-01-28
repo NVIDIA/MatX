@@ -46,6 +46,8 @@ template <typename T> class MatMulTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
+    CheckTestTypeSupport<T>();
+
     pb = std::make_unique<detail::MatXPybind>(); // Half precision needs a bit more
                                          // tolerance when compared to fp32
     if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {

@@ -36,6 +36,7 @@
 #include "matx_half_complex.h"
 #include "matx_half.h"
 
+#include "matx_utils.h"
 #include "matx_error.h"
 #include "matx_tensor.h"
 #include "matx_random.h"

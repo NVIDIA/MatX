@@ -113,8 +113,8 @@ void matxDirectConv2DInternal(OutputType &o, InType &i,
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(FilterType::Rank() == 2, matxInvalidDim);
 
-  using strip_input_t = typename InType::scalar_type;
-  auto shmsize = sizeof(strip_input_t) * filter.Size(0) * filter.Size(1);
+  using filter_input_t = typename FilterType::scalar_type;
+  auto shmsize = sizeof(filter_input_t) * filter.Size(0) * filter.Size(1);
 
 #ifdef __CUDACC__  
   if constexpr (OutputType::Rank() == 1) {

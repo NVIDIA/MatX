@@ -44,6 +44,8 @@ template <typename T> class FFTTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
+    CheckTestTypeSupport<T>();
+
     pb = std::make_unique<detail::MatXPybind>();
 
     // Half precision needs a bit more tolerance when compared to fp32

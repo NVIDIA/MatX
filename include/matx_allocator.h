@@ -220,6 +220,7 @@ inline void matxAlloc(void **ptr, size_t bytes,
                       cudaStream_t stream = 0)
 {
   [[maybe_unused]] cudaError_t err = cudaSuccess;
+
   switch (space) {
   case MATX_MANAGED_MEMORY:
     err = cudaMallocManaged(ptr, bytes);
