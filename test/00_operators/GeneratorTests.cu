@@ -263,31 +263,35 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
-  index_t count = 10;
-  tensor_t<TypeParam, 2> t1{{count,count}};
+  index_t count = 100;
+  tensor_t<TypeParam, 1> t1{{count}};
+
+  (t1 = range<0>(t1.Shape(), 1, 1)).run();
+  cudaStreamSynchronize(0);
 
   TypeParam one = 1;
   TypeParam two = 1;
   TypeParam three = 1;
 
   for (index_t i = 0; i < count; i++) {
-     TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
-     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), it + one));
+    TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), it + one));
   }
 
   {
-     (t1 = t1 * t1).run();
-     cudaStreamSynchronize(0);
+    (t1 = t1 * t1).run();
+    cudaStreamSynchronize(0);
 
-     for (index_t i = 0; i < count; i++) {
-       TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
-       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (it + one) * (it + one)));
-     }
-   
+    for (index_t i = 0; i < count; i++) {
+      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (it + one) * (it + one)));
+    }
+  }
 
   {
     (t1 = t1 * two).run();
     cudaStreamSynchronize(0);
+
     for (index_t i = 0; i < count; i++) {
       TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
       EXPECT_TRUE(

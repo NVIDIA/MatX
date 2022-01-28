@@ -78,7 +78,8 @@ public:
  * Discrete Cosine Transform
  *
  * Computes the DCT of input sequence "in". The input and output ranks must be
- *1, and the sizes must match.
+ * 1, and the sizes must match. This implementation uses the 2N padded version of
+ * Makhoul's method which offloads the complex processing to cuFFT.
  *
  * @tparam T
  *   Input data type
@@ -102,6 +103,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   index_t N = in.Size(OutputTensor::Rank() - 1);
 
   tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
+
   fft(tmp, in);
   auto s = tmp.Slice({0}, {N});
   detail::dctOp(out, s, N).run(stream);
