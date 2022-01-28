@@ -144,6 +144,7 @@ public:
                       params.transform_type == CUFFT_Z2D)
                         ? o.Size(RANK - 1)
                         : i.Size(RANK - 1);
+      
       params.batch = (RANK == 1) ? 1 : i.Size(RANK-2);
       params.inembed[0] = i.Size(RANK - 1); // Unused
       params.onembed[0] = o.Size(RANK - 1); // Unused
@@ -648,8 +649,8 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                  std::is_same_v<T1, matxBf16Complex>) ||
                 (std::is_same_v<T2, matxFp16> &&
                  std::is_same_v<T1, matxFp16Complex>)) { // R2C
-    nom_fft_size = in_size / 2 + 1;
-    act_fft_size = o.Lsize();
+    nom_fft_size = in_size;
+    act_fft_size = (o.Lsize() - 1) * 2;
   }
   else if constexpr ((std::is_same_v<T1, float> &&
                       std::is_same_v<T2, cuda::std::complex<float>>) ||
@@ -660,7 +661,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                      (std::is_same_v<T1, matxFp16> &&
                       std::is_same_v<T2, matxFp16Complex>)) { // C2R
     nom_fft_size = (in_size - 1) * 2;
-    act_fft_size = o.Lsize();
+    act_fft_size = (o.Lsize() / 2) + 1;
   }
 
   // Set up new shape if transform size doesn't match tensor
