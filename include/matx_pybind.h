@@ -78,14 +78,11 @@ template <typename T> struct TestFailResult {
 };
 
 
-
 class MatXPybind {
 public:
   MatXPybind() { Init(); }
 
   void Init() { 
-    static pybind11::scoped_interpreter gil{};
-
     AddPath(std::string(MATX_ROOT) + GENERATORS_PATH); 
   }
 
@@ -437,6 +434,7 @@ public:
   }
 
 private:
+  inline static pybind11::scoped_interpreter gil = pybind11::scoped_interpreter{};
   pybind11::module_ mod;
   pybind11::object res_dict;
   pybind11::object sx_obj;

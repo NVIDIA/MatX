@@ -30,54 +30,31 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "assert.h"
-#include "matx.h"
-#include "matx_pybind.h"
-#include "test_types.h"
-#include "utilities.h"
-#include "gtest/gtest.h"
+#pragma once
+#include "matx_defines.h"
+#include "matx_error.h"
 
-using namespace matx;
+#define AMPERE_CC 8
+#define VOLTA_CC 7
 
-template <typename T> class CovarianceTest : public ::testing::Test {
-
-protected:
-  const index_t cov_dim = 4;
-  void SetUp() override
-  {
-    CheckTestTypeSupport<T>();
-    pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim});
-
-    // Half precision needs a bit more tolerance when compared to
-    // fp32
-    if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
-      thresh = 0.1f;
-    }
-  }
-
-  void TearDown() { pb.reset(); }
-
-  tensor_t<T, 2> av{{cov_dim, cov_dim}};
-  tensor_t<T, 2> cv{{cov_dim, cov_dim}};
-
-  float thresh = 0.01f;
-  std::unique_ptr<detail::MatXPybind> pb;
-};
-
-template <typename TensorType>
-class CovarianceTestFloatTypes : public CovarianceTest<TensorType> {
-};
-
-TYPED_TEST_SUITE(CovarianceTestFloatTypes, MatXFloatTypes);
-
-TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
-{
-  MATX_ENTER_HANDLER();
-  this->pb->RunTVGenerator("cov");
-  this->pb->NumpyToTensorView(this->av, "a");
-  cov(this->cv, this->av, 0);
-
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "c_cov", this->thresh);
-  MATX_EXIT_HANDLER();
+namespace matx {
+namespace detail {
+__MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
+    int val;
+    int dev;
+    cudaGetDevice(&dev);
+    auto err = cudaDeviceGetAttribute(&val, attr, dev);
+    MATX_ASSERT(err == cudaSuccess, matxCudaError);
+    return val;
 }
+
+__MATX_INLINE__ int GetComputeCapabilityMajor() {
+    return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+}
+
+__MATX_INLINE__ bool IsAmpereOrAbove() {
+    return GetComputeCapabilityMajor() >= AMPERE_CC;
+}
+
+};
+};

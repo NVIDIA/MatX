@@ -48,6 +48,7 @@ class CorrelationConvolutionTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
+    CheckTestTypeSupport<T>();
     pb = std::make_unique<detail::MatXPybind>();
     pb->InitTVGenerator<T>("00_transforms", "conv_operators", {a_len, b_len});
 
