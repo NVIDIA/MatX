@@ -120,7 +120,7 @@ using namespace pybind11::literals;
  *1D and 2D tensors are supported only.
  **/
 template <typename TensorType>
-void ReadCSV(const TensorType &t, const std::string fname,
+void ReadCSV(TensorType &t, const std::string fname,
              const std::string delimiter, bool header = true)
 {
   if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
@@ -162,9 +162,72 @@ void WriteCSV(const TensorType &t, const std::string fname,
   std::unique_ptr<detail::MatXPybind> pb;
   auto np = pybind11::module_::import("numpy");
 
-  auto np_ten = np.attr("empty")(ndims);
-  pb->TensorViewToNumpy(np_ten, t);
+  auto np_ten = pb->TensorViewToNumpy(t);
   auto obj = np.attr("savetxt")(fname, np_ten, "delimiter"_a = delimiter);
+}
+
+/**
+ * @brief Read a MAT file into a tensor view
+ *
+ * MAT files use SciPy's loadmat() function to read various MATLAB file
+ * types in. MAT files are supersets of HDF5 files, and are allowed to
+ * have multiple fields in them. 
+ * 
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File name of .mat file
+ * @param var
+ *   Variable name inside of .mat to read
+ * 
+ **/
+template <typename TensorType>
+void ReadMAT(TensorType &t, const std::string fname,
+             const std::string var)
+{
+  std::unique_ptr<detail::MatXPybind> pb;
+
+  auto sp = pybind11::module_::import("scipy.io");
+  auto obj = (pybind11::dict)sp.attr("loadmat")("file_name"_a = fname);
+  auto v = obj[var.c_str()];
+
+  pb->NumpyToTensorView(t, v);
+}
+
+/**
+ * @brief Write a MAT file from a tensor view
+ *
+ * Writes a single tensor value into a .mat file. 
+ * 
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File name of .mat file
+ * @param var
+ *   Variable name to save inside of mat file
+ */
+template <typename TensorType>
+void WriteMAT(const TensorType &t, const std::string fname,
+              const std::string var)
+{
+  pybind11::list ndims;
+  for (int i = 0; i < TensorType::Rank(); i++) {
+    ndims.append(t.Size(i));
+  }
+
+  std::unique_ptr<detail::MatXPybind> pb;
+  auto np = pybind11::module_::import("numpy");
+  auto sp = pybind11::module_::import("scipy.io");
+
+  auto np_ten = pb->TensorViewToNumpy(t);
+
+  auto td = pybind11::dict{};
+  td[var.c_str()] = np_ten;
+  auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
 }
 
 }; // namespace io

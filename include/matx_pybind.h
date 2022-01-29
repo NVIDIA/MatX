@@ -329,13 +329,12 @@ public:
   }
 
   template <typename TensorType>
-  void TensorViewToNumpy(pybind11::object &np_ten,
-                         const TensorType &ten)
+  auto TensorViewToNumpy(const TensorType &ten)
   {
     constexpr int RANK = TensorType::Rank();
 
     using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
-    auto ften = pybind11::array_t<ntype>(np_ten);
+    auto ften = pybind11::array_t<ntype>(ten.Shape());
 
     for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
       if constexpr (RANK > 1) {
@@ -362,6 +361,8 @@ public:
         ften.mutable_at(s1) = ConvertComplex(ten(s1));
       }
     }
+
+    return ften;
   }
 
   template <typename TensorType, 
