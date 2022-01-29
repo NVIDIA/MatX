@@ -79,8 +79,7 @@ void line(const TensorType &ten,
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
 
-  auto np_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(ten);
-  pb->TensorViewToNumpy(np_ten, ten);
+  auto np_ten = pb->TensorViewToNumpy(ten);
 
   auto labels = pybind11::dict("index"_a=xlabel, "value"_a=ylabel);
   auto fig = px.attr("line")(np_ten, "labels"_a = labels, "title"_a = title);  
@@ -132,10 +131,8 @@ void scatter(const TensorType &x,
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
-  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
-  pb->TensorViewToNumpy(np_x_ten, x);
-  pb->TensorViewToNumpy(np_y_ten, y);  
+  auto np_x_ten = pb->TensorViewToNumpy(x);
+  auto np_y_ten = pb->TensorViewToNumpy(y);  
 
   auto labels = pybind11::dict("index"_a=xlabel, "value"_a=ylabel);
   auto fig = px.attr("scatter")("x"_a=np_x_ten, "y"_a=np_y_ten,"labels"_a = labels, "title"_a = title);  
@@ -180,8 +177,7 @@ void bar(const TensorType &y,
 
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
 
-  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
-  pb->TensorViewToNumpy(np_y_ten, y);
+  auto np_y_ten = pb->TensorViewToNumpy(np_y_ten, y);
 
   auto labels = pybind11::dict("y"_a=ylabel);
   auto fig = px.attr("bar")("y"_a=np_y_ten, "labels"_a = labels, "title"_a = title);  
@@ -233,10 +229,8 @@ void bar( const TensorType &x,
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT(x.Size(0) == y.Size(0), matxInvalidDim);
 
-  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
-  pb->TensorViewToNumpy(np_x_ten, x);
-  pb->TensorViewToNumpy(np_y_ten, y);
+  auto np_x_ten = pb->TensorViewToNumpy(x);
+  auto np_y_ten = pb->TensorViewToNumpy(y);
 
   auto labels = pybind11::dict("x"_a=xlabel, "y"_a=ylabel);
   auto fig = px.attr("bar")("x"_a=np_x_ten, "y"_a=np_y_ten,"labels"_a = labels, "title"_a = title);  
@@ -281,12 +275,9 @@ void contour( const T1 &x,
   auto go = pybind11::module_::import("plotly.graph_objects");   
   auto np = pybind11::module_::import("numpy");   
 
-  auto np_x_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(x);
-  auto np_y_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(y);
-  auto np_z_ten = ::matx::detail::MatXPybind::GetEmptyNumpy(z);
-  pb->TensorViewToNumpy(np_x_ten, x);
-  pb->TensorViewToNumpy(np_y_ten, y);
-  pb->TensorViewToNumpy(np_z_ten, z);
+  auto np_x_ten = pb->TensorViewToNumpy(x);
+  auto np_y_ten = pb->TensorViewToNumpy(y);
+  auto np_z_ten = pb->TensorViewToNumpy(z);
 
   auto data = go.attr("Contour")("z"_a = np_z_ten, "y"_a = np_y_ten, "x"_a = np_x_ten);
   auto fig = go.attr("Figure")("data"_a = data);

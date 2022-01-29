@@ -84,3 +84,36 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({1,10});
+
+  // Read "myvar" from mat file
+  io::ReadMAT(t, "../test/00_io/test.mat", "myvar");
+  ASSERT_NEAR(t(0,0), 1.456, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({2,3});
+  auto t2 = make_tensor<TypeParam>({2,3});
+  t.SetVals({{1,2,3},{4,5,6}});
+
+  // Read "myvar" from mat file
+  io::WriteMAT(t, "test_write.mat", "myvar");
+  io::ReadMAT(t2, "test_write.mat", "myvar");
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(0); j++) {
+      ASSERT_EQ(t(i,j), t2(i,j));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
