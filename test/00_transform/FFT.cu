@@ -123,6 +123,23 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 4;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "fft_1d_batched", {fft_dim+1, fft_dim+2, fft_dim*2});
+  tensor_t<TypeParam, 2> av{{fft_dim + 1, fft_dim + 2}};
+  tensor_t<TypeParam, 2> avo{{fft_dim + 1, fft_dim * 2}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  fft(avo, av);
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
 {
   MATX_ENTER_HANDLER();
