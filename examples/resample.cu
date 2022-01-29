@@ -67,26 +67,26 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto randTensor = randData.GetTensorView<1>({num_samp}, NORMAL);
   (sigView = randTensor).run(stream);
 
-  fft(sigViewComplex, sigView, stream);
+  fft(sigViewComplex, sigView, 0, stream);
 
   // Slice
   auto sliceView = sigViewComplex.Slice({0}, {nyq});
 
   // Inverse Transform - FFT size based on output
-  ifft(resampView, sliceView, stream);
+  ifft(resampView, sliceView, 0, stream);
   (resampView = resampView * 1.0f / static_cast<float>(N)).run(stream);
 
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     // Launch 1D FFT
-    fft(sigViewComplex, sigView, stream);
+    fft(sigViewComplex, sigView, 0, stream);
 
     // Slice
     auto sv = sigViewComplex.Slice({0}, {nyq});
 
     // Inverse Transform - FFT size based on output
-    ifft(resampView, sv, stream);
+    ifft(resampView, sv, 0, stream);
 
     (resampView = resampView * 1.0f / static_cast<float>(N)).run(stream);
   }

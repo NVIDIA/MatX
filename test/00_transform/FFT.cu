@@ -137,6 +137,11 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+
+  fft(avo, av, fft_dim * 2); // Force the FFT size
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);  
   MATX_EXIT_HANDLER();
 }
 

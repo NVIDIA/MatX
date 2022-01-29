@@ -620,7 +620,7 @@ static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_2d;
 
 template <typename OutputTensor, typename InputTensor>
 auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
-                    const InputTensor &i,
+                    const InputTensor &i, index_t fft_size,
                     [[maybe_unused]] cudaStream_t stream)
 {
   using index_type = typename OutputTensor::shape_type;
@@ -632,30 +632,39 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
   index_type ends[RANK];
   index_type in_size = i.Lsize();
   index_type nom_fft_size = in_size;
-  index_type act_fft_size = o.Lsize();
+  index_type act_fft_size;
 
-  // If R2C transform, set length of FFT appropriately
-  if constexpr ((std::is_same_v<T2, float> &&
-                 std::is_same_v<T1, cuda::std::complex<float>>) ||
-                (std::is_same_v<T2, double> &&
-                 std::is_same_v<T1, cuda::std::complex<double>>) ||
-                (std::is_same_v<T2, matxBf16> &&
-                 std::is_same_v<T1, matxBf16Complex>) ||
-                (std::is_same_v<T2, matxFp16> &&
-                 std::is_same_v<T1, matxFp16Complex>)) { // R2C
-    nom_fft_size = in_size;
-    act_fft_size = (o.Lsize() - 1) * 2;
+  // Auto-detect FFT size
+  if (fft_size == 0) {
+    act_fft_size = o.Lsize();
+
+    // If R2C transform, set length of FFT appropriately
+    if constexpr ((std::is_same_v<T2, float> &&
+                  std::is_same_v<T1, cuda::std::complex<float>>) ||
+                  (std::is_same_v<T2, double> &&
+                  std::is_same_v<T1, cuda::std::complex<double>>) ||
+                  (std::is_same_v<T2, matxBf16> &&
+                  std::is_same_v<T1, matxBf16Complex>) ||
+                  (std::is_same_v<T2, matxFp16> &&
+                  std::is_same_v<T1, matxFp16Complex>)) { // R2C
+      nom_fft_size = in_size;
+      act_fft_size = (o.Lsize() - 1) * 2;
+    }
+    else if constexpr ((std::is_same_v<T1, float> &&
+                        std::is_same_v<T2, cuda::std::complex<float>>) ||
+                      (std::is_same_v<T1, double> &&
+                        std::is_same_v<T2, cuda::std::complex<double>>) ||
+                      (std::is_same_v<T1, matxBf16> &&
+                        std::is_same_v<T2, matxBf16Complex>) ||
+                      (std::is_same_v<T1, matxFp16> &&
+                        std::is_same_v<T2, matxFp16Complex>)) { // C2R
+      nom_fft_size = (in_size - 1) * 2;
+      act_fft_size = (o.Lsize() / 2) + 1;
+    }
   }
-  else if constexpr ((std::is_same_v<T1, float> &&
-                      std::is_same_v<T2, cuda::std::complex<float>>) ||
-                     (std::is_same_v<T1, double> &&
-                      std::is_same_v<T2, cuda::std::complex<double>>) ||
-                     (std::is_same_v<T1, matxBf16> &&
-                      std::is_same_v<T2, matxBf16Complex>) ||
-                     (std::is_same_v<T1, matxFp16> &&
-                      std::is_same_v<T2, matxFp16Complex>)) { // C2R
-    nom_fft_size = (in_size - 1) * 2;
-    act_fft_size = (o.Lsize() / 2) + 1;
+  else {
+    // Force FFT size
+    act_fft_size = fft_size;
   }
 
   // Set up new shape if transform size doesn't match tensor
@@ -721,16 +730,18 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
  * Future releases may remove this restriction to where there is no copy.
  * @param i
  *   input tensor
+ * @param fft_size
+ *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
  * @param stream
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputTensor>
 void fft(OutputTensor &o, const InputTensor &i,
-         cudaStream_t stream = 0)
+         index_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
-  auto i_new = detail::GetFFTInputView(o, i, stream);
+  auto i_new = detail::GetFFTInputView(o, i, fft_size, stream);
 
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
@@ -774,17 +785,19 @@ void fft(OutputTensor &o, const InputTensor &i,
  * Future releases may remove this restriction to where there is no copy.
  * @param i
  *   input tensor
+ * @param fft_size
+ *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
  * @param stream
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputTensor>
 void ifft(OutputTensor &o, const InputTensor &i,
-          cudaStream_t stream = 0)
+          index_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
 
-  auto i_new = detail::GetFFTInputView(o, i, stream);
+  auto i_new = detail::GetFFTInputView(o, i, fft_size, stream);
 
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i_new, 1);
@@ -801,11 +814,6 @@ void ifft(OutputTensor &o, const InputTensor &i,
     auto fft_type = static_cast<detail::matxFFTPlan1D_t<OutputTensor, InputTensor> *>(ret.value());
     fft_type->Inverse(o, i_new, stream);
   }
-
-  // If we async-allocated memory for zero-padding, free it here
-  // if (i_new.Data() != i.Data()) {
-  //   matxFree(i_new.Data());
-  // }
 }
 
 /**
