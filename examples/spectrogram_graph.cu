@@ -122,7 +122,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     // Create overlapping matrix of segments.
     auto stackedMatrix = x.OverlapView({nperseg}, {nstep});
     // FFT along rows
-    fft(fftStackedMatrix, stackedMatrix, stream);
+    fft(fftStackedMatrix, stackedMatrix, 0, stream);
     // Absolute value
     (fftStackedMatrix = conj(fftStackedMatrix) * fftStackedMatrix)
         .run(stream);
