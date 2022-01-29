@@ -384,12 +384,6 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
     MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
   }
 
-  if constexpr (RANK >= 2) {
-    for (int r = 0; r < RANK - 1; r++) {
-      MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
-    }
-  }
-
   size_t workspaceSize;
   cufftCreate(&this->plan_);
   cufftResult error;

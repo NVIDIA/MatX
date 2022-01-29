@@ -77,6 +77,13 @@ class fft_operators:
             'a_out': np.fft.fft(seq, self.size[1])
         }
 
+    def fft_1d_batched(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft(seq, self.size[2])
+        }        
+
     def ifft_1d(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
         return {
@@ -90,6 +97,13 @@ class fft_operators:
             'a_in': seq,
             'a_out': np.fft.rfft(seq, self.size[1])
         }
+
+    def rfft_1d_batched(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.rfft(seq, self.size[2])
+        }        
 
     def irfft_1d(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
