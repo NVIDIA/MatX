@@ -53,6 +53,7 @@ static constexpr int MAX_FFT_RANK = 2;
  * Parameters needed to execute an FFT/IFFT in cuFFT
  */
 struct FftParams_t {
+  long long irank, orank;
   long long n[MAX_FFT_RANK] = {0};
   long long batch;
   long long inembed[MAX_FFT_RANK] = {0};
@@ -132,6 +133,9 @@ public:
                           const InTensorType &i, int fft_rank)
   {
     FftParams_t params;
+
+    params.irank = i.Rank();
+    params.orank = o.Rank();
 
     params.transform_type = DeduceFFTTransformType();
     params.input_type = matxFFTPlan_t<OutTensorType, InTensorType>::GetInputType();
@@ -428,7 +432,6 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
       auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
-
       this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 
       // Update all but the last 2 indices
@@ -610,7 +613,7 @@ struct FftParamsKeyEq {
            l.idist == t.idist && l.odist == t.odist &&
            l.transform_type == t.transform_type &&
            l.input_type == t.input_type && l.output_type == t.output_type &&
-           l.exec_type == t.exec_type;
+           l.exec_type == t.exec_type && l.irank == t.irank && l.orank == t.orank ;
   }
 };
 
