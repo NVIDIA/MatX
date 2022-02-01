@@ -3,12 +3,10 @@
 using namespace matx;
 
 int main() {
+  auto A = make_tensor<int>({2, 3});
+  auto C = make_tensor<float>({2, 3});
 
-  tensorShape_t<2> shape({2, 3});
-  tensor_t<int, 2> A(shape);
-  tensor_t<float, 2> C(shape);
-
-  CSetVals({ {1, 2, 3},
+  C.SetVals({ {1, 2, 3},
         {4, 5, 6}});
   
 

@@ -9,11 +9,9 @@ using namespace matx;
  */
 
 int main() {
-
-  tensorShape_t<2> shape({2, 3});
-  tensor_t<float, 2> A(shape);
-  tensor_t<float, 2> B(shape);
-  tensor_t<float, 1> V({3});
+  auto A = make_tensor<float>({2, 3});
+  auto B = make_tensor<float>({2, 3});
+  auto V = make_tensor<float>({3});
 
   /****************************************************************************************************
    * Initialize tensor A with increasing values from 0.5 to 3.0 in steps of 0.4,

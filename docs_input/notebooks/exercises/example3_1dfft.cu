@@ -4,7 +4,7 @@ using namespace matx;
 
 int main() {
 
-  tensor_t<cuda::std::complex<float>, 2> C({2, 4});
+  auto C = make_tensor<cuda::std::complex<float>>({2, 4});
 
   randomGenerator_t < cuda::std::complex<float> randData(C.TotalSize(), 0);
   auto randTensor1 = randData.GetTensorView<2>({2, 4}, NORMAL);

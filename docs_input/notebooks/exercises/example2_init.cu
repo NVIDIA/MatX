@@ -3,12 +3,10 @@
 using namespace matx;
 
 int main() {
-
-  tensorShape_t<2> shape({2, 3});
-  tensor_t<float, 2> A(shape);
-  tensor_t<float, 2> B(shape);
-  tensor_t<float, 2> C(shape);
-  tensor_t<float, 1> V({3});
+  auto A = make_tensor<float>({2, 3});
+  auto B = make_tensor<float>({2, 3});
+  auto C = make_tensor<float>({2, 3});
+  auto V = make_tensor<float>({3});
 
   // TODO: Initialize the A tensor to contain values increasing from 1 to 6, and
   // V from 7 to 9.

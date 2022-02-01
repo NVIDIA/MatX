@@ -3,9 +3,7 @@
 using namespace matx;
 
 int main() {
-
-  tensorShape_t<2> shape({8, 8});
-  tensor_t<float, 2> B(shape);
+  auto B = make_tensor<float>({8, 8});  
 
   // TODO: Set tensor B such that it forms an identity matrix
 

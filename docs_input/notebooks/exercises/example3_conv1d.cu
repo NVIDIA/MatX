@@ -3,12 +3,11 @@
 using namespace matx;
 
 int main() {
+  auto C = make_tensor<float>({16});
+  auto filt = make_tensor<float>({3});
+  auto Co = make_tensor<float>({16 + filt.Lsize() - 1});
 
-  tensor_t<float, 1> C({16});
-  tensor_t<float, 1> filt({3});
-  tensor_t<float, 1> Co({16 + filt.Lsize() - 1});
-
-  filt = {1.0/3, 1.0/3, 1.0/3};
+  filt.SetVals({1.0/3, 1.0/3, 1.0/3});
 
   randomGenerator_t<float> randData(C.TotalSize(), 0);
   auto randTensor1 = randData.GetTensorView<1>({16}, NORMAL);

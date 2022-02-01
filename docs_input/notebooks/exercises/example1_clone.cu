@@ -4,10 +4,10 @@ using namespace matx;
 
 int main() {
 
-  tensor_t<int, 1> t1({4});
+  auto t1 = make_tensor<int>({4});
 
   // Initialize the tensor linearly
-  t1 = {1, 2, 3, 4};
+  t1.SetVals({1, 2, 3, 4});
 
   t1.PrefetchDevice(0);
 

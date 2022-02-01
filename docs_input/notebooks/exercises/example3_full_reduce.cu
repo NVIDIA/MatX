@@ -4,13 +4,12 @@ using namespace matx;
 
 int main() {
 
-  tensorShape_t<2> shape({4,5});
-  tensor_t<float, 2> A(shape);
-  tensor_t<float, 0> MD0;
-  tensor_t<float, 0> AD0;
+  auto A = make_tensor<float>({4, 5});
+  auto MD0 = make_tensor<float>();
+  auto AD0 = make_tensor<float>();
 
   randomGenerator_t<float> randData(A.TotalSize(), 0);
-  auto randTensor1 = randData.GetTensorView<2>(shape, NORMAL);
+  auto randTensor1 = randData.GetTensorView<2>({4,5}, NORMAL);
   (A = randTensor1).run();    
   
   // Initialize max and average to 0
