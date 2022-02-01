@@ -9,11 +9,9 @@ using namespace matx;
  */
 
 int main() {
-
-  tensorShape_t<2> shape({2, 3});
   using complex = cuda::std::complex<float>;
-  tensor_t<complex, 2> A(shape);
-  tensor_t<complex, 2> B(shape);
+  auto A = make_tensor<complex>({2, 3});
+  auto B = make_tensor<complex>({2, 3});
 
   /****************************************************************************************************
    * Use the random number generator with a seed of 12345 to generate
@@ -29,8 +27,8 @@ int main() {
   /*** End editing ***/
 
   // Verify init is correct
-  B = {{{0.5927, -0.3677}, {-2.6895, 1.8154}, {-0.0129, 0.9246}},
-       {{0.5646, 0.8638}, {1.6400, 0.3494}, {-0.5709, 0.5919}}};
+  B.SetVals({{{0.5927, -0.3677}, {-2.6895, 1.8154}, {-0.0129, 0.9246}},
+       {{0.5646, 0.8638}, {1.6400, 0.3494}, {-0.5709, 0.5919}}});
   A.Print();
   B.Print();
   cudaStreamSynchronize(0);

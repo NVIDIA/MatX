@@ -4,10 +4,9 @@ using namespace matx;
 
 int main() {
 
-  tensorShape_t<2> shape({4,5});
-  tensor_t<float, 2> A(shape);
-  tensor_t<float, 1> MD1({4});
-  tensor_t<float, 1> AD1({4});
+  auto A = make_tensor<float>({4, 5});
+  auto MD0 = make_tensor<float>({4});
+  auto AD0 = make_tensor<float>({4});
 
   randomGenerator_t<float> randData(A.TotalSize(), 0);
   auto randTensor1 = randData.GetTensorView<2>(shape, NORMAL);

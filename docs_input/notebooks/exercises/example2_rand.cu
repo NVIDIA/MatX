@@ -4,8 +4,7 @@ using namespace matx;
 
 int main() {
 
-  tensorShape_t<2> shape({4,4});
-  tensor_t<float, 2> A(shape);
+  auto A = make_tensor<float>({4, 4});
 
   (A = 0).run();
 

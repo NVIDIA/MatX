@@ -11,25 +11,28 @@ int main() {
   index_t filtered_size = signal_size + filter_size - 1;
 
   // Create time domain buffers
-  tensor_t<complex, 1> sig_time({signal_size});
-  tensor_t<complex, 1> filt_time({filter_size});
-  tensor_t<complex, 1> time_out({filtered_size});
+  auto sig_time  = make_tensor<complex>({signal_size});
+  auto filt_time = make_tensor<complex>({filter_size});
+  auto time_out  = make_tensor<complex>({filtered_size});
 
   // Frequency domain buffers
-  tensor_t<complex, 1> sig_freq({filtered_size});
-  tensor_t<complex, 1> filt_freq({filtered_size});
+  auto sig_freq  = make_tensor<complex>({filtered_size});
+  auto filt_freq = make_tensor<complex>({filtered_size});
 
   // Fill the time domain signals with data
   for (index_t i = 0; i < signal_size; i++) {
-      sig_time(i) = {-1*(2*(i%2)+1) * ((i%10) / 10.0f) + 0.1f, -1*((i%2) == 0) * ((i%10) / 5.0f) - 0.1f};
+    sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
+                          (static_cast<float>(i % 10) / 10.0f) +
+                      0.1f,
+                  -1.0f * (static_cast<float>(i % 2) == 0.0f) *
+                          (static_cast<float>(i % 10) / 5.0f) -
+                      0.1f};
   }
   for (index_t i = 0; i < filter_size; i++) {
-      filt_time(i) = {(float)i/filter_size, (float)-i/filter_size + 0.5f};
+    filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
+                    static_cast<float>(-i) / static_cast<float>(filter_size) +
+                        0.5f};
   }
-
-  // Prefetch the data we just created
-  sig_time.PrefetchDevice(0);
-  filt_time.PrefetchDevice(0);
 
   // TODO: Perform FFT convolution
   // Perform the FFT in-place on both signal and filter, do an element-wise multiply of the two, then IFFT that output

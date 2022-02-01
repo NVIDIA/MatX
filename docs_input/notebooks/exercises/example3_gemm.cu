@@ -3,9 +3,9 @@
 using namespace matx;
 
 int main() {
-  tensor_t<float, 2> A({8, 4});
-  tensor_t<float, 2> B({4, 8});
-  tensor_t<float, 2> C({8,8});
+  auto A = make_tensor<float>({8, 4});
+  auto B = make_tensor<float>({4, 8});
+  auto C = make_tensor<float>({8, 8});
 
   randomGenerator_t<float> randData(C.TotalSize(), 0);
   auto randTensor1 = randData.GetTensorView<2>({8, 4}, NORMAL);

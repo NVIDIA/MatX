@@ -3,9 +3,7 @@
 using namespace matx;
 
 int main() {
-
-  tensorShape_t<2> shape({2, 3});
-  tensor_t<float, 2> C(shape);
+  auto C = make_tensor<float>({2, 3});
 
   C.SetVals({{7, 8, 9}, {10, 11, 12}});
 
