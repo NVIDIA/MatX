@@ -21,7 +21,7 @@ int main() {
 
   // Fill the time domain signals with data
   for (index_t i = 0; i < signal_size; i++) {
-    sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
+    sig_time(i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
                           (static_cast<float>(i % 10) / 10.0f) +
                       0.1f,
                   -1.0f * (static_cast<float>(i % 2) == 0.0f) *
@@ -29,7 +29,7 @@ int main() {
                       0.1f};
   }
   for (index_t i = 0; i < filter_size; i++) {
-    filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
+    filt_time(i) = {static_cast<float>(i) / static_cast<float>(filter_size),
                     static_cast<float>(-i) / static_cast<float>(filter_size) +
                         0.5f};
   }
