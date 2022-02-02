@@ -664,6 +664,11 @@ public:
     std::array<index_t, NRANK> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin()); 
 
+    typename Desc::stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<typename Desc::stride_type>());
+    MATX_ASSERT_STR(
+        sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
+        "Total size of new tensor must not be larger than the original");    
+
     DefaultDescriptor<tshape.size()> desc{std::move(tshape)};   
     return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_};
   }  
