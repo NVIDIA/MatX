@@ -912,6 +912,14 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
     }
   }
 
+
+  // Test if oversized views throw
+  try {
+    t4.View({1000, 1000, 100});
+    FAIL() << "Oversized views not throwing";
+  } catch (detail::matxException &e) {}
+
+
   MATX_EXIT_HANDLER();
 }
 

@@ -170,6 +170,7 @@ TYPED_TEST(ViewTestsAll, Stride)
   MATX_EXIT_HANDLER();
 }
 
+
 TYPED_TEST(ViewTestsIntegral, SliceStride)
 {
   MATX_ENTER_HANDLER();
