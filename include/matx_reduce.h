@@ -144,13 +144,13 @@ __MATX_DEVICE__ inline void atomicMax(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAny(float *addr, float val)
+template <typename T>
+__MATX_DEVICE__ inline void atomicAny(T *addr, T val)
 {
   // We don't actually need an atomic operation here since we only write to the
   // location if any thread has the correct value.
-  if (val != 0) {
-
-    *addr = 1.0;
+  if (val != T(0)) {
+    *addr = T(1);
   }
 };
 
@@ -233,6 +233,18 @@ __MATX_DEVICE__ inline void atomicAll(float *addr, float val)
   while (val == 0.0 && old != 0.0) {
     assumed = old;
     old = atomicCAS(address_as_uint, assumed, 0.0);
+  }
+};
+
+__MATX_DEVICE__ inline void atomicAll(int *addr, int val)
+{
+  int assumed;
+  int old = *addr;
+
+  // nan should be ok here but should verify
+  while (val == 0 && old != 0) {
+    assumed = old;
+    old = atomicCAS(addr, assumed, 0);
   }
 };
 
@@ -451,9 +463,10 @@ template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double minVal<double>
 template <typename T> class reduceOpSum {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 + v2; }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return T(0); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 + v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
 };
 
 /**
@@ -465,9 +478,10 @@ public:
 template <typename T> class reduceOpProd {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 * v2; }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return T(1); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 * v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 *= v2; return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(1); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
 };
 
 /**
@@ -481,9 +495,10 @@ template <typename T> class reduceOpMax {
 public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 > v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return minVal<T>(); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 > v2 ? v1 : v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return minVal<T>(); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
 };
 
 /**
@@ -495,12 +510,14 @@ public:
 template <typename T> class reduceOpAny {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2)
+  using matx_no_cub_reduce = bool; // Don't use CUB for this reduction type
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
   {
     return (v1 != 0) || (v2 != 0);
   }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return (T)(0); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) || (v2 != 0)); return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(0); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
 
 /**
@@ -512,11 +529,14 @@ public:
 template <typename T> class reduceOpAll {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2)
+  using matx_no_cub_reduce = bool; // Don't use CUB for this reduction type
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
   {
     return (v1 != 0) && (v2 != 0);
   }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return (T)(1); }
+
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) && (v2 != 0)); return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
   __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
@@ -531,37 +551,15 @@ template <typename T> class reduceOpMin {
 public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
-  __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) { return v1 < v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ inline T Init() { return maxVal<T>(); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 < v2 ? v1 : v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); } 
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return maxVal<T>(); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
 };
 
-#if 0
-  template<typename T>
-    class reduceOpSumMax {
-      public:
-        using matx_reduce = bool;
-        __MATX_HOST__ __MATX_DEVICE__ inline T Reduce(T v1, T v2) {
-          T val;
-          val.x = reduceOpSum<decltype(T::x)>().Reduce(v1,v2);
-          val.y = reduceOpMax<decltype(T::y)>().Reduce(v1,v2); 
-          return val;
-        }
-        __MATX_HOST__ __MATX_DEVICE__ inline T Init() {
-          T val;
-          val.x = reduceOpSum<decltype(T::x)>().Init();
-          val.y = reduceOpMax<decltype(T::y)>().Init();
-          return val;
-        }
-        __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) {
-          reduceOpSum<decltype(T::x)>().atomicReduce(&(addr->x), val.x);
-          reduceOpMax<decltype(T::y)>().atomicReduce(&(addr->y), val.y);
-        }
-    };
-#endif
 
 template <typename T, typename Op>
-__MATX_DEVICE__ inline T warpReduceOp(T val, Op op, uint32_t size)
+__MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 {
   // breaking this out so common case is faster without branches
   if (size > 16) {
@@ -1000,10 +998,15 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
  */
 template <typename TensorType, typename InType, typename ReduceOp>
 void inline reduce(TensorType &dest, const InType &in, ReduceOp op,
-                   cudaStream_t stream = 0, bool init = true)
+                   cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
-  //auto tmp = tensor_t<index_t, TensorType::Rank(), typename TensorType::storage_type, typename TensorType::desc_type>{nullptr, dest.Shape()};
-  reduce(dest, std::nullopt, in, op, stream, init);
+  // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
+  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && is_tensor_view_v<InType>) {
+    cub_reduce<TensorType, InType, ReduceOp>(dest, in, op.Init(), stream);
+  }
+  else { // Fall back to the slow path of custom implementation
+    reduce(dest, std::nullopt, in, op, stream, init);
+  }
 }
 
 /**
@@ -1036,7 +1039,7 @@ void inline mean(TensorType &dest, const InType &in,
 #ifdef __CUDACC__  
   float scale = 1.0;
 
-  reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream);
+  sum(dest, in, stream);
 
   // The reduction is performed over the difference in ranks between input and
   // output. This loop computes the number of elements it was performed over.
@@ -1150,7 +1153,13 @@ template <typename TensorType, typename InType>
 void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream, true);
+  // Use CUB implementation if we have a tensor on the RHS
+  if constexpr (is_tensor_view_v<InType>) {
+    cub_sum<TensorType, InType>(dest, in, stream);
+  }
+  else { // Fall back to the slow path of custom implementation
+    reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream, true);
+  }
 #endif  
 }
 
@@ -1207,7 +1216,13 @@ template <typename TensorType, typename InType>
 void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+  // Use CUB implementation if we have a tensor on the RHS
+  if constexpr (is_tensor_view_v<InType>) {
+    cub_max<TensorType, InType>(dest, in, stream);
+  }
+  else { // Fall back to the slow path of custom implementation
+    reduce(dest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+  }
 #endif  
 }
 
@@ -1266,7 +1281,13 @@ template <typename TensorType, typename InType>
 void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+  // Use CUB implementation if we have a tensor on the RHS
+  if constexpr (is_tensor_view_v<InType>) {
+    cub_min<TensorType, InType>(dest, in, stream);
+  }
+  else { // Fall back to the slow path of custom implementation
+    reduce(dest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+  }
 #endif  
 }
 

@@ -72,6 +72,83 @@ enum {
 };
 #endif
 
+/**
+ * @brief Iterator for TensorImpl for libraries that can take iterators as input (CUB).
+ * 
+ * @tparam T Data type
+ * @tparam RANK Rank of tensor
+ * @tparam Desc Descriptor for tensor
+ * 
+ */
+template <typename TensorType>
+struct RandomOperatorIterator {
+  using self_type = RandomOperatorIterator<TensorType>;
+  using value_type = typename TensorType::scalar_type;
+  using stride_type = typename TensorType::desc_type::stride_type;
+  using pointer = value_type*;
+  using reference = value_type;
+  using iterator_category = std::random_access_iterator_tag;
+  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const TensorType &t) : t_(t), offset_(0) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const TensorType &t, stride_type offset) : t_(t), offset_(offset) {}
+
+  /**
+   * @brief Dereference value at a pre-computed offset
+   * 
+   * @return Value at offset 
+   */
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  {
+    auto arrs = t_.GetIdxFromAbs(offset_);
+    return t_.operator()(arrs);
+  }  
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
+  {
+    return self_type{t_, offset_ + offset};
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
+  {
+    return *(*this + offset);
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
+  {
+      self_type retval = *this;
+      offset_++;
+      return retval;
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
+  {
+      offset_++;
+      return *this;
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
+  {
+      offset_ += offset;
+      return *this;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator-(difference_type offset) const
+  {
+      return self_type{t_, offset_ - offset};
+  }
+
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator-=(difference_type offset)
+  {
+      offset_ -= offset;
+      return *this;
+  }  
+
+  TensorType t_;
+  stride_type offset_;  
+};
+
 
 /**
  * View of an underlying tensor data object
@@ -1390,29 +1467,6 @@ public:
     return Slice<N>(firsts, ends, strides);
   }
 
-  /**
-   * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
-   * 
-   * @param abs Absolute index
-   * @return std::array of indices 
-   */
-  __MATX_INLINE__ auto GetIdxFromAbs(typename Desc::shape_type abs) {
-    std::array<typename Desc::shape_type, RANK> indices;
-    std::array<typename Desc::shape_type, RANK> sh = this->desc_.Shape();
-    
-    for (int idx = 0; idx < RANK; idx++) {
-      if (idx == RANK-1) {
-        indices[RANK-1] = abs;
-      }
-      else {
-        typename Desc::stride_type prod = std::accumulate(sh.data() + idx + 1, sh.data() + RANK, 1, std::multiplies<typename Desc::stride_type>());
-        indices[idx] = abs / prod;
-        abs -= prod * indices[idx];
-      }
-    }
-
-    return indices;
-  }
 
   /**
    * Print a value

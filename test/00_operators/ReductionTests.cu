@@ -110,6 +110,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
   MATX_EXIT_HANDLER();
 }
 
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
 {
   MATX_ENTER_HANDLER();
@@ -126,19 +127,19 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(
         t0(), (TypeParam)(t4.Size(0) * t4.Size(1) * t4.Size(2) * t4.Size(3))));
 
-    sum(t0, t3, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-        t0(), (TypeParam)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
+     sum(t0, t3, 0);
+     cudaStreamSynchronize(0);
+     EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+         t0(), (TypeParam)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
 
-    sum(t0, t2, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(
-        MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t2.Size(0) * t2.Size(1))));
+     sum(t0, t2, 0);
+     cudaStreamSynchronize(0);
+     EXPECT_TRUE(
+         MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t2.Size(0) * t2.Size(1))));
 
-    sum(t0, t1, 0);
-    cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
+     sum(t0, t1, 0);
+     cudaStreamSynchronize(0);
+     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
   }
   {
     tensor_t<TypeParam, 1> t1({30});
@@ -146,7 +147,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
     auto t4 = ones<float>({30, 40, 50, 60});
     auto t3 = ones<float>({30, 40, 50});
     auto t2 = ones<float>({30, 40});
-    // t4.Print();
+
     sum(t1, t4, 0);
 
     cudaStreamSynchronize(0);
@@ -200,23 +201,23 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
 TEST(ReductionTests, Any)
 {
   MATX_ENTER_HANDLER();
-  using TypeParam = float;
+  using TypeParam = int;
   {
     tensor_t<TypeParam, 0> t0;
 
-    tensor_t<float, 1> t1({30});
-    tensor_t<float, 2> t2({30, 40});
-    tensor_t<float, 3> t3({30, 40, 50});
-    tensor_t<float, 4> t4({30, 40, 50, 60});
+    tensor_t<int, 1> t1({30});
+    tensor_t<int, 2> t2({30, 40});
+    tensor_t<int, 3> t3({30, 40, 50});
+    tensor_t<int, 4> t4({30, 40, 50, 60});
 
-    (t1 = zeros<float>(t1.Shape())).run();
-    (t2 = zeros<float>(t2.Shape())).run();
-    (t3 = zeros<float>(t3.Shape())).run();
-    (t4 = zeros<float>(t4.Shape())).run();
+    (t1 = zeros<int>(t1.Shape())).run();
+    (t2 = zeros<int>(t2.Shape())).run();
+    (t3 = zeros<int>(t3.Shape())).run();
+    (t4 = zeros<int>(t4.Shape())).run();
     cudaStreamSynchronize(0);
 
-    t1(5) = 5.0;
-    t3(1, 1, 1) = 6.0;
+    t1(5) = 5;
+    t3(1, 1, 1) = 6;
 
     any(t0, t4);
     cudaStreamSynchronize(0);
@@ -241,23 +242,23 @@ TEST(ReductionTests, Any)
 TEST(ReductionTests, All)
 {
   MATX_ENTER_HANDLER();
-  using TypeParam = float;
+  using TypeParam = int;
   {
-    tensor_t<TypeParam, 0> t0;
+    tensor_t<int, 0> t0;
 
-    tensor_t<float, 1> t1({30});
-    tensor_t<float, 2> t2({30, 40});
-    tensor_t<float, 3> t3({30, 40, 50});
-    tensor_t<float, 4> t4({30, 40, 50, 60});
+    tensor_t<int, 1> t1({30});
+    tensor_t<int, 2> t2({30, 40});
+    tensor_t<int, 3> t3({30, 40, 50});
+    tensor_t<int, 4> t4({30, 40, 50, 60});
 
-    (t1 = ones<float>(t1.Shape())).run();
-    (t2 = ones<float>(t2.Shape())).run();
-    (t3 = ones<float>(t3.Shape())).run();
-    (t4 = ones<float>(t4.Shape())).run();
+    (t1 = ones<int>(t1.Shape())).run();
+    (t2 = ones<int>(t2.Shape())).run();
+    (t3 = ones<int>(t3.Shape())).run();
+    (t4 = ones<int>(t4.Shape())).run();
     cudaStreamSynchronize(0);
 
-    t1(5) = 0.0;
-    t3(1, 1, 1) = 0.0;
+    t1(5) = 0;
+    t3(1, 1, 1) = 0;
 
     all(t0, t4);
     cudaStreamSynchronize(0);
