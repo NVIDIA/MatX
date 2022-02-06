@@ -160,6 +160,24 @@ template <typename T>
 inline constexpr bool is_matx_index_reduction_v = detail::is_matx_idx_reduction_impl<T>::value;
 
 namespace detail {
+template <typename T, typename = void>
+struct is_matx_no_cub_reduction_impl : std::false_type {
+};
+template <typename T>
+struct is_matx_no_cub_reduction_impl<T, std::void_t<typename T::matx_no_cub_reduce>>
+    : std::true_type {
+};
+}
+
+/**
+ * @brief Determine if a type is not allowed to use CUB for reductions
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool is_matx_no_cub_reduction_v = detail::is_matx_no_cub_reduction_impl<T>::value;
+
+namespace detail {
 template<typename T> struct is_smart_ptr : std::false_type {};
 template<typename T> struct is_smart_ptr<std::shared_ptr<T>> : std::true_type {};
 template<typename T> struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {};
@@ -313,6 +331,7 @@ struct is_matx_descriptor<T, std::void_t<typename T::matx_descriptor>>
  */
 template <typename T>
 inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename remove_cvref<T>::type>::value;
+
 
 namespace detail {
 template <typename T>

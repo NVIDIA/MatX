@@ -143,6 +143,7 @@ public:
 
 namespace detail {
 
+
 /**
  * @brief Bare implementation of tensor class
  * 
@@ -174,12 +175,12 @@ class tensor_impl_t {
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
-    tensor_impl_t(const tensor_impl_t &) = default;
-    tensor_impl_t(tensor_impl_t &&) = default;
-    tensor_impl_t& operator=(tensor_impl_t &&) = default;
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t(const tensor_impl_t &) = default;
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t(tensor_impl_t &&) = default;
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
 
 
-    __MATX_INLINE__ ~tensor_impl_t() = default;
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  ~tensor_impl_t() = default;
 
     /**
      * Constructor for a rank-0 tensor (scalar).
@@ -300,6 +301,7 @@ class tensor_impl_t {
         : desc_{std::forward<DescriptorType>(desc)}
     {
     }        
+
 
     // Lazy operators
     
@@ -766,6 +768,7 @@ class tensor_impl_t {
         }, idx);      
     }  
 
+
     /**
      * operator() setter with an array index
      *
@@ -871,6 +874,38 @@ class tensor_impl_t {
     void SetLocalData(T* data) {
       ldata_ = data;
     }
+
+  /**
+   * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
+   * 
+   * @param abs Absolute index
+   * @return std::array of indices 
+   */
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(typename Desc::shape_type abs) const {
+    using l_stride_type = typename Desc::stride_type;
+    using l_shape_type = typename Desc::shape_type;
+    std::array<l_shape_type, RANK> indices;
+    std::array<l_shape_type, RANK> sh = desc_.Shape();
+    
+    for (int idx = 0; idx < RANK; idx++) {
+      if (idx == RANK-1) {
+        indices[RANK-1] = abs;
+      }
+      else {
+        // no std::accumulate on the device
+        l_stride_type prod = 1;
+        for (int i = idx + 1; i < RANK; i++) {
+          prod *= sh[i];
+        }
+
+        indices[idx] = abs / prod;
+        abs -= prod * indices[idx];
+      }
+    }
+
+    return indices;
+  }
+
 
   protected:
     T *ldata_;
