@@ -110,7 +110,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
   io::WriteMAT(t, "test_write.mat", "myvar");
   io::ReadMAT(t2, "test_write.mat", "myvar");
   for (index_t i = 0; i < t.Size(0); i++) {
-    for (index_t j = 0; j < t.Size(0); j++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
       ASSERT_EQ(t(i,j), t2(i,j));
     }
   }
