@@ -85,7 +85,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {
-    for (index_t i = 0; i < inView.Size(0); i++) {
+    for (index_t i = 0; i < inView.Size(1); i++) {
       inView(b, i) = {static_cast<float>(i & 32) / 16.0f - 1.0f};
       solView(i) = {0.0};
     }

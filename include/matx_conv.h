@@ -54,6 +54,8 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   using shape_type = typename OutputType::shape_type;
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
+  MATX_ASSERT_STR(filter.Size(0) < BLOCK_SIZE_NON_RECURSIVE, matxInvalidSize,
+    "Convolutions are limited to filter lengths < 1024");
 
 #ifdef __CUDACC__  
   // Scale the filter

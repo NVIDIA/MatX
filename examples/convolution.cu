@@ -44,9 +44,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   typedef cuda::std::complex<float> complex;
 
   uint32_t iterations = 10;
-  constexpr index_t numSamples = 16384000;
+  constexpr index_t numSamples = 1638400;
   constexpr index_t filterLen = 10;
-  constexpr index_t batches = 100;
+  constexpr index_t batches = 10;
   float time_ms;
 
   std::cout << "Iterations: " << iterations << std::endl;
@@ -68,29 +68,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Create data objects
   auto inView = make_static_tensor<InType, batches, numSamples>();
   auto outView = make_static_tensor<OutType, batches, numSamples + filterLen - 1>();
-  // tensor_t<InType, 1> solData({numSamples});
+  auto solView = make_static_tensor<InType, batches, numSamples + filterLen - 1>();
+
   auto filterView = make_static_tensor<FilterType, filterLen >();
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {
-    for (index_t i = 0; i < inView.Size(0); i++) {
-      inView(b,
-             i) = {static_cast<float>(static_cast<double>(i & 32) / 16.0 - 1)};
-      // solData.Data()[i] = {0.0};
+    for (index_t i = 0; i < inView.Size(1); i++) {
+      inView(b, i) = {static_cast<float>(static_cast<double>(i & 32) / 16.0 - 1)};
+      solView(b,i) = {0.0};
     }
   }
 
-  // // Init solution
-  // for (int i = 0; i < (int)numSamples; i++) {
-  //   for (int i_nr = 0; i_nr < (int)filterLen; i_nr++) {
-  //     if ((i - i_nr) >= 0) {
-  //       solData.Data()[i] += coeffs.Data()[i_nr] * inData.Data()[i - i_nr];
-  //     }
-  //   }
-  // }
 
   // Init Filters
-  filterView.SetVals({2, 1});
+  filterView(0) = 0.5;
+  for (auto f = 1; f < filterLen; f++) {
+    filterView(f) = filterView(f-1) * 0.99f;
+  }
 
   inView.PrefetchDevice(stream);
   filterView.PrefetchDevice(stream);
@@ -103,6 +98,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     conv1d(outView, inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL,
            stream);
   }
+  
 
   cudaEventRecord(stop, stream);
   cudaStreamSynchronize(stream);
