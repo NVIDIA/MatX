@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <vector>
 
-#define BLOCK_SIZE_NON_RECURSIVE 512
+#define BLOCK_SIZE_NON_RECURSIVE 1024
 
 namespace matx {
 
@@ -121,7 +121,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       }
     }
   }
-  else if (offset < signal_len) {
+  else if (offset > 0 && offset < signal_len) {
     // Each block processes blockDim.x-filt_len+1 samples, but needs to fetch
     // all blockDim.x worth
     if constexpr (d_in.Rank() == 4) {
