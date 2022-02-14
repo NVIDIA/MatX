@@ -62,6 +62,7 @@ typedef enum {
   CUB_OP_REDUCE_SUM,
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
+  CUB_OP_SELECT,
 } CUBOperation_t;
 
 struct CubParams_t {
@@ -83,6 +84,12 @@ template <typename Op, typename I>
 struct ReduceParams_t {
   Op reduce_op;
   I init;
+};
+
+template <typename SelectOp, typename CountTensor>
+struct SelectParams_t {
+  SelectOp op;
+  CountTensor num_found;
 };
 
 struct EmptyParams_t {};
@@ -175,7 +182,10 @@ public:
     }
     else if constexpr (op == CUB_OP_REDUCE_MAX) { 
       ExecMax(a_out, a, stream);
-    }          
+    }
+    else if constexpr (op == CUB_OP_SELECT) { 
+      ExecSelect(a_out, a, stream);
+    }     
     else {
       MATX_THROW(matxNotSupported, "Invalid CUB operation");
     }
@@ -669,6 +679,51 @@ public:
       }        
     }
 #endif    
+  }
+
+  /**
+   * Execute a selection reduction on a tensor
+   *
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputTensor
+   *   Type of input tensor 
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecSelect(OutputTensor &a_out,
+                       const InputTensor &a,
+                       const cudaStream_t stream)
+  {
+#ifdef __CUDACC__      
+    if (a.IsLinear()) {
+      cub::DeviceSelect::If(d_temp, 
+                            temp_storage_bytes, 
+                            a.Data(), 
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            cparams_.op,
+                            stream); 
+    }
+    else {
+      tensor_impl_t<typename InputTensor::scalar_type, InputTensor::Rank(), typename InputTensor::desc_type> base = a;
+      cub::DeviceSelect::If(d_temp, 
+                            temp_storage_bytes, 
+                            RandomOperatorIterator{base},
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            cparams_.op,
+                            stream);            
+    }                                     
+#endif    
   }     
 
 private:
@@ -1054,4 +1109,132 @@ void hist(OutputTensor &a_out, const InputTensor &a,
   }
 #endif  
 }
+
+
+// Utility functions for find()
+template <typename T>
+struct LT
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ LT(T c) : c_(c) {}
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a < c_);
+    }
+};
+
+template <typename T>
+struct GT
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ GT(T c) : c_(c) { }
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a > c_);
+    }
+};
+
+template <typename T>
+struct EQ
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ EQ(T c) : c_(c) {}
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a == c_);
+    }
+};
+
+template <typename T>
+struct NEQ
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ NEQ(T c) : c_(c) {}
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a != c_);
+    }
+};
+
+template <typename T>
+struct LTE
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ LTE(T c) : c_(c) {}
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a <= c_);
+    }
+};
+
+template <typename T>
+struct GTE
+{
+    T c_;
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ GTE(T c) : c_(c) {}
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
+    bool operator()(const T &a) const {
+        return (a >= c_);
+    }
+};
+
+
+/**
+ * Reduce values that meet a certain criteria
+ *
+ * Finds all values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This
+ * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
+ * is only for element-wise output.
+ *
+ * @tparam SelectType
+ *   Type of select functor
+  * @tparam CountTensor
+ *   Output items type
+ * @tparam OutputTensor
+ *   Output type
+ * @tparam InputTensor
+ *   Input type
+ * @param num_found
+ *   Number of items found meeting criteria
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param sel
+ *   Select functor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputTensor>
+void find(OutputTensor &a_out, CountTensor &num_found, const InputTensor &a, SelectType sel, const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__    
+  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+
+  // Get parameters required by these tensors
+  auto params =
+      detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
+  params.stream = stream;
+
+  // Get cache or new Sort plan if it doesn't exist
+  auto ret = detail::cub_cache.Lookup(params);
+  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
+
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
+                                          InputTensor, 
+                                          detail::CUB_OP_SELECT, 
+                                          decltype(cparams)>{a_out, a, cparams, stream};
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->ExecSelect(a_out, a, stream);
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_SELECT, decltype(cparams)> *>(
+            ret.value());
+    sort_type->ExecSelect(a_out, a, stream);
+  }
+#endif  
+}
+
 }; // namespace matx
