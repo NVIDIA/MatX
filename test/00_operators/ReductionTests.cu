@@ -492,37 +492,39 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
   MATX_EXIT_HANDLER();
 }
 
-// TYPED_TEST(ReductionTestsNumericNonComplex, Reduce)
-// {
-//   MATX_ENTER_HANDLER();
-//   {
-//     tensor_t<TypeParam, 0> t0data;
-//     tensor_t<TypeParam, 4> t4data({30, 40, 50, 60});
 
-//     auto t0 = t0data.View();
-//     auto t4 = t4data.View();
-//     for(index_t i = 0 ; i < t4.Size(0); i++) {
-//       for(index_t j = 0 ; j < t4.Size(1); j++) {
-//         for(index_t k = 0 ; k < t4.Size(2); k++) {
-//           for(index_t l = 0 ; l < t4.Size(3); l++) {
-//             t4(i,j,k,l) = (TypeParam) (i + j + k + l - 20);
-//           }
-//         }
-//       }
-//     }
+TYPED_TEST(ReductionTestsNumericNonComplex, Find)
+{
+  MATX_ENTER_HANDLER();
+  {
+    tensor_t<int, 0> num_found{};
+    tensor_t<TypeParam, 1> t1{{100}};
+    tensor_t<TypeParam, 1> t1o{{100}};
+    TypeParam thresh = (TypeParam)0.5;
 
-//     reduce(t0, t4, reduceOpMax<TypeParam>(), 0);
-//     cudaStreamSynchronize(0);
-//     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam) (t4.Size(0) +
-//     t4.Size(1) + t4.Size(2) + t4.Size(3) - 20 - 4) ));
 
-//     reduce(t0, t4, reduceOpMin<TypeParam>(), 0);
-//     cudaStreamSynchronize(0);
-//     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-20) ));
-//   }
+    for (int i = 0; i < t1.Size(0); i++) {
+      t1(i) = static_cast<detail::value_promote_t<TypeParam>>((float)rand() /
+                                                      (float)INT_MAX * 2.0f);
+    }
 
-//   MATX_EXIT_HANDLER();
-// }
+    // Find values greater than 0
+    find(t1o, num_found, t1, GT{thresh});
+    cudaStreamSynchronize(0);
+    
+    int output_found = 0;
+    for (int i = 0; i < t1.Size(0); i++) {
+      if (t1(i) > thresh) {
+        ASSERT_NEAR(t1o(output_found), t1(i), 0.01);
+        output_found++;
+      }
+    }
+    ASSERT_EQ(output_found, num_found());
+
+  }
+
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Trace)
 {
