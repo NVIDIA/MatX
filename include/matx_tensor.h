@@ -1620,11 +1620,12 @@ public:
   void Print(Args... dims) const {
 #ifdef __CUDACC__    
     auto kind = GetPointerKind(this->ldata_);
+
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
       InternalPrint(dims...);
     }
-    else if (DevicePrintable(kind)) {
+    else if (DevicePrintable(kind) || kind == MATX_INVALID_MEMORY) {
       if constexpr (PRINT_ON_DEVICE) {
         PrintKernel<<<1, 1>>>(*this, dims...);
       }
