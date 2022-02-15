@@ -63,6 +63,7 @@ typedef enum {
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
   CUB_OP_SELECT,
+  CUB_OP_UNIQUE
 } CUBOperation_t;
 
 struct CubParams_t {
@@ -89,6 +90,11 @@ struct ReduceParams_t {
 template <typename SelectOp, typename CountTensor>
 struct SelectParams_t {
   SelectOp op;
+  CountTensor num_found;
+};
+
+template <typename CountTensor>
+struct UniqueParams_t {
   CountTensor num_found;
 };
 
@@ -186,6 +192,9 @@ public:
     else if constexpr (op == CUB_OP_SELECT) { 
       ExecSelect(a_out, a, stream);
     }     
+    else if constexpr (op == CUB_OP_UNIQUE) { 
+      ExecUnique(a_out, a, stream);
+    }      
     else {
       MATX_THROW(matxNotSupported, "Invalid CUB operation");
     }
@@ -726,6 +735,49 @@ public:
 #endif    
   }     
 
+/**
+   * Execute a unique reduction on a tensor
+   *
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputTensor
+   *   Type of input tensor 
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecUnique(OutputTensor &a_out,
+                       const InputTensor &a,
+                       const cudaStream_t stream)
+  {
+#ifdef __CUDACC__      
+    if (a.IsLinear()) {
+      cub::DeviceSelect::Unique(d_temp, 
+                            temp_storage_bytes, 
+                            a.Data(), 
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            stream); 
+    }
+    else {
+      tensor_impl_t<typename InputTensor::scalar_type, InputTensor::Rank(), typename InputTensor::desc_type> base = a;
+      cub::DeviceSelect::Unique(d_temp, 
+                            temp_storage_bytes, 
+                            RandomOperatorIterator{base},
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            stream);            
+    }                                     
+#endif    
+  }     
+
 private:
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
@@ -1184,7 +1236,9 @@ struct GTE
  *
  * Finds all values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
- * is only for element-wise output.
+ * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, 
+ * this can be the same size as the input, but if something is known about the data to indicate not as many 
+ * entries are needed, the output can be smaller.
  *
  * @tparam SelectType
  *   Type of select functor
@@ -1237,4 +1291,66 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputTensor &a, Sel
 #endif  
 }
 
+
+/**
+ * Reduce to unique values
+ *
+ * Reduces the input to only unique values saved into the output. Output tensor must be large enough to 
+ * hold unique entries. To be safe, this can be the same size as the input, but if something is known about
+ * the data to indicate not as many entries are needed, the output can be smaller.
+ *
+  * @tparam CountTensor
+ *   Output items type
+ * @tparam OutputTensor
+ *   Output type
+ * @tparam InputTensor
+ *   Input type
+ * @param num_found
+ *   Number of items found meeting criteria
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename CountTensor, typename OutputTensor, typename InputTensor>
+void unique(OutputTensor &a_out, CountTensor &num_found, const InputTensor &a,  const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__    
+  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+
+  // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
+  typename InputTensor::scalar_type *sort_ptr;
+  matxAlloc((void **)&sort_ptr, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto sort_tensor = make_tensor<typename InputTensor::scalar_type>(sort_ptr, a.Shape());
+
+  matx::sort(sort_tensor, a, SORT_DIR_ASC, stream);
+
+  auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
+  // Get parameters required by these tensors
+  auto params =
+      detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_UNIQUE, decltype(cparams)>::GetCubParams(a_out, sort_tensor);
+  params.stream = stream;
+
+  // Get cache or new Sort plan if it doesn't exist
+  auto ret = detail::cub_cache.Lookup(params);
+
+
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
+                                          InputTensor, 
+                                          detail::CUB_OP_UNIQUE, 
+                                          decltype(cparams)>{a_out, sort_tensor, cparams, stream};
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->ExecUnique(a_out, sort_tensor, stream);
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_UNIQUE, decltype(cparams)> *>(
+            ret.value());
+    sort_type->ExecUnique(a_out, sort_tensor, stream);
+  }
+#endif  
+}
 }; // namespace matx

@@ -526,6 +526,34 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Find)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsNumericNonComplex, Unique)
+{
+  MATX_ENTER_HANDLER();
+  {
+    tensor_t<int, 0> num_found{};
+    tensor_t<TypeParam, 1> t1{{100}};
+    tensor_t<TypeParam, 1> t1o{{100}};
+    TypeParam thresh = (TypeParam)0.5;
+
+    for (int i = 0; i < t1.Size(0); i++) {
+      t1(i) = (TypeParam)(i % 10);
+    }
+
+    // Find values greater than 0
+    unique(t1o, num_found, t1);
+    cudaStreamSynchronize(0);
+
+    for (int i = 0; i < 10; i++) {
+      ASSERT_NEAR(t1o(i), i, 0.01);
+    }
+
+    ASSERT_EQ(10, num_found());
+
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Trace)
 {
   MATX_ENTER_HANDLER();
