@@ -212,7 +212,7 @@ namespace matx
     size_t size_;
     std::shared_ptr<T> data_;
 
-    void ConfigureShared(T *ptr, size_t size) {
+    void ConfigureShared(T *ptr, [[maybe_unused]] size_t size) {
       if constexpr (std::is_same_v<O, non_owning>) {
         data_ = std::shared_ptr<T>(ptr, [](auto){});
       }

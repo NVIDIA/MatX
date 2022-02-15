@@ -166,25 +166,6 @@ inline matxMemorySpace_t GetPointerKind(void *ptr)
     return iter->second.kind;
   }
 
-  // If we haven't found the pointer it's likely that this is a View that has a
-  // modified data pointer starting past the base. Instead, look through all
-  // pointers and find the one that's closest to this one.
-  void *tmp = nullptr;
-  intptr_t mindist = std::numeric_limits<int64_t>::max();
-  for (auto const &[k, v] : allocationMap) {
-    auto diff = (intptr_t)ptr - (intptr_t)k;
-    if (diff < mindist) {
-      tmp = k;
-      mindist = diff;
-    }
-  }
-
-  MATX_ASSERT(tmp != nullptr, matxInvalidParameter);
-
-  iter = allocationMap.find(tmp);
-  if (iter != allocationMap.end()) {
-    return iter->second.kind;
-  }
 
   return MATX_INVALID_MEMORY;
 }
