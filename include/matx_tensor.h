@@ -178,6 +178,7 @@ public:
   using tensor_view = bool; ///< Indicate this is a MatX tensor view
   using storage_type = Storage; ///< Storage type trait
   using desc_type = Desc; ///< Descriptor type trait
+  using self_type = tensor_t<T, RANK, Storage, Desc>;
   static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
   /**
