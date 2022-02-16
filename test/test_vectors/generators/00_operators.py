@@ -27,8 +27,8 @@ class meshgrid_operator:
         self.size = size
 
     def run(self) -> Dict[str, np.array]:
-        self.x = np.linspace(1, self.size[1], self.size[1])
-        self.y = np.linspace(1, self.size[0], self.size[0])
+        self.x = np.linspace(1, self.size[0], self.size[0])
+        self.y = np.linspace(1, self.size[1], self.size[1])
         [X, Y] = np.meshgrid(self.x, self.y)
 
         return {
