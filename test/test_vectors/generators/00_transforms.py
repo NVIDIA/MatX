@@ -43,6 +43,10 @@ class matmul_operators:
         self.res['c'] = self.res['a'] @ self.res['b']
         return self.res
 
+    def run_transpose(self) -> Dict[str, np.ndarray]:
+        self.res['c'] = np.transpose(self.res['a'] @ self.res['b'])
+        return self.res        
+
 
 class cov_operators:
     def __init__(self, dtype: str, size: List[int]):
