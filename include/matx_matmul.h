@@ -222,63 +222,97 @@ public:
       params.batch = static_cast<int32_t>(a.Size(RANK - 3));
     }
 
-    matx::tensor_t<T2, RANK> a_comp{a};
-    matx::tensor_t<T2, RANK> b_comp{b};
-    matx::tensor_t<T2, RANK> c_comp{c};
-
     // If the user wants C transposed (as a permuted view), we need the output
     // matrix to still be MxN in memory. The reason is the permuted view will
     // handle viewing it as an NxM. To accomplish this we use the identity C' =
     // B'A', so we swap A and B and permute them.
     if (c.Stride(RANK - 2) == 1 && c.Size(RANK - 1) != 1) {
-      auto at = a.Permute({1, 0});
-      auto bt = b.Permute({1, 0});
-      a_comp.Shallow(bt);
-      b_comp.Shallow(at);
-      c_comp.Shallow(c.Permute({1, 0}));
-    }
+      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+        if (b.Stride(RANK - 2) == 1) {
+          params.opA = CUBLAS_OP_N;
+          params.a_rows = b.Size(RANK - 1);
+          params.a_cols = b.Size(RANK - 2);
+          params.lda = b.Stride(RANK - 1);
+        }
+        else if (b.Stride(RANK - 1) == 1) {
+          params.opA = CUBLAS_OP_T;
+          params.a_rows = b.Size(RANK - 2);
+          params.a_cols = b.Size(RANK - 1);
+          params.lda = b.Stride(RANK - 2);
+        }
 
-    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-      if (a_comp.Stride(RANK - 1) == 1) {
+        if (a.Stride(RANK - 2) == 1) {
+          params.opB = CUBLAS_OP_N;
+          params.b_rows = a.Size(RANK - 1);
+          params.b_cols = a.Size(RANK - 2);
+          params.ldb = a.Stride(RANK - 1);
+        }
+        else if (a.Stride(RANK - 1) == 1) {
+          params.opB = CUBLAS_OP_T;
+          params.b_rows = a.Size(RANK - 2);
+          params.b_cols = a.Size(RANK - 1);
+          params.ldb = a.Stride(RANK - 2);
+        }
+
+        params.c_rows = params.a_rows;
+        params.c_cols = params.b_cols;
+        params.ldc = c.Stride(RANK - 1);
+      }
+      else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
-        params.a_rows = a_comp.Size(RANK - 2);
-        params.a_cols = a_comp.Size(RANK - 1);
-        params.lda = a_comp.Stride(RANK - 2);
-      }
-      else if (a_comp.Stride(RANK - 2) == 1) {
-        params.opA = CUBLAS_OP_T;
-        params.a_rows = a_comp.Size(RANK - 1);
-        params.a_cols = a_comp.Size(RANK - 2);
-        params.lda = a_comp.Stride(RANK - 1);
-      }
-
-      if (b_comp.Stride(RANK - 1) == 1) {
         params.opB = CUBLAS_OP_N;
-        params.b_rows = b_comp.Size(RANK - 2);
-        params.b_cols = b_comp.Size(RANK - 1);
-        params.ldb = b_comp.Stride(RANK - 2);
-      }
-      else if (b_comp.Stride(RANK - 2) == 1) {
-        params.opB = CUBLAS_OP_T;
-        params.b_rows = b_comp.Size(RANK - 1);
-        params.b_cols = b_comp.Size(RANK - 2);
-        params.ldb = b_comp.Stride(RANK - 1);
-      }
-
-      params.c_rows = params.a_rows;
-      params.c_cols = params.b_cols;
-      params.ldc = c_comp.Stride(RANK - 2);
+        params.m = static_cast<int>(b.Size(RANK - 1));
+        params.n = static_cast<int>(a.Size(RANK - 2));
+        params.k =
+            static_cast<int>(a.Size(RANK - 2)); // Gemm Problem dimensions
+        params.lda = static_cast<int>(b.Stride(RANK - 1));
+        params.ldb = static_cast<int>(a.Stride(RANK - 1));
+        params.ldc = static_cast<int>(c.Stride(RANK - 1));
+      }      
     }
-    else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-      params.opA = CUBLAS_OP_N;
-      params.opB = CUBLAS_OP_N;
-      params.m = static_cast<int>(a_comp.Size(RANK - 2));
-      params.n = static_cast<int>(b_comp.Size(RANK - 1));
-      params.k =
-          static_cast<int>(a_comp.Size(RANK - 1)); // Gemm Problem dimensions
-      params.lda = static_cast<int>(a_comp.Stride(RANK - 2));
-      params.ldb = static_cast<int>(b_comp.Stride(RANK - 2));
-      params.ldc = static_cast<int>(c_comp.Stride(RANK - 2));
+    else {
+      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+        if (a.Stride(RANK - 1) == 1) {
+          params.opA = CUBLAS_OP_N;
+          params.a_rows = a.Size(RANK - 2);
+          params.a_cols = a.Size(RANK - 1);
+          params.lda = a.Stride(RANK - 2);
+        }
+        else if (a.Stride(RANK - 2) == 1) {
+          params.opA = CUBLAS_OP_T;
+          params.a_rows = a.Size(RANK - 1);
+          params.a_cols = a.Size(RANK - 2);
+          params.lda = a.Stride(RANK - 1);
+        }
+
+        if (b.Stride(RANK - 1) == 1) {
+          params.opB = CUBLAS_OP_N;
+          params.b_rows = b.Size(RANK - 2);
+          params.b_cols = b.Size(RANK - 1);
+          params.ldb = b.Stride(RANK - 2);
+        }
+        else if (b.Stride(RANK - 2) == 1) {
+          params.opB = CUBLAS_OP_T;
+          params.b_rows = b.Size(RANK - 1);
+          params.b_cols = b.Size(RANK - 2);
+          params.ldb = b.Stride(RANK - 1);
+        }
+
+        params.c_rows = params.a_rows;
+        params.c_cols = params.b_cols;
+        params.ldc = c.Stride(RANK - 2);
+      }
+      else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
+        params.opA = CUBLAS_OP_N;
+        params.opB = CUBLAS_OP_N;
+        params.m = static_cast<int>(a.Size(RANK - 2));
+        params.n = static_cast<int>(b.Size(RANK - 1));
+        params.k =
+            static_cast<int>(a.Size(RANK - 1)); // Gemm Problem dimensions
+        params.lda = static_cast<int>(a.Stride(RANK - 2));
+        params.ldb = static_cast<int>(b.Stride(RANK - 2));
+        params.ldc = static_cast<int>(c.Stride(RANK - 2));
+      }
     }
 
     return params;

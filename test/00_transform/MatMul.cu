@@ -93,6 +93,64 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  TypeParam *ap, *bp, *cp;
+  cudaMallocManaged(&ap, m*k*sizeof(TypeParam));
+  cudaMallocManaged(&bp, k*n*sizeof(TypeParam));
+  cudaMallocManaged(&cp, m*n*sizeof(TypeParam));
+
+  auto a = make_tensor<TypeParam, 2, non_owning>(ap, {m, k});
+  auto b = make_tensor<TypeParam, 2, non_owning>(bp, {k, n});
+  auto c = make_tensor<TypeParam, 2, non_owning>(cp, {m, n});
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  cudaFree(ap);
+  cudaFree(bp);
+  cudaFree(cp);
+
+  MATX_EXIT_HANDLER();
+}
+
+
+TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  tensor_t<TypeParam, 2> a{{m, k}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+
+  auto at = a.Permute({1,0});
+  auto bt = b.Permute({1,0});
+  auto ct = c.Permute({1,0});
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run_transpose", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul<decltype(ct), decltype(bt), decltype(at), PROVIDER_TYPE_CUBLASLT>(ct, bt, at);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", 0.01);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
 {
   MATX_ENTER_HANDLER();
