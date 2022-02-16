@@ -201,7 +201,7 @@ TEST(OperatorTests, MeshGrid)
   constexpr index_t xd = 3;
   constexpr index_t yd = 5;
   pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run",
-                                   {yd, xd});
+                                   {xd, yd});
 
   tensor_t<dtype, 2> xv({yd, xd});
   tensor_t<dtype, 2> yv({yd, xd});

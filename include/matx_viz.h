@@ -177,7 +177,7 @@ void bar(const TensorType &y,
 
   MATX_ASSERT(TensorType::Rank() == 1, matxInvalidDim);
 
-  auto np_y_ten = pb->TensorViewToNumpy(np_y_ten, y);
+  auto np_y_ten = pb->TensorViewToNumpy(y);
 
   auto labels = pybind11::dict("y"_a=ylabel);
   auto fig = px.attr("bar")("y"_a=np_y_ten, "labels"_a = labels, "title"_a = title);  
@@ -280,6 +280,91 @@ void contour( const T1 &x,
   auto np_z_ten = pb->TensorViewToNumpy(z);
 
   auto data = go.attr("Contour")("z"_a = np_z_ten, "y"_a = np_y_ten, "x"_a = np_x_ten);
+  auto fig = go.attr("Figure")("data"_a = data);
+  if (out_fname == "") {
+    fig.attr("show")();
+  }
+  else {
+    fig.attr("write_html")(out_fname);
+  }  
+}
+
+
+/**
+ * Create a surface plot from a tensor view
+ *
+ * Generates either an HTML page or launches a browser displaying a surface plot. Three tensor
+ * are required for a surface plot for the values of each axis and the Z value at each point. The
+ * Z tensor must be one rank higher than the x/y tensors with the outer dimensions matching X/Y.
+ *
+ * @tparam T1
+ *   Type of axes tensors
+ * @tparam T2
+ *   Type of data tensor (Z)
+ * @tparam RANK
+ *   Rank of tensor
+ * 
+ * @param x
+ *   Tensor with X axis points
+ * @param y
+ *   Tensor with Y axis points
+ * @param z
+ *   Tensor with Z axis points
+ * @param out_fname
+ *   Output file name. If blank, a new window will open with the plot in a browser window
+ */
+template <typename T1, typename T2>
+void surf(    const T1 &x, 
+              const T1 &y, 
+              const T2 &z,
+              const std::string &out_fname = "") {
+
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto go = pybind11::module_::import("plotly.graph_objects");   
+  auto np = pybind11::module_::import("numpy");   
+
+  auto np_x_ten = pb->TensorViewToNumpy(x);
+  auto np_y_ten = pb->TensorViewToNumpy(y);
+  auto np_z_ten = pb->TensorViewToNumpy(z);
+
+  auto data = go.attr("Surface")("z"_a = np_z_ten, "y"_a = np_y_ten, "x"_a = np_x_ten);
+  auto fig = go.attr("Figure")("data"_a = data);
+  if (out_fname == "") {
+    fig.attr("show")();
+  }
+  else {
+    fig.attr("write_html")(out_fname);
+  }  
+}
+
+/**
+ * Create a surface plot from a tensor view
+ *
+ * Generates either an HTML page or launches a browser displaying a surface plot. A single
+ * Z tensor uses only the data values, and the X/Y values will be deduced from the size of Z
+ *
+ * @tparam T1
+ *   Type of axes tensors
+ * @tparam RANK
+ *   Rank of tensor
+ * 
+ * @param z
+ *   Tensor with Z axis points
+ * @param out_fname
+ *   Output file name. If blank, a new window will open with the plot in a browser window
+ */
+template <typename T1>
+void surf(
+          const T1 &z,
+          const std::string &out_fname = "") {
+
+  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto go = pybind11::module_::import("plotly.graph_objects");   
+  auto np = pybind11::module_::import("numpy");   
+
+  auto np_z_ten = pb->TensorViewToNumpy(z);
+
+  auto data = go.attr("Surface")("z"_a = np_z_ten, "colorscale"_a = "YlGnBu");
   auto fig = go.attr("Figure")("data"_a = data);
   if (out_fname == "") {
     fig.attr("show")();
