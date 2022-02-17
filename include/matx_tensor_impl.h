@@ -808,7 +808,7 @@ class tensor_impl_t {
      * @returns Total number of elements across all dimensions
      *
      */
-    __MATX_INLINE__ stride_type __MATX_HOST__ __MATX_DEVICE__ TotalSize() const noexcept { return desc_.TotalSize(); }  
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept { return desc_.TotalSize(); }  
 
     /**
      * Get the size of a single dimension of the tensor
@@ -819,7 +819,7 @@ class tensor_impl_t {
      * @returns Number of elements in dimension
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const noexcept
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return desc_.Size(dim);
     }
@@ -845,7 +845,7 @@ class tensor_impl_t {
      * @return
      *    The size of the dimension
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Lsize() const noexcept
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Lsize() const noexcept
     {
       return desc_.Size(Rank() - 1);
     }

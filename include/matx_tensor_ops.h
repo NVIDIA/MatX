@@ -149,7 +149,7 @@ inline
       return RANK;
     }
 
-    index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+    constexpr index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
     {
       return size_[dim];
     }
@@ -200,7 +200,7 @@ inline
           return Op2::Rank();
         }
 
-        index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
           return op2_.Size(dim);
         }        
@@ -426,7 +426,7 @@ inline
      * @param dim Dimension to get size of
      * @return Size of dimension 
      */    
-    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -521,7 +521,7 @@ inline
      * @param dim Dimension to get size of
      * @return Size of dimension 
      */
-    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
     {
       return size_[dim];
     }
@@ -575,7 +575,7 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
     {
       return op_.Size(dim);
     }
@@ -690,7 +690,7 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
     {
       return op_.Size(Rank() - dim - 1);
     }
@@ -743,7 +743,7 @@ inline
       return RANK - 1;
     }
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
     {
       if (dim < RANK - 2) {
         return op_.Size(dim);
@@ -806,7 +806,7 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
     {
       return op1_.Size(dim) * op2_.Size(dim);
     }
@@ -918,7 +918,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
     {
       return op_.Size(dim) * reps_[dim];
     }
@@ -1011,7 +1012,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
     {
       return op_.Size(dim);
     }
@@ -1088,7 +1090,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return op_.Size(dim);
     }
@@ -1198,7 +1201,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return op_.Size(dim);
     }
@@ -1252,7 +1256,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return op_.Size(dim);
     }
@@ -1305,7 +1310,8 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return op_.Size(dim);
     }
@@ -1359,7 +1365,7 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return op_.Size(dim);
     }
@@ -1421,7 +1427,7 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       if (dim == (uint32_t)(Rank() - 1)) {
         return orig_size_;
@@ -1483,14 +1489,14 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       if constexpr (Rank() <= 1)
       {
         return op_.Size(dim) * 2;
       }
 
-      return (dim == static_cast<uint32_t>(Rank()) - 2) ? op_.Size(dim) * 2
+      return (dim == static_cast<int>(Rank()) - 2) ? op_.Size(dim) * 2
                                                         : op_.Size(dim);
     }
   };
@@ -1557,14 +1563,15 @@ inline
     {
       return detail::get_rank<T1>();
     }
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       if constexpr (Rank() <= 1)
       {
         return op_.Size(dim) / 2;
       }
 
-      return (dim == static_cast<uint32_t>(Rank()) - 2) ? op_.Size(dim) / 2
+      return (dim == static_cast<int>(Rank()) - 2) ? op_.Size(dim) / 2
                                                         : op_.Size(dim);
     }
   };
@@ -1628,7 +1635,7 @@ inline
       return detail::get_rank<I1>();
     }
 
-    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return size_[dim];
     }
@@ -1677,7 +1684,7 @@ inline
       return detail::MAX(detail::get_rank<I1>(), detail::get_rank<I2>());
     }
 
-    index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return size_[dim];
     }

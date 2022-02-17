@@ -340,7 +340,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Size of dimension 
    */
-  index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+  constexpr index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
     return shape_.Size(dim);
   }
