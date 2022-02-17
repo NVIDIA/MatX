@@ -41,6 +41,7 @@
 #include "matx_type_utils.h"
 #include "matx_tensor_utils.h"
 #include "matx_exec_kernel.h"
+#include "matx_executor.h"
 #include "matx_make.h"
 
 namespace matx {
