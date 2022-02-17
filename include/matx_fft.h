@@ -167,21 +167,21 @@ public:
     else if (fft_rank == 2) {
       if (params.transform_type == CUFFT_C2R ||
           params.transform_type == CUFFT_Z2D) {
-        params.n[0] = o.Size(RANK-1U);
-        params.n[1] = o.Size(RANK-2U);
+        params.n[0] = o.Size(RANK-1);
+        params.n[1] = o.Size(RANK-2);
       }
       else {
-        params.n[0] = i.Size(RANK-1U);
-        params.n[1] = i.Size(RANK-2U);
+        params.n[0] = i.Size(RANK-1);
+        params.n[1] = i.Size(RANK-2);
       }
 
-      params.batch = (RANK == 2) ? 1 : i.Size(RANK - 3U);
-      params.inembed[1] = o.Size(RANK-1U);
-      params.onembed[1] = i.Size(RANK-1U);
-      params.istride = i.Stride(RANK-1U);
-      params.ostride = o.Stride(RANK-1U);
-      params.idist = i.Size(RANK-2U) * i.Size(RANK-1U);
-      params.odist = o.Size(RANK-2U) * o.Size(RANK-1U);
+      params.batch = (RANK == 2) ? 1 : i.Size(RANK - 3);
+      params.inembed[1] = o.Size(RANK-1);
+      params.onembed[1] = i.Size(RANK-1);
+      params.istride = i.Stride(RANK-1);
+      params.ostride = o.Stride(RANK-1);
+      params.idist = i.Size(RANK-2) * i.Size(RANK-1);
+      params.odist = o.Size(RANK-2) * o.Size(RANK-1);
 
       if constexpr (is_complex_half_v<T1> || is_complex_half_v<T1>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0 ||

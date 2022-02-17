@@ -101,8 +101,7 @@ public:
    * @returns Number of elements in dimension
    *
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
-      noexcept
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
   {
     if constexpr (Rank() > 0)
       return n_[dim];

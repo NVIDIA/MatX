@@ -82,9 +82,9 @@ public:
     }
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    return out_.Size(i);
+    return out_.Size(dim);
   }
 
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -117,9 +117,9 @@ public:
         x_(idx);
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    return out_.Size(i);
+    return out_.Size(dim);
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
@@ -147,9 +147,9 @@ public:
                 x_(idx);
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    return out_.Size(i);
+    return out_.Size(dim);
   }
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {

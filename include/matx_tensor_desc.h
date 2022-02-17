@@ -209,7 +209,7 @@ public:
    *    The size of all dimensions combined. Note that this does not include the
    *    size of the data type itself, but only the product of the lengths of each dimension
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept
   {
     // The stride_type is expected to be able to hold this without overflowing
     stride_type size = 1; 
@@ -260,7 +260,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Size of dimension
    */
-  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size([[maybe_unused]] int dim) const { 
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept { 
     if constexpr (RANK == 0) {
       return static_cast<shape_type>(1);
     }

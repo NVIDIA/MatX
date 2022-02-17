@@ -167,7 +167,7 @@ public:
    * @return
    *   Size of dimension
    */
-  inline __MATX_HOST__ __MATX_DEVICE__ typename Desc::shape_type Size(uint32_t dim) const
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
     static_assert(RANK >= 1, "Size function only works on tensors of rank 1 and higher");
     return size_[dim];

@@ -62,7 +62,7 @@ public:
         in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(uint32_t i) const
+  constexpr __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(int i) const
   {
     return out_.Size(i);
   }

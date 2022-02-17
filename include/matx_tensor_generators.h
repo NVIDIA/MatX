@@ -58,7 +58,7 @@ public:
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
     return v_; };
 
-  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
   {
     return *(s_.begin() + dim);
   }
@@ -168,7 +168,7 @@ public:
     }
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
   {
     return *(s_.begin() + dim);
   }
@@ -261,7 +261,7 @@ public:
     return f_(pp_get<Dim>(indices...));
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
   {
     return *(s_.begin() + dim);
   }
@@ -975,7 +975,7 @@ public:
     }
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
   {
     return sop_.Size(0);
   }
@@ -1014,7 +1014,7 @@ public:
     }
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
   {
     return sop_.Size(0);
   }
@@ -1125,7 +1125,7 @@ public:
     return x_[0] + j * (x_[1] - x_[0]) / (x_[2] - 1);
   }
 
-  inline __MATX_HOST__ __MATX_DEVICE__ auto Size(uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
   {
     return (dim == 0) ? y_[2] : x_[2];
   }
@@ -1149,7 +1149,7 @@ public:
     return y_[0] + i * (y_[1] - y_[0]) / (y_[2] - 1);
   };
 
-  inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
+  constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
   {
     return (dim == 0) ? y_[2] : x_[2];
   }
