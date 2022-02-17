@@ -16,14 +16,6 @@ target_include_directories( example_lib INTERFACE
                             ${CMAKE_SOURCE_DIR}/include/kernels/ 
                             ${CMAKE_SOURCE_DIR}/include/common) 
 
-target_link_libraries(  example_lib INTERFACE
-                        cuda 
-                        CUDA::nvToolsExt 
-                        CUDA::cublas 
-                        CUDA::cublasLt 
-                        CUDA::cufft 
-                        CUDA::cusolver)
-
 target_link_libraries(example_lib INTERFACE matx::matx) # Transitive properties                        
 
 set_property(TARGET example_lib PROPERTY ENABLE_EXPORTS 1)

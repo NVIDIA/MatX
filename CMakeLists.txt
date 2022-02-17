@@ -201,6 +201,14 @@ else()
     target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO=0)
 endif()
 
+# Add in all CUDA linker dependencies
+target_link_libraries(matx INTERFACE    CUDA::cudart
+                                        CUDA::nvToolsExt 
+                                        CUDA::cublas 
+                                        CUDA::cublasLt 
+                                        CUDA::cufft 
+                                        CUDA::cusolver)
+
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
 # should have all build properties needed based on the options passed in
 if (NOT_SUBPROJECT)

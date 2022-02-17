@@ -57,7 +57,7 @@ endif()
 target_include_directories(matx_test PRIVATE "${target_inc}")
 target_include_directories(matx_test SYSTEM PRIVATE "${system_inc}")
 target_link_libraries(matx_test PRIVATE matx::matx) # Transitive properties
-target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} cuda CUDA::nvToolsExt CUDA::cublas CUDA::cublasLt gtest CUDA::cufft CUDA::cusolver)
+target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} gtest)
 
 add_custom_target(test 
     DEPENDS matx_test 
