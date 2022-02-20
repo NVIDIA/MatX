@@ -246,8 +246,9 @@ template <class T> inline constexpr bool is_bf16_type_v = detail::is_bf16_type<T
 
 namespace detail {
 template <typename T> struct is_fp16_type : std::false_type {};
-template <> struct is_fp16_type<matxBf16Complex> : std::true_type {};
-template <> struct is_fp16_type<matxBf16> : std::true_type {};
+template <> struct is_fp16_type<matxFp16Complex> : std::true_type {};
+template <> struct is_fp16_type<matxFp16> : std::true_type {};
+
 }
 
 /**

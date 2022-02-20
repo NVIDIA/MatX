@@ -107,6 +107,21 @@ __MATX_INLINE__ void CheckTestTypeSupport() {
     }
   }
   else if constexpr (is_fp16_type_v<T>) {
+    if (cc < PASCAL_CC) {
+      GTEST_SKIP();
+    }
+  }
+}
+
+template <typename T>
+__MATX_INLINE__ void CheckTestTensorCoreTypeSupport() {
+  auto cc = detail::GetComputeCapabilityMajor();
+  if constexpr (is_bf16_type_v<T>) {
+    if (cc < AMPERE_CC) {
+      GTEST_SKIP();
+    }
+  }
+  else if constexpr (is_fp16_type_v<T>) {
     if (cc < VOLTA_CC) {
       GTEST_SKIP();
     }
