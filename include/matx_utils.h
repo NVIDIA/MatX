@@ -36,6 +36,7 @@
 
 #define AMPERE_CC 8
 #define VOLTA_CC 7
+#define PASCAL_CC 6
 
 namespace matx {
 namespace detail {

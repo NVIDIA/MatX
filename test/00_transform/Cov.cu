@@ -45,7 +45,7 @@ protected:
   const index_t cov_dim = 4;
   void SetUp() override
   {
-    CheckTestTypeSupport<T>();
+    CheckTestTensorCoreTypeSupport<T>();
     pb = std::make_unique<detail::MatXPybind>();
     pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim});
 
