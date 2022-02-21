@@ -168,6 +168,14 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2.Size(1))));
     }
+
+    // Test tensor input too
+    auto t2t = make_tensor<TypeParam>({30, 40});
+    (t2t = ones<TypeParam>({30, 40})).run();
+    sum(t1, t2t);
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2t.Size(1))));
+    }    
   }
 
   {
