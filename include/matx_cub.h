@@ -81,6 +81,10 @@ template <typename T> struct HistEvenParams_t {
   T upper_level;
 };
 
+struct SortParams_t {
+  SortDirection_t dir;
+};
+
 template <typename Op, typename I> 
 struct ReduceParams_t {
   Op reduce_op;
@@ -138,44 +142,28 @@ public:
       }
     }
 
+    if constexpr ((RANK == 1 && ( op == CUB_OP_REDUCE_SUM ||
+                                  op == CUB_OP_REDUCE)) ||
+                  (RANK == 2 && op == CUB_OP_RADIX_SORT)) {
+      matxAlloc((void **)&d_offsets, (a.Size(a.Rank() - 2) + 1) * sizeof(index_t),
+                MATX_ASYNC_DEVICE_MEMORY, stream);
+      for (index_t i = 0; i < a.Size(a.Rank() - 2) + 1; i++) {
+        offsets.push_back(i * a.Lsize());
+      }
+
+      cudaMemcpyAsync(d_offsets, offsets.data(),
+                      offsets.size() * sizeof(index_t),
+                      cudaMemcpyHostToDevice, stream);
+    }
+
     if constexpr (op == CUB_OP_RADIX_SORT) {
-      // Create temporary allocation space for sorting. Only contiguous for now.
-      // The memory required should be the same for ascending or descending, so
-      // just use ascending here.
-      if constexpr (RANK == 1) {
-        cub::DeviceRadixSort::SortKeys(
-            NULL, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Lsize()), 0, sizeof(T1) * 8, stream);
-      }
-      else {
-        matxAlloc((void **)&d_offsets, (a.Size(RANK - 2) + 1) * sizeof(index_t),
-                  MATX_ASYNC_DEVICE_MEMORY, stream);
-        for (index_t i = 0; i < a.Size(RANK - 2) + 1; i++) {
-          offsets.push_back(i * a.Lsize());
-        }
-
-        cudaMemcpyAsync(d_offsets, offsets.data(),
-                        offsets.size() * sizeof(index_t),
-                        cudaMemcpyHostToDevice, stream);
-
-        cub::DeviceSegmentedRadixSort::SortKeys(
-            NULL, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
-            d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
-      }
+      ExecSort(a_out, a, stream, cparams_.dir);
     }
     else if constexpr (op == CUB_OP_INC_SUM) {
-      // Scan only is capable of non-batched mode at the moment
-      cub::DeviceScan::InclusiveSum(NULL, temp_storage_bytes, a.Data(),
-                                    a_out.Data(), static_cast<int>(a.Lsize()),
-                                    stream);
+      ExecPrefixScanEx(a_out, a, stream);
     }
     else if constexpr (op == CUB_OP_HIST_EVEN) {
-      cub::DeviceHistogram::HistogramEven(
-          NULL, temp_storage_bytes, a.Data(), a_out.Data(),
-          static_cast<int>(a_out.Lsize() + 1), cparams_.lower_level, cparams_.upper_level,
-          static_cast<int>(a.Lsize()),
-          stream); // Remove this case once CUB is fixed
+      ExecHistEven(a_out, a, cparams_.lower_level, cparams_.upper_level, stream);
     }
     else if constexpr (op == CUB_OP_REDUCE) { // General reduce
       ExecReduce(a_out, a, stream);
@@ -261,7 +249,7 @@ public:
                            const T1 upper, const cudaStream_t stream)
   {
 #ifdef __CUDACC__      
-    if constexpr (RANK == 1) {
+    if (RANK == 1 || d_temp == nullptr) {
       cub::DeviceHistogram::HistogramEven(
           d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
           static_cast<int>(a_out.Lsize() + 1), lower, upper,
@@ -310,7 +298,7 @@ public:
                                const cudaStream_t stream)
   {
 #ifdef __CUDACC__      
-    if constexpr (RANK == 1) {
+    if (RANK == 1 || d_temp == nullptr) {
       cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, a.Data(),
                                     a_out.Data(), static_cast<int>(a.Lsize()),
                                     stream);
@@ -360,7 +348,7 @@ public:
                        const SortDirection_t dir = SORT_DIR_ASC)
   {
 #ifdef __CUDACC__      
-    if constexpr (RANK == 1) {
+    if (RANK == 1) {
       if (dir == SORT_DIR_ASC) {
         cub::DeviceRadixSort::SortKeys(
             d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -372,7 +360,7 @@ public:
             static_cast<int>(a.Lsize()), 0, sizeof(T1) * 8, stream);
       }
     }        
-    else if constexpr (RANK == 2) {
+    else if (RANK == 2 || d_temp == nullptr) {
         if (dir == SORT_DIR_ASC) {
           cub::DeviceSegmentedRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -1044,17 +1032,19 @@ void sort(OutputTensor &a_out, const InputTensor &a,
       detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
   params.stream = stream;
 
+  detail::SortParams_t p{dir};
+
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_RADIX_SORT>{
-        a_out, a, {}, stream};
+    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_RADIX_SORT, decltype(p)>{
+        a_out, a, p, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSort(a_out, a, stream, dir);
   }
   else {
     auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_RADIX_SORT> *>(
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_RADIX_SORT, decltype(p)> *>(
             ret.value());
     sort_type->ExecSort(a_out, a, stream, dir);
   }
@@ -1155,7 +1145,8 @@ void hist(OutputTensor &a_out, const InputTensor &a,
   }
   else {
     auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_HIST_EVEN> *>(
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, 
+            detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputTensor::scalar_type>> *>(
             ret.value());
     sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   }

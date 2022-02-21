@@ -1088,10 +1088,7 @@ void inline median(TensorType &dest,
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
-    detail::matxCubPlan_t<decltype(tmp_sort), TensorInType, detail::CUB_OP_RADIX_SORT> splan{
-        tmp_sort, in, {}, stream};
-
-    splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
+    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
 
     // Store median
     if (tmp_sort.Lsize() & 1) {
@@ -1110,9 +1107,7 @@ void inline median(TensorType &dest,
   else if (RANK_IN == 2) {
     MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
 
-   detail::matxCubPlan_t<decltype(tmp_sort), TensorInType, detail::CUB_OP_RADIX_SORT> splan{
-        tmp_sort, in, {}, stream};
-    splan.ExecSort(tmp_sort, in, stream, SORT_DIR_ASC);
+    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
 
     if (tmp_sort.Lsize() & 1) {
       auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
