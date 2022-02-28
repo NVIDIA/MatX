@@ -1680,3 +1680,31 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, Cast)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 4;
+  auto t = make_tensor<int8_t>({count0});
+  auto t2 = make_tensor<int8_t>({count0});
+  auto to = make_tensor<float>({count0});
+
+  t.SetVals({126, 126, 126, 126});
+  t2.SetVals({126, 126, 126, 126});
+  
+  (to = as_type<int8_t>(t + t2)).run();
+  cudaStreamSynchronize(0);
+
+  for (int i = 0; i < t.Size(0); i++) {
+    ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
+  }
+
+  (to = as_int8(t + t2)).run();
+  cudaStreamSynchronize(0);
+  
+  for (int i = 0; i < t.Size(0); i++) {
+    ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
+  }  
+
+  MATX_EXIT_HANDLER();
+}
+

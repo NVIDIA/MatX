@@ -57,6 +57,19 @@ Binary Operators
 .. doxygenfunction:: operator&&(Op t, Op t2)
 .. doxygenfunction:: operator||(Op t, Op t2)  
 
+Casting Operators
+------------------
+
+.. doxygenclass:: matx::as_type 
+.. doxygenclass:: matx::as_int8
+.. doxygenclass:: matx::as_uint8
+.. doxygenclass:: matx::as_int16
+.. doxygenclass:: matx::as_uint16
+.. doxygenclass:: matx::as_int32
+.. doxygenclass:: matx::as_uint32
+.. doxygenclass:: matx::as_float
+.. doxygenclass:: matx::as_double
+
 Advanced Operators
 ------------------
 
