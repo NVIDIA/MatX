@@ -527,7 +527,178 @@ inline
     }
   };
 
-  /**
+/**
+ * Casts the element of the tensor to a specified type
+ *
+ * Useful when performing type conversions inside of larger expressions
+ *
+ */
+  namespace detail {
+  template <typename T, typename NewType>
+  class CastOp : public BaseOp<CastOp<T, NewType>>
+  {
+  private:
+    typename base_type<T>::type op_;
+
+  public:
+    using matxop = bool;
+    using scalar_type = NewType;
+
+    __MATX_INLINE__ CastOp(T op) : op_(op){};  
+    
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+    {
+      return static_cast<NewType>(op_(indices...));     
+    }
+
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return detail::get_rank<T>();
+    }
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      return op_.Size(dim);
+    }
+  };
+  }   
+
+
+/**
+ * @brief Helper function to cast an input operator to a different type
+ * 
+ * @tparam T Input type
+ * @tparam NewType Casted type
+ * @param t Input operator
+ * @return Operator output casted to NewType 
+ */
+template <typename NewType, typename T>
+auto __MATX_INLINE__ as_type(T t)
+{
+  return detail::CastOp<T, NewType>(t);
+};   
+
+
+/**
+ * @brief Helper function to cast an input operator to an int
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to int 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_int(T t)
+{
+  return detail::CastOp<T, int>(t);
+};   
+
+/**
+ * @brief Helper function to cast an input operator to an float
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to float 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_float(T t)
+{
+  return detail::CastOp<T, float>(t);
+};   
+
+/**
+ * @brief Helper function to cast an input operator to an double
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to double 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_double(T t)
+{
+  return detail::CastOp<T, double>(t);
+};   
+
+/**
+ * @brief Helper function to cast an input operator to an uint32_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to uint32_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_uint32(T t)
+{
+  return detail::CastOp<T, uint32_t>(t);
+};   
+
+/**
+ * @brief Helper function to cast an input operator to an int32_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to int32_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_int32(T t)
+{
+  return detail::CastOp<T, int32_t>(t);
+}; 
+
+/**
+ * @brief Helper function to cast an input operator to an int16_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to int16_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_int16(T t)
+{
+  return detail::CastOp<T, int16_t>(t);
+}; 
+
+/**
+ * @brief Helper function to cast an input operator to an uint16_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to uint16_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_uint16(T t)
+{
+  return detail::CastOp<T, uint16_t>(t);
+}; 
+
+/**
+ * @brief Helper function to cast an input operator to an int8_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to int8_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_int8(T t)
+{
+  return detail::CastOp<T, int8_t>(t);
+}; 
+
+/**
+ * @brief Helper function to cast an input operator to an uint8_t
+ * 
+ * @tparam T Input type
+ * @param t Input operator
+ * @return Operator output casted to uint8_t 
+ */
+template <typename T>
+auto __MATX_INLINE__ as_uint8(T t)
+{
+  return detail::CastOp<T, uint8_t>(t);
+}; 
+
+
+
+/**
  * Reverse the indexing of a View or operator on a single dimension
  *
  * Allows a view or operator to be indexed in reverse order. After applying the
