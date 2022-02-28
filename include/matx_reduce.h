@@ -625,7 +625,7 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
   }
 
   // Read input
-  typename InType::scalar_type in_val = red.Init();
+  T in_val = red.Init();
 
   if constexpr (InType::Rank() == 1) {
     indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -750,7 +750,7 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
 template <typename TensorType, typename TensorIndexType, typename InType>
 __global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType in, [[maybe_unused]] index_t mult)
 {
-  typename InType::scalar_type in_val;
+  typename TensorIndexType::scalar_type in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;  
   std::array<index_t, InType::Rank()> indices;
