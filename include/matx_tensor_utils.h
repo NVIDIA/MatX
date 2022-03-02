@@ -37,8 +37,55 @@
 
 namespace matx
 {
+  template <typename Op>
+  size_t TotalSize(const Op &op) {
+    if constexpr (is_tensor_view_v<Op>) {
+      return static_cast<size_t>(op.TotalSize());
+    }
+    else {
+      size_t total = 1;
+      for (int i = 0; i < op.Rank(); i++) {
+        total *= op.Size(i);
+      }
+
+      return total;
+    }
+  }
+
 namespace detail {
 
+  /**
+   * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
+   * 
+   * @param abs Absolute index
+   * @return std::array of indices 
+   */
+  template <typename Op>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
+    using l_stride_type = index_t;
+    using l_shape_type = index_t;
+    constexpr int RANK = op.Rank();
+    
+    std::array<l_shape_type, RANK> indices;
+    
+    for (int idx = 0; idx < RANK; idx++) {
+      if (idx == RANK-1) {
+        indices[RANK-1] = abs;
+      }
+      else {
+        // no std::accumulate on the device
+        l_stride_type prod = 1;
+        for (int i = idx + 1; i < RANK; i++) {
+          prod *= op.Size(i);
+        }
+
+        indices[idx] = abs / prod;
+        abs -= prod * indices[idx];
+      }
+    }
+
+    return indices;
+  }  
 
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
@@ -273,8 +320,6 @@ namespace detail {
       }
     }
   }
-
-
 
 }  
 }

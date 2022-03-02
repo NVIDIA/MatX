@@ -111,7 +111,7 @@ public:
    *   CUDA stream
    */
   template <typename TensorType>
-  static inline TensorType
+  static inline auto
   TransposeCopy(typename TensorType::scalar_type *tp, const TensorType &a, cudaStream_t stream = 0)
   {
     auto pa = a.PermuteMatrix();
@@ -1333,7 +1333,7 @@ void svd(UTensor &u, STensor &s,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor>::GetSVDParams(
+  auto params = detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, decltype(tvt)>::GetSVDParams(
       u, s, v, tvt, jobu, jobvt);
 
   // Get cache or new QR plan if it doesn't exist
@@ -1346,7 +1346,7 @@ void svd(UTensor &u, STensor &s,
   }
   else {
     auto svd_type =
-        static_cast<detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, ATensor> *>(ret.value());
+        static_cast<detail::matxDnSVDSolverPlan_t<UTensor, STensor, VTensor, decltype(tvt)> *>(ret.value());
     svd_type->Exec(u, s, v, tvt, jobu, jobvt, stream);
   }
 }

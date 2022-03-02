@@ -43,27 +43,30 @@ namespace matx {
 /**
  * @brief Type-erased generic tensor descriptor for strides and sizes
  *
- * @tparam ShapeType type of sizes
- * @tparam StrideType type of strides
+ * @tparam ShapeContainer type of sizes
+ * @tparam StrideContainer type of strides
  */
-template <typename ShapeType, typename StrideType, int RANK> 
+template <typename ShapeContainer, typename StrideContainer, int RANK> 
 class tensor_desc_t {
 public:
-  using shape_type  = typename ShapeType::value_type; ///< Type trait of shape type
-  using stride_type = typename StrideType::value_type; ///< Type trait of stride type
-  using shape_container = ShapeType; ///< Type trait of shape container
-  using stride_container = StrideType; ///< Type trait of stride container
+  template <typename T1, typename T2, int R1>
+  using self_type = tensor_desc_t<T1, T2, R1>;
+  
+  using shape_container = ShapeContainer;
+  using stride_container = StrideContainer;
+  using shape_type  = typename ShapeContainer::value_type; ///< Type trait of shape type
+  using stride_type = typename StrideContainer::value_type; ///< Type trait of stride type
   using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
 
   /**
    * @brief Default copy constructor
    */
-  __MATX_INLINE__  tensor_desc_t<ShapeType, StrideType, RANK>(const tensor_desc_t& ) = default;
+  __MATX_INLINE__  tensor_desc_t<ShapeContainer, StrideContainer, RANK>(const tensor_desc_t &) = default;
 
   /**
    * @brief Default move constructor
    */  
-  __MATX_INLINE__  tensor_desc_t<ShapeType, StrideType, RANK>(tensor_desc_t&&) = default;
+  __MATX_INLINE__  tensor_desc_t<ShapeContainer, StrideContainer, RANK>(tensor_desc_t &&) = default;
 
   /**
    * @brief Default const copy assignment constructor
@@ -82,10 +85,10 @@ public:
    * @param shape Shape object
    * @param stride Stride object
    */
-  template <typename S = ShapeType, std::enable_if_t<!std::is_array_v<ShapeType> && !std::is_array_v<StrideType>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeType &&shape, StrideType &&stride)
-      : shape_(std::forward<ShapeType>(shape)),
-        stride_(std::forward<StrideType>(stride)) {
+  template <typename S = ShapeContainer, std::enable_if_t<!std::is_array_v<ShapeContainer> && !std::is_array_v<StrideContainer>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeContainer &&shape, StrideContainer &&stride)
+      : shape_(std::forward<ShapeContainer>(shape)),
+        stride_(std::forward<StrideContainer>(stride)) {
     MATX_ASSERT_STR(shape.size() == stride.size(), matxInvalidDim,
                        "Size and stride array sizes must match");
     MATX_ASSERT_STR(shape.size() == RANK, matxInvalidDim,
@@ -137,9 +140,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <std::enable_if_t<!std::is_array_v<ShapeType>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeType &&shape, const stride_type (&strides)[RANK]) : 
-      shape_(std::forward<ShapeType>(shape)) {
+  template <typename S2, std::enable_if_t<!std::is_array_v<S2>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) : 
+      shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(*(shape + i) > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
@@ -155,9 +158,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <std::enable_if_t<!std::is_array_v<StrideType>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideType &&strides) : 
-      stride_(std::forward<StrideType>(strides)) {
+  template <std::enable_if_t<!std::is_array_v<StrideContainer>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) : 
+      stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
@@ -183,12 +186,12 @@ public:
   }    
 
   /**
-   * Check if a descriptor is linear in memory for all elements in the view
+   * Check if a descriptor is contiguous in memory for all elements in the view
    *
    * @return
-   *    True is descriptor is linear, or false otherwise
+   *    True is descriptor is contiguous, or false otherwise
    */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsLinear() const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsContiguous() const noexcept
   {
     stride_type ttl = 1;
     for (int i = RANK - 1; i >= 0; i--) {
@@ -297,8 +300,8 @@ public:
   static auto constexpr Rank() { return RANK; }
 
 private:
-  ShapeType shape_;
-  StrideType stride_;
+  ShapeContainer shape_;
+  StrideContainer stride_;
 };
 
 /**
@@ -310,8 +313,8 @@ private:
 template <index_t I, index_t... Is> 
 class static_tensor_desc_t {
 public:
-  using shape_container = std::array<index_t, sizeof...(Is)+1>;  ///< Type trait of shape type
-  using stride_container = std::array<index_t, sizeof...(Is)+1>; ///< Type trait of stride type
+  using ShapeContainer = std::array<index_t, sizeof...(Is)>;  ///< Type trait of shape type
+  using StrideContainer = std::array<index_t, sizeof...(Is)>; ///< Type trait of stride type
   using shape_type  = index_t; ///< Type trait of shape container
   using stride_type = index_t; ///< Type trait of stride container
   using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
@@ -322,7 +325,7 @@ public:
    * @return
    *    True is descriptor is linear, or false otherwise
    */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsLinear() const noexcept
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsContiguous() const noexcept
   {
     return true;
   }
@@ -382,20 +385,20 @@ private:
       return m;
   }
 
-  static constexpr shape_container shape_ = make_shape();
-  static constexpr stride_container stride_ = make_strides();  
+  static constexpr ShapeContainer shape_ = make_shape();
+  static constexpr StrideContainer stride_ = make_strides();  
 };
 
 /**
  * @brief Constant rank, dynamic size, dynamic strides
  *
- * @tparam ShapeType Type of shape
- * @tparam StrideType Type of stride container
+ * @tparam ShapeContainer Type of shape
+ * @tparam StrideContainer Type of stride container
  * @tparam RANK Rank of shape
  */
-template <typename ShapeType, typename StrideType, int RANK>
+template <typename ShapeContainer, typename StrideContainer, int RANK>
 using tensor_desc_cr_ds_t =
-    tensor_desc_t<std::array<ShapeType, RANK>, std::array<StrideType, RANK>,
+    tensor_desc_t<std::array<ShapeContainer, RANK>, std::array<StrideContainer, RANK>,
                   RANK>;
 
 /**

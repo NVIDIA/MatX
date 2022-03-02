@@ -66,11 +66,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using FilterType = float;
 
   // Create data objects
-  auto inView = make_static_tensor<InType, batches, numSamples>();
-  auto outView = make_static_tensor<OutType, batches, numSamples + filterLen - 1>();
-  auto solView = make_static_tensor<InType, batches, numSamples + filterLen - 1>();
+  auto inView = make_tensor<InType>({batches, numSamples});
+  auto outView = make_tensor<OutType>({batches, numSamples + filterLen - 1});
+  auto solView = make_tensor<InType>({batches, numSamples + filterLen - 1});
+  auto filterView = make_tensor<FilterType>({filterLen});
 
-  auto filterView = make_static_tensor<FilterType, filterLen >();
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {

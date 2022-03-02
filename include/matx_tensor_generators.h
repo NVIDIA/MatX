@@ -100,7 +100,7 @@ inline auto zeros(ShapeType &&s)
 template <typename T = int, int RANK>
 inline auto zeros(const index_t (&s)[RANK])
 {
-  return zeros(detail::to_array(s));
+  return zeros<T>(detail::to_array(s));
 }
 
 /**
@@ -137,7 +137,7 @@ inline auto ones(ShapeType &&s)
 template <typename T = int, int RANK> 
 inline auto ones(const index_t (&s)[RANK])
 {
-  return ones(detail::to_array(s));
+  return ones<T>(detail::to_array(s));
 }
 
 namespace detail {

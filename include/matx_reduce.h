@@ -1065,9 +1065,9 @@ template <typename TensorType, typename InType, typename ReduceOp>
 void inline reduce(TensorType &dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
-  constexpr bool use_cub = TensorType::Rank() == 0;
+  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
-  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && is_tensor_view_v<InType> && use_cub) {
+  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
     cub_reduce<TensorType, InType, ReduceOp>(dest, in, op.Init(), stream);
   }
   else { // Fall back to the slow path of custom implementation
@@ -1214,9 +1214,9 @@ template <typename TensorType, typename InType>
 void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  constexpr bool use_cub = TensorType::Rank() == 0;
+  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (is_tensor_view_v<InType> && use_cub) {
+  if constexpr (use_cub) {
     cub_sum<TensorType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation
@@ -1278,9 +1278,9 @@ template <typename TensorType, typename InType>
 void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  constexpr bool use_cub = TensorType::Rank() == 0;
+  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (is_tensor_view_v<InType> && use_cub) {
+  if constexpr (use_cub) {
     cub_max<TensorType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation
@@ -1344,9 +1344,9 @@ template <typename TensorType, typename InType>
 void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  constexpr bool use_cub = TensorType::Rank() == 0;
+  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (is_tensor_view_v<InType> && use_cub) {
+  if constexpr (use_cub) {
     cub_min<TensorType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation

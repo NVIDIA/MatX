@@ -80,15 +80,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::array<index_t, 1> half_win{nfft / 2 + 1};
   std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
 
-  auto time = make_static_tensor<float, N>();
-  auto modulation = make_static_tensor<float, N>();
-  auto carrier = make_static_tensor<float, N>();
-  auto noise = make_static_tensor<float, N>();
-  auto x = make_static_tensor<float, N>();
+  auto time = make_tensor<float>({N});
+  auto modulation = make_tensor<float>({N});
+  auto carrier = make_tensor<float>({N});
+  auto noise = make_tensor<float>({N});
+  auto x = make_tensor<float>({N});
 
-  auto freqs = make_static_tensor<float, nfft / 2 + 1>();
+  auto freqs = make_tensor<float>({nfft / 2 + 1});
   auto fftStackedMatrix = make_tensor<complex>({(N - noverlap) / nstep, nfft / 2 + 1});
-  auto s_time = make_static_tensor<float,(N - noverlap) / nstep>();
+  auto s_time = make_tensor<float>({(N - noverlap) / nstep});
 
   randomGenerator_t<float> randData({N}, 0);
   auto randDataView = randData.GetTensorView<1>(num_samps, NORMAL);
