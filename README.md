@@ -68,17 +68,17 @@ suggested with the highest number your system will accommodate.
 ### Building MatX
 To build all components, issue the standard cmake build commands in a cloned repo:
 
-```
+```sh
 mkdir build && cd build
 cmake -DMATX_BUILD_TESTS=ON -DMATX_BUILD_BENCHMARKS=ON -DMATX_BUILD_EXAMPLES=ON -DMATX_BUILD_DOCS=OFF ..
 make -j
 ```
 
 By default CMake will target the GPU architecture(s) of the system you're compiling on. If you wish to target other architectures, pass the
-CMAKE_CUDA_ARCHITECTURES flag with a list of architectures to build for:
+`CMAKE_CUDA_ARCHITECTURES` flag with a list of architectures to build for:
 
-```
-cmake .. -CMAKE_CUDA_ARCHITECTURES="60;70"
+```sh
+cmake .. -DCMAKE_CUDA_ARCHITECTURES="60;70"
 ```
 
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
@@ -91,7 +91,7 @@ MATX_BUILD_DOCS
 ```
 
 For example, to enable unit test building:
-```
+```sh
 mkdir build && cd build
 cmake -DMATX_BUILD_TESTS=ON ..
 make -j
@@ -110,7 +110,7 @@ typically two ways to do this:
 Adding the subdirectory is useful if you include the MatX
 source into the directory structure of your project. Using this method, you can simply add the MatX directory:
 
-```
+```cmake
 add_subdirectory(path/to/matx)
 ```
 
@@ -118,7 +118,7 @@ add_subdirectory(path/to/matx)
 The other option is to install MatX and use the configuration file provided after building. This is typically done in a way similar to what is
 shown below:
 
-```
+```sh
 cd /path/to/matx
 mkdir build && cd build
 cmake ..
@@ -128,7 +128,7 @@ make && make install
 If you have the correct permissions, the headers and cmake packages will be installed on your system in the expected paths for your operating
 system. With the package installed you can use ``find_package`` as follows:
 
-```
+```cmake
 find_package(matx CONFIG REQUIRED)
 ```
 
@@ -171,7 +171,7 @@ MatX uses [pybind11](https://github.com/pybind/pybind11) to generate some of the
 the need to store large test vector files in git, and instead can be generated as-needed.
 
 To run the unit tests, from the cmake build directory run:
-```
+```sh
 make test
 ```
 
@@ -180,7 +180,7 @@ may run test/matx_test directly with parameters defined by [Google Test](https:/
 directly, you must be inside the build/test directory for the correct paths to be set. For example,
 to run only tests with the name FFT:
 
-```
+```sh
 cd build/test
 ./matx_test --gtest_filter="*FFT*"
 ```
