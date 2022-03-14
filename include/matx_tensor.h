@@ -1323,10 +1323,10 @@ public:
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
           for (size_t l = 0;
-               l < (((vals.begin() + i)->begin() + j)->begin + k)->size();
+               l < (((vals.begin() + i)->begin() + j)->begin() + k)->size();
                l++) {
             for (size_t m = 0;
-                 m < ((((vals.begin() + i)->begin() + j)->begin + k)->begin + l)
+                 m < ((((vals.begin() + i)->begin() + j)->begin() + k)->begin() + l)
                          ->size();
                  m++) {
               typename T::value_type real =
