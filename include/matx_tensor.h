@@ -1515,6 +1515,9 @@ public:
     else if constexpr (std::is_same_v<T, uint8_t>) {
       printf("%" PRIu8 " ", val);
     }
+    else if constexpr (std::is_same_v<T, bool>) {
+      printf("%d ", val);
+    }    
   }
 
   /**
