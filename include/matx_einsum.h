@@ -390,6 +390,7 @@ template <typename... InT>
 static matxCache_t<EinsumParams_t<InT...>, EinsumParamsKeyHash<InT...>, EinsumParamsKeyEq<InT...>> einsum_cache;
 } // end namespace cutensor
 } // end namespace detail
+#endif
 
 namespace cutensor {
   /**
@@ -417,6 +418,7 @@ namespace cutensor {
   template <typename OutputType, typename... InT>
   void einsum(OutputType &out, const std::string &subscripts, cudaStream_t stream, InT... tensors)
   {
+#if MATX_ENABLE_CUTENSOR    
     // Get parameters required by these tensors
     auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
     params.stream = stream;
@@ -432,9 +434,9 @@ namespace cutensor {
       auto einsum_type = static_cast<matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...> *>(ret.value());
       einsum_type->Exec(out, stream, tensors...);
     }
+#endif    
   }
 }
 
 } // end namespace matx
 
-#endif

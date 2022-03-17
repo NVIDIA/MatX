@@ -2134,6 +2134,13 @@ auto __MATX_INLINE__ as_uint8(T t)
  */
   Op operator!(Op t) {}
 
+ /**
+ * Negate input tensor or operator
+ * @param t
+ *   LHS tensor or operator input
+ */
+  Op operator-(Op t) {}  
+
   /***** Binary operators ********/
 
   /**

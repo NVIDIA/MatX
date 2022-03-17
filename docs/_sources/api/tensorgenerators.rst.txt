@@ -12,6 +12,8 @@ since their only purpose is to compute a single value at a particular location b
 .. doxygenfunction:: matx::eye(const index_t (&s)[RANK])
 .. doxygenfunction:: matx::diag(ShapeType &&s, T val))
 .. doxygenfunction:: matx::diag(const index_t (&s)[RANK], T val))
+.. doxygenfunction:: matx::alternate(ShapeType &&s)
+.. doxygenfunction:: matx::alternate(const index_t (&s)[RANK])
 .. doxygenfunction:: matx::hamming(ShapeType &&s)
 .. doxygenfunction:: matx::hamming(const index_t (&s)[RANK])
 .. doxygenfunction:: matx::hanning(ShapeType &&s)

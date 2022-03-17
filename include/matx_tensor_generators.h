@@ -1085,6 +1085,8 @@ inline auto cchirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, Fre
  *   Time for f1
  * @param f1
  *   Frequency (Hz) at time t1
+ * @param method
+ *   Method to use to generate the chirp
  *
  * @returns The chirp operator
  */
