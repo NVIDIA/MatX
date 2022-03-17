@@ -359,8 +359,11 @@ TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
-  IF(tiv0 == tiv0, tov0 = c).run();
+  (tov0 = -tiv0).run();
+  cudaStreamSynchronize(0);
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
 
+  IF(tiv0 == tiv0, tov0 = c).run();
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 

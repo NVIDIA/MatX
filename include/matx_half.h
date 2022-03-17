@@ -359,7 +359,11 @@ operator/(const T &lhs, const matxHalf<T> &rhs)
 template <typename T>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> operator-(const matxHalf<T> &l)
 {
+#ifdef __CUDA_ARCH__
   return {-l.x};
+#else
+  return {-static_cast<float>(l.x)};
+#endif  
 }
 
 /**

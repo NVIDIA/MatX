@@ -44,7 +44,7 @@ namespace detail {
 // constexpr if
 #define MATX_UNARY_OP_GEN(FUNC, OPNAME)                                        \
   template <typename T>                                                        \
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T v1)                \
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T v1)                \
   {                                                                            \
     if constexpr (is_matx_type_v<T>) {                                         \
       return FUNC(v1);                                                         \
@@ -60,7 +60,7 @@ namespace detail {
     }                                                                          \
   }                                                                            \
   template <typename T> struct OPNAME##F {                                     \
-    static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)                            \
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)                            \
     {                                                                          \
       return _internal_##FUNC(v1);                                             \
     }                                                                          \
@@ -69,7 +69,7 @@ namespace detail {
 
 #define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
   template <typename T1, typename T2>                                          \
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T1 v1, T2 v2)        \
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T1 v1, T2 v2)        \
   {                                                                            \
     if constexpr (is_matx_type_v<T1> || is_matx_type_v<T2>) {                  \
       return FUNC(v1, v2);                                                     \
@@ -85,7 +85,7 @@ namespace detail {
     }                                                                          \
   }                                                                            \
   template <typename T> struct OPNAME##F {                                     \
-    static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)                    \
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)                    \
     {                                                                          \
       return _internal_##FUNC(v1, v2);                                         \
     }                                                                          \
@@ -95,21 +95,21 @@ namespace detail {
 
 template <typename T1, typename F> class UnOp {
 public:
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1) { return F::op(v1); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1) { return F::op(v1); }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) const { return op(v1); }
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) const { return op(v1); }
 
   using scalar_type = std::invoke_result_t<decltype(op), T1>;
 };
 
 template <typename T1, typename T2, typename F> class BinOp {
 public:
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2)
   {
     return F::op(v1, v2);
   }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2) const
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2) const
   {
     return op(v1, v2);
   }
@@ -119,13 +119,13 @@ public:
 
 template <typename T1, typename T2, typename T3, typename F> class TerOp {
 public:
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2,
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2,
                                             const T3 &v3) 
   {
     return F::op(v1, v2, v3);
   }
 
-  inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2, const T3 &v3) const
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2, const T3 &v3) const
   {
     return op(v1, v2, v3);
   }
@@ -142,11 +142,11 @@ MATX_UNARY_OP_GEN(exp, Exp);
 template <typename T> struct ExpjF {
   template <typename T2 = T,
             std::enable_if_t<std::is_floating_point_v<T2>, bool> = true>
-  inline __MATX_HOST__ __MATX_DEVICE__ ExpjF()
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ExpjF()
   {
   }
 
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
     return cuda::std::complex<T>{cuda::std::cos(v1), cuda::std::sin(v1)};
   }
@@ -154,7 +154,7 @@ template <typename T> struct ExpjF {
 template <typename T> using ExpjOp = UnOp<T, ExpjF<T>>;
 
 template <typename T>
-static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
 {
   if constexpr (is_cuda_complex_v<T>) {
     return cuda::std::conj(v1);
@@ -170,7 +170,7 @@ static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
   }
 }
 template <typename T> struct ConjF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
     if constexpr (is_complex_v<T>) {
       return _internal_conj(v1);
@@ -190,7 +190,7 @@ MATX_UNARY_OP_GEN(norm, Norm);
 
 // Trigonometric functions
 // MATX_UNARY_OP_GEN(sin, Sin);
-template <typename T> static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)
+template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)
 {
   if constexpr (is_matx_type_v<T>) {
     return sin(v1);
@@ -206,7 +206,7 @@ template <typename T> static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal
   }
 }
 template <typename T> struct SinF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_sin(v1); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_sin(v1); }
 };
 template <typename T> using SinOp = UnOp<T, SinF<T>>;
 
@@ -223,30 +223,30 @@ MATX_UNARY_OP_GEN(acosh, Acosh);
 MATX_UNARY_OP_GEN(atanh, Atanh);
 
 
-template <typename T> static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
+template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
   return normcdf(v1);
 }
 template <typename T> struct NormCdfF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_normcdf(v1); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_normcdf(v1); }
 };
 template <typename T> using NormCdfOp = UnOp<T, NormCdfF<T>>;
 
 
 template <typename T> struct RealF {
   static_assert(is_complex_v<T>, "real() must have complex input");
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.real(); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.real(); }
 };
 template <typename T> using RealOp = UnOp<T, RealF<T>>;
 
 template <typename T> struct ImagF {
   static_assert(is_complex_v<T>, "imag() must have complex input");
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.imag(); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.imag(); }
 };
 template <typename T> using ImagOp = UnOp<T, ImagF<T>>;
 
 template <typename T>
-static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
 {
   if constexpr (is_cuda_complex_v<T>) {
     return cuda::std::atan2(v1.imag(), v1.real());
@@ -263,7 +263,7 @@ static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
 }
 template <typename T>
 struct Angle {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
     static_assert(is_complex_v<T>, "Angle operator must have complex value as input");
     return _internal_angle(v1);
@@ -271,14 +271,19 @@ struct Angle {
 };
 template <typename T> using AngleOp = UnOp<T, Angle<T>>;
 
-// template<typename T> struct SubNegF {
-//   static inline __MATX_HOST__  __MATX_DEVICE__ auto op(T v1) { return -v1; }};
-// template<typename T> using SubNegOp = UnOp<T,SubNegF<T> >;
+template<typename T> 
+struct SubNegF {
+  static __MATX_INLINE__ __MATX_HOST__  __MATX_DEVICE__ auto op(T v1) 
+  { 
+    return -v1; 
+  }
+};
+template<typename T> using SubNegOp = UnOp<T,SubNegF<T> >;
 
 // Binary Operators
 
 template <typename T1, typename T2> struct AddF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
@@ -316,7 +321,7 @@ template <typename T1, typename T2> using AddOp = BinOp<T1, T2, AddF<T1, T2>>;
 
 
 template <typename T1, typename T2> struct SubF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
@@ -353,7 +358,7 @@ template <typename T1, typename T2> struct SubF {
 template <typename T1, typename T2> using SubOp = BinOp<T1, T2, SubF<T1, T2>>;
 
 template <typename T1, typename T2> struct MulF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
@@ -390,7 +395,7 @@ template <typename T1, typename T2> struct MulF {
 template <typename T1, typename T2> using MulOp = BinOp<T1, T2, MulF<T1, T2>>;
 
 template <typename T1, typename T2> struct DivF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
@@ -427,14 +432,14 @@ template <typename T1, typename T2> struct DivF {
 template <typename T1, typename T2> using DivOp = BinOp<T1, T2, DivF<T1, T2>>;
 
 template <typename T1, typename T2> struct ModF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 % v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 % v2; }
 };
 template <typename T1, typename T2> using ModOp = BinOp<T1, T2, ModF<T1, T2>>;
 
 // MATX_BINARY_OP_GEN(pow, Pow);
 
 template <typename T1, typename T2>
-static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_pow(T1 v1, T2 v2)
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_pow(T1 v1, T2 v2)
 {
   if constexpr (is_matx_type_v<T1>) {
     return pow(v1, v2);
@@ -451,7 +456,7 @@ static inline __MATX_HOST__ __MATX_DEVICE__ auto _internal_pow(T1 v1, T2 v2)
 }
 
 template <typename T1, typename T2> struct PowF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return _internal_pow(v1, v2);
   }
@@ -459,7 +464,7 @@ template <typename T1, typename T2> struct PowF {
 template <typename T1, typename T2> using PowOp = BinOp<T1, T2, PowF<T1, T2>>;
 
 template <typename T1, typename T2> struct MaxF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return max(v1, v2);
   }
@@ -467,7 +472,7 @@ template <typename T1, typename T2> struct MaxF {
 template <typename T1, typename T2> using MaxOp = BinOp<T1, T2, MaxF<T1, T2>>;
 
 template <typename T1, typename T2> struct MinF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return min(v1, v2);
   }
@@ -476,62 +481,62 @@ template <typename T1, typename T2> using MinOp = BinOp<T1, T2, MinF<T1, T2>>;
 
 // Logical Operators
 template <typename T1, typename T2> struct LTF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 < v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 < v2; }
 };
 template <typename T1, typename T2> using LTOp = BinOp<T1, T2, LTF<T1, T2>>;
 
 template <typename T1, typename T2> struct GTF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 > v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 > v2; }
 };
 template <typename T1, typename T2> using GTOp = BinOp<T1, T2, GTF<T1, T2>>;
 
 template <typename T1, typename T2> struct LTEF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 <= v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 <= v2; }
 };
 template <typename T1, typename T2> using LTEOp = BinOp<T1, T2, LTEF<T1, T2>>;
 
 template <typename T1, typename T2> struct GTEF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 >= v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 >= v2; }
 };
 template <typename T1, typename T2> using GTEOp = BinOp<T1, T2, GTEF<T1, T2>>;
 
 template <typename T1, typename T2> struct EQF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 == v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 == v2; }
 };
 template <typename T1, typename T2> using EQOp = BinOp<T1, T2, EQF<T1, T2>>;
 
 template <typename T1, typename T2> struct NEF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 != v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 != v2; }
 };
 template <typename T1, typename T2> using NEOp = BinOp<T1, T2, NEF<T1, T2>>;
 
 template <typename T1, typename T2> struct AndAndF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 && v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 && v2; }
 };
 template <typename T1, typename T2> using AndAndOp = BinOp<T1, T2, AndAndF<T1, T2>>;
 
 template <typename T1, typename T2> struct OrOrF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 || v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 || v2; }
 };
 template <typename T1, typename T2> using OrOrOp = BinOp<T1, T2, OrOrF<T1, T2>>;
 
 template <typename T1> struct NotF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1) { return !v1; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1) { return !v1; }
 };
 template <typename T1> using NotOp = UnOp<T1, NotF<T1>>;
 
 template <typename T1, typename T2> struct AndF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 & v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 & v2; }
 };
 template <typename T1, typename T2> using AndOp = BinOp<T1, T2, AndF<T1, T2>>;
 
 template <typename T1, typename T2> struct OrF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 | v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 | v2; }
 };
 template <typename T1, typename T2> using OrOp = BinOp<T1, T2, OrF<T1, T2>>;
 
 template <typename T1, typename T2> struct XorF {
-  static inline __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 ^ v2; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 ^ v2; }
 };
 template <typename T1, typename T2> using XorOp = BinOp<T1, T2, XorF<T1, T2>>;
 

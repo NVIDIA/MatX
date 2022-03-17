@@ -2268,7 +2268,7 @@ auto __MATX_INLINE__ as_uint8(T t)
   DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
   DEFINE_UNARY_OP(real, detail::RealOp);
   DEFINE_UNARY_OP(imag, detail::ImagOp);  
-  // DEFINE_UNARY_OP( operator-, SubNegOp );
+  DEFINE_UNARY_OP(operator-, detail::SubNegOp );
 
   DEFINE_BINARY_OP(operator+, detail::AddOp);
   DEFINE_BINARY_OP(operator-, detail::SubOp);
