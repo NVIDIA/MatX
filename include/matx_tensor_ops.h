@@ -527,6 +527,57 @@ inline
     }
   };
 
+// /**
+//  * Selects elements of an operator given a list of indices in another operator
+//  *
+//  */
+//   namespace detail {
+//   template <typename T, typename IdxType>
+//   class SelectOp : public BaseOp<SelectOp<T, IdxType>>
+//   {
+//   private:
+//     typename base_type<T>::type op_;
+
+//   public:
+//     using matxop = bool;
+//     using scalar_type = NewType;
+
+//     __MATX_INLINE__ SelectOp(T op) : op_(op){};  
+    
+//     template <typename... Is>
+//     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+//     {
+//       return op_(indices...);     
+//     }
+
+//     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+//     {
+//       return detail::get_rank<T>();
+//     }
+//     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+//     {
+//       return op_.Size(dim);
+//     }
+//   };
+//   }   
+
+
+// /**
+//  * @brief Helper function to cast an input operator to a different type
+//  * 
+//  * @tparam T Input type
+//  * @tparam NewType Casted type
+//  * @param t Input operator
+//  * @return Operator output casted to NewType 
+//  */
+// template <typename NewType, typename T>
+// auto __MATX_INLINE__ as_type(T t)
+// {
+//   return detail::CastOp<T, NewType>(t);
+// };   
+
+
+
 /**
  * Casts the element of the tensor to a specified type
  *
@@ -2082,6 +2133,13 @@ auto __MATX_INLINE__ as_uint8(T t)
  *   LHS tensor or operator input
  */
   Op operator!(Op t) {}
+
+ /**
+ * Negate input tensor or operator
+ * @param t
+ *   LHS tensor or operator input
+ */
+  Op operator-(Op t) {}  
 
   /***** Binary operators ********/
 

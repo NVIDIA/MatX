@@ -63,6 +63,7 @@ typedef enum {
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
   CUB_OP_SELECT,
+  CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE
 } CUBOperation_t;
 
@@ -180,6 +181,9 @@ public:
     else if constexpr (op == CUB_OP_SELECT) { 
       ExecSelect(a_out, a, stream);
     }     
+    else if constexpr (op == CUB_OP_SELECT_IDX) {
+      ExecSelectIndex(a_out, a, stream);
+    }
     else if constexpr (op == CUB_OP_UNIQUE) { 
       ExecUnique(a_out, a, stream);
     }      
@@ -678,6 +682,8 @@ public:
 #endif    
   }
 
+
+
   /**
    * Execute a selection reduction on a tensor
    *
@@ -698,7 +704,7 @@ public:
                        const InputTensor &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__   
     if (a.IsLinear()) {
       cub::DeviceSelect::If(d_temp, 
                             temp_storage_bytes, 
@@ -719,9 +725,73 @@ public:
                             static_cast<int>(a.TotalSize()),
                             cparams_.op,
                             stream);            
-    }                                     
+    }                                  
 #endif    
-  }     
+  }   
+
+
+  /**
+   * @brief Helper class for wrapping counting iterator and data
+   * 
+   * @tparam DataInputIterator Data input
+   * @tparam SelectOp Selection operator
+   */
+  template<typename DataInputIterator, typename SelectOp>
+  struct IndexToSelectOp
+  {
+    __host__ __device__ __forceinline__ bool operator()(index_t idx) const
+    {
+      return select_op(in_data[idx]);
+    }
+
+    DataInputIterator in_data;
+    SelectOp select_op;
+  };  
+
+  /**
+   * Execute an index selection reduction on a tensor
+   *
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputTensor
+   *   Type of input tensor 
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecSelectIndex(OutputTensor &a_out,
+                       const InputTensor &a,
+                       const cudaStream_t stream)
+  {
+#ifdef __CUDACC__   
+    if (a.IsLinear()) {
+      cub::DeviceSelect::If(d_temp, 
+                            temp_storage_bytes, 
+                            cub::CountingInputIterator<index_t>{0}, 
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
+                            stream); 
+    }
+    else {
+      tensor_impl_t<typename InputTensor::scalar_type, InputTensor::Rank(), typename InputTensor::desc_type> base = a;
+      cub::DeviceSelect::If(d_temp, 
+                            temp_storage_bytes, 
+                            RandomOperatorIterator{base},
+                            a_out.Data(), 
+                            cparams_.num_found.Data(),
+                            static_cast<int>(a.TotalSize()),
+                            cparams_.op,
+                            stream);            
+    }    
+#endif        
+  }        
 
 /**
    * Execute a unique reduction on a tensor
@@ -1278,6 +1348,66 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputTensor &a, Sel
         static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_SELECT, decltype(cparams)> *>(
             ret.value());
     sort_type->ExecSelect(a_out, a, stream);
+  }
+#endif  
+}
+
+/**
+ * Reduce indices that meet a certain criteria
+ *
+ * Finds all indices of values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This
+ * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
+ * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, 
+ * this can be the same size as the input, but if something is known about the data to indicate not as many 
+ * entries are needed, the output can be smaller. This 
+ *
+ * @tparam SelectType
+ *   Type of select functor
+  * @tparam CountTensor
+ *   Output items type
+ * @tparam OutputTensor
+ *   Output type
+ * @tparam InputTensor
+ *   Input type
+ * @param num_found
+ *   Number of items found meeting criteria
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param sel
+ *   Select functor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputTensor>
+void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputTensor &a, SelectType sel, const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__    
+  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+
+  // Get parameters required by these tensors
+  auto params =
+      detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a);
+  params.stream = stream;
+
+  // Get cache or new Sort plan if it doesn't exist
+  auto ret = detail::cub_cache.Lookup(params);
+  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
+
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
+                                          InputTensor, 
+                                          detail::CUB_OP_SELECT_IDX, 
+                                          decltype(cparams)>{a_out, a, cparams, stream};
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    tmp->ExecSelectIndex(a_out, a, stream);
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputTensor, detail::CUB_OP_SELECT_IDX, decltype(cparams)> *>(
+            ret.value());
+    sort_type->ExecSelectIndex(a_out, a, stream);
   }
 #endif  
 }

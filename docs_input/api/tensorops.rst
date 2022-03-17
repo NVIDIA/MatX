@@ -36,6 +36,7 @@ Unary Operators
 .. doxygenfunction:: ceil(Op t)
 .. doxygenfunction:: round(Op t)  
 .. doxygenfunction:: operator!(Op t)  
+.. doxygenfunction:: operator-(Op t)  
 
 Binary Operators
 ----------------
@@ -60,15 +61,15 @@ Binary Operators
 Casting Operators
 ------------------
 
-.. doxygenclass:: matx::as_type 
-.. doxygenclass:: matx::as_int8
-.. doxygenclass:: matx::as_uint8
-.. doxygenclass:: matx::as_int16
-.. doxygenclass:: matx::as_uint16
-.. doxygenclass:: matx::as_int32
-.. doxygenclass:: matx::as_uint32
-.. doxygenclass:: matx::as_float
-.. doxygenclass:: matx::as_double
+.. doxygenfunction:: matx::as_type 
+.. doxygenfunction:: matx::as_int8
+.. doxygenfunction:: matx::as_uint8
+.. doxygenfunction:: matx::as_int16
+.. doxygenfunction:: matx::as_uint16
+.. doxygenfunction:: matx::as_int32
+.. doxygenfunction:: matx::as_uint32
+.. doxygenfunction:: matx::as_float
+.. doxygenfunction:: matx::as_double
 
 Advanced Operators
 ------------------
@@ -90,3 +91,4 @@ Advanced Operators
 .. doxygenfunction:: repmat(T1 t, const index_t *reps)
 .. doxygenfunction:: kron
 .. doxygenfunction:: hermitianT
+.. doxygenfunction:: r2cop
