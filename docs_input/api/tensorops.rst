@@ -36,6 +36,7 @@ Unary Operators
 .. doxygenfunction:: ceil(Op t)
 .. doxygenfunction:: round(Op t)  
 .. doxygenfunction:: operator!(Op t)  
+.. doxygenfunction:: operator-(Op t)  
 
 Binary Operators
 ----------------
