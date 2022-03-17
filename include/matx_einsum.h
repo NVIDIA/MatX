@@ -390,8 +390,10 @@ template <typename... InT>
 static matxCache_t<EinsumParams_t<InT...>, EinsumParamsKeyHash<InT...>, EinsumParamsKeyEq<InT...>> einsum_cache;
 } // end namespace cutensor
 } // end namespace detail
+} // end namespace matx
 #endif
 
+namespace matx {
 namespace cutensor {
   /**
    * @brief Evaluates the Einstein summation on the operands
