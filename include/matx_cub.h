@@ -739,7 +739,7 @@ public:
   template<typename DataInputIterator, typename SelectOp>
   struct IndexToSelectOp
   {
-    __host__ __device__ __forceinline__ bool operator()(index_t idx) const
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator()(index_t idx) const
     {
       return select_op(in_data[idx]);
     }
@@ -783,11 +783,12 @@ public:
       tensor_impl_t<typename InputTensor::scalar_type, InputTensor::Rank(), typename InputTensor::desc_type> base = a;
       cub::DeviceSelect::If(d_temp, 
                             temp_storage_bytes, 
-                            RandomOperatorIterator{base},
+                            cub::CountingInputIterator<index_t>{0}, 
                             a_out.Data(), 
                             cparams_.num_found.Data(),
                             static_cast<int>(a.TotalSize()),
-                            cparams_.op,
+                            IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
+                              {RandomOperatorIterator{base}, cparams_.op},
                             stream);            
     }    
 #endif        

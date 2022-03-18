@@ -567,49 +567,44 @@ TYPED_TEST(ReductionTestsNumericNonComplex, FindIdx)
   MATX_EXIT_HANDLER();
 }
 
-// TYPED_TEST(ReductionTestsNumericNonComplex, FindIdxAndSelect)
-// {
-//   MATX_ENTER_HANDLER();
-//   {
-//     tensor_t<int, 0> num_found{}, num_found_2{};
-//     tensor_t<TypeParam, 1> t1{{100}};
-//     tensor_t<int, 1> t1o_idx{{100}};
-//     tensor_t<TypeParam, 1> t1o{{100}};
-//     tensor_t<TypeParam, 1> t1o_2{{100}};
-//     TypeParam thresh = (TypeParam)0.5;
+TYPED_TEST(ReductionTestsNumericNonComplex, FindIdxAndSelect)
+{
+  MATX_ENTER_HANDLER();
+  {
+    tensor_t<int, 0> num_found{}, num_found2{};
+    tensor_t<TypeParam, 1> t1{{100}};
+    tensor_t<int, 1> t1o_idx{{100}};
+    tensor_t<TypeParam, 1> t1o{{100}};
+    tensor_t<TypeParam, 1> t1o_2{{100}};
+    TypeParam thresh = (TypeParam)0.5;
 
 
-//     for (int i = 0; i < t1.Size(0); i++) {
-//       t1(i) = static_cast<detail::value_promote_t<TypeParam>>((float)rand() /
-//                                                       (float)INT_MAX * 2.0f);
-//     }
+    for (int i = 0; i < t1.Size(0); i++) {
+      t1(i) = static_cast<detail::value_promote_t<TypeParam>>((float)rand() /
+                                                      (float)INT_MAX * 2.0f);
+    }
 
-//     // Find indices with values greater than 0.5
-//     find_idx(t1o_idx, num_found, t1, GT{thresh});
+    // Find indices with values greater than 0.5
+    find_idx(t1o_idx, num_found, t1, GT{thresh});
+    cudaStreamSynchronize(0);
 
-//     auto t1o_slice = t1o.Slice({0}, {num_found});
-//     auto t1o_idx_slice = t1o_idx.Slice({0}, {num_found});
-//     (t1o_slice = t1o_idx_slice
+    auto t1o_slice = t1o.Slice({0}, {num_found()});
+    auto t1o_idx_slice = t1o_idx.Slice({0}, {num_found()});
+    (t1o_slice = select(t1o_slice, t1o_idx_slice)).run();
 
-//     // Compare to simply finding the values
-//     find(t1o_2, num_found2, t1, GT{thresh});
-//     cudaStreamSynchronize(0);
+    // Compare to simply finding the values
+    find(t1o_2, num_found2, t1, GT{thresh});
+    cudaStreamSynchronize(0);
 
-//     ASSERT_EQ(num_found, num_found2);
+    ASSERT_EQ(num_found(), num_found2());
     
-//     int output_found = 0;
-//     for (int i = 0; i < t1.Size(0); i++) {
-//       if (t1(i) > thresh) {
-//         ASSERT_EQ(t1o(output_found), i);
-//         output_found++;
-//       }
-//     }
-//     ASSERT_EQ(output_found, num_found());
+    for (int i = 0; i < t1o_slice.Size(0); i++) {
+      ASSERT_EQ(t1o(i), t1o_slice(i));
+    }
+  }
 
-//   }
-
-//   MATX_EXIT_HANDLER();
-// }
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(ReductionTestsNumericNonComplex, Unique)
 {

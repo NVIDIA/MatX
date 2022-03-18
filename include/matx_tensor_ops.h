@@ -527,54 +527,62 @@ inline
     }
   };
 
-// /**
-//  * Selects elements of an operator given a list of indices in another operator
-//  *
-//  */
-//   namespace detail {
-//   template <typename T, typename IdxType>
-//   class SelectOp : public BaseOp<SelectOp<T, IdxType>>
-//   {
-//   private:
-//     typename base_type<T>::type op_;
+/**
+ * Selects elements of an operator given a list of indices in another operator
+ *
+ */
+  namespace detail {
+  template <typename T, typename IdxType>
+  class SelectOp : public BaseOp<SelectOp<T, IdxType>>
+  {
+  private:
+    typename base_type<T>::type op_;
+    typename base_type<IdxType>::type idx_;
 
-//   public:
-//     using matxop = bool;
-//     using scalar_type = NewType;
+  public:
+    using matxop = bool;
+    using scalar_type = typename T::scalar_type;
+    static_assert(IdxType::Rank() == 1, "Rank of index operator must be 1");
 
-//     __MATX_INLINE__ SelectOp(T op) : op_(op){};  
+    __MATX_INLINE__ SelectOp(T op, IdxType idx) : op_(op), idx_(idx) {};  
     
-//     template <typename... Is>
-//     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-//     {
-//       return op_(indices...);     
-//     }
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) const 
+    {
+      auto arrs = op_.GetIdxFromAbs(idx_(i));
+      return op_(arrs);     
+    }
 
-//     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-//     {
-//       return detail::get_rank<T>();
-//     }
-//     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-//     {
-//       return op_.Size(dim);
-//     }
-//   };
-//   }   
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return detail::get_rank<IdxType>();
+    }
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      return idx_.Size(dim);
+    }
+  };
+  }   
 
 
-// /**
-//  * @brief Helper function to cast an input operator to a different type
-//  * 
-//  * @tparam T Input type
-//  * @tparam NewType Casted type
-//  * @param t Input operator
-//  * @return Operator output casted to NewType 
-//  */
-// template <typename NewType, typename T>
-// auto __MATX_INLINE__ as_type(T t)
-// {
-//   return detail::CastOp<T, NewType>(t);
-// };   
+/**
+ * @brief Helper function to select values from a predicate operator
+ * 
+ * select() is used to index from a source operator using indices stored
+ * in another operator. This is commonly used with the find_idx executor 
+ * which returns the indices of values meeting a selection criteria.
+ * 
+ * @tparam T Input type
+ * @tparam IdxType Operator with indices
+ * @param t Input operator
+ * @param idx Index tensor
+ * @return Value in t from each location in idx
+ */
+template <typename T, typename IdxType>
+auto __MATX_INLINE__ select(T t, IdxType idx)
+{
+  return detail::SelectOp<T, IdxType>(t, idx);
+};   
 
 
 
