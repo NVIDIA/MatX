@@ -351,16 +351,122 @@ __MATX_DEVICE__ inline void atomicAny(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAll(double *addr, float val)
+__MATX_DEVICE__ inline void atomicAll(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
-  unsigned long long int val_ull = __double_as_longlong(val);
 
   // nan should be ok here but should verify
   while (val == 0.0 && old != 0.0) {
     assumed = old;
     old = atomicCAS(address_as_ull, assumed, 0.0);
+  }
+}
+
+
+/**
+ * Atomic min version for int64_t
+ *
+ * Computes the minimum of two int64_t values atomically
+ *
+ * @param addr
+ *   Source and destination for new minimum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicMin(int64_t *addr, int64_t val)
+{
+  atomicMin(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
+};
+
+/**
+ * Atomic max version for int64_t
+ *
+ * Computes the maximum of two int64_t values atomically
+ *
+ * @param addr
+ *   Source and destination for new maximum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicMax(int64_t *addr, int64_t val)
+{
+  atomicMax(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
+};
+
+
+/**
+ * Atomic all version for int64_t
+ *
+ * Computes whether both int64_t values are != 0
+ *
+ * @param addr
+ *   Source and destination for new any
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicAll(int64_t *addr, int64_t val)
+{
+  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
+  unsigned long long int old = *address_as_ull, assumed;
+
+  // nan should be ok here but should verify
+  while (val == 0 && old != 0) {
+    assumed = old;
+    old = atomicCAS(address_as_ull, assumed, 0);
+  }
+}
+
+/**
+ * Atomic min version for uint64_t
+ *
+ * Computes the minimum of two uint64_t values atomically
+ *
+ * @param addr
+ *   Source and destination for new minimum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicMin(uint64_t *addr, uint64_t val)
+{
+  atomicMin(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
+};
+
+/**
+ * Atomic max version for uint64_t
+ *
+ * Computes the maximum of two uint64_t values atomically
+ *
+ * @param addr
+ *   Source and destination for new maximum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicMax(uint64_t *addr, uint64_t val)
+{
+  atomicMax(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
+};
+
+
+/**
+ * Atomic all version for uint64_t
+ *
+ * Computes whether both uint64_t values are != 0
+ *
+ * @param addr
+ *   Source and destination for new any
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ inline void atomicAll(uint64_t *addr, uint64_t val)
+{
+  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
+  unsigned long long int old = *address_as_ull, assumed;
+
+  // nan should be ok here but should verify
+  while (val == 0 && old != 0) {
+    assumed = old;
+    old = atomicCAS(address_as_ull, assumed, 0);
   }
 }
 
@@ -411,6 +517,27 @@ namespace detail {
 #ifdef __CUDACC__  
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal();
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal();
+
+/* Returns the max value of an int64_t at compile time */
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int64_t maxVal<int64_t>()
+{
+  return LLONG_MAX;
+}
+/* Returns the min value of an int64_t at compile time */
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int64_t minVal<int64_t>()
+{
+  return LLONG_MIN;
+}
+/* Returns the max value of a uint64_t at compile time */
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint64_t maxVal<uint64_t>()
+{
+  return ULLONG_MAX;
+}
+/* Returns the min value of a uint64_t at compile time */
+template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint64_t minVal<uint64_t>()
+{
+  return 0;
+}
 
 /* Returns the max value of an int32_t at compile time */
 template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int32_t maxVal<int32_t>()
