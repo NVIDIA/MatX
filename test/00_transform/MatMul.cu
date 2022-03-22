@@ -86,9 +86,51 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
   matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
-  // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
-  //                                                                    b);
-  // MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, SmallRectATranspose)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  tensor_t<TypeParam, 2> a{{k, m}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run_a_transpose", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto at = a.PermuteMatrix();
+  matmul(c, at, b);
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  tensor_t<TypeParam, 2> a{{m, k}};
+  tensor_t<TypeParam, 2> b{{n, k}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run_b_transpose", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto bt = b.PermuteMatrix();
+  matmul(c, a, bt);
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   MATX_EXIT_HANDLER();
 }
