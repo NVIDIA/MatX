@@ -34,6 +34,8 @@ class conv_operators:
 class matmul_operators:
     def __init__(self,  dtype: str, size: List[int]):
         np.random.seed(1234)
+        self.size = size
+        self.dtype = dtype
         self.res = {
             'a': matx_common.randn_ndarray((size[0], size[1]), dtype),
             'b': matx_common.randn_ndarray((size[1], size[2]), dtype)
@@ -41,6 +43,15 @@ class matmul_operators:
 
     def run(self) -> Dict[str, np.ndarray]:
         self.res['c'] = self.res['a'] @ self.res['b']
+        return self.res
+
+    def run_a_transpose(self) -> Dict[str, np.ndarray]:
+        self.res['a'] = matx_common.randn_ndarray((self.size[1], self.size[0]), self.dtype)
+        self.res['c'] = np.transpose(self.res['a']) @ self.res['b']
+        return self.res
+    def run_b_transpose(self) -> Dict[str, np.ndarray]:
+        self.res['b'] = matx_common.randn_ndarray((self.size[2], self.size[1]), self.dtype)
+        self.res['c'] = self.res['a'] @ np.transpose(self.res['b'])
         return self.res
 
     def run_transpose(self) -> Dict[str, np.ndarray]:

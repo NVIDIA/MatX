@@ -209,6 +209,14 @@ public:
   static detail::MatMulParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
+    /* If a user passes in a tensor where the last two dimensions are transposed we retain
+       the original size parameters, but tell the underlying libraries that the tensors are
+       in column-major ordering. The exception to this is when a transposed half-precision
+       complex type is used. In that case we have to make a temporary copy of the tensor to
+       put the data in planar format for the libraries. Since we now use the temporary tensor
+       as input to the GEMM, the data is no longer transposed in memory and we simply use
+       the same memory layout as a non-transposed real matrix would use.
+    */    
     detail::MatMulParams_t params;
     params.dtype = TypeToInt<T1>();
     params.prov = PROV;
@@ -272,32 +280,26 @@ public:
     }
     else {
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (a.Stride(RANK - 1) == 1) {
+        if (a.Stride(RANK - 1) == 1 || is_complex_half_v<typename TensorTypeA::scalar_type>) {
           params.opA = CUBLAS_OP_N;
-          params.a_rows = a.Size(RANK - 2);
-          params.a_cols = a.Size(RANK - 1);
-          params.lda = a.Stride(RANK - 2);
         }
         else if (a.Stride(RANK - 2) == 1) {
           params.opA = CUBLAS_OP_T;
-          params.a_rows = a.Size(RANK - 1);
-          params.a_cols = a.Size(RANK - 2);
-          params.lda = a.Stride(RANK - 1);
         }
 
-        if (b.Stride(RANK - 1) == 1) {
+        if (b.Stride(RANK - 1) == 1  || is_complex_half_v<typename TensorTypeB::scalar_type>) {
           params.opB = CUBLAS_OP_N;
-          params.b_rows = b.Size(RANK - 2);
-          params.b_cols = b.Size(RANK - 1);
-          params.ldb = b.Stride(RANK - 2);
         }
         else if (b.Stride(RANK - 2) == 1) {
           params.opB = CUBLAS_OP_T;
-          params.b_rows = b.Size(RANK - 1);
-          params.b_cols = b.Size(RANK - 2);
-          params.ldb = b.Stride(RANK - 1);
         }
 
+        params.a_rows = a.Size(RANK - 2);
+        params.a_cols = a.Size(RANK - 1);
+        params.b_rows = b.Size(RANK - 2);
+        params.b_cols = b.Size(RANK - 1);
+        params.ldb = (params.opB == CUBLAS_OP_T && !is_complex_half_v<typename TensorTypeB::scalar_type>) ? b.Size(RANK - 2) : b.Size(RANK - 1);
+        params.lda = (params.opA == CUBLAS_OP_T && !is_complex_half_v<typename TensorTypeA::scalar_type>) ? a.Size(RANK - 2) : a.Size(RANK - 1);
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 2);
@@ -429,17 +431,19 @@ private:
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
+    cublasLtOrder_t colOrder = CUBLASLT_ORDER_COL;
 
+    auto op = CUBLAS_OP_N;
     // A operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &params_.opA,
-                    sizeof(params_.opA));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &op,
+                    sizeof(op));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // B operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &params_.opB,
-                    sizeof(params_.opB));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &op,
+                    sizeof(op));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Update this later when we're more flexible on compute type
@@ -480,14 +484,28 @@ private:
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Matrix data order
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
+    if (params_.opA == CUBLAS_OP_T) {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
+                      sizeof(colOrder));
+    }
+    else {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
+                      sizeof(rowOrder));      
+    }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
+    if (params_.opB == CUBLAS_OP_T) {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
+                      sizeof(colOrder));
+    }
+    else {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
+                      sizeof(rowOrder));      
+    }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     ret = cublasLtMatrixLayoutSetAttribute(
@@ -802,13 +820,7 @@ private:
                                                         beta);
     }
     else if (c.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto ct = c.Permute(perm);
-      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, ct, stream, alpha,
+      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
     }
     else {
@@ -828,13 +840,7 @@ private:
                                                    beta);
     }
     else if (b.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto bt = b.Permute(perm);
-      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, bt, c, stream, alpha,
+      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
     }
     else {
@@ -852,13 +858,7 @@ private:
       MatMulDispatchB<MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else if (a.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto at = a.Permute(perm);
-      MatMulDispatchB<MEM_ORDER_COL_MAJOR>(at, b, c, stream, alpha, beta);
+      MatMulDispatchB<MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else {
       MATX_THROW(matxNotSupported,
