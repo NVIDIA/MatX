@@ -327,11 +327,11 @@ TEST(ReductionTests, Median)
   MATX_EXIT_HANDLER();
 }
 
-TEST(ReductionTests, MinMax)
+TYPED_TEST(ReductionTestsNumericNonComplex, MinMax)
 {
   MATX_ENTER_HANDLER();
-  using TypeParam = float;
   {
+    using T = TypeParam;
     tensor_t<TypeParam, 0> t0{};
     tensor_t<index_t, 0> t0i{};    
     tensor_t<TypeParam, 1> t1o{{11}};
@@ -339,26 +339,26 @@ TEST(ReductionTests, MinMax)
     tensor_t<TypeParam, 1> t1o_small{{2}};    
     tensor_t<index_t, 1> t1i_small{{2}};
 
-    t1o.SetVals({1, 3, 8, 2, 9, 10, 6, 7, 4, 5, -1, 10, -1});
-    t2o.SetVals({{2, 4, 1, 3, 5}, {3, 1, 5, 2, 4}});
+    t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
+    t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});
 
     rmin(t0, t1o);
     cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-1)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
 
     rmax(t0, t1o);
     cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(10)));    
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(11)));    
 
     argmax(t0, t0i, t1o);
     cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(10)));
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(5)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(11)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(10)));
 
     argmin(t0, t0i, t1o);
     cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(-1)));
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(10)));    
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(1)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TypeParam)(0)));    
 
     argmax(t1o_small, t1i_small, t2o);
     cudaStreamSynchronize(0);
@@ -381,17 +381,17 @@ TEST(ReductionTests, MinMax)
   MATX_EXIT_HANDLER();
 }
 
-TEST(ReductionTests, Mean)
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Mean)
 {
   MATX_ENTER_HANDLER();
-  using TypeParam = float;
+  using T = TypeParam;
   {
     tensor_t<TypeParam, 0> t0;
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-    auto t1 = ones<float>({30});
+    auto t4 = ones<T>({30, 40, 50, 60});
+    auto t3 = ones<T>({30, 40, 50});
+    auto t2 = ones<T>({30, 40});
+    auto t1 = ones<T>({30});
 
     mean(t0, t4);
     cudaStreamSynchronize(0);
@@ -412,9 +412,9 @@ TEST(ReductionTests, Mean)
   {
     tensor_t<TypeParam, 1> t1({30});
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
+    auto t4 = ones<T>({30, 40, 50, 60});
+    auto t3 = ones<T>({30, 40, 50});
+    auto t2 = ones<T>({30, 40});
 
     mean(t1, t4);
     cudaStreamSynchronize(0);
@@ -438,8 +438,8 @@ TEST(ReductionTests, Mean)
   {
     tensor_t<TypeParam, 2> t2({30, 40});
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
+    auto t4 = ones<T>({30, 40, 50, 60});
+    auto t3 = ones<T>({30, 40, 50});
 
     mean(t2, t4);
     cudaStreamSynchronize(0);
