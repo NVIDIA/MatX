@@ -194,7 +194,13 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - A set of MatX [notebooks](docs_input/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
-## Release History
+## Release Major Features
+*v0.2.3*:
+* Several new functions: `find`, `find_idx`, `unique`, and `chirp`
+* cuTENSOR and cuTensorNet integration for new `einsum` function
+   * Tensor contraction support
+* Better error reporting
+   
 *v0.2.2*:
 * Arbitrary tensor ranks
    
