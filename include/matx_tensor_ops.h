@@ -171,6 +171,7 @@ inline
   template <int Dim, typename... Ts>
   __MATX_INLINE__ __MATX_HOST__  auto concat(Ts... ts)
   {
+    static_assert(((Dim < ts.Rank()) && ...), "Concatenation dimension larger than tensor rank");
     return detail::Concatenate<Dim, Ts...>{ts...};
   }  
 

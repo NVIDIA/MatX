@@ -515,70 +515,8 @@ namespace matx {
 namespace detail {
 
 #ifdef __CUDACC__  
-template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal();
-template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal();
-
-/* Returns the max value of an int64_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int64_t maxVal<int64_t>()
-{
-  return LLONG_MAX;
-}
-/* Returns the min value of an int64_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int64_t minVal<int64_t>()
-{
-  return LLONG_MIN;
-}
-/* Returns the max value of a uint64_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint64_t maxVal<uint64_t>()
-{
-  return ULLONG_MAX;
-}
-/* Returns the min value of a uint64_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint64_t minVal<uint64_t>()
-{
-  return 0;
-}
-
-/* Returns the max value of an int32_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int32_t maxVal<int32_t>()
-{
-  return INT_MAX;
-}
-/* Returns the min value of an int32_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ int32_t minVal<int32_t>()
-{
-  return INT_MIN;
-}
-/* Returns the max value of a uint32_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint32_t maxVal<uint32_t>()
-{
-  return UINT_MAX;
-}
-/* Returns the min value of a uint32_t at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ uint32_t minVal<uint32_t>()
-{
-  return 0;
-}
-/* Returns the max value of a float at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ float maxVal<float>()
-{
-  return FLT_MAX;
-}
-/* Returns the min value of a float at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ float minVal<float>()
-{
-  return -FLT_MAX;
-}
-/* Returns the max value of a double at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double maxVal<double>()
-{
-  return DBL_MAX;
-}
-/* Returns the min value of a double at compile time */
-template <> constexpr inline __MATX_HOST__ __MATX_DEVICE__ double minVal<double>()
-{
-  return -DBL_MAX;
-}
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal() { return std::numeric_limits<T>::max(); }
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::min(); }
 
 
 /**
