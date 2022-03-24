@@ -51,6 +51,12 @@
 
 namespace matx {
 
+enum class MemoryLayout {
+  MEMORY_LAYOUT_ROW_MAJOR,
+  MEMORY_LAYOUT_COL_MAJOR,
+};
+
+
 /**
  * @brief Removes cv and reference qualifiers on a type
  * 
@@ -62,7 +68,7 @@ struct remove_cvref {
 };  
 
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;  
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
 namespace detail {
 template <typename T, typename = void>
@@ -459,13 +465,14 @@ constexpr std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
-template <typename T> struct base_type {
+template <typename T, typename = void> 
+struct base_type {
   using type = T;
 };
 
-template <typename T, int RANK, typename Storage, typename Desc> 
-struct base_type<tensor_t<T, RANK, Storage, Desc>> {
-  using type = tensor_impl_t<T, RANK, Desc>;
+template <typename T> 
+struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
+  using type = tensor_impl_t<typename T::scalar_type, T::Rank(), typename T::desc_type>;
 };
 
 // Type traits to help with the lack of short-circuit template logic. Numpy

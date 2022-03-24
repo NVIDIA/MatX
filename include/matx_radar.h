@@ -182,7 +182,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   auto x_normdiv_v = make_tensor<T1>(x_normdiv, x.Shape());
   auto x_norm_v = make_tensor<float>(x_norm);
 
-  matx::reduce(x_norm_v, norm(x), reduceOpSum<float>(), 0);
+  sum(x_norm_v, norm(x), stream);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
   (x_normdiv_v = x / x_norm_v).run(stream);
 
@@ -198,7 +198,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     y_normdiv_v.Reset(y_normdiv, ry.Shape());
     auto y_norm_v = make_tensor<float>(y_norm);
 
-    matx::reduce(y_norm_v, norm(ry), reduceOpSum<float>(), 0);
+    sum(y_norm_v, norm(ry), stream);
     (y_normdiv_v = ry / y_norm_v).run(stream);
   }
 

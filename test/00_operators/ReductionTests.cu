@@ -109,18 +109,33 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
 
   MATX_EXIT_HANDLER();
 }
+TEST(TestRivaDeviceTensor, Min)
+{
+  auto t = matx::make_tensor<float>({2, 5});
+  t.SetVals({{2, 4, 1, 3, 5}, {3, 1, 6, 2, 4}});
+  auto i = matx::make_tensor<long long>({2});
+  auto v = matx::make_tensor<float>({2});
 
+  matx::argmin(v, i, t);
 
+  i.Print(2);
+  v.Print(2);
+
+  EXPECT_EQ(i(0), 2);
+  EXPECT_EQ(i(1), 6);
+  EXPECT_EQ(v(0), 1.f);
+  EXPECT_EQ(v(1), 1.f);
+}
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
 {
   MATX_ENTER_HANDLER();
   {
     tensor_t<TypeParam, 0> t0;
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
-    auto t1 = ones<float>({30});
+    auto t4 = ones<TypeParam>({30, 40, 50, 60});
+    auto t3 = ones<TypeParam>({30, 40, 50});
+    auto t2 = ones<TypeParam>({30, 40});
+    auto t1 = ones<TypeParam>({30});
 
     sum(t0, t4, 0);
     cudaStreamSynchronize(0);
@@ -144,9 +159,9 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
   {
     tensor_t<TypeParam, 1> t1({30});
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
-    auto t2 = ones<float>({30, 40});
+    auto t4 = ones<TypeParam>({30, 40, 50, 60});
+    auto t3 = ones<TypeParam>({30, 40, 50});
+    auto t2 = ones<TypeParam>({30, 40});
 
     sum(t1, t4, 0);
 
@@ -181,8 +196,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
   {
     tensor_t<TypeParam, 2> t2({30, 40});
 
-    auto t4 = ones<float>({30, 40, 50, 60});
-    auto t3 = ones<float>({30, 40, 50});
+    auto t4 = ones<TypeParam>({30, 40, 50, 60});
+    auto t3 = ones<TypeParam>({30, 40, 50});
 
     sum(t2, t4, 0);
     cudaStreamSynchronize(0);
@@ -364,17 +379,17 @@ TYPED_TEST(ReductionTestsNumericNonComplex, MinMax)
     cudaStreamSynchronize(0);
 
     // We need to convert the absolute index into relative before comparing
-    auto rel = t2o.GetIdxFromAbs(t1i_small(0));
+    auto rel = GetIdxFromAbs(t2o, t1i_small(0));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(5)));
-    rel = t2o.GetIdxFromAbs(t1i_small(1));
+    rel = GetIdxFromAbs(t2o, t1i_small(1));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(5)));
 
     argmin(t1o_small, t1i_small, t2o);
     cudaStreamSynchronize(0);
     
-    rel = t2o.GetIdxFromAbs(t1i_small(0));
+    rel = GetIdxFromAbs(t2o, t1i_small(0));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(1)));
-    rel = t2o.GetIdxFromAbs(t1i_small(1));
+    rel = GetIdxFromAbs(t2o, t1i_small(1));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TypeParam)(1)));  
   }
 
@@ -469,9 +484,9 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Prod)
 
     std::array<index_t, 2> s2{3, 4};
     std::array<index_t, 1> s1{3};
+    auto t1 = make_tensor<TypeParam>(s1);
+    auto t2 = make_tensor<TypeParam>(s2);
 
-    tensor_t<TypeParam, 1> t1{s1};
-    tensor_t<TypeParam, 2> t2{s2};
     TypeParam t1p = (TypeParam)1;
     for (int i = 0; i < t1.Size(0); i++) {
       t1(i) = static_cast<detail::value_promote_t<TypeParam>>((float)rand() /

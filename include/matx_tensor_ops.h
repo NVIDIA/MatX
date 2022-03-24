@@ -286,7 +286,7 @@ inline
       return;
     }
 
-    if (!in.IsLinear())
+    if (!in.IsContiguous())
     {
       MATX_THROW(matxInvalidSize, "Must have a linear tensor view for transpose");
     }
@@ -550,7 +550,7 @@ inline
     template <typename... Is>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) const 
     {
-      auto arrs = op_.GetIdxFromAbs(idx_(i));
+      auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
       return op_(arrs);     
     }
 
@@ -1930,7 +1930,8 @@ auto __MATX_INLINE__ as_uint8(T t)
   {                                                                 \
     using I1Type = extract_scalar_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
-    return detail::matxUnaryOp(i1, Op());                           \
+    const typename detail::base_type<I1>::type &base = i1;          \
+    return detail::matxUnaryOp(base, Op());                           \
   }
 
 #define DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
@@ -1942,7 +1943,9 @@ auto __MATX_INLINE__ as_uint8(T t)
     using I1Type = extract_scalar_type_t<I1>;                        \
     using I2Type = extract_scalar_type_t<I2>;                        \
     using Op = TENSOR_OP<I1Type, I2Type>;                            \
-    return detail::matxBinaryOp(i1, i2, Op());                   \
+    const typename detail::base_type<I1>::type &base1 = i1;       \
+    const typename detail::base_type<I2>::type &base2 = i2;       \
+    return detail::matxBinaryOp(base1, base2, Op());              \
   }
 
 #ifdef DOXYGEN_ONLY

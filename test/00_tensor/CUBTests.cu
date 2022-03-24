@@ -32,6 +32,7 @@
 
 #include "assert.h"
 #include "matx.h"
+#include "matx_cub.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -138,7 +139,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, CumSum)
   }
 
   // 2D tests
-  tensor_t<TypeParam, 2> tmpv2(this->t2.Shape());
+  auto tmpv2 = make_tensor<TypeParam>(this->t2.Shape());
 
   for (index_t i = 0; i < this->t2.Size(0); i++) {
     for (index_t j = 0; j < this->t2.Size(1); j++) {
@@ -167,7 +168,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
     this->t1(i) = static_cast<TypeParam>((2 * (i % 2) - 1) * i);
   }
 
-  tensor_t<TypeParam, 1> tmpv({this->t1.Lsize()});
+  auto tmpv = make_tensor<TypeParam>({this->t1.Lsize()});
 
   // Ascending
   matx::sort(tmpv, this->t1, SORT_DIR_ASC);
@@ -186,7 +187,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // 2D tests
-  tensor_t<TypeParam, 2> tmpv2(this->t2.Shape());
+  auto tmpv2 = make_tensor<TypeParam>(this->t2.Shape());
 
   for (index_t i = 0; i < this->t2.Size(0); i++) {
     for (index_t j = 0; j < this->t2.Size(1); j++) {

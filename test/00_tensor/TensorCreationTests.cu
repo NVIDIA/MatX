@@ -115,23 +115,23 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
   ASSERT_EQ(mt4.Size(3), 3);  
 }
 
-TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
-{
-  auto mt1 = make_static_tensor<TypeParam, 10>();
-  ASSERT_EQ(mt1.Size(0), 10);
+// TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
+// {
+//   auto mt1 = make_static_tensor<TypeParam, 10>();
+//   ASSERT_EQ(mt1.Size(0), 10);
 
-  auto mt2 = make_static_tensor<TypeParam, 10, 40>();
-  ASSERT_EQ(mt2.Size(0), 10);
-  ASSERT_EQ(mt2.Size(1), 40);
+//   auto mt2 = make_static_tensor<TypeParam, 10, 40>();
+//   ASSERT_EQ(mt2.Size(0), 10);
+//   ASSERT_EQ(mt2.Size(1), 40);
 
-  auto mt3 = make_static_tensor<TypeParam, 10, 40, 30>();
-  ASSERT_EQ(mt3.Size(0), 10);
-  ASSERT_EQ(mt3.Size(1), 40);  
-  ASSERT_EQ(mt3.Size(2), 30);  
+//   auto mt3 = make_static_tensor<TypeParam, 10, 40, 30>();
+//   ASSERT_EQ(mt3.Size(0), 10);
+//   ASSERT_EQ(mt3.Size(1), 40);  
+//   ASSERT_EQ(mt3.Size(2), 30);  
 
-  auto mt4 = make_static_tensor<TypeParam, 10, 40, 30, 6>();
-  ASSERT_EQ(mt4.Size(0), 10);
-  ASSERT_EQ(mt4.Size(1), 40);  
-  ASSERT_EQ(mt4.Size(2), 30);    
-  ASSERT_EQ(mt4.Size(3), 6);    
-}
+//   auto mt4 = make_static_tensor<TypeParam, 10, 40, 30, 6>();
+//   ASSERT_EQ(mt4.Size(0), 10);
+//   ASSERT_EQ(mt4.Size(1), 40);  
+//   ASSERT_EQ(mt4.Size(2), 30);    
+//   ASSERT_EQ(mt4.Size(3), 6);    
+// }

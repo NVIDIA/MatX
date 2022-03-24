@@ -83,7 +83,8 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
     matx::copy(this->Wv, v, 0);
 
     // Compute lambda*v
-    (this->Lvv = v * this->Wov(i)).run();
+    auto b = v * this->Wov(i);
+    (this->Lvv = b).run();
     // Compute A*v
 
     matmul(this->Gtv, this->Bv, this->Wv);

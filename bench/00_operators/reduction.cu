@@ -55,11 +55,11 @@ void reduce_0d_cub(nvbench::state &state, nvbench::type_list<ValueType>)
   auto xv2 = make_tensor<ValueType>();
   xv.PrefetchDevice(0);
 
-  cub_reduce<decltype(xv2), decltype(xv), CustomSum>(xv2, xv, 0.0f, 0);
+  sum(xv2, xv, 0);
 
   state.exec( 
     [&xv, &xv2](nvbench::launch &launch) {
-      cub_reduce<decltype(xv2), decltype(xv), CustomSum>(xv2, xv, 0.0f, (cudaStream_t)launch.get_stream());
+      sum(xv2, xv, (cudaStream_t)launch.get_stream());
     });
 
 }
