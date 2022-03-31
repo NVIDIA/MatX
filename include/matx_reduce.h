@@ -813,16 +813,17 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
 }
 
 template <typename TensorType, typename TensorIndexType, typename InType>
-__global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType in, [[maybe_unused]] index_t mult)
+__global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType in, [[maybe_unused]] index_t mult)
 {
-  typename TensorIndexType::scalar_type in_val;
+  using index_type = typename TensorIndexType::scalar_type;
+  using T = typename TensorType::scalar_type;
+  index_type in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;  
   std::array<index_t, InType::Rank()> indices;
   index_t abs_idx;
   bool valid = false;
-  using T = typename TensorIndexType::scalar_type;
-
+  
   if constexpr (InType::Rank() == 1) {
     indices[0] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (indices[InType::Rank()-1] < in.Size(0)) {
@@ -886,7 +887,7 @@ __global__ void matxIndexKernel(TensorType idest, TensorIndexType dest, InType i
 
   // Compute output location
   T *out = nullptr;
-  index_t *iout = nullptr;
+  index_type *iout = nullptr;
 
   // compute output offsets
   if constexpr (RANK == 0) {
@@ -1018,7 +1019,7 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
   if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
     (idest = std::numeric_limits<index_t>::max()).run(stream);
     detail::matxIndexKernel<<<blocks, threads, 0, stream>>>(
-        idest, dest, in, mult);     
+        dest, idest, in, mult);     
   }
 #endif  
 }
