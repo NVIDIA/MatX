@@ -1628,7 +1628,6 @@ public:
   void Print(Args... dims) const {
 #ifdef __CUDACC__    
     auto kind = GetPointerKind(this->ldata_);
-
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
       InternalPrint(dims...);
@@ -1638,11 +1637,8 @@ public:
         PrintKernel<<<1, 1>>>(*this, dims...);
       }
       else {
-        auto tmpv = make_tensor<T>(this->desc_);
-        typename detail::base_type<decltype(tmpv)>::type tmpd = tmpv;
-
-        cudaMemcpy(tmpd.Data(), Data(), tmpd.Bytes(),
-                  cudaMemcpyDeviceToHost);
+        auto tmpv = make_tensor<T>(this->Shape());
+        (tmpv = *this).run();
         tmpv.Print(dims...);
       }
     }
