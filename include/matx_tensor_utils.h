@@ -156,18 +156,16 @@ namespace detail {
           make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});   
     }    
   }  
-    
-  template <typename T>
-  __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ T MAX(T a)
-  {
-    return a;
-  }
 
-  template <typename T, typename... Args>
-  __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ T MAX(T a, Args... args)
+  template <typename T0, typename T1, typename... Tn>
+  constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
   {
-    auto v = MAX(args...);
-    return (a >= v) ? a : v;
+      if constexpr (sizeof...(tn) == 0) {
+          return t0 > t1 ? t0 : t1;
+      }
+      else {
+          return matx_max(matx_max(t0, t1), tn...);
+      }
   }
 
   template <class T, class M = T>
