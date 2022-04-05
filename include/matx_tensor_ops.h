@@ -364,7 +364,7 @@ inline
   private:
     typename detail::base_type<T1>::type cond_;
     typename detail::base_type<T2>::type op_;
-    std::array<index_t, detail::MAX(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
+    std::array<index_t, detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
   public:
     using scalar_type = void; ///< Scalar type for type extraction
@@ -393,7 +393,7 @@ inline
           index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
-          size_[i] = detail::MAX(size1, size2);
+          size_[i] = detail::matx_max(size1, size2);
         }
       }
     }
@@ -418,7 +418,7 @@ inline
      */    
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return detail::MAX(detail::get_rank<T1>(), detail::get_rank<T2>());
+      return detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>());
     }
 
     /**
@@ -451,7 +451,7 @@ inline
     typename detail::base_type<C1>::type cond_;
     typename detail::base_type<T1>::type op1_;
     typename detail::base_type<T2>::type op2_;    
-    std::array<index_t, detail::MAX(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
+    std::array<index_t, detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
   public:
     using scalar_type = void; ///< Scalar type for type extraction
@@ -482,7 +482,7 @@ inline
           index_t size0 = detail::get_expanded_size<Rank()>(cond_, i);
           index_t size1 = detail::get_expanded_size<Rank()>(op1, i);
           index_t size2 = detail::get_expanded_size<Rank()>(op2, i);
-          size_[i] = detail::MAX(size0, size1, size2);
+          size_[i] = detail::matx_max(size0, size1, size2);
           MATX_ASSERT(size0 == 0 || size0 == Size(i), matxInvalidSize);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);          
@@ -513,7 +513,7 @@ inline
      */
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return detail::MAX(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>());
+      return detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>());
     }
 
     /**
@@ -1880,7 +1880,7 @@ auto __MATX_INLINE__ as_uint8(T t)
     typename base_type<I1>::type in1_;
     typename base_type<I2>::type in2_;
     typename base_type<Op>::type op_;
-    std::array<index_t, detail::MAX(detail::get_rank<I1>(), detail::get_rank<I2>())> size_;
+    std::array<index_t, detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>())> size_;
 
   public:
     // dummy type to signal this is a matxop
@@ -1894,7 +1894,7 @@ auto __MATX_INLINE__ as_uint8(T t)
         {
           index_t size1 = detail::get_expanded_size<Rank()>(in1_, i);
           index_t size2 = detail::get_expanded_size<Rank()>(in2_, i);
-          size_[i] = detail::MAX(size1, size2);
+          size_[i] = detail::matx_max(size1, size2);
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
         }
@@ -1912,7 +1912,7 @@ auto __MATX_INLINE__ as_uint8(T t)
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
-      return detail::MAX(detail::get_rank<I1>(), detail::get_rank<I2>());
+      return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());
     }
 
     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
