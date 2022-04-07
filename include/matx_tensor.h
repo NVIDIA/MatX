@@ -103,7 +103,7 @@ struct RandomOperatorIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
   {
     auto arrs = detail::GetIdxFromAbs(t_, offset_);
-    return std::apply([&](auto &&...args) {
+    return detail::mapply([&](auto &&...args) {
         return t_.operator()(args...);
       }, arrs);     
   }  

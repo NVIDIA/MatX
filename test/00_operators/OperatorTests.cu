@@ -457,6 +457,30 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsAll, Squeeze)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t2 = make_tensor<TypeParam>({10, 2});
+  auto val = GenerateData<TypeParam>();
+
+  for (index_t i = 0; i < t2.Size(0); i++) {
+    for (index_t j = 0; j < t2.Size(1); j++) {
+      t2(i,j) = val;
+    }
+  }
+
+  auto t1 = make_tensor<TypeParam>({t2.Size(0)*t2.Size(1)});
+  (t1 = squeeze(t2)).run();
+  cudaStreamSynchronize(0);
+  
+  for (index_t i = 0; i < t2.Size(0)*t2.Size(1); i++) {
+    ASSERT_EQ(t1(i), val);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
 {
   MATX_ENTER_HANDLER();

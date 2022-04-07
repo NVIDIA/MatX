@@ -313,7 +313,7 @@ inline
 #endif    
   };
 
-  /**
+/**
  * Permute a tensor view out-of-place
  *
  * Rearranges the dimensions of a tensor view without touching the data. This is
@@ -994,6 +994,67 @@ auto __MATX_INLINE__ as_uint8(T t)
  */
   template <typename T1>
   auto __MATX_INLINE__ diag(T1 t) { return detail::DiagOp<T1, T1::Rank()>(t); }
+
+
+  namespace detail {
+  template <typename T1>
+  class SqueezeOp : public BaseOp<SqueezeOp<T1>>
+  {
+  private:
+    typename base_type<T1>::type op1_;
+
+  public:
+    using matxop = bool;
+    using scalar_type = typename T1::scalar_type;
+
+    __MATX_INLINE__ SqueezeOp(const T1 &op1) : op1_(op1)
+    {
+      static_assert(T1::Rank() > 1, "Squeeze has no effect on tensors of rank 0 and 1");
+    }
+
+    template <typename Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
+    {
+      return *RandomOperatorIterator{op1_, id0};
+    }    
+
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return 1;
+    }
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      index_t size = 1;
+      if (dim == 0) {
+        for (int r = 0; r < op1_.Rank(); r++) {
+          size *= op1_.Size(r);
+        }
+      }
+
+      return size;
+    }
+  };
+  }
+
+/**
+ * Squeeze operator
+ *
+ * The squeeze operator takes an operator of rank 2 or higher and "squeezes" every dimension
+ * into a single 1D tensor. 
+ *
+ * @tparam T1
+ *   Operator type
+ *
+ * @returns
+ *   Operator of squeezed input
+ */
+  template <typename T1>
+  auto __MATX_INLINE__ squeeze(const T1 &a)
+  {
+    return detail::SqueezeOp<T1>(a);
+  };
+
 
   /**
  * Kronecker tensor product
