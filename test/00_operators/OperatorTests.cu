@@ -457,7 +457,7 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, Squeeze)
+TYPED_TEST(OperatorTestsAll, Flatten)
 {
   MATX_ENTER_HANDLER();
 
@@ -471,7 +471,7 @@ TYPED_TEST(OperatorTestsAll, Squeeze)
   }
 
   auto t1 = make_tensor<TypeParam>({t2.Size(0)*t2.Size(1)});
-  (t1 = squeeze(t2)).run();
+  (t1 = flatten(t2)).run();
   cudaStreamSynchronize(0);
   
   for (index_t i = 0; i < t2.Size(0)*t2.Size(1); i++) {

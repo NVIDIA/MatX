@@ -92,3 +92,4 @@ Advanced Operators
 .. doxygenfunction:: kron
 .. doxygenfunction:: hermitianT
 .. doxygenfunction:: r2cop
+.. doxygenfunction:: flatten
