@@ -1484,14 +1484,14 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) const noexcept
   {
     if constexpr (is_complex_v<T>) {
-      printf("%.4f%+.4fj ", static_cast<float>(val.real()),
+      printf("%.4e%+.4ej ", static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
     }
     else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
-      printf("%.4f ", static_cast<float>(val));
+      printf("%.4e ", static_cast<float>(val));
     }
     else if constexpr (std::is_floating_point_v<T>) {
-      printf("%.4f ", val);
+      printf("%.4e ", val);
     }
     else if constexpr (std::is_same_v<T, long long int>) {
       printf("%lld ", val);
