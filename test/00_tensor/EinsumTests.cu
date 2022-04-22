@@ -98,7 +98,7 @@ TYPED_TEST_SUITE(EinsumTestsIntegral, MatXAllIntegralTypes);
 TYPED_TEST_SUITE(EinsumTestsNumericNonComplex, MatXNumericNonComplexTypes);
 TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypes);
 
-#if ENABLE_CUTENSOR
+#if MATX_ENABLE_CUTENSOR
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
 {
   MATX_ENTER_HANDLER();
