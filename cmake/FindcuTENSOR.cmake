@@ -79,7 +79,7 @@ else()
 endif()
 
 if(NOT cuTENSOR_FOUND)
-  set(CUTENSOR_VERSION 1.4.0.6)
+  set(CUTENSOR_VERSION 1.5.0.3)
   set(CUTENSOR_FILENAME libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive)
 
   message(STATUS "cuTENSOR not found. Downloading library. By continuing this download you accept to the license terms of cuTENSOR")

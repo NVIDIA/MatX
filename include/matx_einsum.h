@@ -127,6 +127,15 @@ public:
     MATX_ASSERT_STR(cutensornetCreateContractionOptimizerInfo(handle_, descNet_, &optimizerInfo) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to create cuTensorNet contraction optimizer info");
 
+    int imbalance_factor = 30;
+    MATX_ASSERT_STR(cutensornetContractionOptimizerConfigSetAttribute(
+                                                               handle_,
+                                                               optimizerConfig,
+                                                               CUTENSORNET_CONTRACTION_OPTIMIZER_CONFIG_GRAPH_IMBALANCE_FACTOR,
+                                                               &imbalance_factor,
+                                                               sizeof(imbalance_factor)) == CUTENSORNET_STATUS_SUCCESS,
+                                                    matxcuTensorError, "Failed to run contraction optimizer");      
+
     size_t freeMem, totalMem;
     MATX_ASSERT(cudaMemGetInfo(&freeMem, &totalMem) == cudaSuccess, matxCudaError);
 
@@ -150,13 +159,37 @@ public:
 
     MATX_ASSERT(params_.num_slices_ > 0, matxcuTensorError);
 
+    MATX_ASSERT(cutensornetCreateWorkspaceDescriptor(handle_, &workDesc_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+
+    uint64_t requiredWorkspaceSize = 0;
+    MATX_ASSERT(cutensornetWorkspaceComputeSizes(handle_,
+                                          descNet_,
+                                          optimizerInfo,
+                                          workDesc_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+
+    MATX_ASSERT(cutensornetWorkspaceGetSize(handle_,
+                                         workDesc_,
+                                         CUTENSORNET_WORKSIZE_PREF_MIN,
+                                         CUTENSORNET_MEMSPACE_DEVICE,
+                                         &requiredWorkspaceSize) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+
+    MATX_ASSERT_STR(workSize_ > requiredWorkspaceSize, matxOutOfMemory, "Not enough workspace memory is available.");
+
+    matxAlloc(&workspace_, workSize_, MATX_ASYNC_DEVICE_MEMORY, stream);
+
+    MATX_ASSERT (cutensornetWorkspaceSet(handle_,
+                                          workDesc_,
+                                          CUTENSORNET_MEMSPACE_DEVICE,
+                                          workspace_,
+                                          workSize_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);     
+
     /*******************************
      * Initialize all pair-wise contraction plans (for cuTENSOR)
      *******************************/
     MATX_ASSERT_STR(cutensornetCreateContractionPlan(handle_,
                                                 descNet_,
                                                 optimizerInfo,
-                                                workSize_,
+                                                workDesc_,
                                                 &plan_) == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetCreateContractionPlan failed");
 
@@ -168,12 +201,6 @@ public:
     MATX_ASSERT_STR(cutensornetCreateContractionAutotunePreference(handle_,
                             &autotunePref) == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetCreateContractionAutotunePreference failed");
-
-    // Allocate the real amount needed and free the old amount
-    MATX_ASSERT_STR(cutensornetContractionGetWorkspaceSize(handle_, descNet_, optimizerInfo, &workSize_) == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetContractionGetWorkspaceSize failed");
-
-    matxAlloc(&workspace_, workSize_, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     const int numAutotuningIterations = 5; // may be 0
     MATX_ASSERT_STR(cutensornetContractionAutotunePreferenceSetAttribute(
@@ -189,8 +216,7 @@ public:
                             plan_,
                             data_in,
                             out.Data(),
-                            workspace_, 
-                            workSize_,
+                            workDesc_, 
                             autotunePref,
                             stream) == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetContractionAutotune failed");
@@ -329,8 +355,7 @@ public:
                                 plan_,
                                 data_in,
                                 out.Data(),
-                                workspace_, 
-                                workSize_, 
+                                workDesc_, 
                                 slice, 
                                 stream) == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetContraction failed");
@@ -348,6 +373,7 @@ public:
     cutensornetContractionPlan_t plan_;
     uint64_t workSize_;
     void *workspace_;
+    cutensornetWorkspaceDescriptor_t workDesc_;
     cutensornetHandle_t handle_;
     cutensornetNetworkDescriptor_t descNet_;
     EinsumParams_t<InT...> params_;
