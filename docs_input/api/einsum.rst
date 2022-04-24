@@ -11,6 +11,7 @@ of ``einsum`` operations are:
 * Matrix multiplies (GEMMs)
 * Inner products
 * Transposes
+* Reductions
 
 While many of these operations are possible using other methods in MatX, ``einsum`` typically has a 
 shorter syntax, and is sometimes more optimized than a direct version of the operation. 
