@@ -207,5 +207,28 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
   }
 }
 
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
+{
+  auto a = matx::make_tensor<TypeParam, 2>({2, 3});
+  a.SetVals({
+      {1, 2, 3},
+      {4, 5, 6}
+  });  
+
+  auto b = matx::make_tensor<TypeParam, 1>({3});
+  matx::cutensor::einsum(b, "ij->j", 0, a);
+    
+  cudaStreamSynchronize(0);
+  for (auto i = 0; i < a.Size(1); i++) {
+    TypeParam s = 0;
+    for (auto j = 0; j < a.Size(0); j++) {
+      s += a(j, i);
+    }
+
+    MATX_ASSERT_EQ(s, b(i));
+  }
+}
+
+
 
 #endif
