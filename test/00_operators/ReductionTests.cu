@@ -109,23 +109,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
 
   MATX_EXIT_HANDLER();
 }
-TEST(TestRivaDeviceTensor, Min)
-{
-  auto t = matx::make_tensor<float>({2, 5});
-  t.SetVals({{2, 4, 1, 3, 5}, {3, 1, 6, 2, 4}});
-  auto i = matx::make_tensor<long long>({2});
-  auto v = matx::make_tensor<float>({2});
 
-  matx::argmin(v, i, t);
-
-  i.Print(2);
-  v.Print(2);
-
-  EXPECT_EQ(i(0), 2);
-  EXPECT_EQ(i(1), 6);
-  EXPECT_EQ(v(0), 1.f);
-  EXPECT_EQ(v(1), 1.f);
-}
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
 {
   MATX_ENTER_HANDLER();
