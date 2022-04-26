@@ -817,7 +817,7 @@ __global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType i
 {
   using index_type = typename TensorIndexType::scalar_type;
   using T = typename TensorType::scalar_type;
-  index_type in_val;
+  T in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;  
   std::array<index_t, InType::Rank()> indices;
