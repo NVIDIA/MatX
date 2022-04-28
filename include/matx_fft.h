@@ -390,7 +390,7 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
-  cufftResult error;
+  [[maybe_unused]] cufftResult error;
 
   error = cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
@@ -515,7 +515,7 @@ public:
 
     size_t workspaceSize;
     cufftCreate(&this->plan_);
-    cufftResult error;
+    [[maybe_unused]] cufftResult error;
     cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                        this->params_.istride, this->params_.idist,
                        this->params_.input_type, this->params_.onembed,
