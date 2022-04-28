@@ -821,7 +821,7 @@ __global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType i
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;  
   std::array<index_t, InType::Rank()> indices;
-  index_t abs_idx;
+  index_t abs_idx = -1;
   bool valid = false;
   
   if constexpr (InType::Rank() == 1) {
@@ -889,43 +889,41 @@ __global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType i
   T *out = nullptr;
   index_type *iout = nullptr;
 
-  // compute output offsets
-  if constexpr (RANK == 0) {
-    out  = &dest();
-    iout = &idest();
-    valid = true;
-  }
-  else if constexpr (RANK == 1) {
-    if (indices[InType::Rank()-1] < dest.Size(0)) {
-      out = &dest(indices[InType::Rank()-1]);
-      iout = &idest(indices[InType::Rank()-1]);
+  if (abs_idx != -1) {
+    // compute output offsets
+    if constexpr (RANK == 0) {
+      out  = &dest();
+      iout = &idest();
       valid = true;
     }
-  }
-  else if constexpr (RANK == 2) {
-    if (indices[InType::Rank()-1] < dest.Size(1) && indices[InType::Rank()-2] < dest.Size(0))
+    else if constexpr (RANK == 1) {
+        out = &dest(indices[InType::Rank()-1]);
+        iout = &idest(indices[InType::Rank()-1]);
+        valid = true;
+    }
+    else if constexpr (RANK == 2) {
       out = &dest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
       iout = &idest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
       valid = true;
-  }
-  else if constexpr (RANK == 3) {
-    if (indices[InType::Rank()-1] < dest.Size(2) && indices[InType::Rank()-2] < dest.Size(1) && indices[InType::Rank()-3] < dest.Size(0))
+    }
+    else if constexpr (RANK == 3) {
       out = &dest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
       iout = &idest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
       valid = true;
-  }
-  else {
-    // Calculate valid here
-    valid = true;
-    for (int r = RANK-1; r >= 0; r++) {
-      if (indices[r] >= dest.Size(r)) {
-        valid = false;
-      }
     }
-    if (valid) {
-      iout = mapply([&](auto... param) { return idest.GetPointer(param...); }, indices);
-      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
-    }   
+    else {
+      // Calculate valid here
+      valid = true;
+      for (int r = RANK-1; r >= 0; r++) {
+        if (indices[r] >= dest.Size(r)) {
+          valid = false;
+        }
+      }
+      if (valid) {
+        iout = mapply([&](auto... param) { return idest.GetPointer(param...); }, indices);
+        out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
+      }   
+    }
   }
 
   if (valid) {  
