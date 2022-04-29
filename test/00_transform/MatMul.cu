@@ -243,3 +243,28 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRect)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t batches = 5;
+  constexpr index_t m = 128;
+  constexpr index_t k = 256;
+  constexpr index_t n = 512;
+  
+  tensor_t<TypeParam, 3> a{{batches, m, k}};
+  tensor_t<TypeParam, 3> b{{batches, k, n}};
+  tensor_t<TypeParam, 3> c{{batches, m, n}};  
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n, batches});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}

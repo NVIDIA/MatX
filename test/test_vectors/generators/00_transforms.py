@@ -34,12 +34,19 @@ class conv_operators:
 class matmul_operators:
     def __init__(self,  dtype: str, size: List[int]):
         np.random.seed(1234)
+        batches = 1 if len(size) == 3 else size[-1]
         self.size = size
         self.dtype = dtype
-        self.res = {
-            'a': matx_common.randn_ndarray((size[0], size[1]), dtype),
-            'b': matx_common.randn_ndarray((size[1], size[2]), dtype)
-        }
+        if batches == 1:
+            self.res = {
+                'a': matx_common.randn_ndarray((size[0], size[1]), dtype),
+                'b': matx_common.randn_ndarray((size[1], size[2]), dtype)
+            }
+        else:
+            self.res = {
+                'a': matx_common.randn_ndarray((batches, size[0], size[1]), dtype),
+                'b': matx_common.randn_ndarray((batches, size[1], size[2]), dtype)
+            }   
 
     def run(self) -> Dict[str, np.ndarray]:
         self.res['c'] = self.res['a'] @ self.res['b']

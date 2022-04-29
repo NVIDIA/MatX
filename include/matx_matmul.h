@@ -528,6 +528,41 @@ private:
                     sizeof(params_.batch));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
+    index_t stride;
+
+    if constexpr (is_complex_half_v<T2>) {
+      stride = params_.a_rows * params_.a_cols * 2;
+    }
+    else {
+      stride = params_.a_rows * params_.a_cols;
+    }
+    ret = cublasLtMatrixLayoutSetAttribute(
+                    Adesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
+                    sizeof(stride));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    if constexpr (is_complex_half_v<T3>) {
+      stride = params_.b_rows * params_.b_cols * 2;
+    }
+    else {
+      stride = params_.b_rows * params_.b_cols;
+    }
+    ret = cublasLtMatrixLayoutSetAttribute(
+                    Bdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
+                    sizeof(stride));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+
+    if constexpr (is_complex_half_v<T1>) {
+      stride = params_.c_rows * params_.c_cols * 2;
+    }
+    else {
+      stride = params_.c_rows * params_.c_cols;
+    }
+    ret = cublasLtMatrixLayoutSetAttribute(
+                    Cdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
+                    sizeof(stride));
+    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);    
+
     if constexpr (is_complex_half_v<T1> && is_complex_half_v<T2>) {
       size_t planarA = (params_.a_rows * params_.a_cols * sizeof(T1)) / 2;
       size_t planarB = (params_.b_rows * params_.b_cols * sizeof(T1)) / 2;
