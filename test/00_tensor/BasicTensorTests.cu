@@ -402,6 +402,7 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
       ASSERT_EQ(t2v_small(i, j), i * 4 + j + 1);
     }
   }
+
   MATX_EXIT_HANDLER();
 }
 

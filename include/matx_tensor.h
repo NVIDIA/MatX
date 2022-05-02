@@ -1154,8 +1154,17 @@ public:
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
   }
 
+  __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
+    bool managed;
+    MATX_ASSERT(cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)Data()) == CUDA_SUCCESS, matxNotSupported);
+    return managed;
+  }
+
   /**
    * Rank-0 initializer list setting
+   *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.
    *
    * @param val
    *   0 initializer list value
@@ -1163,14 +1172,18 @@ public:
    * @returns reference to view
    *
    */
-  __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val) noexcept
+  __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
     static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     this->operator()() = val;
   }
 
   /**
    * Rank-1 non-complex or rank-0 initializer list setting
+   *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.
    *
    * @param vals
    *   1D initializer list of values
@@ -1178,10 +1191,11 @@ public:
    * @returns reference to view
    *
    */
-  __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals) noexcept
+  __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
       "Single initializer list on SetVals only for non-complex rank 1 tensor or complex rank 0 tensors");
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     for (size_t i = 0; i < vals.size(); i++) {
       if constexpr (is_cuda_complex_v<T>) {
         typename T::value_type real = (vals.begin() + i)->real();
@@ -1197,6 +1211,9 @@ public:
   /**
    * Rank-2 non-complex or rank-1 initializer list setting
    *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.   
+   *
    * @param vals
    *   1D/2D initializer list of values
    *
@@ -1205,10 +1222,11 @@ public:
    */
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<T>>
-              &vals) noexcept
+              &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 2) || (is_cuda_complex_v<T> && RANK == 1)),
       "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");    
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         if constexpr (is_cuda_complex_v<T>) {
@@ -1229,6 +1247,9 @@ public:
   /**
    * Rank-3 non-complex or rank-2 complex initializer list setting
    *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.   
+   *
    * @param vals
    *   3D/2D initializer list of values
    *
@@ -1238,10 +1259,11 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<T>>>
-              vals) noexcept
+              vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 3) || (is_cuda_complex_v<T> && RANK == 2)),
-      "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");       
+      "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");  
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");     
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1265,6 +1287,9 @@ public:
   /**
    * Rank-4 non-complex or rank-3 complex initializer list setting
    *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.   
+   *
    * @param vals
    *   3D/4D initializer list of values
    *
@@ -1274,10 +1299,11 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>
-              &vals) noexcept
+              &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 4) || (is_cuda_complex_v<T> && RANK == 3)),
       "Quad initializer list on SetVals only for non-complex rank 4 tensor or complex rank 3 tensors");
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1310,6 +1336,9 @@ public:
   /**
    * Rank-4 complex initializer list setting
    *
+   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * at the moment.   
+   *
    * @param vals
    *   4D initializer list of values
    *
@@ -1320,10 +1349,11 @@ public:
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>>
-              &vals) noexcept
+              &vals)
   {
     static_assert((is_cuda_complex_v<T> && RANK == 4),
           "Quintuple initializer list on SetVals only for complex rank 3 tensors");    
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {

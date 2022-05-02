@@ -195,10 +195,10 @@ auto make_tensor() {
  * @returns New tensor
  * 
  **/
-template <typename T>
+template <typename T, typename O = owning>
 auto make_tensor(T *ptr) {
   std::array<T, 0> shape;
-  return make_tensor<T, 0>(ptr, std::move(shape));
+  return make_tensor<T, 0, O>(ptr, std::move(shape));
 }
 
 
