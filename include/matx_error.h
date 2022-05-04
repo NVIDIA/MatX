@@ -197,8 +197,8 @@ namespace matx
   
 #else
   #define MATX_ASSERT(a, error) {}
-
   #define MATX_ASSERT_STR(a, error, str) {}
+  #define MATX_ASSERT_STR_EXP(a, expected, error, str) {}
 #endif
 
 #define MATX_STATIC_ASSERT(a, error)    \
