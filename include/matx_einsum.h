@@ -81,6 +81,8 @@ public:
 
   matxEinsumHandle_t(OutputTensor &out, const std::string &subscripts, cudaStream_t stream, const InT&... tensors)
   {
+    [[maybe_unused]] cutensornetStatus_t status;
+
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
     //cutensornetLoggerSetLevel(5);
@@ -98,11 +100,12 @@ public:
     i = 0;
     ((data_in[i++] = tensors.Data()), ...);
 
-    MATX_ASSERT_STR(cutensornetCreate(&handle_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+    status = cutensornetCreate(&handle_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to create cuTensorNet handle");    
 
     // setup tensor network
-    MATX_ASSERT_STR_EXP(cutensornetCreateNetworkDescriptor(handle_,
+    status = cutensornetCreateNetworkDescriptor(handle_,
                                                 sizeof...(InT), 
                                                 params_.nmodes_.data(), 
                                                 extents, 
@@ -116,81 +119,96 @@ public:
                                                 params_.alignment_out_,
                                                 MatXTypeToCudaType<typename OutputTensor::scalar_type>(), 
                                                 CUTENSORNET_COMPUTE_32F,
-                                                &descNet_), CUTENSORNET_STATUS_SUCCESS,
+                                                &descNet_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "Failed to create cuTensorNet network descriptor");
 
     cutensornetContractionOptimizerConfig_t optimizerConfig;
-    MATX_ASSERT_STR(cutensornetCreateContractionOptimizerConfig(handle_, &optimizerConfig) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+    status = cutensornetCreateContractionOptimizerConfig(handle_, &optimizerConfig);
+    
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to create cuTensorNet optimizer config");
 
     cutensornetContractionOptimizerInfo_t optimizerInfo;
-    MATX_ASSERT_STR(cutensornetCreateContractionOptimizerInfo(handle_, descNet_, &optimizerInfo) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+    status = cutensornetCreateContractionOptimizerInfo(handle_, descNet_, &optimizerInfo);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to create cuTensorNet contraction optimizer info");
 
     int imbalance_factor = 30;
-    MATX_ASSERT_STR(cutensornetContractionOptimizerConfigSetAttribute(
+    status = cutensornetContractionOptimizerConfigSetAttribute(
                                                                handle_,
                                                                optimizerConfig,
                                                                CUTENSORNET_CONTRACTION_OPTIMIZER_CONFIG_GRAPH_IMBALANCE_FACTOR,
                                                                &imbalance_factor,
-                                                               sizeof(imbalance_factor)) == CUTENSORNET_STATUS_SUCCESS,
-                                                    matxcuTensorError, "Failed to run contraction optimizer");      
+                                                               sizeof(imbalance_factor));
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to run contraction optimizer");      
 
     size_t freeMem, totalMem;
-    MATX_ASSERT(cudaMemGetInfo(&freeMem, &totalMem) == cudaSuccess, matxCudaError);
+    auto err = cudaMemGetInfo(&freeMem, &totalMem);
+    MATX_ASSERT(err == cudaSuccess, matxCudaError);
 
     // cuTensorNet recommends a large amount of memory for optimizing, but we limit to 2GB
     workSize_ = static_cast<decltype(workSize_)>(std::min(static_cast<double>(freeMem) * 0.8, 2e9));
 
-    MATX_ASSERT_STR(cutensornetContractionOptimize(handle_,
+    status = cutensornetContractionOptimize(handle_,
                                               descNet_,
                                               optimizerConfig,
                                               workSize_,
-                                              optimizerInfo) == CUTENSORNET_STATUS_SUCCESS,
+                                              optimizerInfo);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "Failed to create run cuTensorNet optimizer");
 
-    MATX_ASSERT_STR(cutensornetContractionOptimizerInfoGetAttribute(
+    status = cutensornetContractionOptimizerInfoGetAttribute(
                 handle_,
                 optimizerInfo,
                 CUTENSORNET_CONTRACTION_OPTIMIZER_INFO_NUM_SLICES,
                 &params_.num_slices_,
-                sizeof(params_.num_slices_)) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+                sizeof(params_.num_slices_));
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
         "Failed to get number of slices from cuTensorNet optimizer");
 
     MATX_ASSERT(params_.num_slices_ > 0, matxcuTensorError);
 
-    MATX_ASSERT(cutensornetCreateWorkspaceDescriptor(handle_, &workDesc_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+    status = cutensornetCreateWorkspaceDescriptor(handle_, &workDesc_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to create cuTENSOR workspace descriptor");  
 
     uint64_t requiredWorkspaceSize = 0;
-    MATX_ASSERT(cutensornetWorkspaceComputeSizes(handle_,
+    status = cutensornetWorkspaceComputeSizes(handle_,
                                           descNet_,
                                           optimizerInfo,
-                                          workDesc_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+                                          workDesc_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+        "Failed to compute cuTENSOR workspace size");  
 
-    MATX_ASSERT(cutensornetWorkspaceGetSize(handle_,
+    status = cutensornetWorkspaceGetSize(handle_,
                                          workDesc_,
                                          CUTENSORNET_WORKSIZE_PREF_MIN,
                                          CUTENSORNET_MEMSPACE_DEVICE,
-                                         &requiredWorkspaceSize) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);  
+                                         &requiredWorkspaceSize);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+      "Failed to get cuTENSOR workspace size");  
 
     MATX_ASSERT_STR(workSize_ > requiredWorkspaceSize, matxOutOfMemory, "Not enough workspace memory is available.");
 
     matxAlloc(&workspace_, workSize_, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-    MATX_ASSERT (cutensornetWorkspaceSet(handle_,
+    status = cutensornetWorkspaceSet(handle_,
                                           workDesc_,
                                           CUTENSORNET_MEMSPACE_DEVICE,
                                           workspace_,
-                                          workSize_) == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError);     
+                                          workSize_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
+      "Failed to set cuTENSOR workspace");     
 
     /*******************************
      * Initialize all pair-wise contraction plans (for cuTENSOR)
      *******************************/
-    MATX_ASSERT_STR(cutensornetCreateContractionPlan(handle_,
+    status = cutensornetCreateContractionPlan(handle_,
                                                 descNet_,
                                                 optimizerInfo,
                                                 workDesc_,
-                                                &plan_) == CUTENSORNET_STATUS_SUCCESS,
+                                                &plan_);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetCreateContractionPlan failed");
 
 
@@ -198,30 +216,34 @@ public:
     * Optional: Auto-tune cuTENSOR's cutensorContractionPlan to pick the fastest kernel
     *******************************/
     cutensornetContractionAutotunePreference_t autotunePref;
-    MATX_ASSERT_STR(cutensornetCreateContractionAutotunePreference(handle_,
-                            &autotunePref) == CUTENSORNET_STATUS_SUCCESS,
+    status = cutensornetCreateContractionAutotunePreference(handle_,
+                            &autotunePref);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetCreateContractionAutotunePreference failed");
 
     const int numAutotuningIterations = 5; // may be 0
-    MATX_ASSERT_STR(cutensornetContractionAutotunePreferenceSetAttribute(
+    status = cutensornetContractionAutotunePreferenceSetAttribute(
                             handle_,
                             autotunePref,
                             CUTENSORNET_CONTRACTION_AUTOTUNE_MAX_ITERATIONS,
                             &numAutotuningIterations,
-                            sizeof(numAutotuningIterations)) == CUTENSORNET_STATUS_SUCCESS,
+                            sizeof(numAutotuningIterations));
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetContractionAutotunePreferenceSetAttribute failed");
 
     // modify the plan again to find the best pair-wise contractions
-    MATX_ASSERT_STR(cutensornetContractionAutotune(handle_,
+    status = cutensornetContractionAutotune(handle_,
                             plan_,
                             data_in,
                             out.Data(),
                             workDesc_, 
                             autotunePref,
-                            stream) == CUTENSORNET_STATUS_SUCCESS,
+                            stream);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetContractionAutotune failed");
 
-    MATX_ASSERT_STR(cutensornetDestroyContractionAutotunePreference(autotunePref) == CUTENSORNET_STATUS_SUCCESS,
+    status = cutensornetDestroyContractionAutotunePreference(autotunePref);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetDestroyContractionAutotunePreference failed"); 
 
   }
@@ -350,15 +372,15 @@ public:
 
     for (int64_t slice = 0; slice < params_.num_slices_; slice++)
     {
-
-        MATX_ASSERT_STR(cutensornetContraction(handle_,
+      auto status = cutensornetContraction(handle_,
                                 plan_,
                                 data_in,
                                 out.Data(),
                                 workDesc_, 
                                 slice, 
-                                stream) == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetContraction failed");
+                                stream);
+      MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+        matxcuTensorError, "cutensornetContraction failed");
     }
   }    
 
