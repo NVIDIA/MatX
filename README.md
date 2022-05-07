@@ -156,9 +156,9 @@ MatX uses semantic versioning and reserve the right to introduce breaking API ch
 ### Supported Data Types
 MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
 
-* Integer: int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t
-* Floating Point: matxFp16 (fp16), matxBf16 (bfloat16), float, double
-* Complex: matxfp16Complex, matxBf16Complex, cuda::std::complex<float>, cuda::std::complex<double>
+* Integer: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`
+* Floating Point: `matxFp16` (fp16), `matxBf16` (bfloat16), `float`, `double`
+* Complex: `matxfp16Complex`, `matxBf16Complex`, `cuda::std::complex<float>`, `cuda::std::complex<double>`
 
 Since CUDA half precision types (``__half`` and ``__nv_bfloat16``) do not support all C++ operators on the host side, MatX provides the ``matxFp16`` and
 ``matxBf16`` types for scalars, and ``matxFp16Complex`` and ``matxBf16Complex`` for complex types. These wrappers are needed so that tensor
