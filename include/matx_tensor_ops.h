@@ -1742,6 +1742,8 @@ auto __MATX_INLINE__ as_uint8(T t)
  *   Type of View/Op
  * @param t
  *   View/Op to shift
+ * @param orig
+ *   Original size. Needed to disambiguate between integer division giving same output size
  *
  */
   template <typename T1>

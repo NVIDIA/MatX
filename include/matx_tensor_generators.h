@@ -1024,7 +1024,7 @@ public:
 
 namespace signal {
 /**
- * Creates a chirp signal (swept-frequency cosine)
+ * Creates a real chirp signal (swept-frequency cosine)
  * 
  * SpaceOp provides the time vector with custom spacing.
  *
@@ -1032,8 +1032,6 @@ namespace signal {
  *   Frequency data type
  * @tparam SpaceOp
  *   Operator type of spacer
- * @tparam Method
- *   Chirp method (CHIRP_METHOD_LINEAR)
  *
  * @param t
  *   Vector representing values in time
@@ -1043,6 +1041,8 @@ namespace signal {
  *   Time for f1
  * @param f1
  *   Frequency (Hz) at time t1
+ * @param method
+ *   Chirp method (CHIRP_METHOD_LINEAR)
  *
  * @returns The chirp operator
  */
@@ -1054,6 +1054,29 @@ inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, Freq
   return detail::Chirp<SpaceOp, FreqType>(t, f0, t1, f1, method);       
 }
 
+/**
+ * Creates a complex chirp signal (swept-frequency cosine)
+ * 
+ * SpaceOp provides the time vector with custom spacing.
+ *
+ * @tparam FreqType
+ *   Frequency data type
+ * @tparam SpaceOp
+ *   Operator type of spacer
+ *
+ * @param t
+ *   Vector representing values in time
+ * @param f0
+ *   Instantenous frequency at time 0
+ * @param t1
+ *   Time for f1
+ * @param f1
+ *   Frequency (Hz) at time t1
+ * @param method
+ *   Chirp method (CHIRP_METHOD_LINEAR)
+ *
+ * @returns The chirp operator
+ */
 template <typename SpaceOp, typename FreqType>
 inline auto cchirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
 {
