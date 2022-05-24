@@ -3,6 +3,8 @@
 einsum
 ######
 
+.. versionadded:: 0.2.3
+
 MatX provides an ``einsum`` function similar to the one found in NumPy. ``einsum`` allows
 a brief syntax to express many different operations in an optimized manner. A non-exhaustive list
 of ``einsum`` operations are:
@@ -31,7 +33,7 @@ is an opt-in feature when configuring MatX. To add support, add the following CM
 
 .. code-block:: shell
 
-    -DEN_CUTENSOR=ON
+    -DMATX_EN_CUTENSOR=ON
 
 Both cuTENSOR and cuTensorNet can have their location specified using ``cutensor_DIR`` and ``cutensornet_DIR``, 
 respectively. If these are not specified, CMake will attempt to download both libraries from the internet. ``einsum`` 
