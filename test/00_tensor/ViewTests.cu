@@ -85,6 +85,13 @@ class ViewTestsAll : public ::testing::Test,
                             public ViewTestsData<TensorType> {
 };
 
+template <typename TensorType>
+class ViewTestsFloatNonComplexNonHalf : public ::testing::Test,
+                            public ViewTestsData<TensorType> {
+};
+
+
+
 TYPED_TEST_SUITE(ViewTestsAll, MatXAllTypes);
 TYPED_TEST_SUITE(ViewTestsComplex, MatXComplexTypes);
 TYPED_TEST_SUITE(ViewTestsFloat, MatXFloatTypes);
@@ -93,6 +100,7 @@ TYPED_TEST_SUITE(ViewTestsNumeric, MatXNumericTypes);
 TYPED_TEST_SUITE(ViewTestsIntegral, MatXAllIntegralTypes);
 TYPED_TEST_SUITE(ViewTestsNumericNonComplex, MatXNumericNonComplexTypes);
 TYPED_TEST_SUITE(ViewTestsBoolean, MatXBoolTypes);
+TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypes);
 
 
 TYPED_TEST(ViewTestsNumericNonComplex, OverlapView)
@@ -525,5 +533,30 @@ TYPED_TEST(ViewTestsComplex, RealComplexView)
     ASSERT_EQ((float)tc(i).real(), (float)tr(i));
     ASSERT_EQ((float)tc(i).imag(), (float)ti(i));
   }
+  MATX_EXIT_HANDLER();
+}
+
+
+TYPED_TEST(ViewTestsNumericNonComplex, Permute)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t3n = make_tensor<TypeParam>({1, 20, 10});
+  auto t3t = make_tensor<TypeParam>({1, 10, 20});
+
+  for (index_t i = 0; i < t3n.TotalSize(); i++) {
+    t3n(0, i / t3n.Size(2), i % t3n.Size(2)) = (TypeParam)i;
+  }
+
+  transpose(t3t, t3n, 0);
+  cudaStreamSynchronize(0);
+
+  for (int i = 0; i < t3n.Size(1); i++) {
+    for (int j = 0; j < t3n.Size(2); j++) {
+      ASSERT_EQ(t3n(0,i,j), t3t(0,j,i));
+    }
+  }
+
+
   MATX_EXIT_HANDLER();
 }
