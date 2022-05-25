@@ -53,10 +53,9 @@ MatX is using features in C++17 and the latest CUDA compilers and libraries. For
 
 MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
-**Note for CUDA 11.4**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5.
+**Note for CUDA 11.4**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5+. When building tests/examples directly the CMake file will grab the right version, but this can be overriden.
 
-**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator
-on CPU, please report it in the issues above. 
+**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator on CPU, please report it in the issues above. 
 
 
 ## Installation
