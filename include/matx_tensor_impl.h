@@ -737,6 +737,7 @@ class tensor_impl_t {
     template <int M = RANK, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(Is... indices) const noexcept
     {
+      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
       return *(ldata_ + GetValC<0, Is...>(std::make_tuple(indices...)));
     }
 
@@ -753,6 +754,7 @@ class tensor_impl_t {
       std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(Is... indices) noexcept
     {
+      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
       return *(ldata_ + GetVal<0, Is...>(std::make_tuple(indices...)));
     }    
 
