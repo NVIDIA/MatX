@@ -306,8 +306,9 @@ inline
           static_cast<int>(in.TotalSize() / (in.Size(RANK - 1) * in.Size(RANK - 2)));
 
       dim3 block(TILE_DIM, TILE_DIM);
-      dim3 grid(batch_dims, static_cast<int>((in.Size(RANK - 1) + TILE_DIM - 1) / TILE_DIM),
-                            static_cast<int>((in.Size(RANK - 2) + TILE_DIM - 1) / TILE_DIM));
+      dim3 grid(static_cast<int>((in.Size(RANK - 1) + TILE_DIM - 1) / TILE_DIM),
+                static_cast<int>((in.Size(RANK - 2) + TILE_DIM - 1) / TILE_DIM),
+                batch_dims);
       transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
     }
 #endif    

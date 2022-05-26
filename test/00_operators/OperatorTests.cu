@@ -826,6 +826,35 @@ TYPED_TEST(OperatorTestsNumeric, NonSquareTranspose)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumeric, Transpose3D)
+{
+  MATX_ENTER_HANDLER();
+
+  index_t num_rows = 5998;
+  index_t num_cols = 64;
+
+  tensor_t<TypeParam, 3> t3 ({1, num_rows, num_cols});
+  tensor_t<TypeParam, 3> t3t({1, num_cols, num_rows});
+
+  for (index_t i = 0; i < num_rows; i++) {
+    for (index_t j = 0; j < num_cols; j++) {
+       t3(0, i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * num_cols + j);
+    }
+  }
+
+  transpose(t3t, t3, 0);
+  cudaError_t error = cudaStreamSynchronize(0);
+  ASSERT_EQ(error, cudaSuccess);
+
+  for (index_t i = 0; i < num_rows; i++) {
+    for (index_t j = 0; j < num_cols; j++) {
+        EXPECT_EQ(t3(0, i, j), t3t(0, j, i));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
 {
   MATX_ENTER_HANDLER();
@@ -854,8 +883,8 @@ TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
     }
   }
 
-  auto smx =
-      steeredMx.Clone<4>({matxKeepDim, numPulses, numPairs, matxKeepDim});
+  auto smx = 
+     steeredMx.Clone<4>({matxKeepDim, numPulses, numPairs, matxKeepDim});
   auto vah = velAccelHypoth.Clone<4>(
       {numBeams, matxKeepDim, matxKeepDim, matxKeepDim});
 
