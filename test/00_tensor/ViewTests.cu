@@ -30,6 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
+#include <cuda.h>
+#include <vector>
+#include <numeric>
+
 #include "assert.h"
 #include "matx.h"
 #include "test_types.h"
@@ -194,6 +199,85 @@ TYPED_TEST(ViewTestsIntegral, SliceStride)
   for (index_t i = 0; i < t1t2.Size(0); i++) {
     ASSERT_EQ(30 + 20 * i, t1t2(i));
   }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ViewTestsFloatNonComplex, ViewTestMean)
+{
+  MATX_ENTER_HANDLER();
+
+  const cudaStream_t stream = 0;
+
+  constexpr int num_rows = 5998;
+  constexpr int num_cols = 64;
+  constexpr int num_elements = num_rows * num_cols;
+  constexpr int num_bytes = num_elements * sizeof(float);
+  const tensorShape_t<2> mat_shape({num_rows, num_cols});
+  const tensorShape_t<2> mat_shape_trans({num_cols, num_rows});
+
+  auto first_method_results = matx::make_tensor<float, 2>(mat_shape);
+  auto second_method_results = matx::make_tensor<float, 2>(mat_shape);
+
+  std::vector<float> external_mat(num_elements);
+  std::iota(external_mat.begin(), external_mat.end(), 1);
+
+  float* d_external_mat;
+  cudaMalloc(&d_external_mat, num_bytes);
+
+  for(int method = 0; method < 2; ++method){
+
+    cudaMemcpy(d_external_mat, external_mat.data(), num_bytes, cudaMemcpyHostToDevice);
+
+    auto non_owning = matx::make_tensor<float, 2, matx::non_owning>(
+      d_external_mat, mat_shape);
+
+    if(method == 0){
+      auto owning_transposed = matx::make_tensor<float, 2>(mat_shape_trans);
+      matx::copy(owning_transposed, non_owning.Permute({1, 0}), stream);
+
+      auto mean_over_rows = matx::make_tensor<float, 1>({num_cols});
+      matx::mean(mean_over_rows, owning_transposed, stream);
+
+      // identical snippet to below
+      for(int row_idx = 0; row_idx < num_rows; ++row_idx){
+        auto subtract_slice = non_owning.Slice<1>(
+          {row_idx, 0},
+          {matx::matxDropDim, matx::matxEnd});
+
+        (subtract_slice = subtract_slice - mean_over_rows).run(stream);
+      }
+
+    }
+    else {
+      auto mean_over_rows = matx::make_tensor<float, 1>({num_cols});
+      matx::mean(mean_over_rows, non_owning.Permute({1, 0}), stream);
+
+      // identical snippet to above
+      for(int row_idx = 0; row_idx < num_rows; ++row_idx){
+        auto subtract_slice = non_owning.Slice<1>(
+          {row_idx, 0},
+          {matx::matxDropDim, matx::matxEnd});
+
+        (subtract_slice = subtract_slice - mean_over_rows).run(stream);
+      }
+    }
+
+    auto& result_dst = method == 0 ? first_method_results : second_method_results;
+    matx::copy(result_dst, non_owning, stream);
+
+  }
+
+  auto results_eq = matx::make_tensor<bool, 2>(mat_shape);
+  (results_eq = first_method_results == second_method_results).run(stream);
+  cudaStreamSynchronize(stream);
+  ASSERT_TRUE(std::all_of(
+    results_eq.Data(),
+    results_eq.Data() + results_eq.Size(0) * results_eq.Size(1),
+    [](const auto& is_elem_eq){return is_elem_eq;}
+  ));
+
+  cudaFree(d_external_mat);
 
   MATX_EXIT_HANDLER();
 }
