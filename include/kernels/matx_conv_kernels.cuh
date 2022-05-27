@@ -3,6 +3,7 @@
 
 #include "cuComplex.h"
 #include "matx_type_utils.h"
+#include "matx_tensor_utils.h"
 #include <complex>
 #include <cuda.h>
 #include <iomanip>
