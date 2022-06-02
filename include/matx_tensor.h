@@ -115,7 +115,7 @@ struct RandomOperatorIterator {
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
   {
-    return *self_type{t_, offset};
+    return *self_type{t_, offset_ + offset};
   }  
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
