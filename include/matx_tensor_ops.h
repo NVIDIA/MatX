@@ -1275,6 +1275,124 @@ auto __MATX_INLINE__ as_uint8(T t)
   {
     return detail::RepMatOp<T1, T1::Rank()>(t, reps);
   };
+  
+ /**
+ * Diff operator
+ *
+ * Returns the derivative of the operator with respect to any
+ * wrt operators in the formula.
+ */
+  namespace detail {
+  template <typename T1, int DIM>
+  class DiffOp : public BaseOp<DiffOp<T1, DIM>>
+  {
+  private:
+    typedef typename base_type<T1>::type OpType;
+    OpType op_;
+
+  public:
+    using matxop = bool;
+    using scalar_type = typename T1::scalar_type;
+
+    __MATX_INLINE__ DiffOp(T1 op) : op_(op) {}
+
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+    {
+      return get_deriv_value(op_, indices...);
+    }
+   
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return detail::get_rank<T1>();
+    }
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      return op_.Size(dim);
+    }
+  };
+  }
+
+ /**
+ * Returns the the operator with respect to the input tensors.  
+ * Input tensors will return the value at their index.
+ *
+ * @tparam T1
+ *   Type of operator or view
+ * @param t
+ *   Operator or view to access
+ *
+ * @returns
+ *   Operator of input
+ */
+  template <typename T1>
+  auto deriv(T1 t) { return detail::DiffOp<T1, T1::Rank()>(t); };
+ 
+/**
+ * WRT operator
+ *
+ * Specifies which variable we are differentiating against.  Functionally this 
+ * is equivalanet to inserting the function f(x)=x at this point and then sampling at the values
+ * computed by the operator x.
+ *
+ * Input tensors will return the value at their index.
+ * For example:  diff(sin(wrt(x))) will return d/dx sin(x) sampled at the tensor values x.
+ */
+  namespace detail {
+  template <typename T1, int DIM>
+  class WrtOp : public BaseOp<DiffOp<T1, DIM>>
+  {
+  private:
+    typedef typename base_type<T1>::type OpType;
+    OpType op_;
+
+  public:
+    using matxop = bool;
+    using scalar_type = typename T1::scalar_type;
+
+    __MATX_INLINE__ WrtOp(T1 op) : op_(op) {}
+
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+    { 
+      // value is just passed through
+      return get_value(op_, indices...);
+    }
+    
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto deriv(Is... indices) const 
+    {
+      // d/dx (x) = 1
+      return scalar_type(1);
+    }
+   
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return detail::get_rank<T1>();
+    }
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      return op_.Size(dim);
+    }
+  };
+  }
+
+ /**
+ * Returns the the operator with respect to the input tensors.  
+ * Input tensors will return the value at their index.
+ *
+ * @tparam T1
+ *   Type of operator or view
+ * @param t
+ *   Operator or view to access
+ *
+ * @returns
+ *   Operator of input
+ */
+  template <typename T1>
+  auto wrt(T1 t) { return detail::WrtOp<T1, T1::Rank()>(t); };
 
   /**
  * Self operator
@@ -1924,7 +2042,23 @@ auto __MATX_INLINE__ as_uint8(T t)
       auto i1 = get_value(in1_, indices...);
       return op_(i1);        
     }
-
+   
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto deriv(Is... indices) const 
+    { 
+      // chain rule 
+      auto gx = get_value(in1_, indices...);         // g(x),  compute g(x) at indices
+      auto gpx = get_deriv_value(in1_, indices...);   // g'(x), compute g'(x) at indices
+      auto fpgx = Op::deriv(gx);                      // f'(g(x)),  compute derivative at g(x)
+      auto retval = fpgx * gpx;                      // f'(g(x)) * g'(x),  chain rule
+#if 0
+      if constexpr (std::is_same<float, scalar_type>::value) {
+        printf("unary diff: chain rule: g(x):%f, g'(x):%f, f'(g(x)):%f, retval: %f\n", gx, gpx, fpgx, retval);
+      }
+#endif
+      return retval;                    
+    }
+    
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
     {
       return detail::get_rank<I1>();
@@ -1937,10 +2071,12 @@ auto __MATX_INLINE__ as_uint8(T t)
   };
 
 
+  //TODO make a mulOp here...
   template <class I1, class I2, class Op>
   class matxBinaryOp
   {
   private:
+    using OP = Op;
     typename base_type<I1>::type in1_;
     typename base_type<I2>::type in2_;
     typename base_type<Op>::type op_;
@@ -1968,10 +2104,25 @@ auto __MATX_INLINE__ as_uint8(T t)
     template <typename... Is>
     __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
     {
-      // Rank 0
       auto i1 = get_value(in1_, indices...);
       auto i2 = get_value(in2_, indices...);
       return op_(i1, i2);
+    }
+    
+    template <typename... Is>
+    __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto deriv(Is... indices) const
+    {
+      //TODO is the compiler eliminating unecessary terms here?
+      auto v1 = get_value(in1_, indices...);         // value of left
+      auto v2 = get_value(in2_, indices...);         // value of right
+      auto d1 = get_deriv_value(in1_, indices...);    // diff of left
+      auto d2= get_deriv_value(in2_, indices...);     // diff or right
+#if 0
+      if constexpr (std::is_same<float, scalar_type>::value) {
+        printf("binary diff:  v1(x):%f, v2(x):%f, d1(x):%f, d2(x): %f\n", v1, v2, d1, d2);
+      }
+#endif
+      return OP::deriv(v1, v2, d1, d2);
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

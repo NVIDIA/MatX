@@ -99,51 +99,51 @@ TYPED_TEST(OperatorTestsFloat, TrigFuncs)
   (tov0 = sin(tiv0)).run();
   return;
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), sin(c)));
 
   (tov0 = cos(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), cos(c)));
 
   (tov0 = tan(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tan(c)));
 
   (tov0 = asin(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), asin(c)));
 
   (tov0 = acos(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), acos(c)));
 
   (tov0 = atan(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), atan(c)));
 
   (tov0 = sinh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), sinh(c)));
 
   (tov0 = cosh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), cosh(c)));
 
   (tov0 = tanh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tanh(c)));
 
   (tov0 = asinh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), asinh(c)));
 
   (tov0 = acosh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), acosh(c)));
 
   (tov0 = atanh(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), atanh(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -243,27 +243,27 @@ TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
 
   (tov0 = log10(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), log10(c)));
 
   (tov0 = log(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), log(c)));
 
   (tov0 = log2(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), log2(c)));
 
   (tov0 = floor(tiv0)).run();   
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), floor(c)));
 
   (tov0 = ceil(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), ceil(c)));
 
   (tov0 = round(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), round(c)));
 
   MATX_EXIT_HANDLER();
 }
@@ -438,21 +438,21 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
 
   (tov0 = exp(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), exp(c)));
 
   (tov0 = conj(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), conj(c)));
 
   // abs and norm take a complex and output a floating point value
   tensor_t<typename TypeParam::value_type, 0> tdd0;
   (tdd0 = norm(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), norm(c)));
 
   (tdd0 = abs(tiv0)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), abs(c)));
 
   MATX_EXIT_HANDLER();
 }

@@ -253,23 +253,8 @@ namespace detail {
         return i(args...);
       }, sliced_tup);
     }
-
-    if constexpr (!(T::Rank() == sizeof...(Is))) {
-      // Construct an integer sequence of the length of the tuple, but only using the last indices
-      using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
-      auto tup = cuda::std::make_tuple(indices...);
-      auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
-      return mapply([&](auto... args) {
-        return i(args...);
-      }, sliced_tup);
-    }
-    else
-    {
-      return i(indices...);
-    }    
   }
-
-
+  
   template <class T, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, Is... indices)
   {
@@ -281,18 +266,55 @@ namespace detail {
     {
       return i;
     }
-
-    if constexpr (!is_matx_op<T>())
-    {
-      return i;
+  }
+  
+  
+  /**
+   * @brief Get the matx deriviative value object using broadcasting
+   * 
+   * @tparam T type of operator
+   * @tparam Is type of indices
+   * @param i operator
+   * @param indices indices
+   * @return Value after broadcasting
+   */
+  template <class T, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_deriv_value(T &i, Is... indices)
+  {
+    if constexpr (T::Rank() == sizeof...(Is)) {
+      return i.deriv(indices...);
     }
     else
     {
-      return get_matx_value(i, indices...);
+      // Construct an integer sequence of the length of the tuple, but only using the last indices
+      using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
+      auto tup = cuda::std::make_tuple(indices...);
+      auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
+      return mapply([&](auto... args) {
+        return i.deriv(args...);
+      }, sliced_tup);
     }
   }
 
 
+  template <class T, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_deriv_value(T &i, Is... indices)
+  {
+    if constexpr (is_tensor_view_v<T>) {
+      // Tensor is considered a constant so d/dx = 0
+      return T::scalar_type(0);
+    } 
+    else if constexpr (is_matx_op<T>())
+    {
+      return get_matx_deriv_value(i, indices...);
+    }
+    else
+    {
+      // scalar d/dx = 0
+      return T(0);
+    }
+  }
+  
   // Returns an address of a pointer of type T aligned to new address
   template <typename T>
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
