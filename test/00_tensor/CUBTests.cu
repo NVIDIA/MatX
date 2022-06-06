@@ -196,7 +196,6 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   matx::sort(tmpv2, this->t2, SORT_DIR_ASC);
-
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
