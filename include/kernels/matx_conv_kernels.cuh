@@ -37,6 +37,11 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
+  int chunk_idx = blockIdx.y;
+  int batch_idx = blockIdx.x;
+
+  // All but the last dim will be populated
+  auto bdims = BlockToIdx(d_in, batch_idx, 1);
 
   // Adjustment to keep base shm size as float, but if the filter is complex we
   // need to adjust it
@@ -70,22 +75,16 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // memory. Some are only there to fetch data, while others both fetch and
   // compute output
   const index_t tid =
-      static_cast<index_t>(blockIdx.x) * (blockDim.x - filter_len + 1) +
+      static_cast<index_t>(chunk_idx) * (blockDim.x - filter_len + 1) +
       threadIdx.x;
   int offset = tid - filter_len + 1;
 
   outtype_strip val = 0;
-  [[maybe_unused]] index_t bdims[2];
 
   // Zero out shared memory since it's used later to index into where we want
   // 0-valued taps
   for (index_t i = threadIdx.x; i < filter_len + blockDim.x; i += blockDim.x) {
     s_data[i] = 0.0;
-  }
-
-  if constexpr (d_in.Rank() == 4) {
-    bdims[0] = blockIdx.z / d_in.Size(1);
-    bdims[1] = blockIdx.z - (bdims[0] * d_in.Size(1));
   }
 
   __syncthreads();
@@ -96,7 +95,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
   __syncthreads();
 
-  if (blockIdx.x == 0) {
+  if (chunk_idx == 0) {
     // We want all blocks to process uniformly, so the first block's last few
     // threads are idle to match what all other blocks do
     s_data[threadIdx.x] = 0;
@@ -106,38 +105,19 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     // The first block just grabs all the data from the start of the sequence
     if (threadIdx.x < signal_len &&
         (threadIdx.x < blockDim.x - filter_len + 1)) {
-      if constexpr (d_in.Rank() == 4) {
-        s_data[threadIdx.x + filter_len - 1] =
-            d_in(bdims[0], bdims[1], blockIdx.y, threadIdx.x);
-      }
-      else if constexpr (d_in.Rank() == 3) {
-        s_data[threadIdx.x + filter_len - 1] =
-            d_in(blockIdx.z, blockIdx.y, threadIdx.x);
-      }
-      else if constexpr (d_in.Rank() == 2) {
-        s_data[threadIdx.x + filter_len - 1] = d_in(blockIdx.y, threadIdx.x);
-      }
-      else if constexpr (d_in.Rank() == 1) {
-        s_data[threadIdx.x + filter_len - 1] = d_in(threadIdx.x);
-      }
+      bdims[InType::Rank() - 1] = threadIdx.x;          
+      detail::mapply([&](auto &&...args) {
+          s_data[threadIdx.x + filter_len - 1] = d_in.operator()(args...);
+        }, bdims);          
     }
   }
   else if (offset > 0 && offset < signal_len) {
     // Each block processes blockDim.x-filt_len+1 samples, but needs to fetch
     // all blockDim.x worth
-    if constexpr (d_in.Rank() == 4) {
-      s_data[threadIdx.x] = d_in(bdims[0], bdims[1], blockIdx.y, offset);
-    }
-    else if constexpr (d_in.Rank() == 3) {
-      s_data[threadIdx.x] = d_in(blockIdx.z, blockIdx.y, offset);
-    }
-    else if constexpr (d_in.Rank() == 2) {
-      s_data[threadIdx.x] = d_in(blockIdx.y, offset);
-    }
-    else if constexpr (d_in.Rank() == 1) {
-      // For all blocks > 0 we need to grab only as much as each block outputs
-      s_data[threadIdx.x] = d_in(offset);
-    }
+    bdims[InType::Rank() - 1] = offset;   
+    detail::mapply([&](auto &&...args) {
+        s_data[threadIdx.x] = d_in.operator()(args...);
+      }, bdims);      
   }
 
   __syncthreads();
@@ -152,18 +132,10 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     }
 
     if (mode == MATX_C_MODE_FULL) {
-      if constexpr (d_in.Rank() == 4) {
-        d_out(bdims[0], bdims[1], blockIdx.y, tid) = val;
-      }
-      else if constexpr (d_in.Rank() == 3) {
-        d_out(blockIdx.z, blockIdx.y, tid) = val;
-      }
-      else if constexpr (d_in.Rank() == 2) {
-        d_out(blockIdx.y, tid) = val;
-      }
-      else if constexpr (d_in.Rank() == 1) {
-        d_out(tid) = val;
-      }
+      bdims[InType::Rank() - 1] = tid;  
+      detail::mapply([&](auto &&...args) {
+          d_out.operator()(args...) = val;
+        }, bdims);        
     }
     else if (mode == MATX_C_MODE_SAME) {
       int start_tid, stop_tid;
@@ -177,18 +149,10 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       }
 
       if (tid >= start_tid && tid <= stop_tid) {
-        if constexpr (d_in.Rank() == 4) {
-          d_out(bdims[0], bdims[1], blockIdx.y, tid - start_tid) = val;
-        }
-        else if constexpr (d_in.Rank() == 3) {
-          d_out(blockIdx.z, blockIdx.y, tid - start_tid) = val;
-        }
-        else if constexpr (d_in.Rank() == 2) {
-          d_out(blockIdx.y, tid - start_tid) = val;
-        }
-        else if constexpr (d_in.Rank() == 1) {
-          d_out(tid - start_tid) = val;
-        }
+        bdims[InType::Rank() - 1] = tid - start_tid; 
+        detail::mapply([&](auto &&...args) {
+            d_out.operator()(args...) = val;
+          }, bdims);
       }
     }
     else {

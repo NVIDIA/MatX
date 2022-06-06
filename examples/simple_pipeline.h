@@ -290,7 +290,6 @@ public:
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
     auto xo = tpcView->Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-
     conv1d(xo, x, *cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
   }
 

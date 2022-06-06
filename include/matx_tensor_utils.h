@@ -57,6 +57,7 @@ namespace detail {
   /**
    * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
    * 
+   * @param op Operator
    * @param abs Absolute index
    * @return std::array of indices 
    */
@@ -86,6 +87,41 @@ namespace detail {
 
     return indices;
   }  
+
+  /**
+   * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs mapping
+   * to a block index. Non-batched dims are removed from the computation
+   * 
+   * @param op Operator
+   * @param abs Absolute index
+   * @param nb_dims Non-batched dims
+   * @return std::array of indices 
+   */
+  template <typename Op>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
+    using l_stride_type = index_t;
+    using l_shape_type = index_t;
+    constexpr int RANK = op.Rank();
+    std::array<l_shape_type, RANK> indices{0};
+    
+    for (int idx = 0; idx < RANK - nb_dims; idx++) {
+      if (idx == RANK-nb_dims-1) {
+        indices[RANK - nb_dims - 1] = abs;
+      }
+      else {
+        // no std::accumulate on the device
+        l_stride_type prod = 1;
+        for (int i = idx + 1; i < RANK - nb_dims; i++) {
+          prod *= op.Size(i);
+        }
+ 
+        indices[idx] = abs / prod;
+        abs -= prod * indices[idx];
+      }
+    }
+
+    return indices;
+  }   
 
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
