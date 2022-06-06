@@ -424,25 +424,25 @@ public:
         if (dir == SORT_DIR_ASC) {
           cub::DeviceRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Lsize()), 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
         }
         else {
           cub::DeviceRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Lsize()), 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
         }
       }        
       else if (RANK == 2 || d_temp == nullptr) {              
         if (dir == SORT_DIR_ASC) {
           cub::DeviceSegmentedRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
         }
         else {
           cub::DeviceSegmentedRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
         }
       }
@@ -459,7 +459,7 @@ public:
         if (dir == SORT_DIR_ASC) {
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
 
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               d_offsets, d_offsets + 1, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
@@ -474,7 +474,7 @@ public:
         }
         else {
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Lsize()), static_cast<int>(a.Size(RANK - 2)),
+          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               d_offsets, d_offsets + 1, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
