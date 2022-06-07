@@ -1123,7 +1123,6 @@ public:
   template <int N>
   __MATX_INLINE__ auto Clone(const typename Desc::shape_type (&clones)[N]) const
   {
-    static_assert(N <= 4 && N > RANK, "Clone() must increase tensor to a higher rank <= 4.");
     std::array<typename Desc::shape_type, N> n;
     std::array<typename Desc::stride_type, N> s;    
 
