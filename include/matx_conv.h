@@ -72,37 +72,15 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   shape_type sig_len = i.Size(OutputType::Rank() - 1);
   float work_per_block =
       static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(0) + 1);
-  uint32_t num_blocks = static_cast<uint32_t>(std::ceil(
+  int num_blocks = static_cast<int>(std::ceil(
       static_cast<float>(sig_len + filter.Size(0) - 1) / work_per_block));
 
-  if constexpr (OutputType::Rank() == 1) {
-    dim3 gsize(num_blocks, 1);
-    Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-          o, i, filter, sig_len, filter.Size(0), mode);
-  }
-  else if constexpr (OutputType::Rank() == 2) {
-    dim3 gsize(num_blocks, static_cast<int>(i.Size(0)));
-    Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-            o, 
-            i, 
-            filter, 
-            sig_len, 
-            filter.Size(0), 
-            mode);
-  }
-  else if constexpr (OutputType::Rank() == 3) {
-    dim3 gsize(num_blocks, static_cast<int>(i.Size(1)),
-               static_cast<int>(i.Size(0)));
-    Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-            o, i, filter, sig_len, filter.Size(0), mode);
-  }
-  else {
-    static_assert(OutputType::Rank() == 4);
-    dim3 gsize(num_blocks, static_cast<int>(i.Size(2)),
-               static_cast<int>(i.Size(0) * i.Size(1)));
-    Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-            o, i, filter, sig_len, filter.Size(0), mode);
-  }
+  int grid_size = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
+
+  dim3 gsize(grid_size, num_blocks);
+  Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
+        o, i, filter, sig_len, filter.Size(0), mode);
+
 #endif  
 }
 
