@@ -34,9 +34,11 @@ endif()
 # In an upcoming CMake it will have the capability to auto-detect GPU architectures. For now, rapids-cmake has a utility
 # function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
 # their own
-file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-21.12/RAPIDS.cmake
-     ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-21.12/RAPIDS.cmake
+         ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+    include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+endif()
 
 include(rapids-cmake)
 include(rapids-cpm)
