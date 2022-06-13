@@ -50,6 +50,8 @@ namespace matx
 
       return total;
     }
+
+    return 0;
   }
 
 namespace detail {
@@ -202,6 +204,8 @@ namespace detail {
       else {
           return matx_max(matx_max(t0, t1), tn...);
       }
+
+      return t0; // 11.4 compiler has a bug. This is dead code
   }
 
   template <class T, class M = T>

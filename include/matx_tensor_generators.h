@@ -973,6 +973,8 @@ public:
     if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
       return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
     }
+
+    return 0.0; 
   }
 
   constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
@@ -1012,6 +1014,8 @@ public:
       FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i) + 90.0/360.0));
       return cuda::std::complex<FreqType>{real, imag};
     }
+    
+    return cuda::std::complex<FreqType>{0, 0};
   }
 
   constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
