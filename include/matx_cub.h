@@ -419,8 +419,7 @@ public:
     MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
 
     if constexpr (is_tensor_view_v<InputOperator>) {
-      if (RANK == 1) {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;     
+      if (RANK == 1) { 
         if (dir == SORT_DIR_ASC) {
           cub::DeviceRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),

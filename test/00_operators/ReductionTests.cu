@@ -612,7 +612,6 @@ TYPED_TEST(ReductionTestsNumericNonComplex, Unique)
     tensor_t<int, 0> num_found{};
     tensor_t<TypeParam, 1> t1{{100}};
     tensor_t<TypeParam, 1> t1o{{100}};
-    TypeParam thresh = (TypeParam)0.5;
 
     for (int i = 0; i < t1.Size(0); i++) {
       t1(i) = (TypeParam)(i % 10);
