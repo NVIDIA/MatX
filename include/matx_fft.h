@@ -56,6 +56,7 @@ struct FftParams_t {
   long long irank, orank;
   long long n[MAX_FFT_RANK] = {0};
   long long batch;
+  int       batch_dims;
   long long inembed[MAX_FFT_RANK] = {0};
   long long onembed[MAX_FFT_RANK] = {0};
   long long istride, ostride;
@@ -144,12 +145,27 @@ public:
     params.fft_rank =  fft_rank;
 
     if (fft_rank == 1) {
+      params.batch_dims = 0;
       params.n[0] = (params.transform_type == CUFFT_C2R ||
                       params.transform_type == CUFFT_Z2D)
                         ? o.Size(RANK - 1)
                         : i.Size(RANK - 1);
+
+      size_t freeMem, totalMem;
+      auto err = cudaMemGetInfo(&freeMem, &totalMem);
+      // Use up to 30% of free memory to batch, assuming memory use matches batch size
+      double max_for_fft_workspace = static_cast<double>(freeMem) * 0.3;
+
+      params.batch = 1;
+      for (int dim = i.Rank() - 2; dim >= 0; dim--) {
+        if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::scalar_type)) > max_for_fft_workspace) {
+          break;
+        }
+
+        params.batch_dims++;
+        params.batch *= i.Size(dim);
+      }
       
-      params.batch = (RANK == 1) ? 1 : i.Size(RANK-2);
       params.inembed[0] = i.Size(RANK - 1); // Unused
       params.onembed[0] = o.Size(RANK - 1); // Unused
       params.istride = i.Stride(RANK - 1);
@@ -418,24 +434,23 @@ private:
 virtual void inline Exec(OutTensorType &o, const InTensorType &i,
                          int dir) override
 {
-  if constexpr (OutTensorType::Rank() <= 2) {
+  if (OutTensorType::Rank() == this->params_.batch_dims + 1) {
     this->InternalExec(static_cast<const void *>(i.Data()),
                       static_cast<void *>(o.Data()), dir);
   }
   else {
     using shape_type = typename InTensorType::desc_type::shape_type;
-    int batch_offset = 2;
     std::array<shape_type, InTensorType::Rank()> idx{0};
     auto i_shape = i.Shape();
     // Get total number of batches
-    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 2), 1, std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
       auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
       this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 
       // Update all but the last 2 indices
-      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, batch_offset);
+      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, this->params_.batch_dims + 2);
     }
   }
    
