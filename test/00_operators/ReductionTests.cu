@@ -326,6 +326,24 @@ TEST(ReductionTests, Median)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, MinMaxNegative)
+{
+  MATX_ENTER_HANDLER();
+  {
+    auto t = matx::make_tensor<TypeParam, 1>({3});
+    t.SetVals({-3, -1, -7});
+
+    matx::tensor_t<float, 0> max_val{};
+    matx::tensor_t<matx::index_t, 0> max_idx{};
+    matx::argmax(max_val, max_idx, t);
+    cudaStreamSynchronize(0);
+    ASSERT_EQ(max_val(), -1);
+    ASSERT_EQ(max_idx(), 1);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsNumericNonComplex, MinMax)
 {
   MATX_ENTER_HANDLER();

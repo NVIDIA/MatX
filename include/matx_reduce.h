@@ -516,7 +516,7 @@ namespace detail {
 
 #ifdef __CUDACC__  
 template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal() { return std::numeric_limits<T>::max(); }
-template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::min(); }
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::lowest(); }
 
 
 /**
