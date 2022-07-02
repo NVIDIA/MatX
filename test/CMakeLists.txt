@@ -23,6 +23,7 @@ set (test_sources
     00_solver/Det.cu
     00_operators/PythonEmbed.cu
     00_io/FileIOTests.cu
+    00_diff/BasicDiffTests.cu
     01_radar/MultiChannelRadarPipeline.cu
     01_radar/MVDRBeamformer.cu
     01_radar/ambgfun.cu

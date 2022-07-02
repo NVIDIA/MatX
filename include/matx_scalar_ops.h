@@ -32,8 +32,7 @@
 
 #pragma once
 
-#include <type_traits>
-
+#include "matx_scalar_diffs.h"
 namespace matx {
 namespace detail {
 
@@ -42,60 +41,23 @@ namespace detail {
 // Utility macro for generating functions that have half precision intrinsics as
 // an option. Lots of verbose code in here because of compiler bugs with
 // constexpr if
-#define MATX_UNARY_OP_GEN(FUNC, OPNAME)                                        \
-  template <typename T>                                                        \
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T v1)                \
-  {                                                                            \
-    if constexpr (is_matx_type_v<T>) {                                         \
-      return FUNC(v1);                                                         \
-    }                                                                          \
-    else {                                                                     \
-      return cuda::std::FUNC(v1);                                              \
-    }                                                                          \
-    if constexpr (!is_matx_type_v<T>) {                                        \
-      return cuda::std::FUNC(v1);                                              \
-    }                                                                          \
-    else {                                                                     \
-      return FUNC(v1);                                                         \
-    }                                                                          \
-  }                                                                            \
+#define MATX_UNARY_OP_GEN(FUNC, OPNAME, DFUNC)                                 \
   template <typename T> struct OPNAME##F {                                     \
-    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)                            \
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)         \
     {                                                                          \
-      return _internal_##FUNC(v1);                                             \
+      return FUNC(v1);                                                         \
+    }                                                                          \
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T v1)      \
+    {                                                                          \
+      return DFUNC(v1);                                                        \
     }                                                                          \
   };                                                                           \
   template <typename T> using OPNAME##Op = UnOp<T, OPNAME##F<T>>;
 
-#define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
-  template <typename T1, typename T2>                                          \
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T1 v1, T2 v2)        \
-  {                                                                            \
-    if constexpr (is_matx_type_v<T1> || is_matx_type_v<T2>) {                  \
-      return FUNC(v1, v2);                                                     \
-    }                                                                          \
-    else {                                                                     \
-      return cuda::std::FUNC(v1, v2);                                          \
-    }                                                                          \
-    if constexpr (!(is_matx_type_v<T1> || is_matx_type_v<T2>)) {               \
-      return cuda::std::FUNC(v1, v2);                                          \
-    }                                                                          \
-    else {                                                                     \
-      return FUNC(v1, v2);                                                     \
-    }                                                                          \
-  }                                                                            \
-  template <typename T> struct OPNAME##F {                                     \
-    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)                    \
-    {                                                                          \
-      return _internal_##FUNC(v1, v2);                                         \
-    }                                                                          \
-  };                                                                           \
-  template <typename T1, typename T2>                                          \
-  using OPNAME##Op = BinOp<T1, T2, OPNAME##F<T1, T2>>;
-
 template <typename T1, typename F> class UnOp {
 public:
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1) { return F::op(v1); }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(const T1 &v1) { return F::deriv(v1); }
 
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) const { return op(v1); }
 
@@ -108,10 +70,16 @@ public:
   {
     return F::op(v1, v2);
   }
-
+  
+  
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2) const
   {
     return op(v1, v2);
+  }
+  
+  static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto deriv(const T1 &v1, const T2 &v2, const T1 &d1, const T2 &d2) 
+  {
+    return F::deriv(v1, v2, d1, d2);
   }
 
   using scalar_type = std::invoke_result_t<decltype(op), T1, T2>;
@@ -133,11 +101,32 @@ public:
   using scalar_type = std::invoke_result_t<decltype(op), T1, T2, T3>;
 };
 
-MATX_UNARY_OP_GEN(ceil, Ceil);
-MATX_UNARY_OP_GEN(floor, Floor);
-MATX_UNARY_OP_GEN(round, Round);
-MATX_UNARY_OP_GEN(sqrt, Sqrt);
-MATX_UNARY_OP_GEN(exp, Exp);
+
+MATX_UNARY_OP_GEN(ceil, Ceil, zero);
+MATX_UNARY_OP_GEN(floor, Floor, zero);
+MATX_UNARY_OP_GEN(round, Round, zero);
+MATX_UNARY_OP_GEN(sqrt, Sqrt, dsqrt);
+MATX_UNARY_OP_GEN(exp, Exp, exp);
+
+MATX_UNARY_OP_GEN(log10, Log10, dlog10);
+MATX_UNARY_OP_GEN(log2, Log2, dlog2);
+MATX_UNARY_OP_GEN(log, Log, dlog);
+MATX_UNARY_OP_GEN(abs, Abs, dabs);
+MATX_UNARY_OP_GEN(norm, Norm, none);
+
+// Trigonometric functions
+MATX_UNARY_OP_GEN(sin, Sin, dsin);
+MATX_UNARY_OP_GEN(cos, Cos, dcos);
+MATX_UNARY_OP_GEN(tan, Tan, dtan);
+MATX_UNARY_OP_GEN(asin, Asin, dasin);
+MATX_UNARY_OP_GEN(acos, Acos, dacos);
+MATX_UNARY_OP_GEN(atan, Atan, datan);
+MATX_UNARY_OP_GEN(sinh, Sinh, dacosh);
+MATX_UNARY_OP_GEN(cosh, Cosh, dasinh);
+MATX_UNARY_OP_GEN(tanh, Tanh, dtanh);
+MATX_UNARY_OP_GEN(asinh, Asinh, dasinh);
+MATX_UNARY_OP_GEN(acosh, Acosh, dacosh);
+MATX_UNARY_OP_GEN(atanh, Atanh, datanh);
 
 template <typename T> struct ExpjF {
   template <typename T2 = T,
@@ -181,46 +170,6 @@ template <typename T> struct ConjF {
 };
 
 template <typename T> using ConjOp = UnOp<T, ConjF<T>>;
-
-MATX_UNARY_OP_GEN(log10, Log10);
-MATX_UNARY_OP_GEN(log2, Log2);
-MATX_UNARY_OP_GEN(log, Log);
-MATX_UNARY_OP_GEN(abs, Abs);
-MATX_UNARY_OP_GEN(norm, Norm);
-
-// Trigonometric functions
-// MATX_UNARY_OP_GEN(sin, Sin);
-template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)
-{
-  if constexpr (is_matx_type_v<T>) {
-    return sin(v1);
-  }
-  else {
-    return cuda::std::sin(v1);
-  }
-  if constexpr (!is_matx_type_v<T>) {
-    return cuda::std::sin(v1);
-  }
-  else {
-    return sin(v1);
-  }
-}
-template <typename T> struct SinF {
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_sin(v1); }
-};
-template <typename T> using SinOp = UnOp<T, SinF<T>>;
-
-MATX_UNARY_OP_GEN(cos, Cos);
-MATX_UNARY_OP_GEN(tan, Tan);
-MATX_UNARY_OP_GEN(asin, Asin);
-MATX_UNARY_OP_GEN(acos, Acos);
-MATX_UNARY_OP_GEN(atan, Atan);
-MATX_UNARY_OP_GEN(sinh, Sinh);
-MATX_UNARY_OP_GEN(cosh, Cosh);
-MATX_UNARY_OP_GEN(tanh, Tanh);
-MATX_UNARY_OP_GEN(asinh, Asinh);
-MATX_UNARY_OP_GEN(acosh, Acosh);
-MATX_UNARY_OP_GEN(atanh, Atanh);
 
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
@@ -316,6 +265,10 @@ template <typename T1, typename T2> struct AddF {
     // Unreachable, but required by the compiler
     return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
+  
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T1 v1, T2 v2, T1 d1, T2 d2) {
+    return dadd(v1, v2, d1, d2); 
+  }
 };
 template <typename T1, typename T2> using AddOp = BinOp<T1, T2, AddF<T1, T2>>;
 
@@ -354,6 +307,10 @@ template <typename T1, typename T2> struct SubF {
     // Unreachable, but required by the compiler
     return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
+  
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T1 v1, T2 v2, T1 d1, T2 d2) {
+    return dsub(v1, v2, d1, d2);
+  }
 };
 template <typename T1, typename T2> using SubOp = BinOp<T1, T2, SubF<T1, T2>>;
 
@@ -390,6 +347,9 @@ template <typename T1, typename T2> struct MulF {
 
     // Unreachable, but required by the compiler
     return typename std::invoke_result_t<decltype(op), T1, T2>{0};
+  }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T1 v1, T2 v2, T1 d1, T2 d2) {
+    return dproduct(v1, v2, d1, d2);
   }
 };
 template <typename T1, typename T2> using MulOp = BinOp<T1, T2, MulF<T1, T2>>;
@@ -428,6 +388,9 @@ template <typename T1, typename T2> struct DivF {
     // Unreachable, but required by the compiler
     return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T1 v1, T2 v2, T1 d1, T2 d2) {
+      return dquotient(v1,v2,d1,d2);
+  }
 };
 template <typename T1, typename T2> using DivOp = BinOp<T1, T2, DivF<T1, T2>>;
 
@@ -435,8 +398,6 @@ template <typename T1, typename T2> struct ModF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 % v2; }
 };
 template <typename T1, typename T2> using ModOp = BinOp<T1, T2, ModF<T1, T2>>;
-
-// MATX_BINARY_OP_GEN(pow, Pow);
 
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_pow(T1 v1, T2 v2)
@@ -459,6 +420,11 @@ template <typename T1, typename T2> struct PowF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return _internal_pow(v1, v2);
+  }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto deriv(T1 v1, T2 v2, T1 d1, T2 d2)
+  {
+
+    return dpow(v1, v2, d1, d2);
   }
 };
 template <typename T1, typename T2> using PowOp = BinOp<T1, T2, PowF<T1, T2>>;
