@@ -172,7 +172,7 @@ the need to store large test vector files in git, and instead can be generated a
 
 To run the unit tests, from the cmake build directory run:
 ```sh
-make test
+test/matx_test
 ```
 
 This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
