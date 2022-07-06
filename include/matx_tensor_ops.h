@@ -100,7 +100,7 @@ inline
 
   public:
     // Scalar type of operation
-    using scalar_type = first_type;
+    using scalar_type = first_value_type;
 
     inline Concatenate(Ts... ts) : ops_(ts...)
     {
