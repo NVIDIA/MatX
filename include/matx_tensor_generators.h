@@ -693,7 +693,7 @@ public:
 
   Range(T first, T step) : first_(first), step_(step) {}
 
-  __MATX_DEVICE__ inline T operator()(index_t idx) const
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
   {
     if constexpr (is_matx_half_v<T>) {
       return first_ + T(static_cast<T>((float)idx) * step_);
@@ -782,7 +782,7 @@ public:
 #endif
   }
 
-  __MATX_DEVICE__ inline T operator()(index_t idx) const { return range_(idx); }
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const { return range_(idx); }
 };
 }
 
@@ -864,7 +864,7 @@ public:
 #endif
   }
 
-  __MATX_DEVICE__ inline T operator()(index_t idx) const
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
   {
     if constexpr (is_matx_half_v<T>) {
       return static_cast<T>(
