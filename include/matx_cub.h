@@ -213,7 +213,7 @@ public:
       params.batches = (RANK == 1) ? 1 : a.Size(RANK - 2);
     }
     else if constexpr (op == CUB_OP_INC_SUM || op == CUB_OP_HIST_EVEN) {
-      params.batches = a.TotalSize() / a.Size(a.Rank() - 1);
+      params.batches = TotalSize(a) / a.Size(a.Rank() - 1);
     }
     params.a_out = a_out.Data();
     params.dtype = TypeToInt<T1>();
@@ -795,7 +795,7 @@ public:
                                     temp_storage_bytes, 
                                     a.Data(), 
                                     a_out.Data(), 
-                                    static_cast<int>(a.TotalSize()),
+                                    static_cast<int>(TotalSize(a)), 
                                     stream); 
         }
         else {
@@ -803,7 +803,7 @@ public:
                                     temp_storage_bytes, 
                                     RandomOperatorIterator{base}, 
                                     a_out.Data(), 
-                                    static_cast<int>(a.TotalSize()),
+                                    static_cast<int>(TotalSize(a)), 
                                     stream);           
         }
       }
@@ -812,7 +812,7 @@ public:
                                   temp_storage_bytes, 
                                   RandomOperatorIterator{a}, 
                                   a_out.Data(), 
-                                  static_cast<int>(a.TotalSize()),
+                                  static_cast<int>(TotalSize(a)), 
                                   stream);              
       }                                     
     }
@@ -885,7 +885,7 @@ public:
                               a.Data(), 
                               a_out.Data(), 
                               cparams_.num_found.Data(),
-                              static_cast<int>(a.TotalSize()),
+                              static_cast<int>(TotalSize(a)), 
                               cparams_.op,
                               stream); 
       }
@@ -895,7 +895,7 @@ public:
                               RandomOperatorIterator{base},
                               a_out.Data(), 
                               cparams_.num_found.Data(),
-                              static_cast<int>(a.TotalSize()),
+                              static_cast<int>(TotalSize(a)), 
                               cparams_.op,
                               stream);            
       }
@@ -906,7 +906,7 @@ public:
                             RandomOperatorIterator{a},
                             a_out.Data(), 
                             cparams_.num_found.Data(),
-                            static_cast<int>(a.TotalSize()),
+                            static_cast<int>(TotalSize(a)), 
                             cparams_.op,
                             stream);            
     }                                  
@@ -960,7 +960,7 @@ public:
                               cub::CountingInputIterator<index_t>{0}, 
                               a_out.Data(), 
                               cparams_.num_found.Data(),
-                              static_cast<int>(a.TotalSize()),
+                              static_cast<int>(TotalSize(a)), 
                               IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
                               stream); 
       }
@@ -971,7 +971,7 @@ public:
                               cub::CountingInputIterator<index_t>{0}, 
                               a_out.Data(), 
                               cparams_.num_found.Data(),
-                              static_cast<int>(a.TotalSize()),
+                              static_cast<int>(TotalSize(a)), 
                               IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
                                 {RandomOperatorIterator{base}, cparams_.op},
                               stream);            
@@ -983,7 +983,7 @@ public:
                             cub::CountingInputIterator<index_t>{0}, 
                             a_out.Data(), 
                             cparams_.num_found.Data(),
-                            static_cast<int>(a.TotalSize()),
+                            static_cast<int>(TotalSize(a)), 
                             IndexToSelectOp<decltype(RandomOperatorIterator{a}), decltype(cparams_.op)>
                               {RandomOperatorIterator{a}, cparams_.op},
                             stream);         
@@ -1020,7 +1020,7 @@ public:
                                 a.Data(), 
                                 a_out.Data(), 
                                 cparams_.num_found.Data(),
-                                static_cast<int>(a.TotalSize()),
+                                static_cast<int>(TotalSize(a)), 
                                 stream); 
         }
         else {
@@ -1029,7 +1029,7 @@ public:
                                 RandomOperatorIterator{base},
                                 a_out.Data(), 
                                 cparams_.num_found.Data(),
-                                static_cast<int>(a.TotalSize()),
+                                static_cast<int>(TotalSize(a)), 
                                 stream);              
         }
     }
@@ -1039,7 +1039,7 @@ public:
                             RandomOperatorIterator{a},
                             a_out.Data(), 
                             cparams_.num_found.Data(),
-                            static_cast<int>(a.TotalSize()),
+                            static_cast<int>(TotalSize(a)), 
                             stream);            
     }                                     
 #endif    
