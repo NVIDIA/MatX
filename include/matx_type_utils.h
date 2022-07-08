@@ -91,6 +91,26 @@ template <typename T> constexpr bool is_matx_op()
 }
 
 namespace detail {
+template <typename T, typename = void>
+struct is_matx_op_lvalue_impl : std::false_type {
+};
+
+template <typename T>
+struct is_matx_op_lvalue_impl<T, std::void_t<typename T::matxoplvalue>> : std::true_type {
+};
+}
+
+/**
+ * @brief Determine if a type is a left hand side operator
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> constexpr bool is_matx_op_lvalue()
+{
+  return detail::is_matx_op_lvalue_impl<T>::value;
+}
+
+namespace detail {
 template <typename T, typename = void> struct is_tensor_view : std::false_type {
 };
 

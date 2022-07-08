@@ -55,22 +55,20 @@ template <typename T, int RANK, typename Desc> class tensor_impl_t; ///< Tensor 
  * as the assignment operator.
  *
  * @tparam T
- *   Type of operator
- * @tparam RANK
- *   Rank of operator
+ *   Operator to use as output
  * @tparam Op
  *   Operator to use as input
  **/
-template <typename T, int RANK, typename Desc, typename Op>
-class set : public BaseOp<set<T, RANK, Desc, Op>> {
+template <typename T, typename Op>
+class set : public BaseOp<set<T, Op>> {
 private:
-  mutable tensor_impl_t<T, RANK, Desc> out_;
+  mutable typename base_type<T>::type out_;
   typename base_type<Op>::type op_;
-  std::array<typename Desc::shape_type, RANK> size_;
 
 public:
   // Type specifier for reflection on class
   using scalar_type = void;
+  using shape_type = typename T::shape_type;
 
   /**
    * Constructor to assign an operator to a view
@@ -81,14 +79,15 @@ public:
    * @param op
    *   Input operator
    */
-  inline set(tensor_impl_t<T, RANK, Desc> &out, const Op op) : out_(out), op_(op)
+  inline set(T &out, const Op op) : out_(out), op_(op)
   {
+    static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
+
     MATX_STATIC_ASSERT(detail::get_rank<Op>() == -1 || Rank() == detail::get_rank<Op>(),
                        matxInvalidDim);
-    if constexpr (RANK > 0) {
-      for (int i = 0; i < RANK; i++) {
-        typename Desc::shape_type size = detail::get_expanded_size<Rank()>(op_, i);
-        size_[i] = out_.Size(i);
+    if constexpr (Rank() > 0) {
+      for (int i = 0; i < Rank(); i++) {
+        index_t size = detail::get_expanded_size<Rank()>(op_, i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
             "Size mismatch in source operator to destination tensor view");        
@@ -140,8 +139,7 @@ public:
       return r;
     }    
   }
-
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<typename Desc::shape_type, RANK> idx) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<shape_type, T::Rank()> idx) const noexcept
   {
     auto res = mapply([&](auto &&...args)  {
         return _internal_mapply(args...);       
@@ -157,7 +155,7 @@ public:
    * @return
    *   Rank of the operator
    */
-  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return T::Rank(); }
 
   /**
    * Get the rank of the operator along a single dimension
@@ -169,10 +167,11 @@ public:
    */
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    static_assert(RANK >= 1, "Size function only works on tensors of rank 1 and higher");
-    return size_[dim];
+    static_assert(T::Rank() >= 1, "Size function only works on tensors of rank 1 and higher");
+    return out_.Size(dim);
   }
 };
+
 
 }
 }
