@@ -1971,7 +1971,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverseY(t2)).run();
+    (t2r = reverse<0>(t2)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1983,7 +1983,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverseX(t2)).run();
+    (t2r = reverse<1>(t2)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1995,7 +1995,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverseX(reverseY(t2))).run();
+    (t2r = reverse<0,1>(t2)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {

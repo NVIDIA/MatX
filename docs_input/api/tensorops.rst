@@ -76,10 +76,7 @@ Advanced Operators
 
 .. doxygenclass:: matx::IF 
 .. doxygenclass:: matx::IFELSE
-.. doxygenfunction:: reverseX
-.. doxygenfunction:: reverseY
-.. doxygenfunction:: reverseZ
-.. doxygenfunction:: reverseW
+.. doxygenfunction:: reverse
 .. doxygenfunction:: shift0
 .. doxygenfunction:: shift1
 .. doxygenfunction:: shift2
