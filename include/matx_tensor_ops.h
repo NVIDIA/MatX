@@ -882,8 +882,8 @@ auto __MATX_INLINE__ as_uint8(T t)
  *
  */
   namespace detail {
-  template <typename T1, int DIM>
-  class ReverseOp : public BaseOp<ReverseOp<T1, DIM>>
+  template <int DIM, typename T1>
+  class ReverseOp : public BaseOp<ReverseOp<DIM, T1>>
   {
   private:
     typename base_type<T1>::type op_;
@@ -928,55 +928,38 @@ auto __MATX_INLINE__ as_uint8(T t)
   };
   }
 
-  /**
- * Helper function to reverse the indexing of the last dimension of a tensor
+/**
+ * @brief Operator to logically reverse elements of an operator. Base case for variadic template.
  *
- * Requires a tensor of at least rank 1
+ * @tparam DIM Dimension to apply the reverse
+ * @tparam Op Input operator/tensor type
+ * @param t Input operator
  */
-  template <typename T1>
-  auto __MATX_INLINE__ reverseX(T1 t)
+  template <int DIM, typename Op>
+  auto __MATX_INLINE__ reverse(Op t)
   {
-    MATX_STATIC_ASSERT(T1::Rank() > 0, matxInvalidDim);
-    return detail::ReverseOp<T1, T1::Rank() - 1>(t);
+    return detail::ReverseOp<DIM, Op>(t);
   };
 
-  /**
- * Helper function to reverse the indexing of the second-to-last
- * dimension of a tensor
+/**
+ * @brief Operator to logically reverse elements of an operator.
  *
- * Requires a tensor of at least rank 2
+ * This operator can appear as an rvalue or lvalue.
+ *
+ * @tparam DIM Dimension to apply the reverse
+ * @tparam DIMS... list of multiple dimensions to reverse along
+ * @tparam Op Input operator/tensor type
+ * @param t Input operator
  */
-  template <typename T1>
-  auto __MATX_INLINE__ reverseY(T1 t)
-  {
-    MATX_STATIC_ASSERT(T1::Rank() > 1, matxInvalidDim);
-    return detail::ReverseOp<T1, T1::Rank() - 2>(t);
-  };
+template <int DIM1, int DIM2, int... DIMS, typename Op>
+auto __MATX_INLINE__ reverse(Op t)
+{
+  // recursively call remap on remaining bits
+  auto op = reverse<DIM2, DIMS...>(t);
 
-  /**
- * Helper function to reverse the indexing of the third-to-last
- * dimension of a tensor
- *
- * Requires a tensor of at least rank 3
- */
-  template <typename T1>
-  auto __MATX_INLINE__ reverseZ(T1 t)
-  {
-    MATX_STATIC_ASSERT(T1::Rank() > 2, matxInvalidDim);
-    return detail::ReverseOp<T1, T1::Rank() - 3>(t);
-  };
-
-  /**
- * Helper function to reverse the indexing of the first dimension of a tensor
- *
- * Requires a tensor of rank 4
- */
-  template <typename T1>
-  auto __MATX_INLINE__ reverseW(T1 t)
-  {
-    MATX_STATIC_ASSERT(T1::Rank() > 3, matxInvalidDim);
-    return detail::ReverseOp<T1, T1::Rank() - 4>(t);
-  };
+  // construct remap op
+  return detail::ReverseOp<DIM1, decltype(op)>(op);
+};
 
   /**
  * Flip the vertical axis of a tensor.
@@ -986,10 +969,10 @@ auto __MATX_INLINE__ as_uint8(T t)
   {
     if constexpr (T1::Rank() == 1)
     {
-      return detail::ReverseOp<T1, T1::Rank() - 1>(t);
+      return detail::ReverseOp<T1::Rank() - 1 , T1>(t);
     }
 
-    return detail::ReverseOp<T1, T1::Rank() - 2>(t);
+    return detail::ReverseOp<T1::Rank() - 2, T1>(t);
   };
 
   /**
@@ -1000,10 +983,10 @@ auto __MATX_INLINE__ as_uint8(T t)
   {
     if constexpr (T1::Rank() == 1)
     {
-      return detail::ReverseOp<T1, T1::Rank() - 1>(t);
+      return detail::ReverseOp<T1::Rank() - 1, T1>(t);
     }
 
-    return detail::ReverseOp<T1, T1::Rank() - 1>(t);
+    return detail::ReverseOp<T1::Rank() - 1, T1>(t);
   };
 
   /**
@@ -1453,8 +1436,8 @@ auto __MATX_INLINE__ as_uint8(T t)
  * of the tensor.
  */
   namespace detail {
-  template <typename T1, int DIM>
-  class ShiftOp : public BaseOp<ShiftOp<T1, DIM>>
+  template <int DIM, typename T1>
+  class ShiftOp : public BaseOp<ShiftOp<DIM, T1>>
   {
   private:
     typename base_type<T1>::type op_;
@@ -1504,81 +1487,63 @@ auto __MATX_INLINE__ as_uint8(T t)
     }
   };
   }
-
   /**
- * Helper function to shift dimension 0 by a given amount
+ * Operator to shift dimension by a given amount
  *
- * @tparam T1
+ * @tparam DIM
+ *   The dimension to be shifted
+ *
+ * @tparam Op
  *   Type of operator or view
- * @param t
+ *
+ * @param op
  *   Operator or view to shift
+ *
  * @param s
  *   Amount to shift forward
  *
  * @returns
  *   New operator with shifted indices
  */
-  template <typename T1>
-  auto __MATX_INLINE__ shift0(T1 t, index_t s)
+  template <int DIM, typename Op>
+  auto __MATX_INLINE__ shift(Op op, index_t s)
   {
-    return detail::ShiftOp<T1, 0>(t, s);
+    return detail::ShiftOp<DIM, Op>(op, s);
   };
 
-  /**
- * Helper function to shift dimension 1 by a given amount
+  
+ /**
+ * Operator to shift dimension by a given amount.
+ * This version allows multiple dimensions.
  *
- * @tparam T1
+ * @tparam DIM
+ *   The dimension to be shifted
+ *
+ * @tparam DIMS...
+ *   The dimensions targeted for shifts
+ *
+ * @tparam Op
  *   Type of operator or view
- * @param t
+ *
+ * @param op
  *   Operator or view to shift
+ *
  * @param s
  *   Amount to shift forward
  *
  * @returns
  *   New operator with shifted indices
  */
-  template <typename T1>
-  auto __MATX_INLINE__ shift1(T1 t, index_t s)
+  template <int DIM, int... DIMS,  typename Op, typename... Shifts>
+  auto __MATX_INLINE__ shift(Op op, index_t s, Shifts... shifts)
   {
-    return detail::ShiftOp<T1, 1>(t, s);
-  };
+    static_assert(sizeof...(DIMS) == sizeof...(shifts), "shift: number of DIMs must match number of shifts");
 
-  /**
- * Helper function to shift  dimension 2 by a given amount
- *
- * @tparam T1
- *   Type of operator or view
- * @param t
- *   Operator or view to shift
- * @param s
- *   Amount to shift forward
- *
- * @returns
- *   New operator with shifted indices
- */
-  template <typename T1>
-  auto __MATX_INLINE__ shift2(T1 t, index_t s)
-  {
-    return detail::ShiftOp<T1, 2>(t, s);
-  };
+    // recursively call shift  on remaining bits
+    auto rop = shift<DIMS...>(op, shifts...);
 
-  /**
- * Helper function to shift dimension 3 by a given amount
- *
- * @tparam T1
- *   Type of operator or view
- * @param t
- *   Operator or view to shift
- * @param s
- *   Amount to shift forward
- *
- * @returns
- *   New operator with shifted indices
- */
-  template <typename T1>
-  auto __MATX_INLINE__ shift3(T1 t, index_t s)
-  {
-    return detail::ShiftOp<T1, 3>(t, s);
+    // construct remap op
+    return detail::ShiftOp<DIM, decltype(rop)>(rop, s);
   };
 
   namespace detail {
