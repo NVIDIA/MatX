@@ -30,15 +30,20 @@ typedef enum {
 #ifdef __CUDACC__  
 template <typename OutType, typename InType, typename FilterType>
 __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
-                       index_t signal_len, index_t filter_len,
+                       index_t signal_len,
                        matxConvCorrMode_t mode)
 {
+  static_assert(InType::Rank() == FilterType::Rank());
+
+  const int Rank = InType::Rank();
+
   extern __shared__ float s_exch[]; // Filter + halo
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
   int chunk_idx = blockIdx.y;
   int batch_idx = blockIdx.x;
+  index_t filter_len = d_filter.Size(Rank-1);
 
   // All but the last dim will be populated
   auto bdims = BlockToIdx(d_in, batch_idx, 1);
@@ -90,7 +95,10 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   __syncthreads();
 
   if (threadIdx.x < filter_len) {
-    s_filter[threadIdx.x] = d_filter(threadIdx.x);
+    bdims[Rank - 1] = threadIdx.x;          
+    detail::mapply([&](auto &&...args) {
+        s_filter[threadIdx.x] = d_filter.operator()(args...);
+      }, bdims);          
   }
 
   __syncthreads();
@@ -105,7 +113,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     // The first block just grabs all the data from the start of the sequence
     if (threadIdx.x < signal_len &&
         (threadIdx.x < blockDim.x - filter_len + 1)) {
-      bdims[InType::Rank() - 1] = threadIdx.x;          
+      bdims[Rank - 1] = threadIdx.x;          
       detail::mapply([&](auto &&...args) {
           s_data[threadIdx.x + filter_len - 1] = d_in.operator()(args...);
         }, bdims);          
@@ -114,7 +122,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   else if (offset > 0 && offset < signal_len) {
     // Each block processes blockDim.x-filt_len+1 samples, but needs to fetch
     // all blockDim.x worth
-    bdims[InType::Rank() - 1] = offset;   
+    bdims[Rank - 1] = offset;   
     detail::mapply([&](auto &&...args) {
         s_data[threadIdx.x] = d_in.operator()(args...);
       }, bdims);      
@@ -132,7 +140,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     }
 
     if (mode == MATX_C_MODE_FULL) {
-      bdims[InType::Rank() - 1] = tid;  
+      bdims[Rank - 1] = tid;  
       detail::mapply([&](auto &&...args) {
           d_out.operator()(args...) = val;
         }, bdims);        
@@ -149,7 +157,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       }
 
       if (tid >= start_tid && tid <= stop_tid) {
-        bdims[InType::Rank() - 1] = tid - start_tid; 
+        bdims[Rank - 1] = tid - start_tid; 
         detail::mapply([&](auto &&...args) {
             d_out.operator()(args...) = val;
           }, bdims);
