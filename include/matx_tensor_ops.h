@@ -1436,8 +1436,8 @@ auto __MATX_INLINE__ reverse(Op t)
  * of the tensor.
  */
   namespace detail {
-  template <typename T1, int DIM>
-  class ShiftOp : public BaseOp<ShiftOp<T1, DIM>>
+  template <int DIM, typename T1>
+  class ShiftOp : public BaseOp<ShiftOp<DIM, T1>>
   {
   private:
     typename base_type<T1>::type op_;
@@ -1487,81 +1487,63 @@ auto __MATX_INLINE__ reverse(Op t)
     }
   };
   }
-
   /**
- * Helper function to shift dimension 0 by a given amount
+ * Operator to shift dimension by a given amount
  *
- * @tparam T1
+ * @tparam DIM
+ *   The dimension to be shifted
+ *
+ * @tparam Op
  *   Type of operator or view
- * @param t
+ *
+ * @param op
  *   Operator or view to shift
+ *
  * @param s
  *   Amount to shift forward
  *
  * @returns
  *   New operator with shifted indices
  */
-  template <typename T1>
-  auto __MATX_INLINE__ shift0(T1 t, index_t s)
+  template <int DIM, typename Op>
+  auto __MATX_INLINE__ shift(Op op, index_t s)
   {
-    return detail::ShiftOp<T1, 0>(t, s);
+    return detail::ShiftOp<DIM, Op>(op, s);
   };
 
-  /**
- * Helper function to shift dimension 1 by a given amount
+  
+ /**
+ * Operator to shift dimension by a given amount.
+ * This version allows multiple dimensions.
  *
- * @tparam T1
+ * @tparam DIM
+ *   The dimension to be shifted
+ *
+ * @tparam DIMS...
+ *   The dimensions targeted for shifts
+ *
+ * @tparam Op
  *   Type of operator or view
- * @param t
+ *
+ * @param op
  *   Operator or view to shift
+ *
  * @param s
  *   Amount to shift forward
  *
  * @returns
  *   New operator with shifted indices
  */
-  template <typename T1>
-  auto __MATX_INLINE__ shift1(T1 t, index_t s)
+  template <int DIM, int... DIMS,  typename Op, typename... Shifts>
+  auto __MATX_INLINE__ shift(Op op, index_t s, Shifts... shifts)
   {
-    return detail::ShiftOp<T1, 1>(t, s);
-  };
+    static_assert(sizeof...(DIMS) == sizeof...(shifts), "shift: number of DIMs must match number of shifts");
 
-  /**
- * Helper function to shift  dimension 2 by a given amount
- *
- * @tparam T1
- *   Type of operator or view
- * @param t
- *   Operator or view to shift
- * @param s
- *   Amount to shift forward
- *
- * @returns
- *   New operator with shifted indices
- */
-  template <typename T1>
-  auto __MATX_INLINE__ shift2(T1 t, index_t s)
-  {
-    return detail::ShiftOp<T1, 2>(t, s);
-  };
+    // recursively call shift  on remaining bits
+    auto rop = shift<DIMS...>(op, shifts...);
 
-  /**
- * Helper function to shift dimension 3 by a given amount
- *
- * @tparam T1
- *   Type of operator or view
- * @param t
- *   Operator or view to shift
- * @param s
- *   Amount to shift forward
- *
- * @returns
- *   New operator with shifted indices
- */
-  template <typename T1>
-  auto __MATX_INLINE__ shift3(T1 t, index_t s)
-  {
-    return detail::ShiftOp<T1, 3>(t, s);
+    // construct remap op
+    return detail::ShiftOp<DIM, decltype(rop)>(rop, s);
   };
 
   namespace detail {

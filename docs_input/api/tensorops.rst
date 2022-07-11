@@ -77,10 +77,7 @@ Advanced Operators
 .. doxygenclass:: matx::IF 
 .. doxygenclass:: matx::IFELSE
 .. doxygenfunction:: reverse
-.. doxygenfunction:: shift0
-.. doxygenfunction:: shift1
-.. doxygenfunction:: shift2
-.. doxygenfunction:: shift3
+.. doxygenfunction:: shift
 .. doxygenfunction:: fftshift1D
 .. doxygenfunction:: fftshift2D    
 .. doxygenfunction:: repmat(T1 t, index_t reps)    

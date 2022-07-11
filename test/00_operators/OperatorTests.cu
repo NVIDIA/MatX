@@ -1841,7 +1841,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   }
 
   {
-    (t2s = shift0(t2, 5)).run();
+    (t2s = shift<0>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1853,7 +1853,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   }
 
   {
-    (t2s = shift1(t2, 5)).run();
+    (t2s = shift<1>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1865,7 +1865,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   }
 
   {
-    (t2s = shift0(shift1(t2, 5), 6)).run();
+    (t2s = shift<1,0>(t2, 5, 6)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1904,7 +1904,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
   // Negative shifts
   {
-    (t2s = shift0(t2, -5)).run();
+    (t2s = shift<0>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1916,7 +1916,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   }
 
   {
-    (t2s = shift1(t2, -5)).run();
+    (t2s = shift<1>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1929,7 +1929,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
   // Large shifts
   {
-    (t2s = shift0(t2, t2.Size(0) * 4)).run();
+    (t2s = shift<0>(t2, t2.Size(0) * 4)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -1942,8 +1942,8 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   {
     // Shift 4 times the size back, minus one. This should be equivalent to
     // simply shifting by -1
-    (t2s = shift0(t2, -t2.Size(0) * 4 - 1)).run();
-    (t2s2 = shift0(t2, -1)).run();
+    (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run();
+    (t2s2 = shift<0>(t2, -1)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
