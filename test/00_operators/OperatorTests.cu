@@ -164,6 +164,304 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
+{
+  int N = 10;
+
+  MATX_ENTER_HANDLER();
+  auto tiv = make_tensor<TypeParam>({N,N});
+
+  for(int i = 0; i < N; i++) {
+    for(int j = 0; j < N; j++) {
+      tiv(i,j) = TypeParam(i*N+j);
+    }
+  }
+
+  { // Identity Gather test
+
+    auto tov = make_tensor<TypeParam>({N, N});
+    auto idx = make_tensor<int>({N});
+    
+    for(int i = 0; i < N; i++) {
+      idx(i) = i;
+    }
+
+    (tov = remap<0>(tiv, idx)).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+    
+    (tov = remap<1>(tiv, idx)).run();
+    cudaStreamSynchronize(0);
+    
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+
+    (tov = remap<0,1>(tiv, idx, idx)).run();
+    cudaStreamSynchronize(0);
+    
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+  }
+  
+  { // Identity lvalue test
+
+    auto tov = make_tensor<TypeParam>({N, N});
+    auto idx = make_tensor<int>({N});
+    
+    for(int i = 0; i < N; i++) {
+      idx(i) = i;
+    }
+
+    (tov = 0).run();
+    (remap<0>(tov, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+    
+    (tov = 0).run();
+    (remap<1>(tov, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+    
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+    
+    (tov = 0).run();
+    (remap<0,1>(tov, idx, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+    
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+      }
+    }
+  }
+
+  { // Reverse test
+    
+    auto tov = make_tensor<TypeParam>({N,N});
+    auto idx = make_tensor<int>({N});
+    
+    for(int i = 0; i < N; i++) {
+      idx(i) = N-i-1;
+    }
+
+    (tov = remap<0>(tiv, idx)).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(N-i-1,j));
+      }
+    }
+    
+    (tov = remap<1>(tiv, idx)).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i, N-j-1));
+      }
+    }
+    
+    (tov = remap<0,1>(tiv, idx, idx)).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
+      }
+    }
+  }
+  
+  { // Reverse lvalue test
+    
+    auto tov = make_tensor<TypeParam>({N,N});
+    auto idx = make_tensor<int>({N});
+    
+    for(int i = 0; i < N; i++) {
+      idx(i) = N-i-1;
+    }
+
+    (remap<0>(tov, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(N-i-1,j));
+      }
+    }
+    
+    (remap<1>(tov, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(i, N-j-1));
+      }
+    }
+    
+    (remap<0,1>(tov, idx, idx) = tiv).run();
+    cudaStreamSynchronize(0);
+
+    for( int i = 0; i < N ; i++) {
+      for( int j = 0; j < N ; j++) {
+        EXPECT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
+      }
+    }
+  }
+  
+  { // Even test
+    int M = N/2;
+    auto idx = make_tensor<int>({M});
+    
+    for(int i = 0; i < M; i++) {
+      idx(i) = i*2;
+    }
+
+    {
+      auto tov = make_tensor<TypeParam>({M, N});
+
+      (tov = remap<0>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < M ; i++) {
+        for( int j = 0; j < N ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i*2,j));
+        }
+      }
+    }
+    
+    {
+      auto tov = make_tensor<TypeParam>({N, M});
+
+      (tov = remap<1>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < N ; i++) {
+        for( int j = 0; j < M ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i,j*2));
+        }
+      }
+    }
+    
+    {
+      auto tov = make_tensor<TypeParam>({M, M});
+
+      (tov = remap<0,1>(tiv, idx, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < M ; i++) {
+        for( int j = 0; j < M ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i*2,j*2));
+	}
+      }
+    }
+  }
+  
+  { // Braodcast test
+    int M = N*2;
+    auto idx = make_tensor<int>({M});
+    
+    for(int i = 0; i < M; i++) {
+      idx(i) = 1;
+    }
+
+    {
+      auto tov = make_tensor<TypeParam>({M, N});
+
+      (tov = remap<0>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < M ; i++) {
+        for( int j = 0; j < N ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(1,j));
+        }
+      }
+    }
+    
+    {
+      auto tov = make_tensor<TypeParam>({N, M});
+
+      (tov = remap<1>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < N ; i++) {
+        for( int j = 0; j < M ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i,1));
+        }
+      }
+    }
+  }
+
+  { // Andvanced test
+    int M = N*2;
+    auto idx = make_tensor<int>({M});
+    
+    for(int i = 0; i < M; i++) {
+      idx(i) = i/4;
+    }
+
+    {
+      auto tov = make_tensor<TypeParam>({M, N});
+
+      (tov = remap<0>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < M ; i++) {
+        for( int j = 0; j < N ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i/4,j));
+        }
+      }
+    }
+    
+    {
+      auto tov = make_tensor<TypeParam>({N, M});
+
+      (tov = remap<1>(tiv, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < N ; i++) {
+        for( int j = 0; j < M ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i,j/4));
+        }
+      }
+    }
+    
+    {
+      auto tov = make_tensor<TypeParam>({M, M});
+
+      (tov = remap<0,1>(tiv, idx, idx)).run();
+      cudaStreamSynchronize(0);
+
+      for( int i = 0; i < M ; i++) {
+        for( int j = 0; j < M ; j++) {
+          EXPECT_TRUE(tov(i,j) == tiv(i/4,j/4));
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsComplex, RealImagOp)
 {
   MATX_ENTER_HANDLER();

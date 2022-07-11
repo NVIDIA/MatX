@@ -176,9 +176,9 @@ public:
   // Type specifier for reflection on class
   using type = T; ///< Type of traits
   using scalar_type = T; ///< Type of traits
-
   // Type specifier for signaling this is a matx operation or tensor view
   using matxop = bool; ///< Indicate this is a MatX operator
+  using matxoplvalue = bool; ///< Indicate this is a MatX operator that can be on the lhs of an equation
   using tensor_view = bool; ///< Indicate this is a MatX tensor view
   using storage_type = Storage; ///< Storage type trait
   using shape_type = typename Desc::shape_type;

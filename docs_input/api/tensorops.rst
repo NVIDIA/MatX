@@ -93,3 +93,4 @@ Advanced Operators
 .. doxygenfunction:: hermitianT
 .. doxygenfunction:: r2cop
 .. doxygenfunction:: flatten
+.. doxygenfunction:: remap
