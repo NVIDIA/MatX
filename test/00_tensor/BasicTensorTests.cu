@@ -406,3 +406,14 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
   MATX_EXIT_HANDLER();
 }
 
+
+TYPED_TEST(BasicTensorTestsAll, Print)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({3});
+  (t = ones(t.Shape())).run();
+  t.Print();
+
+  MATX_EXIT_HANDLER();
+}
