@@ -187,7 +187,6 @@ public:
   using stride_container = typename Desc::stride_container;
   using desc_type = Desc; ///< Descriptor type trait
   using self_type = tensor_t<T, RANK, Storage, Desc>;
-  static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
   /**
    * @brief Construct a new 0-D tensor t object
@@ -1654,26 +1653,8 @@ public:
             std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                  (RANK == 0 || sizeof...(Args) > 0),
                              bool> = true>
-  void Print(Args... dims) const {
-#ifdef __CUDACC__    
-    auto kind = GetPointerKind(this->ldata_);
-    cudaDeviceSynchronize();
-    if (HostPrintable(kind)) {
-      InternalPrint(dims...);
-    }
-    else if (DevicePrintable(kind) || kind == MATX_INVALID_MEMORY) {
-      if constexpr (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(*this, dims...);
-      }
-      else {
-        auto tmpv = make_tensor<T>(this->Shape());
-        (tmpv = *this).run();
-        tmpv.Print(dims...);
-      }
-    }
-#else
-    InternalPrint(dims...);
-#endif
+  [[deprecated("Use non-member function Print() instead")]] void Print(Args... dims) const {
+    matx::Print(*this, dims...);
   }
 
   /**
@@ -1689,9 +1670,7 @@ public:
   template <typename... Args,
             std::enable_if_t<(RANK > 0 && sizeof...(Args) == 0), bool> = true>
   void Print(Args... dims) const {
-    std::array<int, RANK> arr = {0};
-    auto tp = std::tuple_cat(arr);
-    std::apply([&](auto &&...args) { this->Print(args...); }, tp);
+    matx::Print(*this, dims...);
   }
 
   /**
@@ -1718,7 +1697,7 @@ public:
     auto tup = std::tuple_cat(arr);
     std::apply(
       [&](auto&&... args) {
-        s.InternalPrint(args...);
+        detail::InternalPrint(s, args...);
       }, tup);
   }
 
@@ -1747,7 +1726,7 @@ public:
     auto tup = std::tuple_cat(arr);
     std::apply(
       [&](auto&&... args) {
-        s.InternalPrint(args...);
+        detail::InternalPrint(s, args...);
       }, tup);
   }   
 
