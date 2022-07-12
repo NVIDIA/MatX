@@ -53,7 +53,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   using strip_filter_t = typename FilterType::scalar_type;
   using shape_type = typename OutputType::shape_type;
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
-  MATX_STATIC_ASSERT(FilterType::Rank() == 1, matxInvalidDim);
   MATX_ASSERT_STR(filter.Size(0) < BLOCK_SIZE_NON_RECURSIVE, matxInvalidSize,
     "Convolutions are limited to filter lengths < 1024");
 
@@ -61,13 +60,13 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   // Scale the filter
   size_t filter_shm;
   if (sizeof(strip_filter_t) < sizeof(strip_input_t)) {
-    filter_shm = (filter.Size(0) * sizeof(strip_filter_t) + (sizeof(strip_input_t)-1)) / sizeof(strip_input_t) * sizeof(strip_input_t);
+    filter_shm = (filter.Size(filter.Rank()-1) * sizeof(strip_filter_t) + (sizeof(strip_input_t)-1)) / sizeof(strip_input_t) * sizeof(strip_input_t);
   }
   else {
-    filter_shm = filter.Size(0) * sizeof(strip_filter_t);
+    filter_shm = filter.Size(filter.Rank()-1) * sizeof(strip_filter_t);
   }
 
-  auto shmsize = filter_shm + sizeof(strip_input_t) * (filter.Size(0) + BLOCK_SIZE_NON_RECURSIVE);
+  auto shmsize = filter_shm + sizeof(strip_input_t) * (filter.Size(filter.Rank()-1) + BLOCK_SIZE_NON_RECURSIVE);
 
   shape_type sig_len = i.Size(OutputType::Rank() - 1);
   float work_per_block =
@@ -79,7 +78,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   dim3 gsize(grid_size, num_blocks);
   Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-        o, i, filter, sig_len, filter.Size(0), mode);
+        o, i, filter, sig_len, mode);
 
 #endif  
 }
@@ -131,6 +130,26 @@ void matxDirectConv2DInternal(OutputType &o, InType &i,
 }
 }
 
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
+                   matxConvCorrMode_t mode, cudaStream_t stream)
+{
+  static_assert(In1Type::Rank() == In2Type::Rank());
+
+  const int Rank = In1Type::Rank();
+  detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  const typename detail::base_type<In1Type>::type &in1_base = i1;
+  const typename detail::base_type<In2Type>::type &in2_base = i2;
+
+  if (i1.Size(Rank-1) < i2.Size(Rank-1)) {
+    detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
+  }
+  else {
+    detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
+  }
+}
+
+
 /**
  * @brief 1D convolution
  * 
@@ -145,30 +164,33 @@ void matxDirectConv2DInternal(OutputType &o, InType &i,
  */
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d(OutputType &o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, cudaStream_t stream)
-{
-  detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
-  const typename detail::base_type<In1Type>::type &in1_base = i1;
-  const typename detail::base_type<In2Type>::type &in2_base = i2;
+                   matxConvCorrMode_t mode, cudaStream_t stream) {
+  if constexpr ( In2Type::Rank()==1 && In1Type::Rank() >  In2Type::Rank() ) {
+    //broadcast path.  clone In2 across entire batch
+    
+    const int Rank = In1Type::Rank();
+    typename In2Type::shape_type shape[Rank];
 
-  if constexpr (In1Type::Rank() < In2Type::Rank()) {
-    detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
-  }
-  else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_STATIC_ASSERT(OutputType::Rank() == 1, matxInvalidDim);
-    if (i1.Size(0) < i2.Size(0)) {
-      detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
+    #pragma unroll
+    for(int i = 0; i < Rank-1; i++) {
+      shape[i] = i1.Size(i);
     }
-    else {
-      detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
-    }
-  }
-  else {
-    detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
+
+    shape[Rank-1] = matxKeepDim;
+
+    auto ci2 = (i2.template Clone<Rank>(shape));
+
+    static_assert(i1.Rank() == ci2.Rank());
+
+    conv1d_impl(o, i1, ci2, mode, stream);
+    	  
+  } else {
+    static_assert(In1Type::Rank() == In2Type::Rank());
+    // batched pass outer dims must match
+    conv1d_impl(o, i1, i2, mode, stream);
   }
 }
-
-
+    
 /**
  * @brief 2D convolution
  * 
