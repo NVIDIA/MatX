@@ -411,14 +411,10 @@ template <typename T1, typename T2> struct DivF {
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2){v2.real() / static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1)),
-                    v2.imag() / static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1))};
+        return matxHalfComplex<typename T2::value_type>{v1}/v2;
       }
       else {
-        return (T2){v2.real() / static_cast<typename T2::value_type>(v1),
-                    v2.imag() / static_cast<typename T2::value_type>(v1)};
+        return cuda::std::complex<typename T2::value_type>{v1}/v2;
       }
     }
     else {
