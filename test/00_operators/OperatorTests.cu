@@ -632,6 +632,23 @@ TYPED_TEST(OperatorTestsNumericNonComplex, OperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsComplex, OperatorFuncDivComplex)
+{
+  MATX_ENTER_HANDLER();
+  tensor_t<TypeParam, 0> tiv0;
+  tensor_t<TypeParam, 0> tov0; 
+  typename TypeParam::value_type s = 5.0;
+
+  TypeParam c = GenerateData<TypeParam>();  
+  tiv0() = c;
+
+  (tov0 = s / tiv0).run();
+  cudaStreamSynchronize(0);
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), s / tiv0()));
+
+  MATX_EXIT_HANDLER();  
+}
+
 TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
