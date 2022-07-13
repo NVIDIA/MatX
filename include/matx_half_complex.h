@@ -425,7 +425,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator/(const matxHalfComplex<T> &lhs, const T &rhs)
 {
   matxHalfComplex<T> tmp{rhs};
-  return lhs / rhs;
+  return lhs / tmp;
 }
 
 /**
@@ -441,7 +441,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator/(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return lhs / rhs;
+  return tmp / rhs;
 }
 
 
