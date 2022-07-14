@@ -88,6 +88,25 @@ TYPED_TEST_SUITE(OperatorTestsBoolean, MatXBoolTypes);
 TYPED_TEST_SUITE(OperatorTestsFloatHalf, MatXFloatHalfTypes);
 TYPED_TEST_SUITE(OperatorTestsNumericNoHalf, MatXNumericNoHalfTypes);
 
+TYPED_TEST(OperatorTestsComplex, BaseOp)
+{
+  MATX_ENTER_HANDLER();
+  auto A = make_tensor<TypeParam>({10,20});
+  auto op = A + A;
+
+  EXPECT_TRUE(op.Size(0) == A.Size(0));
+  EXPECT_TRUE(op.Size(1) == A.Size(1));
+
+  auto shape = op.Shape();
+
+  EXPECT_TRUE(shape[0] == A.Size(0));
+  EXPECT_TRUE(shape[1] == A.Size(1));
+ 
+  EXPECT_TRUE(A.TotalSize() == op.TotalSize());
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloat, TrigFuncs)
 {
   MATX_ENTER_HANDLER();
