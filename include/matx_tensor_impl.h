@@ -96,7 +96,7 @@ public:
     std::array<index_t, T::Rank()> sizes_;
 
     for(int i = 0 ; i < T::Rank(); i++) {
-      sizes_[i] = reinterpret_cast<T*>(this)->Size(i);
+      sizes_[i] = static_cast<T*>(this)->Size(i);
     }
     return sizes_;
   }
@@ -105,7 +105,7 @@ public:
 
     index_t size = 1;
     for(int i = 0 ; i < T::Rank(); i++) {
-      size *= reinterpret_cast<T*>(this)->Size(i);
+      size *= static_cast<T*>(this)->Size(i);
     }
     return size;
   }
