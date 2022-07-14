@@ -392,9 +392,9 @@ inline
         {
           index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
           index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
+          size_[i] = detail::matx_max(size1, size2);          
           MATX_ASSERT(size1 == 0 || size1 == Size(i), matxInvalidSize);
           MATX_ASSERT(size2 == 0 || size2 == Size(i), matxInvalidSize);
-          size_[i] = detail::matx_max(size1, size2);
         }
       }
     }
