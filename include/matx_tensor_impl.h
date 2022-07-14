@@ -63,7 +63,7 @@ public:
    * 
    * @param stream CUDA stream
    */
-  void run(cudaStream_t stream = 0) noexcept
+  __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
   {
     exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
   }
@@ -74,7 +74,7 @@ public:
    * @param ev CUDA event
    * @param stream CUDA stream
    */
-  void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
+  __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
   {
     exec(*static_cast<T *>(this), CUDADeviceExecutor{stream});
     cudaEventRecord(ev, stream);
@@ -87,11 +87,32 @@ public:
    * @param ex Executor
    */
   template <typename Ex>
-  void run (Ex ex) {
+  __MATX_INLINE__ void run (Ex ex) {
     static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
     exec(*static_cast<T *>(this), ex);
   }
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() {
+    std::array<index_t, T::Rank()> sizes_;
+
+    for(int i = 0 ; i < T::Rank(); i++) {
+      sizes_[i] = reinterpret_cast<T*>(this)->Size(i);
+    }
+    return sizes_;
+  }
+  
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() {
+
+    index_t size = 1;
+    for(int i = 0 ; i < T::Rank(); i++) {
+      size *= reinterpret_cast<T*>(this)->Size(i);
+    }
+    return size;
+  }
+
+  /* This must be in derived class.  Copy paste line below to derived case if it is an lvalue
+  template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*reinterpret_cast<T*>(this), rhs); }
+  */
 };
 
 /**
@@ -117,7 +138,7 @@ public:
    * 
    * @param size Size of each dimension
    */
-  BaseOpCustom(const std::array<index_t, RankOp::Rank()> &size) :
+  __MATX_INLINE__ BaseOpCustom(const std::array<index_t, RankOp::Rank()> &size) :
     size_(size) {}
 
   /**
@@ -125,7 +146,7 @@ public:
    * 
    * @return Operator rank
    */
-  static inline constexpr int32_t Rank()
+  static __MATX_INLINE__ constexpr int32_t Rank()
   {
     return RankOp::Rank();
   }  
@@ -135,7 +156,7 @@ public:
    * 
    * @return Operator size on dimension dim
    */
-  index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
+  index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
     return size_[dim];
   }

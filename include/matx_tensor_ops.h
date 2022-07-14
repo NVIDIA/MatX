@@ -56,7 +56,7 @@ namespace matx
  * @return Product result
  */
 template <typename T, typename S>
-inline
+__MATX_INLINE__
     typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
                               cuda::std::complex<T>>
         __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
@@ -74,7 +74,7 @@ inline
  * @return Product result
  */
 template <typename T, typename S>
-inline
+__MATX_INLINE__
     typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
                               cuda::std::complex<T>>
         __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
@@ -102,7 +102,7 @@ inline
     // Scalar type of operation
     using scalar_type = first_value_type;
 
-    inline Concatenate(Ts... ts) : ops_(ts...)
+    __MATX_INLINE__ Concatenate(Ts... ts) : ops_(ts...)
     {
       static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
       static_assert(sizeof...(Ts) > 0, "Must have more than one tensor to concatenate");
@@ -116,7 +116,7 @@ inline
 
     // Base case. Cannot be reached
     template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const {
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const {
       return static_cast<first_value_type>(0);
     }
 
@@ -125,7 +125,7 @@ inline
        operator() from it. Otherwise we recursively call the same function moving to another 
        operator with a smaller index. */
     template <size_t I = 0, typename... Is, std::enable_if_t<I < sizeof...(Ts), bool> = true>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const
     {
       if (cuda::std::get<Dim>(tup) < cuda::std::get<I>(ops_).Size(Dim)) {
         return mapply([&](auto &&...args) -> first_value_type {
@@ -138,18 +138,18 @@ inline
     }    
 
     template <typename... Is>
-    inline __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
     {
       return static_cast<first_value_type>(GetVal<0, Is...>(cuda::std::make_tuple(is...)));
     }
    
     
-    static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
     {
       return RANK;
     }
 
-    constexpr index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
+    constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
     {
       return size_[dim];
     }
@@ -616,11 +616,8 @@ inline
       else 
         return op_.Size(dim);
     }
-    
-    template<typename R> 
-    inline auto operator=(const R &rhs) {
-      return set(*this, rhs);
-    }
+  
+    template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
   };
   }
 
@@ -890,6 +887,7 @@ auto __MATX_INLINE__ as_uint8(T t)
 
   public:
     using matxop = bool;
+    using matxoplvalue = bool;
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
@@ -925,6 +923,8 @@ auto __MATX_INLINE__ as_uint8(T t)
     {
       return op_.Size(dim);
     }
+    
+    template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
   };
   }
 
@@ -1624,6 +1624,7 @@ auto __MATX_INLINE__ reverse(Op t)
 
   public:
     using matxop = bool;
+    using matxoplvalue = bool;
     using scalar_type = typename T1::scalar_type;
 
     __MATX_INLINE__ ShiftOp(T1 op, index_t shift) : op_(op), shift_(shift)
@@ -1663,6 +1664,8 @@ auto __MATX_INLINE__ reverse(Op t)
     {
       return op_.Size(dim);
     }
+    
+    template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
   };
   }
   /**
@@ -2155,7 +2158,7 @@ auto __MATX_INLINE__ reverse(Op t)
 
   namespace detail {
   template <class I1, class Op>
-  class matxUnaryOp
+  class matxUnaryOp :  public BaseOp<matxUnaryOp<I1,Op>>
   {
   private:
     typename base_type<I1>::type in1_;
@@ -2195,7 +2198,7 @@ auto __MATX_INLINE__ reverse(Op t)
 
 
   template <class I1, class I2, class Op>
-  class matxBinaryOp
+  class matxBinaryOp : public BaseOp<matxBinaryOp<I1,I2,Op>>
   {
   private:
     typename base_type<I1>::type in1_;
