@@ -164,6 +164,115 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
+{
+  int N = 10;
+  int M = 12;
+  int K = 14;
+
+
+  MATX_ENTER_HANDLER();
+  auto tiv = make_tensor<TypeParam>({N,M,K});
+
+  for(int n = 0; n < N; n++) {
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(n,m,k) = TypeParam(n*M*K + m*K + k);
+      }
+    }
+  }
+
+  { // rcollapse 1 
+    auto tov = make_tensor<TypeParam>({N,M*K});
+  
+    auto op = rcollapse<1>(tiv);
+
+    EXPECT_TRUE(op.Rank() == 2);
+    EXPECT_TRUE(op.Size(0) == N);
+    EXPECT_TRUE(op.Size(1) == M*K);
+
+    (tov = 0).run();
+    (tov = op).run();
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          EXPECT_TRUE(tiv(n,m,k) == tov(n,m*K+k));
+        }
+      }
+    }
+  }
+  
+  { // lcollapse 1 
+    auto tov = make_tensor<TypeParam>({N*M,K});
+  
+    auto op = lcollapse<1>(tiv);
+
+    EXPECT_TRUE(op.Rank() == 2);
+    EXPECT_TRUE(op.Size(0) == N*M);
+    EXPECT_TRUE(op.Size(1) == K);
+    
+    
+    (tov = 0).run();
+    (tov = op).run();
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          EXPECT_TRUE(tiv(n,m,k) == tov(n*M+m,k));
+        }
+      }
+    }
+  }
+  
+  { // rcollapse 2 
+    auto tov = make_tensor<TypeParam>({N*M*K});
+  
+    auto op = rcollapse<2>(tiv);
+
+    EXPECT_TRUE(op.Rank() == 1);
+    EXPECT_TRUE(op.Size(0) == N*M*K);
+
+    (tov = 0).run();
+    (tov = op).run();
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          EXPECT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
+        }
+      }
+    }
+  }
+
+  { // lcollapse 2 
+    auto tov = make_tensor<TypeParam>({N*M*K});
+  
+    auto op = lcollapse<2>(tiv);
+
+    EXPECT_TRUE(op.Rank() == 1);
+    EXPECT_TRUE(op.Size(0) == N*M*K);
+
+    (tov = 0).run();
+    (tov = op).run();
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          EXPECT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
 {
   int N = 10;

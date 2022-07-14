@@ -88,3 +88,5 @@ Advanced Operators
 .. doxygenfunction:: r2cop
 .. doxygenfunction:: flatten
 .. doxygenfunction:: remap
+.. doxygenfunction:: rcollapse
+.. doxygenfunction:: lcollapse
