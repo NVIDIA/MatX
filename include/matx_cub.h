@@ -1314,20 +1314,21 @@ void sort(OutputTensor &a_out, const InputOperator &a,
 
   detail::SortParams_t p{dir};
 
+  // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
-  auto ret = detail::cub_cache.Lookup(params);
-  if (ret == std::nullopt) {
+  // auto ret = detail::cub_cache.Lookup(params);
+  // if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
         a_out, a, p, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSort(a_out, a, stream, dir);
-  }
-  else {
-    auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)> *>(
-            ret.value());
-    sort_type->ExecSort(a_out, a, stream, dir);
-  }
+  // }
+  // else {
+  //   auto sort_type =
+  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)> *>(
+  //           ret.value());
+  //   sort_type->ExecSort(a_out, a, stream, dir);
+  // }
 #endif  
 }
 
@@ -1411,9 +1412,10 @@ void hist(OutputTensor &a_out, const InputOperator &a,
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
   params.stream = stream;
 
+  // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
-  auto ret = detail::cub_cache.Lookup(params);
-  if (ret == std::nullopt) {
+  // auto ret = detail::cub_cache.Lookup(params);
+  // if (ret == std::nullopt) {
     detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
     auto tmp = new detail::matxCubPlan_t< OutputTensor, 
                                           InputOperator, 
@@ -1422,14 +1424,14 @@ void hist(OutputTensor &a_out, const InputOperator &a,
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecHistEven(a_out, a, lower, upper, stream);
-  }
-  else {
-    auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, 
-            detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
-            ret.value());
-    sort_type->ExecHistEven(a_out, a, lower, upper, stream);
-  }
+  // }
+  // else {
+  //   auto sort_type =
+  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, 
+  //           detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
+  //           ret.value());
+  //   sort_type->ExecHistEven(a_out, a, lower, upper, stream);
+  // }
 #endif  
 }
 
@@ -1542,23 +1544,24 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
-  auto ret = detail::cub_cache.Lookup(params);
+  //auto ret = detail::cub_cache.Lookup(params);
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
-  if (ret == std::nullopt) {
+  // Don't cache until we have a good plan for hashing parameters here
+  //if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t< OutputTensor, 
                                           InputOperator, 
                                           detail::CUB_OP_SELECT, 
                                           decltype(cparams)>{a_out, a, cparams, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelect(a_out, a, stream);
-  }
-  else {
-    auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, decltype(cparams)> *>(
-            ret.value());
-    sort_type->ExecSelect(a_out, a, stream);
-  }
+  // }
+  // else {
+  //   auto sort_type =
+  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, decltype(cparams)> *>(
+  //           ret.value());
+  //   sort_type->ExecSelect(a_out, a, stream);
+  // }
 #endif  
 }
 
@@ -1602,23 +1605,24 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
   params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
-  auto ret = detail::cub_cache.Lookup(params);
+  //auto ret = detail::cub_cache.Lookup(params);
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
-  if (ret == std::nullopt) {
+  // Don't cache until we have a good plan for hashing parameters here
+  //if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t< OutputTensor, 
                                           InputOperator, 
                                           detail::CUB_OP_SELECT_IDX, 
                                           decltype(cparams)>{a_out, a, cparams, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelectIndex(a_out, a, stream);
-  }
-  else {
-    auto sort_type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, decltype(cparams)> *>(
-            ret.value());
-    sort_type->ExecSelectIndex(a_out, a, stream);
-  }
+  // }
+  // else {
+  //   auto sort_type =
+  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, decltype(cparams)> *>(
+  //           ret.value());
+  //   sort_type->ExecSelectIndex(a_out, a, stream);
+  // }
 #endif  
 }
 
