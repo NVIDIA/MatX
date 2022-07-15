@@ -693,10 +693,16 @@ public:
   template <typename M = T, int R = RANK, typename Shape>
   __MATX_INLINE__ auto View(Shape &&shape)
   {
+    
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
         sizeof(M) * shape.TotalSize() <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
+    
+    // This could be loosened up to make sure only the fastest changing dims 
+    // are compact
+    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize, 
+       "To get a reshaped view the tensor must be compact");
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{std::forward<Shape>(shape)};  
@@ -750,6 +756,11 @@ public:
     MATX_ASSERT_STR(
         sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");    
+    
+    // This could be loosened up to make sure only the fastest changing dims 
+    // are compact
+    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize, 
+       "To get a reshaped view the tensor must be compact");
 
     DefaultDescriptor<tshape.size()> desc{std::move(tshape)};   
     return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_};
