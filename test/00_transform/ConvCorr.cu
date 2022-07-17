@@ -40,8 +40,11 @@
 using namespace matx;
 
 constexpr index_t a_len = 256;
-constexpr index_t b_len = 16;
-constexpr index_t c_len = a_len + b_len - 1;
+constexpr index_t b_len_even = 16;
+constexpr index_t b_len_odd = 15;
+constexpr index_t c_len_full_even = a_len + b_len_even - 1;
+constexpr index_t c_len_full_odd = a_len + b_len_odd - 1;
+constexpr index_t c_len_same = a_len;
 
 template <typename T>
 class CorrelationConvolutionTest : public ::testing::Test {
@@ -50,7 +53,6 @@ protected:
   {
     CheckTestTypeSupport<T>();
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("00_transforms", "conv_operators", {a_len, b_len});
 
     // Half precision needs a bit more tolerance when compared to
     // fp32
@@ -63,8 +65,11 @@ protected:
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 1> av{{a_len}};
-  tensor_t<T, 1> bv{{b_len}};
-  tensor_t<T, 1> cv{{c_len}};
+  tensor_t<T, 1> bv_even{{b_len_even}};
+  tensor_t<T, 1> bv_odd{{b_len_odd}};
+  tensor_t<T, 1> cv_full_even{{c_len_full_even}};
+  tensor_t<T, 1> cv_same{{c_len_same}};
+  tensor_t<T, 1> cv_full_odd{{c_len_full_odd}};
   float thresh = 0.01f;
 };
 
@@ -76,51 +81,94 @@ class CorrelationConvolutionTestFloatTypes
 TYPED_TEST_SUITE(CorrelationConvolutionTestFloatTypes, MatXFloatTypes);
 
 // Real/real direct 1D convolution
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolution)
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
-  this->pb->NumpyToTensorView(this->bv, "b_op");
-  conv1d(this->cv, this->av, this->bv, MATX_C_MODE_FULL, 0);
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv1d(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, 0);
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv", this->thresh);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});
+  this->pb->RunTVGenerator("conv");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv1d(this->cv_same, this->av, this->bv_even, MATX_C_MODE_SAME, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_odd});  
+  this->pb->RunTVGenerator("conv");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_odd, "b_op");
+  conv1d(this->cv_full_odd, this->av, this->bv_odd, MATX_C_MODE_FULL, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_odd, "conv_full", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_odd});   
+  this->pb->RunTVGenerator("conv");   
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_odd, "b_op");
+  conv1d(this->cv_same, this->av, this->bv_odd, MATX_C_MODE_SAME, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
-  this->pb->NumpyToTensorView(this->bv, "b_op");
-  conv1d(this->cv, this->bv, this->av, MATX_C_MODE_FULL, 0);
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv1d(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, 0);
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv", this->thresh);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
 {
   MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});  
   this->pb->RunTVGenerator("corr");
   this->pb->NumpyToTensorView(this->av, "a_op");
-  this->pb->NumpyToTensorView(this->bv, "b_op");
-  corr(this->cv, this->av, this->bv, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  corr(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "corr", this->thresh);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "corr", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
 {
   MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});  
   this->pb->RunTVGenerator("corr_swap");
   this->pb->NumpyToTensorView(this->av, "a_op");
-  this->pb->NumpyToTensorView(this->bv, "b_op");
-  corr(this->cv, this->bv, this->av, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  corr(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "corr_swap", this->thresh);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "corr_swap", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
