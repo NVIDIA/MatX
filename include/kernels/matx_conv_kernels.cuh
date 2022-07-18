@@ -163,8 +163,17 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
           }, bdims);
       }
     }
-    else {
-      // not supported yet
+    else { // Valid
+      int start_tid, stop_tid;
+      start_tid = filter_len - 1;
+      stop_tid = full_len - filter_len;
+
+      if (tid >= start_tid && tid <= stop_tid) {
+        bdims[Rank - 1] = tid - start_tid; 
+        detail::mapply([&](auto &&...args) {
+            d_out.operator()(args...) = val;
+          }, bdims);
+      }
     }
   }
 }

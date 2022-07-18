@@ -21,6 +21,7 @@ class conv_operators:
     def conv(self):
         self.res['conv_full'] = np.convolve(self.a, self.b, 'full')
         self.res['conv_same'] = np.convolve(self.a, self.b, 'same')
+        self.res['conv_valid'] = np.convolve(self.a, self.b, 'valid')
         return self.res
 
     def corr(self):
