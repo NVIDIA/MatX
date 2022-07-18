@@ -44,6 +44,8 @@ constexpr index_t b_len_even = 16;
 constexpr index_t b_len_odd = 15;
 constexpr index_t c_len_full_even = a_len + b_len_even - 1;
 constexpr index_t c_len_full_odd = a_len + b_len_odd - 1;
+constexpr index_t c_len_valid_even = a_len - b_len_even + 1;
+constexpr index_t c_len_valid_odd = a_len - b_len_odd + 1;
 constexpr index_t c_len_same = a_len;
 
 template <typename T>
@@ -68,8 +70,10 @@ protected:
   tensor_t<T, 1> bv_even{{b_len_even}};
   tensor_t<T, 1> bv_odd{{b_len_odd}};
   tensor_t<T, 1> cv_full_even{{c_len_full_even}};
+  tensor_t<T, 1> cv_full_odd{{c_len_full_odd}};  
+  tensor_t<T, 1> cv_valid_even{{c_len_valid_even}};
+  tensor_t<T, 1> cv_valid_odd{{c_len_valid_odd}};
   tensor_t<T, 1> cv_same{{c_len_same}};
-  tensor_t<T, 1> cv_full_odd{{c_len_full_odd}};
   float thresh = 0.01f;
 };
 
@@ -107,6 +111,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_even});
+  this->pb->RunTVGenerator("conv");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv1d(this->cv_valid_even, this->av, this->bv_even, MATX_C_MODE_VALID, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_even, "conv_valid", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
@@ -130,6 +147,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
   conv1d(this->cv_same, this->av, this->bv_odd, MATX_C_MODE_SAME, 0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len_odd});   
+  this->pb->RunTVGenerator("conv");   
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_odd, "b_op");
+  conv1d(this->cv_valid_odd, this->av, this->bv_odd, MATX_C_MODE_VALID, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_odd, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
