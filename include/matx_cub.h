@@ -369,24 +369,24 @@ public:
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {          
           cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, a.Data(),
-                                        a_out.Data(), static_cast<int>(a.Lsize()),
+                                        a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
                                         stream);
         }
         else {
           cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, RandomOperatorIterator{base},
-                                        a_out.Data(), static_cast<int>(a.Lsize()),
+                                        a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
                                         stream);          
         }
       }
       else {
         cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, RandomOperatorIterator{a},
-                                      a_out.Data(), static_cast<int>(a.Lsize()),
+                                      a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
                                       stream);          
       }
     }
     else {
         auto ft = [&](auto ...p){ cub::DeviceScan::InclusiveSum(p...); };
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Lsize()), stream);
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(a.Rank()-1)), stream);
         RunBatches(a_out, a, f, 1);
     }
 #endif    
