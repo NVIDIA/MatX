@@ -1149,7 +1149,11 @@ void inline median(TensorType &dest,
   constexpr int RANK_IN = TensorInType::Rank();
   static_assert(RANK_IN <= 2 && (RANK_IN == TensorType::Rank() + 1));
 
-  auto tmp_sort = make_tensor<T>(in.Shape());
+  T *tmp_alloc;
+  matxAlloc(reinterpret_cast<void **>(&tmp_alloc),
+                sizeof(T) * TotalSize(in), MATX_ASYNC_DEVICE_MEMORY,
+                stream);
+  auto tmp_sort = make_tensor<T, non_owning>(tmp_alloc, in.Shape());
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
@@ -1187,6 +1191,8 @@ void inline median(TensorType &dest,
       (dest = (sv + sv2) / 2.0f).run(stream);
     }
   }
+
+  matxFree(tmp_alloc);
 #endif  
 }
 
