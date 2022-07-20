@@ -67,7 +67,7 @@ private:
 
 public:
   // Type specifier for reflection on class
-  using scalar_type = void;
+  using scalar_type = typename T::scalar_type;
   using shape_type = typename T::shape_type;
 
   /**
@@ -90,7 +90,7 @@ public:
         index_t size = detail::get_expanded_size<Rank()>(op_, i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
-            "Size mismatch in source operator to destination tensor view");        
+            "Size mismatch in source operator to destination tensor view");
       }
     }
   }
@@ -109,42 +109,42 @@ public:
     }
 
     return out_(indices...);
-  }  
+  }
 
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
   template <typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
     if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, args...))>) {   
+                  std::is_integral_v<decltype(detail::get_value(op_, args...))>) {
       auto r = static_cast<float>(detail::get_value(op_, args...));
       out_(args...) = r;
       return r;
     }
-    else {      
+    else {
       auto r = detail::get_value(op_, args...);
-      out_(args...) = r; 
+      out_(args...) = r;
       return r;
-    }  
+    }
 
     if constexpr (!(is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, args...))>)) {   
+                  std::is_integral_v<decltype(detail::get_value(op_, args...))>)) {
       auto r = detail::get_value(op_, args...);
-      out_(args...) = r; 
+      out_(args...) = r;
       return r;
     }
-    else {      
+    else {
       auto r = static_cast<float>(detail::get_value(op_, args...));
       out_(args...) = r;
       return r;
-    }    
+    }
   }
   __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<shape_type, T::Rank()> idx) const noexcept
   {
     auto res = mapply([&](auto &&...args)  {
-        return _internal_mapply(args...);       
+        return _internal_mapply(args...);
       }, idx
-    );  
+    );
 
     return res;
   }
