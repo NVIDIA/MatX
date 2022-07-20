@@ -1382,7 +1382,6 @@ void sort(OutputTensor &a_out, const InputOperator &a,
 
   detail::SortParams_t p{dir};
 
-  // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
@@ -1500,6 +1499,9 @@ void hist(OutputTensor &a_out, const InputOperator &a,
   //           ret.value());
   //   sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   // }
+
+  // Remove once caching fixed
+  delete tmp;
 #endif  
 }
 
@@ -1630,6 +1632,8 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   //           ret.value());
   //   sort_type->ExecSelect(a_out, a, stream);
   // }
+  // Remove once caching fixed
+  delete tmp;  
 #endif  
 }
 
@@ -1691,6 +1695,8 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
   //           ret.value());
   //   sort_type->ExecSelectIndex(a_out, a, stream);
   // }
+  // Remove once caching fixed
+  delete tmp;  
 #endif  
 }
 
