@@ -106,6 +106,105 @@ struct UniqueParams_t {
 
 struct EmptyParams_t {};
 
+template <typename OperatorType>
+struct BeginOffset {
+  using self_type = BeginOffset<OperatorType>;
+  using value_type = typename OperatorType::scalar_type;
+  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  //                         index_t>;
+  using stride_type = index_t;
+  using pointer = value_type*;
+  using reference = value_type;
+  using iterator_category = std::random_access_iterator_tag;
+  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(stride_type size, stride_type offset) : size_(size), offset_(offset) {}
+
+  /**
+   * @brief Dereference value at a pre-computed offset
+   * 
+   * @return Value at offset 
+   */
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  {
+    return offset_ * size_;
+  }  
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
+  {
+    return self_type{size_, offset_ + offset};
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
+  {
+    return *self_type{size_, offset_ + offset};
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
+  {
+      self_type retval = *this;
+      offset_++;
+      return retval;
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
+  {
+      offset_++;
+      return *this;
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
+  {
+      offset_ += offset;
+      return *this;
+  }
+
+  stride_type size_;
+  stride_type offset_;  
+};
+
+template <typename OperatorType>
+struct EndOffset {
+  using self_type = BeginOffset<OperatorType>;
+  using value_type = typename OperatorType::scalar_type;
+  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  //                         index_t>;
+  using stride_type = index_t;
+  using pointer = value_type*;
+  using reference = value_type;
+  using iterator_category = std::random_access_iterator_tag;
+  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(stride_type size, stride_type offset) : size_(size), offset_(offset) {}
+
+  /**
+   * @brief Dereference value at a pre-computed offset
+   * 
+   * @return Value at offset 
+   */
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  {
+    return (offset_ + 1) * size_;
+  }  
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
+  {
+    return self_type{size_, offset_ + offset};
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
+  {
+    return ( offset + 1) * size_;
+  }  
+
+  stride_type size_;
+  stride_type offset_;  
+};
+
 
 template <typename OutputTensor, typename InputOperator, CUBOperation_t op, typename CParams = EmptyParams_t>
 class matxCubPlan_t {
@@ -142,22 +241,6 @@ public:
       for (int i = 0; i < a.Rank(); i++) {
         MATX_ASSERT(a.Size(i) == a_out.Size(i), matxInvalidSize);
       }
-    }
-
-    if constexpr ((RANK == 1 && ( op == CUB_OP_REDUCE_SUM ||
-                                  op == CUB_OP_REDUCE ||
-                                  op == CUB_OP_REDUCE_MIN ||
-                                  op == CUB_OP_REDUCE_MAX)) ||
-                  (RANK == 2 && op == CUB_OP_RADIX_SORT)) {
-      matxAlloc((void **)&d_offsets, (a.Size(a.Rank() - 2) + 1) * sizeof(index_t),
-                MATX_ASYNC_DEVICE_MEMORY, stream);
-      for (index_t i = 0; i < a.Size(a.Rank() - 2) + 1; i++) {
-        offsets.push_back(i * a.Size(a.Rank() - 1));
-      }
-
-      cudaMemcpyAsync(d_offsets, offsets.data(),
-                      offsets.size() * sizeof(index_t),
-                      cudaMemcpyHostToDevice, stream);
     }
 
     if constexpr (op == CUB_OP_RADIX_SORT) {
@@ -231,7 +314,6 @@ public:
   ~matxCubPlan_t()
   {
     matxFree(d_temp);
-    matxFree(d_offsets);
   }
 
   template <typename Func>
@@ -318,27 +400,27 @@ public:
         if (a.IsContiguous()) {      
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a_out.Lsize() + 1), lower, upper,
-              static_cast<int>(a.Lsize()), stream);
+              static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+              static_cast<int>(a.Size(a.Rank() - 1)), stream);
         }
         else {
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, RandomOperatorIterator{base}, a_out.Data(),
-              static_cast<int>(a_out.Lsize() + 1), lower, upper,
-              static_cast<int>(a.Lsize()), stream);          
+              static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+              static_cast<int>(a.Size(a.Rank() - 1)), stream);          
         }
       }
       else {
         cub::DeviceHistogram::HistogramEven(
             d_temp, temp_storage_bytes, RandomOperatorIterator{a}, a_out.Data(),
-            static_cast<int>(a_out.Lsize() + 1), lower, upper,
-            static_cast<int>(a.Lsize()), stream);               
+            static_cast<int>(a_out.Size(a_out.Rank() - 1)  + 1), lower, upper,
+            static_cast<int>(a.Size(a.Rank() - 1)), stream);               
       }
     }
     else { // Batch higher dims
       auto ft = [&](auto ...p){ return cub::DeviceHistogram::HistogramEven(p...); };
-      auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a_out.Lsize() + 1), lower, upper,
-            static_cast<int>(a.Lsize()), stream);
+      auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+            static_cast<int>(a.Size(a.Rank() - 1)), stream);
       RunBatches(a_out, a, f, 2);  
     }
 #endif    
@@ -436,13 +518,13 @@ public:
           cub::DeviceSegmentedRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
+              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
         }
         else {
           cub::DeviceSegmentedRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              d_offsets, d_offsets + 1, 0, sizeof(T1) * 8, stream);
+              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
         }
       }
       else {
@@ -459,7 +541,7 @@ public:
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
 
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              d_offsets, d_offsets + 1, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
             auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
@@ -474,7 +556,7 @@ public:
         else {
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              d_offsets, d_offsets + 1, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
             auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
@@ -558,8 +640,7 @@ public:
                                               a.Data(), 
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);      
         }
         else {
@@ -568,8 +649,7 @@ public:
                                               RandomOperatorIterator{base}, 
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);             
         }
       }
@@ -579,8 +659,7 @@ public:
                                             RandomOperatorIterator{a},  
                                             a_out.Data(), 
                                             static_cast<int>(a_out.Size(0)), 
-                                            d_offsets, 
-                                            d_offsets + 1, 
+                                            BeginOffset{a}, EndOffset{a},
                                             stream);         
       }        
     }
@@ -647,8 +726,7 @@ public:
                                               a.Data(), 
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream); 
         }     
         else {
@@ -657,8 +735,7 @@ public:
                                               RandomOperatorIterator{base},  
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);            
         }
       }
@@ -668,8 +745,7 @@ public:
                                             RandomOperatorIterator{a},  
                                             a_out.Data(), 
                                             static_cast<int>(a_out.Size(0)), 
-                                            d_offsets, 
-                                            d_offsets + 1, 
+                                            BeginOffset{a}, EndOffset{a},
                                             stream);         
       }        
     }
@@ -736,8 +812,7 @@ public:
                                               a.Data(), 
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);      
         }
         else {
@@ -746,8 +821,7 @@ public:
                                               RandomOperatorIterator{base},  
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);            
         }
       }
@@ -757,8 +831,7 @@ public:
                                             RandomOperatorIterator{a},  
                                             a_out.Data(), 
                                             static_cast<int>(a_out.Size(0)), 
-                                            d_offsets, 
-                                            d_offsets + 1, 
+                                            BeginOffset{a}, EndOffset{a},
                                             stream);         
       }        
     }
@@ -825,8 +898,7 @@ public:
                                               a.Data(), 
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a}, 
                                               stream);
         }
         else {
@@ -835,8 +907,7 @@ public:
                                               RandomOperatorIterator{base},  
                                               a_out.Data(), 
                                               static_cast<int>(a_out.Size(0)), 
-                                              d_offsets, 
-                                              d_offsets + 1, 
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);             
         }
       }
@@ -846,8 +917,7 @@ public:
                                             RandomOperatorIterator{a},  
                                             a_out.Data(), 
                                             static_cast<int>(a_out.Size(0)), 
-                                            d_offsets, 
-                                            d_offsets + 1, 
+                                            BeginOffset{a}, EndOffset{a},
                                             stream);         
       }        
     }
@@ -1052,8 +1122,6 @@ private:
   CubParams_t params;
   CParams cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
-  std::vector<index_t> offsets;
-  index_t *d_offsets = nullptr;
   int *d_histogram = nullptr; // Used for hist()
   size_t temp_storage_bytes = 0;
 };
@@ -1316,19 +1384,19 @@ void sort(OutputTensor &a_out, const InputOperator &a,
 
   // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
-  // auto ret = detail::cub_cache.Lookup(params);
-  // if (ret == std::nullopt) {
+  auto ret = detail::cub_cache.Lookup(params);
+  if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
         a_out, a, p, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSort(a_out, a, stream, dir);
-  // }
-  // else {
-  //   auto sort_type =
-  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)> *>(
-  //           ret.value());
-  //   sort_type->ExecSort(a_out, a, stream, dir);
-  // }
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)> *>(
+            ret.value());
+    sort_type->ExecSort(a_out, a, stream, dir);
+  }
 #endif  
 }
 
@@ -1408,9 +1476,9 @@ void hist(OutputTensor &a_out, const InputOperator &a,
   static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram tensor must use int type");
 #ifdef __CUDACC__    
   // Get parameters required by these tensors
-  auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
-  params.stream = stream;
+  // auto params =
+  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
+  // params.stream = stream;
 
   // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
@@ -1422,7 +1490,7 @@ void hist(OutputTensor &a_out, const InputOperator &a,
                                           detail::CUB_OP_HIST_EVEN, 
                                           detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecHistEven(a_out, a, lower, upper, stream);
   // }
   // else {
@@ -1539,9 +1607,9 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   // Get parameters required by these tensors
-  auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
-  params.stream = stream;
+  // auto params =
+  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
+  // params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   //auto ret = detail::cub_cache.Lookup(params);
@@ -1553,7 +1621,7 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
                                           InputOperator, 
                                           detail::CUB_OP_SELECT, 
                                           decltype(cparams)>{a_out, a, cparams, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelect(a_out, a, stream);
   // }
   // else {
@@ -1600,9 +1668,9 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   // Get parameters required by these tensors
-  auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a);
-  params.stream = stream;
+  // auto params =
+  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a);
+  // params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   //auto ret = detail::cub_cache.Lookup(params);
@@ -1614,7 +1682,7 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
                                           InputOperator, 
                                           detail::CUB_OP_SELECT_IDX, 
                                           decltype(cparams)>{a_out, a, cparams, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelectIndex(a_out, a, stream);
   // }
   // else {
