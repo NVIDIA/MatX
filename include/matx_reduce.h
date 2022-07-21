@@ -1102,17 +1102,18 @@ void inline mean(TensorType &dest, const InType &in,
                  cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  float scale = 1.0;
+  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+  inner_type scale = 1;
 
   sum(dest, in, stream);
 
   // The reduction is performed over the difference in ranks between input and
   // output. This loop computes the number of elements it was performed over.
   for (int i = 1; i <= InType::Rank() - TensorType::Rank(); i++) {
-    scale *= static_cast<float>(in.Size(InType::Rank() - i));
+    scale *= static_cast<inner_type>(in.Size(InType::Rank() - i));
   }
 
-  (dest = dest * 1.0 / scale).run(stream);
+  (dest = dest * static_cast<inner_type>(1) / scale).run(stream);
 #endif  
 }
 
@@ -1472,15 +1473,22 @@ template <typename TensorType, typename InType>
 void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
-  typename TensorType::scalar_type *tmps;
-  matxAlloc((void **)&tmps, dest.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tmpv = make_tensor(tmps, dest.Descriptor());
+  typename InType::scalar_type *tmps;
+  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+
+  matxAlloc((void **)&tmps, TotalSize(dest)*sizeof(decltype(*tmps)), MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto mean_tns = make_tensor<typename InType::scalar_type>(tmps, dest.Descriptor());
 
   // Compute mean of each dimension
-  mean(tmpv, in, stream);
+  mean(mean_tns, in, stream);
 
   // Subtract means from each value, square the result, and sum
-  sum(dest, pow(in - tmpv, 2), stream);
+  if constexpr (is_complex_v<typename InType::scalar_type>) {
+    sum(dest, pow(abs(in - mean_tns), static_cast<inner_type>(2)), stream);
+  }
+  else {
+    sum(dest, pow(in - mean_tns, 2), stream);
+  }
 
   // The length of what we are taking the variance over is equal to the product
   // of the outer dimensions covering the different in input/output ranks
@@ -1490,7 +1498,7 @@ void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
   }
 
   // Sample variance for an unbiased estimate
-  (dest = dest / static_cast<double>(N - 1)).run(stream);
+  (dest = dest / static_cast<inner_type>(N - 1)).run(stream);
 #endif  
 }
 

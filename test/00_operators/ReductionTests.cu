@@ -73,6 +73,9 @@ class ReductionTestsNumericNoHalf : public ::testing::Test {
 template <typename TensorType>
 class ReductionTestsAll : public ::testing::Test {
 };
+template <typename TensorType>
+class ReductionTestsComplexNonHalfTypes : public ::testing::Test {
+};
 
 TYPED_TEST_SUITE(ReductionTestsAll, MatXAllTypes);
 TYPED_TEST_SUITE(ReductionTestsComplex, MatXComplexTypes);
@@ -87,6 +90,7 @@ TYPED_TEST_SUITE(ReductionTestsFloatNonComplexNonHalf,
 TYPED_TEST_SUITE(ReductionTestsBoolean, MatXBoolTypes);
 TYPED_TEST_SUITE(ReductionTestsFloatHalf, MatXFloatHalfTypes);
 TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNoHalfTypes);
+TYPED_TEST_SUITE(ReductionTestsComplexNonHalfTypes, MatXComplexNonHalfTypes);
 
 
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
@@ -98,6 +102,27 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
   pb->InitAndRunTVGenerator<TypeParam>("00_operators", "stats", "run", {size});
 
   tensor_t<TypeParam, 0> t0;
+  tensor_t<TypeParam, 1> t1({size});
+  pb->NumpyToTensorView(t1, "x");
+
+  var(t0, t1, 0);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "var", 0.01);
+
+  stdd(t0, t1, 0);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
+{
+  MATX_ENTER_HANDLER();
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  constexpr index_t size = 100;
+  pb->InitAndRunTVGenerator<TypeParam>("00_operators", "stats", "run", {size});
+
+  tensor_t<typename TypeParam::value_type, 0> t0;
   tensor_t<TypeParam, 1> t1({size});
   pb->NumpyToTensorView(t1, "x");
 
