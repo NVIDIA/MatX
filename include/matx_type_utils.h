@@ -232,6 +232,9 @@ struct is_cuda_complex<cuda::std::complex<T>> : std::true_type {
 template <class T>
 inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<T>::value;
 
+
+
+
 namespace detail {
 template <typename T> struct is_complex : std::false_type {
 };
@@ -255,6 +258,22 @@ template <> struct is_complex<matxBf16Complex> : std::true_type {
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_complex_v = detail::is_complex<T>::value;
+
+
+/**
+ * @brief Get the inner value_type of the container
+ * @tparam T Type to test
+ */
+template <typename T, typename = void>
+struct inner_op_type_t {
+  using type = T;
+};
+
+template <typename T>
+struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> { 
+  using type = typename T::value_type;
+};
+
 
 
 namespace detail {
