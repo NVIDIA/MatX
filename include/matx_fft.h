@@ -151,19 +151,31 @@ public:
                         ? o.Size(RANK - 1)
                         : i.Size(RANK - 1);
 
-      size_t freeMem, totalMem;
-      auto err = cudaMemGetInfo(&freeMem, &totalMem);
-      // Use up to 30% of free memory to batch, assuming memory use matches batch size
-      double max_for_fft_workspace = static_cast<double>(freeMem) * 0.3;
+      if (i.IsContiguous()) {
+        size_t freeMem, totalMem;
+        auto err = cudaMemGetInfo(&freeMem, &totalMem);
+        // Use up to 30% of free memory to batch, assuming memory use matches batch size
+        double max_for_fft_workspace = static_cast<double>(freeMem) * 0.3;
 
-      params.batch = 1;
-      for (int dim = i.Rank() - 2; dim >= 0; dim--) {
-        if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::scalar_type)) > max_for_fft_workspace) {
-          break;
+        params.batch = 1;
+        for (int dim = i.Rank() - 2; dim >= 0; dim--) {
+          if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::scalar_type)) > max_for_fft_workspace) {
+            break;
+          }
+
+          params.batch_dims++;
+          params.batch *= i.Size(dim);
         }
-
-        params.batch_dims++;
-        params.batch *= i.Size(dim);
+      }
+      else {
+        if (RANK == 1) {
+          params.batch = 1;
+          params.batch_dims = 0;
+        }
+        else {
+          params.batch = i.Size(RANK-2);
+          params.batch_dims = 1; 
+        }
       }
       
       params.inembed[0] = i.Size(RANK - 1); // Unused
@@ -443,14 +455,14 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
     std::array<shape_type, InTensorType::Rank()> idx{0};
     auto i_shape = i.Shape();
     // Get total number of batches
-    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 2), 1, std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 1), 1, std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
       auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
       this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 
       // Update all but the last 2 indices
-      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, this->params_.batch_dims + 2);
+      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, this->params_.batch_dims + 1);
     }
   }
    
