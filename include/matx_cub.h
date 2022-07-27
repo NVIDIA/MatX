@@ -37,7 +37,7 @@
 #include "matx_tensor.h"
 #include <functional>
 #include <cstdio>
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
 #include <cub/cub.cuh>
 #endif
 #include <numeric>
@@ -48,9 +48,9 @@ using namespace std::placeholders;
 
 /**
  * @brief Direction for sorting
- * 
+ *
  */
-typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t; 
+typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
 
 /**
  * Parameters needed to execute a sort operation.
@@ -87,7 +87,7 @@ struct SortParams_t {
   SortDirection_t dir;
 };
 
-template <typename Op, typename I> 
+template <typename Op, typename I>
 struct ReduceParams_t {
   Op reduce_op;
   I init;
@@ -124,13 +124,13 @@ struct BeginOffset {
 
   /**
    * @brief Dereference value at a pre-computed offset
-   * 
-   * @return Value at offset 
+   *
+   * @return Value at offset
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
   {
     return offset_ * size_;
-  }  
+  }
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
   {
@@ -140,20 +140,20 @@ struct BeginOffset {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
   {
     return *self_type{size_, offset_ + offset};
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
   {
       self_type retval = *this;
       offset_++;
       return retval;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
   {
       offset_++;
       return *this;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
   {
@@ -162,7 +162,7 @@ struct BeginOffset {
   }
 
   stride_type size_;
-  stride_type offset_;  
+  stride_type offset_;
 };
 
 template <typename OperatorType>
@@ -183,13 +183,13 @@ struct EndOffset {
 
   /**
    * @brief Dereference value at a pre-computed offset
-   * 
-   * @return Value at offset 
+   *
+   * @return Value at offset
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
   {
     return (offset_ + 1) * size_;
-  }  
+  }
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
   {
@@ -199,10 +199,10 @@ struct EndOffset {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
   {
     return ( offset + 1) * size_;
-  }  
+  }
 
   stride_type size_;
-  stride_type offset_;  
+  stride_type offset_;
 };
 
 
@@ -233,7 +233,7 @@ public:
   matxCubPlan_t(OutputTensor &a_out, const InputOperator &a, const CParams &cparams, const cudaStream_t stream = 0) :
     cparams_(cparams)
   {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
     // Input/output tensors much match rank/dims
     if constexpr (op == CUB_OP_RADIX_SORT || op == CUB_OP_INC_SUM) {
       static_assert(OutputTensor::Rank() == InputOperator::Rank(), "CUB input and output tensor ranks must match");
@@ -255,24 +255,24 @@ public:
     else if constexpr (op == CUB_OP_REDUCE) { // General reduce
       ExecReduce(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_REDUCE_SUM) { 
+    else if constexpr (op == CUB_OP_REDUCE_SUM) {
       ExecSum(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_REDUCE_MIN) { 
+    else if constexpr (op == CUB_OP_REDUCE_MIN) {
       ExecMin(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_REDUCE_MAX) { 
+    else if constexpr (op == CUB_OP_REDUCE_MAX) {
       ExecMax(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_SELECT) { 
+    else if constexpr (op == CUB_OP_SELECT) {
       ExecSelect(a_out, a, stream);
-    }     
+    }
     else if constexpr (op == CUB_OP_SELECT_IDX) {
       ExecSelectIndex(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_UNIQUE) { 
+    else if constexpr (op == CUB_OP_UNIQUE) {
       ExecUnique(a_out, a, stream);
-    }      
+    }
     else {
       MATX_THROW(matxNotSupported, "Invalid CUB operation");
     }
@@ -280,7 +280,7 @@ public:
     // Allocate any workspace needed by Sort
     matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
               stream);
-#endif  
+#endif
   }
 
   static CubParams_t GetCubParams(OutputTensor &a_out,
@@ -330,7 +330,7 @@ public:
     index_t offset = 0;
     for (int i = InputOperator::Rank() - batch_offset; i < InputOperator::Rank(); i++) {
       total_per_batch *= a.Size(i);
-    }   
+    }
 
     std::array<shape_type, InputOperator::Rank()> idx{0};
 
@@ -355,7 +355,7 @@ public:
           offset += total_per_batch;
 
           UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-        }        
+        }
       }
     }
     else {
@@ -366,7 +366,7 @@ public:
         offset += total_per_batch;
 
         UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-      }        
+      }
     }
   }
 
@@ -393,11 +393,11 @@ public:
                            const InputOperator &a, const T1 lower,
                            const T1 upper, const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
-        if (a.IsContiguous()) {      
+        if (a.IsContiguous()) {
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
@@ -407,23 +407,23 @@ public:
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, RandomOperatorIterator{base}, a_out.Data(),
               static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
-              static_cast<int>(a.Size(a.Rank() - 1)), stream);          
+              static_cast<int>(a.Size(a.Rank() - 1)), stream);
         }
       }
       else {
         cub::DeviceHistogram::HistogramEven(
             d_temp, temp_storage_bytes, RandomOperatorIterator{a}, a_out.Data(),
             static_cast<int>(a_out.Size(a_out.Rank() - 1)  + 1), lower, upper,
-            static_cast<int>(a.Size(a.Rank() - 1)), stream);               
+            static_cast<int>(a.Size(a.Rank() - 1)), stream);
       }
     }
     else { // Batch higher dims
       auto ft = [&](auto ...p){ return cub::DeviceHistogram::HistogramEven(p...); };
       auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
             static_cast<int>(a.Size(a.Rank() - 1)), stream);
-      RunBatches(a_out, a, f, 2);  
+      RunBatches(a_out, a, f, 2);
     }
-#endif    
+#endif
   }
 
   /**
@@ -445,11 +445,11 @@ public:
                                const InputOperator &a,
                                const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-        if (a.IsContiguous()) {          
+        if (a.IsContiguous()) {
           cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, a.Data(),
                                         a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
                                         stream);
@@ -457,13 +457,13 @@ public:
         else {
           cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, RandomOperatorIterator{base},
                                         a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
-                                        stream);          
+                                        stream);
         }
       }
       else {
         cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, RandomOperatorIterator{a},
                                       a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
-                                      stream);          
+                                      stream);
       }
     }
     else {
@@ -471,7 +471,7 @@ public:
         auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(a.Rank()-1)), stream);
         RunBatches(a_out, a, f, 1);
     }
-#endif    
+#endif
   }
 
   /**
@@ -501,7 +501,7 @@ public:
     MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
 
     if constexpr (is_tensor_view_v<InputOperator>) {
-      if (RANK == 1) { 
+      if (RANK == 1) {
         if (dir == SORT_DIR_ASC) {
           cub::DeviceRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -512,13 +512,15 @@ public:
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
         }
-      }        
-      else if (RANK == 2 || d_temp == nullptr) {              
+      }
+      else if (RANK == 2 || d_temp == nullptr) {
         if (dir == SORT_DIR_ASC) {
-          cub::DeviceSegmentedRadixSort::SortKeys(
+          cub::DeviceSegmentedSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+              static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, stream);
+
         }
         else {
           cub::DeviceSegmentedRadixSort::SortKeysDescending(
@@ -566,11 +568,11 @@ public:
 
             // Update all but the last batch_offset indices
             UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-          }        
+          }
         }
       }
     }
-#endif    
+#endif
   }
 
 
@@ -595,76 +597,76 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-        if (a.IsContiguous()) {   
-          cub::DeviceReduce::Reduce(d_temp, 
-                                    temp_storage_bytes, 
-                                    a.Data(), 
-                                    a_out.Data(), 
-                                    static_cast<int>(TotalSize(a)), 
-                                    cparams_.reduce_op, 
+        if (a.IsContiguous()) {
+          cub::DeviceReduce::Reduce(d_temp,
+                                    temp_storage_bytes,
+                                    a.Data(),
+                                    a_out.Data(),
+                                    static_cast<int>(TotalSize(a)),
+                                    cparams_.reduce_op,
                                     cparams_.init,
-                                    stream); 
+                                    stream);
         }
         else {
-          cub::DeviceReduce::Reduce(d_temp, 
-                                    temp_storage_bytes, 
-                                    RandomOperatorIterator{base}, 
-                                    a_out.Data(), 
-                                    static_cast<int>(TotalSize(a)), 
-                                    cparams_.reduce_op, 
+          cub::DeviceReduce::Reduce(d_temp,
+                                    temp_storage_bytes,
+                                    RandomOperatorIterator{base},
+                                    a_out.Data(),
+                                    static_cast<int>(TotalSize(a)),
+                                    cparams_.reduce_op,
                                     cparams_.init,
-                                    stream);            
+                                    stream);
         }
       }
       else {
-        cub::DeviceReduce::Reduce(d_temp, 
-                                  temp_storage_bytes, 
-                                  RandomOperatorIterator{a}, 
-                                  a_out.Data(), 
-                                  static_cast<int>(TotalSize(a)), 
-                                  cparams_.reduce_op, 
+        cub::DeviceReduce::Reduce(d_temp,
+                                  temp_storage_bytes,
+                                  RandomOperatorIterator{a},
+                                  a_out.Data(),
+                                  static_cast<int>(TotalSize(a)),
+                                  cparams_.reduce_op,
                                   cparams_.init,
-                                  stream);              
-      }                                     
+                                  stream);
+      }
     }
     else if constexpr (RANK == 1) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-        if (a.IsContiguous()) { 
-          cub::DeviceSegmentedReduce::Reduce( d_temp, 
-                                              temp_storage_bytes, 
-                                              a.Data(), 
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+        if (a.IsContiguous()) {
+          cub::DeviceSegmentedReduce::Reduce( d_temp,
+                                              temp_storage_bytes,
+                                              a.Data(),
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);      
+                                              stream);
         }
         else {
-          cub::DeviceSegmentedReduce::Reduce( d_temp, 
-                                              temp_storage_bytes, 
-                                              RandomOperatorIterator{base}, 
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Reduce( d_temp,
+                                              temp_storage_bytes,
+                                              RandomOperatorIterator{base},
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);             
+                                              stream);
         }
       }
       else {
-        cub::DeviceSegmentedReduce::Reduce( d_temp, 
-                                            temp_storage_bytes, 
-                                            RandomOperatorIterator{a},  
-                                            a_out.Data(), 
-                                            static_cast<int>(a_out.Size(0)), 
+        cub::DeviceSegmentedReduce::Reduce( d_temp,
+                                            temp_storage_bytes,
+                                            RandomOperatorIterator{a},
+                                            a_out.Data(),
+                                            static_cast<int>(a_out.Size(0)),
                                             BeginOffset{a}, EndOffset{a},
-                                            stream);         
-      }        
+                                            stream);
+      }
     }
-#endif    
-  }  
+#endif
+  }
 
   /**
    * Execute a sum on a tensor
@@ -674,7 +676,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -687,70 +689,70 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__ 
+#ifdef __CUDACC__
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceReduce::Sum(d_temp, 
-                                    temp_storage_bytes, 
-                                    a.Data(), 
-                                    a_out.Data(), 
+          cub::DeviceReduce::Sum(d_temp,
+                                    temp_storage_bytes,
+                                    a.Data(),
+                                    a_out.Data(),
                                     static_cast<int>(TotalSize(a)),
-                                    stream);           
+                                    stream);
         }
         else {
-          cub::DeviceReduce::Sum(d_temp, 
-                                    temp_storage_bytes, 
-                                    RandomOperatorIterator{base}, 
-                                    a_out.Data(), 
+          cub::DeviceReduce::Sum(d_temp,
+                                    temp_storage_bytes,
+                                    RandomOperatorIterator{base},
+                                    a_out.Data(),
                                     static_cast<int>(TotalSize(a)),
-                                    stream);  
+                                    stream);
         }
       }
       else {
-        cub::DeviceReduce::Sum(d_temp, 
-                                  temp_storage_bytes, 
-                                  RandomOperatorIterator{a}, 
-                                  a_out.Data(), 
+        cub::DeviceReduce::Sum(d_temp,
+                                  temp_storage_bytes,
+                                  RandomOperatorIterator{a},
+                                  a_out.Data(),
                                   static_cast<int>(TotalSize(a)),
-                                  stream);              
-      }                                     
+                                  stream);
+      }
     }
     else if constexpr (RANK == 1) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceSegmentedReduce::Sum( d_temp, 
-                                              temp_storage_bytes, 
-                                              a.Data(), 
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Sum( d_temp,
+                                              temp_storage_bytes,
+                                              a.Data(),
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream); 
-        }     
+                                              stream);
+        }
         else {
-          cub::DeviceSegmentedReduce::Sum( d_temp, 
-                                              temp_storage_bytes, 
-                                              RandomOperatorIterator{base},  
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Sum( d_temp,
+                                              temp_storage_bytes,
+                                              RandomOperatorIterator{base},
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);            
+                                              stream);
         }
       }
       else {
-        cub::DeviceSegmentedReduce::Sum( d_temp, 
-                                            temp_storage_bytes, 
-                                            RandomOperatorIterator{a},  
-                                            a_out.Data(), 
-                                            static_cast<int>(a_out.Size(0)), 
+        cub::DeviceSegmentedReduce::Sum( d_temp,
+                                            temp_storage_bytes,
+                                            RandomOperatorIterator{a},
+                                            a_out.Data(),
+                                            static_cast<int>(a_out.Size(0)),
                                             BeginOffset{a}, EndOffset{a},
-                                            stream);         
-      }        
+                                            stream);
+      }
     }
-#endif    
-  }    
+#endif
+  }
 
   /**
    * Execute a min on a tensor
@@ -760,7 +762,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -773,69 +775,69 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceReduce::Min(d_temp, 
-                                    temp_storage_bytes, 
-                                    a.Data(), 
-                                    a_out.Data(), 
+          cub::DeviceReduce::Min(d_temp,
+                                    temp_storage_bytes,
+                                    a.Data(),
+                                    a_out.Data(),
                                     static_cast<int>(TotalSize(a)),
-                                    stream); 
+                                    stream);
         }
         else {
-          cub::DeviceReduce::Min(d_temp, 
-                                    temp_storage_bytes, 
-                                    RandomOperatorIterator{base}, 
-                                    a_out.Data(), 
+          cub::DeviceReduce::Min(d_temp,
+                                    temp_storage_bytes,
+                                    RandomOperatorIterator{base},
+                                    a_out.Data(),
                                     static_cast<int>(TotalSize(a)),
-                                    stream);           
+                                    stream);
         }
       }
       else {
-        cub::DeviceReduce::Min(d_temp, 
-                                  temp_storage_bytes, 
-                                  RandomOperatorIterator{a}, 
-                                  a_out.Data(), 
+        cub::DeviceReduce::Min(d_temp,
+                                  temp_storage_bytes,
+                                  RandomOperatorIterator{a},
+                                  a_out.Data(),
                                   static_cast<int>(TotalSize(a)),
-                                  stream);              
-      }                                     
+                                  stream);
+      }
     }
     else if constexpr (RANK == 1) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceSegmentedReduce::Min( d_temp, 
-                                              temp_storage_bytes, 
-                                              a.Data(), 
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Min( d_temp,
+                                              temp_storage_bytes,
+                                              a.Data(),
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);      
+                                              stream);
         }
         else {
-          cub::DeviceSegmentedReduce::Min( d_temp, 
-                                              temp_storage_bytes, 
-                                              RandomOperatorIterator{base},  
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Min( d_temp,
+                                              temp_storage_bytes,
+                                              RandomOperatorIterator{base},
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);            
+                                              stream);
         }
       }
       else {
-        cub::DeviceSegmentedReduce::Min( d_temp, 
-                                            temp_storage_bytes, 
-                                            RandomOperatorIterator{a},  
-                                            a_out.Data(), 
-                                            static_cast<int>(a_out.Size(0)), 
+        cub::DeviceSegmentedReduce::Min( d_temp,
+                                            temp_storage_bytes,
+                                            RandomOperatorIterator{a},
+                                            a_out.Data(),
+                                            static_cast<int>(a_out.Size(0)),
                                             BeginOffset{a}, EndOffset{a},
-                                            stream);         
-      }        
+                                            stream);
+      }
     }
-#endif    
+#endif
   }
 
   /**
@@ -846,7 +848,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -859,69 +861,69 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceReduce::Max(d_temp, 
-                                    temp_storage_bytes, 
-                                    a.Data(), 
-                                    a_out.Data(), 
-                                    static_cast<int>(TotalSize(a)), 
-                                    stream); 
+          cub::DeviceReduce::Max(d_temp,
+                                    temp_storage_bytes,
+                                    a.Data(),
+                                    a_out.Data(),
+                                    static_cast<int>(TotalSize(a)),
+                                    stream);
         }
         else {
-          cub::DeviceReduce::Max(d_temp, 
-                                    temp_storage_bytes, 
-                                    RandomOperatorIterator{base}, 
-                                    a_out.Data(), 
-                                    static_cast<int>(TotalSize(a)), 
-                                    stream);           
+          cub::DeviceReduce::Max(d_temp,
+                                    temp_storage_bytes,
+                                    RandomOperatorIterator{base},
+                                    a_out.Data(),
+                                    static_cast<int>(TotalSize(a)),
+                                    stream);
         }
       }
       else {
-        cub::DeviceReduce::Max(d_temp, 
-                                  temp_storage_bytes, 
-                                  RandomOperatorIterator{a}, 
-                                  a_out.Data(), 
-                                  static_cast<int>(TotalSize(a)), 
-                                  stream);              
-      }                                     
+        cub::DeviceReduce::Max(d_temp,
+                                  temp_storage_bytes,
+                                  RandomOperatorIterator{a},
+                                  a_out.Data(),
+                                  static_cast<int>(TotalSize(a)),
+                                  stream);
+      }
     }
     else if constexpr (RANK == 1) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceSegmentedReduce::Max( d_temp, 
-                                              temp_storage_bytes, 
-                                              a.Data(), 
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
-                                              BeginOffset{a}, EndOffset{a}, 
+          cub::DeviceSegmentedReduce::Max( d_temp,
+                                              temp_storage_bytes,
+                                              a.Data(),
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
+                                              BeginOffset{a}, EndOffset{a},
                                               stream);
         }
         else {
-          cub::DeviceSegmentedReduce::Max( d_temp, 
-                                              temp_storage_bytes, 
-                                              RandomOperatorIterator{base},  
-                                              a_out.Data(), 
-                                              static_cast<int>(a_out.Size(0)), 
+          cub::DeviceSegmentedReduce::Max( d_temp,
+                                              temp_storage_bytes,
+                                              RandomOperatorIterator{base},
+                                              a_out.Data(),
+                                              static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
-                                              stream);             
+                                              stream);
         }
       }
       else {
-        cub::DeviceSegmentedReduce::Max( d_temp, 
-                                            temp_storage_bytes, 
-                                            RandomOperatorIterator{a},  
-                                            a_out.Data(), 
-                                            static_cast<int>(a_out.Size(0)), 
+        cub::DeviceSegmentedReduce::Max( d_temp,
+                                            temp_storage_bytes,
+                                            RandomOperatorIterator{a},
+                                            a_out.Data(),
+                                            static_cast<int>(a_out.Size(0)),
                                             BeginOffset{a}, EndOffset{a},
-                                            stream);         
-      }        
+                                            stream);
+      }
     }
-#endif    
+#endif
   }
 
 
@@ -933,7 +935,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -946,47 +948,47 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     if constexpr (is_tensor_view_v<InputOperator>) {
       const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
       if (a.IsContiguous()) {
-        cub::DeviceSelect::If(d_temp, 
-                              temp_storage_bytes, 
-                              a.Data(), 
-                              a_out.Data(), 
+        cub::DeviceSelect::If(d_temp,
+                              temp_storage_bytes,
+                              a.Data(),
+                              a_out.Data(),
                               cparams_.num_found.Data(),
-                              static_cast<int>(TotalSize(a)), 
+                              static_cast<int>(TotalSize(a)),
                               cparams_.op,
-                              stream); 
+                              stream);
       }
       else {
-        cub::DeviceSelect::If(d_temp, 
-                              temp_storage_bytes, 
+        cub::DeviceSelect::If(d_temp,
+                              temp_storage_bytes,
                               RandomOperatorIterator{base},
-                              a_out.Data(), 
+                              a_out.Data(),
                               cparams_.num_found.Data(),
-                              static_cast<int>(TotalSize(a)), 
+                              static_cast<int>(TotalSize(a)),
                               cparams_.op,
-                              stream);            
+                              stream);
       }
     }
     else {
-      cub::DeviceSelect::If(d_temp, 
-                            temp_storage_bytes, 
+      cub::DeviceSelect::If(d_temp,
+                            temp_storage_bytes,
                             RandomOperatorIterator{a},
-                            a_out.Data(), 
+                            a_out.Data(),
                             cparams_.num_found.Data(),
-                            static_cast<int>(TotalSize(a)), 
+                            static_cast<int>(TotalSize(a)),
                             cparams_.op,
-                            stream);            
-    }                                  
-#endif    
-  }   
+                            stream);
+    }
+#endif
+  }
 
 
   /**
    * @brief Helper class for wrapping counting iterator and data
-   * 
+   *
    * @tparam DataInputIterator Data input
    * @tparam SelectOp Selection operator
    */
@@ -1000,7 +1002,7 @@ public:
 
     DataInputIterator in_data;
     SelectOp select_op;
-  };  
+  };
 
   /**
    * Execute an index selection reduction on a tensor
@@ -1009,7 +1011,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -1022,44 +1024,44 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__   
+#ifdef __CUDACC__
     if constexpr (is_tensor_view_v<InputOperator>) {
       if (a.IsContiguous()) {
-        cub::DeviceSelect::If(d_temp, 
-                              temp_storage_bytes, 
-                              cub::CountingInputIterator<index_t>{0}, 
-                              a_out.Data(), 
+        cub::DeviceSelect::If(d_temp,
+                              temp_storage_bytes,
+                              cub::CountingInputIterator<index_t>{0},
+                              a_out.Data(),
                               cparams_.num_found.Data(),
-                              static_cast<int>(TotalSize(a)), 
+                              static_cast<int>(TotalSize(a)),
                               IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
-                              stream); 
+                              stream);
       }
       else {
         tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-        cub::DeviceSelect::If(d_temp, 
-                              temp_storage_bytes, 
-                              cub::CountingInputIterator<index_t>{0}, 
-                              a_out.Data(), 
+        cub::DeviceSelect::If(d_temp,
+                              temp_storage_bytes,
+                              cub::CountingInputIterator<index_t>{0},
+                              a_out.Data(),
                               cparams_.num_found.Data(),
-                              static_cast<int>(TotalSize(a)), 
+                              static_cast<int>(TotalSize(a)),
                               IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
                                 {RandomOperatorIterator{base}, cparams_.op},
-                              stream);            
-      }    
+                              stream);
+      }
     }
     else {
-      cub::DeviceSelect::If(d_temp, 
-                            temp_storage_bytes, 
-                            cub::CountingInputIterator<index_t>{0}, 
-                            a_out.Data(), 
+      cub::DeviceSelect::If(d_temp,
+                            temp_storage_bytes,
+                            cub::CountingInputIterator<index_t>{0},
+                            a_out.Data(),
                             cparams_.num_found.Data(),
-                            static_cast<int>(TotalSize(a)), 
+                            static_cast<int>(TotalSize(a)),
                             IndexToSelectOp<decltype(RandomOperatorIterator{a}), decltype(cparams_.op)>
                               {RandomOperatorIterator{a}, cparams_.op},
-                            stream);         
+                            stream);
     }
-#endif        
-  }        
+#endif
+  }
 
 /**
    * Execute a unique reduction on a tensor
@@ -1068,7 +1070,7 @@ public:
    * @tparam OutputTensor
    *   Type of output tensor
    * @tparam InputOperator
-   *   Type of input tensor 
+   *   Type of input tensor
    * @param a_out
    *   Output tensor
    * @param a
@@ -1081,39 +1083,39 @@ public:
                        const InputOperator &a,
                        const cudaStream_t stream)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
-          cub::DeviceSelect::Unique(d_temp, 
-                                temp_storage_bytes, 
-                                a.Data(), 
-                                a_out.Data(), 
+          cub::DeviceSelect::Unique(d_temp,
+                                temp_storage_bytes,
+                                a.Data(),
+                                a_out.Data(),
                                 cparams_.num_found.Data(),
-                                static_cast<int>(TotalSize(a)), 
-                                stream); 
+                                static_cast<int>(TotalSize(a)),
+                                stream);
         }
         else {
-          cub::DeviceSelect::Unique(d_temp, 
-                                temp_storage_bytes, 
+          cub::DeviceSelect::Unique(d_temp,
+                                temp_storage_bytes,
                                 RandomOperatorIterator{base},
-                                a_out.Data(), 
+                                a_out.Data(),
                                 cparams_.num_found.Data(),
-                                static_cast<int>(TotalSize(a)), 
-                                stream);              
+                                static_cast<int>(TotalSize(a)),
+                                stream);
         }
     }
     else {
-      cub::DeviceSelect::Unique(d_temp, 
-                            temp_storage_bytes, 
+      cub::DeviceSelect::Unique(d_temp,
+                            temp_storage_bytes,
                             RandomOperatorIterator{a},
-                            a_out.Data(), 
+                            a_out.Data(),
                             cparams_.num_found.Data(),
-                            static_cast<int>(TotalSize(a)), 
-                            stream);            
-    }                                     
-#endif    
-  }     
+                            static_cast<int>(TotalSize(a)),
+                            stream);
+    }
+#endif
+  }
 
 private:
   // Member variables
@@ -1166,7 +1168,7 @@ static matxCache_t<CubParams_t, CubParamsKeyHash, CubParamsKeyEq> cub_cache;
  *
  * Reduces a tensor using the CUB library for either a 0D or 1D output tensor. There
  * is an existing reduce() implementation as part of matx_reduce.h, but this function
- * exists in cases where CUB is more optimal/faster. 
+ * exists in cases where CUB is more optimal/faster.
  *
  * @tparam OutputTensor
  *   Output tensor type
@@ -1187,14 +1189,14 @@ template <typename OutputTensor, typename InputOperator, typename ReduceOp>
 void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOperator::scalar_type init,
           const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   // Get parameters required by these tensors
   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
   auto reduce_params = param_type{ReduceOp{}, init};
   auto params =
-      detail::matxCubPlan_t<OutputTensor, 
-                            InputOperator, 
-                            detail::CUB_OP_REDUCE, 
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
+                            detail::CUB_OP_REDUCE,
                             param_type>::GetCubParams(a_out, a);
   params.stream = stream;
 
@@ -1212,13 +1214,13 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
             ret.value());
     type->ExecReduce(a_out, a, stream);
   }
-#endif  
+#endif
 }
 
 /**
  * Sum a tensor using CUB
  *
- * Performs a sum reduction/binary fold over + from a tensor. 
+ * Performs a sum reduction/binary fold over + from a tensor.
  *
  * @tparam OutputTensor
  *   Output tensor type
@@ -1232,13 +1234,13 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputOperator>
-void cub_sum(OutputTensor &a_out, const InputOperator &a, 
+void cub_sum(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   auto params =
-      detail::matxCubPlan_t<OutputTensor, 
-                            InputOperator, 
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a);
   params.stream = stream;
 
@@ -1256,7 +1258,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     type->ExecSum(a_out, a, stream);
   }
-#endif  
+#endif
 }
 
 /**
@@ -1274,13 +1276,13 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputOperator>
-void cub_min(OutputTensor &a_out, const InputOperator &a, 
+void cub_min(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   auto params =
-      detail::matxCubPlan_t<OutputTensor, 
-                            InputOperator, 
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
                             detail::CUB_OP_REDUCE_MIN>::GetCubParams(a_out, a);
   params.stream = stream;
 
@@ -1298,7 +1300,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     type->ExecMin(a_out, a, stream);
   }
-#endif  
+#endif
 }
 
 /**
@@ -1316,13 +1318,13 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputOperator>
-void cub_max(OutputTensor &a_out, const InputOperator &a, 
+void cub_max(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   auto params =
-      detail::matxCubPlan_t<OutputTensor, 
-                            InputOperator, 
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
                             detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a);
   params.stream = stream;
 
@@ -1340,7 +1342,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     type->ExecMax(a_out, a, stream);
   }
-#endif  
+#endif
 }
 
 /**
@@ -1374,7 +1376,7 @@ void sort(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir = SORT_DIR_ASC,
           const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
@@ -1396,7 +1398,7 @@ void sort(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     sort_type->ExecSort(a_out, a, stream, dir);
   }
-#endif  
+#endif
 }
 
 /**
@@ -1420,7 +1422,7 @@ template <typename OutputTensor, typename InputOperator>
 void cumsum(OutputTensor &a_out, const InputOperator &a,
             const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a);
@@ -1439,7 +1441,7 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM> *>(ret.value());
     sort_type->ExecPrefixScanEx(a_out, a, stream);
   }
-#endif  
+#endif
 }
 
 /**
@@ -1469,11 +1471,11 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
  */
 template <typename OutputTensor, typename InputOperator>
 void hist(OutputTensor &a_out, const InputOperator &a,
-          const typename InputOperator::scalar_type lower, 
+          const typename InputOperator::scalar_type lower,
           const typename InputOperator::scalar_type upper, const cudaStream_t stream = 0)
 {
   static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram tensor must use int type");
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   // Get parameters required by these tensors
   // auto params =
   //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
@@ -1484,9 +1486,9 @@ void hist(OutputTensor &a_out, const InputOperator &a,
   // auto ret = detail::cub_cache.Lookup(params);
   // if (ret == std::nullopt) {
     detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
-    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
-                                          InputOperator, 
-                                          detail::CUB_OP_HIST_EVEN, 
+    auto tmp = new detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_HIST_EVEN,
                                           detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
     //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
@@ -1494,7 +1496,7 @@ void hist(OutputTensor &a_out, const InputOperator &a,
   // }
   // else {
   //   auto sort_type =
-  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, 
+  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator,
   //           detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
   //           ret.value());
   //   sort_type->ExecHistEven(a_out, a, lower, upper, stream);
@@ -1502,7 +1504,7 @@ void hist(OutputTensor &a_out, const InputOperator &a,
 
   // Remove once caching fixed
   delete tmp;
-#endif  
+#endif
 }
 
 
@@ -1579,8 +1581,8 @@ struct GTE
  *
  * Finds all values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
- * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, 
- * this can be the same size as the input, but if something is known about the data to indicate not as many 
+ * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe,
+ * this can be the same size as the input, but if something is known about the data to indicate not as many
  * entries are needed, the output can be smaller.
  *
  * @tparam SelectType
@@ -1605,7 +1607,7 @@ struct GTE
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
 void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   // Get parameters required by these tensors
@@ -1619,9 +1621,9 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
 
   // Don't cache until we have a good plan for hashing parameters here
   //if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
-                                          InputOperator, 
-                                          detail::CUB_OP_SELECT, 
+    auto tmp = new detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_SELECT,
                                           decltype(cparams)>{a_out, a, cparams, stream};
     //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelect(a_out, a, stream);
@@ -1633,8 +1635,8 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   //   sort_type->ExecSelect(a_out, a, stream);
   // }
   // Remove once caching fixed
-  delete tmp;  
-#endif  
+  delete tmp;
+#endif
 }
 
 /**
@@ -1642,9 +1644,9 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
  *
  * Finds all indices of values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
- * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, 
- * this can be the same size as the input, but if something is known about the data to indicate not as many 
- * entries are needed, the output can be smaller. This 
+ * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe,
+ * this can be the same size as the input, but if something is known about the data to indicate not as many
+ * entries are needed, the output can be smaller. This
  *
  * @tparam SelectType
  *   Type of select functor
@@ -1668,7 +1670,7 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
 void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   // Get parameters required by these tensors
@@ -1682,9 +1684,9 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
 
   // Don't cache until we have a good plan for hashing parameters here
   //if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
-                                          InputOperator, 
-                                          detail::CUB_OP_SELECT_IDX, 
+    auto tmp = new detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_SELECT_IDX,
                                           decltype(cparams)>{a_out, a, cparams, stream};
     //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSelectIndex(a_out, a, stream);
@@ -1696,15 +1698,15 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
   //   sort_type->ExecSelectIndex(a_out, a, stream);
   // }
   // Remove once caching fixed
-  delete tmp;  
-#endif  
+  delete tmp;
+#endif
 }
 
 
 /**
  * Reduce to unique values
  *
- * Reduces the input to only unique values saved into the output. Output tensor must be large enough to 
+ * Reduces the input to only unique values saved into the output. Output tensor must be large enough to
  * hold unique entries. To be safe, this can be the same size as the input, but if something is known about
  * the data to indicate not as many entries are needed, the output can be smaller.
  *
@@ -1726,7 +1728,7 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
 template <typename CountTensor, typename OutputTensor, typename InputOperator>
 void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,  const cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
@@ -1747,9 +1749,9 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
 
 
   if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t< OutputTensor, 
-                                          InputOperator, 
-                                          detail::CUB_OP_UNIQUE, 
+    auto tmp = new detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_UNIQUE,
                                           decltype(cparams)>{a_out, sort_tensor, cparams, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecUnique(a_out, sort_tensor, stream);
@@ -1760,6 +1762,6 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
             ret.value());
     sort_type->ExecUnique(a_out, sort_tensor, stream);
   }
-#endif  
+#endif
 }
 }; // namespace matx
