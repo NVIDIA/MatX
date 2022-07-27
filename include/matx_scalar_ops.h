@@ -450,7 +450,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_fmodf(T1 v1,
   }  
 }
 
-template <typename T1, typename T2> struct FModF {
+template <typename T1, typename T2> struct FModFF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
     return _internal_fmodf(v1, v2); 
 
@@ -458,7 +458,7 @@ template <typename T1, typename T2> struct FModF {
     return typename std::invoke_result_t<decltype(op), T1, T2>{0};    
   }
 };
-template <typename T1, typename T2> using FModOp = BinOp<T1, T2, FModF<T1, T2>>;
+template <typename T1, typename T2> using FModFOp = BinOp<T1, T2, FModFF<T1, T2>>;
 
 // MATX_BINARY_OP_GEN(pow, Pow);
 
