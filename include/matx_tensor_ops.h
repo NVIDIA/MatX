@@ -2670,6 +2670,7 @@ auto __MATX_INLINE__ reverse(Op t)
   DEFINE_BINARY_OP(mul, detail::MulOp);
   DEFINE_BINARY_OP(operator/, detail::DivOp);
   DEFINE_BINARY_OP(operator%, detail::ModOp);
+  DEFINE_BINARY_OP(fmod, detail::FModOp);
   DEFINE_BINARY_OP(operator|, detail::OrOp);
   DEFINE_BINARY_OP(operator&, detail::AndOp);
   DEFINE_BINARY_OP(operator^, detail::XorOp);

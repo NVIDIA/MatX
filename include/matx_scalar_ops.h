@@ -394,6 +394,7 @@ template <typename T1, typename T2> struct MulF {
 };
 template <typename T1, typename T2> using MulOp = BinOp<T1, T2, MulF<T1, T2>>;
 
+
 template <typename T1, typename T2> struct DivF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
@@ -431,6 +432,33 @@ template <typename T1, typename T2> struct ModF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { return v1 % v2; }
 };
 template <typename T1, typename T2> using ModOp = BinOp<T1, T2, ModF<T1, T2>>;
+
+template <typename T1, typename T2>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_fmodf(T1 v1, T2 v2) { 
+  if constexpr (is_matx_half_v<T1> && is_matx_half_v<T2>) {
+    return cuda::std::fmodf(static_cast<float>(v1), static_cast<float>(v2));
+  }
+  else if constexpr (is_matx_half_v<T1> && !is_matx_half_v<T2>) {
+    return cuda::std::fmodf(static_cast<T2>(v1), v2);
+  }
+  else if constexpr (!is_matx_half_v<T1> && is_matx_half_v<T2>) {
+    return cuda::std::fmodf(v1, static_cast<T1>(v2));
+  }  
+  else {
+    // We should not have to cast here, but libcudacxx doesn't support the double version
+    return cuda::std::fmodf(static_cast<float>(v1), static_cast<float>(v2));
+  }  
+}
+
+template <typename T1, typename T2> struct FModF {
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
+    return _internal_fmodf(v1, v2); 
+
+    // Unreachable, but required by the compiler
+    return typename std::invoke_result_t<decltype(op), T1, T2>{0};    
+  }
+};
+template <typename T1, typename T2> using FModOp = BinOp<T1, T2, FModF<T1, T2>>;
 
 // MATX_BINARY_OP_GEN(pow, Pow);
 
