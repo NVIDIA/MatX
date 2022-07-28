@@ -565,6 +565,84 @@ __MATX_INLINE__
     }
   };
   }   
+  
+  namespace detail {
+  template <int CRank, typename T, typename Ind>
+  class CloneOp : public BaseOp<CloneOp<CRank, T, Ind>>
+  {
+    private:
+      mutable typename base_type<T>::type op_;
+      std::array<index_t, CRank> sizes_;         // size of each dimension after cloning
+      std::array<index_t, T::Rank()> dims_;      // gather map for computing operator() indices
+    public:
+      using matxop = bool;
+
+      using scalar_type = typename T::scalar_type;
+
+      __MATX_INLINE__ CloneOp(T op, std::array<index_t, CRank> shape) : op_(op) {
+        // create gather list
+        int d = 0;
+        for(int i = 0; i < Rank(); i++) {
+          if(shape[i]==matxKeepDim) {
+            sizes_[i] = op_.Size(d);
+            dims_[d++] = i;
+          } else {
+            sizes_[i] = shape[i];
+          }
+        }
+        MATX_ASSERT(d == T::Rank(), matxInvalidDim);
+
+      };
+
+      template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+
+          // convert variadic type to tuple so we can read/update
+          std::array<index_t, Rank()> sind{indices...};
+          std::array<index_t, T::Rank()> gind;
+
+          // gather indices
+          for(int i = 0; i < T::Rank(); i++) {
+            auto idx = dims_[i];
+            gind[i] = sind[idx];
+          }
+
+          return mapply(op_, gind);
+        }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return CRank;
+      }
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return sizes_[dim];
+      }
+  
+  };
+  }
+
+  
+/**
+ * @brief Operator to clone an operator or tensor acorss dimensions
+ *
+ * @tparam Rank the rank of the cloned operator
+ * @tparam T source operator/tensor type
+ * @param t source operator/tensor
+ * @param shape the shape of the cloned operator/tensor.  
+ * Each element is either the size of the cloned dimension or matxKeepDim to be from the source tensor
+ * @return operator to compute the cloned value
+ */
+  template <int Rank, typename Op>
+  auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
+  {
+    std::array<index_t, Rank> lshape;
+    for(int i = 0; i < Rank ; i++) {
+      lshape[i]=shape[i];
+    }
+    return detail::CloneOp<Rank, Op, index_t>(t, lshape);
+  };   
 
 /**
  * Remaps elements an operator according to an index array/operator.
@@ -595,7 +673,7 @@ __MATX_INLINE__
       static_assert(sizeof...(Is)==Rank());
       static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-      // convert variadic type to tupple so we can read/update
+      // convert variadic type to tuple so we can read/update
       std::array<index_t, Rank()> ind{indices...};
       // get current index for dim
       auto i = ind[DIM];
