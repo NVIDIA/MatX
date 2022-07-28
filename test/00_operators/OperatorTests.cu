@@ -107,7 +107,7 @@ TYPED_TEST(OperatorTestsComplex, BaseOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplex, FModf)
+TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -116,9 +116,9 @@ TYPED_TEST(OperatorTestsFloatNonComplex, FModf)
 
   tiv0() = (TypeParam)5.0;
   tiv1() = (TypeParam)3.1;
-  (tov0 = fmodf(tiv0, tiv1)).run();
+  (tov0 = fmod(tiv0, tiv1)).run();
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmodf((TypeParam)5.0, (TypeParam)3.1)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TypeParam)5.0, (TypeParam)3.1)));
 
   MATX_EXIT_HANDLER();
 }
