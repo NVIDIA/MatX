@@ -91,3 +91,4 @@ Advanced Operators
 .. doxygenfunction:: remap
 .. doxygenfunction:: rcollapse
 .. doxygenfunction:: lcollapse
+.. doxygenfunction:: clone

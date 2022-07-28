@@ -197,6 +197,192 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
 
   MATX_EXIT_HANDLER();
 }
+TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
+{
+  int N = 10;
+  int M = 12;
+  int K = 14;
+
+  MATX_ENTER_HANDLER();
+  { // clone from 0D
+    auto tiv = make_tensor<TypeParam>();
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    tiv() = 3;
+
+    auto op = clone<3>(tiv, {N, M, K});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv());
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv());
+        }
+      }
+    }
+  }    
+
+  { // clone from 1D
+    auto tiv = make_tensor<TypeParam>({K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int k = 0; k < K; k++) {
+      tiv(k) = TypeParam(k);
+    }
+
+    auto op = clone<3>(tiv, {N, M, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(k));
+        }
+      }
+    }
+  }    
+
+  { // clone from 1D
+    auto tiv = make_tensor<TypeParam>({M});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < K; m++) {
+      tiv(m) = TypeParam(m);
+    }
+
+    auto op = clone<3>(tiv, {N, matxKeepDim, K});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(m));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(m));
+        }
+      }
+    }
+  }    
+
+  { // clone from 2D and operator
+    auto tiv = make_tensor<TypeParam>({M,K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+      }
+    }
+
+    auto op = clone<3>(tiv, {N, matxKeepDim, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(m,k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(m,k));
+        }
+      }
+    }
+  }    
+
+  { // clone from 2D
+    auto tiv = make_tensor<TypeParam>({M,K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+      }
+    }
+
+    auto op = clone<3>(TypeParam(2)*tiv, {N, matxKeepDim, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , TypeParam(2)*tiv(m,k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , TypeParam(2)*tiv(m,k));
+        }
+      }
+    }
+  }    
+
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
 {
