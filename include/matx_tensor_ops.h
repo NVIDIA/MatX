@@ -1692,44 +1692,36 @@ auto __MATX_INLINE__ reverse(Op t)
  * of the tensor.
  */
   namespace detail {
-  template <int DIM, typename T1>
-  class ShiftOp : public BaseOp<ShiftOp<DIM, T1>>
+  template <int DIM, typename T1, typename T2>
+  class ShiftOp : public BaseOp<ShiftOp<DIM, T1, T2>>
   {
   private:
     typename base_type<T1>::type op_;
-    index_t shift_;
-    index_t base_;
+    T2 shift_;
 
   public:
     using matxop = bool;
     using matxoplvalue = bool;
     using scalar_type = typename T1::scalar_type;
 
-    __MATX_INLINE__ ShiftOp(T1 op, index_t shift) : op_(op), shift_(shift)
+    __MATX_INLINE__ ShiftOp(T1 op, T2 shift) : op_(op), shift_(shift)
     {
       static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
-
-      if (shift < 0) {
-        while (-shift > Size(DIM)) {
-          shift += Size(DIM);
-        }
-
-        base_ = Size(DIM) + shift;
-      }
-      else {
-        while (shift > Size(DIM)) {
-          shift -= Size(DIM);
-        }
-
-        base_ = shift;
-      }
     }
 
     template <typename... Is>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
     {
       auto tup = cuda::std::make_tuple(indices...);
-      cuda::std::get<DIM>(tup) = (base_ + cuda::std::get<DIM>(tup)) % Size(DIM);
+      auto shift = get_value(shift_, indices...);
+
+
+      shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
+
+      if(shift<0) shift+= Size(DIM);
+
+      cuda::std::get<DIM>(tup) = shift;
+      
       return mapply(op_, tup);
     }    
 
@@ -1752,22 +1744,25 @@ auto __MATX_INLINE__ reverse(Op t)
  * @tparam DIM
  *   The dimension to be shifted
  *
- * @tparam Op
+ * @tparam OpT
  *   Type of operator or view
+ *
+ * @tparam ShiftOpT
+ *   Type of the operator for the shift
  *
  * @param op
  *   Operator or view to shift
  *
  * @param s
- *   Amount to shift forward
+ *   Operator which returns the shift
  *
  * @returns
  *   New operator with shifted indices
  */
-  template <int DIM, typename Op>
-  auto __MATX_INLINE__ shift(Op op, index_t s)
+  template <int DIM, typename OpT, typename ShiftOpT>
+  auto __MATX_INLINE__ shift(OpT op, ShiftOpT s)
   {
-    return detail::ShiftOp<DIM, Op>(op, s);
+    return detail::ShiftOp<DIM, OpT, ShiftOpT>(op, s);
   };
 
   
@@ -1781,8 +1776,11 @@ auto __MATX_INLINE__ reverse(Op t)
  * @tparam DIMS...
  *   The dimensions targeted for shifts
  *
- * @tparam Op
+ * @tparam OpT
  *   Type of operator or view
+ *
+ * @tparam ShiftsT
+ *   Type of the shift operators
  *
  * @param op
  *   Operator or view to shift
@@ -1793,8 +1791,8 @@ auto __MATX_INLINE__ reverse(Op t)
  * @returns
  *   New operator with shifted indices
  */
-  template <int DIM, int... DIMS,  typename Op, typename... Shifts>
-  auto __MATX_INLINE__ shift(Op op, index_t s, Shifts... shifts)
+  template <int DIM, int... DIMS,  typename OpT, typename ShiftT,  typename... ShiftsT>
+  auto __MATX_INLINE__ shift(OpT op, ShiftT s, ShiftsT... shifts)
   {
     static_assert(sizeof...(DIMS) == sizeof...(shifts), "shift: number of DIMs must match number of shifts");
 
@@ -1802,7 +1800,7 @@ auto __MATX_INLINE__ reverse(Op t)
     auto rop = shift<DIMS...>(op, shifts...);
 
     // construct shift op
-    return detail::ShiftOp<DIM, decltype(rop)>(rop, s);
+    return detail::ShiftOp<DIM, decltype(rop), decltype(s)>(rop, s);
   };
 
   namespace detail {
