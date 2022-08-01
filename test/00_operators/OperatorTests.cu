@@ -2171,7 +2171,7 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Shift)
+TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 100;
@@ -2179,6 +2179,8 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   tensor_t<TypeParam, 2> t2({count0, count1});
   tensor_t<TypeParam, 2> t2s({count0, count1});
   tensor_t<TypeParam, 2> t2s2({count0, count1});
+  tensor_t<int, 0> t0;
+  t0() = 5;
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
@@ -2192,7 +2194,19 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
+            MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
+      }
+    }
+  }
+  
+  {
+    (t2s = shift<0>(t2, t0)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
       }
     }
@@ -2204,7 +2218,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, (j + 5) % count1)));
       }
     }
@@ -2216,7 +2230,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j), t2((i + 6) % count0, (j + 5) % count1)));
       }
     }
@@ -2228,7 +2242,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j), t2((i + (count0 + 1) / 2) % count0,
                           (j + (count1 + 1) / 2) % count1)));
       }
@@ -2241,7 +2255,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j),
             t2((i + (count0) / 2) % count0, (j + (count1) / 2) % count1)));
       }
@@ -2256,7 +2270,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
         index_t idim = i < 5 ? (t2.Size(0) - 5 + i) : (i - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
       }
     }
   }
@@ -2268,7 +2282,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
         index_t jdim = j < 5 ? (t2.Size(1) - 5 + j) : (j - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
       }
     }
   }
@@ -2280,7 +2294,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
       }
     }
   }
@@ -2294,7 +2308,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
       }
     }
   }
