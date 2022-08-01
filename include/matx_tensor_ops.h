@@ -1682,7 +1682,8 @@ auto __MATX_INLINE__ reverse(Op t)
   auto self(T1 t) { return detail::SelfOp<T1, T1::Rank()>(t); };
 
   /**
- * Shifts the indexing of an operator or View by a given amount
+ * Shifts the indexing of an operator to move the array forward or backward by the
+ * shift amount. 
  *
  * ShiftOp allows adjusting the relative view of a tensor to start at a
  * new offset. This may be useful to cut off part of a tensor that is
@@ -1713,7 +1714,7 @@ auto __MATX_INLINE__ reverse(Op t)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
     {
       auto tup = cuda::std::make_tuple(indices...);
-      auto shift = get_value(shift_, indices...);
+      auto shift = -get_value(shift_, indices...);
 
 
       shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
