@@ -2180,7 +2180,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   tensor_t<TypeParam, 2> t2s({count0, count1});
   tensor_t<TypeParam, 2> t2s2({count0, count1});
   tensor_t<int, 0> t0;
-  t0() = 5;
+  t0() = -5;
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
@@ -2189,7 +2189,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<0>(t2, 5)).run();
+    (t2s = shift<0>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2213,7 +2213,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, 5)).run();
+    (t2s = shift<1>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2225,7 +2225,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1,0>(t2, 5, 6)).run();
+    (t2s = shift<1,0>(t2, -5, -6)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2262,9 +2262,9 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
     }
   }
 
-  // Negative shifts
+  // Right shifts
   {
-    (t2s = shift<0>(t2, -5)).run();
+    (t2s = shift<0>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2276,7 +2276,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, -5)).run();
+    (t2s = shift<1>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2289,7 +2289,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 
   // Large shifts
   {
-    (t2s = shift<0>(t2, t2.Size(0) * 4)).run();
+    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
