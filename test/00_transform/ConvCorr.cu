@@ -98,6 +98,37 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionRemap)
+{
+  MATX_ENTER_HANDLER();
+
+  int N = 256;
+  //int N = 10; // memory errors
+  int B = 5;
+  int F = 3;
+  int R = 3;
+
+  // This is a does it compile and run test
+  // TODO add correctness checking
+  auto in = make_tensor<int>({B, N});
+  auto out = make_tensor<int>({B, N});
+  auto filt = make_tensor<int>({B, F});
+  auto idx = make_tensor<int>({R});
+  for(int i = 0; i < idx.Size(0); i++) {
+    idx(i) = i;
+  }
+
+  (in = 1).run();
+  (filt = 1).run();
+
+  conv1d(out, in, filt, MATX_C_MODE_SAME, 0);
+  
+  conv1d(remap<0>(out,idx), remap<0>(in,idx), filt, MATX_C_MODE_SAME, 0);
+
+  cudaDeviceSynchronize();
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();

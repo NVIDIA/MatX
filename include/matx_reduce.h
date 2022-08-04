@@ -55,7 +55,7 @@
  * @returns
  *   Value shuffled*
  */
-__MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
+__MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
                                         cuda::std::complex<float> var,
                                         unsigned int delta)
 {
@@ -79,7 +79,7 @@ __MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
  * @returns
  *   Value shuffled
  */
-__MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
+__MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
                                         cuda::std::complex<double> var,
                                         unsigned int delta)
 {
@@ -98,7 +98,7 @@ __MATX_DEVICE__ inline auto __shfl_down_sync(unsigned mask,
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMin(float *addr, float val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -121,7 +121,7 @@ __MATX_DEVICE__ inline void atomicMin(float *addr, float val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMax(float *addr, float val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -145,7 +145,7 @@ __MATX_DEVICE__ inline void atomicMax(float *addr, float val)
  *   Value to compare against
  */
 template <typename T>
-__MATX_DEVICE__ inline void atomicAny(T *addr, T val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAny(T *addr, T val)
 {
   // We don't actually need an atomic operation here since we only write to the
   // location if any thread has the correct value.
@@ -196,7 +196,7 @@ template <typename T> __MATX_DEVICE__ T atomicMul(T *address, T val)
  * @param val
  *   Value to compare against
  */
-template <> __MATX_DEVICE__ inline float atomicMul(float *address, float val)
+template <> __MATX_DEVICE__ __MATX_INLINE__ float atomicMul(float *address, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)address;
   unsigned int old = *address_as_uint, assumed;
@@ -223,7 +223,7 @@ template <> __MATX_DEVICE__ inline float atomicMul(float *address, float val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAll(float *addr, float val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
@@ -236,7 +236,7 @@ __MATX_DEVICE__ inline void atomicAll(float *addr, float val)
   }
 };
 
-__MATX_DEVICE__ inline void atomicAll(int *addr, int val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
 {
   int assumed;
   int old = *addr;
@@ -258,7 +258,7 @@ __MATX_DEVICE__ inline void atomicAll(int *addr, int val)
  * @param val
  *   Value to compare against
  */
-template <> __MATX_DEVICE__ inline double atomicMul(double *address, double val)
+template <> __MATX_DEVICE__ __MATX_INLINE__ double atomicMul(double *address, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)address;
   unsigned long long int old = *address_as_ull, assumed;
@@ -285,7 +285,7 @@ template <> __MATX_DEVICE__ inline double atomicMul(double *address, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMin(double *addr, double val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -308,7 +308,7 @@ __MATX_DEVICE__ inline void atomicMin(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMax(double *addr, double val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -332,7 +332,7 @@ __MATX_DEVICE__ inline void atomicMax(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAny(double *addr, double val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAny(double *addr, double val)
 {
   // We don't actually need an atomic operation here since we only write to the
   // location if any thread has the correct value.
@@ -351,7 +351,7 @@ __MATX_DEVICE__ inline void atomicAny(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAll(double *addr, double val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(double *addr, double val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -374,7 +374,7 @@ __MATX_DEVICE__ inline void atomicAll(double *addr, double val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMin(int64_t *addr, int64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(int64_t *addr, int64_t val)
 {
   atomicMin(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
 };
@@ -389,7 +389,7 @@ __MATX_DEVICE__ inline void atomicMin(int64_t *addr, int64_t val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMax(int64_t *addr, int64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(int64_t *addr, int64_t val)
 {
   atomicMax(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
 };
@@ -405,7 +405,7 @@ __MATX_DEVICE__ inline void atomicMax(int64_t *addr, int64_t val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAll(int64_t *addr, int64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int64_t *addr, int64_t val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -427,7 +427,7 @@ __MATX_DEVICE__ inline void atomicAll(int64_t *addr, int64_t val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMin(uint64_t *addr, uint64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(uint64_t *addr, uint64_t val)
 {
   atomicMin(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
 };
@@ -442,7 +442,7 @@ __MATX_DEVICE__ inline void atomicMin(uint64_t *addr, uint64_t val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicMax(uint64_t *addr, uint64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(uint64_t *addr, uint64_t val)
 {
   atomicMax(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
 };
@@ -458,7 +458,7 @@ __MATX_DEVICE__ inline void atomicMax(uint64_t *addr, uint64_t val)
  * @param val
  *   Value to compare against
  */
-__MATX_DEVICE__ inline void atomicAll(uint64_t *addr, uint64_t val)
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(uint64_t *addr, uint64_t val)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)addr;
   unsigned long long int old = *address_as_ull, assumed;
@@ -482,7 +482,7 @@ __MATX_DEVICE__ inline void atomicAll(uint64_t *addr, uint64_t val)
  * @param val
  *   Value to add
  */
-__MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<float> *addr,
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(cuda::std::complex<float> *addr,
                                  cuda::std::complex<float> val)
 {
   float *addrf = reinterpret_cast<float *>(addr);
@@ -502,7 +502,7 @@ __MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<float> *addr,
  * @param val
  *   Value to add
  */
-__MATX_DEVICE__ inline void atomicAdd(cuda::std::complex<double> *addr,
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(cuda::std::complex<double> *addr,
                                  cuda::std::complex<double> val)
 {
   double *addrp = reinterpret_cast<double *>(addr);
@@ -515,8 +515,8 @@ namespace matx {
 namespace detail {
 
 #ifdef __CUDACC__  
-template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T maxVal() { return std::numeric_limits<T>::max(); }
-template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::lowest(); }
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() { return std::numeric_limits<T>::max(); }
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::lowest(); }
 
 
 /**
@@ -602,7 +602,7 @@ public:
 
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) && (v2 != 0)); return v1; }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
-  __MATX_DEVICE__ inline void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
 /**
@@ -656,15 +656,15 @@ __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 }
 
 
-template <typename TensorType, typename InType, typename ReduceOp>
-__global__ void matxReduceKernel(TensorType dest, InType in,
+template <typename OutType, typename InType, typename ReduceOp>
+__global__ void matxReduceKernel(OutType dest, InType in,
                                  ReduceOp red, [[maybe_unused]] index_t mult)
 {
-  constexpr uint32_t RANK = TensorType::Rank();
+  constexpr uint32_t RANK = OutType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;
   std::array<index_t, InType::Rank()> indices;
   using scalar_type = typename InType::scalar_type;
-  using T = typename TensorType::scalar_type;
+  using T = typename OutType::scalar_type;
   [[maybe_unused]] bool valid;
   
   // This is for 2 stage reduction
@@ -812,11 +812,11 @@ __global__ void matxReduceKernel(TensorType dest, InType in,
   }
 }
 
-template <typename TensorType, typename TensorIndexType, typename InType>
-__global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType in, [[maybe_unused]] index_t mult)
+template <typename OutType, typename TensorIndexType, typename InType>
+__global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, [[maybe_unused]] index_t mult)
 {
   using index_type = typename TensorIndexType::scalar_type;
-  using T = typename TensorType::scalar_type;
+  using T = typename OutType::scalar_type;
   T in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;  
@@ -955,7 +955,7 @@ __global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType i
  * the reduction is performed across the two innermost dimensions of the input,
  * and so on.
  *
- * @tparam TensorType
+ * @tparam OutType
  *   Output data type
  * @tparam TensorIndexType
  *   Output index type
@@ -979,21 +979,21 @@ __global__ void matxIndexKernel(TensorType dest, TensorIndexType idest, InType i
  *   otherwise the values in the destination will be included
  *   in the reduction.
  */
-template <typename TensorType, typename TensorIndexType, typename InType, typename ReduceOp,
+template <typename OutType, typename TensorIndexType, typename InType, typename ReduceOp,
   std::enable_if_t<is_matx_reduction_v<ReduceOp>, bool> = true>
-void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InType in, ReduceOp op,
+void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest, InType in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
 #ifdef __CUDACC__  
   using scalar_type = typename InType::scalar_type;
-  using T = typename TensorType::scalar_type;
+  using T = typename OutType::scalar_type;
 
-  static_assert(TensorType::Rank() < InType::Rank());
+  static_assert(OutType::Rank() < InType::Rank());
   static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");    
 
 
-  if constexpr (TensorType::Rank() > 0) {
-    for (int i = 0; i < TensorType::Rank(); i++) {
+  if constexpr (OutType::Rank() > 0) {
+    for (int i = 0; i < OutType::Rank(); i++) {
       MATX_ASSERT(dest.Size(i) == in.Size(i), matxInvalidDim);
     }
   }
@@ -1040,7 +1040,7 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
  * the reduction is performed across the two innermost dimensions of the input,
  * and so on.
  *
- * @tparam TensorType
+ * @tparam OutType
  *   Output data type
  * @tparam InType
  *   Input data type
@@ -1060,14 +1060,14 @@ void inline reduce(TensorType dest, [[maybe_unused]] TensorIndexType idest, InTy
  *   otherwise the values in the destination will be included
  *   in the reduction.
  */
-template <typename TensorType, typename InType, typename ReduceOp>
-void inline reduce(TensorType &dest, const InType &in, ReduceOp op,
+template <typename OutType, typename InType, typename ReduceOp>
+void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
-  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
+  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
   if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
-    cub_reduce<TensorType, InType, ReduceOp>(dest, in, op.Init(), stream);
+    cub_reduce<OutType, InType, ReduceOp>(dest, in, op.Init(), stream);
   }
   else { // Fall back to the slow path of custom implementation
     reduce(dest, std::nullopt, in, op, stream, init);
@@ -1097,8 +1097,8 @@ void inline reduce(TensorType &dest, const InType &in, ReduceOp op,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline mean(TensorType &dest, const InType &in,
+template <typename OutType, typename InType>
+void __MATX_INLINE__ mean(OutType dest, const InType &in,
                  cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
@@ -1109,7 +1109,7 @@ void inline mean(TensorType &dest, const InType &in,
 
   // The reduction is performed over the difference in ranks between input and
   // output. This loop computes the number of elements it was performed over.
-  for (int i = 1; i <= InType::Rank() - TensorType::Rank(); i++) {
+  for (int i = 1; i <= InType::Rank() - OutType::Rank(); i++) {
     scale *= static_cast<inner_type>(in.Size(InType::Rank() - i));
   }
 
@@ -1141,14 +1141,14 @@ void inline mean(TensorType &dest, const InType &in,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename TensorInType>
-void inline median(TensorType &dest,
+template <typename OutType, typename TensorInType>
+void __MATX_INLINE__ median(OutType dest,
                    const TensorInType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  using T = typename TensorType::scalar_type;
+  using T = typename OutType::scalar_type;
   constexpr int RANK_IN = TensorInType::Rank();
-  static_assert(RANK_IN <= 2 && (RANK_IN == TensorType::Rank() + 1));
+  static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
   T *tmp_alloc;
   matxAlloc(reinterpret_cast<void **>(&tmp_alloc),
@@ -1216,17 +1216,17 @@ void inline median(TensorType &dest,
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
+  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
-    cub_sum<TensorType, InType>(dest, in, stream);
+    cub_sum<OutType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpSum<typename TensorType::scalar_type>(), stream, true);
+    reduce(dest, in, detail::reduceOpSum<typename OutType::scalar_type>(), stream, true);
   }
 #endif  
 }
@@ -1250,11 +1250,11 @@ void inline sum(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline prod(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  reduce(dest, in, detail::reduceOpProd<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1280,17 +1280,17 @@ void inline prod(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
-  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
+  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
-    cub_max<TensorType, InType>(dest, in, stream);
+    cub_max<OutType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+    reduce(dest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
   }
 #endif  
 }
@@ -1316,11 +1316,11 @@ void inline rmax(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename TensorIndexType, typename InType>
-void inline argmax(TensorType &dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, detail::reduceOpMax<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1346,17 +1346,17 @@ void inline argmax(TensorType &dest, TensorIndexType &idest, const InType &in, c
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  constexpr bool use_cub = TensorType::Rank() == 0 || (TensorType::Rank() == 1 && InType::Rank() == 2);
+  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
-    cub_min<TensorType, InType>(dest, in, stream);
+    cub_min<OutType, InType>(dest, in, stream);
   }
   else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+    reduce(dest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
   }
 #endif  
 }
@@ -1382,12 +1382,12 @@ void inline rmin(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename TensorIndexType, typename InType>
-void inline argmin(TensorType &dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
-  static_assert(TensorType::Rank() == TensorIndexType::Rank());
+  static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__  
-  reduce(dest, idest, in, detail::reduceOpMin<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1412,11 +1412,11 @@ void inline argmin(TensorType &dest, TensorIndexType &idest, const InType &in, c
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline any(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ any(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, detail::reduceOpAny<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAny<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1441,11 +1441,11 @@ void inline any(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline all(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ all(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  reduce(dest, in, detail::reduceOpAll<typename TensorType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAll<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
@@ -1469,8 +1469,8 @@ void inline all(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
   typename InType::scalar_type *tmps;
@@ -1493,7 +1493,7 @@ void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
   // The length of what we are taking the variance over is equal to the product
   // of the outer dimensions covering the different in input/output ranks
   index_t N = in.Size(in.Rank() - 1);
-  for (int i = 2; i <= in.Rank() - TensorType::Rank(); i++) {
+  for (int i = 2; i <= in.Rank() - OutType::Rank(); i++) {
     N *= in.Size(in.Rank() - i);
   }
 
@@ -1522,8 +1522,8 @@ void inline var(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline stdd(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ stdd(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
   var(dest, in, stream);
@@ -1550,8 +1550,8 @@ void inline stdd(TensorType &dest, const InType &in, cudaStream_t stream = 0)
  * @param stream
  *   CUDA stream
  */
-template <typename TensorType, typename InType>
-void inline trace(TensorType &dest, const InType &in, cudaStream_t stream = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ trace(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
   auto d = diag(in);
