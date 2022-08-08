@@ -652,7 +652,8 @@ __MATX_INLINE__
   class RemapOp : public BaseOp<RemapOp<DIM, T, IdxType>>
   {
   private:
-    mutable typename base_type<T>::type op_;
+    //mutable typename base_type<T>::type op_;
+    typename base_type<T>::type op_;
     typename base_type<IdxType>::type idx_;
 
   public:
@@ -668,7 +669,23 @@ __MATX_INLINE__
     __MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
 
     template <typename... Is>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) const 
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+    {
+      static_assert(sizeof...(Is)==Rank());
+      static_assert((std::is_convertible_v<Is, index_t> && ... ));
+
+      // convert variadic type to tuple so we can read/update
+      std::array<index_t, Rank()> ind{indices...};
+      // get current index for dim
+      auto i = ind[DIM];
+      // remap current index for dim
+      ind[DIM] = idx_(i);
+      //return op_(ind);
+      return mapply(op_, ind);
+    }
+    
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
     {
       static_assert(sizeof...(Is)==Rank());
       static_assert((std::is_convertible_v<Is, index_t> && ... ));
