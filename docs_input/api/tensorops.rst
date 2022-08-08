@@ -92,3 +92,4 @@ Advanced Operators
 .. doxygenfunction:: rcollapse
 .. doxygenfunction:: lcollapse
 .. doxygenfunction:: clone
+.. doxygenfunction:: slice
