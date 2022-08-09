@@ -93,3 +93,4 @@ Advanced Operators
 .. doxygenfunction:: lcollapse
 .. doxygenfunction:: clone
 .. doxygenfunction:: slice
+.. doxygenfunction:: permute
