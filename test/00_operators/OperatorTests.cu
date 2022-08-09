@@ -384,6 +384,167 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
   MATX_EXIT_HANDLER();
 }
 
+
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
+{
+  MATX_ENTER_HANDLER();
+  tensor_t<TypeParam, 1> t1{{10}};
+
+  t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
+  auto t1t = slice(t1, {0}, {matxEnd}, {2});
+ 
+  for (index_t i = 0; i < t1.Size(0); i += 2) {
+    ASSERT_EQ(t1(i), t1t(i / 2));
+  }
+
+  auto t1t2 = slice(t1, {2}, {matxEnd}, {2});
+
+  for (index_t i = 0; i < t1t2.Size(0); i++) {
+    ASSERT_EQ(TypeParam(30 + 20 * i), t1t2(i));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
+{
+  MATX_ENTER_HANDLER();
+  
+  tensor_t<TypeParam, 2> t2{{20, 10}};
+  tensor_t<TypeParam, 3> t3{{30, 20, 10}};
+  tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
+
+  (t2 = linspace<1>(t2.Shape(), 0, 10)).run();
+  (t3 = linspace<2>(t3.Shape(), 0, 10)).run();
+  (t4 = linspace<3>(t4.Shape(), 0, 10)).run();
+
+  auto t2t = slice(t2, {1, 2}, {3, 5});
+  auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
+  auto t4t = slice(t4, {1, 2, 3, 4}, {3, 5, 7, 9});
+
+  ASSERT_EQ(t2t.Size(0), 2);
+  ASSERT_EQ(t2t.Size(1), 3);
+
+  ASSERT_EQ(t3t.Size(0), 2);
+  ASSERT_EQ(t3t.Size(1), 3);
+  ASSERT_EQ(t3t.Size(2), 4);
+
+  ASSERT_EQ(t4t.Size(0), 2);
+  ASSERT_EQ(t4t.Size(1), 3);
+  ASSERT_EQ(t4t.Size(2), 4);
+  ASSERT_EQ(t4t.Size(3), 5);
+
+  for (index_t i = 0; i < t2t.Size(0); i++) {
+    for (index_t j = 0; j < t2t.Size(1); j++) {
+      ASSERT_EQ(t2t(i, j), t2(i + 1, j + 2));
+    }
+  }
+
+  for (index_t i = 0; i < t3t.Size(0); i++) {
+    for (index_t j = 0; j < t3t.Size(1); j++) {
+      for (index_t k = 0; k < t3t.Size(2); k++) {
+        ASSERT_EQ(t3t(i, j, k), t3(i + 1, j + 2, k + 3));
+      }
+    }
+  }
+
+  for (index_t i = 0; i < t4t.Size(0); i++) {
+    for (index_t j = 0; j < t4t.Size(1); j++) {
+      for (index_t k = 0; k < t4t.Size(2); k++) {
+        for (index_t l = 0; l < t4t.Size(3); l++) {
+          ASSERT_EQ(t4t(i, j, k, l), t4(i + 1, j + 2, k + 3, l + 4));
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
+{
+  MATX_ENTER_HANDLER();
+ 
+  tensor_t<TypeParam, 2> t2t{{20, 10}};
+  tensor_t<TypeParam, 3> t3t{{30, 20, 10}};
+  (t2t = linspace<1>(t2t.Shape(), 0, 10)).run();
+  (t3t = linspace<2>(t3t.Shape(), 0, 10)).run();
+
+  {
+    index_t j = 0;
+    auto t2sly = slice<1>(t2t, {0, j}, {matxEnd, matxDropDim});
+    for (index_t i = 0; i < t2sly.Size(0); i++) {
+      ASSERT_EQ(t2sly(i), t2t(i, j));
+    }
+  }
+
+  {
+    index_t i = 0;
+    auto t2slx = slice<1>(t2t, {i, 0}, {matxDropDim, matxEnd});
+    for (index_t j = 0; j < t2slx.Size(0); j++) {
+      ASSERT_EQ(t2slx(j), t2t(i, j));
+    }
+  }
+
+  {
+    index_t j = 0;
+    index_t k = 0;
+    auto t3slz = slice<1>(t3t, {0, j, k}, {matxEnd, matxDropDim, matxDropDim});
+    for (index_t i = 0; i < t3slz.Size(0); i++) {
+      ASSERT_EQ(t3slz(i), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t i = 0;
+    index_t k = 0;
+    auto t3sly = slice<1>(t3t, {i, 0, k}, {matxDropDim, matxEnd, matxDropDim});
+    for (index_t j = 0; j < t3sly.Size(0); j++) {
+      ASSERT_EQ(t3sly(j), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t i = 0;
+    index_t j = 0;
+    auto t3slx = slice<1>(t3t, {i, j, 0}, {matxDropDim, matxDropDim, matxEnd});
+    for (index_t k = 0; k < t3slx.Size(0); k++) {
+      ASSERT_EQ(t3slx(k), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t k = 0;
+    auto t3slzy = slice<2>(t3t, {0, 0, k}, {matxEnd, matxEnd, matxDropDim});
+    for (index_t i = 0; i < t3slzy.Size(0); i++) {
+      for (index_t j = 0; j < t3slzy.Size(1); j++) {
+        ASSERT_EQ(t3slzy(i, j), t3t(i, j, k));
+      }
+    }
+  }
+
+  {
+    index_t j = 0;
+    auto t3slzx = slice<2>(t3t, {0, j, 0}, {matxEnd, matxDropDim, matxEnd});
+    for (index_t i = 0; i < t3slzx.Size(0); i++) {
+      for (index_t k = 0; k < t3slzx.Size(1); k++) {
+        ASSERT_EQ(t3slzx(i, k), t3t(i, j, k));
+      }
+    }
+  }
+
+  {
+    index_t i = 0;
+    auto t3slyx = slice<2>(t3t, {i, 0, 0}, {matxDropDim, matxEnd, matxEnd});
+    for (index_t j = 0; j < t3slyx.Size(0); j++) {
+      for (index_t k = 0; k < t3slyx.Size(1); k++) {
+        ASSERT_EQ(t3slyx(j, k), t3t(i, j, k));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
 {
   int N = 10;
