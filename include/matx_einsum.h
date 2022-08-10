@@ -190,13 +190,13 @@ public:
 
     MATX_ASSERT_STR(workSize_ > requiredWorkspaceSize, matxOutOfMemory, "Not enough workspace memory is available.");
 
-    matxAlloc(&workspace_, workSize_, MATX_ASYNC_DEVICE_MEMORY, stream);
+    matxAlloc(&workspace_, requiredWorkspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     status = cutensornetWorkspaceSet(handle_,
                                           workDesc_,
                                           CUTENSORNET_MEMSPACE_DEVICE,
                                           workspace_,
-                                          workSize_);
+                                          requiredWorkspaceSize);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to set cuTENSOR workspace");     
 
