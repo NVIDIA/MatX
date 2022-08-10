@@ -107,6 +107,42 @@ TYPED_TEST(OperatorTestsComplex, BaseOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
+{
+  MATX_ENTER_HANDLER();
+  auto A = make_tensor<TypeParam>({10,20,30});
+  for(int i=0; i < A.Size(0); i++) {
+    for(int j=0; j < A.Size(1); j++) {
+      for(int k=0; k < A.Size(2); k++) {
+        A(i,j,k) = TypeParam( i * A.Size(1)*A.Size(2) +
+	       j * A.Size(2) + k);	
+      }
+    }
+  }
+
+  auto op = permute(A, {2, 0, 1});
+  auto At = A.Permute({2, 0, 1});
+
+  ASSERT_TRUE(op.Size(0) == A.Size(2));
+  ASSERT_TRUE(op.Size(1) == A.Size(0));
+  ASSERT_TRUE(op.Size(2) == A.Size(1));
+  
+  ASSERT_TRUE(op.Size(0) == At.Size(0));
+  ASSERT_TRUE(op.Size(1) == At.Size(1));
+  ASSERT_TRUE(op.Size(2) == At.Size(2));
+
+  for(int i=0; i < op.Size(0); i++) {
+    for(int j=0; j < op.Size(1); j++) {
+      for(int k=0; k < op.Size(2); k++) {
+        ASSERT_TRUE( op(i,j,k) == A(j,k,i));	
+        ASSERT_TRUE( op(i,j,k) == At(i,j,k));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
 {
   MATX_ENTER_HANDLER();
