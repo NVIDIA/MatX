@@ -31,32 +31,70 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
-
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+#include "matx_type_utils.h"
+#include "matx/operators/base_operator.h"
 
-#define TEST_VECTOR_PATH "generated/"
+namespace matx
+{
+  namespace detail {
+    template <typename T1>
+      class FlattenOp : public BaseOp<FlattenOp<T1>>
+    {
+      private:
+        typename base_type<T1>::type op1_;
 
+      public:
+        using matxop = bool;
+        using scalar_type = typename T1::scalar_type;
+
+        __MATX_INLINE__ FlattenOp(const T1 &op1) : op1_(op1)
+      {
+        static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
+      }
+
+        template <typename Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
+          {
+            return *RandomOperatorIterator{op1_, id0};
+          }    
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          return 1;
+        }
+
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        {
+          index_t size = 1;
+          if (dim == 0) {
+            for (int r = 0; r < op1_.Rank(); r++) {
+              size *= op1_.Size(r);
+            }
+          }
+
+          return size;
+        }
+    };
+  }
+
+  /**
+   * Flatten operator
+   *
+   * The flatten operator takes an operator of rank 2 or higher and flattens every dimension
+   * into a single 1D tensor. 
+   *
+   * @tparam T1
+   *   Operator type
+   *
+   * @returns
+   *   Operator of flattened input
+   */
+  template <typename T1>
+    auto __MATX_INLINE__ flatten(const T1 &a)
+    {
+      return detail::FlattenOp<T1>(a);
+    };
+
+} // end namespace matx

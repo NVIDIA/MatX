@@ -31,32 +31,39 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
-
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+#include "matx_type_utils.h"
 
-#define TEST_VECTOR_PATH "generated/"
+namespace matx
+{
+  /**
+   * Make a deep copy of a view into another view
+   *
+   * Copies the data from a view into another view. Views should normally be
+   * backed by different data objects, but it's not necessary if there is no
+   * overlap between the soure and destination. If the source in destination
+   * overlap in any way, it is a race condition and the result of the operation
+   * is undefined.
+   *
+   * Both tensor views must be the same rank and size in every dimension
+   *
+   * @param out
+   *   Tensor to copy into
+   * @param in
+   *   Tensor to copy from
+   * @param stream
+   *   CUDA stream to operate in
+   */
+  template <typename OutputTensor, typename InputTensor>
+    __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
+        const cudaStream_t stream)
+    {
+      for (int i = 0; i < OutputTensor::Rank(); i++)
+      {
+        MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
+      }
 
+      (out = in).run(stream);
+    };
+} // end namespace matx
