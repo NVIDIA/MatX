@@ -34,7 +34,6 @@
 
 #include "matx_error.h"
 #include "matx_shape.h"
-#include "matx_tensor_ops.h"
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>

@@ -31,32 +31,62 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
-
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+#include "matx_type_utils.h"
+#include "matx/operators/base_operator.h"
 
-#define TEST_VECTOR_PATH "generated/"
+namespace matx
+{
+  /**
+   * Self operator
+   *
+   * Returns the values of itself. This is useful when converting a type like a
+   * tensor view into an operator
+   */
+  namespace detail {
+    template <typename T1, int DIM>
+      class SelfOp : public BaseOp<SelfOp<T1, DIM>>
+    {
+      private:
+        typename base_type<T1>::type op_;
 
+      public:
+        using matxop = bool;
+        using scalar_type = typename T1::scalar_type;
+
+        __MATX_INLINE__ SelfOp(T1 op) : op_(op) {}
+
+        template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          {
+            return op_(indices...);
+          }
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          return detail::get_rank<T1>();
+        }
+
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        {
+          return op_.Size(dim);
+        }
+    };
+  }
+
+  /**
+   * Returns the values of itself. This is useful when converting a type like a
+   * tensor view into an operator
+   *
+   * @tparam T1
+   *   Type of operator or view
+   * @param t
+   *   Operator or view to access
+   *
+   * @returns
+   *   Operator of input
+   */
+  template <typename T1>
+    auto self(T1 t) { return detail::SelfOp<T1, T1::Rank()>(t); };
+} // end namespace matx

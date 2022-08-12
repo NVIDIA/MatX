@@ -31,32 +31,56 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
-
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+#include "matx_type_utils.h"
+#include "matx/operators/base_operator.h"
 
-#define TEST_VECTOR_PATH "generated/"
+namespace matx
+{
+  /**
+   * Performs a Hermitian transpose operator on a tensor
+   *
+   * This operation allows a user to perform a Hermitian operator using a
+   * single operator instead of Permute followed by a conj() operator.
+   */
+  namespace detail {
+    template <typename T1, int DIM>
+      class HermitianTransOp : public BaseOp<HermitianTransOp<T1, DIM>>
+    {
+      private:
+        typename base_type<T1>::type op_;
 
+      public:
+        using matxop = bool;
+        using scalar_type = typename T1::scalar_type;
+
+        __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {}
+
+        template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          {
+            auto tup = cuda::std::make_tuple(indices...);
+            return conj(mapply_reverse(op_, tup));
+          }
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          return detail::get_rank<T1>();
+        }
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        {
+          return op_.Size(Rank() - dim - 1);
+        }
+    };
+  }
+
+  /**
+   * Helper function for creating a hermitian transpose from an operator/View
+   */
+  template <typename T1>
+    auto __MATX_INLINE__ hermitianT(T1 t)
+    {
+      return detail::HermitianTransOp<T1, T1::Rank()>(t);
+    }
+} // end namespace matx

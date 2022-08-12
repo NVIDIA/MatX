@@ -40,7 +40,8 @@
 #include "kernels/matx_conv_kernels.cuh"
 #include "matx_error.h"
 #include "matx_tensor.h"
-#include "matx_tensor_ops.h"
+
+#include "matx/operators/clone.h"
 
 namespace matx {
 namespace detail {

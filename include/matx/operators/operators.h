@@ -31,32 +31,30 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
 
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
+#include "matx/operators/unary_operators.h"
+#include "matx/operators/binary_operators.h"
 
-
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
-
-#define TEST_VECTOR_PATH "generated/"
-
+#include "matx/operators/collapse.h"
+#include "matx/operators/concat.h"
+#include "matx/operators/cast.h"
+#include "matx/operators/clone.h"
+#include "matx/operators/comma.h"
+#include "matx/operators/diag.h"
+#include "matx/operators/fftshift.h"
+#include "matx/operators/flatten.h"
+#include "matx/operators/hermitian.h"
+#include "matx/operators/if.h"
+#include "matx/operators/ifelse.h"
+#include "matx/operators/interleaved.h"
+#include "matx/operators/kronecker.h"
+#include "matx/operators/permute.h"
+#include "matx/operators/planar.h"
+#include "matx/operators/r2c.h"
+#include "matx/operators/remap.h"
+#include "matx/operators/repmat.h"
+#include "matx/operators/reverse.h"
+#include "matx/operators/select.h"
+#include "matx/operators/self.h"
+#include "matx/operators/shift.h"
+#include "matx/operators/slice.h"

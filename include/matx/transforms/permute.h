@@ -31,32 +31,42 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
-
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
 
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+#include "matx_type_utils.h"
 
-#define TEST_VECTOR_PATH "generated/"
+namespace matx
+{
+  /**
+   * Permute a tensor view out-of-place
+   *
+   * Rearranges the dimensions of a tensor view without touching the data. This is
+   * accomplished by changing the strides between dimensions to reflect the new
+   * transposed order. This function can result in very in efficient memory
+   * accesses, so it's recommended only to use in places performance is not
+   * critical.
+   *
+   * Both tensor views must be the same rank, and the dimensions that moved must
+   * match their original size
+   *
+   * @param out
+   *   Tensor to copy into
+   * @param in
+   *   Tensor to copy from
+   * @param dims
+   *   Order of transposed tensor dimensions
+   * @param stream
+   *   CUDA stream to operate in
+   *
+   */
+  template <class T, int Rank>
+    __MATX_INLINE__ void permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in,
+        const std::initializer_list<uint32_t> &dims,
+        const cudaStream_t stream)
+    {
+      // This is very naive, we should make optimized versions for various swizzles
+      auto in_t = in.Permute(dims.begin());
 
+      copy(out, in_t, stream);
+    };
+} // end namespace matx
