@@ -1,0 +1,12 @@
+``BUILD_EXPORT_SET``
+  Record that a :cmake:command:`CPMFindPackage()` for |PKG_NAME| is required in our build directory export set.
+
+``INSTALL_EXPORT_SET``
+  Record that a :cmake:command:`find_dependency() <cmake:module:CMakeFindDependencyMacro>` for |PKG_NAME| is required in our install directory export set.
+
+.. note::
+  Installation of |PKG_NAME| will occur if an INSTALL_EXPORT_SET is provided, and |PKG_NAME|
+  is added to the project via :cmake:command:`add_subdirectory <cmake:command:add_subdirectory>` by CPM.
+
+``CPM_ARGS``
+  Any arguments after `CPM_ARGS` will be forwarded to the underlying |PKG_NAME| :cmake:command:`CPMFindPackage`()` call

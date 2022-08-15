@@ -1,0 +1,45 @@
+#=============================================================================
+# Copyright (c) 2021, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#=============================================================================
+cmake_minimum_required(VERSION 3.20.1)
+
+include(FetchContent)
+
+set(local-rapids-cmake-root "${rapids-cmake-dir}/..")
+FetchContent_Declare(
+  rapids-cmake
+  GIT_REPOSITORY "${local-rapids-cmake-root}/.git"
+  GIT_TAG HEAD
+  )
+
+FetchContent_GetProperties(rapids-cmake)
+FetchContent_Populate(rapids-cmake)
+
+# Copy any local uncommited changes over
+file(COPY ${local-rapids-cmake-root}/rapids-cmake/
+     DESTINATION ${rapids-cmake_SOURCE_DIR}/rapids-cmake/)
+file(COPY ${local-rapids-cmake-root}/CMakeLists.txt
+     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
+file(COPY ${local-rapids-cmake-root}/init.cmake
+     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
+file(COPY ${local-rapids-cmake-root}/RAPIDS.cmake
+     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
+
+add_subdirectory(${rapids-cmake_SOURCE_DIR} ${rapids-cmake_BINARY_DIR})
+
+# We need to enable at least one language so that we get properly
+# generated system search paths.
+project(@test_name@ LANGUAGES CXX)
+include("@test_cmake_file@")
