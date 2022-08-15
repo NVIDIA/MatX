@@ -31,7 +31,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
-#include "matx_filter.h"
 #include <cassert>
 #include <cstdio>
 #include <cuda/std/ccomplex>

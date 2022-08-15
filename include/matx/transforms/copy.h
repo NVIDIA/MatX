@@ -33,7 +33,7 @@
 #pragma once
 
 
-#include "matx_type_utils.h"
+#include "matx/core/type_utils.h"
 
 namespace matx
 {
