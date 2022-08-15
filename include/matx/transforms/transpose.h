@@ -33,8 +33,8 @@
 #pragma once
 
 
-#include "matx_type_utils.h"
-#include "kernels/matx_transpose.cuh"
+#include "matx/core/type_utils.h"
+#include "matx/kernels/transpose.cuh"
 
 namespace matx
 {

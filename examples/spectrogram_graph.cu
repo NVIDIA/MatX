@@ -31,7 +31,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
-#include "matx_viz.h"
 #include <cassert>
 #include <cstdio>
 #include <math.h>

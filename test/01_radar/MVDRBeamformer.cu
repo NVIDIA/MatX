@@ -32,7 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
 #include "mvdr_beamformer.h"
 #include "utilities.h"
 #include "gtest/gtest.h"

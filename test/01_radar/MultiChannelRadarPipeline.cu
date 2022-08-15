@@ -32,7 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
 #include "simple_pipeline.h"
 #include "test_types.h"
 #include "utilities.h"

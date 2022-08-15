@@ -32,9 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
-#include "matx_radar.h"
-#include "matx_signal.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
 
@@ -65,7 +62,7 @@ TEST_F(DctTests, Real1DN100)
   MATX_ENTER_HANDLER();
 
   tensor_t<float, 1> out{{sig_size}};
-  signal::dct(out, xv);
+  dct(out, xv);
   MATX_TEST_ASSERT_COMPARE(pb, out, "Y", 0.01);
 
   MATX_EXIT_HANDLER();

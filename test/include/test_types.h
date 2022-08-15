@@ -31,11 +31,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "matx_half.h"
-#include "matx_half_complex.h"
-#include "matx_type_utils.h"
-#include "gtest/gtest.h"
 #include <cuda/std/ccomplex>
+#include "gtest/gtest.h"
+#include "matx.h"
 
 using testing::Types;
 

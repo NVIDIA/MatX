@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 #include "matx.h"
-#include "matx_pybind.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
 

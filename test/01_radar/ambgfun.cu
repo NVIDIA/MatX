@@ -32,8 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
-#include "matx_radar.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
 
@@ -67,7 +65,7 @@ TEST_F(RadarAmbiguityFunction, Cut2D)
       {2 * sig_size - 1,
        (index_t)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
 
-  signal::ambgfun(amf2dv, xv, 1e3, signal::AMGBFUN_CUT_TYPE_2D, 1.0);
+  ambgfun(amf2dv, xv, 1e3, AMGBFUN_CUT_TYPE_2D, 1.0);
   MATX_TEST_ASSERT_COMPARE(pb, amf2dv, "amf_2d", 0.01);
 
   MATX_EXIT_HANDLER();
@@ -80,7 +78,7 @@ TEST_F(RadarAmbiguityFunction, CutDelay)
   tensor_t<float, 2> amf_delay_v(
       {1, (index_t)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
 
-  signal::ambgfun(amf_delay_v, xv, 1e3, signal::AMGBFUN_CUT_TYPE_DELAY, 1.0);
+  ambgfun(amf_delay_v, xv, 1e3, AMGBFUN_CUT_TYPE_DELAY, 1.0);
 
   auto delay1d = amf_delay_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
   MATX_TEST_ASSERT_COMPARE(pb, delay1d, "amf_delay", 0.01);
@@ -94,7 +92,7 @@ TEST_F(RadarAmbiguityFunction, CutDoppler)
 
   tensor_t<float, 2> amf_doppler_v({1, xv.Size(0) * 2 - 1});
 
-  signal::ambgfun(amf_doppler_v, xv, 1e3, signal::AMGBFUN_CUT_TYPE_DOPPLER,
+  ambgfun(amf_doppler_v, xv, 1e3, AMGBFUN_CUT_TYPE_DOPPLER,
                   1.0);
 
   auto doppler1d = amf_doppler_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
