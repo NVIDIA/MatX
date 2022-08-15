@@ -1,0 +1,11 @@
+{
+  "format": {
+    "line_width": 100,
+    "tab_size": 2,
+    "command_case": "unchanged",
+    "dangle_parens": false,
+    "max_subgroups_hwrap": 4,
+    "min_prefix_chars": 32,
+    "max_pargs_hwrap": 999
+  }
+}

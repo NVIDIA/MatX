@@ -1,0 +1,12 @@
+
+#cmake code owners
+**/CMakeLists.txt     @rapidsai/rapids-cmake-codeowners
+*.cmake               @rapidsai/rapids-cmake-codeowners
+
+#build/ops code owners
+.github/              @rapidsai/ops-codeowners
+ci/                   @rapidsai/ops-codeowners
+conda/                @rapidsai/ops-codeowners
+**/Dockerfile         @rapidsai/ops-codeowners
+**/.dockerignore      @rapidsai/ops-codeowners
+docker/               @rapidsai/ops-codeowners
