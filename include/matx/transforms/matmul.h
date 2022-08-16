@@ -639,11 +639,11 @@ private:
 
       auto a_shape = a.Shape();
       *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
-      auto a_planar = make_tensor<typename T1::value_type, non_owning>(A, a_shape);
+      auto a_planar = make_tensor<typename T1::value_type>(A, a_shape);
 
       auto b_shape = b.Shape();
       *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
-      auto b_planar = make_tensor<typename T1::value_type, non_owning>(B, b_shape);
+      auto b_planar = make_tensor<typename T1::value_type>(B, b_shape);
 
       // Convert A/B to planar layout
       (a_planar = planar(a)).run(stream);

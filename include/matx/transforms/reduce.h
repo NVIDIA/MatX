@@ -1154,7 +1154,7 @@ void __MATX_INLINE__ median(OutType dest,
   matxAlloc(reinterpret_cast<void **>(&tmp_alloc),
                 sizeof(T) * TotalSize(in), MATX_ASYNC_DEVICE_MEMORY,
                 stream);
-  auto tmp_sort = make_tensor<T, non_owning>(tmp_alloc, in.Shape());
+  auto tmp_sort = make_tensor<T>(tmp_alloc, in.Shape());
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
