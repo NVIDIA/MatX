@@ -82,7 +82,15 @@ class MatXPybind {
 public:
   MatXPybind() { Init(); }
 
-  void Init() { 
+  void Init() {  
+    if (gil == nullptr) {
+      try {
+        gil = new pybind11::scoped_interpreter{};
+      }
+      catch (...) {
+        // Interpreter already running
+      }
+    }
     AddPath(std::string(MATX_ROOT) + GENERATORS_PATH); 
   }
 
@@ -121,7 +129,9 @@ public:
 
   auto GetMethod(const std::string meth) { return sx_obj.attr(meth.c_str()); }
 
-  ~MatXPybind() {}
+  ~MatXPybind() {
+    
+  }
 
   template <typename T> static std::string GetNumpyDtype()
   {
@@ -435,7 +445,7 @@ public:
   }
 
 private:
-  inline static pybind11::scoped_interpreter gil = pybind11::scoped_interpreter{};
+  inline static pybind11::scoped_interpreter *gil = nullptr;
   pybind11::module_ mod;
   pybind11::object res_dict;
   pybind11::object sx_obj;
