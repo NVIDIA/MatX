@@ -45,7 +45,7 @@ namespace matx
    * internally.
    * 
    */
-  template <typename T, typename O, typename Allocator = matx_allocator<T>>
+  template <typename T, typename Allocator = matx_allocator<T>>
   class raw_pointer_buffer
   {
   public:
@@ -59,7 +59,7 @@ namespace matx
      * 
      * @param size Size of allocation
      */
-    raw_pointer_buffer(size_t size) : size_(size) {
+    raw_pointer_buffer(size_t size) : size_(size), owning_(true) {
       T *tmp = alloc_.allocate(size);
       ConfigureShared(tmp, size); 
     }
@@ -70,7 +70,7 @@ namespace matx
      * @param ptr Previously-allocated pointer
      * @param size Size of allocation
      */
-    raw_pointer_buffer(T *ptr, size_t size) : size_(size) { 
+    raw_pointer_buffer(T *ptr, size_t size, bool owning = false) : size_(size), owning_(owning) { 
       ConfigureShared(ptr, size);  
     }
 
@@ -210,10 +210,12 @@ namespace matx
   private:
     Allocator alloc_ = {};
     size_t size_;
-    std::shared_ptr<T> data_;
+    bool owning_;
 
+    std::shared_ptr<T> data_;
+    
     void ConfigureShared(T *ptr, [[maybe_unused]] size_t size) {
-      if constexpr (std::is_same_v<O, non_owning>) {
+      if (!owning_) {
         data_ = std::shared_ptr<T>(ptr, [](auto){});
       }
       else {
@@ -537,5 +539,5 @@ namespace matx
  * @tparam T Type of pointer
  */
   template <typename T>
-  using DefaultStorage = basic_storage<raw_pointer_buffer<T, owning, matx_allocator<T>>>;
+  using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
 };

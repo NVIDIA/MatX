@@ -102,7 +102,6 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionRemap)
   MATX_ENTER_HANDLER();
 
   int N = 256;
-  //int N = 10; // memory errors
   int B = 5;
   int F = 3;
   int R = 3;

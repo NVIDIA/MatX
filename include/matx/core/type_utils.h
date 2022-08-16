@@ -755,7 +755,4 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
 }
 } // end namespace detail
 
-struct owning {};
-struct non_owning {};
-
 } // end namespace matx
