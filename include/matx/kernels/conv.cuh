@@ -150,12 +150,12 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       int start_tid, stop_tid;
       if (filter_len & 1) {
         start_tid = (filter_len - 1) >> 1;
-        stop_tid = full_len - ((filter_len - 1) >> 1);
       }
       else {
         start_tid = (filter_len >> 1) - 1;
-        stop_tid = full_len - (filter_len >> 1) + 1;
       }
+
+      stop_tid = full_len - (filter_len >> 1) - 1;
 
       if (tid >= start_tid && tid <= stop_tid) {
         bdims[Rank - 1] = tid - start_tid; 
