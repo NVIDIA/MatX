@@ -68,10 +68,11 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   }
 
   auto shmsize = filter_shm + sizeof(strip_input_t) * (filter.Size(filter.Rank()-1) + BLOCK_SIZE_NON_RECURSIVE);
+  
 
   shape_type sig_len = i.Size(OutputType::Rank() - 1);
   float work_per_block =
-      static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(0) + 1);
+      static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(filter.Rank()-1) + 1);
   int num_blocks = static_cast<int>(std::ceil(
       static_cast<float>(sig_len + filter.Size(0) - 1) / work_per_block));
 
