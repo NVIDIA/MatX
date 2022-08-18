@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #include <cstdio>
 #include <iterator>
 #include <shared_mutex>
@@ -43,7 +45,8 @@
 #include "matx/core/tensor.h"
 #include "matx/core/error.h"
 
-#pragma once
+
+#if MATX_ENABLE_FILEIO
 
 namespace matx {
 namespace io {
@@ -232,3 +235,5 @@ void WriteMAT(const TensorType &t, const std::string fname,
 
 }; // namespace io
 }; // namespace matx
+
+#endif
