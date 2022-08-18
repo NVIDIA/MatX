@@ -34,10 +34,11 @@
 #include "matx/core/type_utils.h"
 
 
+#if MATX_ENABLE_PYBIND11
+
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h> 
 
-#if MATX_ENABLE_PYBIND11
 namespace matx {
 
 #define MATX_TEST_ASSERT_NEAR(__x, __y, __t)                                   \
