@@ -3,6 +3,7 @@
 import numpy as np
 import sys
 from scipy import io
+from scipy import signal
 from scipy.constants import c, pi
 import matx_common
 from typing import Dict, List
@@ -30,6 +31,22 @@ class conv_operators:
 
     def corr_swap(self):
         self.res['corr_swap'] = np.correlate(self.b, self.a, 'full')
+        return self.res
+
+class conv2d_operators:
+    def __init__(self, dtype: str, size: List[int]):
+        np.random.seed(1234)
+        self.a = matx_common.randn_ndarray((size[0],size[1]), dtype)
+        self.b = matx_common.randn_ndarray((size[2],size[3]), dtype)
+        self.res = {
+            'a_op': self.a,
+            'b_op': self.b
+        }
+
+    def conv2d(self):
+        self.res['conv_full'] = signal.convolve2d(self.a, self.b, 'full')
+        self.res['conv_same'] = signal.convolve2d(self.a, self.b, 'same')
+        self.res['conv_valid'] = signal.convolve2d(self.a, self.b, 'valid')
         return self.res
 
 
