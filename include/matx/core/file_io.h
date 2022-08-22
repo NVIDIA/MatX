@@ -131,7 +131,7 @@ void ReadCSV(TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
-  std::unique_ptr<detail::MatXPybind> pb;
+  auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")(fname, "delimiter"_a = delimiter,
@@ -162,7 +162,7 @@ void WriteCSV(const TensorType &t, const std::string fname,
     ndims.append(t.Size(i));
   }
 
-  std::unique_ptr<detail::MatXPybind> pb;
+  auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
 
   auto np_ten = pb->TensorViewToNumpy(t);
@@ -190,7 +190,7 @@ template <typename TensorType>
 void ReadMAT(TensorType &t, const std::string fname,
              const std::string var)
 {
-  std::unique_ptr<detail::MatXPybind> pb;
+  auto pb = std::make_unique<detail::MatXPybind>();
 
   auto sp = pybind11::module_::import("scipy.io");
   auto obj = (pybind11::dict)sp.attr("loadmat")("file_name"_a = fname);
@@ -222,7 +222,7 @@ void WriteMAT(const TensorType &t, const std::string fname,
     ndims.append(t.Size(i));
   }
 
-  std::unique_ptr<detail::MatXPybind> pb;
+  auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
   auto sp = pybind11::module_::import("scipy.io");
 
