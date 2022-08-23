@@ -471,6 +471,36 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(uint64_t *addr, uint64_t val)
 }
 
 /**
+ * Atomic add for int64_t
+ *
+ * @param addr
+ *   Source and destination for result
+ * @param val
+ *   Value to add
+ */
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(int64_t *addr,
+                                 int64_t val)
+{
+  unsigned long long int *addri = reinterpret_cast<unsigned long long int *>(addr);
+  atomicAdd(addri, (unsigned long long int)val);
+}
+
+/**
+ * Atomic add for uint64_t
+ *
+ * @param addr
+ *   Source and destination for result
+ * @param val
+ *   Value to add
+ */
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(uint64_t *addr,
+                                 uint64_t val)
+{
+  unsigned long long int *addri = reinterpret_cast<unsigned long long int *>(addr);
+  atomicAdd(addri, (unsigned long long int)val);
+}
+
+/**
  * Atomic add for complex floats
  *
  * Atomically adds two complex floating point numbers. Note that

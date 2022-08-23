@@ -128,7 +128,7 @@ struct BeginOffset {
    * 
    * @return Value at offset 
    */
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator*() const
   {
     return offset_ * size_;
   }  
@@ -138,7 +138,7 @@ struct BeginOffset {
     return self_type{size_, offset_ + offset};
   }
 
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type offset) const
   {
     return *self_type{size_, offset_ + offset};
   }  
@@ -187,7 +187,7 @@ struct EndOffset {
    * 
    * @return Value at offset 
    */
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator*() const
   {
     return (offset_ + 1) * size_;
   }  
@@ -197,7 +197,7 @@ struct EndOffset {
     return self_type{size_, offset_ + offset};
   }
 
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type offset) const
   {
     return ( offset + 1) * size_;
   }  
