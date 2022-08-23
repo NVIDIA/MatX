@@ -36,8 +36,8 @@
 #if MATX_ENABLE_CUTENSOR
 #include <cstdio>
 #include <numeric>
-#include "matx_error.h"
-#include "matx_tensor.h"
+#include "error.h"
+#include "tensor.h"
 
 
 #include <cutensornet.h>
