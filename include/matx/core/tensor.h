@@ -1664,7 +1664,7 @@ public:
             std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                  (RANK == 0 || sizeof...(Args) > 0),
                              bool> = true>
-  [[deprecated("Use non-member function Print() instead")]] void Print(Args... dims) const {
+  void Print(Args... dims) const {
     matx::Print(*this, dims...);
   }
 

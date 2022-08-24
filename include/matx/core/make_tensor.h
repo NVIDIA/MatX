@@ -146,9 +146,9 @@ auto make_tensor(ShapeType &&shape) {
   raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
   basic_storage<decltype(rp)> s{std::move(rp)};
   return tensor_t<T, 
-  std::tuple_size<typename remove_cvref<ShapeType>::type>::value, 
-  decltype(s), 
-  decltype(desc)>{std::move(s), std::move(desc)};
+    std::tuple_size<typename remove_cvref<ShapeType>::type>::value, 
+    decltype(s), 
+    decltype(desc)>{std::move(s), std::move(desc)};
 }
 
 /**
@@ -183,8 +183,22 @@ auto make_tensor_p(ShapeType &&shape) {
  **/
 template <typename T>
 auto make_tensor() {
-  std::array<T, 0> shape;
-  return make_tensor<T, 0>(std::move(shape));
+  std::array<index_t, 0> shape;
+  return make_tensor<T, decltype(shape)>(std::move(shape));
+}
+
+/**
+ * Create a 0D tensor with user-defined memory
+ * 
+ * @param ptr
+ *  Pointer to data
+ * @returns New tensor
+ * 
+ **/
+template <typename T>
+auto make_tensor_p() {
+  std::array<index_t, 0> shape;
+  return make_tensor_p<T, decltype(shape)>(std::move(shape));
 }
 
 /**
@@ -234,8 +248,8 @@ auto make_tensor(T *data, ShapeType &&shape, bool owning = false) {
  **/
 template <typename T>
 auto make_tensor(T *ptr, bool owning = false) {
-  std::array<T, 0> shape;
-  return make_tensor<T, 0>(ptr, std::move(shape), owning);
+  std::array<index_t, 0> shape;
+  return make_tensor<T, decltype(shape)>(ptr, std::move(shape), owning);
 }
 
 
