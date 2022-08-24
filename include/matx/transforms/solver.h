@@ -1199,14 +1199,14 @@ void det(OutputTensor &out, const InputTensor &a,
   constexpr int RANK = InputTensor::Rank();
 
   // Get parameters required by these tensors
-  tensorShape_t<RANK - 1> s;
+  std::array<index_t, RANK - 1> s;
 
   // Set batching dimensions of piv
   for (int i = 0; i < RANK - 2; i++) {
-    s.SetSize(i, a.Size(i));
+    s[i] = a.Size(i);
   }
 
-  s.SetSize(RANK - 2, std::min(a.Size(RANK - 1), a.Size(RANK - 2)));
+  s[RANK - 2] = std::min(a.Size(RANK - 1), a.Size(RANK - 2));
 
   auto piv = make_tensor<int64_t>(s);
   auto ac = make_tensor<typename OutputTensor::scalar_type>(a.Shape());

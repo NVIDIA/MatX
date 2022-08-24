@@ -93,17 +93,15 @@ public:
     devs = make_tensor_p<T1>(a.Shape());
 
     // Transposed view of deviations
-    tensorShape_t<RANK> tmp;
+    std::array<index_t, RANK> tmp;
     for (int i = 0; i < RANK; i++) {
-      tmp.SetSize(i, a.Size(RANK - i - 1));
+      tmp[i] = a.Size(RANK - i - 1);
     }
 
-    devsT = make_tensor_p<T1>(tmp);
+    devsT = make_tensor_p<T1>(std::move(tmp));
 
     // Populate our ones matrix
-    exec(set(*onesM,
-             ones({a.Size(RANK - 2), a.Size(RANK - 2)})),
-         0);
+    (*onesM = ones({a.Size(RANK - 2), a.Size(RANK - 2)})).run();
   }
 
   static CovParams_t GetCovParams([[maybe_unused]] TensorTypeC &c, const TensorTypeA &a)
