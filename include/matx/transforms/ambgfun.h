@@ -34,6 +34,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <optional>
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
