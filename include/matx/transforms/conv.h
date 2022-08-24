@@ -54,7 +54,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   using strip_filter_t = typename FilterType::scalar_type;
   using shape_type = typename OutputType::shape_type;
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
-  MATX_ASSERT_STR(filter.Size(0) < BLOCK_SIZE_NON_RECURSIVE, matxInvalidSize,
+  MATX_ASSERT_STR(filter.Size(filter.Rank()-1) < BLOCK_SIZE_NON_RECURSIVE, matxInvalidSize,
     "Convolutions are limited to filter lengths < 1024");
 
 #ifdef __CUDACC__  
@@ -74,7 +74,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   float work_per_block =
       static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(filter.Rank()-1) + 1);
   int num_blocks = static_cast<int>(std::ceil(
-      static_cast<float>(sig_len + filter.Size(0) - 1) / work_per_block));
+      static_cast<float>(sig_len + filter.Size(filter.Rank()-1) - 1) / work_per_block));
 
   int grid_size = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
