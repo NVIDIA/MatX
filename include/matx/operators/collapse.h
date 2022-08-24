@@ -49,6 +49,8 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
+        using shape_type = typename T1::shape_type;
+        using matxlvalue = bool;
 
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
@@ -103,6 +105,8 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(DIM+dim);
         }
+        
+        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
   /**
@@ -138,6 +142,7 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
+        using shape_type = typename T1::shape_type;
         using matxlvalue = bool;
 
         __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
@@ -193,6 +198,8 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(dim);
         }
+        
+        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
   /**
