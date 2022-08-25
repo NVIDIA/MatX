@@ -44,7 +44,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using outtype_strip = typename OutType::scalar_type;
   int chunk_idx = blockIdx.y;
   int batch_idx = blockIdx.x;
-  index_t filter_len = d_filter.Size(Rank-1);
+  int32_t filter_len = d_filter.Size(Rank-1);
 
   // All but the last dim will be populated
   auto bdims = BlockToIdx(d_in, batch_idx, 1);
@@ -62,13 +62,13 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   if constexpr (std::alignment_of_v < intype_strip >>
                 std::alignment_of_v<ftype_strip>) {
     s_data =
-        matx::detail::AlignAddr<intype_strip>((uint8_t *)&s_exch[static_cast<index_t>(
+        matx::detail::AlignAddr<intype_strip>((uint8_t *)&s_exch[static_cast<int32_t>(
             filter_len * filt_size_adj)]); // Start data portion after 2x the
                                            // filter to remove conditionals and
                                            // multiply by 0
   }
   else {
-    s_data = reinterpret_cast<intype_strip *>(&s_exch[static_cast<index_t>(
+    s_data = reinterpret_cast<intype_strip *>(&s_exch[static_cast<int32_t>(
         filter_len *
         filt_size_adj)]); // Start data portion after 2x the filter to
                           // remove conditionals and multiply by 0
@@ -80,7 +80,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // duplicate tids based on this formula, but not all threads write out to
   // memory. Some are only there to fetch data, while others both fetch and
   // compute output
-  const index_t tid =
+  const int32_t tid =
       static_cast<index_t>(chunk_idx) * (blockDim.x - filter_len + 1) +
       threadIdx.x;
   int offset = tid - filter_len + 1;
@@ -89,7 +89,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
   // Zero out shared memory since it's used later to index into where we want
   // 0-valued taps
-  for (index_t i = threadIdx.x; i < filter_len + blockDim.x; i += blockDim.x) {
+  for (int32_t i = threadIdx.x; i < filter_len + blockDim.x; i += blockDim.x) {
     s_data[i] = 0.0;
   }
 
@@ -135,10 +135,19 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // data in shared memory for blockDim-filt_len+1 to operate on. The rest sit
   // idle through this process.
   if (tid < full_len && (threadIdx.x < blockDim.x - filter_len + 1)) {
+#if 0
 #pragma unroll
     for (index_t r = 0; r < filter_len; r++) {
       val = val + s_filter[r] * s_data[threadIdx.x + filter_len - 1 - r];
     }
+#else
+    s_data += threadIdx.x + filter_len - 1;
+    for (int32_t r = 0; r < filter_len; r++) {
+      val = val + s_filter[0] * s_data[0];
+      s_data--;
+      s_filter++;
+    }
+#endif
 
     if (mode == MATX_C_MODE_FULL) {
       bdims[Rank - 1] = tid;  
