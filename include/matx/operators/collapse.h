@@ -50,7 +50,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
         using shape_type = typename T1::shape_type;
-        using matxlvalue = bool;
+        using matxoplvalue = bool;
 
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
@@ -61,7 +61,7 @@ namespace matx
         // comptue size of collapsed dimension
         size_ = 1;
 
-        // Collapse right-most dims
+        // Collapse left-most dims
 #pragma unroll
         for(int i = 0 ; i <= DIM; i++) {
           size_ *= op_.Size(i);
@@ -85,7 +85,32 @@ namespace matx
             auto ind = in[0];
 #pragma unroll
             for(int i = 0; i <= DIM; i++) {
-              index_t d = DIM - i;
+              int d = DIM - i;
+              out[d] = ind % op_.Size(d);
+              ind /= op_.Size(d);
+            }
+
+            return mapply(op_, out);
+          }    
+        
+	template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+          {
+            // indices coming in
+            std::array<index_t, Rank()> in{indices...};  // index coming in
+            std::array<index_t, T1::Rank()> out;         // index going out
+
+#pragma unroll
+            for(int i = 1; i < Rank(); i++) {
+              // copy all but first input index into out array
+              out[DIM+i] = in[i];
+            }
+
+            // expand first input index into DIM indices
+            auto ind = in[0];
+#pragma unroll
+            for(int i = 0; i <= DIM; i++) {
+              int d = DIM - i;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
             }
@@ -163,6 +188,31 @@ namespace matx
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          {
+            // indices coming in
+            std::array<index_t, Rank()> in{indices...};  // index coming in
+            std::array<index_t, T1::Rank()> out;         // index going out
+
+#pragma unroll
+            for(int i = 0 ; i < Rank() - 1; i++) {
+              // copy all but last index into out array
+              out[i] = in[i];
+            }
+
+            // expand last index into DIM indices
+            auto ind = in[Rank() - 1];
+#pragma unroll
+            for(int i = 0; i <= DIM; i++) {
+              index_t d = T1::Rank() - 1 - i;
+              out[d] = ind % op_.Size(d);
+              ind /= op_.Size(d);
+            }
+
+            return mapply(op_, out);
+          }    
+        
+	template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
           {
             // indices coming in
             std::array<index_t, Rank()> in{indices...};  // index coming in

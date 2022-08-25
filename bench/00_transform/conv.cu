@@ -4,7 +4,7 @@
 using namespace matx;
 
 using conv_types =
-    nvbench::type_list<cuda::std::complex<float>, cuda::std::complex<double>>;
+    nvbench::type_list<cuda::std::complex<float>, cuda::std::complex<double>, float, double>;
 
 /* FFT benchmarks */
 template <typename ValueType>

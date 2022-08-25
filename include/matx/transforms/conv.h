@@ -166,7 +166,7 @@ inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
  * @param stream CUDA stream
  */
 template <typename OutputType, typename In1Type, typename In2Type>
-inline void conv1d(OutputType &&o, const In1Type &i1, const In2Type &i2,
+inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream) {
   if constexpr ( In1Type::Rank() >  In2Type::Rank() ) {
     // broadcast i2 path.  clone i2 across batches
