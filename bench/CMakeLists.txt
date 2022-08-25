@@ -1,6 +1,7 @@
 set (bench_sources
     00_transform/matmul.cu
     00_transform/fft.cu
+    00_transform/conv.cu
     00_transform/einsum.cu
     00_operators/operators.cu
     00_operators/reduction.cu
