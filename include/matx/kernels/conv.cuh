@@ -28,8 +28,9 @@ typedef enum {
   MATX_C_METHOD_AUTO,
 } matxConvCorrMethod_t;
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__ 
 template <typename OutType, typename InType, typename FilterType>
+__launch_bounds__(1024)
 __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
                        index_t signal_len,
                        matxConvCorrMode_t mode)
