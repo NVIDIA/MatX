@@ -31,6 +31,10 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <type_traits>
+#include <cuda_fp16.h>
+
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
 
@@ -55,6 +59,66 @@ __MATX_INLINE__ int GetComputeCapabilityMajor() {
 
 __MATX_INLINE__ bool IsAmpereOrAbove() {
     return GetComputeCapabilityMajor() >= AMPERE_CC;
+}
+
+template <typename T1, typename T2, typename T3>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &y, const T3 &z) {
+  using T4 = decltype(x*y+z); 
+  if constexpr (is_complex_v<T4> && !is_complex_half_v<T4>) {
+    
+    using value_type = typename T4::value_type;
+
+    value_type xr, xi;
+    value_type yr, yi;
+    value_type zr, zi;
+
+    if constexpr (is_complex_v<T1>) {
+      xr = x.real();
+      xi = x.imag();
+    } else {
+      xr = x;
+      xi = value_type(0);
+    }
+
+    if constexpr (is_complex_v<T2>) {
+      yr = y.real();
+      yi = y.imag();
+    } else {
+      yr = y;
+      yi = value_type(0);
+    }
+
+    if constexpr (is_complex_v<T3>) {
+      zr = z.real();
+      zi = z.imag();
+    } else {
+      zr = z;
+      zi = value_type(0);
+    }
+
+    T4 Z(zr,zi);
+
+    Z.real(Z.real() + xr*yr);
+    Z.real(Z.real() - xi*yi);
+
+    Z.imag(Z.imag() + xi*yr);
+    Z.imag(Z.imag() + xr*yi);
+
+    return Z;
+  } else if constexpr (std::is_same_v<T4, matxFp16Complex>) {
+    //__half2 X = make_half2(x.real(), x.imag());
+    //__half2 Y = make_half2(y.real(), y.imag());
+    //__half2 Z = make_half2(z.real(), z.imag());
+    
+    const __half2 &X = *reinterpret_cast<const __half2*>(&x);
+    const __half2 &Y = *reinterpret_cast<const __half2*>(&y);
+    const __half2 &Z = *reinterpret_cast<const __half2*>(&z);
+
+    auto v = __hcmadd(X,Y,Z);
+    return T4(v.x, v.y);
+  } else {
+    return x*y+z;
+  }
 }
 
 };

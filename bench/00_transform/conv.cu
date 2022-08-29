@@ -1,10 +1,11 @@
 #include "matx.h"
 #include <nvbench/nvbench.cuh>
+#include "matx/core/half_complex.h"
 
 using namespace matx;
 
 using conv_types =
-    nvbench::type_list<cuda::std::complex<float>, cuda::std::complex<double>, float, double>;
+    nvbench::type_list<matxFp16Complex, cuda::std::complex<float>, cuda::std::complex<double>, float, double>;
 
 /* FFT benchmarks */
 template <typename ValueType>
