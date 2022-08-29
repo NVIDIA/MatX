@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cuComplex.h"
+#include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 
@@ -144,7 +145,11 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 #else
     s_data += threadIdx.x + filter_len - 1;
     for (int32_t r = 0; r < filter_len; r++) {
+#if 0
       val = val + s_filter[0] * s_data[0];
+#else
+      val = detail::madd(s_filter[0], s_data[0], val);
+#endif
       s_data--;
       s_filter++;
     }
@@ -242,19 +247,19 @@ __global__ void Conv2D(OutType d_out, InType d_in, FilterType d_filter,
       }
 
       if constexpr (d_in.Rank() == 4) {
-        val += s_filter[y * d_filter.Size(1) + x] *
+      val = detail::madd(s_filter[y * d_filter.Size(1) + x],
                d_in(bdims[0], bdims[1], tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x);
+                    tid_x - d_filter.Size(1) + 1 + x), val);
       }
       else if constexpr (d_in.Rank() == 3) {
-        val += s_filter[y * d_filter.Size(1) + x] *
+        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
                d_in(blockIdx.z, tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x);
+                    tid_x - d_filter.Size(1) + 1 + x), val);
       }
       else if constexpr (d_in.Rank() == 2) {
-        val += s_filter[y * d_filter.Size(1) + x] *
+        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
                d_in(tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x);
+                    tid_x - d_filter.Size(1) + 1 + x), val);
       }
     }
   }
