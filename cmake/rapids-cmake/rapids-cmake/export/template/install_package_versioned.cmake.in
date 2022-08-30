@@ -1,0 +1,2 @@
+find_package(@name@ @version@ QUIET)
+find_dependency(@name@)

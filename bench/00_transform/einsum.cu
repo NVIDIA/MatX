@@ -1,6 +1,5 @@
 #include <nvbench/nvbench.cuh>
 #include "matx.h"
-#include "matx_einsum.h"
 
 #if ENABLE_CUTENSOR
 

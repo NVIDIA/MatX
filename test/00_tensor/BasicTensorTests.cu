@@ -413,7 +413,7 @@ TYPED_TEST(BasicTensorTestsAll, Print)
 
   auto t = make_tensor<TypeParam>({3});
   (t = ones(t.Shape())).run();
-  t.Print();
+  Print(t);
 
   MATX_EXIT_HANDLER();
 }

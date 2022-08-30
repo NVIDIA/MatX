@@ -32,27 +32,19 @@
 
 #pragma once
 #include <cuda/std/ccomplex>
-#include "matx_defines.h"
-#include "matx_half_complex.h"
-#include "matx_half.h"
+#include "matx/core/defines.h"
+#include "matx/core/error.h"
+#include "matx/core/file_io.h"
+#include "matx/core/half_complex.h"
+#include "matx/core/half.h"
+#include "matx/core/pybind.h"
+#include "matx/core/tensor.h"
+#include "matx/core/utils.h"
 
-#include "matx_utils.h"
-#include "matx_error.h"
-#include "matx_tensor.h"
-#include "matx_random.h"
-#include "matx_tensor_generators.h"
-#include "matx_tensor_ops.h"
-#include "matx_exec_kernel.h"
-#include "matx_fft.h"
-#include "matx_conv.h"
-#include "matx_corr.h"
-#include "matx_matmul.h"
-#include "matx_reduce.h"
-#include "matx_inverse.h"
-#include "matx_solver.h"
-#include "matx_cov.h"
-#include "matx_cub.h"
-
+#include "matx/executors/executors.h"
+#include "matx/generators/generators.h"
+#include "matx/operators/operators.h"
+#include "matx/transforms/transforms.h"
 
 using fcomplex = cuda::std::complex<float>;
 using dcomplex = cuda::std::complex<double>;

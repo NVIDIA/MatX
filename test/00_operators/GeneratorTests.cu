@@ -32,7 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -540,11 +539,11 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
       "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
 
   auto t1 = make_tensor<TypeParam>({count});
-  (t1 = signal::chirp(count, end, f0, end, f1)).run();
+  (t1 = chirp(count, end, f0, end, f1)).run();
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
   auto t1c = make_tensor<cuda::std::complex<TypeParam>>({count});
-  (t1c = signal::cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
+  (t1c = cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
 
   pb.reset();
   MATX_EXIT_HANDLER();

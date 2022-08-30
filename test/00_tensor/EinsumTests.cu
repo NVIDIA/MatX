@@ -35,8 +35,6 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
-#include "matx_pybind.h"
-#include "matx_einsum.h"
 
 using namespace matx;
 

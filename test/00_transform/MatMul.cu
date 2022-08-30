@@ -32,8 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_matmul.h"
-#include "matx_pybind.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -146,9 +144,9 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
   cudaMallocManaged(&bp, k*n*sizeof(TypeParam));
   cudaMallocManaged(&cp, m*n*sizeof(TypeParam));
 
-  auto a = make_tensor<TypeParam, 2, non_owning>(ap, {m, k});
-  auto b = make_tensor<TypeParam, 2, non_owning>(bp, {k, n});
-  auto c = make_tensor<TypeParam, 2, non_owning>(cp, {m, n});
+  auto a = make_tensor<TypeParam, 2>(ap, {m, k},false);
+  auto b = make_tensor<TypeParam, 2>(bp, {k, n},false);
+  auto c = make_tensor<TypeParam, 2>(cp, {m, n},false);
 
   this->pb->template InitAndRunTVGenerator<TypeParam>(
       "00_transforms", "matmul_operators", "run", {m, k, n});

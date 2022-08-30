@@ -30,13 +30,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "matx.h"
-#include "matx_viz.h"
-#include "matx_make.h"
 #include <cassert>
 #include <cstdio>
 #include <math.h>
 #include <memory>
+
+#include "matx.h"
 
 using namespace matx;
 #define FFT_TYPE CUFFT_C2C

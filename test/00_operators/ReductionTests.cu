@@ -32,7 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -135,7 +134,7 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Sum)
+TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
 {
   MATX_ENTER_HANDLER();
   {
@@ -274,6 +273,7 @@ TEST(ReductionTests, Any)
 TEST(ReductionTests, All)
 {
   MATX_ENTER_HANDLER();
+
   using TypeParam = int;
   {
     tensor_t<int, 0> t0;

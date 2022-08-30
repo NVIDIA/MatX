@@ -32,7 +32,6 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "matx_pybind.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -107,6 +106,58 @@ TYPED_TEST(OperatorTestsComplex, BaseOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
+{
+  MATX_ENTER_HANDLER();
+  auto A = make_tensor<TypeParam>({10,20,30});
+  for(int i=0; i < A.Size(0); i++) {
+    for(int j=0; j < A.Size(1); j++) {
+      for(int k=0; k < A.Size(2); k++) {
+        A(i,j,k) = TypeParam( i * A.Size(1)*A.Size(2) +
+	       j * A.Size(2) + k);	
+      }
+    }
+  }
+
+  auto op = permute(A, {2, 0, 1});
+  auto At = A.Permute({2, 0, 1});
+
+  ASSERT_TRUE(op.Size(0) == A.Size(2));
+  ASSERT_TRUE(op.Size(1) == A.Size(0));
+  ASSERT_TRUE(op.Size(2) == A.Size(1));
+  
+  ASSERT_TRUE(op.Size(0) == At.Size(0));
+  ASSERT_TRUE(op.Size(1) == At.Size(1));
+  ASSERT_TRUE(op.Size(2) == At.Size(2));
+
+  for(int i=0; i < op.Size(0); i++) {
+    for(int j=0; j < op.Size(1); j++) {
+      for(int k=0; k < op.Size(2); k++) {
+        ASSERT_TRUE( op(i,j,k) == A(j,k,i));	
+        ASSERT_TRUE( op(i,j,k) == At(i,j,k));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
+{
+  MATX_ENTER_HANDLER();
+  tensor_t<TypeParam, 0> tiv0;
+  tensor_t<TypeParam, 0> tiv1;
+  tensor_t<TypeParam, 0> tov0;
+
+  tiv0() = (TypeParam)5.0;
+  tiv1() = (TypeParam)3.1;
+  (tov0 = fmod(tiv0, tiv1)).run();
+  cudaStreamSynchronize(0);
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TypeParam)5.0, (TypeParam)3.1)));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloat, TrigFuncs)
 {
   MATX_ENTER_HANDLER();
@@ -116,7 +167,6 @@ TYPED_TEST(OperatorTestsFloat, TrigFuncs)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
   (tov0 = sin(tiv0)).run();
-  return;
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
 
@@ -182,6 +232,353 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
 
   MATX_EXIT_HANDLER();
 }
+TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
+{
+  int N = 10;
+  int M = 12;
+  int K = 14;
+
+  MATX_ENTER_HANDLER();
+  { // clone from 0D
+    auto tiv = make_tensor<TypeParam>();
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    tiv() = 3;
+
+    auto op = clone<3>(tiv, {N, M, K});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv());
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv());
+        }
+      }
+    }
+  }    
+
+  { // clone from 1D
+    auto tiv = make_tensor<TypeParam>({K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int k = 0; k < K; k++) {
+      tiv(k) = TypeParam(k);
+    }
+
+    auto op = clone<3>(tiv, {N, M, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(k));
+        }
+      }
+    }
+  }    
+
+  { // clone from 1D
+    auto tiv = make_tensor<TypeParam>({M});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < K; m++) {
+      tiv(m) = TypeParam(m);
+    }
+
+    auto op = clone<3>(tiv, {N, matxKeepDim, K});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(m));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(m));
+        }
+      }
+    }
+  }    
+
+  { // clone from 2D and operator
+    auto tiv = make_tensor<TypeParam>({M,K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+      }
+    }
+
+    auto op = clone<3>(tiv, {N, matxKeepDim, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , tiv(m,k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(m,k));
+        }
+      }
+    }
+  }    
+
+  { // clone from 2D
+    auto tiv = make_tensor<TypeParam>({M,K});
+    auto tov = make_tensor<TypeParam>({N,M,K});
+
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+      }
+    }
+
+    auto op = clone<3>(TypeParam(2)*tiv, {N, matxKeepDim, matxKeepDim});
+
+    ASSERT_EQ(op.Size(0), N);
+    ASSERT_EQ(op.Size(1), M);
+    ASSERT_EQ(op.Size(2), K);
+
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(op(n,m,k) , TypeParam(2)*tiv(m,k));
+        }
+      }
+    }
+
+    (tov = op).run();
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , TypeParam(2)*tiv(m,k));
+        }
+      }
+    }
+  }    
+
+  MATX_EXIT_HANDLER();
+}
+
+
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
+{
+  MATX_ENTER_HANDLER();
+  tensor_t<TypeParam, 1> t1{{10}};
+
+  t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
+  auto t1t = slice(t1, {0}, {matxEnd}, {2});
+ 
+  for (index_t i = 0; i < t1.Size(0); i += 2) {
+    ASSERT_EQ(t1(i), t1t(i / 2));
+  }
+
+  auto t1t2 = slice(t1, {2}, {matxEnd}, {2});
+
+  for (index_t i = 0; i < t1t2.Size(0); i++) {
+    ASSERT_EQ(TypeParam(30 + 20 * i), t1t2(i));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
+{
+  MATX_ENTER_HANDLER();
+  
+  tensor_t<TypeParam, 2> t2{{20, 10}};
+  tensor_t<TypeParam, 3> t3{{30, 20, 10}};
+  tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
+
+  (t2 = linspace<1>(t2.Shape(), 0, 10)).run();
+  (t3 = linspace<2>(t3.Shape(), 0, 10)).run();
+  (t4 = linspace<3>(t4.Shape(), 0, 10)).run();
+
+  auto t2t = slice(t2, {1, 2}, {3, 5});
+  auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
+  auto t4t = slice(t4, {1, 2, 3, 4}, {3, 5, 7, 9});
+
+  ASSERT_EQ(t2t.Size(0), 2);
+  ASSERT_EQ(t2t.Size(1), 3);
+
+  ASSERT_EQ(t3t.Size(0), 2);
+  ASSERT_EQ(t3t.Size(1), 3);
+  ASSERT_EQ(t3t.Size(2), 4);
+
+  ASSERT_EQ(t4t.Size(0), 2);
+  ASSERT_EQ(t4t.Size(1), 3);
+  ASSERT_EQ(t4t.Size(2), 4);
+  ASSERT_EQ(t4t.Size(3), 5);
+
+  for (index_t i = 0; i < t2t.Size(0); i++) {
+    for (index_t j = 0; j < t2t.Size(1); j++) {
+      ASSERT_EQ(t2t(i, j), t2(i + 1, j + 2));
+    }
+  }
+
+  for (index_t i = 0; i < t3t.Size(0); i++) {
+    for (index_t j = 0; j < t3t.Size(1); j++) {
+      for (index_t k = 0; k < t3t.Size(2); k++) {
+        ASSERT_EQ(t3t(i, j, k), t3(i + 1, j + 2, k + 3));
+      }
+    }
+  }
+
+  for (index_t i = 0; i < t4t.Size(0); i++) {
+    for (index_t j = 0; j < t4t.Size(1); j++) {
+      for (index_t k = 0; k < t4t.Size(2); k++) {
+        for (index_t l = 0; l < t4t.Size(3); l++) {
+          ASSERT_EQ(t4t(i, j, k, l), t4(i + 1, j + 2, k + 3, l + 4));
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
+{
+  MATX_ENTER_HANDLER();
+ 
+  tensor_t<TypeParam, 2> t2t{{20, 10}};
+  tensor_t<TypeParam, 3> t3t{{30, 20, 10}};
+  (t2t = linspace<1>(t2t.Shape(), 0, 10)).run();
+  (t3t = linspace<2>(t3t.Shape(), 0, 10)).run();
+
+  {
+    index_t j = 0;
+    auto t2sly = slice<1>(t2t, {0, j}, {matxEnd, matxDropDim});
+    for (index_t i = 0; i < t2sly.Size(0); i++) {
+      ASSERT_EQ(t2sly(i), t2t(i, j));
+    }
+  }
+
+  {
+    index_t i = 0;
+    auto t2slx = slice<1>(t2t, {i, 0}, {matxDropDim, matxEnd});
+    for (index_t j = 0; j < t2slx.Size(0); j++) {
+      ASSERT_EQ(t2slx(j), t2t(i, j));
+    }
+  }
+
+  {
+    index_t j = 0;
+    index_t k = 0;
+    auto t3slz = slice<1>(t3t, {0, j, k}, {matxEnd, matxDropDim, matxDropDim});
+    for (index_t i = 0; i < t3slz.Size(0); i++) {
+      ASSERT_EQ(t3slz(i), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t i = 0;
+    index_t k = 0;
+    auto t3sly = slice<1>(t3t, {i, 0, k}, {matxDropDim, matxEnd, matxDropDim});
+    for (index_t j = 0; j < t3sly.Size(0); j++) {
+      ASSERT_EQ(t3sly(j), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t i = 0;
+    index_t j = 0;
+    auto t3slx = slice<1>(t3t, {i, j, 0}, {matxDropDim, matxDropDim, matxEnd});
+    for (index_t k = 0; k < t3slx.Size(0); k++) {
+      ASSERT_EQ(t3slx(k), t3t(i, j, k));
+    }
+  }
+
+  {
+    index_t k = 0;
+    auto t3slzy = slice<2>(t3t, {0, 0, k}, {matxEnd, matxEnd, matxDropDim});
+    for (index_t i = 0; i < t3slzy.Size(0); i++) {
+      for (index_t j = 0; j < t3slzy.Size(1); j++) {
+        ASSERT_EQ(t3slzy(i, j), t3t(i, j, k));
+      }
+    }
+  }
+
+  {
+    index_t j = 0;
+    auto t3slzx = slice<2>(t3t, {0, j, 0}, {matxEnd, matxDropDim, matxEnd});
+    for (index_t i = 0; i < t3slzx.Size(0); i++) {
+      for (index_t k = 0; k < t3slzx.Size(1); k++) {
+        ASSERT_EQ(t3slzx(i, k), t3t(i, j, k));
+      }
+    }
+  }
+
+  {
+    index_t i = 0;
+    auto t3slyx = slice<2>(t3t, {i, 0, 0}, {matxDropDim, matxEnd, matxEnd});
+    for (index_t j = 0; j < t3slyx.Size(0); j++) {
+      for (index_t k = 0; k < t3slyx.Size(1); k++) {
+        ASSERT_EQ(t3slyx(j, k), t3t(i, j, k));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
 {
@@ -217,7 +614,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          EXPECT_TRUE(tiv(n,m,k) == tov(n,m*K+k));
+          ASSERT_TRUE(tiv(n,m,k) == tov(n,m*K+k));
         }
       }
     }
@@ -240,7 +637,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          EXPECT_TRUE(tiv(n,m,k) == tov(n*M+m,k));
+          ASSERT_TRUE(tiv(n,m,k) == tov(n*M+m,k));
         }
       }
     }
@@ -261,7 +658,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          EXPECT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
+          ASSERT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
         }
       }
     }
@@ -282,7 +679,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          EXPECT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
+          ASSERT_TRUE(tiv(n,m,k) == tov(n*M*K+m*K+k));
         }
       }
     }
@@ -1970,7 +2367,7 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Shift)
+TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 100;
@@ -1978,6 +2375,8 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   tensor_t<TypeParam, 2> t2({count0, count1});
   tensor_t<TypeParam, 2> t2s({count0, count1});
   tensor_t<TypeParam, 2> t2s2({count0, count1});
+  tensor_t<int, 0> t0;
+  t0() = -5;
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
@@ -1986,36 +2385,48 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
   }
 
   {
-    (t2s = shift<0>(t2, 5)).run();
+    (t2s = shift<0>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
+            MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
+      }
+    }
+  }
+  
+  {
+    (t2s = shift<0>(t2, t0)).run();
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < count0; i++) {
+      for (index_t j = 0; j < count1; j++) {
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2s(i, j), t2((i + 5) % count0, j)));
       }
     }
   }
 
   {
-    (t2s = shift<1>(t2, 5)).run();
+    (t2s = shift<1>(t2, -5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, (j + 5) % count1)));
       }
     }
   }
 
   {
-    (t2s = shift<1,0>(t2, 5, 6)).run();
+    (t2s = shift<1,0>(t2, -5, -6)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j), t2((i + 6) % count0, (j + 5) % count1)));
       }
     }
@@ -2027,7 +2438,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j), t2((i + (count0 + 1) / 2) % count0,
                           (j + (count1 + 1) / 2) % count1)));
       }
@@ -2040,46 +2451,46 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2s(i, j),
             t2((i + (count0) / 2) % count0, (j + (count1) / 2) % count1)));
       }
     }
   }
 
-  // Negative shifts
+  // Right shifts
   {
-    (t2s = shift<0>(t2, -5)).run();
+    (t2s = shift<0>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
         index_t idim = i < 5 ? (t2.Size(0) - 5 + i) : (i - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(idim, j)));
       }
     }
   }
 
   {
-    (t2s = shift<1>(t2, -5)).run();
+    (t2s = shift<1>(t2, 5)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
         index_t jdim = j < 5 ? (t2.Size(1) - 5 + j) : (j - 5);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, jdim)));
       }
     }
   }
 
   // Large shifts
   {
-    (t2s = shift<0>(t2, t2.Size(0) * 4)).run();
+    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run();
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2(i, j)));
       }
     }
   }
@@ -2093,7 +2504,7 @@ TYPED_TEST(OperatorTestsNumeric, Shift)
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2s(i, j), t2s2(i, j)));
       }
     }
   }
@@ -2206,6 +2617,169 @@ TEST(OperatorTests, Cast)
 
   MATX_EXIT_HANDLER();
 }
+
+TEST(OperatorTestsAdvanced, AdvancedRemapOp)
+{
+  typedef cuda::std::complex<float> complex;
+  MATX_ENTER_HANDLER();
+
+  int I = 4;
+  int J = 4;
+  int K = 14;
+  int L = 133;
+
+  int F = 4096;
+  int P = 288;
+
+  int M = 2;
+
+  auto idx = matx::make_tensor<int, 1>({M});
+
+  idx(0) = 1;
+  idx(1) = 3;
+
+  auto A = matx::make_tensor<complex, 4>({I, J, K, L});
+  //collapsed tensor
+  auto B = matx::make_tensor<complex, 2>({I * M * K, L});
+
+  auto index = [&] (int i, int j, int k, int l) {
+    return i * J * K * L +
+      j * K * L +
+      k * L +
+      l;
+  };
+  for (int i = 0; i < I ; i++) {
+    for (int j = 0; j < J ; j++) {
+      for (int k = 0; k < K ; k++) {
+        for (int l = 0; l < L ; l++) {
+          float val = (float)index(i,j,k,l);
+          A(i,j,k,l) = complex(val, val/100);
+        }
+      }
+    }
+  }
+
+  (B = 0).run();
+
+  auto rop = remap<1>(A, idx);
+  auto lop = lcollapse<2>(rop);
+
+  ASSERT_EQ(lop.Rank() , 2);
+  ASSERT_EQ(lop.Size(1) , A.Size(3));
+  ASSERT_EQ(lop.Size(0) , I * M * K);
+
+  (B = lop).run();
+
+  cudaDeviceSynchronize();  
+
+  for (int i = 0; i < I; i++) {
+    for (int m = 0; m < M; m++) {
+      for (int k = 0; k < K; k++) {
+        for (int l = 0; l < L; l++) {
+          int j = idx(m);
+          int fidx = i * M * K + m * K  + k;
+          float val = (float)index(i,j,k,l);
+          complex expected_val = complex(val,val/100);
+          complex a_val = A(i,j,k,l);
+          complex b_val = B(fidx, l);	  
+          complex lop_val = lop(fidx, l);
+          complex rop_val = rop(i, m, k, l);
+
+          //	  printf("fidx: %d, i: %d, j: %d, k: %d, l: %d, val: %f,%f\n", fidx, i, j, k, l, val, val/100);
+          //	  printf("a_val: %f, %f, rop_val: %f, %f, lop_val: %f, %f, b_val: %f, %f\n",
+          //			  a_val.real(), a_val.imag(),
+          //			 rop_val.real(), rop_val.imag(),
+          //			lop_val.real(), lop_val.imag(),
+          //		       b_val.real(), b_val.imag());
+          ASSERT_EQ(a_val, expected_val);
+          ASSERT_EQ(rop_val, expected_val);
+          ASSERT_EQ(lop_val, expected_val);
+          ASSERT_EQ(b_val, expected_val);
+
+          ASSERT_EQ(B(fidx, l) , lop(fidx, l));
+        }
+      }
+    }
+  }
+
+
+  // convolution test
+  auto O1 = matx::make_tensor<complex, 4>({I, J, K, F + P + L - 1});
+  auto O2 = matx::make_tensor<complex, 4>({I, J, K, F + P + L - 1});
+  auto O3 = matx::make_tensor<complex, 4>({I, J, K, F + P + L - 1});
+  auto O4 = matx::make_tensor<complex, 4>({I, J, K, F + P + L - 1});
+
+  auto C = matx::make_tensor<complex, 3>({I, K, F + P});
+  //collapsed tensor
+  auto D = matx::make_tensor<complex, 2>({I * M * K, F + P});
+  
+  auto indexc = [&] (int i, int j, int k) {
+    return i * C.Size(1) * C.Size(2) +
+      j * C.Size(2) +
+      k;
+  };
+  
+  for (int i = 0; i < I ; i++) {
+    for (int j = 0; j < J ; j++) {
+      for (int k = 0; k < K ; k++) {
+        float val = (float) indexc(i,j,k);
+        C(i,j,k) = complex(val, val/100);
+      }
+    }
+  }
+  
+  A.PrefetchDevice(0);
+  B.PrefetchDevice(0);
+  C.PrefetchDevice(0);
+  D.PrefetchDevice(0);
+  O1.PrefetchDevice(0);
+  O2.PrefetchDevice(0);
+  O3.PrefetchDevice(0);
+  O4.PrefetchDevice(0);
+
+  cudaDeviceSynchronize();
+
+  auto o1op = lcollapse<2>(remap<1>(O1, idx));
+  auto o2op = lcollapse<2>(remap<1>(O2, idx));
+  auto o3op = lcollapse<2>(remap<1>(O3, idx));
+  auto o4op = lcollapse<2>(remap<1>(O4, idx));
+
+  auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
+  auto rcop = lcollapse<2>(remap<1>(cop, idx));
+
+  (O1 = 1).run();
+  (O2 = 2).run();
+  (O3 = 3).run();
+  (O4 = 4).run();
+  
+  (B = lop).run();
+  (D = rcop).run();
+
+  // two operators as input
+  matx::conv1d(o1op, lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+
+  // one tensor and one operators as input
+  matx::conv1d(o2op, B, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  
+  // one tensor and one operators as input
+  matx::conv1d(o3op, lop, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  
+  //two tensors as input
+  matx::conv1d(o4op, B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+
+  cudaDeviceSynchronize();
+
+  for (int i = 0; i < o1op.Size(0); i++) {
+    for (int l = 0; l < o1op.Size(1); l++) {
+      ASSERT_EQ(o1op(i,l), o2op(i,l));
+      ASSERT_EQ(o2op(i,l), o3op(i,l));
+      ASSERT_EQ(o3op(i,l), o4op(i,l));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 
 TYPED_TEST(OperatorTestsFloat, Print)
 {

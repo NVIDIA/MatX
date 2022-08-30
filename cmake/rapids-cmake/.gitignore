@@ -1,0 +1,25 @@
+## Common
+.DS_Store
+
+## C++ test build directory
+build/
+example/build/
+docs/_build
+
+## Eclipse IDE
+.project
+.cproject
+.settings
+
+## IntelliJ IDE
+.idea/
+.idea_modules/
+*.iml
+*.ipr
+*.iws
+
+## VSCode IDE
+.vscode
+
+# vim
+*.sw[a-z]

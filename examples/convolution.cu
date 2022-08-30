@@ -30,9 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "matx_type_utils.h"
-#include "matx_tensor.h"
-#include "matx_conv.h"
+#include "matx.h"
 #include <cassert>
 #include <cstdio>
 

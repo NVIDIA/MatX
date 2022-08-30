@@ -47,5 +47,5 @@ function(find_and_configure_nvbench VERSION)
 endfunction()
 
 # NVBench doesn't tag yet
-set(CUDA_MATX_MIN_VERSION_nvbench "old-cmake")
+set(CUDA_MATX_MIN_VERSION_nvbench "1a13a2e")
 find_and_configure_nvbench(${CUDA_MATX_MIN_VERSION_nvbench})

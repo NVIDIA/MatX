@@ -46,6 +46,7 @@ Binary Operators
 .. doxygenfunction:: mul(Op t, Op t2)
 .. doxygenfunction:: operator/(Op t, Op t2)  
 .. doxygenfunction:: operator%(Op t, Op t2)  
+.. doxygenfunction:: fmod(Op t, Op t2)
 .. doxygenfunction:: pow(Op t, Op t2) 
 .. doxygenfunction:: max(Op t, Op t2)
 .. doxygenfunction:: min(Op t, Op t2)
@@ -90,3 +91,6 @@ Advanced Operators
 .. doxygenfunction:: remap
 .. doxygenfunction:: rcollapse
 .. doxygenfunction:: lcollapse
+.. doxygenfunction:: clone
+.. doxygenfunction:: slice
+.. doxygenfunction:: permute
