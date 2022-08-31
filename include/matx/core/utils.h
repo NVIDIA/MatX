@@ -65,7 +65,7 @@ template <typename T1, typename T2, typename T3>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &y, const T3 &z) {
   using T4 = decltype(x*y+z); 
   if constexpr (is_complex_v<T4> && !is_complex_half_v<T4>) {
-    
+
     using value_type = typename T4::value_type;
 
     value_type xr, xi;
@@ -109,13 +109,34 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
     //__half2 X = make_half2(x.real(), x.imag());
     //__half2 Y = make_half2(y.real(), y.imag());
     //__half2 Z = make_half2(z.real(), z.imag());
-    
+
     const __half2 &X = *reinterpret_cast<const __half2*>(&x);
     const __half2 &Y = *reinterpret_cast<const __half2*>(&y);
     const __half2 &Z = *reinterpret_cast<const __half2*>(&z);
 
+#if 1
     auto v = __hcmadd(X,Y,Z);
     return T4(v.x, v.y);
+#else
+    // In theory this could be faster but compiler is not folding broadcast/swap into HFMAs
+
+    __half2 ari = make_half2(X.x, X.y);
+    // negate and swap supported in hardware sm_8.6+
+    __half2 air = make_half2(X.y, __hneg(X.x));
+    // broadcast supported in hardware 
+    __half2 brr = make_half2(Y.x, Y.x);
+    // broadcast supported in hardware
+    __half2 bii = make_half2(Y.y, Y.y);
+    __half2 c = Z;
+    __half2 d;
+
+    // HFMA2 RD, RA.H1_H0, RB.H1_H1, RC.H1_H0
+    d = __hfma2(ari, brr, c); 
+    // HFMA2 RD, RB.H0_H0, -RA.H0_NH1, RC.H1_H0
+    d = __hfma2(bii, -air, d); 
+
+    return T4(d.x, d.y);
+#endif
   } else {
     return x*y+z;
   }

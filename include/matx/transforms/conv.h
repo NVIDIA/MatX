@@ -54,33 +54,43 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   using strip_filter_t = typename FilterType::scalar_type;
   using shape_type = typename OutputType::shape_type;
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
-  MATX_ASSERT_STR(filter.Size(filter.Rank()-1) < BLOCK_SIZE_NON_RECURSIVE, matxInvalidSize,
-    "Convolutions are limited to filter lengths < 1024");
+  MATX_ASSERT_STR(filter.Size(filter.Rank()-1) < CONV1D_ELEMENTS_PER_BLOCK, matxInvalidSize,
+      "Convolutions are limited to filter lengths < 1024");
+
+  MATX_ASSERT_STR(mode != MATX_C_MODE_FULL || o.Size(o.Rank()-1) == i.Size(i.Rank()-1) + filter.Size(filter.Rank()-1) - 1,
+      matxInvalidSize, "Output size for FULL convolution incorrect");
+  MATX_ASSERT_STR(mode != MATX_C_MODE_SAME || o.Size(o.Rank()-1) == i.Size(i.Rank()-1), 
+      matxInvalidSize, "Output size for SAME convolution incorrect");
 
 #ifdef __CUDACC__  
-  // Scale the filter
-  size_t filter_shm;
-  if (sizeof(strip_filter_t) < sizeof(strip_input_t)) {
-    filter_shm = (filter.Size(filter.Rank()-1) * sizeof(strip_filter_t) + (sizeof(strip_input_t)-1)) / sizeof(strip_input_t) * sizeof(strip_input_t);
-  }
-  else {
-    filter_shm = filter.Size(filter.Rank()-1) * sizeof(strip_filter_t);
-  }
+  size_t filter_len = filter.Size(filter.Rank()-1);
+  size_t signal_len = i.Size(i.Rank()-1);
 
-  auto shmsize = filter_shm + sizeof(strip_input_t) * (filter.Size(filter.Rank()-1) + BLOCK_SIZE_NON_RECURSIVE);
-  
+  size_t filter_shm = sizeof(strip_filter_t) * filter_len;
+  size_t signal_shm = sizeof(strip_input_t) * (CONV1D_ELEMENTS_PER_BLOCK + filter_len);
+
+  // align filter size to signal size
+  int align = std::alignment_of_v<InType>;
+  filter_shm = (filter_shm + align - 1) / align * align;
+
+  size_t shmsize = filter_shm + signal_shm;
 
   shape_type sig_len = i.Size(OutputType::Rank() - 1);
-  float work_per_block =
-      static_cast<float>(BLOCK_SIZE_NON_RECURSIVE - filter.Size(filter.Rank()-1) + 1);
-  int num_blocks = static_cast<int>(std::ceil(
-      static_cast<float>(sig_len + filter.Size(filter.Rank()-1) - 1) / work_per_block));
+  int work_per_block = CONV1D_ELEMENTS_PER_BLOCK;
+  int num_blocks = (int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
+
+  // number below was chosen arbitrarily.  Cannot be more than 65536.
+  num_blocks = std::min(num_blocks, 10000);
 
   int grid_size = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
   dim3 gsize(grid_size, num_blocks);
-  Conv1D<<<gsize, BLOCK_SIZE_NON_RECURSIVE, shmsize, stream>>>(
-        o, i, filter, sig_len, mode);
+  constexpr int EPT = 4;
+  constexpr int THREADS = CONV1D_ELEMENTS_PER_BLOCK / EPT;
+  static_assert(CONV1D_ELEMENTS_PER_BLOCK % EPT == 0);
+
+  Conv1D<THREADS, EPT><<<gsize, THREADS, shmsize, stream>>>(
+      o, i, filter, sig_len, mode);
 
 #endif  
 }
