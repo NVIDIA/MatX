@@ -56,6 +56,10 @@ constexpr index_t c_len1_valid_even = a_len1 - b_len1_even + 1;
 constexpr index_t c_len1_valid_odd = a_len1 - b_len1_odd + 1;
 constexpr index_t c_len1_same = a_len1;
 
+constexpr index_t a_len = 8 * 1228800 + 2 * 32768;
+constexpr index_t b_len = 209;
+constexpr index_t c_len = a_len + b_len - 1;
+
 template <typename T>
 class CorrelationConvolutionTest : public ::testing::Test {
 protected:
@@ -114,9 +118,38 @@ protected:
   float thresh = 0.01f;
 };
 
+template <typename T>
+class CorrelationConvolutionLargeTest : public ::testing::Test {
+protected:
+  void SetUp() override
+  {
+    CheckTestTypeSupport<T>();
+    pb = std::make_unique<detail::MatXPybind>();
+
+    // Half precision needs a bit more tolerance when compared to
+    // fp32
+    if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
+      thresh = 0.2f;
+    }
+  }
+
+  void TearDown() { pb.reset(); }
+
+  std::unique_ptr<detail::MatXPybind> pb;
+  tensor_t<T, 1> av{{a_len}};
+  tensor_t<T, 1> bv{{b_len}};
+  tensor_t<T, 1> cv{{c_len}};
+  float thresh = 0.01f;
+};
+
 template <typename TensorType>
 class CorrelationConvolutionTestFloatTypes
     : public CorrelationConvolutionTest<TensorType> {
+};
+
+template <typename TensorType>
+class CorrelationConvolutionLargeTestFloatTypes
+    : public CorrelationConvolutionLargeTest<TensorType> {
 };
 
 template <typename TensorType>
@@ -125,7 +158,22 @@ class CorrelationConvolution2DTestFloatTypes
 };
 
 TYPED_TEST_SUITE(CorrelationConvolutionTestFloatTypes, MatXFloatTypes);
+TYPED_TEST_SUITE(CorrelationConvolutionLargeTestFloatTypes, MatXFloatNonHalfTypes);
 TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatTypes);
+
+// Real/real direct 1D convolution Large
+TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv_operators", {a_len, b_len});
+  this->pb->RunTVGenerator("conv");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv, "b_op");
+  conv1d(this->cv, this->av, this->bv, MATX_C_MODE_FULL, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
+  MATX_EXIT_HANDLER();
+}
 
 // Real/real direct 1D convolution
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)

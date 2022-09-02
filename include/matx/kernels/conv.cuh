@@ -13,7 +13,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 
-#define BLOCK_SIZE_NON_RECURSIVE 1024
+#define CONV1D_ELEMENTS_PER_BLOCK 512
 
 namespace matx {
 
@@ -30,168 +30,161 @@ typedef enum {
 } matxConvCorrMethod_t;
 
 #ifdef __CUDACC__ 
-template <typename OutType, typename InType, typename FilterType>
-__launch_bounds__(1024)
+template <int THREADS, int EPT, typename OutType, typename InType, typename FilterType>
+__launch_bounds__(THREADS)
 __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
                        index_t signal_len,
                        matxConvCorrMode_t mode)
 {
+
+  /* strategy:
+     1 thread per EPT outputs.  
+     Each block produces EPT * THREADS outputs
+     Full convolution is computed and results are windowed down based on the request
+     Filter is fully loaded into shared memory
+     Chunk of signal is loaded into shared memory with filter_len pandding on the negative side.  
+     If out of range then we pad with zeros.
+     */
   static_assert(InType::Rank() == FilterType::Rank());
 
   const int Rank = InType::Rank();
 
-  extern __shared__ float s_exch[]; // Filter + halo
+  extern __shared__ char s_exch1d[]; // Filter + halo
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
-  int chunk_idx = blockIdx.y;
   int batch_idx = blockIdx.x;
-  int32_t filter_len = d_filter.Size(Rank-1);
+  uint32_t filter_len = d_filter.Size(Rank-1);
+  uint32_t full_len = signal_len + filter_len - 1;
 
   // All but the last dim will be populated
   auto bdims = BlockToIdx(d_in, batch_idx, 1);
 
-  // Adjustment to keep base shm size as float, but if the filter is complex we
-  // need to adjust it
-  constexpr float filt_size_adj =
-      static_cast<float>(sizeof(ftype_strip)) / sizeof(s_exch[0]);
+  ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch1d[0]);
 
-  ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch[0]);
-  intype_strip *s_data;
+  size_t filter_bytes = filter_len * sizeof(ftype_strip);
+  // pad bytes to alignmetn of InType
+  int align = std::alignment_of_v<intype_strip>;
+  filter_bytes = (filter_bytes + align - 1) / align * align;
 
-  // If the data type has a higher alignment type than the filter, we need to
-  // adjust our shm pointer
-  if constexpr (std::alignment_of_v < intype_strip >>
-                std::alignment_of_v<ftype_strip>) {
-    s_data =
-        matx::detail::AlignAddr<intype_strip>((uint8_t *)&s_exch[static_cast<int32_t>(
-            filter_len * filt_size_adj)]); // Start data portion after 2x the
-                                           // filter to remove conditionals and
-                                           // multiply by 0
-  }
-  else {
-    s_data = reinterpret_cast<intype_strip *>(&s_exch[static_cast<int32_t>(
-        filter_len *
-        filt_size_adj)]); // Start data portion after 2x the filter to
-                          // remove conditionals and multiply by 0
-  }
+  intype_strip *s_data = reinterpret_cast<intype_strip*>(&s_exch1d[filter_bytes]);
 
-  index_t full_len = signal_len + filter_len - 1;
-
-  // This is the location that is written in memory. Note that there will be
-  // duplicate tids based on this formula, but not all threads write out to
-  // memory. Some are only there to fetch data, while others both fetch and
-  // compute output
-  const int32_t tid =
-      static_cast<index_t>(chunk_idx) * (blockDim.x - filter_len + 1) +
-      threadIdx.x;
-  int offset = tid - filter_len + 1;
-
-  outtype_strip val = 0;
-
-  // Zero out shared memory since it's used later to index into where we want
-  // 0-valued taps
-  for (int32_t i = threadIdx.x; i < filter_len + blockDim.x; i += blockDim.x) {
-    s_data[i] = 0.0;
-  }
-
-  __syncthreads();
-
-  if (threadIdx.x < filter_len) {
-    bdims[Rank - 1] = threadIdx.x;          
+  // load filter
+  for (uint32_t idx = threadIdx.x;  idx < filter_len; idx += THREADS) {
+    bdims[Rank - 1] = idx;
     detail::mapply([&](auto &&...args) {
-        s_filter[threadIdx.x] = d_filter.operator()(args...);
-      }, bdims);          
+        s_filter[idx] = d_filter.operator()(args...);
+        }, bdims);
   }
 
-  __syncthreads();
+  // number of chunks in the signal, number of output elements / chunk size rounded up
+  uint32_t num_chunks = (signal_len + filter_len -1 + CONV1D_ELEMENTS_PER_BLOCK - 1) / CONV1D_ELEMENTS_PER_BLOCK;
 
-  if (chunk_idx == 0) {
-    // We want all blocks to process uniformly, so the first block's last few
-    // threads are idle to match what all other blocks do
-    s_data[threadIdx.x] = 0;
+  // number of chunks per Y block, rounded up
+  num_chunks = (num_chunks + gridDim.y - 1) / gridDim.y;
 
+#pragma unroll 1
+  for(uint32_t n = 0; n < num_chunks; n++) {
+    // compute current chunk idx
+    uint32_t chunk_idx = blockIdx.y + n * gridDim.y;
+
+    // ensure s_data is consumed from last iteration of chunk loop
+    if( n > 0 )
+      __syncthreads();
+
+    // load signal,  pad extra elements with zeros
+    for (int32_t lidx = threadIdx.x, gidx  = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x;  
+        gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ; 
+        gidx += THREADS, lidx += THREADS) {
+
+      // some elements may be out of range.  We set their values to 0.
+      intype_strip val(0);
+
+      if( gidx >= 0 && gidx < signal_len) { 
+        bdims[Rank - 1] = gidx;
+        detail::mapply([&](auto &&...args) {
+            val = d_in.operator()(args...);
+            }, bdims);
+      }
+
+      s_data[lidx] = val;
+    }
+
+    // wait for signal to load
     __syncthreads();
 
-    // The first block just grabs all the data from the start of the sequence
-    if (threadIdx.x < signal_len &&
-        (threadIdx.x < blockDim.x - filter_len + 1)) {
-      bdims[Rank - 1] = threadIdx.x;          
-      detail::mapply([&](auto &&...args) {
-          s_data[threadIdx.x + filter_len - 1] = d_in.operator()(args...);
-        }, bdims);          
-    }
-  }
-  else if (offset > 0 && offset < signal_len) {
-    // Each block processes blockDim.x-filt_len+1 samples, but needs to fetch
-    // all blockDim.x worth
-    bdims[Rank - 1] = offset;   
-    detail::mapply([&](auto &&...args) {
-        s_data[threadIdx.x] = d_in.operator()(args...);
-      }, bdims);      
-  }
+    // register array for output data  
+    outtype_strip oval[EPT] = {0}; 
 
-  __syncthreads();
+    // Below will use pointer modification instead of offsets to change IMADS into IADS.  IMADS go through FMA pipe.
 
-  // Even though all threads in the block fetched data, there is only enough
-  // data in shared memory for blockDim-filt_len+1 to operate on. The rest sit
-  // idle through this process.
-  if (tid < full_len && (threadIdx.x < blockDim.x - filter_len + 1)) {
-#if 0
-#pragma unroll
-    for (index_t r = 0; r < filter_len; r++) {
-      val = val + s_filter[r] * s_data[threadIdx.x + filter_len - 1 - r];
-    }
-#else
+    // offset s_data to last element in the filter
     s_data += threadIdx.x + filter_len - 1;
-    for (int32_t r = 0; r < filter_len; r++) {
-#if 0
-      val = val + s_filter[0] * s_data[0];
-#else
-      val = detail::madd(s_filter[0], s_data[0], val);
-#endif
-      s_data--;
+
+    // for each tap
+    for(uint32_t f = 0; f < filter_len; f++) {
+      // load filter value into registers
+      ftype_strip fval = s_filter[0];
+
+      // next filter value
       s_filter++;
+
+      // register array for signal data
+      intype_strip ival[EPT];
+      // load N elements of the signal into registers
+
+#pragma unroll
+      for(uint32_t i = 0; i < EPT; i++) {
+        ival[i] = s_data[i*THREADS];
+      }
+      s_data--; // next signal value
+
+      // compute N elements of the convolution
+#pragma unroll
+      for(uint32_t i = 0; i < EPT; i++) {
+        oval[i] = detail::madd(ival[i], fval, oval[i]);
+      }
     }
-#endif
+
+    // restore shared pointers for next loop
+    s_filter -= filter_len;
+    s_data -= (threadIdx.x - 1);
+
+    // We have computed the full convolution here.  we now need to output the correct range.
+    // compute output range
+    uint32_t start;
+    uint32_t stop;
 
     if (mode == MATX_C_MODE_FULL) {
-      bdims[Rank - 1] = tid;  
-      detail::mapply([&](auto &&...args) {
-          d_out.operator()(args...) = val;
-        }, bdims);        
+      start = 0;
+      stop = full_len - 1;
+    } else if ( mode == MATX_C_MODE_SAME) {
+      if( filter_len & 1) {
+        start = (filter_len - 1) / 2;
+      } else {
+        start = filter_len / 2 - 1;
+      }
+      stop = full_len - filter_len / 2 - 1;
+    } else {
+      start = filter_len - 1;
+      stop = full_len - filter_len;
     }
-    else if (mode == MATX_C_MODE_SAME) {
-      int start_tid, stop_tid;
-      if (filter_len & 1) {
-        start_tid = (filter_len - 1) >> 1;
-      }
-      else {
-        start_tid = (filter_len >> 1) - 1;
-      }
 
-      stop_tid = full_len - (filter_len >> 1) - 1;
+#pragma unroll
+    for (uint32_t i = 0; i < EPT; i++) {
+      // index for the computation
+      uint32_t idx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + i * THREADS + threadIdx.x;
+      // output index is shifted by start
+      int32_t gidx = idx - start;
 
-      if (tid >= start_tid && tid <= stop_tid) {
-        bdims[Rank - 1] = tid - start_tid; 
+      if(idx >= start && idx <= stop) {
+        bdims[Rank - 1] = gidx; 
         detail::mapply([&](auto &&...args) {
-            d_out.operator()(args...) = val;
-          }, bdims);
+            d_out.operator()(args...) = oval[i];
+            }, bdims);        
       }
     }
-    else { // Valid
-      int start_tid, stop_tid;
-      start_tid = filter_len - 1;
-      stop_tid = full_len - filter_len;
-
-      if (tid >= start_tid && tid <= stop_tid) {
-        bdims[Rank - 1] = tid - start_tid; 
-        detail::mapply([&](auto &&...args) {
-            d_out.operator()(args...) = val;
-          }, bdims);
-      }
-    }
-  }
+  } // end chunk loop
 }
 
 template <typename OutType, typename InType, typename FilterType>
