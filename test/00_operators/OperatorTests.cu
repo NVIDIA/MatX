@@ -234,9 +234,9 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
 }
 TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
 {
-  int N = 10;
-  int M = 12;
-  int K = 14;
+  constexpr int N = 10;
+  constexpr int M = 12;
+  constexpr int K = 14;
 
   MATX_ENTER_HANDLER();
   { // clone from 0D
@@ -250,7 +250,6 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
     ASSERT_EQ(op.Size(0), N);
     ASSERT_EQ(op.Size(1), M);
     ASSERT_EQ(op.Size(2), K);
-
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
