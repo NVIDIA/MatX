@@ -54,6 +54,8 @@ namespace matx
     using citerator = T const *; ///< Type trait for const iterator value
     using matx_storage_container = bool; ///< Type trait to indicate this is a storage type
 
+    raw_pointer_buffer() = delete;
+    
     /**
      * @brief Construct a new raw pointer buffer object and allocate space
      * 
@@ -99,6 +101,7 @@ namespace matx
     raw_pointer_buffer(raw_pointer_buffer &&rhs) noexcept {
       size_ = rhs.size_; 
       data_ = std::move(rhs.data_);
+      owning_ = rhs.owning_;
     } 
 
     /**

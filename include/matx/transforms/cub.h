@@ -288,8 +288,8 @@ public:
                                   const InputOperator &a)
   {
     CubParams_t params;
-    for (int r = a.Rank() - 1; r >= RANK - 2; r--) {
-      params.size[1 - r] = a.Size(r);
+    for (int r = 0; r < std::min(a.Rank(), 2); r++) {
+      params.size[r] = a.Size(r);
     }
 
     params.op = op;
@@ -1236,6 +1236,7 @@ template <typename OutputTensor, typename InputOperator>
 void cub_sum(OutputTensor &a_out, const InputOperator &a, 
           const cudaStream_t stream = 0)
 {
+
 #ifdef __CUDACC__    
   auto params =
       detail::matxCubPlan_t<OutputTensor, 

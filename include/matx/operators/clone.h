@@ -55,12 +55,19 @@ namespace matx
           // create gather list
           int d = 0;
           for(int i = 0; i < Rank(); i++) {
-            if(shape[i]==matxKeepDim) {
-              sizes_[i] = op_.Size(d);
-              dims_[d++] = i;
-            } else {
-              sizes_[i] = shape[i];
+            if constexpr (T::Rank() > 0) { // This is needed since the compiler can be fooled
+              if(shape[i] == matxKeepDim) {
+                sizes_[i] = op_.Size(d);
+                dims_[d++] = i;
+              } else {
+                sizes_[i] = shape[i];
+              }
             }
+            else {
+              MATX_ASSERT(shape[i] != matxKeepDim, matxInvalidDim);
+              sizes_[i] = shape[i];             
+            }
+
           }
           MATX_ASSERT(d == T::Rank(), matxInvalidDim);
 

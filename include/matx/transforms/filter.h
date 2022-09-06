@@ -427,8 +427,8 @@ static auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NR> &h_rec,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
-  tensor_t<FilterType, 1> rec_v({static_cast<index_t>(h_rec.size())});
-  tensor_t<FilterType, 1> nonrec_v({static_cast<index_t>(h_nonrec.size())});
+  auto rec_v = make_tensor<FilterType>({static_cast<index_t>(h_rec.size())});
+  auto nonrec_v = make_tensor<FilterType>({static_cast<index_t>(h_nonrec.size())});
 
   for (size_t j = 0; j < h_rec.size(); j++) {
     rec_v(static_cast<index_t>(j)) = h_rec[j];
