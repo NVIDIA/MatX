@@ -709,11 +709,7 @@ public:
   {
     static_assert(RANK >= 2);
 
-    T1 *tmp;
-    matxAlloc(reinterpret_cast<void **>(&tmp), a.Bytes(), MATX_DEVICE_MEMORY);
-    MATX_ASSERT(tmp != nullptr, matxOutOfMemory);
-
-    scratch = make_tensor_p<T1>(tmp, a.Shape());
+    scratch = make_tensor_p<T1>(a.Shape(), MATX_DEVICE_MEMORY);
     params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
 
     GetWorkspaceSize(&hspace, &dspace);

@@ -1180,11 +1180,7 @@ void __MATX_INLINE__ median(OutType dest,
   constexpr int RANK_IN = TensorInType::Rank();
   static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
-  T *tmp_alloc;
-  matxAlloc(reinterpret_cast<void **>(&tmp_alloc),
-                sizeof(T) * TotalSize(in), MATX_ASYNC_DEVICE_MEMORY,
-                stream);
-  auto tmp_sort = make_tensor<T>(tmp_alloc, in.Shape());
+  auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   // If the rank is 0 we're finding the median of a vector
   if constexpr (RANK_IN == 1) {
@@ -1223,7 +1219,6 @@ void __MATX_INLINE__ median(OutType dest,
     }
   }
 
-  matxFree(tmp_alloc);
 #endif  
 }
 
@@ -1503,11 +1498,9 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
-  typename InType::scalar_type *tmps;
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
 
-  matxAlloc((void **)&tmps, TotalSize(dest)*sizeof(decltype(*tmps)), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto mean_tns = make_tensor<typename InType::scalar_type>(tmps, dest.Descriptor());
+  auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   // Compute mean of each dimension
   mean(mean_tns, in, stream);

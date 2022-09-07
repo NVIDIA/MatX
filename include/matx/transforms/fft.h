@@ -708,7 +708,6 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
       return i.Slice(starts, ends);
     }
     else { // FFT length is longer than the input. Pad input
-      T2 *i_pad;
 
       // If the input needs to be padded we have to temporarily allocate a new
       // buffer, zero the output, then copy our input buffer. This is not very
@@ -721,11 +720,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
       auto tot = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<typename decltype(shape)::value_type>());
 
       // Make a new buffer large enough for our input
-      matxAlloc(reinterpret_cast<void **>(&i_pad),
-                sizeof(T1) * tot, MATX_ASYNC_DEVICE_MEMORY,
-                stream);
-
-      auto i_new = make_tensor<T2>(i_pad, shape);
+      auto i_new = make_tensor<T2>(shape, MATX_ASYNC_DEVICE_MEMORY, stream);
       ends[RANK - 1] = i.Lsize();
       auto i_pad_part_v = i_new.Slice(starts, ends);
 
