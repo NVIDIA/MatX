@@ -42,31 +42,44 @@ namespace matx {
 /**
  * Create a tensor with a C array for the shape using implicitly-allocated memory
  *
- * @param shape
- *   Shape of tensor
+ * @param shape Shape of tensor
+ * @param space  memory space to allocate in.  Default is manged memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  **/
 template <typename T, int RANK>
-auto make_tensor(const index_t (&shape)[RANK]) {
+auto make_tensor(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  T *ptr;
   DefaultDescriptor<RANK> desc{shape};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
+  
+  size_t size = desc.TotalSize() * sizeof(T);
+  matxAlloc((void**)&ptr, desc.TotalSize() * sizeof(T), space, stream);
+
+  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
   return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
 }
 
 /**
- * Create a tensor with a C array for the shape using implicitly-allocated memory
+ * Create a tensor with a C array for the shape using implicitly-allocated memory.
+ * Caller is responsible for deleting the tensor.
  *
- * @param shape
- *   Shape of tensor
+ * @param shape Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns Pointer to new tensor
  **/
 template <typename T, int RANK>
-auto make_tensor_p(const index_t (&shape)[RANK]) {
+auto make_tensor_p(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  T *ptr;
   DefaultDescriptor<RANK> desc{shape};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
+
+  size_t size = desc.TotalSize() * sizeof(T);
+  matxAlloc((void**)&ptr, desc.TotalSize() * sizeof(T), space, stream);
+  
+  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
-  return  new tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  return new tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
 }
 
 /**
@@ -131,8 +144,9 @@ auto make_tensor(T *ptr, const tensorShape_t<RANK> &shape, bool owning = false) 
  * Conforming containers have sequential iterators defined (both const and non-const). std::array
  * and std::vector meet this criteria.
  *
- * @param shape
- *   Shape of tensor
+ * @param shape Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  * 
  **/
@@ -140,11 +154,17 @@ template <typename T, typename ShapeType,
   std::enable_if_t< !is_matx_shape_v<ShapeType> && 
                     !is_matx_descriptor_v<ShapeType> && 
                     !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-auto make_tensor(ShapeType &&shape) {
+auto make_tensor(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  T *ptr;
   constexpr int blah = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<blah> desc{std::move(shape)};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
+  
+  size_t size = desc.TotalSize() * sizeof(T);
+  matxAlloc((void**)&ptr, desc.TotalSize() * sizeof(T), space, stream);
+  
+  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
+  
   return tensor_t<T, 
     std::tuple_size<typename remove_cvref<ShapeType>::type>::value, 
     decltype(s), 
@@ -155,19 +175,25 @@ auto make_tensor(ShapeType &&shape) {
  * Create a tensor from a conforming container type
  * 
  * Conforming containers have sequential iterators defined (both const and non-const). std::array
- * and std::vector meet this criteria.
+ * and std::vector meet this criteria.  Caller is responsible for deleting tensor.
  *
- * @param shape
- *   Shape of tensor
+ * @param shape  Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns Pointer to new tensor
  * 
  **/
 template <typename T, typename ShapeType,
   std::enable_if_t< !is_matx_shape_v<ShapeType> && 
                     !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-auto make_tensor_p(ShapeType &&shape) {
+auto make_tensor_p(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  T *ptr;
   DefaultDescriptor<static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value)> desc{std::move(shape)};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
+  
+  size_t size = desc.TotalSize() * sizeof(T);
+  matxAlloc((void**)&ptr, desc.TotalSize() * sizeof(T), space, stream);
+
+  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
   return new tensor_t<T, 
   std::tuple_size<typename remove_cvref<ShapeType>::type>::value, 
@@ -176,29 +202,32 @@ auto make_tensor_p(ShapeType &&shape) {
 }
 
 /**
- * Create a 0D tensor with implicitly-allocated memory
+ * Create a 0D tensor with implicitly-allocated memory.
  * 
+ * @param shape  Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory memory.
  * @returns New tensor
  * 
  **/
 template <typename T>
-auto make_tensor() {
+auto make_tensor(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
   std::array<index_t, 0> shape;
-  return make_tensor<T, decltype(shape)>(std::move(shape));
+
+  return make_tensor<T, decltype(shape)>(std::move(shape), space, stream);
 }
 
 /**
- * Create a 0D tensor with user-defined memory
+ * Create a 0D tensor with user-defined memory.
  * 
- * @param ptr
- *  Pointer to data
+ * @param shape  Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory memory.
  * @returns New tensor
  * 
  **/
 template <typename T>
-auto make_tensor_p() {
+auto make_tensor_p(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
   std::array<index_t, 0> shape;
-  return make_tensor_p<T, decltype(shape)>(std::move(shape));
+  return make_tensor_p<T, decltype(shape)>(std::move(shape), space, stream);
 }
 
 /**
@@ -316,14 +345,20 @@ auto make_tensor(T* const data, D &&desc, bool owning = false) {
 /**
  * Create a tensor with implicitly-allocated memory and an existing descriptor
  *
- * @param desc
- *   Tensor descriptor (tensor_desc_t)
+ * @param desc Tensor descriptor (tensor_desc_t)
+ * @param shape  Shape of tensor
+ * @param space  memory space to allocate in.  Default is managed memory memory.
  * @returns New tensor
  **/
 template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
-auto make_tensor(D &&desc) {    
+auto make_tensor(D &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {    
+  T *ptr;
   using Dstrip = typename remove_cvref<D>::type;
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
+  
+  size_t size = desc.TotalSize() * sizeof(T);
+  matxAlloc((void**)&ptr, desc.TotalSize() * sizeof(T), space, stream);
+
+  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
   return tensor_t<T, Dstrip::Rank(), decltype(s), Dstrip>{std::move(s), std::forward<D>(desc)};
 }
