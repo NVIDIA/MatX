@@ -83,62 +83,6 @@ auto make_tensor_p(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_
 }
 
 /**
- * Create a tensor using a tensorShape_t
- * 
- * This function is deprecated and other container types (std::array, for example) should be 
- * preferred over tensorShape_t.
- *
- * @param shape
- *   Shape of tensor
- * @returns New tensor
- **/
-template <typename T, int RANK>
-[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
-auto make_tensor(const tensorShape_t<RANK> &shape) {
-  DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
-}
-
-/**
- * Create a tensor using a tensorShape_t
- * 
- * This function is deprecated and other container types (std::array, for example) should be 
- * preferred over tensorShape_t.
- *
- * @param shape
- *   Shape of tensor
- * @returns Pointer to new tensor
- **/
-template <typename T, int RANK>
-[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
-auto make_tensor_p(const tensorShape_t<RANK> &shape) {
-  DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return new tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
-}
-
-/**
- * Create a tensor using a tensorShape_t and user-defined pointer
- *
- * @param ptr
- *   Pointer to device data
- * @param shape
- *   Shape of tensor
- * @returns Pointer to new tensor
- **/
-template <typename T, int RANK>
-[[deprecated("Use a conforming shape type instead of tensorShape_t")]] 
-auto make_tensor(T *ptr, const tensorShape_t<RANK> &shape, bool owning = false) {
-  DefaultDescriptor<RANK> desc{std::move(shape.AsArray())};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{ptr, static_cast<size_t>(desc.TotalSize()*sizeof(T)), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
-}
-
-/**
  * Create a tensor from a conforming container type
  * 
  * Conforming containers have sequential iterators defined (both const and non-const). std::array
