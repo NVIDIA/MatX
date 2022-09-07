@@ -167,20 +167,12 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   using T1 = typename XTensor::scalar_type;
   using T2 = typename AMFTensor::scalar_type;
 
-  T1 *x_normdiv, *y_normdiv;
-  float *x_norm, *y_norm;
-
   MATX_STATIC_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
   auto ry = x.View();
   //tensor_t<T1, RANK> ry(x);
 
-  matxAlloc(reinterpret_cast<void **>(&x_normdiv),
-            sizeof(T1) * x.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
-  matxAlloc(reinterpret_cast<void **>(&x_norm), sizeof(*x_norm),
-            MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  auto x_normdiv_v = make_tensor<T1>(x_normdiv, x.Shape());
-  auto x_norm_v = make_tensor<float>(x_norm);
+  auto x_normdiv_v = make_tensor<T1>(x.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto x_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
 
   sum(x_norm_v, norm(x), stream);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
@@ -190,13 +182,8 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 
   if (y) {
     ry.Reset(y.value().Data(), y.value().Shape());
-    matxAlloc(reinterpret_cast<void **>(&y_normdiv),
-              sizeof(T1) * ry.Size(RANK - 1), MATX_ASYNC_DEVICE_MEMORY, stream);
-    matxAlloc(reinterpret_cast<void **>(&y_norm), sizeof(*y_norm),
-              MATX_ASYNC_DEVICE_MEMORY, stream);
-              
-    y_normdiv_v.Reset(y_normdiv, ry.Shape());
-    auto y_norm_v = make_tensor<float>(y_norm);
+    y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
+    auto y_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
 
     sum(y_norm_v, norm(ry), stream);
     (y_normdiv_v = ry / y_norm_v).run(stream);
@@ -208,21 +195,12 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   index_t xlen = x_normdiv_v.Size(RANK - 1);
 
   if (cut == ::matx::AMGBFUN_CUT_TYPE_2D) {
-    T1 *new_ynorm;
-    matxAlloc(reinterpret_cast<void **>(&new_ynorm),
-              sizeof(T1) * (len_seq - 1) * xlen, MATX_ASYNC_DEVICE_MEMORY,
-              stream);
           
-    auto new_ynorm_v = make_tensor<T1>(new_ynorm, {len_seq - 1, xlen});
+    auto new_ynorm_v = make_tensor<T1>({len_seq - 1, xlen}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     newYNorm(new_ynorm_v, x_normdiv_v, y_normdiv_v).run(stream);
 
-    T1 *fft_data, *amf_tmp;
-    matxAlloc(reinterpret_cast<void **>(&fft_data),
-              sizeof(*fft_data) * nfreq * (len_seq - 1),
-              MATX_ASYNC_DEVICE_MEMORY, stream);
-  
-    auto fullfft = make_tensor<T1>(fft_data, {(len_seq - 1), nfreq});
+    auto fullfft = make_tensor<T1>({(len_seq - 1), nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     auto partfft = fullfft.Slice({0, 0}, {(len_seq - 1), xlen});
 
     (fullfft = 0).run(stream);
@@ -232,21 +210,13 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 
     // We need to temporarily allocate a complex output version of AMF since we
     // have no way to convert complex to real in an operator currently
-    matxAlloc(reinterpret_cast<void **>(&amf_tmp),
-              sizeof(*amf_tmp) * nfreq * (len_seq - 1),
-              MATX_ASYNC_DEVICE_MEMORY, stream);
-             
-    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {(len_seq - 1), nfreq});
+    auto amf_tmp_v = make_tensor<T1>({(len_seq - 1), nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
+
     (amf_tmp_v = (float)nfreq * abs(fftshift1D(fullfft))).run(stream);
     matx::copy(amf, amf_tmp_v.RealView(), stream);
   }
   else if (cut == ::matx::AMGBFUN_CUT_TYPE_DELAY) {
-    T1 *fft_data_x, *fft_data_y, *amf_tmp;
-    matxAlloc(reinterpret_cast<void **>(&fft_data_x),
-              sizeof(*fft_data_x) * nfreq, MATX_ASYNC_DEVICE_MEMORY, stream);
-    matxAlloc(reinterpret_cast<void **>(&fft_data_y),
-              sizeof(*fft_data_y) * nfreq, MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto fullfft_x = make_tensor<T1>(fft_data_x, {nfreq});
+    auto fullfft_x = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     auto partfft_x = fullfft_x.Slice({0}, {xlen});
     (fullfft_x = 0).run(stream);
     matx::copy(partfft_x, x_normdiv_v, stream);
@@ -255,7 +225,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     AmbgFftXOp(fullfft_x, fullfft_x, fs, cut_val, (float)nfreq).run(stream);
     ifft(fullfft_x, fullfft_x, 0, stream);
 
-    auto fullfft_y = make_tensor<T1>(fft_data_y, {nfreq});
+    auto fullfft_y = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = 0).run(stream);
 
     auto partfft_y = fullfft_y.Slice({0}, {xlen});
@@ -265,10 +235,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
-    matxAlloc(reinterpret_cast<void **>(&amf_tmp),
-              sizeof(*amf_tmp) * fullfft_y.Size(0), MATX_ASYNC_DEVICE_MEMORY,
-              stream);
-    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {fullfft_y.Size(0)});
+    auto amf_tmp_v = make_tensor<T1>({fullfft_y.Size(0)}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     (amf_tmp_v = (float)nfreq * abs(ifftshift1D(fullfft_y))).run(stream);
 
@@ -277,21 +244,14 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     matx::copy(amf, amfv.RealView(), stream);
   }
   else if (cut == ::matx::AMGBFUN_CUT_TYPE_DOPPLER) {
-    T1 *fft_data_x, *fft_data_y, *amf_tmp;
-    matxAlloc(reinterpret_cast<void **>(&fft_data_x),
-              sizeof(*fft_data_x) * (len_seq - 1), MATX_ASYNC_DEVICE_MEMORY,
-              stream);
-    matxAlloc(reinterpret_cast<void **>(&fft_data_y),
-              sizeof(*fft_data_y) * (len_seq - 1), MATX_ASYNC_DEVICE_MEMORY,
-              stream);
-    auto fullfft_y = make_tensor<T1>(fft_data_y, {len_seq - 1});
+    auto fullfft_y = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     auto partfft_y = fullfft_y.Slice({0}, {y_normdiv_v.Size(0)});
 
     (fullfft_y = 0).run(stream);
     matx::copy(partfft_y, y_normdiv_v, stream);
     fft(fullfft_y, fullfft_y, 0, stream);
 
-    auto fullfft_x = make_tensor<T1>(fft_data_x, {len_seq - 1});
+    auto fullfft_x = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_x = 0).run(stream);
 
     std::array<index_t, 1> xnd_size = {x_normdiv_v.Size(0)};
@@ -302,10 +262,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
-    matxAlloc(reinterpret_cast<void **>(&amf_tmp),
-              sizeof(*amf_tmp) * fullfft_x.Size(0), MATX_ASYNC_DEVICE_MEMORY,
-              stream);
-    auto amf_tmp_v = make_tensor<T1>(amf_tmp, {fullfft_x.Size(0)});
+    auto amf_tmp_v = make_tensor<T1>({fullfft_x.Size(0)}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
     ifft(fullfft_y, fullfft_y, 0, stream);
 
