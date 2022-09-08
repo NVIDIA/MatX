@@ -253,3 +253,39 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16C2C)
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
 }
+
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024C2CShort)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "fft_1d", {fft_dim, fft_dim - 16});
+
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  fft(avo, av);
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT1D1024C2CShort)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "ifft_1d", {fft_dim, fft_dim - 16});
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  ifft(avo, av);
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
