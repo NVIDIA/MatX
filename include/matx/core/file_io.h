@@ -157,13 +157,14 @@ void WriteCSV(const TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
-  pybind11::list ndims;
-  for (int i = 0; i < TensorType::Rank(); i++) {
-    ndims.append(t.Size(i));
-  }
 
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
+
+  // pybind11::list ndims;
+  // for (int i = 0; i < TensorType::Rank(); i++) {
+  //   ndims.append(t.Size(i));
+  // }
 
   auto np_ten = pb->TensorViewToNumpy(t);
   auto obj = np.attr("savetxt")(fname, np_ten, "delimiter"_a = delimiter);
@@ -174,8 +175,8 @@ void WriteCSV(const TensorType &t, const std::string fname,
  *
  * MAT files use SciPy's loadmat() function to read various MATLAB file
  * types in. MAT files are supersets of HDF5 files, and are allowed to
- * have multiple fields in them. 
- * 
+ * have multiple fields in them.
+ *
  * @tparam TensorType
  *   Data type of tensor
  * @param t
@@ -184,7 +185,7 @@ void WriteCSV(const TensorType &t, const std::string fname,
  *   File name of .mat file
  * @param var
  *   Variable name inside of .mat to read
- * 
+ *
  **/
 template <typename TensorType>
 void ReadMAT(TensorType &t, const std::string fname,
@@ -202,8 +203,8 @@ void ReadMAT(TensorType &t, const std::string fname,
 /**
  * @brief Write a MAT file from a tensor view
  *
- * Writes a single tensor value into a .mat file. 
- * 
+ * Writes a single tensor value into a .mat file.
+ *
  * @tparam TensorType
  *   Data type of tensor
  * @param t
