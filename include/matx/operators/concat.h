@@ -71,7 +71,7 @@ namespace matx
 
       // Base case. Cannot be reached
       template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup) const {
           return static_cast<first_value_type>(0);
         }
 

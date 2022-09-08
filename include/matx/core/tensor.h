@@ -752,7 +752,7 @@ public:
     std::array<index_t, NRANK> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin()); 
 
-    stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
+    [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
     MATX_ASSERT_STR(
         sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");    

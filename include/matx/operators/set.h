@@ -87,7 +87,7 @@ public:
                        matxInvalidDim);
     if constexpr (Rank() > 0) {
       for (int i = 0; i < Rank(); i++) {
-        index_t size = detail::get_expanded_size<Rank()>(op_, i);
+        [[maybe_unused]] index_t size = detail::get_expanded_size<Rank()>(op_, i);
         MATX_ASSERT_STR(
             size == 0 || size == Size(i), matxInvalidSize,
             "Size mismatch in source operator to destination tensor view");

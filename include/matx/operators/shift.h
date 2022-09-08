@@ -71,12 +71,12 @@ namespace matx
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
-            auto shift = -get_value(shift_, indices...);
+            index_t shift = -get_value(shift_, indices...);
 
 
             shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
 
-            if(shift<0) shift+= Size(DIM);
+            if(shift<0) shift += Size(DIM);
 
             cuda::std::get<DIM>(tup) = shift;
 

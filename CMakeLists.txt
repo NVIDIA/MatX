@@ -108,7 +108,6 @@ endif()
 # Set preferred compiler warning flags
 set(WARN_FLAGS  -Wall 
                 -Wextra 
-                -Werror all-warnings
                 -Wcast-align
                 -Wunused
                 -Wconversion
@@ -124,6 +123,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wlogical-op
         -Wnull-dereference)
 endif()
+
+set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
 # CUTLASS slows down compile times when used, so leave it as optional for now
 if (MATX_EN_CUTLASS)

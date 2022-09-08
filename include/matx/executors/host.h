@@ -54,54 +54,18 @@ class SingleThreadHostExecutor {
      */
     template <typename Op>
     void Exec(Op &op) const noexcept {
-      if constexpr (op.Rank() == 0) {
+      if constexpr (Op::Rank() == 0) {
         op();
       }
-      else if constexpr (op.Rank() == 1) {
-        index_t size0 = op.Size(0);
-        for (index_t idx = 0; idx < size0; idx++) {
-          op(idx);
-        }
-      }
-      else if constexpr (op.Rank() == 2) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-
-        for (index_t idx = 0; idx < size0; idx++) {
-          for (index_t idy = 0; idy < size1; idy++) {
-            op(idx, idy);
-          }
-        }
-      }
-      else if constexpr (op.Rank() == 3) {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
-
-        for (index_t idx = 0; idx < size0; idx++) {
-          for (index_t idy = 0; idy < size1; idy++) {
-            for (index_t idz = 0; idz < size2; idz++) {
-              op(idx, idy, idz);
-            }
-          }
-        }
-      }
       else {
-        index_t size0 = op.Size(0);
-        index_t size1 = op.Size(1);
-        index_t size2 = op.Size(2);
-        index_t size3 = op.Size(3);
-
-        for (index_t idx = 0; idx < size0; idx++) {
-          for (index_t idy = 0; idy < size1; idy++) {
-            for (index_t idz = 0; idz < size2; idz++) {
-              for (index_t idw = 0; idw < size3; idw++) {
-                op(idx, idy, idz, idw);
-              }
-            }
-          }
-        }
-      }        
+        index_t size = TotalSize(op);
+        for (index_t i = 0; i < size; i++) {
+          auto idx = GetIdxFromAbs(op, i);
+          std::apply([&](auto... args) {
+            return op(args...);
+          }, idx);        
+        }      
+      }
     }
 };
 

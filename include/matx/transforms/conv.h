@@ -50,9 +50,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
                                      const FilterType &filter, matxConvCorrMode_t mode,
                                      cudaStream_t stream)
 {
-  using strip_input_t = typename InType::scalar_type;
-  using strip_filter_t = typename FilterType::scalar_type;
-  using shape_type = typename OutputType::shape_type;
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
   MATX_ASSERT_STR(filter.Size(filter.Rank()-1) < CONV1D_ELEMENTS_PER_BLOCK, matxInvalidSize,
       "Convolutions are limited to filter lengths < 1024");
@@ -63,6 +60,10 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
       matxInvalidSize, "Output size for SAME convolution incorrect");
 
 #ifdef __CUDACC__  
+  using strip_input_t = typename InType::scalar_type;
+  using strip_filter_t = typename FilterType::scalar_type;
+  using shape_type = typename OutputType::shape_type;
+  
   size_t filter_len = filter.Size(filter.Rank()-1);
   size_t signal_len = i.Size(i.Rank()-1);
 
