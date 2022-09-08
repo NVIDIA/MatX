@@ -213,10 +213,6 @@ template <typename TensorType>
 void WriteMAT(const TensorType &t, const std::string fname,
               const std::string var)
 {
-  pybind11::list ndims;
-  for (int i = 0; i < TensorType::Rank(); i++) {
-    ndims.append(t.Size(i));
-  }
 
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
