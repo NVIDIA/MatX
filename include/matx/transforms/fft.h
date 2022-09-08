@@ -704,7 +704,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
     // FFT shorter than the size of the input signal. Create a new view of this
     // slice.
     if (act_fft_size < nom_fft_size) {
-      ends[RANK - 1] = nom_fft_size;
+      ends[RANK - 1] = act_fft_size;
       return i.Slice(starts, ends);
     }
     else { // FFT length is longer than the input. Pad input
