@@ -43,7 +43,7 @@ function(find_and_configure_libcudacxx version)
       ${PROJECT_NAME}-exports
     CPM_ARGS
       GIT_REPOSITORY  https://github.com/NVIDIA/libcudacxx.git
-      GIT_TAG         ${version}-ea
+      GIT_TAG         ${version}
       GIT_SHALLOW     TRUE
       DOWNLOAD_ONLY   TRUE
       OPTIONS         "LIBCXX_INCLUDE_BENCHMARKS OFF"
