@@ -161,11 +161,6 @@ void WriteCSV(const TensorType &t, const std::string fname,
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
 
-  // pybind11::list ndims;
-  // for (int i = 0; i < TensorType::Rank(); i++) {
-  //   ndims.append(t.Size(i));
-  // }
-
   auto np_ten = pb->TensorViewToNumpy(t);
   auto obj = np.attr("savetxt")(fname, np_ten, "delimiter"_a = delimiter);
 }
