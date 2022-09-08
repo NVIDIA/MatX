@@ -151,6 +151,9 @@ public:
 
   void Exec(OutType &o, const InType &i, cudaStream_t stream)
   {
+#ifndef __CUDACC__
+    MATX_THROW(matxNotSupported, "convolution not supported on host");
+#else
     if (num_recursive > 0) {
       auto grid =
           dim3(static_cast<int>(
@@ -171,6 +174,7 @@ public:
       // use SAME here or give them an option? IIR doesn't have the same concept
       conv1d(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
     }
+#endif
   }
 
 private:

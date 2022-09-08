@@ -93,6 +93,8 @@ namespace matx
             batch_dims);
         transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
       }
+#else
+     MATX_THROW(matxNotSupported, "Transpose not supported on host");
 #endif    
     };
 } // end namespace matx

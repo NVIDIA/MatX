@@ -31,6 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <cuda_runtime_api.h>
 #include <cuda/std/ccomplex>
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
