@@ -430,9 +430,9 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, SliceOp)
   tensor_t<TypeParam, 3> t3{{30, 20, 10}};
   tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
 
-  (t2 = linspace<1>(t2.Shape(), 0, 10)).run(SingleThreadHostExecutor());
-  (t3 = linspace<2>(t3.Shape(), 0, 10)).run(SingleThreadHostExecutor());
-  (t4 = linspace<3>(t4.Shape(), 0, 10)).run(SingleThreadHostExecutor());
+  (t2 = linspace<1>(t2.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t3 = linspace<2>(t3.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t4 = linspace<3>(t4.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
 
   auto t2t = slice(t2, {1, 2}, {3, 5});
   auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
@@ -482,8 +482,8 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, SliceAndReduceOp)
  
   tensor_t<TypeParam, 2> t2t{{20, 10}};
   tensor_t<TypeParam, 3> t3t{{30, 20, 10}};
-  (t2t = linspace<1>(t2t.Shape(), 0, 10)).run(SingleThreadHostExecutor());
-  (t3t = linspace<2>(t3t.Shape(), 0, 10)).run(SingleThreadHostExecutor());
+  (t2t = linspace<1>(t2t.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t3t = linspace<2>(t3t.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
 
   {
     index_t j = 0;
@@ -587,7 +587,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     ASSERT_TRUE(op.Size(0) == N);
     ASSERT_TRUE(op.Size(1) == M*K);
 
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
@@ -609,7 +609,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     ASSERT_TRUE(op.Size(1) == K);
     
     
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
@@ -629,7 +629,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     ASSERT_TRUE(op.Rank() == 1);
     ASSERT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
@@ -649,7 +649,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     ASSERT_TRUE(op.Rank() == 1);
     ASSERT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
@@ -721,7 +721,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, RemapOp)
       idx(i) = i;
     }
 
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (remap<0>(tov, idx) = tiv).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
@@ -730,7 +730,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (remap<1>(tov, idx) = tiv).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
@@ -739,7 +739,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = 0).run(SingleThreadHostExecutor());
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
     (remap<0,1>(tov, idx, idx) = tiv).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
@@ -1135,7 +1135,7 @@ TYPED_TEST(HostOperatorTestsNumeric, HostOperatorFuncs)
   ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
   TypeParam p = 2.0f;
-  (tov0 = pow(tiv0, p)).run(SingleThreadHostExecutor());
+  (tov0 = as_type<TypeParam>(pow(tiv0, p))).run(SingleThreadHostExecutor());
   ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
   TypeParam three = 3.0f;
@@ -1418,10 +1418,6 @@ TYPED_TEST(HostOperatorTestsComplex, ComplexTypeCompatibility)
   tensor_t<float, 1> fview({count});
   tensor_t<TypeParam, 1> dview({count});
 
-  using data_type =
-      typename std::conditional_t<is_complex_half_v<TypeParam>, float,
-                                  typename TypeParam::value_type>;
-
   // Multiply by scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i);
@@ -1491,7 +1487,7 @@ TYPED_TEST(HostOperatorTestsComplex, ComplexTypeCompatibility)
   MATX_EXIT_HANDLER();
 }
 
-#if 0  // Transpose not supported on host
+#if 0
 TYPED_TEST(HostOperatorTestsNumeric, SquareCopyTranspose)
 {
   MATX_ENTER_HANDLER();
@@ -1507,36 +1503,36 @@ TYPED_TEST(HostOperatorTestsNumeric, SquareCopyTranspose)
 
   t2.PrefetchDevice(0);
   t2t.PrefetchDevice(0);
-  matx::copy(t2t, t2, 0);
+  (t2t = t2).run(SingleThreadHostExecutor{});
 
   t2t.PrefetchHost(0);
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
-                                             TypeParam(i * count + (double)j)));
+                                             (TypeParam)(i * count + j)));
     }
   }
 
-  t2t.PrefetchDevice(0);
-  transpose(t2t, t2, 0);
+  // t2t.PrefetchDevice(0);
+  // transpose(t2t, t2, 0);
 
-  t2t.PrefetchHost(0);
+  // t2t.PrefetchHost(0);
 
-  for (index_t i = 0; i < count; i++) {
-    for (index_t j = 0; j < count; j++) {
-      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
-      ASSERT_TRUE(
-          MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
-    }
-  }
+  // for (index_t i = 0; i < count; i++) {
+  //   for (index_t j = 0; j < count; j++) {
+  //     ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
+  //                                            TypeParam(i * count + (double)j)));
+  //     ASSERT_TRUE(
+  //         MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
+  //   }
+  // }
   MATX_EXIT_HANDLER();
 }
 #endif
 
-#if 0 // Transpose not supported on host
-TYPED_TEST(HostOperatorTestsNumeric, NonSquareTranspose)
+#if 0
+TYPED_TEST(HostOperatorTestsNumeric, DISABLED_NonSquareTranspose)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
@@ -1559,17 +1555,17 @@ TYPED_TEST(HostOperatorTestsNumeric, NonSquareTranspose)
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2t(j, i),
-                                             TypeParam(i * count + (double)j)));
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
     }
   }
   MATX_EXIT_HANDLER();
 }
 #endif
 
-#if 0  // Transpose not supported on host
-TYPED_TEST(HostOperatorTestsNumeric, Transpose3D)
+
+TYPED_TEST(HostOperatorTestsNumeric, DISABLED_Transpose3D)
 {
   MATX_ENTER_HANDLER();
 
@@ -1595,7 +1591,7 @@ TYPED_TEST(HostOperatorTestsNumeric, Transpose3D)
 
   MATX_EXIT_HANDLER();
 }
-#endif
+
 
 TYPED_TEST(HostOperatorTestsNumeric, CloneAndAdd)
 {
@@ -1681,7 +1677,7 @@ TYPED_TEST(HostOperatorTestsNumeric, Reshape)
         for (index_t l = 0; l < t4.Size(3); l++) {
           MATX_ASSERT_EQ(rsv1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
                               i * t4.Size(3) * t4.Size(2) * t4.Size(1)),
-                         (TypeParam)(i + j + k + (double)l));
+                         static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l));
         }
       }
     }
@@ -2484,10 +2480,12 @@ TEST(HostOperatorTests, Cast)
   MATX_EXIT_HANDLER();
 }
 
-#if 0  // conv not supported on host
-TEST(HostOperatorTestsAdvanced, AdvancedRemapOp)
+#if 0
+TEST(HostOperatorTestsAdvanced, DISABLED_AdvancedRemapOp)
 {
-  typedef cuda::std::complex<float> complex;
+  using ftype = float;
+  using complex = cuda::std::complex<ftype>;
+
   MATX_ENTER_HANDLER();
 
   int I = 4;
@@ -2526,7 +2524,7 @@ TEST(HostOperatorTestsAdvanced, AdvancedRemapOp)
     }
   }
 
-  (B = 0).run(SingleThreadHostExecutor());
+  (B = (ftype)0).run(SingleThreadHostExecutor());
 
   auto rop = remap<1>(A, idx);
   auto lop = lcollapse<2>(rop);
@@ -2611,10 +2609,10 @@ TEST(HostOperatorTestsAdvanced, AdvancedRemapOp)
   auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
   auto rcop = lcollapse<2>(remap<1>(cop, idx));
 
-  (O1 = 1).run(SingleThreadHostExecutor());
-  (O2 = 2).run(SingleThreadHostExecutor());
-  (O3 = 3).run(SingleThreadHostExecutor());
-  (O4 = 4).run(SingleThreadHostExecutor());
+  (O1 = (ftype)1).run(SingleThreadHostExecutor());
+  (O2 = (ftype)2).run(SingleThreadHostExecutor());
+  (O3 = (ftype)3).run(SingleThreadHostExecutor());
+  (O4 = (ftype)4).run(SingleThreadHostExecutor());
   
   (B = lop).run(SingleThreadHostExecutor());
   (D = rcop).run(SingleThreadHostExecutor());

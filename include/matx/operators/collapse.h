@@ -203,7 +203,7 @@ namespace matx
             auto ind = in[Rank() - 1];
 #pragma unroll
             for(int i = 0; i <= DIM; i++) {
-              index_t d = T1::Rank() - 1 - i;
+              int d = T1::Rank() - 1 - i;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
             }
@@ -228,7 +228,7 @@ namespace matx
             auto ind = in[Rank() - 1];
 #pragma unroll
             for(int i = 0; i <= DIM; i++) {
-              index_t d = T1::Rank() - 1 - i;
+              int d = T1::Rank() - 1 - i;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
             }

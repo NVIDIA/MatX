@@ -350,7 +350,6 @@ template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO =
 void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
-  using T1 = typename TensorTypeAInv::scalar_type;
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);

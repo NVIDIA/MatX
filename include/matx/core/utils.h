@@ -48,7 +48,7 @@ __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
     int val;
     int dev;
     cudaGetDevice(&dev);
-    auto err = cudaDeviceGetAttribute(&val, attr, dev);
+    [[maybe_unused]] auto err = cudaDeviceGetAttribute(&val, attr, dev);
     MATX_ASSERT(err == cudaSuccess, matxCudaError);
     return val;
 }

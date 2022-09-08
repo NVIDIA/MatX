@@ -62,7 +62,7 @@ public:
   matxError_t SetAdvancedOptions(cusolverDnFunction_t function,
                                  cusolverAlgMode_t algo)
   {
-    cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
     return matxSuccess;
@@ -1312,9 +1312,6 @@ void svd(UTensor &u, STensor &s,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
   using T1 = typename ATensor::scalar_type;
-  using T2 = typename UTensor::scalar_type;
-  using T3 = typename STensor::scalar_type;
-  using T4 = typename VTensor::scalar_type;
 
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the

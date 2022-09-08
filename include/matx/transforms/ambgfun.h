@@ -165,7 +165,6 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 {
   constexpr int RANK = XTensor::Rank();
   using T1 = typename XTensor::scalar_type;
-  using T2 = typename AMFTensor::scalar_type;
 
   MATX_STATIC_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
   auto ry = x.View();
