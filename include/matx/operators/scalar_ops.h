@@ -33,6 +33,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cuda/std/array>
 
 namespace matx {
 namespace detail {
@@ -484,7 +485,7 @@ template <typename T1, typename T2> using PowOp = BinOp<T1, T2, PowF<T1, T2>>;
 template <typename T1, typename T2> struct MaxF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
-    return max(v1, v2);
+    return cuda::std::max(v1, v2);
   }
 };
 template <typename T1, typename T2> using MaxOp = BinOp<T1, T2, MaxF<T1, T2>>;
@@ -492,7 +493,7 @@ template <typename T1, typename T2> using MaxOp = BinOp<T1, T2, MaxF<T1, T2>>;
 template <typename T1, typename T2> struct MinF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
-    return min(v1, v2);
+    return cuda::std::min(v1, v2);
   }
 };
 template <typename T1, typename T2> using MinOp = BinOp<T1, T2, MinF<T1, T2>>;

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 set (test_sources
+    00_host/OperatorTests.cc
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/ViewTests.cu
@@ -50,8 +51,8 @@ set_property(TARGET matx_test PROPERTY ENABLE_EXPORTS 1)
 if (MSVC)
     target_compile_options(matx_test  PRIVATE /W4 /WX)
 else()
-    target_compile_options(matx_test PRIVATE ${WARN_FLAGS})
-    target_compile_options(matx_test PRIVATE ${MATX_CUDA_FLAGS})
+    target_compile_options(matx_test PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${WARN_FLAGS}>)
+    target_compile_options(matx_test PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)
 endif() 
 
 target_include_directories(matx_test PRIVATE "${target_inc}")
