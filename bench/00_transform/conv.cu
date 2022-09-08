@@ -21,6 +21,8 @@ void conv1d_4d_batch(nvbench::state &state,
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
+  
+  cudaDeviceSynchronize();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
@@ -41,6 +43,8 @@ void conv1d_2d_batch(nvbench::state &state,
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
+  
+  cudaDeviceSynchronize();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
@@ -51,13 +55,15 @@ template <typename ValueType>
 void conv1d_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
-  auto out = make_tensor<ValueType>({39321704});
-  auto at = make_tensor<ValueType>({39321600});
-  auto bt = make_tensor<ValueType>({105});
+  auto at = make_tensor<ValueType>({100000000});
+  auto bt = make_tensor<ValueType>({1000});
+  auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
 
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
+
+  cudaDeviceSynchronize();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
