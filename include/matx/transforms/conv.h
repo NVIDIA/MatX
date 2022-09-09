@@ -51,8 +51,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
                                      cudaStream_t stream)
 {
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
-  MATX_ASSERT_STR(filter.Size(filter.Rank()-1) < CONV1D_ELEMENTS_PER_BLOCK, matxInvalidSize,
-      "Convolutions are limited to filter lengths < 1024");
 
   MATX_ASSERT_STR(mode != MATX_C_MODE_FULL || o.Size(o.Rank()-1) == i.Size(i.Rank()-1) + filter.Size(filter.Rank()-1) - 1,
       matxInvalidSize, "Output size for FULL convolution incorrect");
