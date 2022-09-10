@@ -504,30 +504,57 @@ public:
     if constexpr (is_tensor_view_v<InputOperator>) {
       if (RANK == 1) {
         if (dir == SORT_DIR_ASC) {
+#if CUB_MINOR_VERSION  >  14
           cub::DeviceRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+#else
+          cub::DeviceRadixSort::SortKeys(
+              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+#endif
         }
         else {
+#if CUB_MINOR_VERSION  >  14
           cub::DeviceRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+#else
+          cub::DeviceRadixSort::SortKeysDescending(
+              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+#endif
         }
       }
       else if (RANK == 2 || d_temp == nullptr) {
         if (dir == SORT_DIR_ASC) {
+#if CUB_MINOR_VERSION  >  14
           cub::DeviceSegmentedSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
               static_cast<int>(a.Size(RANK - 2)),
               BeginOffset{a}, EndOffset{a}, stream);
+#else
+            cub::DeviceSegmentedRadixSort::SortKeys(
+              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+              static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+#endif
 
         }
         else {
+#if CUB_MINOR_VERSION  >  14
           cub::DeviceSegmentedRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
               static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+#else
+          cub::DeviceSegmentedRadixSort::SortKeysDescending(
+              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+#endif
         }
       }
       else {
@@ -541,6 +568,7 @@ public:
         std::array<shape_type, InputOperator::Rank()> idx{0};
 
         if (dir == SORT_DIR_ASC) {
+#if CUB_MINOR_VERSION  >  14
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
 
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
@@ -555,8 +583,25 @@ public:
             // Update all but the last batch_offset indices
             UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
           }
+#else
+          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
+
+          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+
+          for (size_t iter = 0; iter < total_iter; iter++) {
+            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+            f(ap, aop);
+
+            // Update all but the last batch_offset indices
+            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
+          }
+#endif
         }
         else {
+#if CUB_MINOR_VERSION  >  14
           auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
               BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
@@ -570,6 +615,21 @@ public:
             // Update all but the last batch_offset indices
             UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
           }
+#else
+          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
+          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+
+          for (size_t iter = 0; iter < total_iter; iter++) {
+            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+            f(ap, aop);
+
+            // Update all but the last batch_offset indices
+            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
+          }
+#endif
         }
       }
     }
