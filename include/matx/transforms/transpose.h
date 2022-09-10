@@ -58,9 +58,9 @@ namespace matx
    *
    */
   template <typename OutputTensor, typename InputTensor>
-    __MATX_INLINE__ void transpose(OutputTensor &out,
+    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
         const InputTensor &in,
-        const cudaStream_t stream)
+        [[maybe_unused]] const cudaStream_t stream)
     {
       constexpr int RANK = OutputTensor::Rank();
       if constexpr (RANK <= 1)
@@ -93,6 +93,8 @@ namespace matx
             batch_dims);
         transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
       }
+#else
+     MATX_THROW(matxNotSupported, "Transpose not supported on host");
 #endif    
     };
 } // end namespace matx

@@ -626,32 +626,28 @@ private:
     // If the tensors are complex half precision, we need to do a planar
     // transform since all libraries expect this format at the moment.
     if constexpr (is_complex_half_v<T1>) {
-      typename T1::value_type *A;
-      typename T2::value_type *B;
-      typename T3::value_type *C;
-
-      matxAlloc(reinterpret_cast<void **>(&A), a.Bytes(),
-                MATX_ASYNC_DEVICE_MEMORY, stream);
-      matxAlloc(reinterpret_cast<void **>(&B), b.Bytes(),
-                MATX_ASYNC_DEVICE_MEMORY, stream);
-      matxAlloc(reinterpret_cast<void **>(&C), c.Bytes(),
-                MATX_ASYNC_DEVICE_MEMORY, stream);
-
+      
       auto a_shape = a.Shape();
       *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
-      auto a_planar = make_tensor<typename T1::value_type>(A, a_shape);
+      auto a_planar = make_tensor<typename T1::value_type>(a_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       auto b_shape = b.Shape();
       *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
-      auto b_planar = make_tensor<typename T1::value_type>(B, b_shape);
+      auto b_planar = make_tensor<typename T2::value_type>(b_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      
+      auto c_shape = c.Shape();
+      *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
+      auto c_planar = make_tensor<typename T3::value_type>(c_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       // Convert A/B to planar layout
       (a_planar = planar(a)).run(stream);
       (b_planar = planar(b)).run(stream);
 
-      a_adj.Reset(reinterpret_cast<T1 *>(A));
-      b_adj.Reset(reinterpret_cast<T2 *>(B));
-      c_adj.Reset(reinterpret_cast<T3 *>(C));
+      // update poitners to planar data. 
+      // must use Reset because types for planar are different
+      a_adj.Reset(reinterpret_cast<T1 *>(a_planar.Data()));
+      b_adj.Reset(reinterpret_cast<T2 *>(b_planar.Data()));
+      c_adj.Reset(reinterpret_cast<T3 *>(c_planar.Data()));
     }
 
     // Prep for batch looping

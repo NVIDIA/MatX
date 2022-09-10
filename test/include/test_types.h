@@ -82,6 +82,9 @@ typedef Types<matx::matxFp16, matx::matxBf16, float, double,
               cuda::std::complex<float>, cuda::std::complex<double>,
               matx::matxFp16Complex, matx::matxBf16Complex>
     MatXFloatTypes;
+typedef Types<float, double,
+              cuda::std::complex<float>, cuda::std::complex<double>>
+    MatXFloatNonHalfTypes;
 typedef Types<matx::matxFp16, matx::matxBf16, float, double>
     MatXFloatNonComplexTypes;
 typedef Types<matx::matxFp16, matx::matxBf16> MatXFloatHalfTypes;

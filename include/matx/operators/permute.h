@@ -65,14 +65,10 @@ namespace matx
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
 
         __MATX_INLINE__ PermuteOp(T op, const int32_t (&dims)[Rank()]) : op_(op) {
-
-          bool selected[Rank()] = {0};
-
+            
           for(int32_t i = 0; i < Rank(); i++) {
-            int32_t dim = dims[i];
+            [[maybe_unused]] int32_t dim = dims[i];
             MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
-            MATX_ASSERT_STR(selected[dim] == false, matxInvalidDim, "PermuteOp:  Dim selected more than once");
-            selected[dim] = true;
 
             dims_[i] = dims[i];
           }

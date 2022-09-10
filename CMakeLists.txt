@@ -93,15 +93,11 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.4)
     message(FATAL_ERROR "MatX requires CUDA 11.4 or higher. Please update before using.")
 endif()
 
-# If we're on CUDA 11.4 or lower we need a newer version of libcudacxx
-if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
-    message(STATUS "Need libcuda++ 1.7.0 or higher (included in CTK 11.5+). Finding...")
-    set(LIBCUDACXX_VERSION "1.7.0" CACHE STRING "Version of libcudacxx to use")
-    include(cmake/FindLibcudacxx.cmake)
-    target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
-else()
-    message(STATUS "Recent libcuda++ found in CUDA toolkit. Skipping finding...")
-endif()
+# We typically need newer versions libcudacxx than availabled in the toolkit.  pull down specific version here
+message(STATUS "Need libcuda++. Finding...")
+set(LIBCUDACXX_VERSION "1.8.0" CACHE STRING "Version of libcudacxx to use")
+include(cmake/FindLibcudacxx.cmake)
+target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0)
@@ -112,7 +108,6 @@ endif()
 # Set preferred compiler warning flags
 set(WARN_FLAGS  -Wall 
                 -Wextra 
-                -Werror all-warnings
                 -Wcast-align
                 -Wunused
                 -Wconversion
@@ -128,6 +123,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wlogical-op
         -Wnull-dereference)
 endif()
+
+set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
 # CUTLASS slows down compile times when used, so leave it as optional for now
 if (MATX_EN_CUTLASS)

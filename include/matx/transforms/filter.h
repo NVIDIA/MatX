@@ -151,6 +151,9 @@ public:
 
   void Exec(OutType &o, const InType &i, cudaStream_t stream)
   {
+#ifndef __CUDACC__
+    MATX_THROW(matxNotSupported, "convolution not supported on host");
+#else
     if (num_recursive > 0) {
       auto grid =
           dim3(static_cast<int>(
@@ -171,6 +174,7 @@ public:
       // use SAME here or give them an option? IIR doesn't have the same concept
       conv1d(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
     }
+#endif
   }
 
 private:
@@ -427,8 +431,8 @@ static auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NR> &h_rec,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
-  tensor_t<FilterType, 1> rec_v({static_cast<index_t>(h_rec.size())});
-  tensor_t<FilterType, 1> nonrec_v({static_cast<index_t>(h_nonrec.size())});
+  auto rec_v = make_tensor<FilterType>({static_cast<index_t>(h_rec.size())});
+  auto nonrec_v = make_tensor<FilterType>({static_cast<index_t>(h_nonrec.size())});
 
   for (size_t j = 0; j < h_rec.size(); j++) {
     rec_v(static_cast<index_t>(j)) = h_rec[j];

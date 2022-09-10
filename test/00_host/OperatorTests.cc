@@ -40,73 +40,73 @@
 using namespace matx;
 
 template <typename TensorType>
-class OperatorTestsComplex : public ::testing::Test {
+class HostOperatorTestsComplex : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsFloat : public ::testing::Test {
+class HostOperatorTestsFloat : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsNumeric : public ::testing::Test {
+class HostOperatorTestsNumeric : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsNumericNonComplex : public ::testing::Test {
+class HostOperatorTestsNumericNonComplex : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsFloatNonComplex : public ::testing::Test {
+class HostOperatorTestsFloatNonComplex : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsFloatNonComplexNonHalf : public ::testing::Test {
+class HostOperatorTestsFloatNonComplexNonHalf : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsIntegral : public ::testing::Test {
+class HostOperatorTestsIntegral : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsBoolean : public ::testing::Test {
+class HostOperatorTestsBoolean : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsFloatHalf : public ::testing::Test {
+class HostOperatorTestsFloatHalf : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsNumericNoHalf : public ::testing::Test {
+class HostOperatorTestsNumericNoHalf : public ::testing::Test {
 };
 template <typename TensorType>
-class OperatorTestsAll : public ::testing::Test {
+class HostOperatorTestsAll : public ::testing::Test {
 };
 
-TYPED_TEST_SUITE(OperatorTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(OperatorTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(OperatorTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(OperatorTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(OperatorTestsNumericNonComplex,
+TYPED_TEST_SUITE(HostOperatorTestsAll, MatXAllTypes);
+TYPED_TEST_SUITE(HostOperatorTestsComplex, MatXComplexTypes);
+TYPED_TEST_SUITE(HostOperatorTestsFloat, MatXFloatTypes);
+TYPED_TEST_SUITE(HostOperatorTestsNumeric, MatXNumericTypes);
+TYPED_TEST_SUITE(HostOperatorTestsIntegral, MatXAllIntegralTypes);
+TYPED_TEST_SUITE(HostOperatorTestsNumericNonComplex,
                  MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalf,
+TYPED_TEST_SUITE(HostOperatorTestsFloatNonComplex, MatXFloatNonComplexTypes);
+TYPED_TEST_SUITE(HostOperatorTestsFloatNonComplexNonHalf,
                  MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(OperatorTestsBoolean, MatXBoolTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatHalf, MatXFloatHalfTypes);
-TYPED_TEST_SUITE(OperatorTestsNumericNoHalf, MatXNumericNoHalfTypes);
+TYPED_TEST_SUITE(HostOperatorTestsBoolean, MatXBoolTypes);
+TYPED_TEST_SUITE(HostOperatorTestsFloatHalf, MatXFloatHalfTypes);
+TYPED_TEST_SUITE(HostOperatorTestsNumericNoHalf, MatXNumericNoHalfTypes);
 
-TYPED_TEST(OperatorTestsComplex, BaseOp)
+TYPED_TEST(HostOperatorTestsComplex, BaseOp)
 {
   MATX_ENTER_HANDLER();
   auto A = make_tensor<TypeParam>({10,20});
   auto op = A + A;
 
-  EXPECT_TRUE(op.Size(0) == A.Size(0));
-  EXPECT_TRUE(op.Size(1) == A.Size(1));
+  ASSERT_TRUE(op.Size(0) == A.Size(0));
+  ASSERT_TRUE(op.Size(1) == A.Size(1));
 
   auto shape = op.Shape();
 
-  EXPECT_TRUE(shape[0] == A.Size(0));
-  EXPECT_TRUE(shape[1] == A.Size(1));
+  ASSERT_TRUE(shape[0] == A.Size(0));
+  ASSERT_TRUE(shape[1] == A.Size(1));
  
-  EXPECT_TRUE(A.TotalSize() == op.TotalSize());
+  ASSERT_TRUE(A.TotalSize() == op.TotalSize());
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, PermuteOp)
 {
   MATX_ENTER_HANDLER();
   auto A = make_tensor<TypeParam>({10,20,30});
@@ -142,7 +142,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
+TYPED_TEST(HostOperatorTestsFloatNonComplex, FMod)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -151,14 +151,13 @@ TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
 
   tiv0() = (TypeParam)5.0;
   tiv1() = (TypeParam)3.1;
-  (tov0 = fmod(tiv0, tiv1)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TypeParam)5.0, (TypeParam)3.1)));
+  (tov0 = fmod(tiv0, tiv1)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TypeParam)5.0, (TypeParam)3.1)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloat, TrigFuncs)
+TYPED_TEST(HostOperatorTestsFloat, TrigFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -166,58 +165,46 @@ TYPED_TEST(OperatorTestsFloat, TrigFuncs)
 
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
-  (tov0 = sin(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
+  (tov0 = sin(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
 
-  (tov0 = cos(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
+  (tov0 = cos(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
 
-  (tov0 = tan(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
+  (tov0 = tan(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
 
-  (tov0 = asin(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
+  (tov0 = asin(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
 
-  (tov0 = acos(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
+  (tov0 = acos(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
 
-  (tov0 = atan(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
+  (tov0 = atan(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
 
-  (tov0 = sinh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
+  (tov0 = sinh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
 
-  (tov0 = cosh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
+  (tov0 = cosh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
 
-  (tov0 = tanh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
+  (tov0 = tanh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
 
-  (tov0 = asinh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
+  (tov0 = asinh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
 
-  (tov0 = acosh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
+  (tov0 = acosh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
 
-  (tov0 = atanh(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
+  (tov0 = atanh(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, AngleOp)
+TYPED_TEST(HostOperatorTestsComplex, AngleOp)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -226,13 +213,12 @@ TYPED_TEST(OperatorTestsComplex, AngleOp)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = angle(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
+  (tov0 = angle(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
 
   MATX_EXIT_HANDLER();
 }
-TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, CloneOp)
 {
   constexpr int N = 10;
   constexpr int M = 12;
@@ -259,8 +245,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
-    cudaDeviceSynchronize();
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -294,8 +279,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
-    cudaDeviceSynchronize();
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -329,8 +313,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
-    cudaDeviceSynchronize();
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -366,8 +349,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
-    cudaDeviceSynchronize();
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -403,8 +385,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
-    cudaDeviceSynchronize();
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -420,7 +401,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
 
 
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, SliceStrideOp)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 1> t1{{10}};
@@ -441,7 +422,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, SliceOp)
 {
   MATX_ENTER_HANDLER();
   
@@ -449,9 +430,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
   tensor_t<TypeParam, 3> t3{{30, 20, 10}};
   tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
 
-  (t2 = linspace<1>(t2.Shape(), 0, 10)).run();
-  (t3 = linspace<2>(t3.Shape(), 0, 10)).run();
-  (t4 = linspace<3>(t4.Shape(), 0, 10)).run();
+  (t2 = linspace<1>(t2.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t3 = linspace<2>(t3.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t4 = linspace<3>(t4.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
 
   auto t2t = slice(t2, {1, 2}, {3, 5});
   auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
@@ -495,14 +476,14 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, SliceAndReduceOp)
 {
   MATX_ENTER_HANDLER();
  
   tensor_t<TypeParam, 2> t2t{{20, 10}};
   tensor_t<TypeParam, 3> t3t{{30, 20, 10}};
-  (t2t = linspace<1>(t2t.Shape(), 0, 10)).run();
-  (t3t = linspace<2>(t3t.Shape(), 0, 10)).run();
+  (t2t = linspace<1>(t2t.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
+  (t3t = linspace<2>(t3t.Shape(), (TypeParam)0, (TypeParam)10)).run(SingleThreadHostExecutor());
 
   {
     index_t j = 0;
@@ -579,7 +560,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
 {
   int N = 10;
   int M = 12;
@@ -602,13 +583,12 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   
     auto op = rcollapse<1>(tiv);
 
-    EXPECT_TRUE(op.Rank() == 2);
-    EXPECT_TRUE(op.Size(0) == N);
-    EXPECT_TRUE(op.Size(1) == M*K);
+    ASSERT_TRUE(op.Rank() == 2);
+    ASSERT_TRUE(op.Size(0) == N);
+    ASSERT_TRUE(op.Size(1) == M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -624,14 +604,13 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   
     auto op = lcollapse<1>(tiv);
 
-    EXPECT_TRUE(op.Rank() == 2);
-    EXPECT_TRUE(op.Size(0) == N*M);
-    EXPECT_TRUE(op.Size(1) == K);
+    ASSERT_TRUE(op.Rank() == 2);
+    ASSERT_TRUE(op.Size(0) == N*M);
+    ASSERT_TRUE(op.Size(1) == K);
     
     
-    (tov = 0).run();
-    (tov = op).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -647,12 +626,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   
     auto op = rcollapse<2>(tiv);
 
-    EXPECT_TRUE(op.Rank() == 1);
-    EXPECT_TRUE(op.Size(0) == N*M*K);
+    ASSERT_TRUE(op.Rank() == 1);
+    ASSERT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -668,12 +646,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   
     auto op = lcollapse<2>(tiv);
 
-    EXPECT_TRUE(op.Rank() == 1);
-    EXPECT_TRUE(op.Size(0) == N*M*K);
+    ASSERT_TRUE(op.Rank() == 1);
+    ASSERT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (tov = op).run(SingleThreadHostExecutor());
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -688,7 +665,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
 }
 
 
-TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, RemapOp)
 {
   int N = 10;
 
@@ -710,30 +687,27 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       idx(i) = i;
     }
 
-    (tov = remap<0>(tiv, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<0>(tiv, idx)).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
     
-    (tov = remap<1>(tiv, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<1>(tiv, idx)).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
 
-    (tov = remap<0,1>(tiv, idx, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<0,1>(tiv, idx, idx)).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
   }
@@ -747,33 +721,30 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       idx(i) = i;
     }
 
-    (tov = 0).run();
-    (remap<0>(tov, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (remap<0>(tov, idx) = tiv).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
     
-    (tov = 0).run();
-    (remap<1>(tov, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (remap<1>(tov, idx) = tiv).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
     
-    (tov = 0).run();
-    (remap<0,1>(tov, idx, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (tov = (TypeParam)0).run(SingleThreadHostExecutor());
+    (remap<0,1>(tov, idx, idx) = tiv).run(SingleThreadHostExecutor());
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i,j));
+        ASSERT_TRUE(tov(i,j) == tiv(i,j));
       }
     }
   }
@@ -787,30 +758,27 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       idx(i) = N-i-1;
     }
 
-    (tov = remap<0>(tiv, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<0>(tiv, idx)).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(N-i-1,j));
+        ASSERT_TRUE(tov(i,j) == tiv(N-i-1,j));
       }
     }
     
-    (tov = remap<1>(tiv, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<1>(tiv, idx)).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i, N-j-1));
+        ASSERT_TRUE(tov(i,j) == tiv(i, N-j-1));
       }
     }
     
-    (tov = remap<0,1>(tiv, idx, idx)).run();
-    cudaStreamSynchronize(0);
+    (tov = remap<0,1>(tiv, idx, idx)).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
+        ASSERT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
       }
     }
   }
@@ -824,30 +792,27 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       idx(i) = N-i-1;
     }
 
-    (remap<0>(tov, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (remap<0>(tov, idx) = tiv).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(N-i-1,j));
+        ASSERT_TRUE(tov(i,j) == tiv(N-i-1,j));
       }
     }
     
-    (remap<1>(tov, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (remap<1>(tov, idx) = tiv).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(i, N-j-1));
+        ASSERT_TRUE(tov(i,j) == tiv(i, N-j-1));
       }
     }
     
-    (remap<0,1>(tov, idx, idx) = tiv).run();
-    cudaStreamSynchronize(0);
+    (remap<0,1>(tov, idx, idx) = tiv).run(SingleThreadHostExecutor());
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
-        EXPECT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
+        ASSERT_TRUE(tov(i,j) == tiv(N-i-1, N-j-1));
       }
     }
   }
@@ -863,12 +828,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<0>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i*2,j));
+          ASSERT_TRUE(tov(i,j) == tiv(i*2,j));
         }
       }
     }
@@ -876,12 +840,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<1>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i,j*2));
+          ASSERT_TRUE(tov(i,j) == tiv(i,j*2));
         }
       }
     }
@@ -889,12 +852,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({M, M});
 
-      (tov = remap<0,1>(tiv, idx, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<0,1>(tiv, idx, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < M ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i*2,j*2));
+          ASSERT_TRUE(tov(i,j) == tiv(i*2,j*2));
 	}
       }
     }
@@ -911,12 +873,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<0>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(1,j));
+          ASSERT_TRUE(tov(i,j) == tiv(1,j));
         }
       }
     }
@@ -924,12 +885,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<1>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i,1));
+          ASSERT_TRUE(tov(i,j) == tiv(i,1));
         }
       }
     }
@@ -946,12 +906,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<0>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i/4,j));
+          ASSERT_TRUE(tov(i,j) == tiv(i/4,j));
         }
       }
     }
@@ -959,12 +918,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<1>(tiv, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i,j/4));
+          ASSERT_TRUE(tov(i,j) == tiv(i,j/4));
         }
       }
     }
@@ -972,12 +930,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     {
       auto tov = make_tensor<TypeParam>({M, M});
 
-      (tov = remap<0,1>(tiv, idx, idx)).run();
-      cudaStreamSynchronize(0);
+      (tov = remap<0,1>(tiv, idx, idx)).run(SingleThreadHostExecutor());
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < M ; j++) {
-          EXPECT_TRUE(tov(i,j) == tiv(i/4,j/4));
+          ASSERT_TRUE(tov(i,j) == tiv(i/4,j/4));
         }
       }
     }
@@ -986,7 +943,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, RealImagOp)
+TYPED_TEST(HostOperatorTestsComplex, RealImagOp)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -995,18 +952,16 @@ TYPED_TEST(OperatorTestsComplex, RealImagOp)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = real(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.real()));  
+  (tov0 = real(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.real()));  
 
-  (tov0 = imag(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.imag()));   
+  (tov0 = imag(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.imag()));   
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsAll, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1019,42 +974,37 @@ TYPED_TEST(OperatorTestsAll, OperatorFuncs)
 
   tensor_t<TypeParam, 0> tov00;
 
-  IFELSE(tiv0 == d, tov0 = z, tov0 = d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
+  IFELSE(tiv0 == d, tov0 = z, tov0 = d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
-  IFELSE(tiv0 == d, tov0 = tiv0, tov0 = d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tiv0()));
+  IFELSE(tiv0 == d, tov0 = tiv0, tov0 = d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tiv0()));
 
-  IFELSE(tiv0 != d, tov0 = d, tov0 = z).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
+  IFELSE(tiv0 != d, tov0 = d, tov0 = z).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
-  (tov0 = c, tov00 = c).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  
+  (tov0 = c, tov00 = c).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsFloatNonComplexNonHalf, HostOperatorFuncs)
 {
   tensor_t<TypeParam, 0> tiv0;
   tensor_t<cuda::std::complex<TypeParam>, 0> tov0;
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = expj(tiv0)).run();
-  cudaStreamSynchronize(0);
+  (tov0 = expj(tiv0)).run(SingleThreadHostExecutor());
 
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(
       tov0(),
       cuda::std::complex(cuda::std::cos(tiv0()), cuda::std::sin(tiv0()))));
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsFloatNonComplex, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1063,52 +1013,45 @@ TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = log10(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
+  (tov0 = log10(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
 
-  (tov0 = log(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
+  (tov0 = log(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
 
-  (tov0 = log2(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
+  (tov0 = log2(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
 
-  (tov0 = floor(tiv0)).run();   
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
+  (tov0 = floor(tiv0)).run(SingleThreadHostExecutor());   
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
 
-  (tov0 = ceil(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
+  (tov0 = ceil(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
 
-  (tov0 = round(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
+  (tov0 = round(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, NDOperatorFuncs)
+#if 0   // currently broken on host because it only supports RANK<=4
+TYPED_TEST(HostOperatorTestsFloatNonComplexNonHalf, NDHostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   auto a = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
   auto b = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
-  (a = ones(a.Shape())).run();
-  cudaDeviceSynchronize();
-  (b = ones(b.Shape())).run();
-  cudaDeviceSynchronize();
-  (a = a + b).run();
+  (a = ones(a.Shape())).run(SingleThreadHostExecutor());
+  (b = ones(b.Shape())).run(SingleThreadHostExecutor());
+  (a = a + b).run(SingleThreadHostExecutor());
 
-  auto t0 = make_tensor<TypeParam>();
-  sum(t0, a);
-  cudaStreamSynchronize(0);
-  ASSERT_EQ(t0(), 2 * a.TotalSize());
+//  auto t0 = make_tensor<TypeParam>();
+//  sum(t0, a);
+//  ASSERT_EQ(t0(), 2 * a.TotalSize());
   MATX_EXIT_HANDLER();
 }
+#endif
 
-TYPED_TEST(OperatorTestsNumericNonComplex, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1118,45 +1061,37 @@ TYPED_TEST(OperatorTestsNumericNonComplex, OperatorFuncs)
   tiv0() = c;
   TypeParam d = c + 1;
 
-  (tov0 = max(tiv0, d)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), max(c, d)));
+  (tov0 = max(tiv0, d)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::max(c, d)));
 
-  (tov0 = min(tiv0, d)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), min(c, d)));
+  (tov0 = min(tiv0, d)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::min(c, d)));
 
   // These operators convert type T into bool
   tensor_t<bool, 0> tob;
 
-  (tob = tiv0 < d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c < d));
+  (tob = tiv0 < d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c < d));
 
-  (tob = tiv0 > d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c > d));
+  (tob = tiv0 > d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c > d));
 
-  (tob = tiv0 <= d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c <= d));
+  (tob = tiv0 <= d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c <= d));
 
-  (tob = tiv0 >= d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c >= d));
+  (tob = tiv0 >= d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c >= d));
 
-  (tob = tiv0 == d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c == d));
+  (tob = tiv0 == d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c == d));
 
-  (tob = tiv0 != d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c != d));
+  (tob = tiv0 != d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tob(), c != d));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, OperatorFuncDivComplex)
+TYPED_TEST(HostOperatorTestsComplex, HostOperatorFuncDivComplex)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1166,14 +1101,13 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncDivComplex)
   TypeParam c = GenerateData<TypeParam>();  
   tiv0() = c;
 
-  (tov0 = s / tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), s / tiv0()));
+  (tov0 = s / tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), s / tiv0()));
 
   MATX_EXIT_HANDLER();  
 }
 
-TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsNumeric, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1182,48 +1116,40 @@ TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = tiv0 + tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c + c));
+  (tov0 = tiv0 + tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c + c));
 
-  (tov0 = tiv0 - tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c - c));
+  (tov0 = tiv0 - tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c - c));
 
-  (tov0 = tiv0 * tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c * c));
+  (tov0 = tiv0 * tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c * c));
 
-  (tov0 = tiv0 / tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
+  (tov0 = tiv0 / tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
-  (tov0 = -tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
+  (tov0 = -tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
 
-  IF(tiv0 == tiv0, tov0 = c).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
+  IF(tiv0 == tiv0, tov0 = c).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
   TypeParam p = 2.0f;
-  (tov0 = pow(tiv0, p)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
+  (tov0 = as_type<TypeParam>(pow(tiv0, p))).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
   TypeParam three = 3.0f;
 
-  (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run();
-  cudaStreamSynchronize(0);
+  (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run(SingleThreadHostExecutor());
 
   TypeParam res;
   res = c * c * (c + c) / c + three;
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), res, 0.07));
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), res, 0.07));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsIntegral, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsIntegral, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1233,14 +1159,13 @@ TYPED_TEST(OperatorTestsIntegral, OperatorFuncs)
   tiv0() = c;
   TypeParam mod = 2;
 
-  (tov0 = tiv0 % mod).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c % mod));
+  (tov0 = tiv0 % mod).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c % mod));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsBoolean, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsBoolean, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   tensor_t<TypeParam, 0> tiv0;
@@ -1250,22 +1175,19 @@ TYPED_TEST(OperatorTestsBoolean, OperatorFuncs)
   TypeParam d = false;
   tiv0() = c;
 
-  (tov0 = tiv0 && d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c && d));
+  (tov0 = tiv0 && d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c && d));
 
-  (tov0 = tiv0 || d).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c || d));
+  (tov0 = tiv0 || d).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c || d));
 
-  (tov0 = !tiv0).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), !c));
+  (tov0 = !tiv0).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), !c));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
+TYPED_TEST(HostOperatorTestsComplex, HostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
 
@@ -1275,28 +1197,24 @@ TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
   TypeParam c = GenerateData<TypeParam>();
   tiv0() = c;
 
-  (tov0 = exp(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
+  (tov0 = exp(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
 
-  (tov0 = conj(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
+  (tov0 = conj(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
   // abs and norm take a complex and output a floating point value
   tensor_t<typename TypeParam::value_type, 0> tdd0;
-  (tdd0 = norm(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
+  (tdd0 = norm(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
 
-  (tdd0 = abs(tiv0)).run();
-  cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
+  (tdd0 = abs(tiv0)).run(SingleThreadHostExecutor());
+  ASSERT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, Flatten)
+TYPED_TEST(HostOperatorTestsAll, Flatten)
 {
   MATX_ENTER_HANDLER();
 
@@ -1310,8 +1228,7 @@ TYPED_TEST(OperatorTestsAll, Flatten)
   }
 
   auto t1 = make_tensor<TypeParam>({t2.Size(0)*t2.Size(1)});
-  (t1 = flatten(t2)).run();
-  cudaStreamSynchronize(0);
+  (t1 = flatten(t2)).run(SingleThreadHostExecutor());
   
   for (index_t i = 0; i < t2.Size(0)*t2.Size(1); i++) {
     ASSERT_EQ(t1(i), val);
@@ -1320,7 +1237,7 @@ TYPED_TEST(OperatorTestsAll, Flatten)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
+TYPED_TEST(HostOperatorTestsNumericNoHalf, AdvancedHostOperators)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
@@ -1335,48 +1252,42 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
   }
 
   {
-    (c = a + b).run();
-
-    cudaStreamSynchronize(0);
+    (c = a + b).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
     }
   }
 
   {
-    (c = a * b).run();
-
-    cudaStreamSynchronize(0);
+    (c = a * b).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
     }
   }
 
   {
-    (c = a * b + a).run();
-    cudaStreamSynchronize(0);
+    (c = a * b + a).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
     }
   }
 
   {
 
-    (c = a * b + a * (TypeParam)4.0f).run();
-    cudaStreamSynchronize(0);
+    (c = a * b + a * (TypeParam)4.0f).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
     }
   }
@@ -1384,7 +1295,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
 }
 
 // TODO: add more host testing on everything that supports it
-TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
+TYPED_TEST(HostOperatorTestsNumericNoHalf, HostAdvancedHostOperators)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
@@ -1402,7 +1313,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
     (c = a + b).run(SingleThreadHostExecutor{});
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
     }
   }
@@ -1412,7 +1323,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
     }
   }
@@ -1422,7 +1333,7 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
     }
   }
@@ -1433,14 +1344,14 @@ TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
+TYPED_TEST(HostOperatorTestsFloatHalf, AdvancedHostOperators)
 {
   MATX_ENTER_HANDLER();
   index_t count = 10;
@@ -1455,47 +1366,42 @@ TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
   }
 
   {
-    (c = a + b).run();
-
-    cudaStreamSynchronize(0);
+    (c = a + b).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = (double)i;
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), (float)tcnt + ((float)tcnt + 2.0f)));
     }
   }
 
   {
-    (c = a * b).run();
-    cudaStreamSynchronize(0);
+    (c = a * b).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = (double)i;
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), (float)tcnt * ((float)tcnt + 2.0f)));
     }
   }
 
   {
-    (c = a * b + a).run();
-    cudaStreamSynchronize(0);
+    (c = a * b + a).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = (double)i;
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), (float)tcnt * ((float)tcnt + 2.0f) + (float)tcnt));
     }
   }
 
   {
 
-    (c = a * b + a * (TypeParam)2.0f).run();
-    cudaStreamSynchronize(0);
+    (c = a * b + a * (TypeParam)2.0f).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count; i++) {
       TypeParam tcnt = (double)i;
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), (float)tcnt * ((float)tcnt + 2.0f) + (float)tcnt * 2.0f));
     }
   }
@@ -1504,17 +1410,13 @@ TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
 
 
 // Testing 4 basic arithmetic operations with complex numbers and non-complex
-TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
+TYPED_TEST(HostOperatorTestsComplex, ComplexTypeCompatibility)
 {
   MATX_ENTER_HANDLER();
   index_t count = 10;
 
   tensor_t<float, 1> fview({count});
   tensor_t<TypeParam, 1> dview({count});
-
-  using data_type =
-      typename std::conditional_t<is_complex_half_v<TypeParam>, float,
-                                  typename TypeParam::value_type>;
 
   // Multiply by scalar
   for (index_t i = 0; i < count; i++) {
@@ -1523,8 +1425,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
-  (dview = dview * fview).run();
-  cudaDeviceSynchronize();
+  (dview = dview * fview).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
@@ -1540,8 +1441,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
-  (dview = dview / fview).run();
-  cudaDeviceSynchronize();
+  (dview = dview / fview).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
@@ -1559,8 +1459,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
-  (dview = dview + fview).run();
-  cudaDeviceSynchronize();
+  (dview = dview + fview).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
@@ -1576,8 +1475,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
 
-  (dview = dview - fview).run();
-  cudaDeviceSynchronize();
+  (dview = dview - fview).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
@@ -1589,7 +1487,8 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
+#if 0
+TYPED_TEST(HostOperatorTestsNumeric, SquareCopyTranspose)
 {
   MATX_ENTER_HANDLER();
   index_t count = 512;
@@ -1604,36 +1503,36 @@ TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
 
   t2.PrefetchDevice(0);
   t2t.PrefetchDevice(0);
-  matx::copy(t2t, t2, 0);
+  (t2t = t2).run(SingleThreadHostExecutor{});
 
   t2t.PrefetchHost(0);
-  cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
-                                             TypeParam(i * count + (double)j)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
+                                             (TypeParam)(i * count + j)));
     }
   }
 
-  t2t.PrefetchDevice(0);
-  transpose(t2t, t2, 0);
+  // t2t.PrefetchDevice(0);
+  // transpose(t2t, t2, 0);
 
-  t2t.PrefetchHost(0);
-  cudaStreamSynchronize(0);
+  // t2t.PrefetchHost(0);
 
-  for (index_t i = 0; i < count; i++) {
-    for (index_t j = 0; j < count; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
-    }
-  }
+  // for (index_t i = 0; i < count; i++) {
+  //   for (index_t j = 0; j < count; j++) {
+  //     ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
+  //                                            TypeParam(i * count + (double)j)));
+  //     ASSERT_TRUE(
+  //         MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
+  //   }
+  // }
   MATX_EXIT_HANDLER();
 }
+#endif
 
-TYPED_TEST(OperatorTestsNumeric, NonSquareTranspose)
+#if 0
+TYPED_TEST(HostOperatorTestsNumeric, DISABLED_NonSquareTranspose)
 {
   MATX_ENTER_HANDLER();
   index_t count = 100;
@@ -1652,20 +1551,21 @@ TYPED_TEST(OperatorTestsNumeric, NonSquareTranspose)
   transpose(t2t, t2, 0);
 
   t2t.PrefetchHost(0);
-  cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(j, i),
-                                             TypeParam(i * count + (double)j)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2t(j, i),
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
     }
   }
   MATX_EXIT_HANDLER();
 }
+#endif
 
-TYPED_TEST(OperatorTestsNumeric, Transpose3D)
+
+TYPED_TEST(HostOperatorTestsNumeric, DISABLED_Transpose3D)
 {
   MATX_ENTER_HANDLER();
 
@@ -1682,19 +1582,18 @@ TYPED_TEST(OperatorTestsNumeric, Transpose3D)
   }
 
   transpose(t3t, t3, 0);
-  cudaError_t error = cudaStreamSynchronize(0);
-  ASSERT_EQ(error, cudaSuccess);
 
   for (index_t i = 0; i < num_rows; i++) {
     for (index_t j = 0; j < num_cols; j++) {
-        EXPECT_EQ(t3(0, i, j), t3t(0, j, i));
+        ASSERT_EQ(t3(0, i, j), t3t(0, j, i));
     }
   }
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
+
+TYPED_TEST(HostOperatorTestsNumeric, CloneAndAdd)
 {
   MATX_ENTER_HANDLER();
   index_t numSamples = 8;
@@ -1727,17 +1626,16 @@ TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
   auto vah = velAccelHypoth.Clone<4>(
       {numBeams, matxKeepDim, matxKeepDim, matxKeepDim});
 
-  (beamwiseRangeDoppler = smx + vah).run();
+  (beamwiseRangeDoppler = smx + vah).run(SingleThreadHostExecutor());
 
-  cudaStreamSynchronize(0);
   for (index_t i = 0; i < numBeams; i++) {
     for (index_t j = 0; j < numPulses; j++) {
       for (index_t k = 0; k < numPairs; k++) {
         for (index_t l = 0; l < numSamples; l++) {
-          EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+          ASSERT_TRUE(MatXUtils::MatXTypeCompare(
               beamwiseRangeDoppler(i, j, k, l),
               steeredMx(i, l) + velAccelHypoth(j, k, l)));
-          EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+          ASSERT_TRUE(MatXUtils::MatXTypeCompare(
               beamwiseRangeDoppler(i, j, k, l),
               ((i + 1) * 10 + (l + 1)) // steeredMx
                   + ((j + 1) * 10000 + (k + 1) * 1000 +
@@ -1750,7 +1648,7 @@ TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Reshape)
+TYPED_TEST(HostOperatorTestsNumeric, Reshape)
 {
   MATX_ENTER_HANDLER();
   index_t count = 10;
@@ -1779,7 +1677,7 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
         for (index_t l = 0; l < t4.Size(3); l++) {
           MATX_ASSERT_EQ(rsv1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
                               i * t4.Size(3) * t4.Size(2) * t4.Size(1)),
-                         (TypeParam)(i + j + k + (double)l));
+                         static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l));
         }
       }
     }
@@ -1820,7 +1718,7 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
 }
 
 
-TYPED_TEST(OperatorTestsNumeric, Broadcast)
+TYPED_TEST(HostOperatorTestsNumeric, Broadcast)
 {
   MATX_ENTER_HANDLER();
   {
@@ -1840,8 +1738,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
       }
     }
 
-    (t4o = t4i * t0).run();
-    cudaStreamSynchronize(0);
+    (t4o = t4i * t0).run(SingleThreadHostExecutor());
   
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -1858,8 +1755,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-    (t4o = t0 * t4i).run();
-    cudaStreamSynchronize(0);
+    (t4o = t0 * t4i).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -1897,8 +1793,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t1).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t1).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -1916,8 +1811,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t1 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t1 * t4i).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -1958,8 +1852,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t2).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t2).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -1977,8 +1870,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t2 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t2 * t4i).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2021,8 +1913,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t3).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t3).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2040,8 +1931,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t3 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t3 * t4i).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2099,8 +1989,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i + t3 + t2 + t1 + t0).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i + t3 + t2 + t1 + t0).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2121,8 +2010,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t0 + t1 + t2 + t3 + t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t0 + t1 + t2 + t3 + t4i).run(SingleThreadHostExecutor());
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2146,7 +2034,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, Concatenate)
 {
   MATX_ENTER_HANDLER();
 
@@ -2160,8 +2048,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   t11.SetVals({0,1,2,3,4,5,6,7,8,9});
   t12.SetVals({0,1,2,3,4});
 
-  (t1o = concat<0>(t11, t12)).run();
-  cudaStreamSynchronize(0);
+  (t1o = concat<0>(t11, t12)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
     if (i < t11.Size(0)) {
@@ -2191,8 +2078,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
                {9,10,11},
                {10,11,12}});
 
-  (t2o1 = concat<0>(t21, t22)).run();
-  cudaStreamSynchronize(0);
+  (t2o1 = concat<0>(t21, t22)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
     for (j = 0; j < t21.Size(1); j++) {
@@ -2205,8 +2091,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     }
   }
 
-  (t2o2 = concat<1>(t21, t23)).run(); 
-  cudaStreamSynchronize(0);
+  (t2o2 = concat<1>(t21, t23)).run(SingleThreadHostExecutor()); 
   
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
     for (i = 0; i < t21.Size(0); i++) {
@@ -2220,8 +2105,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   }  
 
   // Concatenating 3 tensors
-  (t1o1 = concat<0>(t11, t11, t11)).run();
-  cudaStreamSynchronize(0);
+  (t1o1 = concat<0>(t11, t11, t11)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t1o1.Size(0); i++) {
     ASSERT_EQ(t1o1(i), t11(i % t11.Size(0)));
@@ -2231,7 +2115,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
 }
 
 
-TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
+TYPED_TEST(HostOperatorTestsComplex, HermitianTranspose)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 100;
@@ -2245,15 +2129,14 @@ TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
     }
   }
 
-  (t2s = hermitianT(t2)).run();
-  cudaStreamSynchronize(0);
+  (t2s = hermitianT(t2)).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(static_cast<double>(t2s(j, i).real()),
                                      static_cast<double>(t2(i, j).real())));
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(-static_cast<double>(t2s(j, i).imag()),
                                      static_cast<double>(t2(i, j).imag())));
     }
@@ -2261,7 +2144,7 @@ TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, PlanarTransform)
+TYPED_TEST(HostOperatorTestsComplex, PlanarTransform)
 {
   MATX_ENTER_HANDLER();
   index_t m = 10;
@@ -2275,20 +2158,19 @@ TYPED_TEST(OperatorTestsComplex, PlanarTransform)
     }
   }
 
-  (t2p = planar(t2)).run();
-  cudaStreamSynchronize(0);
+  (t2p = planar(t2)).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
-      EXPECT_TRUE(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j))) << i << " " << j << "\n";
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
+TYPED_TEST(HostOperatorTestsComplex, InterleavedTransform)
 {
   MATX_ENTER_HANDLER();
   index_t m = 10;
@@ -2306,20 +2188,19 @@ TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
     }
   }
 
-  (t2 = interleaved(t2p)).run();
-  cudaStreamSynchronize(0);
+  (t2 = interleaved(t2p)).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
-      EXPECT_TRUE(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j).real(), t2p(i, j)));
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(t2(i, j).imag(), t2p(i + t2.Size(0), j)));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, RepMat)
+TYPED_TEST(HostOperatorTestsAll, RepMat)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 4;
@@ -2338,12 +2219,11 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   ASSERT_TRUE(repop.Size(0) == same_reps * t2.Size(0));
   ASSERT_TRUE(repop.Size(1) == same_reps * t2.Size(1));
 
-  (t2s = repop).run();
-  cudaStreamSynchronize(0);
+  (t2s = repop).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
     for (index_t j = 0; j < count1 * same_reps; j++) {
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(t2s(i, j), t2(i % count0, j % count1)));
     }
   }
@@ -2355,19 +2235,18 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   ASSERT_TRUE(rrepop.Size(0) == same_reps * t2.Size(0));
   ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
 
-  (t2r = rrepop).run();
-  cudaStreamSynchronize(0);
+  (t2r = rrepop).run(SingleThreadHostExecutor());
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
     for (index_t j = 0; j < count1 * same_reps * 2; j++) {
-      EXPECT_TRUE(
+      ASSERT_TRUE(
           MatXUtils::MatXTypeCompare(t2r(i, j), t2(i % count0, j % count1)));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, ShiftOp)
+TYPED_TEST(HostOperatorTestsNumeric, ShiftOp)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 100;
@@ -2385,8 +2264,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<0>(t2, -5)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<0>(t2, -5)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2397,8 +2275,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
   
   {
-    (t2s = shift<0>(t2, t0)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<0>(t2, t0)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2409,8 +2286,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, -5)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<1>(t2, -5)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2421,8 +2297,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1,0>(t2, -5, -6)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<1,0>(t2, -5, -6)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2433,8 +2308,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = fftshift2D(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2s = fftshift2D(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2446,8 +2320,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = ifftshift2D(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2s = ifftshift2D(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2460,8 +2333,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 
   // Right shifts
   {
-    (t2s = shift<0>(t2, 5)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<0>(t2, 5)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2472,8 +2344,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, 5)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<1>(t2, 5)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2485,8 +2356,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 
   // Large shifts
   {
-    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2498,9 +2368,8 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   {
     // Shift 4 times the size back, minus one. This should be equivalent to
     // simply shifting by -1
-    (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run();
-    (t2s2 = shift<0>(t2, -1)).run();
-    cudaStreamSynchronize(0);
+    (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run(SingleThreadHostExecutor());
+    (t2s2 = shift<0>(t2, -1)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -2512,7 +2381,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Reverse)
+TYPED_TEST(HostOperatorTestsNumeric, Reverse)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 100;
@@ -2527,36 +2396,33 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverse<0>(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2r = reverse<0>(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
       }
     }
   }
 
   {
-    (t2r = reverse<1>(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2r = reverse<1>(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
       }
     }
   }
 
   {
-    (t2r = reverse<0,1>(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2r = reverse<0,1>(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2r(i, j), t2(count0 - i - 1, count1 - j - 1)));
       }
     }
@@ -2564,24 +2430,22 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
 
   // Flip versions
   {
-    (t2r = flipud(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2r = flipud(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2r(i, j), t2(count0 - i - 1, j)));
       }
     }
   }
 
   {
-    (t2r = fliplr(t2)).run();
-    cudaStreamSynchronize(0);
+    (t2r = fliplr(t2)).run(SingleThreadHostExecutor());
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2r(i, j), t2(i, count1 - j - 1)));
       }
     }
@@ -2590,7 +2454,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   MATX_EXIT_HANDLER();
 }
 
-TEST(OperatorTests, Cast)
+TEST(HostOperatorTests, Cast)
 {
   MATX_ENTER_HANDLER();
   index_t count0 = 4;
@@ -2601,15 +2465,13 @@ TEST(OperatorTests, Cast)
   t.SetVals({126, 126, 126, 126});
   t2.SetVals({126, 126, 126, 126});
   
-  (to = as_type<int8_t>(t + t2)).run();
-  cudaStreamSynchronize(0);
+  (to = as_type<int8_t>(t + t2)).run(SingleThreadHostExecutor());
 
   for (int i = 0; i < t.Size(0); i++) {
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
   }
 
-  (to = as_int8(t + t2)).run();
-  cudaStreamSynchronize(0);
+  (to = as_int8(t + t2)).run(SingleThreadHostExecutor());
   
   for (int i = 0; i < t.Size(0); i++) {
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
@@ -2618,9 +2480,12 @@ TEST(OperatorTests, Cast)
   MATX_EXIT_HANDLER();
 }
 
-TEST(OperatorTestsAdvanced, AdvancedRemapOp)
+#if 0
+TEST(HostOperatorTestsAdvanced, DISABLED_AdvancedRemapOp)
 {
-  typedef cuda::std::complex<float> complex;
+  using ftype = float;
+  using complex = cuda::std::complex<ftype>;
+
   MATX_ENTER_HANDLER();
 
   int I = 4;
@@ -2659,7 +2524,7 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
     }
   }
 
-  (B = 0).run();
+  (B = (ftype)0).run(SingleThreadHostExecutor());
 
   auto rop = remap<1>(A, idx);
   auto lop = lcollapse<2>(rop);
@@ -2668,9 +2533,8 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   ASSERT_EQ(lop.Size(1) , A.Size(3));
   ASSERT_EQ(lop.Size(0) , I * M * K);
 
-  (B = lop).run();
+  (B = lop).run(SingleThreadHostExecutor());
 
-  cudaDeviceSynchronize();  
 
   for (int i = 0; i < I; i++) {
     for (int m = 0; m < M; m++) {
@@ -2737,8 +2601,6 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   O3.PrefetchDevice(0);
   O4.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
-
   auto o1op = lcollapse<2>(remap<1>(O1, idx));
   auto o2op = lcollapse<2>(remap<1>(O2, idx));
   auto o3op = lcollapse<2>(remap<1>(O3, idx));
@@ -2747,13 +2609,13 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
   auto rcop = lcollapse<2>(remap<1>(cop, idx));
 
-  (O1 = 1).run();
-  (O2 = 2).run();
-  (O3 = 3).run();
-  (O4 = 4).run();
+  (O1 = (ftype)1).run(SingleThreadHostExecutor());
+  (O2 = (ftype)2).run(SingleThreadHostExecutor());
+  (O3 = (ftype)3).run(SingleThreadHostExecutor());
+  (O4 = (ftype)4).run(SingleThreadHostExecutor());
   
-  (B = lop).run();
-  (D = rcop).run();
+  (B = lop).run(SingleThreadHostExecutor());
+  (D = rcop).run(SingleThreadHostExecutor());
 
   // two operators as input
   matx::conv1d(o1op, lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
@@ -2767,8 +2629,6 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   //two tensors as input
   matx::conv1d(o4op, B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
 
-  cudaDeviceSynchronize();
-
   for (int i = 0; i < o1op.Size(0); i++) {
     for (int l = 0; l < o1op.Size(1); l++) {
       ASSERT_EQ(o1op(i,l), o2op(i,l));
@@ -2779,9 +2639,9 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
 
   MATX_EXIT_HANDLER();
 }
+#endif
 
-
-TYPED_TEST(OperatorTestsFloat, Print)
+TYPED_TEST(HostOperatorTestsFloat, Print)
 {
   MATX_ENTER_HANDLER();
   auto t = make_tensor<TypeParam>({3});
@@ -2789,4 +2649,4 @@ TYPED_TEST(OperatorTestsFloat, Print)
 
   Print(r);
   MATX_EXIT_HANDLER();
-}  
+}

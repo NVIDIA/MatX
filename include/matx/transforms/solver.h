@@ -62,7 +62,7 @@ public:
   matxError_t SetAdvancedOptions(cusolverDnFunction_t function,
                                  cusolverAlgMode_t algo)
   {
-    cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
     return matxSuccess;
@@ -709,11 +709,7 @@ public:
   {
     static_assert(RANK >= 2);
 
-    T1 *tmp;
-    matxAlloc(reinterpret_cast<void **>(&tmp), a.Bytes(), MATX_DEVICE_MEMORY);
-    MATX_ASSERT(tmp != nullptr, matxOutOfMemory);
-
-    scratch = make_tensor_p<T1>(tmp, a.Shape());
+    scratch = make_tensor_p<T1>(a.Shape(), MATX_DEVICE_MEMORY);
     params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
 
     GetWorkspaceSize(&hspace, &dspace);
@@ -1316,9 +1312,6 @@ void svd(UTensor &u, STensor &s,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
   using T1 = typename ATensor::scalar_type;
-  using T2 = typename UTensor::scalar_type;
-  using T3 = typename STensor::scalar_type;
-  using T4 = typename VTensor::scalar_type;
 
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
