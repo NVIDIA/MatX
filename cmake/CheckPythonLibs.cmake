@@ -29,15 +29,15 @@
 # // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # /////////////////////////////////////////////////////////////////////////////////
-function(check_python_libs libs)
-    foreach (pack ${required_python_packages})
+function(check_python_libs)
+    foreach (pack IN LISTS ARGN)
+        message(STATUS "checking python import module ${pack}")
         set(CMD "import ${pack}")
 
         execute_process(COMMAND ${Python3_EXECUTABLE} -c ${CMD} RESULT_VARIABLE EXIT_CODE OUTPUT_QUIET)
         if (NOT ${EXIT_CODE} EQUAL 0)
             message(FATAL_ERROR
                     "The ${pack} Python3 package is not installed. Please install it using the following command: \"pip3 install ${pack}\".")
-        endif()    
+        endif()
     endforeach ()
 endfunction()
-
