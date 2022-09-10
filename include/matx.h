@@ -40,6 +40,7 @@
 #include "matx/core/half.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
+#include "matx/core/viz.h"
 #include "matx/core/utils.h"
 
 #include "matx/executors/executors.h"
