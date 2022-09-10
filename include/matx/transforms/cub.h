@@ -505,9 +505,12 @@ public:
       if (RANK == 1) {
         if (dir == SORT_DIR_ASC) {
 #if CUB_MINOR_VERSION  >  14
-          cub::DeviceRadixSort::SortKeys(
+          cub::DeviceSegmentedSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)),
+              1,
+              BeginOffset{a}, EndOffset{a},
+              stream);
 #else
           cub::DeviceRadixSort::SortKeys(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -516,9 +519,12 @@ public:
         }
         else {
 #if CUB_MINOR_VERSION  >  14
-          cub::DeviceRadixSort::SortKeysDescending(
+          cub::DeviceSegmentedSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)),
+              1,
+              BeginOffset{a}, EndOffset{a},
+              stream);
 #else
           cub::DeviceRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -545,10 +551,11 @@ public:
         }
         else {
 #if CUB_MINOR_VERSION  >  14
-          cub::DeviceSegmentedRadixSort::SortKeysDescending(
+          cub::DeviceSegmentedSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+              static_cast<int>(a.Size(RANK - 2)),
+              BeginOffset{a}, EndOffset{a}, stream);
 #else
           cub::DeviceSegmentedRadixSort::SortKeysDescending(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
@@ -569,10 +576,10 @@ public:
 
         if (dir == SORT_DIR_ASC) {
 #if CUB_MINOR_VERSION  >  14
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
+          auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
 
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+              BeginOffset{a}, EndOffset{a}, stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
             auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
@@ -602,9 +609,9 @@ public:
         }
         else {
 #if CUB_MINOR_VERSION  >  14
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
+          auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
           auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+              BeginOffset{a}, EndOffset{a}, stream, false);
 
           for (size_t iter = 0; iter < total_iter; iter++) {
             auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
