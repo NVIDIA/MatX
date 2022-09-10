@@ -84,7 +84,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<float, 1> carrier({N});
   tensor_t<float, 1> noise({N});
   tensor_t<float, 1> x({N});
-  auto freqs = make_tensor<float, 1>(half_win);
+  auto freqs = make_tensor<float>(half_win);
   tensor_t<complex, 2> fftStackedMatrix(
       {(N - noverlap) / nstep, nfft / 2 + 1});
   tensor_t<float, 1> s_time({(N - noverlap) / nstep});
