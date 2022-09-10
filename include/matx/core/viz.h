@@ -75,7 +75,7 @@ void line(const TensorType &ten,
           const std::string &ylabel,
           const std::string &out_fname = "") {
 
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
 
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
@@ -124,7 +124,7 @@ void scatter(const TensorType &x,
           const std::string &ylabel,
           const std::string &out_fname = "") {
          
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
 
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
@@ -171,7 +171,7 @@ void bar(const TensorType &y,
           const std::string &ylabel,
           const std::string &out_fname = "") {
 
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
 
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
@@ -222,7 +222,7 @@ void bar( const TensorType &x,
           const std::string &xlabel,
           const std::string &ylabel,
           const std::string &out_fname = "") {
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
   
   auto px = pybind11::module_::import("plotly.express");   
   auto np = pybind11::module_::import("numpy");   
@@ -272,7 +272,7 @@ void contour( const T1 &x,
               const std::string &out_fname = "") {
   MATX_STATIC_ASSERT_STR(T1::Rank() == T2::Rank()-1, matxInvalidDim, "X/Y rank must be one less than Z rank");
 
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
   auto go = pybind11::module_::import("plotly.graph_objects");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -320,7 +320,7 @@ void surf(    const T1 &x,
               const T2 &z,
               const std::string &out_fname = "") {
 
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
   auto go = pybind11::module_::import("plotly.graph_objects");   
   auto np = pybind11::module_::import("numpy");   
 
@@ -359,7 +359,7 @@ void surf(
           const T1 &z,
           const std::string &out_fname = "") {
 
-  std::unique_ptr<::matx::detail::MatXPybind> pb;  
+  auto pb = std::make_unique<matx::detail::MatXPybind>();  
   auto go = pybind11::module_::import("plotly.graph_objects");   
   auto np = pybind11::module_::import("numpy");   
 
