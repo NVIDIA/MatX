@@ -1314,6 +1314,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a);
   params.stream = stream;
 
+
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
