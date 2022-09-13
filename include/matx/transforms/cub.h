@@ -474,9 +474,9 @@ public:
     }
 #endif
   }
-
+// #if CUB_MINOR_VERSION  >  14
   /**
-   * Execute a sort on a tensor
+   * Execute an optimized sort based on newer CUB
    *
    * @note Views being passed must be in row-major order
    *
@@ -492,156 +492,263 @@ public:
    *   Sort order (SORT_DIR_ASC or SORT_DIR_DESC)
    *
    */
-  inline void ExecSort(OutputTensor &a_out,
-                       const InputOperator &a,
-                       const cudaStream_t stream,
-                       const SortDirection_t dir = SORT_DIR_ASC)
-  {
+ inline void OptimizedExecSort(
+                              OutputTensor &a_out,
+                              const InputOperator &a,
+                              const cudaStream_t stream,
+                              const SortDirection_t dir = SORT_DIR_ASC
+                              )
+{
+
 #ifdef __CUDACC__
-    static_assert(is_tensor_view_v<InputOperator>, "Sorting only accepts tensors for now (no operators)");
-    MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
 
-    if constexpr (is_tensor_view_v<InputOperator>) {
-      if (RANK == 1) {
-        if (dir == SORT_DIR_ASC) {
-#if CUB_MINOR_VERSION  >  14
-          cub::DeviceSegmentedSort::SortKeys(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)),
-              1,
-              BeginOffset{a}, EndOffset{a},
-              stream);
-#else
-          cub::DeviceRadixSort::SortKeys(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
-#endif
-        }
-        else {
-#if CUB_MINOR_VERSION  >  14
-          cub::DeviceSegmentedSort::SortKeysDescending(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)),
-              1,
-              BeginOffset{a}, EndOffset{a},
-              stream);
-#else
-          cub::DeviceRadixSort::SortKeysDescending(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
-#endif
-        }
+  if constexpr (is_tensor_view_v<InputOperator>)
+  {
+
+    //////////////////////////////////////////////////////
+    //////           Rank 1 Tensors               ////////
+    //////////////////////////////////////////////////////
+    if (RANK == 1)
+    {
+      if (dir == SORT_DIR_ASC)
+      {
+        cub::DeviceSegmentedSort::SortKeys(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)),
+            1,
+            BeginOffset{a}, EndOffset{a},
+            stream);
       }
-      else if (RANK == 2 || d_temp == nullptr) {
-        if (dir == SORT_DIR_ASC) {
-#if CUB_MINOR_VERSION  >  14
-          cub::DeviceSegmentedSort::SortKeys(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
-              static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, stream);
-#else
-            cub::DeviceSegmentedRadixSort::SortKeys(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
-              static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
-#endif
+      else
+      {
 
-        }
-        else {
-#if CUB_MINOR_VERSION  >  14
-          cub::DeviceSegmentedSort::SortKeysDescending(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
-              static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, stream);
-#else
-          cub::DeviceSegmentedRadixSort::SortKeysDescending(
-              d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
-#endif
-        }
+        cub::DeviceSegmentedSort::SortKeysDescending(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)),
+            1,
+            BeginOffset{a}, EndOffset{a},
+            stream);
       }
-      else {
-        constexpr int batch_offset = 2;
-        using shape_type = index_t;
-        size_t total_iter = 1;
-        for (int i = 0; i < InputOperator::Rank() - batch_offset; i++) {
-          total_iter *= a.Size(i);
+    }
+
+    //////////////////////////////////////////////////////
+    //////           Rank 2 Tensors               ////////
+    //////////////////////////////////////////////////////
+    else if (RANK == 2 || d_temp == nullptr)
+    {
+      if (dir == SORT_DIR_ASC)
+      {
+        cub::DeviceSegmentedSort::SortKeys(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+            static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, stream);
+      }
+      else
+      {
+        cub::DeviceSegmentedSort::SortKeysDescending(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+            static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, stream);
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    //////    Batching for Higher Rank Tensors    ////////
+    //////////////////////////////////////////////////////
+    else
+    {
+      constexpr int batch_offset = 2;
+      using shape_type = index_t;
+      size_t total_iter = 1;
+      for (int i = 0; i < InputOperator::Rank() - batch_offset; i++)
+      {
+        total_iter *= a.Size(i);
+      }
+
+      std::array<shape_type, InputOperator::Rank()> idx{0};
+
+      if (dir == SORT_DIR_ASC)
+      {
+        auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
+
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, stream, false);
+
+        for (size_t iter = 0; iter < total_iter; iter++)
+        {
+          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+          f(ap, aop);
+
+          // Update all but the last batch_offset indices
+          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
         }
 
-        std::array<shape_type, InputOperator::Rank()> idx{0};
+      }
+      else
+      {
+        auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, stream, false);
 
-        if (dir == SORT_DIR_ASC) {
-#if CUB_MINOR_VERSION  >  14
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
+        for (size_t iter = 0; iter < total_iter; iter++)
+        {
+          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, stream, false);
+          f(ap, aop);
 
-          for (size_t iter = 0; iter < total_iter; iter++) {
-            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-            f(ap, aop);
-
-            // Update all but the last batch_offset indices
-            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-          }
-#else
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
-
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
-
-          for (size_t iter = 0; iter < total_iter; iter++) {
-            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-            f(ap, aop);
-
-            // Update all but the last batch_offset indices
-            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-          }
-#endif
-        }
-        else {
-#if CUB_MINOR_VERSION  >  14
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, stream, false);
-
-          for (size_t iter = 0; iter < total_iter; iter++) {
-            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-            f(ap, aop);
-
-            // Update all but the last batch_offset indices
-            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-          }
-#else
-          auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
-          auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-              BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
-
-          for (size_t iter = 0; iter < total_iter; iter++) {
-            auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-            auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-            f(ap, aop);
-
-            // Update all but the last batch_offset indices
-            UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-          }
-#endif
+          // Update all but the last batch_offset indices
+          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
         }
       }
     }
-#endif
   }
+#endif // end CUDACC
+}
+// #endif cub > 14
+
+/**
+ * Execute a sort on a tensor
+ *
+ * @note Views being passed must be in row-major order
+ *
+ * @tparam T1
+ *   Type of tensor
+ * @param a_out
+ *   Output tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ * @param dir
+ *   Sort order (SORT_DIR_ASC or SORT_DIR_DESC)
+ *
+ */
+inline void ExecSort(OutputTensor &a_out,
+                     const InputOperator &a,
+                     const cudaStream_t stream,
+                     const SortDirection_t dir = SORT_DIR_ASC)
+{
+
+#ifdef __CUDACC__
+  static_assert(is_tensor_view_v<InputOperator>, "Sorting only accepts tensors for now (no operators)");
+  MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
+
+#if CUB_MINOR_VERSION  >  14
+
+  OptimizedExecSort(a_out,
+                    a,
+                    stream,
+                    dir);
+
+#else
+  // legacy Implementation
+  if constexpr (is_tensor_view_v<InputOperator>)
+  {
+
+    //////////////////////////////////////////////////////
+    //////           Rank 1 Tensors               ////////
+    //////////////////////////////////////////////////////
+    if (RANK == 1)
+    {
+      if (dir == SORT_DIR_ASC)
+      {
+        cub::DeviceRadixSort::SortKeys(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+      }
+      else
+      {
+        cub::DeviceRadixSort::SortKeysDescending(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)), 0, sizeof(T1) * 8, stream);
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    //////           Rank 2 Tensors               ////////
+    //////////////////////////////////////////////////////
+    else if (RANK == 2 || d_temp == nullptr)
+    {
+      if (dir == SORT_DIR_ASC)
+      {
+        cub::DeviceSegmentedRadixSort::SortKeys(
+          d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+          static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
+          static_cast<int>(a.Size(RANK - 2)),
+          BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+      }
+      else
+      {
+        cub::DeviceSegmentedRadixSort::SortKeysDescending(
+            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
+            static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, 0, sizeof(T1) * 8, stream);
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    //////    Batching for Higher Rank Tensors    ////////
+    //////////////////////////////////////////////////////
+    else
+    {
+      constexpr int batch_offset = 2;
+      using shape_type = index_t;
+      size_t total_iter = 1;
+      for (int i = 0; i < InputOperator::Rank() - batch_offset; i++)
+      {
+        total_iter *= a.Size(i);
+      }
+
+      std::array<shape_type, InputOperator::Rank()> idx{0};
+
+      if (dir == SORT_DIR_ASC)
+      {
+
+        auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
+
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+
+        for (size_t iter = 0; iter < total_iter; iter++)
+        {
+          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+          f(ap, aop);
+
+          // Update all but the last batch_offset indices
+          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
+        }
+      }
+      else
+      {
+
+        auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+
+        for (size_t iter = 0; iter < total_iter; iter++)
+        {
+          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+
+          f(ap, aop);
+
+          // Update all but the last batch_offset indices
+          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
+        }
+      }
+    }
+  }
+#endif // end Legacy
+#endif // end CUDACC
+}
+
 
 
   /**
