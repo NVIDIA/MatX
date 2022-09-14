@@ -53,6 +53,8 @@ using namespace std::placeholders;
  */
 typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
 
+
+constexpr uint64_t cubSegmentCuttoff = 8192;
 /**
  * Parameters needed to execute a sort operation.
  */
@@ -639,13 +641,20 @@ inline void ExecSort(OutputTensor &a_out,
   MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
 
 #if CUB_MINOR_VERSION  >  14
+  // use optimized segmented sort if:
+  //    - it is available (cub > 1.4)
+  //    - it is greater than Rank 1 Tensor
+  //    - it is < 8192 in all dims
+  if( ( RANK > 1 ) && ( LargestDimSize(a) < cubSegmentCuttoff) )
+  {
+    OptimizedExecSort(a_out,
+                      a,
+                      stream,
+                      dir);
+    return;
+  }
 
-  OptimizedExecSort(a_out,
-                    a,
-                    stream,
-                    dir);
-
-#else
+#endif
   // legacy Implementation
   if constexpr (is_tensor_view_v<InputOperator>)
   {
@@ -745,7 +754,6 @@ inline void ExecSort(OutputTensor &a_out,
       }
     }
   }
-#endif // end Legacy
 #endif // end CUDACC
 }
 
