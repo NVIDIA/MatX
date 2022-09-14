@@ -31,7 +31,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include<string>
-#include<utility>
 #include <nvToolsExt.h>
 
 namespace matx
@@ -54,15 +53,20 @@ const int32_t  colors[nunNvtxColors] = {NVTX_BLACK, NVTX_RED, NVTX_GREEN, NVTX_B
 
 uint64_t curColorIdx;
 
-std::map<std::string, nvtxRangeId_t> nvtx_ranges;
+#define CONCAT(a, b) CONCAT_INNER(a, b)
+#define CONCAT_INNER(a, b) a ## b
+
+#define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
 
 #define NVTX_FLAGS 1
 
 #ifdef NVTX_FLAGS
 
-#define NVTX_START( message ) start_nvtxEvent( message );
 
-#define NVTX_END( message ) end_nvtxEvent( message );
+
+#define NVTX_START( message ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
+
+#define NVTX_END( eventClass, message ) eventClass.NvtxEvent( message );
 
 #else
 
@@ -74,68 +78,77 @@ std::map<std::string, nvtxRangeId_t> nvtx_ranges;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief description of function
-///
-///\param message
+///\brief Class wrapping NVTX management for automatic creation/deletion
 ///
 ////////////////////////////////////////////////////////////////////////////////
-void
-start_nvtxEvent( std::string message="" )
+class NvtxEvent
 {
+  public:
+  ////////////////////////////////////////////////////////////////////////////////
+  ///
+  ///\brief ctor
+  ///
+  ///\param message
+  ///
+  ////////////////////////////////////////////////////////////////////////////////
+  NvtxEvent( std::string functionName, std::string message="" )
+  {
 
   int32_t curColor = colors[ curColorIdx % nunNvtxColors];
   curColorIdx++;
 
-  nvtxEventAttributes_t eventAttrib; // = {0};
+  nvtxEventAttributes_t eventAttrib;
 
-  // set the version and the size information
-  eventAttrib.version = NVTX_VERSION;
-  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
-
-  // configure the attributes.  0 is the default for all attributes.
-  eventAttrib.colorType = NVTX_COLOR_ARGB;
-  eventAttrib.color = curColor;
+  // default event info
+  eventAttrib.version     = NVTX_VERSION;
+  eventAttrib.size        = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
+  eventAttrib.colorType   = NVTX_COLOR_ARGB;
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
 
+  // set custom color
+  eventAttrib.color = curColor;
+
+  // set message, if no message provided use the calling funciton as name
   if( message != "" )
   {
     eventAttrib.message.ascii = message.c_str();
   }
   else
   {
-    ///\todo get the name of the calling function instead
-    eventAttrib.message.ascii =  __FUNCTION__;
+    ///\todo get the name of the calling function instead https://en.cppreference.com/w/cpp/utility/source_location
+    eventAttrib.message.ascii =  functionName.c_str();
   }
 
+  // save the id
+  rangeId_ = nvtxRangeStartEx(&eventAttrib);
 
-  nvtxRangeId_t newId = nvtxRangeStartEx(&eventAttrib);
+  }
 
-
-  std::pair< std::string, nvtxRangeId_t> newPair(message, newId);
-
-  // insert range ID into map
-  nvtx_ranges.insert( newPair );
-
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-///
-///\brief description of function
-///
-////////////////////////////////////////////////////////////////////////////////
-void
-end_nvtxEvent( std::string message )
-{
-  auto search = nvtx_ranges.find(message);
-
-  if( search != nvtx_ranges.end() )
+  ////////////////////////////////////////////////////////////////////////////////
+  ///
+  ///\brief destroyEvent
+  ///
+  ////////////////////////////////////////////////////////////////////////////////
+  void
+  destroyEvent()
   {
     std::cout << "ending range" << std::endl;
-    nvtxRangeEnd(search->second);
+    nvtxRangeEnd(rangeId_);
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  ///
+  ///\brief dtor
+  ///
+  ////////////////////////////////////////////////////////////////////////////////
+  ~NvtxEvent( )
+  {
+    std::cout << "ending range" << std::endl;
+    nvtxRangeEnd(rangeId_);
   }
 
 
+  nvtxRangeId_t  rangeId_;
 };
 
 } // end matx namespace

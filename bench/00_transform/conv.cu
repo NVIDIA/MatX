@@ -25,13 +25,13 @@ void conv1d_4d_batch(nvbench::state &state,
   bt.PrefetchDevice(0);
 
   cudaDeviceSynchronize();
-  // NVTX_START("conv1d_4d_RUN" )
+  NVTX_START("conv1d_4d_RUN" )
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
 
   // NVTX_END("conv1d_4d_RUN" )
 
-  NVTX_END("conv1d_4d_batch_TEST")
+  // NVTX_END("conv1d_4d_batch_TEST")
 }
 NVBENCH_BENCH_TYPES(conv1d_4d_batch, NVBENCH_TYPE_AXES(conv_types));
 
