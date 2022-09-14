@@ -90,7 +90,7 @@ public:
   inline tensorShape_t(const T &sizes)
       : tensorShape_t(reinterpret_cast<const index_t *>(sizes.data()))
   {
-  }
+  }  
 
   /**
    * Get the size of a single dimension of the tensor
@@ -133,24 +133,6 @@ public:
   }
 
   /**
-   * Get the total size of the shape
-   *
-   * @return
-   *    The size of the largest dimension of the data
-   *
-   */
-  inline __MATX_HOST__ __MATX_DEVICE__ size_t LargestDimSize() const noexcept
-  {
-    size_t maxSize = 0;
-    for (int i = 0; i < RANK; i++){
-      if( Size(i) > maxSize){
-        maxSize = Size(i);
-      }
-    }
-    return maxSize;
-  }
-
-  /**
    * Set the size of a dimension
    *
    * @param dim
@@ -171,7 +153,7 @@ public:
   inline std::array<index_t, RANK> AsArray() const
   {
     return n_;
-  }
+  }  
 
   /**
    * Get the rank of the tensor
@@ -187,7 +169,7 @@ private:
 
 /**
  * @brief Shape equality
- *
+ * 
  * @tparam RANK1 Rank of first tensor
  * @tparam RANK2 Rank of second tensor
  * @param lhs Left shape
@@ -213,7 +195,7 @@ operator==(const tensorShape_t<RANK1> &lhs, const tensorShape_t<RANK2> &rhs)
 
 /**
  * @brief Shape inequality
- *
+ * 
  * @tparam RANK1 Rank of first tensor
  * @tparam RANK2 Rank of second tensor
  * @param lhs Left shape

@@ -54,7 +54,7 @@ using namespace std::placeholders;
 typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
 
 
-constexpr uint64_t cubSegmentCuttoff = 8192;
+constexpr index_t cubSegmentCuttoff = 8192;
 /**
  * Parameters needed to execute a sort operation.
  */

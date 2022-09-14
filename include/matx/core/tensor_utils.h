@@ -65,28 +65,22 @@ namespace matx
 
   /**
    * @brief finds the size of the largest dim of the tensor
-   *
+   *core/tensor_utils.h
    * @param op Operator
    * @return size of largest dim
    */
   template <typename Op>
-  size_t LargestDimSize(const Op &op) {
-    if constexpr (is_tensor_view_v<Op>) {
-      return static_cast<size_t>(op.LargestDimSize());
-    }
-    else {
-      size_t maxSize = 0;
-      for (int i = 0; i < op.Rank(); i++)
+  index_t LargestDimSize(const Op &op) {
+    index_t maxSize = 0;
+    for (int i = 0; i < op.Rank(); i++)
+    {
+      if( op.Size(i) > maxSize)
       {
-        if( op.Size(i) > maxSize)
-        {
-          maxSize = op.Size(i);
-        }
+        maxSize = op.Size(i);
       }
-
-      return maxSize;
     }
-    return 0;
+
+    return maxSize;
   }
 
 namespace detail {
