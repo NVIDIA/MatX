@@ -71,8 +71,18 @@ std::map< int, nvtxRangeId_t> eventMap;
 
 #ifdef NVTX_FLAGS
 
-  #define NVTX_START( message ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
-  #define NVTX_START_SCOPED( message, id ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, id);
+  #define NVTX_1( message ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
+  #define NVTX_2( message, customId ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, customId );
+  #define NVTX_3( message, customId, nvtxLevel ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, customId, nvtxLevel );
+
+  #define NVTX_X(x,A,B,C,FUNC, ...)  FUNC
+
+  // The macro that the programmer uses
+  #define NVTX_START(...)   NVTX_X(,##__VA_ARGS__,\
+                                  NVTX_3(__VA_ARGS__),\
+                                  NVTX_2(__VA_ARGS__),\
+                                  NVTX_1(__VA_ARGS__)\
+                                  )
 
   #define NVTX_END( id ) endEvent( id );
 
@@ -138,8 +148,13 @@ class NvtxEvent
   ///\param message
   ///
   ////////////////////////////////////////////////////////////////////////////////
-  NvtxEvent( std::string functionName, std::string message="", int registerId = -1 )
+  NvtxEvent( std::string functionName, std::string message="", int registerId = -1, size_t nvtxLevel=0 )
   {
+    size_t userLevel = 0;
+    if( nvtxLevel < userLevel )
+    {
+      return;
+    }
 
     int32_t curColor = colors[ curColorIdx % nunNvtxColors];
     curColorIdx++;
