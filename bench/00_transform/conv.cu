@@ -13,8 +13,8 @@ template <typename ValueType>
 void conv1d_4d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
-
-  NVTX_START("conv1d_4d_batch_TEST" )
+  NVTX_START("conv1d_4d_batch_FUNC" )
+  NVTX_START_SCOPED("conv1d_4d_batch_INIT", 1 )
 
   auto out = make_tensor<ValueType>({4, 2, 14, 288 + 4096 + 133 - 1});
   auto at = make_tensor<ValueType>({ 4, 2, 14, 133});
@@ -25,13 +25,11 @@ void conv1d_4d_batch(nvbench::state &state,
   bt.PrefetchDevice(0);
 
   cudaDeviceSynchronize();
+  NVTX_END( 1 )
   NVTX_START("conv1d_4d_RUN" )
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
 
-  // NVTX_END("conv1d_4d_RUN" )
-
-  // NVTX_END("conv1d_4d_batch_TEST")
 }
 NVBENCH_BENCH_TYPES(conv1d_4d_batch, NVBENCH_TYPE_AXES(conv_types));
 
