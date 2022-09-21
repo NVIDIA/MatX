@@ -476,7 +476,8 @@ public:
     }
 #endif
   }
-// #if CUB_MINOR_VERSION  >  14
+
+#if CUB_MINOR_VERSION  >  14
   /**
    * Execute an optimized sort based on newer CUB
    *
@@ -611,7 +612,7 @@ public:
   }
 #endif // end CUDACC
 }
-// #endif cub > 14
+#endif //cub > 14
 
 /**
  * Execute a sort on a tensor
