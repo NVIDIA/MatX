@@ -7,21 +7,22 @@ using namespace matx;
 //
 // types of data to run tests on
 //
-// using sort_types = nvbench::type_list<matxFp16Complex, cuda::std::complex<float>, cuda::std::complex<double>, float, double>;
-using sort_types = nvbench::type_list<double>;
+using sort_types = nvbench::type_list< float, double>;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief benchmark for 1D Sorts
+///\brief benchmark for 1D Sorts across key element types
 ///
-///\param param in
+///\param nvbench::state &state,        benchmark state structutre
+///\param nvbench::type_list<ValueType> list of sort data types to test
 ///
 ////////////////////////////////////////////////////////////////////////////////
 template <typename ValueType>
-void sort1d_range(
-                 nvbench::state &state,
-                 nvbench::type_list<ValueType>
-                 )
+void sort1d(
+           nvbench::state &state,
+           nvbench::type_list<ValueType>
+           )
 {
   const int dataSize = static_cast<int>(state.get_int64("Tensor Size"));
 
@@ -29,6 +30,10 @@ void sort1d_range(
   auto randomData = matx::make_tensor<ValueType>({dataSize});
 
   randomGenerator_t < ValueType > randData(dataSize, 0);
+
+  sortedData.PrefetchDevice(0);
+  randomData.PrefetchDevice(0);
+  cudaDeviceSynchronize();
 
   auto randTensorView = randData.template GetTensorView<sortedData.Rank()>(sortedData.Shape(), NORMAL);
 
@@ -38,22 +43,23 @@ void sort1d_range(
 
 }
 
-NVBENCH_BENCH_TYPES(sort1d_range, NVBENCH_TYPE_AXES(sort_types))
+NVBENCH_BENCH_TYPES(sort1d, NVBENCH_TYPE_AXES(sort_types))
   .add_int64_power_of_two_axis("Tensor Size", nvbench::range(7, 14, 1));
 
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief benchmark for 2D Sorts
+///\brief benchmark for 2D Sorts across key element types
 ///
-///\param param in
+///\param nvbench::state &state,        benchmark state structutre
+///\param nvbench::type_list<ValueType> list of sort data types to test
 ///
 ////////////////////////////////////////////////////////////////////////////////
 template <typename ValueType>
-void sort2d_range(
-                 nvbench::state &state,
-                 nvbench::type_list<ValueType>
-                 )
+void sort2d(
+           nvbench::state &state,
+           nvbench::type_list<ValueType>
+           )
 {
 
 
@@ -75,6 +81,6 @@ void sort2d_range(
 
 }
 
-NVBENCH_BENCH_TYPES(sort2d_range, NVBENCH_TYPE_AXES(sort_types))
+NVBENCH_BENCH_TYPES(sort2d, NVBENCH_TYPE_AXES(sort_types))
   .add_int64_power_of_two_axis("Tensor Dim1 Size", nvbench::range(3, 8, 1))
   .add_int64_power_of_two_axis("Tensor Dim2 Size", nvbench::range(7, 14, 1));

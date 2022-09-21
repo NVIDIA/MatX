@@ -71,13 +71,12 @@ namespace matx
    */
   template <typename Op>
   index_t LargestDimSize(const Op &op) {
-    index_t maxSize = 0;
-    for (int i = 0; i < op.Rank(); i++)
+
+    index_t maxSize = op.Size(0);
+
+    for (int i = 1; i < op.Rank(); i++)
     {
-      if( op.Size(i) > maxSize)
-      {
-        maxSize = op.Size(i);
-      }
+      maxSize = std::max(op.Size(i), maxSize);
     }
 
     return maxSize;
