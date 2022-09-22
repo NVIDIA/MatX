@@ -39,6 +39,12 @@
 
 namespace matx
 {
+    /**
+   * @brief Returns Total Size of the Operation
+   *
+   * @param op Operator
+   * @return size_t size of data
+   */
   template <typename Op>
   size_t TotalSize(const Op &op) {
     if constexpr (is_tensor_view_v<Op>) {
@@ -56,23 +62,43 @@ namespace matx
     return 0;
   }
 
+
+  /**
+   * @brief finds the size of the largest dim of the tensor
+   *core/tensor_utils.h
+   * @param op Operator
+   * @return size of largest dim
+   */
+  template <typename Op>
+  index_t LargestDimSize(const Op &op) {
+
+    index_t maxSize = op.Size(0);
+
+    for (int i = 1; i < op.Rank(); i++)
+    {
+      maxSize = std::max(op.Size(i), maxSize);
+    }
+
+    return maxSize;
+  }
+
 namespace detail {
 
   /**
    * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
-   * 
+   *
    * @param op Operator
    * @param abs Absolute index
-   * @return std::array of indices 
+   * @return std::array of indices
    */
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
     using l_stride_type = index_t;
     using l_shape_type = index_t;
     constexpr int RANK = op.Rank();
-    
+
     std::array<l_shape_type, RANK> indices;
-    
+
     for (int idx = 0; idx < RANK; idx++) {
       if (idx == RANK-1) {
         indices[RANK-1] = abs;
@@ -90,16 +116,16 @@ namespace detail {
     }
 
     return indices;
-  }  
+  }
 
   /**
    * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs mapping
    * to a block index. Non-batched dims are removed from the computation
-   * 
+   *
    * @param op Operator
    * @param abs Absolute index
    * @param nb_dims Non-batched dims
-   * @return std::array of indices 
+   * @return std::array of indices
    */
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
@@ -107,7 +133,7 @@ namespace detail {
     using l_shape_type = index_t;
     constexpr int RANK = op.Rank();
     std::array<l_shape_type, RANK> indices{0};
-    
+
     for (int idx = 0; idx < RANK - nb_dims; idx++) {
       if (idx == RANK-nb_dims-1) {
         indices[RANK - nb_dims - 1] = abs;
@@ -118,14 +144,14 @@ namespace detail {
         for (int i = idx + 1; i < RANK - nb_dims; i++) {
           prod *= op.Size(i);
         }
- 
+
         indices[idx] = abs / prod;
         abs -= prod * indices[idx];
       }
     }
 
     return indices;
-  }   
+  }
 
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
@@ -138,21 +164,21 @@ namespace detail {
     }
 
     if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
-            return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...); 
+            return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
     else {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
-    }    
+    }
   }
 
   template <class Func, class Tuple>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t) 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t)
   {
     if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
           std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
-    } 
+    }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
@@ -163,16 +189,16 @@ namespace detail {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
           std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
-    } 
+    }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
           std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
-    }    
-  }  
+    }
+  }
 
   template <class Func, class Tuple>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t) 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t)
   {
     if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
       return apply_impl(
@@ -182,20 +208,20 @@ namespace detail {
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});      
+          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
     }
 
     if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});   
+          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});   
-    }    
-  }  
+          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+    }
+  }
 
   template <typename T0, typename T1, typename... Tn>
   constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
@@ -272,7 +298,7 @@ namespace detail {
 
   /**
    * @brief Get the matx value object using broadcasting
-   * 
+   *
    * @tparam T type of operator
    * @tparam Is type of indices
    * @param i operator
@@ -308,7 +334,7 @@ namespace detail {
     else
     {
       return i(indices...);
-    }    
+    }
   }
 
 
@@ -370,7 +396,7 @@ namespace detail {
    * @param val
    */
   template <typename T>
-  __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) 
+  __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val)
   {
     if constexpr (is_complex_v<T>) {
       printf("%.4e%+.4ej ", static_cast<float>(val.real()),
@@ -411,7 +437,7 @@ namespace detail {
     }
     else if constexpr (std::is_same_v<T, bool>) {
       printf("%d ", val);
-    }    
+    }
   }
 
   /**
@@ -421,7 +447,7 @@ namespace detail {
    *
    */
   template <typename Op, typename ... Args>
-  __MATX_HOST__ void InternalPrint(const Op &op, Args ...dims) 
+  __MATX_HOST__ void InternalPrint(const Op &op, Args ...dims)
   {
     MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
@@ -466,13 +492,13 @@ namespace detail {
           printf("\n");
         }
         printf("\n");
-      }      
+      }
     }
     else if constexpr (sizeof...(Args) == 4) {
       auto& i = detail::pp_get<0>(dims...);
       auto& j = detail::pp_get<1>(dims...);
       auto& k = detail::pp_get<2>(dims...);
-      auto& l = detail::pp_get<3>(dims...); 
+      auto& l = detail::pp_get<3>(dims...);
       for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
         for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
           printf("[%06lld,%06lld,:,:]\n", _i, _j);
@@ -489,27 +515,27 @@ namespace detail {
         }
       }
     }
-  }   
-}  
+  }
+}
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
 /**
  * @brief Print a tensor's values to stdout
- * 
+ *
  * This form of `Print()` takes integral values for each index, and prints that as many values
  * in each dimension as the arguments specify. For example:
- * 
+ *
  * `a.Print(2, 3, 2);`
- * 
+ *
  * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
  * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
  * 0 can be used if the entire tensor should be printed:
- * 
+ *
  * `a.Print(0, 0, 0);` // Prints the whole tensor
- * 
+ *
  * For more fine-grained printing, see the over `Print()` overloads.
- * 
+ *
  * @tparam Args Integral argument types
  * @param dims Number of values to print for each dimension
  */
@@ -518,8 +544,8 @@ template <typename Op, typename... Args,
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
 void Print(const Op &op, Args... dims) {
-#ifdef __CUDACC__   
-  if constexpr (is_tensor_view_v<Op>) { 
+#ifdef __CUDACC__
+  if constexpr (is_tensor_view_v<Op>) {
     auto kind = GetPointerKind(op.Data());
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
@@ -564,16 +590,16 @@ void Print(const Op &op, Args... dims) {
 
 /**
  * @brief Print a tensor's values to stdout using start/end parameters
- * 
+ *
  * This form of `Print()` takes two array-like lists for the start and end indices, respectively. For
  * example:
- * 
+ *
  * `a.Print({2, 3}, {matxEnd, 5});`
- * 
+ *
  * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end, and
  * the second index starting at 3 and ending at 5 (exlusive). The format is identical to calling
  * `Slice()` to get a sliced view, followed by `Print()` with the indices.
- * 
+ *
  * @tparam NRANK Automatically-deduced rank of tensor
  * @param start Start indices to print from
  * @param end End indices to stop
@@ -592,16 +618,16 @@ void Print(const Op &op, Args... dims) {
 
 /**
  * @brief Print a tensor's values to stdout using start/end/stride
- * 
+ *
  * This form of `Print()` takes three array-like lists for the start, end, and stride indices, respectively. For
  * example:
- * 
+ *
  * `a.Print({2, 3}, {matxEnd, 5}, {1, 2});`
- * 
- * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end with a 
- * stride of 1, and the second index starting at 3 and ending at 5 (exlusive) with a stride of 2. The format is 
+ *
+ * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end with a
+ * stride of 1, and the second index starting at 3 and ending at 5 (exlusive) with a stride of 2. The format is
  * identical to calling `Slice()` to get a sliced view, followed by `Print()` with the indices.
- * 
+ *
  * @tparam NRANK Automatically-deduced rank of tensor
  * @param start Start indices to print from
  * @param end End indices to stop
@@ -617,6 +643,6 @@ void Print(const Op &op, Args... dims) {
 //     [&](auto&&... args) {
 //       s.InternalPrint(args...);
 //     }, tup);
-// }   
+// }
 
 }
