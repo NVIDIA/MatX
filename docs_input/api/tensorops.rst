@@ -94,3 +94,4 @@ Advanced Operators
 .. doxygenfunction:: clone
 .. doxygenfunction:: slice
 .. doxygenfunction:: permute
+.. doxygenfunction:: transpose

@@ -1034,22 +1034,23 @@ TYPED_TEST(HostOperatorTestsFloatNonComplex, HostOperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
-#if 0   // currently broken on host because it only supports RANK<=4
 TYPED_TEST(HostOperatorTestsFloatNonComplexNonHalf, NDHostOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   auto a = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
   auto b = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
-  (a = ones(a.Shape())).run(SingleThreadHostExecutor());
-  (b = ones(b.Shape())).run(SingleThreadHostExecutor());
+  (a = ones<TypeParam>(a.Shape())).run(SingleThreadHostExecutor());
+  (b = ones<TypeParam>(b.Shape())).run(SingleThreadHostExecutor());
   (a = a + b).run(SingleThreadHostExecutor());
 
-//  auto t0 = make_tensor<TypeParam>();
-//  sum(t0, a);
-//  ASSERT_EQ(t0(), 2 * a.TotalSize());
+#if 0
+  // sum not supported on host
+  auto t0 = make_tensor<TypeParam>();
+  sum(t0, a);
+  ASSERT_EQ(t0(), TypeParam(2 * a.TotalSize()));
+#endif
   MATX_EXIT_HANDLER();
 }
-#endif
 
 TYPED_TEST(HostOperatorTestsNumericNonComplex, HostOperatorFuncs)
 {
@@ -1487,8 +1488,7 @@ TYPED_TEST(HostOperatorTestsComplex, ComplexTypeCompatibility)
   MATX_EXIT_HANDLER();
 }
 
-#if 0
-TYPED_TEST(HostOperatorTestsNumeric, SquareCopyTranspose)
+TYPED_TEST(HostOperatorTestsNumericNonComplex, SquareCopyTranspose)
 {
   MATX_ENTER_HANDLER();
   index_t count = 512;
@@ -1501,35 +1501,27 @@ TYPED_TEST(HostOperatorTestsNumeric, SquareCopyTranspose)
     }
   }
 
-  t2.PrefetchDevice(0);
-  t2t.PrefetchDevice(0);
   (t2t = t2).run(SingleThreadHostExecutor{});
-
-  t2t.PrefetchHost(0);
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
-                                             (TypeParam)(i * count + j)));
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
     }
   }
 
-  // t2t.PrefetchDevice(0);
-  // transpose(t2t, t2, 0);
+  transpose(t2t, t2, SingleThreadHostExecutor{});
 
-  // t2t.PrefetchHost(0);
-
-  // for (index_t i = 0; i < count; i++) {
-  //   for (index_t j = 0; j < count; j++) {
-  //     ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-  //                                            TypeParam(i * count + (double)j)));
-  //     ASSERT_TRUE(
-  //         MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
-  //   }
-  // }
+  for (index_t i = 0; i < count; i++) {
+    for (index_t j = 0; j < count; j++) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
+                                             static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
+      ASSERT_TRUE(
+          MatXUtils::MatXTypeCompare(t2t(j, i),  static_cast<detail::value_promote_t<TypeParam>>(i * count + j)));
+    }
+  }
   MATX_EXIT_HANDLER();
 }
-#endif
 
 #if 0
 TYPED_TEST(HostOperatorTestsNumeric, DISABLED_NonSquareTranspose)
