@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/executors/executors.h"
 #include "matx/kernels/transpose.cuh"
 
 namespace matx
@@ -59,9 +60,10 @@ namespace matx
    */
   template <typename OutputTensor, typename InputTensor>
     __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in,
-        [[maybe_unused]] const cudaStream_t stream)
+        const InputTensor &in, cudaExecutor exec)
     {
+      [[ maybe_unused ]] cudaStream_t stream = exec.getStream();
+
       constexpr int RANK = OutputTensor::Rank();
       if constexpr (RANK <= 1)
       {
@@ -96,5 +98,18 @@ namespace matx
 #else
      MATX_THROW(matxNotSupported, "Transpose not supported on host");
 #endif    
+    };
+  
+  template <typename OutputTensor, typename InputTensor>
+    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
+        const InputTensor &in, SingleThreadHostExecutor exec)
+    {
+      constexpr int RANK = OutputTensor::Rank();
+      if constexpr (RANK <= 1)
+      {
+        return;
+      }
+      
+      (out = transpose(in)).run(exec);
     };
 } // end namespace matx

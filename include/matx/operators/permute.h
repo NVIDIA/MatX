@@ -140,5 +140,31 @@ namespace matx
         const int32_t (&dims)[T::Rank()]) {
       return detail::PermuteOp<T>(op, dims);
     }
+  
+  /**
+   * @brief Operator to transpose the dimensions of a tensor or operator.
+   *
+   * The each dimension must appear in the dims array once.
+
+   * This operator can appear as an rvalue or lvalue. 
+   *
+   * @tparam T Input operator/tensor type
+   * @param Op Input operator
+   * @return permuted operator
+   */
+  template <typename T>
+    __MATX_INLINE__ auto transpose( const T op) {
+    
+      static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
+
+      int32_t dims[T::Rank()];
+      for(int i = 0; i < T::Rank(); i++) 
+        dims[i] = i;
+      int32_t dim1 = T::Rank() - 1;
+      int32_t dim2 = T::Rank() - 2;
+
+      std::swap(dims[dim1],dims[dim2]);
+      return detail::PermuteOp<T>(op, dims);
+    }
 
 } // end namespace matx
