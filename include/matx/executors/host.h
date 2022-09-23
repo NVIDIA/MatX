@@ -44,8 +44,9 @@ namespace matx
  */
 class SingleThreadHostExecutor {
   public:
+    using matx_cpu = bool; ///< Type trait indicating this is an executor
     using matx_executor = bool; ///< Type trait indicating this is an executor
-    
+
     /**
      * @brief Execute an operator
      * 
