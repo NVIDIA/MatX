@@ -39,6 +39,16 @@
 namespace matx
 {
 
+
+enum nvxtLogLevels
+{
+  ALL = 0,
+  INTERNAL = 1,
+  API = 2,
+  NONE = 3
+};
+
+
 const int32_t NVTX_BLACK  = 0x000000;
 const int32_t NVTX_RED    = 0xFF0000;
 const int32_t NVTX_GREEN  = 0x00FF00;
@@ -55,8 +65,9 @@ const int32_t nunNvtxColors = 10;
 const int32_t  colors[nunNvtxColors] = {NVTX_BLACK, NVTX_RED, NVTX_GREEN, NVTX_BLUE, NVTX_ORANGE, NVTX_PURPLE, NVTX_YELLOW, NVTX_TEAL, NVTX_PINK, NVTX_WHITE};
 
 uint64_t curColorIdx;
-
 std::map< int, nvtxRangeId_t> eventMap;
+
+nvxtLogLevels globalNvtxLevel = nvxtLogLevels::ALL;
 
 ////////////  macros to ensure custom variable names for every call   ////////////
 #define CONCAT(a, b) CONCAT_INNER(a, b)
@@ -88,10 +99,20 @@ std::map< int, nvtxRangeId_t> eventMap;
 
 #else
 
-  #define NVTX_START( message )
-  #define NVTX_START_SCOPED( message )
+  #define NVTX_1( message )
+  #define NVTX_2( message, customId )
+  #define NVTX_3( message, customId, nvtxLevel )
 
-  #define NVTX_END( message )
+  #define NVTX_X(x,A,B,C,FUNC, ...)  FUNC
+
+  // The macro that the programmer uses
+  #define NVTX_START(...)   NVTX_X(,##__VA_ARGS__,\
+                                  NVTX_3(__VA_ARGS__),\
+                                  NVTX_2(__VA_ARGS__),\
+                                  NVTX_1(__VA_ARGS__)\
+                                  )
+
+  #define NVTX_END( id ) endEvent( id );
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -145,13 +166,18 @@ class NvtxEvent
   ///
   ///\brief ctor
   ///
-  ///\param message
+  ///\param functionName name of calling function, only used if no message is provided;
+  ///                    is auto-populated from macro
+  ///\param message      custom message/name for range defaults to ""
+  ///                    which uses function name instead
+  ///\param registerId   customID (integer) used to reference ranges you wish to manually end
+  ///\param nvtxLevel
   ///
   ////////////////////////////////////////////////////////////////////////////////
-  NvtxEvent( std::string functionName, std::string message="", int registerId = -1, size_t nvtxLevel=0 )
+  NvtxEvent( std::string functionName, std::string message="", int registerId = -1, nvxtLogLevels nvtxLevel = nvxtLogLevels::ALL )
   {
-    size_t userLevel = 0;
-    if( nvtxLevel < userLevel )
+
+    if( nvtxLevel >= globalNvtxLevel )
     {
       return;
     }
