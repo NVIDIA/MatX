@@ -448,29 +448,30 @@ namespace detail {
    */
   template <typename T> static std::string GetTensorType()
   {
+    if constexpr (std::is_same_v<T, bool>)
+      return "bool";    
     if constexpr (std::is_same_v<T, int32_t>)
-      return "i4";
+      return "int32_t";
     if constexpr (std::is_same_v<T, uint32_t>)
-      return "u4";
+      return "uint32_t";
     if constexpr (std::is_same_v<T, int64_t>)
-      return "i8";
+      return "int64_t";
     if constexpr (std::is_same_v<T, uint64_t>)
-      return "u8";
+      return "uint64_t";
     if constexpr (std::is_same_v<T, float> || is_matx_half_v<T>)
-      return "f4";
+      return "float";
     if constexpr (std::is_same_v<T, double>)
-      return "f8";
+      return "double";
     if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
                   std::is_same_v<T, std::complex<double>>) {
-      return "c8";
+      return "complex<double>";
     }
     if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
                   std::is_same_v<T, std::complex<float>> ||
                   is_complex_half_v<T>) {
-      return "c4";
+      return "complex<float>";
     }
-
-    return "";
+    return "unknown";
   }
 
 

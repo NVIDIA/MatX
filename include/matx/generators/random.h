@@ -191,8 +191,8 @@ public:
   /**
    * Get a tensor view of the random numbers
    *
-   * @param sizes
-   *   Dimensions of the view in the form of an initializer list
+   * @param shape
+   *   Dimensions of the view in the form of a Shape
    * @param dist
    *   Distribution to use
    * @param alpha
@@ -210,7 +210,20 @@ public:
   return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
 }
 
-
+  /**
+   * Get a tensor view of the random numbers
+   *
+   * @param sizes
+   *   Dimensions of the view in the form of an initializer list
+   * @param dist
+   *   Distribution to use
+   * @param alpha
+   *   Alpha value
+   * @param beta
+   *   Beta value
+   * @returns
+   *   A randomTensorView_t with given parameters
+   */
   template <int RANK>
   inline auto GetTensorView(const index_t (&sizes)[RANK], Distribution_t dist,
                             T alpha = 1, T beta = 0)
