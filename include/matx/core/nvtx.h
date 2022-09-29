@@ -40,12 +40,12 @@ namespace matx
 {
 
 
-enum nvxtLogLevels
+enum matx_nvxtLogLevels
 {
-  ALL = 0,
-  INTERNAL = 1,
-  API = 2,
-  NONE = 3
+  MATX_NVTX_LOG_ALL = 0,
+  MATX_NVTX_LOG_INTERNAL = 1,
+  MATX_NVTX_LOG_API = 2,
+  MATX_NVTX_LOG_NONE = 3
 };
 
 
@@ -62,57 +62,68 @@ const int32_t NVTX_WHITE  = 0xFFFFFF;
 
 const int32_t nunNvtxColors = 10;
 
-const int32_t  colors[nunNvtxColors] = {NVTX_BLACK, NVTX_RED, NVTX_GREEN, NVTX_BLUE, NVTX_ORANGE, NVTX_PURPLE, NVTX_YELLOW, NVTX_TEAL, NVTX_PINK, NVTX_WHITE};
+const int32_t  colors[nunNvtxColors] = {
+                                       NVTX_BLACK,
+                                       NVTX_RED,
+                                       NVTX_GREEN,
+                                       NVTX_BLUE,
+                                       NVTX_ORANGE,
+                                       NVTX_PURPLE,
+                                       NVTX_YELLOW,
+                                       NVTX_TEAL,
+                                       NVTX_PINK,
+                                       NVTX_WHITE
+                                       };
 
 uint64_t curColorIdx;
 std::map< int, nvtxRangeId_t> eventMap;
 
-nvxtLogLevels globalNvtxLevel = nvxtLogLevels::ALL;
+matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALL;
 
-////////////  macros to ensure custom variable names for every call   ////////////
-#define CONCAT(a, b) CONCAT_INNER(a, b)
-#define CONCAT_INNER(a, b) a ## b
+//////  macros to ensure custom variable names for every call  ////////
+#define MATX_CONCAT(a, b) MATX_CONCAT_INNER(a, b)
+#define MATX_CONCAT_INNER(a, b) a ## b
 
-#define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
-////////////////////////////////////////////////////////////////////////////////
+#define MATX_UNIQUE_NAME(base) MATX_CONCAT(base, __COUNTER__)
+///////////////////////////////////////////////////////////////////////
 
 
-////////////             Enable or Disable NVTX Macros          /////////////////
-#define NVTX_FLAGS 1
+////////////             Enable NVTX Macros          /////////////////
+///\todo remove and hook into build system
+#define MATX_NVTX_FLAGS 1
 
-#ifdef NVTX_FLAGS
+#ifdef MATX_NVTX_FLAGS
 
-  #define NVTX_1( message ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
-  #define NVTX_2( message, customId ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, customId );
-  #define NVTX_3( message, customId, nvtxLevel ) NvtxEvent UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, customId, nvtxLevel );
+  #define MATX_NVTX_1( message ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
+  #define MATX_NVTX_2( message, nvtxLevel ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel );
 
-  #define NVTX_X(x,A,B,C,FUNC, ...)  FUNC
+  #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
   // The macro that the programmer uses
-  #define NVTX_START(...)   NVTX_X(,##__VA_ARGS__,\
-                                  NVTX_3(__VA_ARGS__),\
-                                  NVTX_2(__VA_ARGS__),\
-                                  NVTX_1(__VA_ARGS__)\
-                                  )
+  #define MATX_NVTX_START(...)  MATX_NVTX_X(,##__VA_ARGS__,\
+                                MATX_NVTX_2(__VA_ARGS__),\
+                                MATX_NVTX_1(__VA_ARGS__)\
+                                )
 
-  #define NVTX_END( id ) endEvent( id );
+  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
+
+  #define MATX_NVTX_END_RANGE( id ) endEvent( id );
+////////////             Disable NVTX Macros          /////////////////
 
 #else
 
-  #define NVTX_1( message )
-  #define NVTX_2( message, customId )
-  #define NVTX_3( message, customId, nvtxLevel )
+  #define MATX_NVTX_1( message )
+  #define MATX_NVTX_2( message, customId )
 
-  #define NVTX_X(x,A,B,C,FUNC, ...)  FUNC
+  #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
   // The macro that the programmer uses
-  #define NVTX_START(...)   NVTX_X(,##__VA_ARGS__,\
-                                  NVTX_3(__VA_ARGS__),\
-                                  NVTX_2(__VA_ARGS__),\
-                                  NVTX_1(__VA_ARGS__)\
+  #define MATX_NVTX_START(...)    MATX_NVTX_X(,##__VA_ARGS__,\
+                                  MATX_NVTX_2(__VA_ARGS__),\
+                                  MATX_NVTX_1(__VA_ARGS__)\
                                   )
 
-  #define NVTX_END( id ) endEvent( id );
+  #define MATX_NVTX_END( id ) endEvent( id );
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -174,7 +185,7 @@ class NvtxEvent
   ///\param nvtxLevel
   ///
   ////////////////////////////////////////////////////////////////////////////////
-  NvtxEvent( std::string functionName, std::string message="", int registerId = -1, nvxtLogLevels nvtxLevel = nvxtLogLevels::ALL )
+  NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, int registerId = -1 )
   {
 
     if( nvtxLevel >= globalNvtxLevel )
