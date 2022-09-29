@@ -14,7 +14,7 @@ void conv1d_4d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)                          // default call, will name the range based on the function
-  MATX_NVTX_START_RANGE("conv1d_4d_batch_INIT", matx::MATX_NVTX_LOG_ALL, 1)  // overrides the default call name and gives it a end-able handle to stop the range early
+  MATX_NVTX_START_RANGE("conv1d_4d_batch_INIT", matx::MATX_NVTX_LOG_API, 1)  // overrides the default call name and gives it a end-able handle to stop the range early
 
   auto out = make_tensor<ValueType>({4, 2, 14, 288 + 4096 + 133 - 1});
   auto at = make_tensor<ValueType>({ 4, 2, 14, 133});

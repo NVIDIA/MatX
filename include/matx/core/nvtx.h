@@ -42,10 +42,10 @@ namespace matx
 
 enum matx_nvxtLogLevels
 {
-  MATX_NVTX_LOG_ALL = 0,
+  MATX_NVTX_LOG_NONE = 0,
   MATX_NVTX_LOG_INTERNAL = 1,
   MATX_NVTX_LOG_API = 2,
-  MATX_NVTX_LOG_NONE = 3
+  MATX_NVTX_LOG_ALWAYS = 0xFFFFFF
 };
 
 
@@ -78,7 +78,7 @@ const int32_t  colors[nunNvtxColors] = {
 uint64_t curColorIdx;
 std::map< int, nvtxRangeId_t> eventMap;
 
-matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALL;
+matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS;
 
 //////  macros to ensure custom variable names for every call  ////////
 #define MATX_CONCAT(a, b) MATX_CONCAT_INNER(a, b)
@@ -114,6 +114,7 @@ matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALL;
 
   #define MATX_NVTX_1( message )
   #define MATX_NVTX_2( message, customId )
+  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) 
 
   #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
@@ -138,7 +139,6 @@ void registerEvent( size_t registerId, nvtxRangeId_t eventId )
 {
 
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
-  std::cout << "Registering Event: "  << registerId << std::endl;
   eventMap.insert(newPair);
 }
 
@@ -150,7 +150,6 @@ void registerEvent( size_t registerId, nvtxRangeId_t eventId )
 ////////////////////////////////////////////////////////////////////////////////
 void endEvent( size_t id )
 {
-
 
   auto foundIter = eventMap.find( id );
 
@@ -173,6 +172,7 @@ void endEvent( size_t id )
 class NvtxEvent
 {
   public:
+  
   ////////////////////////////////////////////////////////////////////////////////
   ///
   ///\brief ctor
@@ -181,14 +181,15 @@ class NvtxEvent
   ///                    is auto-populated from macro
   ///\param message      custom message/name for range defaults to ""
   ///                    which uses function name instead
+  ///\param nvtxLevel    level of NVTX events to use higher number reduces scope
   ///\param registerId   customID (integer) used to reference ranges you wish to manually end
-  ///\param nvtxLevel
+  
   ///
   ////////////////////////////////////////////////////////////////////////////////
-  NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, int registerId = -1 )
+  NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL, int registerId = -1 )
   {
 
-    if( nvtxLevel >= globalNvtxLevel )
+    if( nvtxLevel > globalNvtxLevel )
     {
       return;
     }
