@@ -37,30 +37,89 @@
 #include "matx/executors/kernel.h"
 
 namespace matx
-{  
-namespace detail {
-  /* Executors define how an operator is executed. Currently supported types are
-     CUDA device and single-threaded host
-  */
-  class Executor {
+{
+
+  /**
+   * @brief Executes operators on the host on a CUDA-enabled device
+   * 
+   * Optionally takes a stream for asynchronous execution
+   * 
+   */
+  class cudaExecutor {
     public:
-      template <typename Op> 
-      void Exec(Op &op) const noexcept {
-        MATX_THROW(matxInvalidParameter, "Must use a concrete executor type!");
-      }
+      using matx_cuda = bool;  // signal this is a GPU executor
+      using matx_executor = bool; ///< Type trait indicating this is an executor
+      /**
+       * @brief Construct a new cudaExecutor with a stream
+       * 
+       * @param stream CUDA stream
+       */
+      cudaExecutor(cudaStream_t stream) : stream_(stream) {}
+
+      /**
+       * @brief Construct a new cudaExecutor object using the default stream
+       * 
+       */
+      cudaExecutor() : stream_(0) {}
+
+      /*
+       * @breif Returns stream associated with executor
+       */
+      auto getStream() { return stream_; }
+
+      /**
+       * Execute an operator on a device
+       * 
+       * @tparam Op Operator type
+       * @param op value
+       **/
+      template <typename Op>
+        void Exec(Op &op) const noexcept {
+#ifdef __CUDACC__      
+          dim3 threads, blocks;  
+
+          // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
+          // need to error out and have them break up the statement
+          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
+              "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
+
+          if constexpr (op.Rank() == 0) {
+            threads = 1;
+            blocks = 1;
+            detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+          }
+          else {
+            std::array<index_t, op.Rank()> sizes;
+            for (int i = 0; i < op.Rank(); i++) {
+              sizes[i] = op.Size(i);
+            }        
+
+            detail::get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
+
+            if constexpr (op.Rank() == 1) {
+              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);      
+            }
+            else if constexpr (op.Rank() == 2) {
+              detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+            }
+            else if constexpr (op.Rank() == 3) {
+              detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+            }
+            else if constexpr (op.Rank() == 4) {
+              detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+            }        
+            else {
+              index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
+              detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+            } 
+          }
+#else
+          MATX_THROW(matxNotSupported, "Cannot execute device function from host compiler");    
+#endif    
+        }
+
+    private:
+      cudaStream_t stream_;
   };
 
-  template <class Op> 
-  void __MATX_INLINE__ exec(Op op, const cudaStream_t stream)
-  {
-    exec(op, CUDADeviceExecutor{stream});
-  }    
-
-
-  template <typename Op, typename Ex, std::enable_if_t<is_executor_t<Ex>(), bool> = true> 
-  void __MATX_INLINE__ exec(Op op, Ex ex)
-  {
-    ex.Exec(op);
-  }  
-}
 };
