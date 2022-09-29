@@ -458,19 +458,23 @@ namespace detail {
       return "int64_t";
     if constexpr (std::is_same_v<T, uint64_t>)
       return "uint64_t";
-    if constexpr (std::is_same_v<T, float> || is_matx_half_v<T>)
+    if constexpr (std::is_same_v<T, float> )
       return "float";
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return "float16";
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return "bfloat16";
     if constexpr (std::is_same_v<T, double>)
       return "double";
-    if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
-                  std::is_same_v<T, std::complex<double>>) {
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>) 
       return "complex<double>";
-    }
-    if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, std::complex<float>> ||
-                  is_complex_half_v<T>) {
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>) 
       return "complex<float>";
-    }
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return "complex<float16>";
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return "complex<bfloat16>";
+          
     return "unknown";
   }
 
