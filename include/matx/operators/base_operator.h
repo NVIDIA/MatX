@@ -56,8 +56,8 @@ namespace matx
          */
         __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
         {
-	  auto ex = cudaExecutor(stream);
-	  ex.Exec(*static_cast<T *>(this));
+          auto ex = cudaExecutor(stream);
+          ex.Exec(*static_cast<T *>(this));
         }
 
         /**
@@ -68,8 +68,8 @@ namespace matx
          */
         __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
         {
-	  auto ex = cudaExecutor(stream);
-	  ex.Exec(*static_cast<T *>(this));
+          auto ex = cudaExecutor(stream);
+          ex.Exec(*static_cast<T *>(this));
           cudaEventRecord(ev, stream);
         }
 
@@ -82,7 +82,7 @@ namespace matx
         template <typename Ex>
           __MATX_INLINE__ void run (Ex ex) {
             static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
-	    ex.Exec(*static_cast<T *>(this));
+            ex.Exec(*static_cast<T *>(this));
           }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() {
