@@ -2785,7 +2785,7 @@ TYPED_TEST(OperatorTestsFloat, Print)
 {
   MATX_ENTER_HANDLER();
   auto t = make_tensor<TypeParam>({3});
-  auto r = ones(t.Shape());
+  auto r = ones<TypeParam>(t.Shape());
 
   Print(r);
   MATX_EXIT_HANDLER();

@@ -33,7 +33,6 @@
 #pragma once
 
 #include "matx/core/error.h"
-#include "matx/core/shape.h"
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>
@@ -45,7 +44,7 @@ namespace matx {
  */
 enum Distribution_t { UNIFORM, NORMAL };
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
 template <typename Gen>
 __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 {
@@ -57,12 +56,12 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 
 /**
  * @brief Get a random number
- * 
+ *
  * @tparam Gen Generator type
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__ 
+ * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
@@ -78,12 +77,12 @@ __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
 
 /**
  * @brief Get a random number
- * 
+ *
  * @tparam Gen Generator type
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__ 
+ * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
@@ -99,12 +98,12 @@ __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
 
 /**
  * @brief Get a random number
- * 
+ *
  * @tparam Gen Generator type
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__ 
+ * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
@@ -123,12 +122,12 @@ __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
 
 /**
  * @brief Get a random number
- * 
+ *
  * @tparam Gen Generator type
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__ 
+ * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
@@ -178,7 +177,7 @@ public:
   inline randomGenerator_t(index_t total_threads, uint64_t seed)
       : total_threads_(total_threads)
   {
-#ifdef __CUDACC__      
+#ifdef __CUDACC__
     matxAlloc((void **)&states_,
               total_threads_ * sizeof(curandStatePhilox4_32_10_t),
               MATX_DEVICE_MEMORY);
@@ -186,14 +185,14 @@ public:
     int threads = 128;
     int blocks = static_cast<int>((total_threads_ + threads - 1) / threads);
     curand_setup_kernel<<<blocks, threads>>>(states_, seed, total_threads);
-#endif    
+#endif
   };
 
   /**
    * Get a tensor view of the random numbers
    *
    * @param shape
-   *   Dimensions of the view in the form of an tensorShape_t
+   *   Dimensions of the view in the form of a Shape
    * @param dist
    *   Distribution to use
    * @param alpha
@@ -203,12 +202,13 @@ public:
    * @returns
    *   A randomTensorView_t with given parameters
    */
-  template <int RANK>
-  inline auto GetTensorView(const tensorShape_t<RANK> shape,
-                            Distribution_t dist, T alpha = 1, T beta = 0)
-  {
-    return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
-  }
+  template <int RANK, typename ShapeType,
+           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  inline auto GetTensorView(ShapeType &&shape, Distribution_t dist,
+                            T alpha = 1, T beta = 0)
+{
+  return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
+}
 
   /**
    * Get a tensor view of the random numbers
@@ -228,8 +228,7 @@ public:
   inline auto GetTensorView(const index_t (&sizes)[RANK], Distribution_t dist,
                             T alpha = 1, T beta = 0)
   {
-    tensorShape_t<RANK> shape((const index_t *)sizes);
-    return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
+    return GetTensorView<RANK>(detail::to_array(sizes), dist, alpha, beta);
   }
 
   /**
@@ -250,7 +249,7 @@ public:
  */
 template <typename T, int RANK> class randomTensorView_t {
 private:
-  tensorShape_t<RANK> shape_;
+  std::array<index_t, RANK> shape_;
   std::array<index_t, RANK> strides_;
   curandStatePhilox4_32_10_t *states_;
   Distribution_t dist_;
@@ -264,17 +263,19 @@ public:
 
   /**
    * @brief Construct a new randomTensorView t object
-   * 
+   *
    * @param shape Shape of view
    * @param states States of RNG
    * @param dist RNG distribution
    * @param alpha Alpha value
    * @param beta Beta value
    */
-  randomTensorView_t(const tensorShape_t<RANK> shape,
+
+  template < typename ShapeType, std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  randomTensorView_t(    ShapeType &&shape,
                          curandStatePhilox4_32_10_t *states,
                          Distribution_t dist, T alpha, T beta)
-      : alpha_(alpha), beta_(beta), shape_(shape)
+      : alpha_(alpha), beta_(beta)
   {
     dist_ = dist;
     states_ = states;
@@ -284,6 +285,13 @@ public:
     }
 
     #pragma unroll
+    for (int i = 0; i < RANK; ++i)
+    {
+      shape_[i] = shape[i];
+    }
+
+
+    #pragma unroll
     for (int i = RANK - 2; i >= 0; i--) {
       strides_[i] = Stride(i+1) * Size(i+1);
     }
@@ -291,7 +299,7 @@ public:
 
   /**
    * Get the random number at an index
-   * 
+   *
    * @tparam I Unused
    * @tparam Is Index types
    * @return Value at index
@@ -299,16 +307,16 @@ public:
   template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...>) const {
     return 0;
-  }    
+  }
 
   template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...> tup) const {
     return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*Stride(I);
-  }        
+  }
 
   /**
    * Retrieve a value from a random view
-   * 
+   *
    * @tparam Is Index type
    * @param indices Index values
    */
@@ -317,7 +325,7 @@ public:
   {
     T val;
     if constexpr (RANK == 0) {
-      get_random(val, &states_[0], dist_);      
+      get_random(val, &states_[0], dist_);
     }
     else {
       get_random(val, &states_[GetValC<0, Is...>(std::make_tuple(indices...))], dist_);
@@ -328,32 +336,32 @@ public:
 
   /**
    * Get rank of random view
-   * 
+   *
    * @return Rank of view
    */
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
 
   /**
    *  Get size of a dimension
-   * 
+   *
    * @param dim Dimension to retrieve
-   * @return Size of dimension 
+   * @return Size of dimension
    */
   constexpr index_t inline __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
   {
-    return shape_.Size(dim);
+    return shape_[dim];
   }
 
   /**
    * Get stride of a dimension
-   * 
+   *
    * @param dim Dimension to retrieve
-   * @return Stride of dimension 
+   * @return Stride of dimension
    */
   index_t inline __MATX_HOST__ __MATX_DEVICE__ Stride(int dim) const
   {
     return strides_[dim];
-  }  
+  }
 };
 
 /**
