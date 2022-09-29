@@ -156,7 +156,7 @@ public:
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
 
     // Subtract the means from the observations to get the deviations
-    exec(set(*devs, a - *means), stream);
+    (*devs = a - *means).run(stream);
 
     if constexpr (is_complex_v<T1>) {
       // This step is not really necessary since BLAS can do it for us, but
@@ -164,7 +164,7 @@ public:
       // to have this in a temporary variable. Note that we use the Python
       // convention of E[XX'] instead of MATLAB's E[X'X]. Both are "correct",
       // but we need to match python output
-      exec(set(*devsT, hermitianT(*devs)), stream);
+      (*devsT = hermitianT(*devs)).run(stream);      
     }
     else {
       transpose(*devsT, *devs, stream);
