@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "matx/core/nvtx.h"
 #include "matx/generators/generator1d.h"
 
 namespace matx
@@ -76,6 +77,7 @@ namespace matx
            std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto blackman(ShapeType &&s)
              {
+               MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
                constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                detail::Blackman<T> h( *(s.begin() + Dim));

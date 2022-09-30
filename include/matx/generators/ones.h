@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "matx/core/nvtx.h"
 #include "matx/operators/constval.h"
 
 namespace matx
@@ -70,6 +71,7 @@ namespace matx
   template <typename T = int, int RANK> 
     inline auto ones(const index_t (&s)[RANK])
     {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       return ones<T>(detail::to_array(s));
     }
 

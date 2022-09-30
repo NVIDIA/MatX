@@ -29,13 +29,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include "matx/core/error.h"
+#include <type_traits>
+
 #include <cuda/std/complex>
 #include <curand_kernel.h>
-#include <type_traits>
+
+#include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 
 namespace matx {
 
@@ -109,6 +111,7 @@ template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
                                       Gen *state, Distribution_t dist)
 {
+
   if (dist == UNIFORM) {
     val.real(curand_uniform(state));
     val.imag(curand_uniform(state));
@@ -133,6 +136,7 @@ template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
                                       Gen *state, Distribution_t dist)
 {
+
   if (dist == UNIFORM) {
     val.real(curand_uniform_double(state));
     val.imag(curand_uniform_double(state));
@@ -228,6 +232,7 @@ public:
   inline auto GetTensorView(const index_t (&sizes)[RANK], Distribution_t dist,
                             T alpha = 1, T beta = 0)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     return GetTensorView<RANK>(detail::to_array(sizes), dist, alpha, beta);
   }
 
@@ -277,6 +282,7 @@ public:
                          Distribution_t dist, T alpha, T beta)
       : alpha_(alpha), beta_(beta)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     dist_ = dist;
     states_ = states;
 
