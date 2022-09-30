@@ -35,15 +35,16 @@
 #include <cstdio>
 #include <iterator>
 #include <shared_mutex>
+#include <sys/stat.h>
 #include <unordered_map>
 #include <utility>
 // #include <cudf/table/table.hpp>
 // #include <cudf/io/csv.hpp>
 // #include <cudf/types.hpp>
 
+#include "matx/core/error.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
-#include "matx/core/error.h"
 
 
 #if MATX_ENABLE_FILEIO
@@ -131,6 +132,12 @@ void ReadCSV(TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
+  struct stat buffer;  
+  if (stat(fname.c_str(), &buffer) != 0) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+  
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
@@ -186,6 +193,13 @@ template <typename TensorType>
 void ReadMAT(TensorType &t, const std::string fname,
              const std::string var)
 {
+  
+  struct stat buffer;  
+  if (stat(fname.c_str(), &buffer) != 0) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+    
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto sp = pybind11::module_::import("scipy.io");
