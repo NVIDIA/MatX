@@ -38,6 +38,7 @@
 #include "matx/core/cache.h"
 #include "matx/core/error.h"
 #include "matx/core/make_tensor.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 
 #include <cstdio>
@@ -95,6 +96,7 @@ public:
   void inline Forward(OutTensorType &o,
                       const InTensorType &i, cudaStream_t stream)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
     Exec(o, i, CUFFT_FORWARD);
   }
@@ -116,6 +118,7 @@ public:
   void inline Inverse(OutTensorType &o,
                       const InTensorType &i, cudaStream_t stream)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
     Exec(o, i, CUFFT_INVERSE);
 
@@ -133,6 +136,7 @@ public:
   static FftParams_t GetFFTParams(OutTensorType &o,
                           const InTensorType &i, int fft_rank)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     FftParams_t params;
 
     params.irank = i.Rank();
@@ -395,6 +399,8 @@ public:
  * */
 matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   int dev;
   cudaGetDevice(&dev);
 
@@ -446,6 +452,8 @@ private:
 virtual void inline Exec(OutTensorType &o, const InTensorType &i,
                          int dir) override
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   if (OutTensorType::Rank() == this->params_.batch_dims + 1) {
     this->InternalExec(static_cast<const void *>(i.Data()),
                       static_cast<void *>(o.Data()), dir);
@@ -509,6 +517,9 @@ public:
   matxFFTPlan2D_t(OutTensorType &o, const InTensorType &i)
   {
     static_assert(RANK >= 2, "2D FFTs require a rank-2 tensor or higher");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     int dev;
     cudaGetDevice(&dev);
 
@@ -582,6 +593,8 @@ private:
   virtual void inline Exec(OutTensorType &o, const InTensorType &i,
                            int dir) override
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     static_assert(RANK >= 2);
 
     if constexpr (RANK <= 3) {
@@ -653,6 +666,8 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                     const InputTensor &i, index_t fft_size,
                     [[maybe_unused]] cudaStream_t stream)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   using index_type = typename OutputTensor::shape_type;
   using T1    = typename OutputTensor::scalar_type;
   using T2    = typename InputTensor::scalar_type;
@@ -766,6 +781,9 @@ void fft(OutputTensor &o, const InputTensor &i,
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto i_new = detail::GetFFTInputView(o, i, fft_size, stream);
 
   // Get parameters required by these tensors
@@ -821,6 +839,8 @@ void ifft(OutputTensor &o, const InputTensor &i,
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   auto i_new = detail::GetFFTInputView(o, i, fft_size, stream);
 
@@ -867,7 +887,9 @@ void fft2(OutputTensor &o, const InputTensor &i,
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;
@@ -911,7 +933,9 @@ void ifft2(OutputTensor &o, const InputTensor &i,
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<OutputTensor, InputTensor>::GetFFTParams(o, i, 2);
   params.stream = stream;

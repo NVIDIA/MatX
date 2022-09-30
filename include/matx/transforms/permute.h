@@ -32,7 +32,7 @@
 
 #pragma once
 
-
+#include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
 
 namespace matx
@@ -64,6 +64,8 @@ namespace matx
         const std::initializer_list<uint32_t> &dims,
         const cudaStream_t stream)
     {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+      
       // This is very naive, we should make optimized versions for various swizzles
       auto in_t = in.Permute(dims.begin());
 

@@ -35,6 +35,7 @@
 #include "cublas_v2.h"
 #include "cusolverDn.h"
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include <cstdio>
 #include <numeric>
@@ -51,6 +52,8 @@ class matxDnSolver_t {
 public:
   matxDnSolver_t()
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     [[maybe_unused]] cusolverStatus_t  ret;
     ret = cusolverDnCreate(&handle);
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
@@ -79,6 +82,8 @@ public:
   template <typename TensorType>
   void SetBatchPointers(TensorType &a)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (TensorType::Rank() == 2) {
       batch_a_ptrs.push_back(&a(0, 0));
     }
@@ -114,6 +119,8 @@ public:
   static inline auto
   TransposeCopy(typename TensorType::scalar_type *tp, const TensorType &a, cudaStream_t stream = 0)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     auto pa = a.PermuteMatrix();
     auto tv = make_tensor(tp, pa.Shape());
     matx::copy(tv, pa, stream);
@@ -196,6 +203,8 @@ public:
   {
     static_assert(RANK >= 2);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     params = GetCholParams(a, uplo);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -230,6 +239,8 @@ public:
     // Ensure matrix is square
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
@@ -344,6 +355,8 @@ public:
                        const ATensor &a)
   {
     static_assert(RANK >= 2);
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     params = GetLUParams(piv, a);
     GetWorkspaceSize(&hspace, &dspace);
@@ -377,6 +390,8 @@ public:
   void Exec(OutputTensor &out, PivotTensor &piv,
             const ATensor &a, const cudaStream_t stream = 0)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     cusolverDnSetStream(handle, stream);
     int info;
 
@@ -513,6 +528,8 @@ public:
   {
     static_assert(RANK >= 2);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     params = GetQRParams(tau, a);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -545,6 +562,8 @@ public:
   void Exec(OutTensor &out, TauTensor &tau,
             const ATensor &a, cudaStream_t stream = 0)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
@@ -709,6 +728,8 @@ public:
   {
     static_assert(RANK >= 2);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
     scratch = make_tensor_p<T1>(a.Shape(), MATX_DEVICE_MEMORY);
     params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
 
@@ -755,6 +776,8 @@ public:
             const char jobu = 'A', const char jobvt = 'A',
             cudaStream_t stream = 0)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 2) {
       batch_s_ptrs.push_back(&s(0));
       batch_u_ptrs.push_back(&u(0, 0));
@@ -906,6 +929,8 @@ public:
   {
     static_assert(RANK >= 2);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     params = GetEigParams(w, a, jobz, uplo);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -948,6 +973,8 @@ public:
     // Ensure matrix is square
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
@@ -1068,6 +1095,8 @@ void chol(OutputTensor &out, const ATensor &a,
           cudaStream_t stream = 0,
           cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using T1 = typename OutputTensor::scalar_type;
 
   /* Temporary WAR
@@ -1131,6 +1160,8 @@ template <typename OutputTensor, typename PivotTensor, typename ATensor>
 void lu(OutputTensor &out, PivotTensor &piv,
         const ATensor &a, const cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using T1 = typename OutputTensor::scalar_type;
 
   /* Temporary WAR
@@ -1191,6 +1222,8 @@ template <typename OutputTensor, typename InputTensor>
 void det(OutputTensor &out, const InputTensor &a,
          const cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
   constexpr int RANK = InputTensor::Rank();
 
@@ -1239,6 +1272,8 @@ template <typename OutTensor, typename TauTensor, typename ATensor>
 void qr(OutTensor &out, TauTensor &tau,
         const ATensor &a, cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using T1 = typename OutTensor::scalar_type;
 
   /* Temporary WAR
@@ -1311,6 +1346,8 @@ void svd(UTensor &u, STensor &s,
          VTensor &v, const ATensor &a,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using T1 = typename ATensor::scalar_type;
 
   /* Temporary WAR
@@ -1379,6 +1416,8 @@ void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit

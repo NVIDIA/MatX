@@ -39,6 +39,7 @@
 
 #include "matx/transforms/conv.h"
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 
 namespace matx {
@@ -66,7 +67,9 @@ void corr(OutputTensor &o, const In1Type &i1, const In2Type &i2,
 
   MATX_ASSERT_STR(method == MATX_C_METHOD_DIRECT, matxNotSupported,
                "Only direct correlation method supported at this time");
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto i2r = reverse<In2Type::Rank()-1>(conj(i2));
   conv1d(o, i1, i2r, mode, stream);
 }

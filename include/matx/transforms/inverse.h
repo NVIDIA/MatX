@@ -34,6 +34,7 @@
 
 #include "cublas_v2.h"
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include <cstdio>
 #include <numeric>
@@ -98,6 +99,8 @@ public:
   {
     static_assert(RANK >= 2);
 
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     // Ok to remove since we're just passing a list of RO pointers
     //using a_nc = typename std::remove_const<decltype(a)>(a); 
 
@@ -215,6 +218,8 @@ public:
    */
   inline void Exec(cudaStream_t stream)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     cublasSetStream(handle, stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
@@ -350,6 +355,8 @@ template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO =
 void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);

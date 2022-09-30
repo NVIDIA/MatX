@@ -37,6 +37,7 @@
 #include <numeric>
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/transforms/matmul.h"
 
@@ -79,6 +80,8 @@ public:
     static_assert(RANK >= 2);
     MATX_ASSERT(c.Size(RANK - 1) == c.Size(RANK - 2), matxInvalidSize);
     MATX_ASSERT(a.Size(RANK - 1) == c.Size(RANK - 1), matxInvalidSize);
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
 
     // Ensure batch dimensions are equal
     for (int i = 2; i < RANK - 2; i++) {
@@ -151,6 +154,7 @@ public:
   inline void Exec(TensorTypeC &c, const TensorTypeA &a,
                    cudaStream_t stream)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
     // Calculate a matrix of means
     matmul(*means, *onesM, a, stream,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
@@ -237,6 +241,7 @@ template <typename TensorTypeC, typename TensorTypeA>
 void cov(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)    
   // Get parameters required by these tensors
   auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a);
   params.stream = stream;
