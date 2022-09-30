@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/nvtx.h"
 
 namespace matx
 {
@@ -56,6 +57,7 @@ namespace matx
          */
         __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
         {
+          MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
           auto ex = cudaExecutor(stream);
           ex.Exec(*static_cast<T *>(this));
         }
@@ -68,6 +70,7 @@ namespace matx
          */
         __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
         {
+          MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
           auto ex = cudaExecutor(stream);
           ex.Exec(*static_cast<T *>(this));
           cudaEventRecord(ev, stream);
@@ -81,6 +84,7 @@ namespace matx
          */
         template <typename Ex>
           __MATX_INLINE__ void run (Ex ex) {
+            MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
             static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
             ex.Exec(*static_cast<T *>(this));
           }
