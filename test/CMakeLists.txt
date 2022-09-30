@@ -6,7 +6,6 @@ set (test_sources
     00_tensor/CUBTests.cu
     00_tensor/ViewTests.cu
     00_tensor/VizTests.cu
-    00_tensor/ShapeTests.cu
     00_tensor/TensorCreationTests.cu
     00_tensor/EinsumTests.cu
     00_operators/OperatorTests.cu
@@ -14,8 +13,8 @@ set (test_sources
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
     00_transform/MatMul.cu
-    00_transform/Cov.cu   
-    00_transform/FFT.cu 
+    00_transform/Cov.cu
+    00_transform/FFT.cu
     00_solver/Cholesky.cu
     00_solver/LU.cu
     00_solver/QR.cu
@@ -46,7 +45,7 @@ set(all_test_srcs ${test_sources} ${proprietary_sources})
 add_executable(matx_test main.cu ${all_test_srcs})
 
 # Set all the flags/other properties
-set_property(TARGET matx_test PROPERTY ENABLE_EXPORTS 1)   
+set_property(TARGET matx_test PROPERTY ENABLE_EXPORTS 1)
 
 if (MSVC)
     target_compile_options(matx_test  PRIVATE /W4 /WX)
@@ -54,17 +53,17 @@ else()
     target_compile_options(matx_test PRIVATE ${WARN_FLAGS})
     #target_compile_options(matx_test PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${WARN_FLAGS}>)
     target_compile_options(matx_test PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)
-endif() 
+endif()
 
 target_include_directories(matx_test PRIVATE "${target_inc}")
 target_include_directories(matx_test SYSTEM PRIVATE "${system_inc}")
 target_link_libraries(matx_test PRIVATE matx::matx) # Transitive properties
 target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} gtest)
 
-add_custom_target(test 
-    DEPENDS matx_test 
+add_custom_target(test
+    DEPENDS matx_test
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/matx_test)
 
-    
+
 
 

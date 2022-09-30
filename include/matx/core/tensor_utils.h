@@ -441,6 +441,45 @@ namespace detail {
   }
 
   /**
+   * convert Type to string
+   *
+   * function convert a tensor type to a string
+   *
+   */
+  template <typename T> static std::string GetTensorType()
+  {
+    if constexpr (std::is_same_v<T, bool>)
+      return "bool";    
+    if constexpr (std::is_same_v<T, int32_t>)
+      return "int32_t";
+    if constexpr (std::is_same_v<T, uint32_t>)
+      return "uint32_t";
+    if constexpr (std::is_same_v<T, int64_t>)
+      return "int64_t";
+    if constexpr (std::is_same_v<T, uint64_t>)
+      return "uint64_t";
+    if constexpr (std::is_same_v<T, float> )
+      return "float";
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return "float16";
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return "bfloat16";
+    if constexpr (std::is_same_v<T, double>)
+      return "double";
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>) 
+      return "complex<double>";
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>) 
+      return "complex<float>";
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return "complex<float16>";
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return "complex<bfloat16>";
+          
+    return "unknown";
+  }
+
+
+  /**
    * Print a tensor
    *
    * Type-agnostic function to print a tensor to stdout
@@ -451,6 +490,7 @@ namespace detail {
   {
     MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
+
     if constexpr (sizeof...(Args) == 0) {
       PrintVal(op.operator()());
       printf("\n");
@@ -516,7 +556,7 @@ namespace detail {
       }
     }
   }
-}
+} // end namespace detail
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
@@ -544,8 +584,29 @@ template <typename Op, typename... Args,
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
 void Print(const Op &op, Args... dims) {
+
+  // print tensor size info first
+  std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
+
+  printf("%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), op.Rank());
+
+  for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
+    printf("%lld", op.Size(static_cast<int>(dimIdx)) );
+    if( dimIdx < (op.Rank() - 1) )
+      printf(", ");
+  }
+
 #ifdef __CUDACC__
   if constexpr (is_tensor_view_v<Op>) {
+
+    printf("], Strides:[");
+    for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
+    printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
+    if( dimIdx < (op.Rank() - 1) )
+      printf(",");
+    }
+    printf("]\n");
+
     auto kind = GetPointerKind(op.Data());
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
@@ -563,9 +624,11 @@ void Print(const Op &op, Args... dims) {
     }
   }
   else {
+    printf("]\n");
     InternalPrint(op, dims...);
   }
 #else
+  printf("]\n");
   InternalPrint(op, dims...);
 #endif
 }
