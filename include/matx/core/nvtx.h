@@ -60,25 +60,26 @@ const int32_t NVTX_TEAL   = 0x008080;
 const int32_t NVTX_PINK   = 0xFFC0CB;
 const int32_t NVTX_WHITE  = 0xFFFFFF;
 
-const int32_t nunNvtxColors = 10;
+static const int32_t nunNvtxColors = 10;
 
-const int32_t  colors[nunNvtxColors] = {
-                                       NVTX_BLACK,
-                                       NVTX_RED,
-                                       NVTX_GREEN,
-                                       NVTX_BLUE,
-                                       NVTX_ORANGE,
-                                       NVTX_PURPLE,
-                                       NVTX_YELLOW,
-                                       NVTX_TEAL,
-                                       NVTX_PINK,
-                                       NVTX_WHITE
-                                       };
+static const int32_t colors[nunNvtxColors] = {
+                                             NVTX_BLACK,
+                                             NVTX_RED,
+                                             NVTX_GREEN,
+                                             NVTX_BLUE,
+                                             NVTX_ORANGE,
+                                             NVTX_PURPLE,
+                                             NVTX_YELLOW,
+                                             NVTX_TEAL,
+                                             NVTX_PINK,
+                                             NVTX_WHITE
+                                             };
 
-uint64_t curColorIdx;
-std::map< int, nvtxRangeId_t> eventMap;
+inline uint64_t curColorIdx;
+inline uint64_t dataTest = 0;
+inline std::map< int, nvtxRangeId_t>  eventMap;
 
-matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS;
+static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS;
 
 //////  macros to ensure custom variable names for every call  ////////
 #define MATX_CONCAT(a, b) MATX_CONCAT_INNER(a, b)
@@ -135,9 +136,10 @@ matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS;
 ///\brief Class wrapping NVTX management for automatic creation/deletion
 ///
 ////////////////////////////////////////////////////////////////////////////////
-void registerEvent( size_t registerId, nvtxRangeId_t eventId )
-{
-
+static void registerEvent( int registerId, nvtxRangeId_t eventId )
+{ 
+  dataTest++;
+  
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   eventMap.insert(newPair);
 }
@@ -148,9 +150,10 @@ void registerEvent( size_t registerId, nvtxRangeId_t eventId )
 ///\brief Class wrapping NVTX management for automatic creation/deletion
 ///
 ////////////////////////////////////////////////////////////////////////////////
-void endEvent( size_t id )
+static void endEvent( int id )
 {
-
+  dataTest++;
+    
   auto foundIter = eventMap.find( id );
 
   if( foundIter != eventMap.end())
