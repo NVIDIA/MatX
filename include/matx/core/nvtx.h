@@ -95,6 +95,8 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
 
 #ifdef MATX_NVTX_FLAGS
 
+  ///\todo update to use C++20 runtime fucntion for actual call location
+  /// https://en.cppreference.com/w/cpp/utility/source_location
   #define MATX_NVTX_1( message ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
   #define MATX_NVTX_2( message, nvtxLevel ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel );
 
@@ -218,7 +220,6 @@ class NvtxEvent
     }
     else
     {
-      ///\todo get the name of the calling function instead https://en.cppreference.com/w/cpp/utility/source_location
       eventAttrib.message.ascii =  functionName.c_str();
     }
 
