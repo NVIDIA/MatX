@@ -33,9 +33,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "matx/core/nvtx.h"
 #include "matx/core/storage.h"
 #include "matx/core/tensor_desc.h"
-
 namespace matx {
 
 /**
@@ -48,6 +48,8 @@ namespace matx {
  **/
 template <typename T, int RANK>
 auto make_tensor(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   T *ptr;
   DefaultDescriptor<RANK> desc{shape};
 
@@ -70,6 +72,8 @@ auto make_tensor(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MA
  **/
 template <typename T, int RANK>
 auto make_tensor_p(const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   T *ptr;
   DefaultDescriptor<RANK> desc{shape};
 
@@ -98,6 +102,8 @@ template <typename T, typename ShapeType,
                     !is_matx_descriptor_v<ShapeType> &&
                     !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   T *ptr;
   constexpr int blah = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<blah> desc{std::move(shape)};
@@ -130,6 +136,8 @@ template <typename T, typename ShapeType,
   std::enable_if_t< !is_matx_shape_v<ShapeType> &&
                     !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor_p(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   T *ptr;
   DefaultDescriptor<static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value)> desc{std::move(shape)};
 
@@ -153,7 +161,7 @@ auto make_tensor_p(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEM
  *
  **/
 template <typename T>
-auto make_tensor(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+auto make_tensor(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {  
   std::array<index_t, 0> shape;
 
   return make_tensor<T, decltype(shape)>(std::move(shape), space, stream);
@@ -169,6 +177,7 @@ auto make_tensor(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t str
  **/
 template <typename T>
 auto make_tensor_p(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  
   std::array<index_t, 0> shape;
   return make_tensor_p<T, decltype(shape)>(std::move(shape), space, stream);
 }
@@ -184,6 +193,8 @@ auto make_tensor_p(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t s
  **/
 template <typename T, int RANK>
 auto make_tensor(T *data, const index_t (&shape)[RANK], bool owning = false) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   DefaultDescriptor<RANK> desc{shape};
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize()*sizeof(T)), owning};
   basic_storage<decltype(rp)> s{std::move(rp)};
@@ -202,6 +213,8 @@ auto make_tensor(T *data, const index_t (&shape)[RANK], bool owning = false) {
 template <typename T, typename ShapeType,
   std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor(T *data, ShapeType &&shape, bool owning = false) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
@@ -238,6 +251,8 @@ auto make_tensor(T *ptr, bool owning = false) {
 template <typename T, typename ShapeType,
   std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor_p(T *const data, ShapeType &&shape, bool owning = false) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
@@ -260,6 +275,8 @@ template <typename Storage, typename ShapeType,
                   !is_matx_descriptor_v<ShapeType> &&
                   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor(Storage s, ShapeType &&shape) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
@@ -279,6 +296,8 @@ auto make_tensor(Storage s, ShapeType &&shape) {
  **/
 template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
 auto make_tensor(T* const data, D &&desc, bool owning = false) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using Dstrip = typename remove_cvref<D>::type;
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize()*sizeof(T)), owning};
   basic_storage<decltype(rp)> s{std::move(rp)};
@@ -295,6 +314,8 @@ auto make_tensor(T* const data, D &&desc, bool owning = false) {
  **/
 template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
 auto make_tensor(D &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   T *ptr;
   using Dstrip = typename remove_cvref<D>::type;
 
@@ -319,6 +340,8 @@ auto make_tensor(D &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaSt
  **/
 template <typename T, int RANK>
 auto make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&strides)[RANK], bool owning = false) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   DefaultDescriptor<RANK>  desc{shape, strides};
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize()*sizeof(T)), owning};
   basic_storage<decltype(rp)> s{std::move(rp)};
@@ -339,6 +362,8 @@ auto make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&st
  **/
 template <typename T, index_t I, index_t ...Is>
 auto make_static_tensor() {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   static_tensor_desc_t<I, Is...> desc{};
   raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(desc.TotalSize()*sizeof(T))};
   basic_storage<decltype(rp)> s{std::move(rp)};

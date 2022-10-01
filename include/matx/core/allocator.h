@@ -42,6 +42,7 @@
 #endif
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 
 #pragma once
 
@@ -201,7 +202,9 @@ inline void matxAlloc(void **ptr, size_t bytes,
                       cudaStream_t stream = 0)
 {
   [[maybe_unused]] cudaError_t err = cudaSuccess;
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   switch (space) {
   case MATX_MANAGED_MEMORY:
     err = cudaMallocManaged(ptr, bytes);
@@ -244,6 +247,8 @@ inline void matxAlloc(void **ptr, size_t bytes,
  */
 inline void matxFree(void *ptr)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   if (ptr == nullptr) {
     return;
   }

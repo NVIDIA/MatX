@@ -35,6 +35,7 @@
 #include <cuda/std/tuple>
 #include <functional>
 
+#include "matx/core/nvtx.h"
 #include "matx/core/make_tensor.h"
 
 namespace matx
@@ -47,6 +48,8 @@ namespace matx
    */
   template <typename Op>
   size_t TotalSize(const Op &op) {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     if constexpr (is_tensor_view_v<Op>) {
       return static_cast<size_t>(op.TotalSize());
     }
@@ -71,7 +74,7 @@ namespace matx
    */
   template <typename Op>
   index_t LargestDimSize(const Op &op) {
-
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     index_t maxSize = op.Size(0);
 
     for (int i = 1; i < op.Rank(); i++)
@@ -156,6 +159,7 @@ namespace detail {
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
+    
     if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
     }
@@ -226,19 +230,20 @@ namespace detail {
   template <typename T0, typename T1, typename... Tn>
   constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
   {
-      if constexpr (sizeof...(tn) == 0) {
-          return t0 > t1 ? t0 : t1;
-      }
-      else {
-          return matx_max(matx_max(t0, t1), tn...);
-      }
+    
+    if constexpr (sizeof...(tn) == 0) {
+        return t0 > t1 ? t0 : t1;
+    }
+    else {
+        return matx_max(matx_max(t0, t1), tn...);
+    }
 
-      return t0; // 11.4 compiler has a bug. This is dead code
+    return t0; // 11.4 compiler has a bug. This is dead code
   }
 
   template <class T, class M = T>
   __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t get_rank()
-  {
+  {   
     if constexpr (is_matx_op<M>())
       return T::Rank();
     else
@@ -398,6 +403,8 @@ namespace detail {
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
     if constexpr (is_complex_v<T>) {
       printf("%.4e%+.4ej ", static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
@@ -488,6 +495,8 @@ namespace detail {
   template <typename Op, typename ... Args>
   __MATX_HOST__ void InternalPrint(const Op &op, Args ...dims)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
     MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
 
@@ -584,7 +593,8 @@ template <typename Op, typename... Args,
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
 void Print(const Op &op, Args... dims) {
-
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // print tensor size info first
   std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
 

@@ -693,6 +693,7 @@ public:
   template <typename M = T, int R = RANK, typename Shape>
   __MATX_INLINE__ auto View(Shape &&shape)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
@@ -748,6 +749,8 @@ public:
   template <typename ShapeIntType, int NRANK>
   __MATX_INLINE__ auto View(const ShapeIntType (&shape)[NRANK])
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     // Change this to not rely on index_t
     std::array<index_t, NRANK> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin()); 
@@ -788,6 +791,8 @@ public:
    */
   __MATX_INLINE__ void PrefetchDevice(cudaStream_t const stream) const noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     int dev;
     cudaGetDevice(&dev);
     cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), dev, stream);
@@ -805,6 +810,8 @@ public:
    */
   __MATX_INLINE__ void PrefetchHost(cudaStream_t const stream) const noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
@@ -820,6 +827,8 @@ public:
   template <typename U = T>
   __MATX_INLINE__ auto RealView() const noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
@@ -863,6 +872,8 @@ public:
   template <typename U = T>
   __MATX_INLINE__ auto ImagView() const noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
@@ -901,6 +912,8 @@ public:
    */
   __MATX_INLINE__ auto Permute(const uint32_t (&dims)[RANK]) const
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     std::array<shape_type, RANK> n;
     std::array<stride_type, RANK> s;
@@ -940,6 +953,8 @@ public:
    */
   __MATX_INLINE__ auto PermuteMatrix() const
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     uint32_t tdims[RANK];
     std::iota(std::begin(tdims), std::end(tdims), 0);
@@ -993,6 +1008,8 @@ public:
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data) noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     storage_.SetData(data);
     this->ldata_ = data;
   }
@@ -1076,7 +1093,9 @@ public:
               std::initializer_list<typename Desc::stride_type> const &strides) const
   {
     static_assert(RANK == 1, "Overlapped views only supported on 1D tensors.");
-
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     std::array<typename Desc::shape_type, RANK+1> n;
     std::array<typename Desc::stride_type, RANK+1> s;
 
@@ -1133,6 +1152,8 @@ public:
   template <int N>
   __MATX_INLINE__ auto Clone(const typename Desc::shape_type (&clones)[N]) const
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     std::array<typename Desc::shape_type, N> n;
     std::array<typename Desc::stride_type, N> s;    
 
@@ -1184,6 +1205,9 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
     static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     this->operator()() = val;
   }
@@ -1205,6 +1229,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
       "Single initializer list on SetVals only for non-complex rank 1 tensor or complex rank 0 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     for (size_t i = 0; i < vals.size(); i++) {
       if constexpr (is_cuda_complex_v<T>) {
         typename T::value_type real = (vals.begin() + i)->real();
@@ -1236,6 +1263,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 2) || (is_cuda_complex_v<T> && RANK == 1)),
       "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");    
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         if constexpr (is_cuda_complex_v<T>) {
@@ -1273,6 +1303,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 3) || (is_cuda_complex_v<T> && RANK == 2)),
       "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");  
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");     
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1313,6 +1346,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 4) || (is_cuda_complex_v<T> && RANK == 3)),
       "Quad initializer list on SetVals only for non-complex rank 4 tensor or complex rank 3 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1363,6 +1399,9 @@ public:
     static_assert((is_cuda_complex_v<T> && RANK == 4),
           "Quintuple initializer list on SetVals only for complex rank 3 tensors");    
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1429,6 +1468,9 @@ public:
                               [[maybe_unused]] const typename Desc::stride_type (&strides)[RANK]) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     std::array<typename Desc::shape_type, N> n = {};
     std::array<typename Desc::stride_type, N> s = {};
 
@@ -1508,6 +1550,9 @@ public:
                               const typename Desc::shape_type (&ends)[RANK]) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     const typename Desc::stride_type strides[RANK] = {-1};
     return Slice<N>(firsts, ends, strides);
   }
@@ -1522,6 +1567,8 @@ public:
    */
   __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) const noexcept
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     if constexpr (is_complex_v<T>) {
       printf("%.4e%+.4ej ", static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
@@ -1572,7 +1619,7 @@ public:
    */
   template <typename ... Args>
   __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
-  {
+  {   
     MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(RANK <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
     if constexpr (sizeof...(Args) == 0) {
@@ -1703,6 +1750,7 @@ public:
   template <int NRANK>
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK]) const
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     auto s = this->Slice(start, end);
     std::array<index_t, NRANK> arr = {0};
     auto tup = std::tuple_cat(arr);
@@ -1732,6 +1780,8 @@ public:
   template <int NRANK>
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK], const index_t (&strides)[NRANK]) const
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     auto s = this->Slice(start, end, strides);
     std::array<index_t, NRANK> arr = {0};
     auto tup = std::tuple_cat(arr);

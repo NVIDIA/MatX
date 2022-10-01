@@ -22,10 +22,11 @@ void conv1d_4d_batch(nvbench::state &state,
   bt.PrefetchDevice(0);
 
   cudaDeviceSynchronize();
-
+  MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS, 1 )
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
-
+  MATX_NVTX_END_RANGE( 1 )
+  
 }
 NVBENCH_BENCH_TYPES(conv1d_4d_batch, NVBENCH_TYPE_AXES(conv_types));
 

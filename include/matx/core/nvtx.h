@@ -127,7 +127,7 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
                                   MATX_NVTX_1(__VA_ARGS__)\
                                   )
 
-  #define MATX_NVTX_END( id ) endEvent( id );
+  #define MATX_NVTX_END( id );
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +141,7 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
 static void registerEvent( int registerId, nvtxRangeId_t eventId )
 { 
   dataTest++;
-  
+  ///\todo need mutex for sync protection?
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   eventMap.insert(newPair);
 }
@@ -163,10 +163,7 @@ static void endEvent( int id )
     nvtxRangeEnd(foundIter->second);
     eventMap.erase( foundIter );
   }
-  else
-  {
-    std::cout << "!!! Warning, failed to end NVTX range: " << id << ", ranges may be incorrect !!!" << std::endl;
-  }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -225,7 +222,7 @@ class NvtxEvent
 
     // save the id
     rangeId_ = nvtxRangeStartEx(&eventAttrib);
-
+    userHandle_ = registerId;
     // if register with global map
     if( registerId >= 0 )
     {
@@ -242,11 +239,17 @@ class NvtxEvent
   ////////////////////////////////////////////////////////////////////////////////
   ~NvtxEvent( )
   {
+    if(userHandle_ != -1)
+    {
+      endEvent( userHandle_ );
+    }
+    
     nvtxRangeEnd(rangeId_);
   }
 
 
   nvtxRangeId_t  rangeId_;
+  int            userHandle_;
 };
 
 } // end matx namespace
