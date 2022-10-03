@@ -52,7 +52,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStreamCreate(&stream);
   
   // manually set to log all NVTX levels
-  matx::setNVTXLogLevel( matx_nvxtLogLevels::MATX_NVTX_LOG_API );
+  matx::setNVTXLogLevel( matx_nvxtLogLevels::MATX_NVTX_LOG_ALL );
   
   // create some events for timing
   cudaEvent_t start, stop;
@@ -93,7 +93,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStreamSynchronize(stream);
   MATX_NVTX_END_RANGE(2)
   
-  MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
+  MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 3)
   float time_ms;
   cudaEventElapsedTime(&time_ms, start, stop);
   float time_s = time_ms * .001f;
