@@ -43,9 +43,10 @@ namespace matx
 enum matx_nvxtLogLevels
 {
   MATX_NVTX_LOG_NONE = 0,
-  MATX_NVTX_LOG_INTERNAL = 1,
+  MATX_NVTX_LOG_USER = 1,
   MATX_NVTX_LOG_API = 2,
-  MATX_NVTX_LOG_ALWAYS = 0xFFFFFF
+  MATX_NVTX_LOG_INTERNAL = 3,
+  MATX_NVTX_LOG_ALL = 0xFFFFFF
 };
 
 
@@ -79,7 +80,7 @@ inline uint64_t curColorIdx;
 inline uint64_t dataTest = 0;
 inline std::map< int, nvtxRangeId_t>  eventMap;
 
-static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_ALWAYS;
+inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_API;
 
 //////  macros to ensure custom variable names for every call  ////////
 #define MATX_CONCAT(a, b) MATX_CONCAT_INNER(a, b)
@@ -97,8 +98,8 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
 
   ///\todo update to use C++20 runtime fucntion for actual call location
   /// https://en.cppreference.com/w/cpp/utility/source_location
-  #define MATX_NVTX_1( message ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
-  #define MATX_NVTX_2( message, nvtxLevel ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel );
+  #define MATX_NVTX_1( message ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message );
+  #define MATX_NVTX_2( message, nvtxLevel ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel );
 
   #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
@@ -108,7 +109,7 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
                                 MATX_NVTX_1(__VA_ARGS__)\
                                 )
 
-  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
+  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
 
   #define MATX_NVTX_END_RANGE( id ) endEvent( id );
 ////////////             Disable NVTX Macros          /////////////////
@@ -132,6 +133,17 @@ static matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AL
 #endif
 ////////////////////////////////////////////////////////////////////////////////
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+///
+///\brief Utility Function to set Global Log Level 
+///
+////////////////////////////////////////////////////////////////////////////////
+[[maybe_unused]] static void setNVTXLogLevel( matx_nvxtLogLevels newNVTXLevel)
+{
+  globalNvtxLevel = newNVTXLevel;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///

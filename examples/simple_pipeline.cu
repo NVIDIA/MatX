@@ -50,29 +50,50 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // cuda stream to place work in
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-
+  
+  // manually set to log all NVTX levels
+  matx::setNVTXLogLevel( matx_nvxtLogLevels::MATX_NVTX_LOG_API );
+  
   // create some events for timing
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-
+  
+  MATX_NVTX_START_RANGE("Pipeline Initialize", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1)
   printf("Initializing data structures...\n");
   auto radar =
       RadarPipeline(numPulses, numSamples, waveformLength, numChannels, stream);
   radar.GetInputView()->PrefetchDevice(stream);
-
+  MATX_NVTX_END_RANGE(1)
+  
+  MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   printf("Running test...\n");
   cudaStreamSynchronize(stream);
   cudaEventRecord(start, stream);
+  
   for (uint32_t i = 0; i < iterations; i++) {
+    MATX_NVTX_START_RANGE("PulseCompression", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 21)
     radar.PulseCompression();
+    MATX_NVTX_END_RANGE(21)  
+    
+    MATX_NVTX_START_RANGE("ThreePulseCanceller", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 22)
     radar.ThreePulseCanceller();
+    MATX_NVTX_END_RANGE(22)
+    
+    MATX_NVTX_START_RANGE("DopplerProcessing", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 23)
     radar.DopplerProcessing();
+    MATX_NVTX_END_RANGE(23)
+    
+    MATX_NVTX_START_RANGE("CFARDetections", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 24)
     radar.CFARDetections();
+    MATX_NVTX_END_RANGE(24)
   }
 
   cudaEventRecord(stop, stream);
   cudaStreamSynchronize(stream);
+  MATX_NVTX_END_RANGE(2)
+  
+  MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   float time_ms;
   cudaEventElapsedTime(&time_ms, start, stop);
   float time_s = time_ms * .001f;
@@ -90,7 +111,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   matxPrintMemoryStatistics();
 
   printf("Done\n");
-
+  MATX_NVTX_END_RANGE(3)
   MATX_EXIT_HANDLER();
   return 0;
 }
