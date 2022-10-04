@@ -35,8 +35,6 @@
     <script src="../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Tensor Transformations" href="transformations.html" />
-    <link rel="prev" title="tensor_t" href="tensorview.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="None">
     
@@ -68,7 +66,7 @@
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
 </form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item active">
-        <ul class="current nav bd-sidenav">
+        <ul class="nav bd-sidenav">
  <li class="toctree-l1">
   <a class="reference internal" href="../build.html">
    Building MatX
@@ -84,44 +82,27 @@
    Creating Tensors
   </a>
  </li>
- <li class="toctree-l1 current active has-children">
+ <li class="toctree-l1 has-children">
   <a class="reference internal" href="index.html">
    API Reference
   </a>
-  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
   <label for="toctree-checkbox-1">
    <i class="fas fa-chevron-down">
    </i>
   </label>
-  <ul class="current">
-   <li class="toctree-l2 current active has-children">
-    <a class="reference internal" href="class.html">
-     Tensor Class Reference
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorview.html">
+     Tensors
     </a>
-    <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-    <label for="toctree-checkbox-2">
-     <i class="fas fa-chevron-down">
-     </i>
-    </label>
-    <ul class="current">
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorview.html">
-       tensor_t
-      </a>
-     </li>
-     <li class="toctree-l3 current active">
-      <a class="current reference internal" href="#">
-       tensorShape_t
-      </a>
-     </li>
-    </ul>
    </li>
    <li class="toctree-l2 has-children">
     <a class="reference internal" href="transformations.html">
      Tensor Transformations
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
-    <label for="toctree-checkbox-3">
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
      <i class="fas fa-chevron-down">
      </i>
     </label>
@@ -209,8 +190,8 @@
   <a class="reference internal" href="../examples/index.html">
    Example Applications
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
-  <label for="toctree-checkbox-4">
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
    <i class="fas fa-chevron-down">
    </i>
   </label>
@@ -305,117 +286,10 @@
 <h1>tensorShape_t<a class="headerlink" href="#tensorshape-t" title="Permalink to this headline"></a></h1>
 <p>The tensorShape_t is used to describe the rank and dimensions of data and view objects. It can be initialized with initializer-list syntax to improve clarity.
 Note that <code class="docutils literal notranslate"><span class="pre">tensorShape_t</span></code> will be deprecated in a future release. Please use a container meeting the tensor descriptor interfaces, such as <code class="docutils literal notranslate"><span class="pre">std::array</span></code>.</p>
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I_iEN4matx13tensorShape_tE">
-<span id="_CPPv3I_iEN4matx13tensorShape_tE"></span><span id="_CPPv2I_iEN4matx13tensorShape_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1tensorShape__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">tensorShape_t</span></span></span><a class="headerlink" href="#_CPPv4I_iEN4matx13tensorShape_tE" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Class containing the shape and type of a tensor.</p>
-<p><a class="reference internal" href="#classmatx_1_1tensorShape__t"><span class="std std-ref">tensorShape_t</span></a> contains metadata about the shape of a tensor but does not contain any data. </p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
-<dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13tensorShape_t10matx_shapeE">
-<span id="_CPPv3N4matx13tensorShape_t10matx_shapeE"></span><span id="_CPPv2N4matx13tensorShape_t10matx_shapeE"></span><span class="target" id="classmatx_1_1tensorShape__t_1aaa3092038e33106f7c8ad90e4aa50c43"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matx_shape</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><a class="headerlink" href="#_CPPv4N4matx13tensorShape_t10matx_shapeE" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Type trait to indicate shape. </p>
-</dd></dl>
-
-</div>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13tensorShape_t13tensorShape_tEPCK7index_t">
-<span id="_CPPv3N4matx13tensorShape_t13tensorShape_tEPCK7index_t"></span><span id="_CPPv2N4matx13tensorShape_t13tensorShape_tEPCK7index_t"></span><span id="matx::tensorShape_t::tensorShape_t__index_tCPC"></span><span class="target" id="classmatx_1_1tensorShape__t_1a46131934d6afcffc8b059bee81cc7502"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tensorShape_t</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">sizes</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N4matx13tensorShape_t13tensorShape_tEPCK7index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Constructor for a rank-1 and above tensor.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>sizes</strong> – Sizes for each dimension. Length of sizes must match RANK </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t">
-<span id="_CPPv3I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t"></span><span id="_CPPv2I_i_NSt11enable_if_tIXM != 0EbEEEN4matx13tensorShape_t13tensorShape_tERAM_K7index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">M</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_iEN4matx13tensorShape_tE" title="matx::tensorShape_t::RANK"><span class="n"><span class="pre">RANK</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t" title="matx::tensorShape_t::tensorShape_t::M"><span class="n"><span class="pre">M</span></span></a><span class="w"> </span><span class="o"><span class="pre">!=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1tensorShape__t_1abcff843440c360cb95f50dc7078ae298"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tensorShape_t</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sizes</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t" title="matx::tensorShape_t::tensorShape_t::M"><span class="n"><span class="pre">M</span></span></a><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i_NSt11enable_if_tIXne1ML0EEbEEEN4matx13tensorShape_t13tensorShape_tERA1M_K7index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Constructor for a rank-1 and above tensor using initializer lists</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>sizes</strong> – Sizes for each dimension. Length of sizes must match RANK </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T">
-<span id="_CPPv3I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T"></span><span id="_CPPv2I0_NSt11enable_if_tIX!std::is_array_v<typename remove_cvref<T>::type> && !std::is_pointer_v<typename remove_cvref<T>::type>EbEEEN4matx13tensorShape_t13tensorShape_tERK1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><span class="o"><span class="pre">!</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">is_array_v</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="type_traits.html#_CPPv4I0EN4matx12remove_cvrefE" title="matx::remove_cvref"><span class="n"><span class="pre">remove_cvref</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T" title="matx::tensorShape_t::tensorShape_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="o"><span class="pre">&amp;&amp;</span></span><span class="w"> </span><span class="o"><span class="pre">!</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">is_pointer_v</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="type_traits.html#_CPPv4I0EN4matx12remove_cvrefE" title="matx::remove_cvref"><span class="n"><span class="pre">remove_cvref</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T" title="matx::tensorShape_t::tensorShape_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1tensorShape__t_1a227d46806bae8b2573e158d3bee9f63c"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tensorShape_t</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T" title="matx::tensorShape_t::tensorShape_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sizes</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_NSt11enable_if_tIXaantNSt10is_array_vIN12remove_cvrefI1TE4typeEEEntNSt12is_pointer_vIN12remove_cvrefI1TE4typeEEEEbEEEN4matx13tensorShape_t13tensorShape_tERK1T" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Constructor for a rank-1 and above tensor using initializer lists</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>sizes</strong> – Sizes for each dimension. Length of sizes must match RANK </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx13tensorShape_t4SizeEi">
-<span id="_CPPv3NK4matx13tensorShape_t4SizeEi"></span><span id="_CPPv2NK4matx13tensorShape_t4SizeEi"></span><span id="matx::tensorShape_t::Size__iCCE"></span><span class="target" id="classmatx_1_1tensorShape__t_1ac4b9e66be2036c3ca6c8e961fd792089"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Size</span></span></span><span class="sig-paren">(</span><span class="pre">[[maybe_unused]]</span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dim</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK4matx13tensorShape_t4SizeEi" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Get the size of a single dimension of the tensor</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>dim</strong> – Desired dimension</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Number of elements in dimension </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx13tensorShape_t9TotalSizeEv">
-<span id="_CPPv3NK4matx13tensorShape_t9TotalSizeEv"></span><span id="_CPPv2NK4matx13tensorShape_t9TotalSizeEv"></span><span id="matx::tensorShape_t::TotalSizeC"></span><span class="target" id="classmatx_1_1tensorShape__t_1a83cb2bb711cb3430fd811e95370b02ef"></span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TotalSize</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK4matx13tensorShape_t9TotalSizeEv" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Get the total size of the shape</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The size of all dimensions combined. Note that this does not include the size of the data type itself, but only the product of the lengths of each dimension </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13tensorShape_t7SetSizeEi7index_t">
-<span id="_CPPv3N4matx13tensorShape_t7SetSizeEi7index_t"></span><span id="_CPPv2N4matx13tensorShape_t7SetSizeEi7index_t"></span><span id="matx::tensorShape_t::SetSize__i.index_t"></span><span class="target" id="classmatx_1_1tensorShape__t_1a6ceb3bdfa36ed5c762574cd779fe65d9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SetSize</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dim</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">size</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13tensorShape_t7SetSizeEi7index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Set the size of a dimension</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>dim</strong> – Dimension to set </p></li>
-<li><p><strong>size</strong> – Set the size of a dimension </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx13tensorShape_t7AsArrayEv">
-<span id="_CPPv3NK4matx13tensorShape_t7AsArrayEv"></span><span id="_CPPv2NK4matx13tensorShape_t7AsArrayEv"></span><span id="matx::tensorShape_t::AsArrayC"></span><span class="target" id="classmatx_1_1tensorShape__t_1ab9685ec2e59df963bbc83146f3fdd5d4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">index_t</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_iEN4matx13tensorShape_tE" title="matx::tensorShape_t::RANK"><span class="n"><span class="pre">RANK</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AsArray</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx13tensorShape_t7AsArrayEv" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Get shape as an array </p>
-</dd></dl>
-
-</div>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-static-functions">Public Static Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx13tensorShape_t4RankEv">
-<span id="_CPPv3N4matx13tensorShape_t4RankEv"></span><span id="_CPPv2N4matx13tensorShape_t4RankEv"></span><span id="matx::tensorShape_t::RankCE"></span><span class="target" id="classmatx_1_1tensorShape__t_1a41fa7f5b9be120f4fc1cff172b102db4"></span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rank</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13tensorShape_t4RankEv" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Get the rank of the tensor</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Rank of the tensor </p>
-</dd>
-</dl>
-</dd></dl>
-
-</div>
-</dd></dl>
-
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>doxygenclass: Cannot find class “matx::tensorShape_t” in doxygen xml output for project “MatX” from directory: /scratch/build/docs_input/doxygen/xml</p>
+</aside>
 </section>
 
 
@@ -423,21 +297,7 @@ Note that <code class="docutils literal notranslate"><span class="pre">tensorSha
               
         
             <!-- Previous / next buttons -->
-<div class='prev-next-area'> 
-    <a class='left-prev' id="prev-link" href="tensorview.html" title="previous page">
-        <i class="fas fa-angle-left"></i>
-        <div class="prev-next-info">
-            <p class="prev-next-subtitle">previous</p>
-            <p class="prev-next-title">tensor_t</p>
-        </div>
-    </a>
-    <a class='right-next' id="next-link" href="transformations.html" title="next page">
-    <div class="prev-next-info">
-        <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Tensor Transformations</p>
-    </div>
-    <i class="fas fa-angle-right"></i>
-    </a>
+<div class='prev-next-area'>
 </div>
         
         </div>

@@ -32,3 +32,5 @@ since their only purpose is to compute a single value at a particular location b
 .. doxygenfunction:: matx::logspace(const index_t (&s)[RANK], T first, T last)
 .. doxygenfunction:: matx::meshgrid_x(const std::array<T, 3> &x, const std::array<T, 3> &y)
 .. doxygenfunction:: matx::meshgrid_y(const std::array<T, 3> &x, const std::array<T, 3> &y)
+.. doxygenfunction:: matx::signal::chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method)
+.. doxygenfunction:: matx::signal::cchirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method)

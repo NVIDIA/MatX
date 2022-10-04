@@ -94,34 +94,17 @@
    </i>
   </label>
   <ul class="current">
-   <li class="toctree-l2 has-children">
-    <a class="reference internal" href="class.html">
-     Tensor Class Reference
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorview.html">
+     Tensors
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-    <label for="toctree-checkbox-2">
-     <i class="fas fa-chevron-down">
-     </i>
-    </label>
-    <ul>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorview.html">
-       tensor_t
-      </a>
-     </li>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorshape.html">
-       tensorShape_t
-      </a>
-     </li>
-    </ul>
    </li>
    <li class="toctree-l2 current active has-children">
     <a class="reference internal" href="transformations.html">
      Tensor Transformations
     </a>
-    <input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
-    <label for="toctree-checkbox-3">
+    <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
      <i class="fas fa-chevron-down">
      </i>
     </label>
@@ -209,8 +192,8 @@
   <a class="reference internal" href="../examples/index.html">
    Example Applications
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
-  <label for="toctree-checkbox-4">
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
    <i class="fas fa-chevron-down">
    </i>
   </label>
@@ -305,8 +288,8 @@
 <h1>Sorting<a class="headerlink" href="#sorting" title="Permalink to this headline"></a></h1>
 <p>The API below provides methods for sorting tensor data using CUB radix sort as a backend.</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4sortEvR12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t">
-<span id="_CPPv3I00EN4matx4sortER12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t"></span><span id="_CPPv2I00EN4matx4sortER12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a99e2d9bacc7df03f83ff0d7ade1bd338"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">sort</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t" title="matx::sort::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t" title="matx::sort::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">SortDirection_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dir</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">SORT_DIR_ASC</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK11InputTensorK15SortDirection_tK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t">
+<span id="_CPPv3I00EN4matx4sortER12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t"></span><span id="_CPPv2I00EN4matx4sortER12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputOperator</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a11bc3a945d131771f005c77ce39acdaa"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">sort</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t" title="matx::sort::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t" title="matx::sort::InputOperator"><span class="n"><span class="pre">InputOperator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">SortDirection_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dir</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">SORT_DIR_ASC</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_tK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Sort rows of a tensor</p>
 <p>Sort rows of a tensor using a radix sort. Currently supported types are float, double, ints, and long ints (both signed and unsigned). For a 1D tensor, a linear sort is performed. For 2D and above each row of the inner dimensions are batched and sorted separately. There is currently a restriction that the tensor must have contiguous data in both rows and columns, but this restriction may be removed in the future.</p>
 <div class="admonition note">

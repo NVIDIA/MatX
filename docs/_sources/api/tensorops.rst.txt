@@ -46,6 +46,7 @@ Binary Operators
 .. doxygenfunction:: mul(Op t, Op t2)
 .. doxygenfunction:: operator/(Op t, Op t2)  
 .. doxygenfunction:: operator%(Op t, Op t2)  
+.. doxygenfunction:: fmod(Op t, Op t2)
 .. doxygenfunction:: pow(Op t, Op t2) 
 .. doxygenfunction:: max(Op t, Op t2)
 .. doxygenfunction:: min(Op t, Op t2)
@@ -76,14 +77,8 @@ Advanced Operators
 
 .. doxygenclass:: matx::IF 
 .. doxygenclass:: matx::IFELSE
-.. doxygenfunction:: reverseX
-.. doxygenfunction:: reverseY
-.. doxygenfunction:: reverseZ
-.. doxygenfunction:: reverseW
-.. doxygenfunction:: shift0
-.. doxygenfunction:: shift1
-.. doxygenfunction:: shift2
-.. doxygenfunction:: shift3
+.. doxygenfunction:: reverse
+.. doxygenfunction:: shift
 .. doxygenfunction:: fftshift1D
 .. doxygenfunction:: fftshift2D    
 .. doxygenfunction:: repmat(T1 t, index_t reps)    
@@ -92,3 +87,11 @@ Advanced Operators
 .. doxygenfunction:: kron
 .. doxygenfunction:: hermitianT
 .. doxygenfunction:: r2cop
+.. doxygenfunction:: flatten
+.. doxygenfunction:: remap
+.. doxygenfunction:: rcollapse
+.. doxygenfunction:: lcollapse
+.. doxygenfunction:: clone
+.. doxygenfunction:: slice
+.. doxygenfunction:: permute
+.. doxygenfunction:: transpose
