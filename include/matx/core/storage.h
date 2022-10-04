@@ -71,6 +71,7 @@ namespace matx
      * 
      * @param ptr Previously-allocated pointer
      * @param size Size of allocation
+     * @param owning if this class owns memory
      */
     raw_pointer_buffer(T *ptr, size_t size, bool owning = false) : size_(size), owning_(owning) { 
       ConfigureShared(ptr, size);  

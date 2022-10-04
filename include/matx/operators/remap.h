@@ -153,6 +153,7 @@ namespace matx
    * @tparam Inds... list of multiple index operators to remap along
    * @param t Input operator
    * @param idx Index operator/tensor
+   * @param inds list of multiple index operators to remap along
    * @return Value in t from each location in idx
    */
   template <int DIM, int... DIMS, typename Op, typename Ind, typename... Inds>

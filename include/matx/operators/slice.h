@@ -159,7 +159,7 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam T_wStrideT Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @param strides Optional:  the stride between consecutive elements
@@ -181,10 +181,9 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam T_wShapeT Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
-   * @param strides Optional:  the stride between consecutive elements
    * @return sliced operator
    */
   template <typename T_wShapeT>
@@ -206,7 +205,7 @@ namespace matx
    *
    * @tparam N The Rank of the output operator
    * @tparam T_wStridet_2 Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @param strides Optional:  the stride between consecutive elements
@@ -229,10 +228,9 @@ namespace matx
    *
    * @tparam N The Rank of the output operator
    * @tparam T_wShapet_2 Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
-   * @param strides Optional:  the stride between consecutive elements
    * @return sliced operator
    */
   template <int N, typename T_wShapet_2>
