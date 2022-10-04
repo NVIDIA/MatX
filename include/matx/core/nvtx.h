@@ -91,8 +91,6 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 
 ////////////             Enable NVTX Macros          /////////////////
-///\todo remove and hook into build system
-#define MATX_NVTX_FLAGS 1
 
 #ifdef MATX_NVTX_FLAGS
 
@@ -116,9 +114,9 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 #else
 
-  #define MATX_NVTX_1( message )
-  #define MATX_NVTX_2( message, customId )
-  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) 
+  #define MATX_NVTX_1( message );
+  #define MATX_NVTX_2( message, customId );
+  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id );
 
   #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
@@ -127,8 +125,8 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                   MATX_NVTX_2(__VA_ARGS__),\
                                   MATX_NVTX_1(__VA_ARGS__)\
                                   )
-
-  #define MATX_NVTX_END( id );
+                                  
+  #define MATX_NVTX_END_RANGE( id );
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,7 +151,6 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 static void registerEvent( int registerId, nvtxRangeId_t eventId )
 { 
   dataTest++;
-  ///\todo need mutex for sync protection?
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   eventMap.insert(newPair);
 }

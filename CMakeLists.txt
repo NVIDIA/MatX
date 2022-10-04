@@ -11,6 +11,7 @@ endif()
 option(MATX_BUILD_EXAMPLES "Build examples" OFF)
 option(MATX_BUILD_TESTS "Build unit tests" OFF)
 option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
 option(MATX_BUILD_DOCS "Build documentation. Mutually exclusive with all other options" OFF)
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MATX_MULTI_GPU "Multi-GPU support" OFF)
@@ -241,7 +242,9 @@ if (NOT_SUBPROJECT)
 endif()
 
 
-
+if (MATX_NVTX_FLAGS)
+    add_definitions(-DMATX_NVTX_FLAGS)
+endif()
 if (MATX_BUILD_32_BIT)
     add_definitions(-DINDEX_32_BIT)
     target_compile_definitions(matx INTERFACE INDEX_32_BIT)
