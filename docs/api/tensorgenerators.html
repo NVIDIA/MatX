@@ -792,14 +792,118 @@ Returns values for a Flattop window across the selected dimension. </p>
 </dl>
 </dd></dl>
 
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>doxygenfunction: Cannot find function “matx::signal::chirp” in doxygen xml output for project “MatX” from directory: /scratch/build/docs_input/doxygen/xml</p>
-</aside>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>doxygenfunction: Cannot find function “matx::signal::cchirp” in doxygen xml output for project “MatX” from directory: /scratch/build/docs_input/doxygen/xml</p>
-</aside>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod">
+<span id="_CPPv3I00EN4matx5chirpE7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod"></span><span id="_CPPv2I00EN4matx5chirpE7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SpaceOp</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FreqType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ab0253bb448bccacc61f59b987c64e2bd"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">chirp</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::chirp::SpaceOp"><span class="n"><span class="pre">SpaceOp</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::chirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f0</span></span>, <span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::chirp::SpaceOp"><span class="n"><span class="pre">SpaceOp</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t1</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::chirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f1</span></span>, <span class="n"><span class="pre">ChirpMethod</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">method</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">ChirpMethod</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">CHIRP_METHOD_LINEAR</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Creates a real chirp signal (swept-frequency cosine)</p>
+<p>SpaceOp provides the time vector with custom spacing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FreqType</strong> – Frequency data type </p></li>
+<li><p><strong>SpaceOp</strong> – Operator type of spacer</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – Vector representing values in time </p></li>
+<li><p><strong>f0</strong> – Instantenous frequency at time 0 </p></li>
+<li><p><strong>t1</strong> – Time for f1 </p></li>
+<li><p><strong>f1</strong> – Frequency (Hz) at time t1 </p></li>
+<li><p><strong>method</strong> – Chirp method (CHIRP_METHOD_LINEAR)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The chirp operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod">
+<span id="_CPPv3I00EN4matx5chirpE7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod"></span><span id="_CPPv2I00EN4matx5chirpE7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TimeType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FreqType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a35a415b5e5633829b98fcd6689bd6de9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">chirp</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">num</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::chirp::TimeType"><span class="n"><span class="pre">TimeType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">last</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::chirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f0</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::chirp::TimeType"><span class="n"><span class="pre">TimeType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t1</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::chirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f1</span></span>, <span class="n"><span class="pre">ChirpMethod</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">method</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">ChirpMethod</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">CHIRP_METHOD_LINEAR</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Creates a chirp signal (swept-frequency cosine)</p>
+<p>Creates a linearly-spaced sequence from 0 to “last” with “num” elements in between. Each step is of size 1/num.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FreqType</strong> – Frequency data type </p></li>
+<li><p><strong>TimeType</strong> – Type of time vector </p></li>
+<li><p><strong>Method</strong> – Chirp method (CHIRP_METHOD_LINEAR)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>num</strong> – Number of time samples </p></li>
+<li><p><strong>last</strong> – Last time sample value </p></li>
+<li><p><strong>f0</strong> – Instantenous frequency at time 0 </p></li>
+<li><p><strong>t1</strong> – Time for f1 </p></li>
+<li><p><strong>f1</strong> – Frequency (Hz) at time t1 </p></li>
+<li><p><strong>method</strong> – Method to use to generate the chirp</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The chirp operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod">
+<span id="_CPPv3I00EN4matx6cchirpE7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod"></span><span id="_CPPv2I00EN4matx6cchirpE7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SpaceOp</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FreqType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1abfa2e090aff349f2d1d8cf802f90df0d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">cchirp</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::cchirp::SpaceOp"><span class="n"><span class="pre">SpaceOp</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::cchirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f0</span></span>, <span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::cchirp::SpaceOp"><span class="n"><span class="pre">SpaceOp</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">scalar_type</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t1</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="matx::cchirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f1</span></span>, <span class="n"><span class="pre">ChirpMethod</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">method</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">ChirpMethod</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">CHIRP_METHOD_LINEAR</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6cchirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Creates a complex chirp signal (swept-frequency cosine)</p>
+<p>SpaceOp provides the time vector with custom spacing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FreqType</strong> – Frequency data type </p></li>
+<li><p><strong>SpaceOp</strong> – Operator type of spacer</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – Vector representing values in time </p></li>
+<li><p><strong>f0</strong> – Instantenous frequency at time 0 </p></li>
+<li><p><strong>t1</strong> – Time for f1 </p></li>
+<li><p><strong>f1</strong> – Frequency (Hz) at time t1 </p></li>
+<li><p><strong>method</strong> – Chirp method (CHIRP_METHOD_LINEAR)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The chirp operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod">
+<span id="_CPPv3I00EN4matx6cchirpE7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod"></span><span id="_CPPv2I00EN4matx6cchirpE7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TimeType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FreqType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a80320b77d1022b771c412b43ac7da1bb"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">cchirp</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">num</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::cchirp::TimeType"><span class="n"><span class="pre">TimeType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">last</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::cchirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f0</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::cchirp::TimeType"><span class="n"><span class="pre">TimeType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t1</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="matx::cchirp::FreqType"><span class="n"><span class="pre">FreqType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">f1</span></span>, <span class="n"><span class="pre">ChirpMethod</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">method</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">ChirpMethod</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">CHIRP_METHOD_LINEAR</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6cchirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Creates a complex chirp signal (swept-frequency cosine)</p>
+<p>Creates a linearly-spaced sequence from 0 to “last” with “num” elements in between. Each step is of size 1/num.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FreqType</strong> – Frequency data type </p></li>
+<li><p><strong>TimeType</strong> – Type of time vector </p></li>
+<li><p><strong>Method</strong> – Chirp method (CHIRP_METHOD_LINEAR)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>num</strong> – Number of time samples </p></li>
+<li><p><strong>last</strong> – Last time sample value </p></li>
+<li><p><strong>f0</strong> – Instantenous frequency at time 0 </p></li>
+<li><p><strong>t1</strong> – Time for f1 </p></li>
+<li><p><strong>f1</strong> – Frequency (Hz) at time t1 </p></li>
+<li><p><strong>method</strong> – Method to use to generate the chirp</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The chirp operator </p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 
 
