@@ -52,7 +52,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStreamCreate(&stream);
   
   // manually set to log all NVTX levels
-  matx::setNVTXLogLevel( matx_nvxtLogLevels::MATX_NVTX_LOG_ALL );
+  MATX_NVTX_SET_LOG_LEVEL( matx_nvxtLogLevels::MATX_NVTX_LOG_ALL );
   
   // create some events for timing
   cudaEvent_t start, stop;

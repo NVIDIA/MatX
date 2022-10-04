@@ -48,21 +48,23 @@ NVTX Examples
     - NVTX range scoped to this function, named “MY_MESSAGE” with log level of Internal
   * - MATX_NVTX_START("MY_MESSAGE", matx::MATX_NVTX_LOG_API )
     - NVTX range scoped to this function, named “MY_MESSAGE” with log level of API
-  * - MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1 )
+  * - MATX_NVTX_START_RANGE( "MY_MESSAGE", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1 )
     - NVTX range with manual scope, named “MY_MESSAGE”, log level of USER, and handle ID of 1
   * - MATX_NVTX_END_RANGE(1)
     - Ends the NVTX range of range with a handle of 1 used in NVTX_START_RANGE        
     
 Code examples are provided in the ``simple_pipeline`` code to show user utilization of the MatX NVTX API. 
 
-.. doxygenvariable:: matx::matx_nvxtLogLevels
-
-
+MatX NVTX API 
+-----------------
 .. doxygenfunction:: matx::setNVTXLogLevel
 .. doxygenfunction:: matx::registerEvent
 .. doxygenfunction:: matx::endEvent
 
-.. doxygenclass:: matx::NvtxEvent
-    :members:
-    
-.. doxygenvariable:: matx::matx_nvxtLogLevels    
+MatX NVTX Logging Levels
+-----------------
+.. doxygenenum:: matx::matx_nvxtLogLevels
+
+MatX NVTX Auto Range Colors
+-----------------
+.. doxygenvariable:: matx::nvtxColors    

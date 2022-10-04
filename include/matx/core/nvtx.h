@@ -39,7 +39,10 @@
 namespace matx
 {
 
-/// Enum for levels of NVTX Logging. Lower level is more selective (prints less)
+/**
+ * @brief levels of NVTX Logging. Lower level is more selective (prints less)
+ * 
+ */
 enum matx_nvxtLogLevels
 {
   MATX_NVTX_LOG_NONE = 0,
@@ -63,7 +66,10 @@ const int32_t NVTX_WHITE  = 0xFFFFFF;
 
 static const int32_t nunNvtxColors = 10;
 
-/// automatic NVTX Colors
+/**
+ * @brief automatic NVTX Colors
+ * 
+ */
 static const int32_t nvtxColors[nunNvtxColors] = {
                                              NVTX_BLACK,
                                              NVTX_RED,
@@ -110,6 +116,9 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
   #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
 
   #define MATX_NVTX_END_RANGE( id ) endEvent( id );
+  
+  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) setNVTXLogLevel( nvtxLevel );
+  
 ////////////             Disable NVTX Macros          /////////////////
 
 #else
@@ -127,6 +136,8 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                   )
                                   
   #define MATX_NVTX_END_RANGE( id );
+  
+  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel );
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +146,8 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief Utility Function to set Global Log Level 
+///\brief Utility Function to set Global Log Level. should be called through the 
+///       MATX_NVTX_SET_LOG_LEVEL macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void setNVTXLogLevel( matx_nvxtLogLevels newNVTXLevel)
@@ -145,10 +157,11 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief Class wrapping NVTX management for automatic creation/deletion
+///\brief fucntion wrapping NVTX management for automatic creation/deletion 
+///       MATX_NVTX_START or MATX_NVTX_START_RANGE macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
-static void registerEvent( int registerId, nvtxRangeId_t eventId )
+[[maybe_unused]] static void registerEvent( int registerId, nvtxRangeId_t eventId )
 { 
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   eventMap.insert(newPair);
@@ -157,7 +170,8 @@ static void registerEvent( int registerId, nvtxRangeId_t eventId )
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief Class wrapping NVTX management for automatic creation/deletion
+///\brief fucntion wrapping NVTX management for automatic creation/deletion 
+///       MATX_NVTX_END_RANGE macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 static void endEvent( int id )
