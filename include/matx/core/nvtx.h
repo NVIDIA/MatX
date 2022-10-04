@@ -39,7 +39,7 @@
 namespace matx
 {
 
-
+/// Enum for levels of NVTX Logging. Lower level is more selective (prints less)
 enum matx_nvxtLogLevels
 {
   MATX_NVTX_LOG_NONE = 0,
@@ -63,7 +63,8 @@ const int32_t NVTX_WHITE  = 0xFFFFFF;
 
 static const int32_t nunNvtxColors = 10;
 
-static const int32_t colors[nunNvtxColors] = {
+/// automatic NVTX Colors
+static const int32_t nvtxColors[nunNvtxColors] = {
                                              NVTX_BLACK,
                                              NVTX_RED,
                                              NVTX_GREEN,
@@ -77,7 +78,6 @@ static const int32_t colors[nunNvtxColors] = {
                                              };
 
 inline uint64_t curColorIdx;
-inline uint64_t dataTest = 0;
 inline std::map< int, nvtxRangeId_t>  eventMap;
 
 inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_API;
@@ -150,7 +150,6 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 static void registerEvent( int registerId, nvtxRangeId_t eventId )
 { 
-  dataTest++;
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   eventMap.insert(newPair);
 }
@@ -162,9 +161,7 @@ static void registerEvent( int registerId, nvtxRangeId_t eventId )
 ///
 ////////////////////////////////////////////////////////////////////////////////
 static void endEvent( int id )
-{
-  dataTest++;
-    
+{    
   auto foundIter = eventMap.find( id );
 
   if( foundIter != eventMap.end())
@@ -205,7 +202,7 @@ class NvtxEvent
       return;
     }
 
-    int32_t curColor = colors[ curColorIdx % nunNvtxColors];
+    int32_t curColor = nvtxColors[ curColorIdx % nunNvtxColors];
     curColorIdx++;
 
     nvtxEventAttributes_t eventAttrib;
