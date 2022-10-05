@@ -193,7 +193,7 @@ namespace matx
               typename T_wShapeT::shape_type strides[T_wShapeT::Rank()];
       for(int i = 0; i < T_wShapeT::Rank(); i++)
         strides[i] = 1;
-      return detail::SliceOp<T_wShapeT::Rank(),T>(op, starts, ends, strides);
+      return detail::SliceOp<T_wShapeT::Rank(),T_wShapeT>(op, starts, ends, strides);
     }
 
   /**
