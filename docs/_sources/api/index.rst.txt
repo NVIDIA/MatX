@@ -6,7 +6,7 @@ API Reference
 .. toctree::
    :maxdepth: 4
 
-   class.rst
+   tensorview.rst
    transformations.rst
    tensorops.rst
    tensorgenerators.rst

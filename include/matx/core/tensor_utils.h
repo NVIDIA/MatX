@@ -577,6 +577,7 @@ static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on 
  * For more fine-grained printing, see the over `Print()` overloads.
  *
  * @tparam Args Integral argument types
+ * @param op input Operator
  * @param dims Number of values to print for each dimension
  */
 template <typename Op, typename... Args,
