@@ -7,7 +7,7 @@ MatX provides an NVTX API to enable native compile-in profiling capabilities. Th
 easily profile all MatX calls using built-in NVTX ranges, while also providing a convenient API for the user to insert 
 custom ranges in their own code. This API provides many convenience features such as:
 
-- A cconvineint comple-in/compile-out MACRO based API 
+- A convenient compile-in/compile-out MACRO based API 
 - verbosity levels allowing varying levels of profiling detail
 - Built-in color rotation
 - Automatic scope management and range naming 
