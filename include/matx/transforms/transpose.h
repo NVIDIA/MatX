@@ -54,8 +54,8 @@ namespace matx
    *   Tensor to copy into
    * @param in
    *   Tensor to copy from
-   * @param stream
-   *   CUDA stream to operate in
+   * @param exec
+   *   CUDA executor to run operation
    *
    */
   template <typename OutputTensor, typename InputTensor>

@@ -225,7 +225,36 @@ namespace matx
       auto space = linspace<0>(std::move(shape), (TimeType)0, last);
       return chirp(space, f0, t1, f1, method);
     }
-
+    
+    
+  /**
+   *  Creates a complex chirp signal (swept-frequency cosine)
+   * 
+   * Creates a linearly-spaced sequence from 0 to "last" with "num" elements in between. Each step is
+   * of size 1/num.
+   *
+   * @tparam FreqType
+   *   Frequency data type
+   * @tparam TimeType
+   *   Type of time vector
+   * @tparam Method
+   *   Chirp method (CHIRP_METHOD_LINEAR)
+   *
+   * @param num
+   *   Number of time samples
+   * @param last
+   *   Last time sample value
+   * @param f0
+   *   Instantenous frequency at time 0
+   * @param t1
+   *   Time for f1
+   * @param f1
+   *   Frequency (Hz) at time t1
+   * @param method
+   *   Method to use to generate the chirp
+   *
+   * @returns The chirp operator
+   */
   template <typename TimeType, typename FreqType>
     inline auto cchirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {

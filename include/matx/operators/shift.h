@@ -145,7 +145,9 @@ namespace matx
    *
    * @param s
    *   Amount to shift forward
-   *
+   * 
+   * @param shifts
+   *    list of shift amounts
    * @returns
    *   New operator with shifted indices
    */

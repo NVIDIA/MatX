@@ -119,8 +119,8 @@ namespace matx
    * @tparam Op Input operator/tensor type
    * @param t Input operator
    */
-  template <int DIM1, int DIM2, int... DIMS, typename Op>
-    auto __MATX_INLINE__ reverse(Op t)
+  template <int DIM1, int DIM2, int... DIMS, typename Op_type>
+    auto __MATX_INLINE__ reverse(Op_type t)
     {
       // recursively call remap on remaining bits
       auto op = reverse<DIM2, DIMS...>(t);

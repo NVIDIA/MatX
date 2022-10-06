@@ -131,7 +131,7 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam T Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @param dims the reordered dimensions of the operator.
    * @return permuted operator
    */
@@ -149,7 +149,7 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam T Input operator/tensor type
-   * @param Op Input operator
+   * @param op Input operator
    * @return permuted operator
    */
   template <typename T>

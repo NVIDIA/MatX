@@ -155,8 +155,8 @@ auto make_tensor_p(ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEM
 /**
  * Create a 0D tensor with implicitly-allocated memory.
  *
- * @param shape  Shape of tensor
  * @param space  memory space to allocate in.  Default is managed memory memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  *
  **/
@@ -170,8 +170,8 @@ auto make_tensor(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t str
 /**
  * Create a 0D tensor with user-defined memory.
  *
- * @param shape  Shape of tensor
  * @param space  memory space to allocate in.  Default is managed memory memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  *
  **/
@@ -189,6 +189,8 @@ auto make_tensor_p(matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t s
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @param owning
+ *   If this class owns memory of data
  * @returns New tensor
  **/
 template <typename T, int RANK>
@@ -208,6 +210,8 @@ auto make_tensor(T *data, const index_t (&shape)[RANK], bool owning = false) {
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+ * @param owning
+ *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename T, typename ShapeType,
@@ -228,8 +232,9 @@ auto make_tensor(T *data, ShapeType &&shape, bool owning = false) {
  *
  * @param ptr
  *  Pointer to data
+ * @param owning
+ *    If this class owns memory of data
  * @returns New tensor
- *
  **/
 template <typename T>
 auto make_tensor(T *ptr, bool owning = false) {
@@ -246,6 +251,8 @@ auto make_tensor(T *ptr, bool owning = false) {
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
+  * @param owning
+ *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename T, typename ShapeType,
@@ -292,6 +299,8 @@ auto make_tensor(Storage s, ShapeType &&shape) {
  *   Pointer to device data
  * @param desc
  *   Tensor descriptor (tensor_desc_t)
+ * @param owning
+ *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
@@ -308,8 +317,8 @@ auto make_tensor(T* const data, D &&desc, bool owning = false) {
  * Create a tensor with implicitly-allocated memory and an existing descriptor
  *
  * @param desc Tensor descriptor (tensor_desc_t)
- * @param shape  Shape of tensor
  * @param space  memory space to allocate in.  Default is managed memory memory.
+ * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  **/
 template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
@@ -336,6 +345,8 @@ auto make_tensor(D &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaSt
  *   Shape of tensor
  * @param strides
  *   Strides of tensor
+ * @param owning
+ *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename T, int RANK>
@@ -351,13 +362,6 @@ auto make_tensor(T *const data, const index_t (&shape)[RANK], const index_t (&st
 
 /**
  * Create a static-sized tensor with implicit memory
- *
- * @param data
- *   Pointer to device data
- * @param shape
- *   Shape of tensor
- * @param strides
- *   Strides of tensor
  * @returns New tensor
  **/
 template <typename T, index_t I, index_t ...Is>
