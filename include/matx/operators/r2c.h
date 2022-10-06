@@ -50,6 +50,8 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type; 
 
+	 __MATX_INLINE__ std::string str() { return "r2c(" + op_.str() + ")"; }
+
         __MATX_INLINE__ R2COp(T1 op, index_t orig) : op_(op), orig_size_(orig) {
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
@@ -100,6 +102,6 @@ namespace matx
    *
    */
   template <typename T1>
-    auto r2cop(T1 t, index_t orig) { return detail::R2COp<T1>(t, orig); }
+    auto r2c(T1 t, index_t orig) { return detail::R2COp<T1>(t, orig); }
 
 } // end namespace matx

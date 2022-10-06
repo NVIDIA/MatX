@@ -38,6 +38,17 @@
 
 namespace matx
 {
+
+  template<typename T> __MATX_INLINE__ std::string as_type_str() { return "as_type"; }
+  template<> __MATX_INLINE__ std::string as_type_str<float>() { return "as_float"; }
+  template<> __MATX_INLINE__ std::string as_type_str<double>() { return "as_double"; }
+  template<> __MATX_INLINE__ std::string as_type_str<int32_t>() { return "as_int32_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<uint32_t>() { return "as_uint32_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<int16_t>() { return "as_int16_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<uint16_t>() { return "as_uint16_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<int8_t>() { return "as_int8_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<uint8_t>() { return "as_uint8_t"; }
+
   /**
    * Casts the element of the tensor to a specified type
    *
@@ -55,6 +66,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = NewType;
 
+	__MATX_INLINE__ std::string str() { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(T op) : op_(op){};  
 
         template <typename... Is>

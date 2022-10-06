@@ -61,6 +61,8 @@ namespace matx
     public:
       using scalar_type = void; ///< Scalar type for type extraction
 
+      __MATX_INLINE__ std::string str() { return  "if(" + cond_.str() + ") then {" +  op1_.str() + "} else {" + op2_.str() + "}"; }
+
       /**
        * @brief Constructor for an IFELSE statement
        * 

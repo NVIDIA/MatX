@@ -61,6 +61,9 @@ namespace matx
         public:
         using scalar_type = FreqType;
         using matxop = bool;
+
+        __MATX_INLINE__ std::string str() { return "chirp"; }
+
         inline __MATX_HOST__ __MATX_DEVICE__ Chirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
           sop_(sop),
           f0_(f0),
@@ -100,7 +103,10 @@ namespace matx
         public:
         using scalar_type = cuda::std::complex<FreqType>;
         using matxop = bool;
-        inline __MATX_HOST__ __MATX_DEVICE__ ComplexChirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
+        
+	__MATX_INLINE__ std::string str() { return "cchirp"; }
+        
+	inline __MATX_HOST__ __MATX_DEVICE__ ComplexChirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
           sop_(sop),
           f0_(f0),
           t1_(t1),

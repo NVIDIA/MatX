@@ -105,6 +105,11 @@ namespace matx
         // dummy type to signal this is a matxop
         using matxop = bool;
         using scalar_type = typename Op::scalar_type;
+
+      __MATX_INLINE__ const std::string str() {
+        return op_.str(get_type_str(in1_), get_type_str(in2_));
+      }
+
         __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)

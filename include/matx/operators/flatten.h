@@ -49,6 +49,8 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
 
+        __MATX_INLINE__ std::string str() { return "flatten(" + op1_.str() + ")"; }
+ 
         __MATX_INLINE__ FlattenOp(const T1 &op1) : op1_(op1)
       {
         static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");

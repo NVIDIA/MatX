@@ -49,6 +49,8 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type; 
 
+	__MATX_INLINE__ std::string str() { return "fftshift(" + op_.str() + ")"; }
+
         __MATX_INLINE__ FFTShift1DOp(T1 op) : op_(op){
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };

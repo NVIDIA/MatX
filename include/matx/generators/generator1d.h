@@ -43,6 +43,8 @@ namespace matx
         using scalar_type = typename Generator1D::scalar_type;
         static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
+        __MATX_INLINE__ std::string str() { return "gen1d"; }
+
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 

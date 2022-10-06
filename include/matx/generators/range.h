@@ -47,6 +47,9 @@ namespace matx
 
         Range() = default;
 
+        __MATX_INLINE__ std::string str() { return "range"; }
+
+
         Range(T first, T step) : first_(first), step_(step) {}
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const

@@ -56,6 +56,7 @@ private:
   I4 pfa_;
 
 public:
+
   /**
    * @brief Construct a new calcDets object
    * 

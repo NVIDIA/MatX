@@ -46,6 +46,8 @@ namespace matx
         using matxop = bool;
         using scalar_type = T;
 
+        __MATX_INLINE__ std::string str() { return "meshgridx"; }	
+
         Meshgrid_X(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 
         inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
@@ -69,6 +71,8 @@ namespace matx
         // dummy type to signal this is a matxop
         using matxop = bool;
         using scalar_type = T;
+        
+	__MATX_INLINE__ std::string str() { return "meshgridy"; }	
 
         Meshgrid_Y(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
 

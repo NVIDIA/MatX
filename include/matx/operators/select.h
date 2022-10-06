@@ -55,6 +55,8 @@ namespace matx
         using scalar_type = typename T::scalar_type;
         static_assert(IdxType::Rank() == 1, "Rank of index operator must be 1");
 
+        __MATX_INLINE__ std::string str() { return "select(" + op_.str() + ")"; }
+
         __MATX_INLINE__ SelectOp(T op, IdxType idx) : op_(op), idx_(idx) {};  
 
         template <typename... Is>

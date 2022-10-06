@@ -66,6 +66,10 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename Op::scalar_type;
 
+    __MATX_INLINE__ const std::string str() {
+      return op_.str() + "(" + get_type_str(in1_) + ")";
+    }
+
     __MATX_INLINE__ matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
       if constexpr (Rank() > 0) {
         for (int32_t i = 0; i < Rank(); i++) {

@@ -57,6 +57,8 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
 
+      __MATX_INLINE__ std::string str() { return "kron(" + op1_.str() + "," + op2_.str() + ")"; }
+
         __MATX_INLINE__ KronOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
       {
         static_assert(Rank() >= 2, "Kronecker product must be used on tensors with rank 2 or higher");
