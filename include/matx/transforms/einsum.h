@@ -43,6 +43,7 @@
 #include <cutensornet.h>
 #include <cutensor.h>
 
+#include "matx/core/nvtx.h"
 
 
 
@@ -82,7 +83,8 @@ public:
   matxEinsumHandle_t(OutputTensor &out, const std::string &subscripts, cudaStream_t stream, const InT&... tensors)
   {
     [[maybe_unused]] cutensornetStatus_t status;
-
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
     //cutensornetLoggerSetLevel(5);
@@ -256,6 +258,8 @@ public:
    * @return true if tokenized successfully, or false otherwise 
    */
   static bool ParseEinsum(const std::string &str, std::vector<std::string> &out) {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     // Find output separator
     auto iout = str.find("->");
     if (iout == std::string::npos) {
@@ -283,6 +287,8 @@ public:
 
   static EinsumParams_t<InT...> GetEinsumParams(OutputTensor &out, const std::string &subscripts, const InT&... tensors)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     EinsumParams_t<InT...> params; 
     std::vector<std::string> tokens;
     size_t i;
@@ -366,6 +372,8 @@ public:
 
   inline void Exec(OutputTensor &out, cudaStream_t stream, const InT... tensors)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     void *data_in[sizeof...(InT)];
     size_t i = 0;
     ((data_in[i++] = tensors.Data()), ...);
@@ -469,6 +477,8 @@ namespace cutensor {
   void einsum(OutputType &out, const std::string &subscripts, cudaStream_t stream, InT... tensors)
   {
 #if MATX_ENABLE_CUTENSOR    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     // Get parameters required by these tensors
     auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
     params.stream = stream;

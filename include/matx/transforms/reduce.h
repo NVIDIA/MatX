@@ -32,12 +32,14 @@
 
 #pragma once
 
+#include <cfloat>
+
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/transforms/cub.h"
-#include <cfloat>
 
 #ifdef __CUDACC__  
 /**
@@ -1015,6 +1017,8 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
                    cudaStream_t stream = 0, bool init = true)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using scalar_type = typename InType::scalar_type;
   using T = typename OutType::scalar_type;
 
@@ -1094,6 +1098,8 @@ template <typename OutType, typename InType, typename ReduceOp>
 void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
   if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
@@ -1132,6 +1138,8 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in,
                  cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
   inner_type scale = 1;
 
@@ -1179,7 +1187,9 @@ void __MATX_INLINE__ median(OutType dest,
   using T = typename OutType::scalar_type;
   constexpr int RANK_IN = TensorInType::Rank();
   static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   // If the rank is 0 we're finding the median of a vector
@@ -1245,6 +1255,8 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
@@ -1279,6 +1291,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
@@ -1309,6 +1322,8 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
@@ -1345,6 +1360,7 @@ template <typename OutType, typename TensorIndexType, typename InType>
 void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
@@ -1375,6 +1391,8 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
@@ -1412,6 +1430,7 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
@@ -1441,6 +1460,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ any(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   reduce(dest, in, detail::reduceOpAny<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
@@ -1469,7 +1489,8 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, cudaStream_t stream = 0
 template <typename OutType, typename InType>
 void __MATX_INLINE__ all(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__ 
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API) 
   reduce(dest, in, detail::reduceOpAll<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
@@ -1498,6 +1519,8 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__    
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
 
   auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -1549,6 +1572,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ stdd(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   var(dest, in, stream);
   (dest = sqrt(dest)).run(stream);
 #endif  
@@ -1577,6 +1601,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ trace(OutType dest, const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   auto d = diag(in);
   sum(dest, d, stream);
 #endif  

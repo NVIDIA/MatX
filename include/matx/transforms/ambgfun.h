@@ -38,6 +38,7 @@
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
 
@@ -163,6 +164,8 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
                      [[maybe_unused]] double fs, ::matx::AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   constexpr int RANK = XTensor::Rank();
   using T1 = typename XTensor::scalar_type;
 
@@ -317,6 +320,7 @@ inline void ambgfun(AMFTensor &amf, XTensor &x,
                     YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0, cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   detail::InternalAmbgFun(amf, x, std::make_optional(y), fs, cut, cut_val, stream);
 }
 
@@ -356,6 +360,7 @@ inline void ambgfun(AMFTensor &amf, XTensor &x,
                     double fs, AMBGFunCutType_t cut, float cut_val = 0.0,
                     cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   static_assert(AMFTensor::Rank() == 2, "Output tensor of ambgfun must be 2D");
   
   std::optional<XTensor> nil = std::nullopt;

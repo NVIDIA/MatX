@@ -39,6 +39,7 @@
 #include <type_traits>
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/transforms/conv.h"
 #include "matx/kernels/filter.cuh"
@@ -57,7 +58,8 @@ public:
                const filter_tensor &h_nonrec)
       : h_nonr_copy(h_nonrec)
   {
-
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 1) {
       MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
 
@@ -154,6 +156,8 @@ public:
 #ifndef __CUDACC__
     MATX_THROW(matxNotSupported, "convolution not supported on host");
 #else
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (num_recursive > 0) {
       auto grid =
           dim3(static_cast<int>(
@@ -180,6 +184,8 @@ public:
 private:
   void ClearState()
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (num_recursive > 0) {
       MATX_CUDA_CHECK(cudaMemset(
           (void *)d_status, 0,
@@ -197,6 +203,7 @@ private:
 
   void ComputeCorrectionFactors(const FilterType *coeffs)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     FilterType *out = reinterpret_cast<FilterType *>(
         malloc(sizeof(FilterType) * num_recursive * CORR_COLS));
     FilterType *last = reinterpret_cast<FilterType *>(
@@ -383,6 +390,7 @@ static auto matxMakeFilter(OutType &o, const InType &i,
                            tensor_t<FilterType, 1> &h_rec,
                            tensor_t<FilterType, 1> &h_nonrec)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   return detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>{o, i, h_rec,
                                                                   h_nonrec};
 }
@@ -431,6 +439,8 @@ static auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NR> &h_rec,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto rec_v = make_tensor<FilterType>({static_cast<index_t>(h_rec.size())});
   auto nonrec_v = make_tensor<FilterType>({static_cast<index_t>(h_nonrec.size())});
 
@@ -495,6 +505,8 @@ void filter(OutType &o, const InType &i,
             const std::array<FilterType, NR> h_rec,
             const std::array<FilterType, NNR> h_nonrec, cudaStream_t stream = 0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   auto params = detail::FilterParams_t();
   auto rhash = detail::PodArrayToHash<FilterType, NR>(h_rec);

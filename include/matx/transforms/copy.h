@@ -33,6 +33,7 @@
 #pragma once
 
 
+#include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
 
 namespace matx
@@ -59,6 +60,7 @@ namespace matx
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
         const cudaStream_t stream)
     {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)      
       for (int i = 0; i < OutputTensor::Rank(); i++)
       {
         MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);

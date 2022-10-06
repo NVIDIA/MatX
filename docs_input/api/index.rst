@@ -15,3 +15,4 @@ API Reference
    utilities.rst
    type_traits.rst
    einsum.rst
+   nvtx.rst
