@@ -41,6 +41,7 @@
 #include <numeric>
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 
 namespace matx {
@@ -53,7 +54,8 @@ using namespace std::placeholders;
  */
 typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
 
-
+// define of dimension size for when the cub segemented sort
+// is outperformed by the radixSort
 constexpr index_t cubSegmentCuttoff = 8192;
 /**
  * Parameters needed to execute a sort operation.
@@ -245,7 +247,9 @@ public:
         MATX_ASSERT(a.Size(i) == a_out.Size(i), matxInvalidSize);
       }
     }
-
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (op == CUB_OP_RADIX_SORT) {
       ExecSort(a_out, a, stream, cparams_.dir);
     }
@@ -322,6 +326,8 @@ public:
   template <typename Func>
   void RunBatches(OutputTensor &a_out, const InputOperator &a, const Func &f, int batch_offset)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     using shape_type = index_t;
     size_t total_iter = 1;
     for (int i = 0; i < InputOperator::Rank() - batch_offset; i++) {
@@ -397,6 +403,8 @@ public:
                            const T1 upper, const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -449,6 +457,8 @@ public:
                                const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -640,7 +650,9 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
   static_assert(is_tensor_view_v<InputOperator>, "Sorting only accepts tensors for now (no operators)");
   MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
-
+  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
 #if CUB_MINOR_VERSION  >  14
   // use optimized segmented sort if:
   //    - it is available (cub > 1.4)
@@ -782,6 +794,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -874,6 +888,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -960,6 +976,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -1046,6 +1064,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -1133,6 +1153,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (is_tensor_view_v<InputOperator>) {
       const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
       if (a.IsContiguous()) {
@@ -1209,6 +1231,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if constexpr (is_tensor_view_v<InputOperator>) {
       if (a.IsContiguous()) {
         cub::DeviceSelect::If(d_temp,
@@ -1268,6 +1292,8 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+      
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
@@ -1374,6 +1400,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
   auto reduce_params = param_type{ReduceOp{}, init};
@@ -1423,7 +1450,8 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 {
 
 #ifdef __CUDACC__
-
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1467,6 +1495,8 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1509,6 +1539,8 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1564,6 +1596,8 @@ void sort(OutputTensor &a_out, const InputOperator &a,
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
@@ -1610,6 +1644,7 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
             const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a);
@@ -1662,6 +1697,9 @@ void hist(OutputTensor &a_out, const InputOperator &a,
           const typename InputOperator::scalar_type upper, const cudaStream_t stream = 0)
 {
   static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram tensor must use int type");
+ 
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
 #ifdef __CUDACC__
   // Get parameters required by these tensors
   // auto params =
@@ -1797,6 +1835,8 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   // auto params =
   //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
@@ -1859,7 +1899,8 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
 {
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
-
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   // auto params =
   //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a);
@@ -1917,7 +1958,8 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
 {
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
-
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
   typename InputOperator::scalar_type *sort_ptr;
   matxAlloc((void **)&sort_ptr, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);

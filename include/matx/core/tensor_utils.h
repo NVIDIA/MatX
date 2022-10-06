@@ -35,6 +35,7 @@
 #include <cuda/std/tuple>
 #include <functional>
 
+#include "matx/core/nvtx.h"
 #include "matx/core/make_tensor.h"
 
 namespace matx
@@ -47,6 +48,8 @@ namespace matx
    */
   template <typename Op>
   size_t TotalSize(const Op &op) {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
     if constexpr (is_tensor_view_v<Op>) {
       return static_cast<size_t>(op.TotalSize());
     }
@@ -71,7 +74,7 @@ namespace matx
    */
   template <typename Op>
   index_t LargestDimSize(const Op &op) {
-
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     index_t maxSize = op.Size(0);
 
     for (int i = 1; i < op.Rank(); i++)
@@ -156,6 +159,7 @@ namespace detail {
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
+    
     if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
     }
@@ -226,19 +230,20 @@ namespace detail {
   template <typename T0, typename T1, typename... Tn>
   constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
   {
-      if constexpr (sizeof...(tn) == 0) {
-          return t0 > t1 ? t0 : t1;
-      }
-      else {
-          return matx_max(matx_max(t0, t1), tn...);
-      }
+    
+    if constexpr (sizeof...(tn) == 0) {
+        return t0 > t1 ? t0 : t1;
+    }
+    else {
+        return matx_max(matx_max(t0, t1), tn...);
+    }
 
-      return t0; // 11.4 compiler has a bug. This is dead code
+    return t0; // 11.4 compiler has a bug. This is dead code
   }
 
   template <class T, class M = T>
   __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t get_rank()
-  {
+  {   
     if constexpr (is_matx_op<M>())
       return T::Rank();
     else
@@ -398,6 +403,8 @@ namespace detail {
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
     if constexpr (is_complex_v<T>) {
       printf("%.4e%+.4ej ", static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
@@ -441,6 +448,45 @@ namespace detail {
   }
 
   /**
+   * convert Type to string
+   *
+   * function convert a tensor type to a string
+   *
+   */
+  template <typename T> static std::string GetTensorType()
+  {
+    if constexpr (std::is_same_v<T, bool>)
+      return "bool";    
+    if constexpr (std::is_same_v<T, int32_t>)
+      return "int32_t";
+    if constexpr (std::is_same_v<T, uint32_t>)
+      return "uint32_t";
+    if constexpr (std::is_same_v<T, int64_t>)
+      return "int64_t";
+    if constexpr (std::is_same_v<T, uint64_t>)
+      return "uint64_t";
+    if constexpr (std::is_same_v<T, float> )
+      return "float";
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return "float16";
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return "bfloat16";
+    if constexpr (std::is_same_v<T, double>)
+      return "double";
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>) 
+      return "complex<double>";
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>) 
+      return "complex<float>";
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return "complex<float16>";
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return "complex<bfloat16>";
+          
+    return "unknown";
+  }
+
+
+  /**
    * Print a tensor
    *
    * Type-agnostic function to print a tensor to stdout
@@ -449,8 +495,11 @@ namespace detail {
   template <typename Op, typename ... Args>
   __MATX_HOST__ void InternalPrint(const Op &op, Args ...dims)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
     MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
+
     if constexpr (sizeof...(Args) == 0) {
       PrintVal(op.operator()());
       printf("\n");
@@ -516,7 +565,7 @@ namespace detail {
       }
     }
   }
-}
+} // end namespace detail
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
 
@@ -537,6 +586,7 @@ static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on 
  * For more fine-grained printing, see the over `Print()` overloads.
  *
  * @tparam Args Integral argument types
+ * @param op input Operator
  * @param dims Number of values to print for each dimension
  */
 template <typename Op, typename... Args,
@@ -544,8 +594,30 @@ template <typename Op, typename... Args,
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
 void Print(const Op &op, Args... dims) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  // print tensor size info first
+  std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
+
+  printf("%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), op.Rank());
+
+  for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
+    printf("%lld", op.Size(static_cast<int>(dimIdx)) );
+    if( dimIdx < (op.Rank() - 1) )
+      printf(", ");
+  }
+
 #ifdef __CUDACC__
   if constexpr (is_tensor_view_v<Op>) {
+
+    printf("], Strides:[");
+    for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
+    printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
+    if( dimIdx < (op.Rank() - 1) )
+      printf(",");
+    }
+    printf("]\n");
+
     auto kind = GetPointerKind(op.Data());
     cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
@@ -563,9 +635,11 @@ void Print(const Op &op, Args... dims) {
     }
   }
   else {
+    printf("]\n");
     InternalPrint(op, dims...);
   }
 #else
+  printf("]\n");
   InternalPrint(op, dims...);
 #endif
 }

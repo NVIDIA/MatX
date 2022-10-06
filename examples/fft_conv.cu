@@ -43,7 +43,7 @@ using namespace matx;
  * This example shows how to perform an FFT convolution using the MatX library.
  * The example shows the convolution theorem of:
  *
- * \f$ h*x \leftrightarrow H \cdot X$
+ * \f(h*x \leftrightarrow H \cdot X$  \f)
  *
  * Namely, a convolution in the time domain is a point-wise multiplication in
  * the frequency domain. In this example we start with two signals in the time
@@ -65,7 +65,7 @@ using namespace matx;
  * there is some buffer and 3 FFT operations (2 for FFT of signal and filter,
  * and 1 IFFT after the multiply) that causes the setup time to dominate.
  *
-**/
+ */
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();

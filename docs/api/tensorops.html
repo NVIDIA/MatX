@@ -94,34 +94,17 @@
    </i>
   </label>
   <ul class="current">
-   <li class="toctree-l2 has-children">
-    <a class="reference internal" href="class.html">
-     Tensor Class Reference
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorview.html">
+     Tensors
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-    <label for="toctree-checkbox-2">
-     <i class="fas fa-chevron-down">
-     </i>
-    </label>
-    <ul>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorview.html">
-       tensor_t
-      </a>
-     </li>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorshape.html">
-       tensorShape_t
-      </a>
-     </li>
-    </ul>
    </li>
    <li class="toctree-l2 has-children">
     <a class="reference internal" href="transformations.html">
      Tensor Transformations
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
-    <label for="toctree-checkbox-3">
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
      <i class="fas fa-chevron-down">
      </i>
     </label>
@@ -209,8 +192,8 @@
   <a class="reference internal" href="../examples/index.html">
    Example Applications
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
-  <label for="toctree-checkbox-4">
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
    <i class="fas fa-chevron-down">
    </i>
   </label>
@@ -744,6 +727,20 @@ the values.</p>
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx4fmodE2Op2Op">
+<span id="_CPPv3N4matx4fmodE2Op2Op"></span><span id="_CPPv2N4matx4fmodE2Op2Op"></span><span id="matx::fmod__Op.Op"></span><span class="target" id="namespacematx_1a8c65aa74f6f4594fafe6f38a1b5e05de"></span><span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">fmod</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t2</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx4fmodE2Op2Op" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Modulo two operators or tensors </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> – LHS tensor or operator input </p></li>
+<li><p><strong>t2</strong> – RHS second tensor or operator modulus </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N4matx3powE2Op2Op">
 <span id="_CPPv3N4matx3powE2Op2Op"></span><span id="_CPPv2N4matx3powE2Op2Op"></span><span id="matx::pow__Op.Op"></span><span class="target" id="namespacematx_1a64b1ad1725683ebb2b676b8c57d695e3"></span><span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">pow</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">Op</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t2</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx3powE2Op2Op" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Compute the t^t2 of two operators or tensors </p>
@@ -1074,105 +1071,57 @@ the values.</p>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx8reverseXEDa2T1">
-<span id="_CPPv3I0EN4matx8reverseXE2T1"></span><span id="_CPPv2I0EN4matx8reverseXE2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae84e1952c119012425ec9186b59b7d40"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverseX</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx8reverseXEDa2T1" title="matx::reverseX::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx8reverseXEDa2T1" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to reverse the indexing of the last dimension of a tensor</p>
-<p>Requires a tensor of at least rank 1 </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx8reverseYEDa2T1">
-<span id="_CPPv3I0EN4matx8reverseYE2T1"></span><span id="_CPPv2I0EN4matx8reverseYE2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aac1ffd17e76bf1a8eb21621137535cd3"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverseY</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx8reverseYEDa2T1" title="matx::reverseY::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx8reverseYEDa2T1" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to reverse the indexing of the second-to-last dimension of a tensor</p>
-<p>Requires a tensor of at least rank 2 </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx8reverseZEDa2T1">
-<span id="_CPPv3I0EN4matx8reverseZE2T1"></span><span id="_CPPv2I0EN4matx8reverseZE2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a796bd1e71d2907432b4dbd6e428fdac3"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverseZ</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx8reverseZEDa2T1" title="matx::reverseZ::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx8reverseZEDa2T1" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to reverse the indexing of the third-to-last dimension of a tensor</p>
-<p>Requires a tensor of at least rank 3 </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx8reverseWEDa2T1">
-<span id="_CPPv3I0EN4matx8reverseWE2T1"></span><span id="_CPPv2I0EN4matx8reverseWE2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a4d045cd7e185d58e7105674398e8caa0"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverseW</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx8reverseWEDa2T1" title="matx::reverseW::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx8reverseWEDa2T1" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to reverse the indexing of the first dimension of a tensor</p>
-<p>Requires a tensor of rank 4 </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx6shift0EDa2T17index_t">
-<span id="_CPPv3I0EN4matx6shift0E2T17index_t"></span><span id="_CPPv2I0EN4matx6shift0E2T17index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae4b7a5af9365342c40181ee6646000e6"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">shift0</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx6shift0EDa2T17index_t" title="matx::shift0::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx6shift0EDa2T17index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to shift dimension 0 by a given amount</p>
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx7reverseEDa2Op">
+<span id="_CPPv3I_i0EN4matx7reverseE2Op"></span><span id="_CPPv2I_i0EN4matx7reverseE2Op"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Op</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ab75890260afbc5540779e9fd7e502a6b"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverse</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i0EN4matx7reverseEDa2Op" title="matx::reverse::Op"><span class="n"><span class="pre">Op</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx7reverseEDa2Op" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically reverse elements of an operator. Base case for variadic template. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of operator or view </p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>t</strong> – Operator or view to shift </p></li>
-<li><p><strong>s</strong> – Amount to shift forward</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – Dimension to apply the reverse </p></li>
+<li><p><strong>Op</strong> – Input operator/tensor type </p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>New operator with shifted indices </p>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>t</strong> – Input operator </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx6shift1EDa2T17index_t">
-<span id="_CPPv3I0EN4matx6shift1E2T17index_t"></span><span id="_CPPv2I0EN4matx6shift1E2T17index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1af16bbea62633920ac9f3c84557fbe0a5"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">shift1</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx6shift1EDa2T17index_t" title="matx::shift1::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx6shift1EDa2T17index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to shift dimension 1 by a given amount</p>
+<dt class="sig sig-object cpp" id="_CPPv4I_i_i_Dpi0EN4matx7reverseEDa7Op_type">
+<span id="_CPPv3I_i_i_Dpi0EN4matx7reverseE7Op_type"></span><span id="_CPPv2I_i_i_Dpi0EN4matx7reverseE7Op_type"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM1</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM2</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIMS</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Op_type</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae6fe7887b34bc86a3ea0d6e661b2d7b0"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">reverse</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i_i_Dpi0EN4matx7reverseEDa7Op_type" title="matx::reverse::Op_type"><span class="n"><span class="pre">Op_type</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i_i_Dpi0EN4matx7reverseEDa7Op_type" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically reverse elements of an operator. </p>
+<p>This operator can appear as an rvalue or lvalue.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of operator or view </p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>t</strong> – Operator or view to shift </p></li>
-<li><p><strong>s</strong> – Amount to shift forward</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – Dimension to apply the reverse </p></li>
+<li><p><strong>DIMS...</strong> – list of multiple dimensions to reverse along </p></li>
+<li><p><strong>Op</strong> – Input operator/tensor type </p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>New operator with shifted indices </p>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>t</strong> – Input operator </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx6shift2EDa2T17index_t">
-<span id="_CPPv3I0EN4matx6shift2E2T17index_t"></span><span id="_CPPv2I0EN4matx6shift2E2T17index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a4f71b31bead1fa1dc179ddb94a3cca6f"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">shift2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx6shift2EDa2T17index_t" title="matx::shift2::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx6shift2EDa2T17index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to shift dimension 2 by a given amount</p>
+<dt class="sig sig-object cpp" id="_CPPv4I_i00EN4matx5shiftEDa3OpT8ShiftOpT">
+<span id="_CPPv3I_i00EN4matx5shiftE3OpT8ShiftOpT"></span><span id="_CPPv2I_i00EN4matx5shiftE3OpT8ShiftOpT"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpT</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ShiftOpT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aa45c72f18656505584118dd13ee396f4"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">shift</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i00EN4matx5shiftEDa3OpT8ShiftOpT" title="matx::shift::OpT"><span class="n"><span class="pre">OpT</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <a class="reference internal" href="#_CPPv4I_i00EN4matx5shiftEDa3OpT8ShiftOpT" title="matx::shift::ShiftOpT"><span class="n"><span class="pre">ShiftOpT</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i00EN4matx5shiftEDa3OpT8ShiftOpT" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to shift dimension by a given amount</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of operator or view </p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>t</strong> – Operator or view to shift </p></li>
-<li><p><strong>s</strong> – Amount to shift forward</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – The dimension to be shifted</p></li>
+<li><p><strong>OpT</strong> – Type of operator or view</p></li>
+<li><p><strong>ShiftOpT</strong> – Type of the operator for the shift</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>New operator with shifted indices </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx6shift3EDa2T17index_t">
-<span id="_CPPv3I0EN4matx6shift3E2T17index_t"></span><span id="_CPPv2I0EN4matx6shift3E2T17index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ad28cd9bfa83b1f819a5f22a4f9d1ac54"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">shift3</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx6shift3EDa2T17index_t" title="matx::shift3::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx6shift3EDa2T17index_t" title="Permalink to this definition"></a><br /></dt>
-<dd><p>Helper function to shift dimension 3 by a given amount</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>T1</strong> – Type of operator or view </p>
-</dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>t</strong> – Operator or view to shift </p></li>
-<li><p><strong>s</strong> – Amount to shift forward</p></li>
+<li><p><strong>op</strong> – Operator or view to shift</p></li>
+<li><p><strong>s</strong> – Operator which returns the shift</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -1311,7 +1260,291 @@ the values.</p>
 <dd class="field-odd"><p><strong>T1</strong> – Type of View/Op </p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>t</strong> – View/Op to shift </p>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – View/Op to shift </p></li>
+<li><p><strong>orig</strong> – Original size. Needed to disambiguate between integer division giving same output size </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx7flattenEDaRK2T1">
+<span id="_CPPv3I0EN4matx7flattenERK2T1"></span><span id="_CPPv2I0EN4matx7flattenERK2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ac58b2f96f8ca9aaf30024e1f182aafb8"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">flatten</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx7flattenEDaRK2T1" title="matx::flatten::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx7flattenEDaRK2T1" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Flatten operator</p>
+<p>The flatten operator takes an operator of rank 2 or higher and flattens every dimension into a single 1D tensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T1</strong> – Operator type</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Operator of flattened input </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i00EN4matx5remapEDa2Op3Ind">
+<span id="_CPPv3I_i00EN4matx5remapE2Op3Ind"></span><span id="_CPPv2I_i00EN4matx5remapE2Op3Ind"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Op</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Ind</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1afb59826d531aeaf754febe1c5bf513c8"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">remap</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i00EN4matx5remapEDa2Op3Ind" title="matx::remap::Op"><span class="n"><span class="pre">Op</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <a class="reference internal" href="#_CPPv4I_i00EN4matx5remapEDa2Op3Ind" title="matx::remap::Ind"><span class="n"><span class="pre">Ind</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">idx</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i00EN4matx5remapEDa2Op3Ind" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically remap elements of an operator based on an index array/operator. </p>
+<p>The rank of the output tensor is equal to the rank of the input tensor. The rank of the index tensor must be 1. </p>
+<p>The size of the output tensor is the same as the input tensor except in the applied dimenions. In the applied dimension the size of the output tensor is equal to the size of the index tensor.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – Dimension to apply the remap </p></li>
+<li><p><strong>T</strong> – Input operator/tensor type </p></li>
+<li><p><strong>Ind</strong> – Input index Operator type </p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – Input operator </p></li>
+<li><p><strong>idx</strong> – Index operator/tensor </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Value in t from each location in idx </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i_Dpi00DpEN4matx5remapEDa2Op3IndDp4Inds">
+<span id="_CPPv3I_i_Dpi00DpEN4matx5remapE2Op3IndDp4Inds"></span><span id="_CPPv2I_i_Dpi00DpEN4matx5remapE2Op3IndDp4Inds"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIMS</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Op</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Ind</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Inds</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a06ac3e2e29250102c5aed8e1e94c4887"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">remap</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i_Dpi00DpEN4matx5remapEDa2Op3IndDp4Inds" title="matx::remap::Op"><span class="n"><span class="pre">Op</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <a class="reference internal" href="#_CPPv4I_i_Dpi00DpEN4matx5remapEDa2Op3IndDp4Inds" title="matx::remap::Ind"><span class="n"><span class="pre">Ind</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">idx</span></span>, <a class="reference internal" href="#_CPPv4I_i_Dpi00DpEN4matx5remapEDa2Op3IndDp4Inds" title="matx::remap::Inds"><span class="n"><span class="pre">Inds</span></span></a><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">inds</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i_Dpi00DpEN4matx5remapEDa2Op3IndDp4Inds" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically remap elements of an operator based on an index array/operator. </p>
+<p><p>The rank of the output tensor is equal to the rank of the input tensor. The rank of the index tensor must be 1.</p>
+<p>The number of DIMS and the number of Inds provided must be the same.</p>
+</p>
+<p>The size of the output tensor is the same as the input tensor except in the applied dimenions. In the applied dimension the size of the output tensor is equal to the size of the index tensor.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – Dimension to apply the remap </p></li>
+<li><p><strong>DIMS...</strong> – list of multiple dimensions to remap along </p></li>
+<li><p><strong>T</strong> – Input operator/tensor type </p></li>
+<li><p><strong>Ind</strong> – Input index Operator type </p></li>
+<li><p><strong>Inds...</strong> – list of multiple index operators to remap along </p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – Input operator </p></li>
+<li><p><strong>idx</strong> – Index operator/tensor </p></li>
+<li><p><strong>inds</strong> – list of multiple index operators to remap along </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Value in t from each location in idx </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx9rcollapseEDaRK2T1">
+<span id="_CPPv3I_i0EN4matx9rcollapseERK2T1"></span><span id="_CPPv2I_i0EN4matx9rcollapseERK2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1acf70bf9f514e11c8f073f1e4d1792d91"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">rcollapse</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx9rcollapseEDaRK2T1" title="matx::rcollapse::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx9rcollapseEDaRK2T1" title="Permalink to this definition"></a><br /></dt>
+<dd><p>rcollapse operator</p>
+<p>The rcollapse operator takes a tensor and collapses the right most dimensions into a single dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – The number of dimensions to collapse </p></li>
+<li><p><strong>T1</strong> – Operator type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>a</strong> – The parameter being collapsed</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with collapsed input </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx9lcollapseEDaRK2T1">
+<span id="_CPPv3I_i0EN4matx9lcollapseERK2T1"></span><span id="_CPPv2I_i0EN4matx9lcollapseERK2T1"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DIM</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T1</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a5b6128b0aa09e8bc0eb22b4520b251bc"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">lcollapse</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx9lcollapseEDaRK2T1" title="matx::lcollapse::T1"><span class="n"><span class="pre">T1</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx9lcollapseEDaRK2T1" title="Permalink to this definition"></a><br /></dt>
+<dd><p>lcollapse operator</p>
+<p>The lcollapse operator takes a tensor and collapses the left most dimensions into a single dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DIM</strong> – The number of dimensions to collapse </p></li>
+<li><p><strong>T1</strong> – Operator type</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>a</strong> – The operator being collapsed</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with collapsed input </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx5cloneEDa2OpRA4Rank_K7index_t">
+<span id="_CPPv3I_i0EN4matx5cloneE2OpRA4Rank_K7index_t"></span><span id="_CPPv2I_i0EN4matx5cloneE2OpRARank_K7index_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rank</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Op</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a662d4d4a9eb539973512e4b351edc1cb"></span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">clone</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I_i0EN4matx5cloneEDa2OpRA4Rank_K7index_t" title="matx::clone::Op"><span class="n"><span class="pre">Op</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">shape</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5cloneEDa2OpRA4Rank_K7index_t" title="matx::clone::Rank"><span class="n"><span class="pre">Rank</span></span></a><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx5cloneEDa2OpRA4Rank_K7index_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to clone an operator or tensor acorss dimensions. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>Rank</strong> – the rank of the cloned operator </p></li>
+<li><p><strong>T</strong> – source operator/tensor type </p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>t</strong> – source operator/tensor </p></li>
+<li><p><strong>shape</strong> – <p>the shape of the cloned operator/tensor.</p>
+<p>Each element is either the size of the cloned dimension or matxKeepDim to be from the source tensor</p>
+</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>operator to compute the cloned value </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE">
+<span id="_CPPv3I0EN4matx5sliceEK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE"></span><span id="_CPPv2I0EN4matx5sliceEK10T_wStrideTRAT_wStrideT::Rank()_KN10T_wStrideT10shape_typeERAT_wStrideT::Rank()_KN10T_wStrideT10shape_typeERAT_wStrideT::Rank()_KN10T_wStrideT11stride_typeE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T_wStrideT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1abfd71ac98ece0be33852d3157929a9df"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">slice</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">starts</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ends</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">stride_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">strides</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="matx::slice::T_wStrideT"><span class="n"><span class="pre">T_wStrideT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx5sliceEDaK10T_wStrideTRAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT10shape_typeERAclN10T_wStrideT4RankEE_KN10T_wStrideT11stride_typeE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically slice a tensor or operator. </p>
+<p>The rank of the the operator must be greater than 0.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T_wStrideT</strong> – Input operator/tensor type </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>op</strong> – Input operator </p></li>
+<li><p><strong>starts</strong> – the first element (inclusive) of each dimension of the input operator. </p></li>
+<li><p><strong>ends</strong> – the last element (exclusive) of each dimension of the input operator. matxDrop Dim removes that dimension. matxEnd deontes all remaining elements in that dimension. </p></li>
+<li><p><strong>strides</strong> – Optional: the stride between consecutive elements </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>sliced operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE">
+<span id="_CPPv3I0EN4matx5sliceEK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE"></span><span id="_CPPv2I0EN4matx5sliceEK9T_wShapeTRAT_wShapeT::Rank()_KN9T_wShapeT10shape_typeERAT_wShapeT::Rank()_KN9T_wShapeT10shape_typeE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T_wShapeT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a019abd03000fe94ada0398d56256a624"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">slice</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="matx::slice::T_wShapeT"><span class="n"><span class="pre">T_wShapeT</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="matx::slice::T_wShapeT"><span class="n"><span class="pre">T_wShapeT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">starts</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="matx::slice::T_wShapeT"><span class="n"><span class="pre">T_wShapeT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="matx::slice::T_wShapeT"><span class="n"><span class="pre">T_wShapeT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ends</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="matx::slice::T_wShapeT"><span class="n"><span class="pre">T_wShapeT</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx5sliceEDaK9T_wShapeTRAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeERAclN9T_wShapeT4RankEE_KN9T_wShapeT10shape_typeE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically slice a tensor or operator. </p>
+<p>The rank of the the operator must be greater than 0.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T_wShapeT</strong> – Input operator/tensor type </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>op</strong> – Input operator </p></li>
+<li><p><strong>starts</strong> – the first element (inclusive) of each dimension of the input operator. </p></li>
+<li><p><strong>ends</strong> – the last element (exclusive) of each dimension of the input operator. matxDrop Dim removes that dimension. matxEnd deontes all remaining elements in that dimension. </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>sliced operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE">
+<span id="_CPPv3I_i0EN4matx5sliceEK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE"></span><span id="_CPPv2I_i0EN4matx5sliceEK12T_wStridet_2RAT_wStridet_2::Rank()_KN12T_wStridet_210shape_typeERAT_wStridet_2::Rank()_KN12T_wStridet_210shape_typeERAT_wStridet_2::Rank()_KN12T_wStridet_211stride_typeE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">N</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T_wStridet_2</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a2b839e6df906568c149ba59aae2f0691"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">slice</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">starts</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ends</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">stride_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">strides</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="matx::slice::T_wStridet_2"><span class="n"><span class="pre">T_wStridet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx5sliceEDaK12T_wStridet_2RAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_210shape_typeERAclN12T_wStridet_24RankEE_KN12T_wStridet_211stride_typeE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically slice a tensor or operator. </p>
+<p>The rank of the the operator must be greater than 0.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> – The Rank of the output operator </p></li>
+<li><p><strong>T_wStridet_2</strong> – Input operator/tensor type </p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>op</strong> – Input operator </p></li>
+<li><p><strong>starts</strong> – the first element (inclusive) of each dimension of the input operator. </p></li>
+<li><p><strong>ends</strong> – the last element (exclusive) of each dimension of the input operator. matxDrop Dim removes that dimension. matxEnd deontes all remaining elements in that dimension. </p></li>
+<li><p><strong>strides</strong> – Optional: the stride between consecutive elements </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>sliced operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE">
+<span id="_CPPv3I_i0EN4matx5sliceEK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE"></span><span id="_CPPv2I_i0EN4matx5sliceEK11T_wShapet_2RAT_wShapet_2::Rank()_KN11T_wShapet_210shape_typeERAT_wShapet_2::Rank()_KN11T_wShapet_210shape_typeE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">N</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T_wShapet_2</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aec54146057c9c7b46e8f772d84e80577"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">slice</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="matx::slice::T_wShapet_2"><span class="n"><span class="pre">T_wShapet_2</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="matx::slice::T_wShapet_2"><span class="n"><span class="pre">T_wShapet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">starts</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="matx::slice::T_wShapet_2"><span class="n"><span class="pre">T_wShapet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="matx::slice::T_wShapet_2"><span class="n"><span class="pre">T_wShapet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ends</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="matx::slice::T_wShapet_2"><span class="n"><span class="pre">T_wShapet_2</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_i0EN4matx5sliceEDaK11T_wShapet_2RAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeERAclN11T_wShapet_24RankEE_KN11T_wShapet_210shape_typeE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to logically slice a tensor or operator. </p>
+<p>The rank of the the operator must be greater than 0.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> – The Rank of the output operator </p></li>
+<li><p><strong>T_wShapet_2</strong> – Input operator/tensor type </p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>op</strong> – Input operator </p></li>
+<li><p><strong>starts</strong> – the first element (inclusive) of each dimension of the input operator. </p></li>
+<li><p><strong>ends</strong> – the last element (exclusive) of each dimension of the input operator. matxDrop Dim removes that dimension. matxEnd deontes all remaining elements in that dimension. </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>sliced operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t">
+<span id="_CPPv3I0_iEN4matx7permuteERN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t"></span><span id="_CPPv2I0_iEN4matx7permuteERN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rank</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aec0d3246c1035bb3613d6a03992ae3c1"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">permute</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">detail</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tensor_impl_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t" title="matx::permute::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t" title="matx::permute::Rank"><span class="n"><span class="pre">Rank</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">detail</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tensor_impl_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t" title="matx::permute::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t" title="matx::permute::Rank"><span class="n"><span class="pre">Rank</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">uint32_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Permute a tensor view out-of-place</p>
+<p>Rearranges the dimensions of a tensor view without touching the data. This is accomplished by changing the strides between dimensions to reflect the new transposed order. This function can result in very in efficient memory accesses, so it’s recommended only to use in places performance is not critical.</p>
+<p>Both tensor views must be the same rank, and the dimensions that moved must match their original size</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>out</strong> – Tensor to copy into </p></li>
+<li><p><strong>in</strong> – Tensor to copy from </p></li>
+<li><p><strong>dims</strong> – Order of transposed tensor dimensions </p></li>
+<li><p><strong>stream</strong> – CUDA stream to operate in </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx7permuteEDaK1TRAclN1T4RankEE_K7int32_t">
+<span id="_CPPv3I0EN4matx7permuteEK1TRAclN1T4RankEE_K7int32_t"></span><span id="_CPPv2I0EN4matx7permuteEK1TRAT::Rank()_K7int32_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a384e278c0c946f88f4dd0a7409b3d851"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">permute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx7permuteEDaK1TRAclN1T4RankEE_K7int32_t" title="matx::permute::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0EN4matx7permuteEDaK1TRAclN1T4RankEE_K7int32_t" title="matx::permute::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Rank</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx7permuteEDaK1TRAclN1T4RankEE_K7int32_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Operator to permute the dimensions of a tensor or operator. </p>
+<p>The each dimension must appear in the dims array once.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T</strong> – Input operator/tensor type </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>op</strong> – Input operator </p></li>
+<li><p><strong>dims</strong> – the reordered dimensions of the operator. </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>permuted operator </p>
 </dd>
 </dl>
 </dd></dl>

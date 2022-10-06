@@ -43,9 +43,10 @@
 #include <numeric>
 
 #include "cublas_v2.h"
-#include "matx/core/error.h"
-#include "matx/core/tensor.h"
 #include "matx/core/cache.h"
+#include "matx/core/error.h"
+#include "matx/core/nvtx.h"
+#include "matx/core/tensor.h"
 
 namespace matx {
 
@@ -144,6 +145,8 @@ public:
   matxMatMulHandle_t(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
                   "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
     static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
@@ -386,7 +389,7 @@ public:
                    const TensorTypeB &b, cudaStream_t stream,
                    float alpha = 1.0f, float beta = 0.0f)
   {
-
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Reorder C/A to match cutlass API
     MatMulDispatchA(a, b, c, stream, alpha, beta);
   }
@@ -415,6 +418,7 @@ private:
 
   void ConfigureCublasLt()
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     ret = cublasLtCreate(&ltHandle);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
@@ -616,7 +620,8 @@ private:
       MATX_THROW(matxInvalidType,
                  "A/B/C types must all be half complex if any of them are");
     }
-
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Make copies of each tensor in case we have to do a transformation before
     // the GEMM
     [[maybe_unused]] TensorTypeA a_adj { a };
@@ -848,6 +853,8 @@ private:
                               TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (c.Stride(RANK - 1) == 1) {
       MatMulLaunch<OrderA, OrderB, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha,
                                                         beta);
@@ -868,6 +875,8 @@ private:
                               TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (b.Stride(RANK - 1) == 1) {
       MatMulDispatchC<OrderA, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
@@ -887,6 +896,8 @@ private:
                               TensorTypeC &c, cudaStream_t stream,
                               float alpha, float beta)
   {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    
     if (a.Stride(RANK - 1) == 1) {
       MatMulDispatchB<MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha, beta);
     }
@@ -978,6 +989,8 @@ void matmul(TensorTypeC &c, const TensorTypeA &a,
             const TensorTypeB &b, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   // Get parameters required by these tensors
   auto params =
       detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);

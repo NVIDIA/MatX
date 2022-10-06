@@ -198,6 +198,16 @@ namespace matx
   Op operator%(Op t, Op t2) {}
 
   /**
+   * Modulo two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS second tensor or operator modulus
+   */
+  Op fmod(Op t, Op t2) {}
+
+
+  /**
    * Compute the t^t2 of two operators or tensors
    * @param t
    *   LHS tensor or operator input

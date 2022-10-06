@@ -94,34 +94,17 @@
    </i>
   </label>
   <ul class="current">
-   <li class="toctree-l2 has-children">
-    <a class="reference internal" href="class.html">
-     Tensor Class Reference
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorview.html">
+     Tensors
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-    <label for="toctree-checkbox-2">
-     <i class="fas fa-chevron-down">
-     </i>
-    </label>
-    <ul>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorview.html">
-       tensor_t
-      </a>
-     </li>
-     <li class="toctree-l3">
-      <a class="reference internal" href="tensorshape.html">
-       tensorShape_t
-      </a>
-     </li>
-    </ul>
    </li>
    <li class="toctree-l2 has-children">
     <a class="reference internal" href="transformations.html">
      Tensor Transformations
     </a>
-    <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
-    <label for="toctree-checkbox-3">
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
      <i class="fas fa-chevron-down">
      </i>
     </label>
@@ -209,8 +192,8 @@
   <a class="reference internal" href="../examples/index.html">
    Example Applications
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
-  <label for="toctree-checkbox-4">
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
    <i class="fas fa-chevron-down">
    </i>
   </label>
@@ -316,6 +299,9 @@
                 
   <section id="einsum">
 <span id="id1"></span><h1>einsum<a class="headerlink" href="#einsum" title="Permalink to this headline"></a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.2.3.</span></p>
+</div>
 <p>MatX provides an <code class="docutils literal notranslate"><span class="pre">einsum</span></code> function similar to the one found in NumPy. <code class="docutils literal notranslate"><span class="pre">einsum</span></code> allows
 a brief syntax to express many different operations in an optimized manner. A non-exhaustive list
 of <code class="docutils literal notranslate"><span class="pre">einsum</span></code> operations are:</p>
@@ -324,6 +310,7 @@ of <code class="docutils literal notranslate"><span class="pre">einsum</span></c
 <li><p>Matrix multiplies (GEMMs)</p></li>
 <li><p>Inner products</p></li>
 <li><p>Transposes</p></li>
+<li><p>Reductions</p></li>
 </ul>
 <p>While many of these operations are possible using other methods in MatX, <code class="docutils literal notranslate"><span class="pre">einsum</span></code> typically has a
 shorter syntax, and is sometimes more optimized than a direct version of the operation.</p>
@@ -338,7 +325,7 @@ output tensor at the cost of extra verbosity.</p>
 <p>For tensor contractions, MatX uses cuTENSOR and cuTensorNet as the optimized backend libraries. Since
 neither of these libraries are included with CUDA, and not all users need <code class="docutils literal notranslate"><span class="pre">einsum</span></code> functionality, <code class="docutils literal notranslate"><span class="pre">einsum</span></code>
 is an opt-in feature when configuring MatX. To add support, add the following CMake line:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>-DEN_CUTENSOR<span class="o">=</span>ON
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>-DMATX_EN_CUTENSOR<span class="o">=</span>ON
 </pre></div>
 </div>
 <p>Both cuTENSOR and cuTensorNet can have their location specified using <code class="docutils literal notranslate"><span class="pre">cutensor_DIR</span></code> and <code class="docutils literal notranslate"><span class="pre">cutensornet_DIR</span></code>,
@@ -364,10 +351,10 @@ contraction step.</p>
 <section id="api">
 <h2>API<a class="headerlink" href="#api" title="Permalink to this headline"></a></h2>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0DpEN8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">
-<span id="_CPPv3I0DpEN8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span id="_CPPv2I0DpEN8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">InT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacecutensor_1adb80b9b46d85953740fd76a7a33bba45"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">cutensor</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">einsum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0DpEN8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="cutensor::einsum::OutputType"><span class="n"><span class="pre">OutputType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">subscripts</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span>, <a class="reference internal" href="#_CPPv4I0DpEN8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="cutensor::einsum::InT"><span class="n"><span class="pre">InT</span></span></a><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tensors</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0DpEN8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="Permalink to this definition"></a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">
+<span id="_CPPv3I0DpEN4matx8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span id="_CPPv2I0DpEN4matx8cutensor6einsumER10OutputTypeRKNSt6stringE12cudaStream_tDp3InT"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">InT</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1_1cutensor_1a9e5fb0181482cf1fec38ecf338c6999d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">cutensor</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">einsum</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="matx::cutensor::einsum::OutputType"><span class="n"><span class="pre">OutputType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">subscripts</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span>, <a class="reference internal" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="matx::cutensor::einsum::InT"><span class="n"><span class="pre">InT</span></span></a><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tensors</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT" title="Permalink to this definition"></a><br /></dt>
 <dd><p>Evaluates the Einstein summation on the operands. </p>
-<p><a class="reference internal" href="#namespacecutensor_1adb80b9b46d85953740fd76a7a33bba45"><span class="std std-ref">einsum()</span></a> is a multi-purpose tool capable of performing various operations on tensors in a compact syntax. A non-exhaustive list of operations are: tensor contractions, GEMMs, dot products, and tranposes. Because einsum is extremely powerful, not all features are supported or tested in MatX yet. Currently only tensor contractions are tested. Other operations may work, but they’re not tested yet.</p>
+<p><a class="reference internal" href="#namespacematx_1_1cutensor_1a9e5fb0181482cf1fec38ecf338c6999d"><span class="std std-ref">einsum()</span></a> is a multi-purpose tool capable of performing various operations on tensors in a compact syntax. A non-exhaustive list of operations are: tensor contractions, GEMMs, dot products, and tranposes. Because einsum is extremely powerful, not all features are supported or tested in MatX yet. Currently only tensor contractions are tested. Other operations may work, but they’re not tested yet.</p>
 <p>MatX uses a syntax very similar to NumPy’s einsum syntax: <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.einsum.html">https://numpy.org/doc/stable/reference/generated/numpy.einsum.html</a></p>
 <p>Ellipses are not supported yet, but a variadic list of tensors for contraction is supported. The output operator ‘-&gt;’ is required in MatX currently, and serves to provide error checking on the output tensor size.</p>
 <dl class="field-list simple">

@@ -38,6 +38,7 @@
 #include <type_traits>
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/operators/clone.h"
 #include "matx/kernels/conv.cuh"
@@ -58,6 +59,8 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
       matxInvalidSize, "Output size for SAME convolution incorrect");
 
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
   using shape_type = typename OutputType::shape_type;
@@ -107,6 +110,8 @@ void matxDirectConv2DInternal(OutputType &o, InType &i,
   auto shmsize = sizeof(filter_input_t) * filter.Size(0) * filter.Size(1);
 
 #ifdef __CUDACC__  
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   if constexpr (OutputType::Rank() == 1) {
     MATX_THROW(matxInvalidDim,
                "matxDirectConv2D not supported on Rank 1 Tensors");
@@ -145,6 +150,8 @@ template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
   static_assert(In1Type::Rank() == In2Type::Rank());
 
   const int Rank = In1Type::Rank();
@@ -177,6 +184,8 @@ inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   if constexpr ( In1Type::Rank() >  In2Type::Rank() ) {
     // broadcast i2 path.  clone i2 across batches
     
@@ -255,6 +264,8 @@ template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, cudaStream_t stream)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
   const typename detail::base_type<In1Type>::type &in1_base = i1;
   const typename detail::base_type<In2Type>::type &in2_base = i2;

@@ -32,7 +32,7 @@
 
 #pragma once
 
-
+#include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
 #include "matx/executors/executors.h"
 #include "matx/kernels/transpose.cuh"
@@ -54,14 +54,16 @@ namespace matx
    *   Tensor to copy into
    * @param in
    *   Tensor to copy from
-   * @param stream
-   *   CUDA stream to operate in
+   * @param exec
+   *   CUDA executor to run operation
    *
    */
   template <typename OutputTensor, typename InputTensor>
     __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
         const InputTensor &in, cudaExecutor exec)
     {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+      
       [[ maybe_unused ]] cudaStream_t stream = exec.getStream();
 
       constexpr int RANK = OutputTensor::Rank();
@@ -104,6 +106,8 @@ namespace matx
     __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
         const InputTensor &in, SingleThreadHostExecutor exec)
     {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+      
       constexpr int RANK = OutputTensor::Rank();
       if constexpr (RANK <= 1)
       {

@@ -43,6 +43,7 @@
 // #include <cudf/types.hpp>
 
 #include "matx/core/error.h"
+#include "matx/core/nvtx.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
 
@@ -127,6 +128,8 @@ template <typename TensorType>
 void ReadCSV(TensorType &t, const std::string fname,
              const std::string delimiter, bool header = true)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
@@ -159,6 +162,8 @@ template <typename TensorType>
 void WriteCSV(const TensorType &t, const std::string fname,
               const std::string delimiter)
 {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
@@ -193,13 +198,17 @@ template <typename TensorType>
 void ReadMAT(TensorType &t, const std::string fname,
              const std::string var)
 {
-  
+
   struct stat buffer;  
   if (stat(fname.c_str(), &buffer) != 0) {
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
     
+
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto sp = pybind11::module_::import("scipy.io");
@@ -227,7 +236,8 @@ template <typename TensorType>
 void WriteMAT(const TensorType &t, const std::string fname,
               const std::string var)
 {
-
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
   auto sp = pybind11::module_::import("scipy.io");
