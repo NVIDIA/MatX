@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include "matx/core/nvtx.h"
 #include "matx/generators/linspace.h"
 
 namespace matx
@@ -155,8 +154,8 @@ namespace matx
     inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {
       MATX_ASSERT_STR(method == ChirpMethod::CHIRP_METHOD_LINEAR, matxInvalidType, "Only linear chirps are supported")
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-      return detail::Chirp<SpaceOp, FreqType>(t, f0, t1, f1, method);
+
+        return detail::Chirp<SpaceOp, FreqType>(t, f0, t1, f1, method);       
     }
 
   /**

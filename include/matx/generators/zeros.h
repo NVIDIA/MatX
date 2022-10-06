@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include "matx/core/nvtx.h"
 
 namespace matx
 {
@@ -52,7 +51,6 @@ namespace matx
            std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto zeros(ShapeType &&s)
              {
-              MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
                return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
              }
 

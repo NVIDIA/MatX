@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include "matx/core/nvtx.h"
 
 namespace matx
 {
@@ -97,7 +96,6 @@ namespace matx
   template <typename T = int>
     inline auto meshgrid_x(const std::array<T, 3> &x, const std::array<T, 3> &y)
     {
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       return detail::Meshgrid_X<T>(x, y);
     }
 
@@ -112,7 +110,6 @@ namespace matx
   template <typename T = int>
     inline auto meshgrid_y(const std::array<T, 3> &x, const std::array<T, 3> &y)
     {
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       return detail::Meshgrid_Y<T>(x, y);
     } 
 } // end namespace matx
