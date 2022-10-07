@@ -33,9 +33,9 @@
 #pragma once
 
 #include <cstdio>
+#include <filesystem>
 #include <iterator>
 #include <shared_mutex>
-#include <sys/stat.h>
 #include <unordered_map>
 #include <utility>
 // #include <cudf/table/table.hpp>
@@ -135,8 +135,8 @@ void ReadCSV(TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
-  struct stat buffer;  
-  if (stat(fname.c_str(), &buffer) != 0) {
+
+  if (!std::filesystem::exists(fname)) {
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
@@ -199,8 +199,8 @@ void ReadMAT(TensorType &t, const std::string fname,
              const std::string var)
 {
 
-  struct stat buffer;  
-  if (stat(fname.c_str(), &buffer) != 0) {
+ 
+  if (!std::filesystem::exists(fname)) {
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
