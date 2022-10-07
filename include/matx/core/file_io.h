@@ -33,6 +33,7 @@
 #pragma once
 
 #include <cstdio>
+#include <filesystem>
 #include <iterator>
 #include <shared_mutex>
 #include <unordered_map>
@@ -134,6 +135,12 @@ void ReadCSV(TensorType &t, const std::string fname,
                "CSV reading limited to tensors of rank 1 and 2");
   }
 
+
+  if (!std::filesystem::exists(fname)) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+  
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
@@ -191,8 +198,17 @@ template <typename TensorType>
 void ReadMAT(TensorType &t, const std::string fname,
              const std::string var)
 {
+
+ 
+  if (!std::filesystem::exists(fname)) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+    
+
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
+
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto sp = pybind11::module_::import("scipy.io");
