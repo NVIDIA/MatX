@@ -260,6 +260,8 @@ public:
   using scalar_type = T; ///< Type trait to get type
   // dummy type to signal this is a matxop
   using matxop = bool; ///< Type trait to indicate this is an operator
+        
+  __MATX_INLINE__ std::string str() { return "rand"; }
 
   /**
    * @brief Construct a new randomTensorView t object

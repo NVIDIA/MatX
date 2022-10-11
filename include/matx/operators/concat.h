@@ -57,6 +57,18 @@ namespace matx
       // Scalar type of operation
       using scalar_type = first_value_type;
 
+      template <int I = -1>
+      __MATX_INLINE__ std::string get_str() {
+        if constexpr (I==-1) return "concat(" + get_str<I+1>();
+	else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
+	else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
+	else return "";
+      }
+	      
+      __MATX_INLINE__ std::string str() {
+         return get_str<-1>();
+      }
+
       __MATX_INLINE__ Concatenate(Ts... ts) : ops_(ts...)
       {
         static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");

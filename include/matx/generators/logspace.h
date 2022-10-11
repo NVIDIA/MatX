@@ -44,6 +44,8 @@ namespace matx
       public:
         using scalar_type = T;
 
+        __MATX_INLINE__ std::string str() { return "logspace"; }
+	
         inline Logspace(T first, T last, index_t count)
         {
 #ifdef __CUDA_ARCH__

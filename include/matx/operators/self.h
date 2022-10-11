@@ -54,8 +54,10 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
-
-        __MATX_INLINE__ SelfOp(T1 op) : op_(op) {}
+        
+        __MATX_INLINE__ std::string str() { return "self(" + op_.str() + ")"; }
+        
+	__MATX_INLINE__ SelfOp(T1 op) : op_(op) {}
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 

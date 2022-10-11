@@ -44,8 +44,9 @@ namespace matx
       public:
         using scalar_type = T;
 
-        inline __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
-        inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
+	__MATX_INLINE__ std::string str() { return "alternate"; }
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
         {
           return (-2 * (i & 1)) + 1;
         }

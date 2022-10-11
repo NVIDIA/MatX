@@ -60,7 +60,10 @@ namespace matx
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
         static_assert(IdxType::Rank() == 1, "RemapOp: Rank of index operator must be 1");
         static_assert(DIM<T::Rank(), "RemapOp: DIM must be less than Rank of tensor");
-        __MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
+
+        __MATX_INLINE__ std::string str() { return "remap(" + op_.str() + ")"; }
+
+	__MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 

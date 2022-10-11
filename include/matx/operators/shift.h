@@ -62,6 +62,8 @@ namespace matx
         using matxoplvalue = bool;
         using scalar_type = typename T1::scalar_type;
 
+        __MATX_INLINE__ std::string str() { return "shift(" + op_.str() + ")"; }
+
         __MATX_INLINE__ ShiftOp(T1 op, T2 shift) : op_(op), shift_(shift)
       {
         static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");

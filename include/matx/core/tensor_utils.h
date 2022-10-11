@@ -365,6 +365,61 @@ namespace detail {
     }
   }
 
+  template <typename T> __MATX_INLINE__ std::string to_short_str() {
+    if constexpr (!is_complex_v<T>) {
+      if constexpr (std::is_same_v<T, bool>)
+        return "b";
+      if constexpr (std::is_same_v<T, int32_t>)
+        return "i32";
+      if constexpr (std::is_same_v<T, uint32_t>)
+        return "u32";
+      if constexpr (std::is_same_v<T, int64_t>)
+        return "i64";
+      if constexpr (std::is_same_v<T, uint64_t>)
+        return "u64";
+      if constexpr (std::is_same_v<T, float>)
+        return "f32";
+      if constexpr (std::is_same_v<T, double>)
+        return "f64";
+      if constexpr (std::is_same_v<T, matxHalf<__half>>)
+        return "f16";
+      if constexpr (std::is_same_v<T, matxHalf<__nv_bfloat16>>)
+        return "bf16";
+      else
+        return "x" + std::to_string(sizeof(T)*8);
+    }
+    else {
+      if constexpr (std::is_same_v<typename T::value_type, int32_t>)
+        return "i32c";
+      if constexpr (std::is_same_v<typename T::value_type, uint32_t>)
+        return "u32c";
+      if constexpr (std::is_same_v<typename T::value_type, int64_t>)
+        return "i64c";
+      if constexpr (std::is_same_v<typename T::value_type, uint64_t>)
+        return "u64c";
+      if constexpr (std::is_same_v<typename T::value_type, float>)
+        return "f32c";
+      if constexpr (std::is_same_v<typename T::value_type, double>)
+        return "f64c";
+      if constexpr (std::is_same_v<typename T::value_type, matxHalf<__half>>)
+        return "f16";
+      if constexpr (std::is_same_v<typename T::value_type, matxHalf<__nv_bfloat16>>)
+        return "bf16";
+      else
+        return "x" + std::to_string(sizeof(typename T::value_type)*8) + "c";
+    }
+  }
+
+  template <class T> 
+  __MATX_INLINE__ __MATX_HOST__  auto get_type_str( [[maybe_unused]] T op) {
+     if constexpr (is_matx_op<T>()) {
+       return op.str(); 
+     } else {
+       // This should be a scalar value
+       return "S_" + to_short_str<T>();
+     }
+  }
+
 
   // Returns an address of a pointer of type T aligned to new address
   template <typename T>

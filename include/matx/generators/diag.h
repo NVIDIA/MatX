@@ -48,6 +48,8 @@ namespace matx
       using matxop = bool;
       using scalar_type = T;
 
+       __MATX_INLINE__ std::string str() { return "diag"; }
+
       Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
       {
         static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");

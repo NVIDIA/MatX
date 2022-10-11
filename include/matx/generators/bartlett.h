@@ -43,7 +43,9 @@ namespace matx
 
       public:
         using scalar_type = T;
-        inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
+        __MATX_INLINE__ std::string str() { return "bartlett"; }
+
+	inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
         inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
         {

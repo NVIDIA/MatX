@@ -43,6 +43,9 @@ namespace matx
 
       public:
         using scalar_type = T;
+
+        __MATX_INLINE__ std::string str() { return "blackman"; }
+
         inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
         inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const

@@ -153,7 +153,6 @@ struct RandomOperatorIterator {
   stride_type offset_;  
 };
 
-
 /**
  * View of an underlying tensor data object
  *
@@ -236,6 +235,9 @@ public:
 
   __MATX_INLINE__  ~tensor_t() = default;
 
+  const std::string str() {
+    return std::string("T") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
+  }
 
   /**
    * @brief Construct a new tensor t object from an arbitrary shape and descriptor

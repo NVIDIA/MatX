@@ -48,6 +48,7 @@ namespace matx
       using matxop = bool;
       using scalar_type = T;
 
+      __MATX_INLINE__ std::string str() { return  "constval"; }
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
       template <typename... Is>

@@ -36,6 +36,7 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 #include <type_traits>
+#include <iostream>
 
 using namespace matx;
 
@@ -102,6 +103,30 @@ TYPED_TEST(OperatorTestsComplex, BaseOp)
   EXPECT_TRUE(shape[1] == A.Size(1));
  
   EXPECT_TRUE(A.TotalSize() == op.TotalSize());
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsAll, GetString)
+{
+  MATX_ENTER_HANDLER();
+  auto A = make_tensor<TypeParam>({10,20});
+  auto B = make_tensor<TypeParam>({20});
+  auto C = make_tensor<TypeParam>({10,20});
+
+  auto op1 = C = A;
+  auto op2 = C = A + B + (TypeParam)5;
+  auto op3 = C = A / B;
+  auto op4 = C = cos(A * B) + sin(C);
+  auto op5 = concat<0>(A,A);
+  auto op6 = (op1,op2,op3,op4,op5);
+
+  std::cout << "op1: " << op1.str() << std::endl;
+  std::cout << "op2: " << op2.str() << std::endl;
+  std::cout << "op3: " << op3.str() << std::endl;
+  std::cout << "op4: " << op4.str() << std::endl;
+  std::cout << "op5: " << op5.str() << std::endl;
+  std::cout << "op6: " << op6.str() << std::endl;
 
   MATX_EXIT_HANDLER();
 }

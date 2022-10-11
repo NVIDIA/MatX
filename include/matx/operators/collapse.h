@@ -52,6 +52,7 @@ namespace matx
         using shape_type = typename T1::shape_type;
         using matxoplvalue = bool;
 
+	 __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
         static_assert(DIM < T1::Rank(),  "Collapse DIM must be less than Rank() of operator");
@@ -169,6 +170,8 @@ namespace matx
         using scalar_type = typename T1::scalar_type;
         using shape_type = typename T1::shape_type;
         using matxlvalue = bool;
+	 
+	__MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
       {

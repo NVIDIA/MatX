@@ -51,6 +51,8 @@ namespace matx
 
         using scalar_type = typename T::scalar_type;
 
+        __MATX_INLINE__ std::string str() { return "clone(" + op_.str() + ")"; }
+
         __MATX_INLINE__ CloneOp(T op, std::array<index_t, CRank> shape) : op_(op) {
           // create gather list
           int d = 0;

@@ -70,6 +70,10 @@ public:
   using scalar_type = typename T::scalar_type;
   using shape_type = typename T::shape_type;
 
+  const std::string str() {
+    return get_type_str(out_) + "=" + get_type_str(op_);
+  }
+
   /**
    * Constructor to assign an operator to a view
    *
