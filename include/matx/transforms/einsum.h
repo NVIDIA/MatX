@@ -37,13 +37,13 @@
 #include <cstdio>
 #include <numeric>
 #include "error.h"
-#include "tensor.h"
 
 
 #include <cutensornet.h>
 #include <cutensor.h>
 
 #include "matx/core/nvtx.h"
+#include "matx/core/tensor.h"
 
 
 
