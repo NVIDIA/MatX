@@ -78,9 +78,8 @@ typedef Types<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
               cuda::std::complex<double>, matx::matxFp16Complex,
               matx::matxBf16Complex>
     MatXAllTypes;
-typedef Types<matx::matxFp16, matx::matxBf16, float, double,
-              cuda::std::complex<float>, cuda::std::complex<double>,
-              matx::matxFp16Complex, matx::matxBf16Complex>
+typedef Types<float, double,
+              cuda::std::complex<float>, cuda::std::complex<double>>
     MatXFloatTypes;
 typedef Types<float, double,
               cuda::std::complex<float>, cuda::std::complex<double>>

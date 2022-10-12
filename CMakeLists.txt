@@ -244,6 +244,7 @@ endif()
 
 if (MATX_NVTX_FLAGS)
     add_definitions(-DMATX_NVTX_FLAGS)
+    target_compile_definitions(matx INTERFACE MATX_NVTX_FLAGS)
 endif()
 if (MATX_BUILD_32_BIT)
     add_definitions(-DINDEX_32_BIT)
