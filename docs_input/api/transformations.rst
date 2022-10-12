@@ -21,4 +21,4 @@ below provide both cached and non-cached interfaces.
   filter.rst
   reduce.rst
   sort.rst
-  
+.. doxygenfunction:: permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in, const std::initializer_list<uint32_t> &dims, const cudaStream_t stream)  
