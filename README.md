@@ -26,7 +26,7 @@ are necessary
 * :open_hands: MatX is easy to learn. Users familiar with high-level languages will pick up the syntax quickly
 
 * :bookmark_tabs: MatX easily integrates with existing libraries and code
-
+ 
 * :sparkler: Visualize data from the GPU right on a web browser
 
 * :arrow_up_down: IO capabilities for reading/writing files
