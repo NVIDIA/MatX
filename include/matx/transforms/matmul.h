@@ -707,8 +707,8 @@ private:
           auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
           auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
-                  Adesc, (void *)&bp, Bdesc, &sbeta,
-                  (void *)&cp, Cdesc, (void *)&cp,
+                  Adesc, (void *)bp, Bdesc, &sbeta,
+                  (void *)cp, Cdesc, (void *)cp,
                   Cdesc, &heuristicResult.algo, workspace, workspaceSize,
                   stream);
           MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
