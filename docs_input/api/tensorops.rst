@@ -98,6 +98,5 @@ Advanced Operators
 .. doxygenfunction:: slice( const T_wShapeT op, const typename T_wShapeT::shape_type (&starts)[T_wShapeT::Rank()], const typename T_wShapeT::shape_type (&ends)[T_wShapeT::Rank()])
 .. doxygenfunction:: slice( const T_wStridet_2 op, const typename T_wStridet_2::shape_type (&starts)[T_wStridet_2::Rank()], const typename T_wStridet_2::shape_type (&ends)[T_wStridet_2::Rank()], const typename T_wStridet_2::stride_type (&strides)[T_wStridet_2::Rank()])
 .. doxygenfunction:: slice( const T_wShapet_2 op, const typename T_wShapet_2::shape_type (&starts)[T_wShapet_2::Rank()], const typename T_wShapet_2::shape_type (&ends)[T_wShapet_2::Rank()])
-  
-.. doxygenfunction:: permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in, const std::initializer_list<uint32_t> &dims, const cudaStream_t stream)
 .. doxygenfunction:: permute(const T op, const int32_t (&dims)[T::Rank()])  
+.. doxygenfunction:: reshape(const T op, const int32_t (&sizes)[T::Rank()])  

@@ -167,6 +167,43 @@ TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, ReshapeOp)
+{
+  MATX_ENTER_HANDLER();
+  auto A = make_tensor<TypeParam>({2*4*8*16});
+  for(int i = 0; i < A.Size(0); i++) {
+    A(i) = (TypeParam)i;
+  }
+
+  auto op = reshape(A, {2, 4, 8, 16});
+  auto op2 = reshape(op, {2*4*8*16});
+
+  ASSERT_TRUE(op.Rank() == 4);
+  ASSERT_TRUE(op2.Rank() == 1);
+
+  ASSERT_TRUE(op.Size(0) == 2 );
+  ASSERT_TRUE(op.Size(1) == 4 );
+  ASSERT_TRUE(op.Size(2) == 8 );
+  ASSERT_TRUE(op.Size(3) == 16 );
+  
+  ASSERT_TRUE(op2.Size(0) == A.TotalSize() );
+
+  int idx = 0;
+  for(int i=0; i < A.Size(0); i++) {
+    for(int j=0; j < A.Size(1); j++) {
+      for(int k=0; k < A.Size(2); k++) {
+        for(int l=0; l < A.Size(3); l++) {
+	  ASSERT_TRUE( A(idx) == op(i,j,k,l) );
+	  ASSERT_TRUE( A(idx) == op2(idx));
+	  idx++;
+	}
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
 {
   MATX_ENTER_HANDLER();
