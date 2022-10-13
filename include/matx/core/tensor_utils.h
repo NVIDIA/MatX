@@ -666,10 +666,12 @@ void Print(const Op &op, Args... dims) {
   if constexpr (is_tensor_view_v<Op>) {
 
     printf("], Strides:[");
-    for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
-    printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
-    if( dimIdx < (op.Rank() - 1) )
-      printf(",");
+    if constexpr (Op::Rank() > 0) {
+      for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ) {
+        printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
+      if( dimIdx < (op.Rank() - 1) )
+        printf(",");
+      }
     }
     printf("]\n");
 
