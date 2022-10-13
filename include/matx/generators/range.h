@@ -114,5 +114,6 @@ namespace matx
     {
       return range<Dim>(detail::to_array(s), first, step);
     }
+ 
 
 } // end namespace matx

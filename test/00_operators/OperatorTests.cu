@@ -189,14 +189,14 @@ TYPED_TEST(OperatorTestsNumericNonComplex, ReshapeOp)
   ASSERT_TRUE(op2.Size(0) == A.TotalSize() );
 
   int idx = 0;
-  for(int i=0; i < A.Size(0); i++) {
-    for(int j=0; j < A.Size(1); j++) {
-      for(int k=0; k < A.Size(2); k++) {
-        for(int l=0; l < A.Size(3); l++) {
-	  ASSERT_TRUE( A(idx) == op(i,j,k,l) );
-	  ASSERT_TRUE( A(idx) == op2(idx));
-	  idx++;
-	}
+  for(int i=0; i < op.Size(0); i++) {
+    for(int j=0; j < op.Size(1); j++) {
+      for(int k=0; k < op.Size(2); k++) {
+        for(int l=0; l < op.Size(3); l++) {
+          ASSERT_TRUE( A(idx) == op(i,j,k,l) );
+          ASSERT_TRUE( A(idx) == op2(idx));
+          idx++;
+        }
       }
     }
   }

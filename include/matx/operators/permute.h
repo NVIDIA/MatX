@@ -47,7 +47,6 @@ namespace matx
     {
       public: 
         using scalar_type = typename T::scalar_type;
-        using shape_type = typename T::shape_type; 
 
       private:
         typename base_type<T>::type op_;
@@ -83,8 +82,8 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<shape_type, Rank()> inds{indices...};
-            std::array<shape_type, T::Rank()> ind{indices...};
+            std::array<index_t, Rank()> inds{indices...};
+            std::array<index_t, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int32_t i = 0; i < Rank(); i++) {	  
@@ -103,8 +102,8 @@ namespace matx
             //          static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<shape_type, Rank()> inds{indices...};
-            std::array<shape_type, T::Rank()> ind{indices...};
+            std::array<index_t, Rank()> inds{indices...};
+            std::array<index_t, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int i = 0; i < Rank(); i++) {	  
@@ -116,7 +115,7 @@ namespace matx
             return mapply(op_, ind);
           }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ shape_type Size(int32_t dim) const
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           return op_.Size(dims_[dim]);
         }

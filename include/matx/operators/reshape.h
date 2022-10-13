@@ -43,16 +43,15 @@ namespace matx
    * TotalSize for reshape and input operator must match
    */
   namespace detail {
-    template <int RANK, typename T>
-      class ReshapeOp : public BaseOp<ReshapeOp<RANK, T>>
+    template <int RANK, typename T, typename ShapeType>
+      class ReshapeOp : public BaseOp<ReshapeOp<RANK, T, ShapeType>>
     {
       public: 
         using scalar_type = typename T::scalar_type;
-        using shape_type = typename T::shape_type;
 	
       private:
         T op_;
-	std::array<shape_type, RANK> sizes_;
+	      ShapeType sizes_;
 
       public:
         using matxop = bool;
@@ -68,26 +67,24 @@ namespace matx
         static_assert(Rank() > 0, "ReshapeOp: Rank of operator must be greater than 0.");
         static_assert(T::Rank() > 0, "ReshapeOp: Rank of input operator must be greater than 0.");
 
+        __MATX_INLINE__ ReshapeOp(const T &op, ShapeType &&s) : op_(op), sizes_(s) {
 
-        __MATX_INLINE__ ReshapeOp(T op, const int32_t (&sizes)[Rank()]) : op_(op) {
-
-          int size = 1;
+          index_t size = 1;
 
           for(int32_t i = 0; i < Rank(); i++) {
-            sizes_[i] = sizes[i];
-            size *= sizes[i];
+            size *= sizes_[i];
           }
 
-          MATX_ASSERT_STR(this->TotalSize() == op_.TotalSize(), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
+          MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
-	    std::array<shape_type, Rank()> inds{indices...};
-	    std::array<shape_type,T::Rank()> ninds;
-            
-	    index_t idx = 0;
+            std::array<index_t, Rank()> inds{indices...};
+            std::array<index_t, T::Rank()> ninds;
+                  
+            index_t idx = 0;
             index_t stride = 1;
 
             // linearlize incoming index
@@ -107,7 +104,7 @@ namespace matx
             return mapply(op_, ninds);
           }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ shape_type Size(int32_t dim) const
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           return sizes_[dim];
         }
@@ -115,6 +112,24 @@ namespace matx
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
+
+    /**
+   * @brief Operator to reshape a tensor or operator.
+   *
+   * This operator can appear as an rvalue or lvalue. 
+   *
+   * @tparam RANK the reshaped rank
+   * @tparam T Input operator/tensor type
+   * @param op Input operator
+   * @param sizes the size of each reshaped dimension
+   * @return reshaped operator
+   */
+  template <int RANK, typename T, typename ShapeType,
+           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+             __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
+  {
+    return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));
+  }  
   
     /**
    * @brief Operator to reshape a tensor or operator.
@@ -128,8 +143,8 @@ namespace matx
    * @return reshaped operator
    */
   template <int RANK, typename T>
-    __MATX_INLINE__ auto reshape( const T op, 
+    __MATX_INLINE__ auto reshape( const T &op, 
         const int32_t (&sizes)[RANK]) {
-      return detail::ReshapeOp<RANK, T>(op, sizes);
+      return reshape<RANK, T>(op, detail::to_array(sizes));
     }
 } // end namespace matx
