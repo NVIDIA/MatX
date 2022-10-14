@@ -76,7 +76,8 @@ namespace matx
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
-          return op_.Size(Rank() - dim - 1);
+          // Optimize these branches later
+          return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
         }
     };
   }
