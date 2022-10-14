@@ -127,7 +127,7 @@ public:
       }
       else {
         using shape_type = typename TensorTypeA::desc_type::shape_type;
-        int batch_offset = 3;
+        int batch_offset = 2;
         std::array<shape_type, TensorTypeA::Rank()> idx{0};
         auto a_shape = a.Shape();
         // Get total number of batches
@@ -135,6 +135,7 @@ public:
         for (size_t iter = 0; iter < total_iter; iter++) {
           auto ip = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
           auto op = std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
+          
           in_pointers.push_back(ip);
           out_pointers.push_back(op);
 
@@ -178,7 +179,7 @@ public:
         params.batch_size = 1;
       }
       else {
-        params.batch_size = a.TotalSize() - a.Size(RANK - 1) - a.Size(RANK - 2);
+        params.batch_size = a.TotalSize() / (a.Size(RANK - 1) * a.Size(RANK - 2));
       }
     }
 
@@ -243,7 +244,7 @@ public:
       }
       else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
         ret = cublasZgetrfBatched(
-            handle, params.n,
+            handle, static_cast<int>(params.n),
             reinterpret_cast<cuDoubleComplex *const *>(d_A_array),
             static_cast<int>(params.n), d_pivot, d_info,
             static_cast<int>(params.batch_size));
