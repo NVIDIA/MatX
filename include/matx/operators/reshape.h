@@ -38,134 +38,113 @@
 
 namespace matx
 {
-  /**
-   * permutes dimensions of a tensor/operator
+/**
+   * logically reshapes dimensions of a tensor/operator
+   * TotalSize for reshape and input operator must match
    */
   namespace detail {
-    template <typename T>
-      class PermuteOp : public BaseOp<PermuteOp<T>>
+    template <int RANK, typename T, typename ShapeType>
+      class ReshapeOp : public BaseOp<ReshapeOp<RANK, T, ShapeType>>
     {
       public: 
         using scalar_type = typename T::scalar_type;
-
+	
       private:
-        typename base_type<T>::type op_;
-        std::array<int32_t, T::Rank()> dims_;
+        T op_;
+	      ShapeType sizes_;
 
       public:
         using matxop = bool;
         using matxoplvalue = bool;
-        
-        __MATX_INLINE__ std::string str() { return "permute(" + op_.str() + ")"; }
- 
+
+        __MATX_INLINE__ std::string str() { return "reshape(" + op_.str() + ")"; }
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return T::Rank();
+          return RANK;
         }
 
-        static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
+        static_assert(Rank() > 0, "ReshapeOp: Rank of operator must be greater than 0.");
+        static_assert(T::Rank() > 0, "ReshapeOp: Rank of input operator must be greater than 0.");
 
-        __MATX_INLINE__ PermuteOp(T op, const int32_t (&dims)[Rank()]) : op_(op) {
-            
+        __MATX_INLINE__ ReshapeOp(const T &op, ShapeType &&s) : op_(op), sizes_(s) {
+
+          index_t size = 1;
+
           for(int32_t i = 0; i < Rank(); i++) {
-            [[maybe_unused]] int32_t dim = dims[i];
-            MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
-
-            dims_[i] = dims[i];
+            size *= sizes_[i];
           }
+
+          MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
-            // convert variadic type to tuple so we can read/update
             std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ind{indices...};
+            std::array<index_t, T::Rank()> ninds;
+                  
+            index_t idx = 0;
+            index_t stride = 1;
 
-#pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {	  
-              ind[dims_[i]] = inds[i];
-              //ind[i] = inds[dims_[i]];
+            // linearlize incoming index
+#pragma unroll
+            for(int i = Rank() - 1 ; i >= 0 ; i--) {
+              idx += stride * inds[i];
+              stride *= Size(i);
             }
 
-            //return op_(ind);
-            return mapply(op_, ind);
-          }
-
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
-          {
-            static_assert(sizeof...(Is)==Rank());
-            //          static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
-            // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ind{indices...};
-
-#pragma unroll 
-            for(int i = 0; i < Rank(); i++) {	  
-              ind[dims_[i]] = inds[i];
-              //ind[i] = inds[dims_[i]];
+            // extract new indices
+#pragma unroll
+            for(int i = T::Rank() - 1; i >= 0; i--) {
+              ninds[i] = idx % op_.Size(i);
+              idx /= op_.Size(i);
             }
 
-            //return op_(ind);
-            return mapply(op_, ind);
+            return mapply(op_, ninds);
           }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
-          return op_.Size(dims_[dim]);
+          return sizes_[dim];
         }
 
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
 
-  /**
-   * @brief Operator to permute the dimensions of a tensor or operator.
+    /**
+   * @brief Operator to reshape a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
-
    * This operator can appear as an rvalue or lvalue. 
    *
+   * @tparam RANK the reshaped rank
    * @tparam T Input operator/tensor type
    * @param op Input operator
-   * @param dims the reordered dimensions of the operator.
-   * @return permuted operator
+   * @param sizes the size of each reshaped dimension
+   * @return reshaped operator
    */
-  template <typename T>
-    __MATX_INLINE__ auto permute( const T op, 
-        const int32_t (&dims)[T::Rank()]) {
-      return detail::PermuteOp<T>(op, dims);
-    }
+  template <int RANK, typename T, typename ShapeType,
+           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+             __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
+  {
+    return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));
+  }  
   
-  /**
-   * @brief Operator to transpose the dimensions of a tensor or operator.
+    /**
+   * @brief Operator to reshape a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
-
    * This operator can appear as an rvalue or lvalue. 
    *
+   * @tparam RANK the reshaped rank
    * @tparam T Input operator/tensor type
    * @param op Input operator
-   * @return permuted operator
+   * @param sizes the size of each reshaped dimension
+   * @return reshaped operator
    */
-  template <typename T>
-    __MATX_INLINE__ auto transpose( const T op) {
-    
-      static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
-
-      int32_t dims[T::Rank()];
-      for(int i = 0; i < T::Rank(); i++) 
-        dims[i] = i;
-      int32_t dim1 = T::Rank() - 1;
-      int32_t dim2 = T::Rank() - 2;
-
-      std::swap(dims[dim1],dims[dim2]);
-      return detail::PermuteOp<T>(op, dims);
+  template <int RANK, typename T>
+    __MATX_INLINE__ auto reshape( const T &op, 
+        const int32_t (&sizes)[RANK]) {
+      return reshape<RANK, T>(op, detail::to_array(sizes));
     }
-
 } // end namespace matx

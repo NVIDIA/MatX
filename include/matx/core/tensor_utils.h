@@ -47,14 +47,14 @@ namespace matx
    * @return size_t size of data
    */
   template <typename Op>
-  size_t TotalSize(const Op &op) {
+  index_t TotalSize(const Op &op) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
     if constexpr (is_tensor_view_v<Op>) {
       return static_cast<size_t>(op.TotalSize());
     }
     else {
-      size_t total = 1;
+      index_t total = 1;
       for (int i = 0; i < op.Rank(); i++) {
         total *= op.Size(i);
       }
@@ -666,10 +666,12 @@ void Print(const Op &op, Args... dims) {
   if constexpr (is_tensor_view_v<Op>) {
 
     printf("], Strides:[");
-    for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ){
-    printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
-    if( dimIdx < (op.Rank() - 1) )
-      printf(",");
+    if constexpr (Op::Rank() > 0) {
+      for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ) {
+        printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
+      if( dimIdx < (op.Rank() - 1) )
+        printf(",");
+      }
     }
     printf("]\n");
 

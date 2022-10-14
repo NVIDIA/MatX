@@ -56,13 +56,18 @@ namespace matx
         using scalar_type = typename T1::scalar_type;
 
 	__MATX_INLINE__ std::string str() { return "hermitian(" + op_.str() + ")"; }
-        __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {}
+        __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {
+          static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
+        }
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
-            return conj(mapply_reverse(op_, tup));
+            auto stl = cuda::std::get<Rank()-2>(tup);
+            cuda::std::get<Rank()-2>(tup) = cuda::std::get<Rank()-1>(tup);
+            cuda::std::get<Rank()-1>(tup) = stl;      
+            return conj(mapply(op_, tup));
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -71,7 +76,8 @@ namespace matx
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
-          return op_.Size(Rank() - dim - 1);
+          // Optimize these branches later
+          return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
         }
     };
   }
