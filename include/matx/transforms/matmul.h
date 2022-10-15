@@ -705,15 +705,17 @@ private:
           auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
           auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
           auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+  
           auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
-                  Adesc, (void *)&bp, Bdesc, &sbeta,
-                  (void *)&cp, Cdesc, (void *)&cp,
+                  Adesc, (void *)bp, Bdesc, &sbeta,
+                  (void *)cp, Cdesc, (void *)cp,
                   Cdesc, &heuristicResult.algo, workspace, workspaceSize,
                   stream);
+
           MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-          // Update all but the last 2 indices
+          // Update all but the last 3 indices
           UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
         }
       }
