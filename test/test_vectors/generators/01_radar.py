@@ -11,7 +11,7 @@ import cupy as cp
 from typing import Dict, List
 
 
-class simple_pipeline:
+class simple_radar_pipeline:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
         self.dtype = dtype
