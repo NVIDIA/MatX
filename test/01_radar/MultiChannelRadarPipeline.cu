@@ -32,7 +32,7 @@
 
 #include "assert.h"
 #include "matx.h"
-#include "simple_pipeline.h"
+#include "simple_radar_pipeline.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -44,7 +44,7 @@ protected:
     assert(numSamples > waveformLength);
 
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("01_radar", "simple_pipeline",
+    pb->InitTVGenerator<T>("01_radar", "simple_radar_pipeline",
                            {numPulses, numSamples, waveformLength});
 
     // Set the number of channels before running

@@ -1,5 +1,5 @@
 #include <nvbench/nvbench.cuh>
-#include "simple_pipeline.h"
+#include "simple_radar_pipeline.h"
 #include "matx.h"
 
 using namespace matx;

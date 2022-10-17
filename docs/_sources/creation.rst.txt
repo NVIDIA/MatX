@@ -95,7 +95,7 @@ All ``make_``-style functions return a ``tensor_t`` object with the template par
 only has two required template parameters (type and rank). For simple cases where only implicitly-allocated memory is needed, the default constructor
 will suffice. Some situations prevent using the ``make_`` functions, such as when a tensor variable is a class member variable. In this case the type of
 the member variable must be specified in the member list. In these scenaries it's expected that the user knows what they are doing and can handle 
-spelling out the types themselves. For examples of this, see the simple_pipeline files.
+spelling out the types themselves. For examples of this, see the simple_radar_pipeline files.
 
 All make functions take the data type as the first template parameter.
 

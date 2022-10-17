@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "simple_pipeline.h"
+#include "simple_radar_pipeline.h"
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {

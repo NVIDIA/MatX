@@ -1,5 +1,5 @@
 set(examples 
-    simple_pipeline 
+    simple_radar_pipeline 
     recursive_filter 
     convolution 
     fft_conv 

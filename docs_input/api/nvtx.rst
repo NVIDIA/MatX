@@ -53,7 +53,7 @@ NVTX Examples
   * - MATX_NVTX_END_RANGE(1)
     - Ends the NVTX range of range with a handle of 1 used in NVTX_START_RANGE        
     
-Code examples are provided in the ``simple_pipeline`` code to show user utilization of the MatX NVTX API. 
+Code examples are provided in the ``simple_radar_pipeline`` code to show user utilization of the MatX NVTX API. 
 
 MatX NVTX API 
 -----------------
