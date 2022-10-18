@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <cuda/std/array>
-
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/scalar_ops.h"
