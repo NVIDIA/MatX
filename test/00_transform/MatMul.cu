@@ -273,7 +273,32 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
   tensor_t<TypeParam, 3> c{{batches, m, n}};  
 
   this->pb->template InitAndRunTVGenerator<TypeParam>(
-      "00_transforms", "matmul_operators", "run", {m, k, n, batches});
+      "00_transforms", "matmul_operators", "run", {batches, m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
+{
+  MATX_ENTER_HANDLER();
+  // constexpr index_t batches = 5;
+  // constexpr index_t m = 128;
+  // constexpr index_t k = 256;
+  // constexpr index_t n = 512;
+  
+  auto a = make_tensor<TypeParam>({5, 5, 128, 256});
+  auto b = make_tensor<TypeParam>({5, 5, 256, 512});
+  auto c = make_tensor<TypeParam>({5, 5, 128, 512});  
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {5, 5, 128, 256, 512});
 
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
