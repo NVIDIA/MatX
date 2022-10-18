@@ -33,7 +33,6 @@
 #pragma once
 
 #include <type_traits>
-#include <cuda/std/array>
 
 namespace matx {
 namespace detail {
