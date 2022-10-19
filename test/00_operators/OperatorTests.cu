@@ -2288,6 +2288,28 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   for (i = 0; i < t1o1.Size(0); i++) {
     ASSERT_EQ(t1o1(i), t11(i % t11.Size(0)));
   }
+
+
+  // Multiple concatenations
+  {
+    auto a = matx::make_tensor<float>({10});
+    auto b = matx::make_tensor<float>({10});
+    auto c = matx::make_tensor<float>({10});
+    auto d = matx::make_tensor<float>({10});
+    
+    auto result = matx::make_tensor<float>({40});
+    a.SetVals({1,2,3,4,5,6,7,8,9,10});
+    b.SetVals({11,12,13,14,15,16,17,18,19,20});
+    c.SetVals({21,22,23,24,25,26,27,28,29,30});
+    d.SetVals({31,32,33,34,35,36,37,38,39,40});
+    
+    auto tempConcat1 = matx::concat<0>(a,b);
+    auto tempConcat2 = matx::concat<0>(c, d);
+    (result = matx::concat<0>(tempConcat1, tempConcat2 )).run();
+    for (int i = 0; i < result.Size(0); i++) {
+      ASSERT_EQ(result(i), i + 1);
+    }    
+  }  
   
   MATX_EXIT_HANDLER();
 }
