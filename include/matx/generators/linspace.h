@@ -37,17 +37,18 @@
 namespace matx
 {
   namespace detail {
-    template <class T> class Linspace {
+    template <class T> class LinspaceOp {
       private:
         Range<T> range_;
 
       public:
         using scalar_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() { return "linspace"; }
 
 
-        inline Linspace(T first, T last, index_t count)
+        inline LinspaceOp(T first, T last, index_t count)
         {
 #ifdef __CUDA_ARCH__
           range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
@@ -84,15 +85,15 @@ namespace matx
    * @param last Last value
    * @return Operator with linearly-spaced values 
    */
-  template <int Dim, typename ShapeType, typename T = float,
+  template <int Dim, typename ShapeType, typename T,
            std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto linspace(ShapeType &&s, T first, T last)
              {
                constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                auto count =  *(s.begin() + Dim);
-               detail::Linspace<T> l(first, last, count);
-               return detail::matxGenerator1D_t<detail::Linspace<T>, Dim, ShapeType>(std::forward<ShapeType>(s), l);
+               detail::LinspaceOp<T> l(first, last, count);
+               return detail::matxGenerator1D_t<detail::LinspaceOp<T>, Dim, ShapeType>(std::forward<ShapeType>(s), l);
              }
 
   /**
@@ -110,7 +111,7 @@ namespace matx
    * @param last Last value
    * @return Operator with linearly-spaced values 
    */
-  template <int Dim, int RANK, typename T = float>
+  template <int Dim, int RANK, typename T>
     inline auto linspace(const index_t (&s)[RANK], T first, T last)
     {
       return linspace<Dim>(detail::to_array(s), first, last);
