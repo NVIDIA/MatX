@@ -2306,8 +2306,10 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     auto tempConcat1 = matx::concat<0>(a,b);
     auto tempConcat2 = matx::concat<0>(c, d);
     (result = matx::concat<0>(tempConcat1, tempConcat2 )).run();
-    for (int i = 0; i < result.Size(0); i++) {
-      ASSERT_EQ(result(i), i + 1);
+
+    cudaStreamSynchronize(0);
+    for (int cnt = 0; cnt < result.Size(0); cnt++) {
+      ASSERT_EQ(result(cnt), cnt + 1);
     }    
   }  
   
