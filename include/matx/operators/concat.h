@@ -50,7 +50,8 @@ namespace matx
       class Concatenate : public BaseOp<Concatenate<Dim, Ts...>>
     {
       using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
-      using first_value_type = typename first_type::value_type;
+      using first_value_type = typename first_type::scalar_type;
+
       static constexpr int RANK = first_type::Rank();
 
       public:
@@ -60,9 +61,9 @@ namespace matx
       template <int I = -1>
       __MATX_INLINE__ std::string get_str() {
         if constexpr (I==-1) return "concat(" + get_str<I+1>();
-	else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
-	else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
-	else return "";
+        else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
+        else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
+        else return "";
       }
 	      
       __MATX_INLINE__ std::string str() {
