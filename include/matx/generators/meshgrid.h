@@ -31,89 +31,87 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
+#include "matx/operators/permute.h"
 
 namespace matx
 {
+
+
   namespace detail {
-    template <typename T> class Meshgrid_X {
-      private:
-        std::array<T, 3> x_;
-        std::array<T, 3> y_;
 
-      public:
-        // dummy type to signal this is a matxop
-        using matxop = bool;
-        using scalar_type = T;
+    template <typename T1, int RANK, int AXIS> 
+      class MeshGridOp {
+        private:
+          T1 t1_;
+          std::array<index_t, RANK> shape_;
 
-        __MATX_INLINE__ std::string str() { return "meshgridx"; }	
+        public:
+          using matxop = bool;
+          using scalar_type = typename T1::scalar_type;
+          //typedef typename T1::scalar_type scalar_type;
 
-        Meshgrid_X(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
+          __MATX_INLINE__ std::string str() { return "meshgrid"; }
 
-        inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
-        {
-          return x_[0] + j * (x_[1] - x_[0]) / (x_[2] - 1);
+          __MATX_INLINE__ MeshGridOp(T1 t1, std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
+            static_assert(shape.size() == RANK );
+            static_assert(is_matx_op<T1>());
+          }
+
+          template <typename... Is>
+            __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+
+              std::array<index_t, Rank()> inds{indices...};
+              // get index for the axis
+              auto ind = inds[AXIS];
+              // look up value for the axis
+              auto val = get_value(t1_, ind);
+              return val;
+            }
+
+          __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
+            return shape_[dim];
+          }
+
+          static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+      };
+
+    template <typename... Ts, int... I>
+      __MATX_INLINE__  auto meshgrid_impl(std::integer_sequence<int, I...>, Ts&... ts) {
+        auto constexpr RANK = (int)sizeof...(Ts);
+
+        // construct shape from size of each rank1 tensor
+        std::array<index_t, RANK> shape{ts.Size(0)...};
+
+        // Python XY indexing is reverse from natural tensor indexing.  We permute here to match
+        int perm[RANK];
+        for(int i=0; i < RANK; i++) {
+          perm[RANK-i-1] = i;
         }
 
-        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
-        {
-          return (dim == 0) ? y_[2] : x_[2];
-        }
-        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 2; }
-    };
+        // return one meshgrid operator per rank
+        return std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape}, perm)...};
+      }
 
-    template <typename T> class Meshgrid_Y {
-      private:
-        std::array<T, 3> x_;
-        std::array<T, 3> y_;
-
-      public:
-        // dummy type to signal this is a matxop
-        using matxop = bool;
-        using scalar_type = T;
-        
-	__MATX_INLINE__ std::string str() { return "meshgridy"; }	
-
-        Meshgrid_Y(std::array<T, 3> x, std::array<T, 3> y) : x_(x), y_(y) {}
-
-        inline __MATX_DEVICE__ T operator()(index_t i, index_t j) const
-        {
-          return y_[0] + i * (y_[1] - y_[0]) / (y_[2] - 1);
-        };
-
-        constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t dim) const
-        {
-          return (dim == 0) ? y_[2] : x_[2];
-        }
-        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 2; }
-    };
-  }
+  } // end namespace detail
 
   /**
-   * Creates an mesh grid X matrix
+   * Creates mesh grid operators
    *
    *
-   * @tparam T
-   *   Data type
+   * @tparam Ts...
+   *   list of N Rank1 operators types defining mesh points
+   * @param ts
+   *   list of N Rank1 operators
+   *
+   * @returns N RankN operators of mesh grid.  Grids are returned in cartisian indexing 
+   * (transpose of matrix indexing)
    *
    */
-  template <typename T = int>
-    inline auto meshgrid_x(const std::array<T, 3> &x, const std::array<T, 3> &y)
-    {
-      return detail::Meshgrid_X<T>(x, y);
+  template <typename... Ts>
+    __MATX_INLINE__  auto meshgrid(Ts&&... ts) {
+
+      // generating index sequence that we can convert to axis
+      return detail::meshgrid_impl(std::make_integer_sequence<int, (int)sizeof...(Ts)>{}, ts...);
     }
 
-  /**
-   * Creates an mesh grid Y matrix
-   *
-   *
-   * @tparam T
-   *   Data type
-   *
-   */
-  template <typename T = int>
-    inline auto meshgrid_y(const std::array<T, 3> &x, const std::array<T, 3> &y)
-    {
-      return detail::Meshgrid_Y<T>(x, y);
-    } 
 } // end namespace matx
