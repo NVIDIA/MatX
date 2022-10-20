@@ -207,6 +207,9 @@ We provide a variety of training materials and examples to quickly learn the Mat
 * Static tensor dimensions for compile-time sizes and strides
 * Slew of new ``make_`` helper functions and documentation
 
+## Discussions
+We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
+
 ## Filing Issues
 We welcome and encourage the [creation of issues](https://github.com/NVIDIA/MatX/issues/new) against MatX. When creating a new issue, please use the following syntax in the title of your submission to help us prioritize responses and planned work.
 * Bug Report: Append `[BUG]` to the beginning of the issue title, e.g. `[BUG] MatX fails to build on P100 GPU`
