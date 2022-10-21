@@ -225,6 +225,217 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
       }
     }
   }
+  
+  {
+    tensor_t<TypeParam, 2> t2a({30, 40});
+    tensor_t<TypeParam, 2> t2b({30, 40});
+    
+    auto t4 = ones<TypeParam>({30, 40, 50, 60});
+
+    sum(t2a, t4, 0);
+    sum(t2b, t4, {2,3}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+
+  
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsNumericNoHalf, PermutedReduce)
+{
+  MATX_ENTER_HANDLER();
+
+
+  tensor_t<TypeParam, 2> t2a({50, 60});
+  tensor_t<TypeParam, 2> t2b({50, 60});
+  
+  tensor_t<int, 2> t2ai({50, 60});
+  tensor_t<int, 2> t2bi({50, 60});
+
+  tensor_t<TypeParam, 4> t4({30, 40, 50, 60});
+  
+  randomGenerator_t<float> random(30*40*50*60, 0);
+  auto t4r = random.GetTensorView<4>({30,40,50,60}, UNIFORM, 100);
+
+  (t4 = as_type<TypeParam>(t4r)).run();
+  
+  {
+    sum(t2a, permute(t4,{2,3,0,1}), 0);
+    sum(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j),.1));
+      }
+    }
+  }
+ 
+  {
+    mean(t2a, permute(t4,{2,3,0,1}), 0);
+    mean(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+
+#if 0  // Rank4 not supported at this time
+  {
+    median(t2a, permute(t4,{2,3,0,1}), 0);
+    median(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+#endif
+
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    prod(t2a, permute(t4,{2,3,0,1}), 0);
+    prod(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    rmax(t2a, permute(t4,{2,3,0,1}), 0);
+    rmax(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    rmin(t2a, permute(t4,{2,3,0,1}), 0);
+    rmin(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    argmax(t2a, t2ai, permute(t4,{2,3,0,1}), 0);
+    argmax(t2b, t2bi, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2ai(i, j), t2bi(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    argmin(t2a, t2ai, permute(t4,{2,3,0,1}), 0);
+    argmin(t2b, t2bi, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2ai(i, j), t2bi(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (std::is_same_v<TypeParam, bool>)
+  {
+    any(t2a, permute(t4,{2,3,0,1}), 0);
+    any(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (std::is_same_v<TypeParam, bool>)
+  {
+    all(t2a, permute(t4,{2,3,0,1}), 0);
+    all(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+ 
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    var(t2a, permute(t4,{2,3,0,1}), 0);
+    var(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
+  
+  if constexpr (!is_complex_v<TypeParam>)
+  {
+    stdd(t2a, permute(t4,{2,3,0,1}), 0);
+    stdd(t2b, t4, {0,1}, 0);
+
+    cudaStreamSynchronize(0);
+    for (index_t i = 0; i < t2a.Size(0); i++) {
+      for (index_t j = 0; j < t2a.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+            t2a(i, j), t2b(i,j)));
+      }
+    }
+  }
 
   MATX_EXIT_HANDLER();
 }

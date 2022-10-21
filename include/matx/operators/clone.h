@@ -118,11 +118,13 @@ namespace matx
   template <int Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
     {
-      std::array<index_t, Rank> lshape;
-      for(int i = 0; i < Rank ; i++) {
-        lshape[i]=shape[i];
-      }
-      return detail::CloneOp<Rank, Op, index_t>(t, lshape);
+      return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+    };   
+  
+  template <int Rank, typename Op>
+    auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> &shape)
+    {
+      return detail::CloneOp<Rank, Op, index_t>(t, shape);
     };   
 
 } // end namespace matx

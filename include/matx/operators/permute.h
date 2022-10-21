@@ -65,7 +65,7 @@ namespace matx
 
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
 
-        __MATX_INLINE__ PermuteOp(T op, const int32_t (&dims)[Rank()]) : op_(op) {
+	      __MATX_INLINE__ PermuteOp(T op, const std::array<int32_t, T::Rank()> &dims) : op_(op) {
             
           for(int32_t i = 0; i < Rank(); i++) {
             [[maybe_unused]] int32_t dim = dims[i];
@@ -74,6 +74,7 @@ namespace matx
             dims_[i] = dims[i];
           }
         };
+
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
@@ -108,10 +109,8 @@ namespace matx
 #pragma unroll 
             for(int i = 0; i < Rank(); i++) {	  
               ind[dims_[i]] = inds[i];
-              //ind[i] = inds[dims_[i]];
             }
 
-            //return op_(ind);
             return mapply(op_, ind);
           }
 
@@ -137,8 +136,25 @@ namespace matx
    * @return permuted operator
    */
   template <typename T>
-    __MATX_INLINE__ auto permute( const T op, 
+    __MATX_INLINE__ auto permute( const T &op, 
         const int32_t (&dims)[T::Rank()]) {
+      return detail::PermuteOp<T>(op, detail::to_array(dims));
+    }
+
+  /**
+   * @brief Operator to permute the dimensions of a tensor or operator.
+   *
+   * The each dimension must appear in the dims array once.
+   * This operator can appear as an rvalue or lvalue. 
+   *
+   * @tparam T Input operator/tensor type
+   * @param op Input operator
+   * @param dims the reordered dimensions of the operator.
+   * @return permuted operator
+   */
+  template <typename T>
+    __MATX_INLINE__ auto permute( const T &op, 
+        const std::array<int32_t, T::Rank()> &dims) {
       return detail::PermuteOp<T>(op, dims);
     }
   
@@ -165,7 +181,7 @@ namespace matx
       int32_t dim2 = T::Rank() - 2;
 
       std::swap(dims[dim1],dims[dim2]);
-      return detail::PermuteOp<T>(op, dims);
+      return detail::PermuteOp<T>(op, detail::to_array(dims));
     }
 
 } // end namespace matx
