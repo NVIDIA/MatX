@@ -292,7 +292,6 @@ TYPED_TEST(ReductionTestsNumericNoHalf, PermutedReduce)
     }
   }
 
-#if 0  // Rank4 not supported at this time
   {
     median(t2a, permute(t4,{2,3,0,1}), 0);
     median(t2b, t4, {0,1}, 0);
@@ -305,7 +304,6 @@ TYPED_TEST(ReductionTestsNumericNoHalf, PermutedReduce)
       }
     }
   }
-#endif
 
   if constexpr (!is_complex_v<TypeParam>)
   {

@@ -49,7 +49,7 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
-        using shape_type = typename T1::shape_type;
+        using shape_type = index_t;
         using matxoplvalue = bool;
 
 	 __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
@@ -168,7 +168,7 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
-        using shape_type = typename T1::shape_type;
+        using shape_type = index_t;
         using matxlvalue = bool;
 	 
 	__MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
