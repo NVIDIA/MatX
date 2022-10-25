@@ -1229,52 +1229,77 @@ void __MATX_INLINE__ median(OutType dest,
                    const TensorInType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  using T = typename OutType::scalar_type;
-  constexpr int RANK_IN = TensorInType::Rank();
-  static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
-  
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  if constexpr ( OutType::Rank() <= 1 && TensorInType::Rank() <=2 ) {
+    MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+      using T = typename OutType::scalar_type;
+    constexpr int RANK_IN = TensorInType::Rank();
+    static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
-  // If the rank is 0 we're finding the median of a vector
-  if constexpr (RANK_IN == 1) {
-    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    // Store median
-    if (tmp_sort.Lsize() & 1) {
-      auto middlev =
+      auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+
+    // If the rank is 0 we're finding the median of a vector
+    if constexpr (RANK_IN == 1) {
+      matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+
+      // Store median
+      if (tmp_sort.Lsize() & 1) {
+        auto middlev =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
-      matx::copy(dest, middlev, stream);
-    }
-    else {
-      auto middle1v =
+        matx::copy(dest, middlev, stream);
+      }
+      else {
+        auto middle1v =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2 - 1}, {matxDropDim});
-      auto middle2v =
+        auto middle2v =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
-      (dest = (middle1v + middle2v) / 2.0f).run(stream);
+        (dest = (middle1v + middle2v) / 2.0f).run(stream);
+      }
     }
+    else if constexpr (RANK_IN == 2) {
+      MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
+
+      matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+
+      if (tmp_sort.Lsize() & 1) {
+        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+            {matxEnd, matxDropDim});
+        (dest = self(sv)).run(stream);
+      }
+      else {
+        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2 - 1},
+            {matxEnd, matxDropDim});
+        auto sv2 = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+            {matxEnd, matxDropDim});
+        (dest = (sv + sv2) / 2.0f).run(stream);
+      }
+    }
+  } else {
+
+    constexpr int batch_dims = OutType::Rank() - 1;
+    constexpr int red_dims = OutType::Rank() - TensorInType::Rank();
+
+    if constexpr (batch_dims > 1) {
+      // collapse batch dimensions to a single dimension
+      auto oop = lcollapse<batch_dims>(dest);
+      auto iop = lcollapse<batch_dims>(in);
+
+      static_assert(oop.Rank() <= 1);
+      median(oop, iop, stream);
+
+    } else if constexpr ( red_dims > 1) {
+
+      // collapse reduction dim to a single dim
+      auto iop = rcollapse<red_dims - 1>(in);
+
+      static_assert(dest.Rank() <= 1);
+      static_assert(iop.Rank() <= 2);
+
+      median(dest, iop, stream);
+    }
+
   }
-  else if constexpr (RANK_IN == 2) {
-    MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
-
-    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
-
-    if (tmp_sort.Lsize() & 1) {
-      auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
-                                           {matxEnd, matxDropDim});
-      (dest = self(sv)).run(stream);
-    }
-    else {
-      auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2 - 1},
-                                           {matxEnd, matxDropDim});
-      auto sv2 = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
-                                            {matxEnd, matxDropDim});
-      (dest = (sv + sv2) / 2.0f).run(stream);
-    }
-  }
-
 #endif  
 }
 
