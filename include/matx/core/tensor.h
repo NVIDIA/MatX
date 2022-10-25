@@ -1152,18 +1152,18 @@ public:
    *
    */
   template <int N>
-  __MATX_INLINE__ auto Clone(const typename Desc::shape_type (&clones)[N]) const
+  __MATX_INLINE__ auto Clone(const std::array<index_t, N> &clones) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
-    std::array<typename Desc::shape_type, N> n;
+    std::array<index_t, N> n;
     std::array<typename Desc::stride_type, N> s;    
 
     int d = 0;
 
 #pragma unroll
     for (int i = 0; i < N; i++) {
-      typename Desc::shape_type size = clones[i];
+      index_t size = clones[i];
 
       if (size == matxKeepDim) {
         n[i] = this->desc_.Size(d);
@@ -1184,6 +1184,12 @@ public:
                     "Must keep as many dimension as the original tensor has");
     tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};  
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
+  }
+  
+  template <int N>
+  __MATX_INLINE__ auto Clone(const index_t (&clones)[N]) const
+  {
+    return Clone<N>(detail::to_array(clones));
   }
 
   __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
