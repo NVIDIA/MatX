@@ -90,20 +90,20 @@ namespace matx
             ex.Exec(*static_cast<T *>(this));
           }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() {
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
           std::array<index_t, T::Rank()> sizes_;
 
           for(int i = 0 ; i < T::Rank(); i++) {
-            sizes_[i] = static_cast<T*>(this)->Size(i);
+            sizes_[i] = static_cast<const T*>(this)->Size(i);
           }
           return sizes_;
         }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() {
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() const {
 
           index_t size = 1;
           for(int i = 0 ; i < T::Rank(); i++) {
-            size *= static_cast<T*>(this)->Size(i);
+            size *= static_cast<const T*>(this)->Size(i);
           }
           return size;
         }
