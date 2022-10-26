@@ -52,7 +52,7 @@ namespace matx
         using shape_type = index_t;
         using matxoplvalue = bool;
 
-	 __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
         static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
@@ -93,8 +93,8 @@ namespace matx
 
             return mapply(op_, out);
           }    
-        
-	        template <typename... Is>
+
+        template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
           {
             // indices coming in
@@ -131,7 +131,7 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(DIM + dim - 1);
         }
-        
+
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
@@ -170,8 +170,8 @@ namespace matx
         using scalar_type = typename T1::scalar_type;
         using shape_type = index_t;
         using matxlvalue = bool;
-	 
-	__MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+
+        __MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
       {
@@ -213,8 +213,8 @@ namespace matx
 
             return mapply(op_, out);
           }    
-        
-	        template <typename... Is>
+
+        template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
           {
             // indices coming in
@@ -251,7 +251,7 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(dim);
         }
-        
+
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
