@@ -1224,15 +1224,15 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], 
  * @param stream
  *   CUDA stream
  */
-template <typename OutType, typename TensorInType>
+template <typename OutType, typename InType>
 void __MATX_INLINE__ median(OutType dest,
-                   const TensorInType &in, cudaStream_t stream = 0)
+                   const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  if constexpr ( OutType::Rank() <= 1 && TensorInType::Rank() <=2 ) {
+  if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
     MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
       using T = typename OutType::scalar_type;
-    constexpr int RANK_IN = TensorInType::Rank();
+    constexpr int RANK_IN = InType::Rank();
     static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1277,28 +1277,32 @@ void __MATX_INLINE__ median(OutType dest,
     }
   } else {
 
-    constexpr int batch_dims = OutType::Rank() - 1;
-    constexpr int red_dims = OutType::Rank() - TensorInType::Rank();
+#if 1  // sort doesn't currently work on non-tensor input
+    static_assert(InType::Rank() <= 2 && OutType::Rank() <= 1, "median only supported with output rank <= 1 and input rank <= 2");
+#else 
+    constexpr int out_dims = OutType::Rank();
+    constexpr int red_dims = InType::Rank() - OutType::Rank();
 
-    if constexpr (batch_dims > 1) {
+    if constexpr ( out_dims > 1) {  
       // collapse batch dimensions to a single dimension
-      auto oop = lcollapse<batch_dims>(dest);
-      auto iop = lcollapse<batch_dims>(in);
+      auto oop = lcollapse<out_dims - 1>(dest);
+      auto iop = lcollapse<out_dims - 1>(in);
 
-      static_assert(oop.Rank() <= 1);
+      static_assert(oop.Rank() == 1);
       median(oop, iop, stream);
 
-    } else if constexpr ( red_dims > 1) {
+    } else if constexpr ( red_dims > 1) { 
 
       // collapse reduction dim to a single dim
       auto iop = rcollapse<red_dims - 1>(in);
 
       static_assert(dest.Rank() <= 1);
       static_assert(iop.Rank() <= 2);
-
       median(dest, iop, stream);
+    } else {
+      static_assert(false, "median ranks not supported");
     }
-
+#endif
   }
 #endif  
 }
@@ -1342,7 +1346,7 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
