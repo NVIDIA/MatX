@@ -84,13 +84,17 @@ if(NOT cuTENSOR_FOUND)
 
   message(STATUS "cuTENSOR not found. Downloading library. By continuing this download you accept to the license terms of cuTENSOR")
 
-  file(DOWNLOAD https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive.tar.xz
-      ${CMAKE_BINARY_DIR}/${CUTENSOR_FILENAME}.tar.xz)
+  CPMAddPackage(
+    NAME cutensor
+    VERSION ${CUTENSOR_VERSION}
+    URL https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive.tar.xz
+    # Eigen's CMakelists are not intended for library use
+    DOWNLOAD_ONLY YES 
+  )
+      
+  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/11/libcutensor.so)
+  set(cuTENSOR_INCLUDE_DIR ${cutensor_SOURCE_DIR}/include) 
 
-  file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/${CUTENSOR_FILENAME}.tar.xz DESTINATION ${CMAKE_BINARY_DIR}/cutensor/)    
-
-  set(cuTENSOR_LIBRARY ${CMAKE_BINARY_DIR}/cutensor/${CUTENSOR_FILENAME}/lib/11/libcutensor.so) 
-  set(cuTENSOR_INCLUDE_DIR ${CMAKE_BINARY_DIR}/cutensor/${CUTENSOR_FILENAME}/include) 
 
   set(cuTENSOR_FOUND TRUE)
 endif()

@@ -68,7 +68,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CUDA_CXX_STANDARD 17)
 
 # CPM is required for all package management
-include(cmake/GetCPM.cmake)
+include(public/cpm-cmake/cmake/CPM.cmake)
 # Helper for selecting build type
 include(cmake/BuildType.cmake)
 

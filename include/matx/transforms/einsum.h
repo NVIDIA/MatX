@@ -37,7 +37,7 @@
 #include <cstdio>
 #include <numeric>
 #include "error.h"
-#include "tensor.h"
+#include "matx/core/tensor.h"
 
 
 #include <cutensornet.h>
