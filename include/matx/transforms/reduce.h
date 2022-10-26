@@ -1285,8 +1285,8 @@ void __MATX_INLINE__ median(OutType dest,
 
     if constexpr ( out_dims > 1) {  
       // collapse batch dimensions to a single dimension
-      auto oop = lcollapse<out_dims - 1>(dest);
-      auto iop = lcollapse<out_dims - 1>(in);
+      auto oop = lcollapse<out_dims>(dest);
+      auto iop = lcollapse<out_dims>(in);
 
       static_assert(oop.Rank() == 1);
       median(oop, iop, stream);
@@ -1294,7 +1294,7 @@ void __MATX_INLINE__ median(OutType dest,
     } else if constexpr ( red_dims > 1) { 
 
       // collapse reduction dim to a single dim
-      auto iop = rcollapse<red_dims - 1>(in);
+      auto iop = rcollapse<red_dims>(in);
 
       static_assert(dest.Rank() <= 1);
       static_assert(iop.Rank() <= 2);
