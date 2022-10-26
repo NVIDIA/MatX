@@ -1,1 +1,1 @@
-git subtree add --prefix public/cpm-cmake https://github.com/cpm-cmake/CPM.cmake.git 0.32.2 --squash
+git subtree add --prefix public/cpm-cmake https://github.com/cpm-cmake/CPM.cmake.git v0.32.2 --squash
