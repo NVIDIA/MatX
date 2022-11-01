@@ -115,7 +115,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
     const __half2 &Z = *reinterpret_cast<const __half2*>(&z);
 
 #if 1
-#ifdef __CUDACC__
+#ifdef __CUDA_ARCH__
     auto v = __hcmadd(X,Y,Z);
     return T4(v.x, v.y);
 #else
