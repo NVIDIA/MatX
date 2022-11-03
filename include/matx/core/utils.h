@@ -146,5 +146,36 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
   }
 }
 
+template <int RANK, int D>
+auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+  std::array<int, RANK> perm;
+  std::array<bool, RANK> visited;
+
+  visited.fill(false);
+
+  // construct permutation array by moving fastest changing dims to end
+  int j = RANK-1;
+  #pragma unroll
+  for(int i = D-1; i>= 0; i--) {
+    int a = dims[i];
+    MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");
+    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
+
+    visited[a] = true;
+
+    perm[j--] = a;
+  }
+
+  // now add remaning dims to front
+  j = 0;
+  for(int i = 0; i < RANK;  i++) {
+    if(!visited[i]) {
+      perm[j++] = i;
+    }
+  }
+
+  return perm;
+}
+
 };
 };

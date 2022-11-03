@@ -39,6 +39,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/transforms/cub.h"
 
 #ifdef __CUDACC__  
@@ -972,37 +973,6 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
 
 } // namespace detail
 
-template <int RANK, int D>
-auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
-  std::array<int, RANK> perm;
-  std::array<bool, RANK> visited;
-
-  visited.fill(false);
-  
-  // construct permutation array by moving fastest changing dims to end
-  int j = RANK-1;
-  #pragma unroll
-  for(int i = D-1; i>= 0; i--) {
-    int a = dims[i];
-    MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");
-    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
-
-    visited[a] = true;
-
-    perm[j--] = a;
-  }
-
-  // now add remaning dims to front
-  j = 0;
-  for(int i = 0; i < RANK;  i++) {
-    if(!visited[i]) {
-      perm[j++] = i;
-    }
-  }
-
-  return perm;
-}
-
 /**
  * Perform a reduction and preserves indices
  *
@@ -1196,7 +1166,7 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   mean(dest, permute(in, perm), stream);
 #endif  
@@ -1318,7 +1288,7 @@ void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D]
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   median(dest, permute(in, perm), stream);
 #endif  
@@ -1369,7 +1339,7 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   sum(dest, permute(in, perm), stream);
 #endif  
@@ -1413,7 +1383,7 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   prod(dest, permute(in, perm), stream);
 #endif  
@@ -1467,7 +1437,7 @@ void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   rmax(dest, permute(in, perm), stream);
 #endif  
@@ -1512,7 +1482,7 @@ void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const In
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   argmax(dest, idest, permute(in, perm), stream);
 #endif  
@@ -1566,7 +1536,7 @@ void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   rmin(dest, permute(in, perm), stream);
 
@@ -1613,7 +1583,7 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   argmin(dest, idest, permute(in, perm), stream);
 #endif  
@@ -1658,7 +1628,7 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   any(dest, permute(in, perm), stream);
 #endif  
@@ -1703,7 +1673,7 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   all(dest, permute(in, perm), stream);
 #endif  
@@ -1784,7 +1754,7 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   var(dest, permute(in, perm), stream);
 #endif  
@@ -1829,7 +1799,7 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-  auto perm = getPermuteDims<InType::Rank()>(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   stdd(dest, permute(in, perm), stream);
 
