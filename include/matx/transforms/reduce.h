@@ -689,6 +689,7 @@ __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 
 
 template <typename OutType, typename InType, typename ReduceOp>
+__launch_bounds__(1024, 1)
 __global__ void matxReduceKernel(OutType dest, const InType in,
                                  ReduceOp red, [[maybe_unused]] index_t mult)
 {
@@ -1072,8 +1073,9 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
-
+  
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
+
   detail::matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp(), mult);
 
