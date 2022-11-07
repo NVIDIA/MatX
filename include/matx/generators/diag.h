@@ -48,7 +48,7 @@ namespace matx
       using matxop = bool;
       using scalar_type = T;
 
-       __MATX_INLINE__ std::string str() { return "diag"; }
+       __MATX_INLINE__ std::string str() const { return "diag"; }
 
       Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
       {

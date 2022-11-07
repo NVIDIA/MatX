@@ -66,7 +66,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = NewType;
 
-	__MATX_INLINE__ std::string str() { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
+	__MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(T op) : op_(op){};  
 
         template <typename... Is>

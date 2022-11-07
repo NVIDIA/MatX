@@ -44,7 +44,7 @@ namespace matx
       public:
         using scalar_type = T;
 
-	__MATX_INLINE__ std::string str() { return "alternate"; }
+	__MATX_INLINE__ std::string str() const { return "alternate"; }
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
         {

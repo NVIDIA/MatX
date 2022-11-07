@@ -57,7 +57,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
 
-        __MATX_INLINE__ std::string str() { return "diag(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "diag(" + op_.str() + ")"; }
  
         __MATX_INLINE__ DiagOp(T1 op) : op_(op) {}
 

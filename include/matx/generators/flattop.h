@@ -51,7 +51,7 @@ namespace matx
 
         using scalar_type = T;
 
-        __MATX_INLINE__ std::string str() { return "flattop"; }
+        __MATX_INLINE__ std::string str() const { return "flattop"; }
 
         inline __MATX_HOST__ __MATX_DEVICE__ FlatTop(index_t size) : size_(size){};
 

@@ -63,7 +63,7 @@ namespace matx
         static_assert(T::Rank()>0, "SliceOp: Rank of operator must be greater than 0.");
         static_assert(DIM<=T::Rank(), "SliceOp: DIM must be less than or equal to operator rank.");
 
-        __MATX_INLINE__ std::string str() { return "slice(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "slice(" + op_.str() + ")"; }
 
         __MATX_INLINE__ SliceOp(T op, const shape_type (&starts)[T::Rank()], const shape_type (&ends)[T::Rank()], const shape_type (&strides)[T::Rank()]) : op_(op) {
           int32_t d = 0;

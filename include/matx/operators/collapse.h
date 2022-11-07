@@ -52,7 +52,7 @@ namespace matx
         using shape_type = index_t;
         using matxoplvalue = bool;
 
-        __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
         static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
@@ -171,7 +171,7 @@ namespace matx
         using shape_type = index_t;
         using matxlvalue = bool;
 
-        __MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
       {

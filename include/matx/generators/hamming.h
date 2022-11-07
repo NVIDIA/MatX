@@ -44,7 +44,7 @@ namespace matx
       public:
         using scalar_type = T;
 
-        __MATX_INLINE__ std::string str() { return "hamming"; }
+        __MATX_INLINE__ std::string str() const { return "hamming"; }
 	
         inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
