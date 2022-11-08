@@ -88,6 +88,228 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
+{
+  MATX_ENTER_HANDLER();
+  const int d1 = 8;
+  const int d2 = 512;
+  const int d3 = 1024;
+
+  auto in = make_tensor<TypeParam>({d1, d2, d3});
+  auto out1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out2 = make_tensor<TypeParam>({d1, d2, d3});
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        in(i,j,k) = static_cast<TypeParam>((float)(i+j+k));
+      }
+    }
+  }
+
+  fft(out1, in);
+  fft(out2, in, {2});
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  fft(out1.Permute({0,2,1}), in.Permute({0,2,1}));
+  fft(out2, in, {1});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+  
+  ifft(out1, in);
+  ifft(out2, in, {2});
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  ifft(out1.Permute({0,2,1}), in.Permute({0,2,1}));
+  ifft(out2, in, {1});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+  
+  {
+    auto in1 =  ones<TypeParam>(in.Shape());
+    fft(out1.Permute({0,2,1}), permute(in1, {0,2,1}));
+    fft(out2, in1, {1});
+
+    cudaStreamSynchronize(0);
+
+    for(int i = 0; i < d1; i++) {
+      for(int j = 0; j < d2; j++) {
+        for(int k = 0; k < d3; k++) {
+          ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+        }
+      }
+    }
+
+    ifft(out1.Permute({1,2,0}), permute(in1, {1,2,0}));
+    ifft(out2, in1, {0});
+    cudaStreamSynchronize(0);
+
+    for(int i = 0; i < d1; i++) {
+      for(int j = 0; j < d2; j++) {
+        for(int k = 0; k < d3; k++) {
+          ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
+{
+  MATX_ENTER_HANDLER();
+  const int d1 = 128;
+  const int d2 = 256;
+  const int d3 = 512;
+
+  auto in = make_tensor<TypeParam>({d1, d2, d3});
+  auto out1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out2 = make_tensor<TypeParam>({d1, d2, d3});
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        in(i,j,k) = sin(float(i+1)) + sin(float(j+1)) + sin(float(k+1));
+      }
+    }
+  }
+
+  fft2(out1, in);
+  fft2(out2, in, {1,2});
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  fft2(out1.Permute({1,2,0}), in.Permute({1,2,0}));
+  fft2(out2, in, {2,0});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  fft2(out1.Permute({1,0,2}), in.Permute({1,0,2}));
+  fft2(out2, in, {0,2});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+  
+  ifft2(out1, in);
+  ifft2(out2, in, {1,2});
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  ifft2(out1.Permute({1,2,0}), in.Permute({1,2,0}));
+  ifft2(out2, in, {2,0});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+
+  ifft2(out1.Permute({1,0,2}), in.Permute({1,0,2}));
+  ifft2(out2, in, {0,2});
+  cudaStreamSynchronize(0);
+  
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+      }
+    }
+  }
+ 
+  {
+    auto in1 =  ones<TypeParam>(in.Shape());
+
+    fft2(out1.Permute({1,0,2}), permute(in1, {1,0,2}));
+    fft2(out2, in1, {0,2});
+    cudaStreamSynchronize(0);
+
+    for(int i = 0; i < d1; i++) {
+      for(int j = 0; j < d2; j++) {
+        for(int k = 0; k < d3; k++) {
+          ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+        }
+      }
+    }
+    
+
+    ifft2(out1.Permute({1,0,2}), permute(in1, {1,0,2}));
+    ifft2(out2, in1, {0,2});
+    cudaStreamSynchronize(0);
+
+    for(int i = 0; i < d1; i++) {
+      for(int j = 0; j < d2; j++) {
+        for(int k = 0; k < d3; k++) {
+          ASSERT_EQ(out1(i,j,k), out2(i,j,k)); 
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
 {
   MATX_ENTER_HANDLER();
