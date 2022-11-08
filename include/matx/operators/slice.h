@@ -173,7 +173,11 @@ namespace matx
       const index_t (&ends)[OpType::Rank()],
       const index_t (&strides)[OpType::Rank()]) 
   {
-    return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
+    if constexpr (is_tensor_view_v<OpType>) {
+      return op.Slice(starts, ends, strides);
+    } else {
+      return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
+    }
   }
 
   /**
