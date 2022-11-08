@@ -118,7 +118,11 @@ namespace matx
   template <int Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
     {
-      return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+      if constexpr (is_tensor_view_v<Op>) {
+        return t.template Clone<Rank>(shape);
+      } else {
+        return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+      }
     };   
   
   template <int Rank, typename Op>
