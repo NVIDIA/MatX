@@ -55,7 +55,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
 
-	__MATX_INLINE__ std::string str() { return "hermitian(" + op_.str() + ")"; }
+	__MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
         __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }

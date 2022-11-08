@@ -50,7 +50,7 @@ namespace matx
           using scalar_type = typename T1::scalar_type;
           //typedef typename T1::scalar_type scalar_type;
 
-          __MATX_INLINE__ std::string str() { return "meshgrid"; }
+          __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 
           __MATX_INLINE__ MeshGridOp(T1 t1, std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
             static_assert(shape.size() == RANK );

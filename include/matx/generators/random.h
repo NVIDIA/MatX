@@ -261,7 +261,7 @@ public:
   // dummy type to signal this is a matxop
   using matxop = bool; ///< Type trait to indicate this is an operator
         
-  __MATX_INLINE__ std::string str() { return "rand"; }
+  __MATX_INLINE__ std::string str() const { return "rand"; }
 
   /**
    * @brief Construct a new randomTensorView t object

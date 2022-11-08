@@ -52,7 +52,7 @@ namespace matx
         using complex_type = std::conditional_t<is_matx_half_v<scalar_type>,
               matxHalfComplex<scalar_type>,
               cuda::std::complex<scalar_type>>;
-        __MATX_INLINE__ std::string str() { return "interleaved(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "interleaved(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ComplexInterleavedOp(T1 op) : op_(op) {
           static_assert(!is_complex_v<extract_scalar_type_t<T1>>, "Complex interleaved op only works on scalar input types");

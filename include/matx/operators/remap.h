@@ -61,7 +61,7 @@ namespace matx
         static_assert(IdxType::Rank() == 1, "RemapOp: Rank of index operator must be 1");
         static_assert(DIM<T::Rank(), "RemapOp: DIM must be less than Rank of tensor");
 
-        __MATX_INLINE__ std::string str() { return "remap(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
 
 	__MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
 

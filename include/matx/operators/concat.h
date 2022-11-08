@@ -59,14 +59,14 @@ namespace matx
       using scalar_type = first_value_type;
 
       template <int I = -1>
-      __MATX_INLINE__ std::string get_str() {
+      __MATX_INLINE__ std::string get_str() const {
         if constexpr (I==-1) return "concat(" + get_str<I+1>();
         else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
         else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
         else return "";
       }
 	      
-      __MATX_INLINE__ std::string str() {
+      __MATX_INLINE__ std::string str() const {
          return get_str<-1>();
       }
 

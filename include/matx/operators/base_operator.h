@@ -50,7 +50,7 @@ namespace matx
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
 
-	__MATX_INLINE__ std::string str() { return "BaseOp"; }
+	__MATX_INLINE__ std::string str() const { return "BaseOp"; }
         /**
          * @brief Launch kernel in a GPU stream
          * 
