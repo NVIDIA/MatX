@@ -245,7 +245,7 @@ public:
 
   __MATX_INLINE__  ~tensor_t() = default;
 
-  const std::string str() const {
+  __MATX_INLINE__ const std::string str() const {
     return std::string("T") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
   }
 

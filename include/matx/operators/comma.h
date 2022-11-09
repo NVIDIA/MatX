@@ -53,7 +53,8 @@ namespace matx
                 "Chained expressions using the comma operator must match in rank");
           }
 
-	  __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
+	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
+
           template <typename... Is>
             auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
               op1_(indices...);
