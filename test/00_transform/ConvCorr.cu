@@ -363,6 +363,173 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
+{
+  MATX_ENTER_HANDLER();
+  const int d1 = 8;
+  const int d2 = 512;
+  const int d3 = 1024;
+
+  auto in1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto in2 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out2 = make_tensor<TypeParam>({d1, d2, d3});
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        in1(i,j,k) = static_cast<TypeParam>((float)(i+j+k));
+        in2(i,j,k) = static_cast<TypeParam>((float)(1));
+      }
+    }
+  }
+
+  conv1d(out1, in1, in2, MATX_C_MODE_SAME);
+  conv1d(out2, in1, in2, {2}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  conv1d(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME);
+  conv1d(out2, in1, in2, {1}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  conv1d(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME);
+  conv1d(out2, in1, in2, {0}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  corr(out1, in1, in2, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  corr(out2, in1, in2, {2}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  corr(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  corr(out2, in1, in2, {1}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  corr(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  corr(out2, in1, in2, {0}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
+{
+  MATX_ENTER_HANDLER();
+#if 0  // currently doesn't work because Conv2D requires rank2 filter.
+  const int d1 = 8;
+  const int d2 = 512;
+  const int d3 = 1024;
+
+  auto in1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto in2 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out1 = make_tensor<TypeParam>({d1, d2, d3});
+  auto out2 = make_tensor<TypeParam>({d1, d2, d3});
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+			for(int k = 0; k < d3; k++) {
+				in1(i,j,k) = static_cast<TypeParam>((float)(i+j+k));
+				in2(i,j,k) = static_cast<TypeParam>((float)(1));
+      }
+    }
+  }
+
+  conv2d(out1, in1, in2, MATX_C_MODE_SAME);
+  conv2d(out2, in1, in2, {1, 2}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+ 
+  conv2d(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME);
+  conv2d(out2, in1, in2, {2, 1}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+  
+  conv2d(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME);
+  conv2d(out2, in1, in2, {2, 0}, MATX_C_MODE_SAME);
+
+  cudaStreamSynchronize(0);
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        ASSERT_EQ(out1(i,j,k), out2(i,j,k));
+      }
+    }
+  }
+#endif
+
+  MATX_EXIT_HANDLER();
+}
+
 // // Complex/complex direct 1D convolution
 // TEST_F(CorrelationConvolutionTest, Direct1DC2CConvolution)
 // {
