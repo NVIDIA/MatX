@@ -104,7 +104,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename Op::scalar_type;
 
-      __MATX_INLINE__ const std::string str() {
+      __MATX_INLINE__ const std::string str() const {
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 

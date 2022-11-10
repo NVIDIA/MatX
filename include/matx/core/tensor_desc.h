@@ -272,6 +272,14 @@ public:
   }
 
   /**
+   * @brief Return strides contaienr of descriptor
+   * 
+   * @return Strides container
+   */
+  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Strides() const { 
+    return stride_;
+  }
+  /**
    * @brief Return stride of descriptor on a single dimension
    * 
    * @param dim Dimension to retrieve

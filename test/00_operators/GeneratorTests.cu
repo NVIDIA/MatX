@@ -197,16 +197,20 @@ TEST(OperatorTests, MeshGrid)
   MATX_ENTER_HANDLER();
   using dtype = int;
   auto pb = std::make_unique<detail::MatXPybind>();
-  constexpr index_t xd = 3;
-  constexpr index_t yd = 5;
-  pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run",
-                                   {xd, yd});
-
+  constexpr dtype xd = 3;
+  constexpr dtype yd = 5;
+  pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run", {xd, yd});
   tensor_t<dtype, 2> xv({yd, xd});
   tensor_t<dtype, 2> yv({yd, xd});
 
-  (xv = meshgrid_x({1, xd, xd}, {1, yd, yd})).run();
-  (yv = meshgrid_y({1, xd, xd}, {1, yd, yd})).run();
+  auto x = linspace<0>({xd}, 1, xd);
+  auto y = linspace<0>({yd}, 1, yd);
+
+  auto [xx, yy] = meshgrid(x, y);
+
+  (xv = xx).run();
+  (yv = yy).run();
+
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, xv, "X", 0);
   MATX_TEST_ASSERT_COMPARE(pb, yv, "Y", 0);

@@ -49,22 +49,22 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
-        using shape_type = typename T1::shape_type;
+        using shape_type = index_t;
         using matxoplvalue = bool;
 
-	 __MATX_INLINE__ std::string str() { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
-        static_assert(DIM < T1::Rank(),  "Collapse DIM must be less than Rank() of operator");
-        static_assert(DIM > 0, "Collapse DIM must have a magnitude greater than 0");
-        static_assert(T1::Rank() > 1, "Collapse must be called on operators with rank > 1");
+        static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
+        static_assert(DIM > 1, "Must collapse multiple dims");
+        static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
         // comptue size of collapsed dimension
         size_ = 1;
 
         // Collapse left-most dims
 #pragma unroll
-        for(int i = 0 ; i <= DIM; i++) {
+        for(int i = 0 ; i < DIM; i++) {
           size_ *= op_.Size(i);
         }
       }
@@ -79,22 +79,22 @@ namespace matx
 #pragma unroll
             for(int i = 1; i < Rank(); i++) {
               // copy all but first input index into out array
-              out[DIM+i] = in[i];
+              out[DIM + i - 1] = in[i];
             }
 
             // expand first input index into DIM indices
             auto ind = in[0];
 #pragma unroll
-            for(int i = 0; i <= DIM; i++) {
-              int d = DIM - i;
+            for(int i = 0; i < DIM; i++) {
+              int d = DIM - i - 1;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
             }
 
             return mapply(op_, out);
           }    
-        
-	template <typename... Is>
+
+        template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
           {
             // indices coming in
@@ -104,14 +104,14 @@ namespace matx
 #pragma unroll
             for(int i = 1; i < Rank(); i++) {
               // copy all but first input index into out array
-              out[DIM+i] = in[i];
+              out[DIM + i - 1] = in[i];
             }
 
             // expand first input index into DIM indices
             auto ind = in[0];
 #pragma unroll
-            for(int i = 0; i <= DIM; i++) {
-              int d = DIM - i;
+            for(int i = 0; i < DIM; i++) {
+              int d = DIM - i - 1;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
             }
@@ -121,7 +121,7 @@ namespace matx
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return T1::Rank() - DIM;
+          return T1::Rank() - DIM + 1;
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -129,9 +129,9 @@ namespace matx
           if(dim == 0)  // if asking for the first dim, return collapsed size
             return size_;
           else // otherwise return the un-collapsed size from operator
-            return op_.Size(DIM+dim);
+            return op_.Size(DIM + dim - 1);
         }
-        
+
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
@@ -141,7 +141,7 @@ namespace matx
    * The lcollapse operator takes a tensor and collapses the left most dimensions into a single dimension.
    *
    * @tparam DIM
-   *   The number of dimensions to collapse
+   *   The number of input dimensions to collapse
    * @tparam T1
    *   Operator type
    *
@@ -168,23 +168,23 @@ namespace matx
       public:
         using matxop = bool;
         using scalar_type = typename T1::scalar_type;
-        using shape_type = typename T1::shape_type;
+        using shape_type = index_t;
         using matxlvalue = bool;
-	 
-	__MATX_INLINE__ std::string str() { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
+
+        __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
       {
-        static_assert(DIM < T1::Rank(),  "Collapse DIM must be less than Rank() of operator");
-        static_assert(DIM > 0, "Collapse DIM must have a magnitude greater than 0");
-        static_assert(T1::Rank() > 1, "Collapse must be called on operators with rank > 1");
+        static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
+        static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
+        static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
         // comptue size of collapsed dimension
         size_ = 1;
 
         // Collapse right-most dims
 #pragma unroll
-        for(int i = 0 ; i <= DIM; i++) {
+        for(int i = 0 ; i < DIM; i++) {
           size_ *= op_.Size(T1::Rank() - 1 - i);
         }
       }
@@ -205,7 +205,7 @@ namespace matx
             // expand last index into DIM indices
             auto ind = in[Rank() - 1];
 #pragma unroll
-            for(int i = 0; i <= DIM; i++) {
+            for(int i = 0; i < DIM; i++) {
               int d = T1::Rank() - 1 - i;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
@@ -213,8 +213,8 @@ namespace matx
 
             return mapply(op_, out);
           }    
-        
-	template <typename... Is>
+
+        template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
           {
             // indices coming in
@@ -230,7 +230,7 @@ namespace matx
             // expand last index into DIM indices
             auto ind = in[Rank() - 1];
 #pragma unroll
-            for(int i = 0; i <= DIM; i++) {
+            for(int i = 0; i < DIM; i++) {
               int d = T1::Rank() - 1 - i;
               out[d] = ind % op_.Size(d);
               ind /= op_.Size(d);
@@ -241,7 +241,7 @@ namespace matx
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return T1::Rank() - DIM;
+          return T1::Rank() - DIM + 1;
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -251,7 +251,7 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(dim);
         }
-        
+
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
@@ -261,7 +261,7 @@ namespace matx
    * The rcollapse operator takes a tensor and collapses the right most dimensions into a single dimension.
    *
    * @tparam DIM
-   *   The number of dimensions to collapse
+   *   The number of input dimensions to collapse
    * @tparam T1
    *   Operator type
    *

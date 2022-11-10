@@ -217,6 +217,16 @@ public:
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
   { }
 
+  template <typename O>
+  __MATX_INLINE__ bool isSameView(const O &o) {
+    if constexpr (is_tensor_view_v<O> && RANK == O::Rank()) {
+      return Data() == o.Data() &&
+        this->Shape() == o.Shape() &&
+        this->desc_.Strides() == o.desc_.Strides();
+    } else {
+      return false;
+    }
+  }
   /** Perform a shallow copy of a tensor view
    *
    * Alternative to operator= since it's used for lazy evaluation. This function
@@ -235,7 +245,7 @@ public:
 
   __MATX_INLINE__  ~tensor_t() = default;
 
-  const std::string str() {
+  __MATX_INLINE__ const std::string str() const {
     return std::string("T") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
   }
 
@@ -896,7 +906,7 @@ public:
     Desc new_desc{this->desc_.Shape(), std::move(strides)};  
     return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
   }
-
+  
   /**
    * Permute the dimensions of a tensor
    *
@@ -912,7 +922,7 @@ public:
    * @returns tensor view of only imaginary-valued components
    *
    */
-  __MATX_INLINE__ auto Permute(const uint32_t (&dims)[RANK]) const
+  __MATX_INLINE__ auto Permute(const std::array<int32_t, RANK> &dims) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
@@ -937,6 +947,27 @@ public:
     return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
   }
 
+
+  /**
+   * Permute the dimensions of a tensor
+   *
+   * Accepts any order of permutation. Number of dimensions must match RANK of
+   * tensor
+   *
+   * @tparam M
+   *   Rank of tensor to permute. Should not be used directly
+   *
+   * @param dims
+   *   Dimensions of tensor
+   *
+   * @returns tensor view of only imaginary-valued components
+   *
+   */
+  __MATX_INLINE__ auto Permute(const int32_t (&dims)[RANK]) const
+  {
+    return Permute(detail::to_array(dims));
+  }
+
   /**
    * Permute the last two dimensions of a matrix
    *
@@ -958,7 +989,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
-    uint32_t tdims[RANK];
+    int32_t tdims[RANK];
     std::iota(std::begin(tdims), std::end(tdims), 0);
     std::swap(tdims[RANK - 2], tdims[RANK - 1]);
     return Permute(tdims);
@@ -1152,18 +1183,18 @@ public:
    *
    */
   template <int N>
-  __MATX_INLINE__ auto Clone(const typename Desc::shape_type (&clones)[N]) const
+  __MATX_INLINE__ auto Clone(const std::array<index_t, N> &clones) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
-    std::array<typename Desc::shape_type, N> n;
+    std::array<index_t, N> n;
     std::array<typename Desc::stride_type, N> s;    
 
     int d = 0;
 
 #pragma unroll
     for (int i = 0; i < N; i++) {
-      typename Desc::shape_type size = clones[i];
+      index_t size = clones[i];
 
       if (size == matxKeepDim) {
         n[i] = this->desc_.Size(d);
@@ -1184,6 +1215,12 @@ public:
                     "Must keep as many dimension as the original tensor has");
     tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};  
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
+  }
+  
+  template <int N>
+  __MATX_INLINE__ auto Clone(const index_t (&clones)[N]) const
+  {
+    return Clone<N>(detail::to_array(clones));
   }
 
   __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {

@@ -70,7 +70,7 @@ public:
   using scalar_type = typename T::scalar_type;
   using shape_type = typename T::shape_type;
 
-  const std::string str() {
+  __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
 

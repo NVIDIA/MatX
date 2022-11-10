@@ -47,7 +47,7 @@ namespace matx
     {
       public: 
         using scalar_type = typename T::scalar_type;
-        using shape_type = typename T::shape_type; 
+        using shape_type = index_t; 
 
       private:
         typename base_type<T>::type op_;
@@ -63,7 +63,7 @@ namespace matx
         static_assert(T::Rank()>0, "SliceOp: Rank of operator must be greater than 0.");
         static_assert(DIM<=T::Rank(), "SliceOp: DIM must be less than or equal to operator rank.");
 
-        __MATX_INLINE__ std::string str() { return "slice(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "slice(" + op_.str() + ")"; }
 
         __MATX_INLINE__ SliceOp(T op, const shape_type (&starts)[T::Rank()], const shape_type (&ends)[T::Rank()], const shape_type (&strides)[T::Rank()]) : op_(op) {
           int32_t d = 0;
@@ -160,20 +160,25 @@ namespace matx
 
    * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam T_wStrideT Input operator/tensor type
+   * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @param strides Optional:  the stride between consecutive elements
    * @return sliced operator
    */
-  template <typename T_wStrideT>
-    __MATX_INLINE__ auto slice( const T_wStrideT op, 
-        const typename T_wStrideT::shape_type (&starts)[T_wStrideT::Rank()],
-        const typename T_wStrideT::shape_type (&ends)[T_wStrideT::Rank()],
-        const typename T_wStrideT::stride_type (&strides)[T_wStrideT::Rank()]) {
-      return detail::SliceOp<T_wStrideT::Rank(),T_wStrideT>(op, starts, ends, strides);
+  template <typename OpType>
+  __MATX_INLINE__ auto slice( const OpType &op, 
+      const index_t (&starts)[OpType::Rank()],
+      const index_t (&ends)[OpType::Rank()],
+      const index_t (&strides)[OpType::Rank()]) 
+  {
+    if constexpr (is_tensor_view_v<OpType>) {
+      return op.Slice(starts, ends, strides);
+    } else {
+      return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
     }
+  }
 
   /**
    * @brief Operator to logically slice a tensor or operator.
@@ -182,21 +187,22 @@ namespace matx
 
    * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam T_wShapeT Input operator/tensor type
+   * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
    */
-  template <typename T_wShapeT>
-    __MATX_INLINE__ auto slice( const T_wShapeT op, 
-        const typename T_wShapeT::shape_type (&starts)[T_wShapeT::Rank()],
-        const typename T_wShapeT::shape_type (&ends)[T_wShapeT::Rank()]) {
-              typename T_wShapeT::shape_type strides[T_wShapeT::Rank()];
-      for(int i = 0; i < T_wShapeT::Rank(); i++)
-        strides[i] = 1;
-      return detail::SliceOp<T_wShapeT::Rank(),T_wShapeT>(op, starts, ends, strides);
-    }
+  template <typename OpType>
+  __MATX_INLINE__ auto slice( const OpType &op, 
+      const index_t (&starts)[OpType::Rank()],
+      const index_t (&ends)[OpType::Rank()]) 
+  {
+    index_t strides[OpType::Rank()];
+    for(int i = 0; i < OpType::Rank(); i++)
+      strides[i] = 1;
+    return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
+  }
 
   /**
    * @brief Operator to logically slice a tensor or operator.
@@ -206,20 +212,21 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam N The Rank of the output operator
-   * @tparam T_wStridet_2 Input operator/tensor type
+   * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @param strides Optional:  the stride between consecutive elements
    * @return sliced operator
    */
-  template <int N, typename T_wStridet_2>
-    __MATX_INLINE__ auto slice( const T_wStridet_2 op, 
-        const typename T_wStridet_2::shape_type (&starts)[T_wStridet_2::Rank()],
-        const typename T_wStridet_2::shape_type (&ends)[T_wStridet_2::Rank()],
-        const typename T_wStridet_2::stride_type (&strides)[T_wStridet_2::Rank()]) {
-      return detail::SliceOp<N,T_wStridet_2>(op, starts, ends, strides);
-    }
+  template <int N, typename OpType>
+    __MATX_INLINE__ auto slice( const OpType op, 
+        const index_t (&starts)[OpType::Rank()],
+        const index_t (&ends)[OpType::Rank()],
+        const index_t (&strides)[OpType::Rank()]) 
+  {
+    return detail::SliceOp<N,OpType>(op, starts, ends, strides);
+  }
 
   /**
    * @brief Operator to logically slice a tensor or operator.
@@ -229,19 +236,20 @@ namespace matx
    * This operator can appear as an rvalue or lvalue. 
    *
    * @tparam N The Rank of the output operator
-   * @tparam T_wShapet_2 Input operator/tensor type
+   * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
    */
-  template <int N, typename T_wShapet_2>
-    __MATX_INLINE__ auto slice( const T_wShapet_2 op, 
-        const typename T_wShapet_2::shape_type (&starts)[T_wShapet_2::Rank()],
-        const typename T_wShapet_2::shape_type (&ends)[T_wShapet_2::Rank()]) {
-              typename T_wShapet_2::shape_type strides[T_wShapet_2::Rank()];
-      for(int i = 0; i < T_wShapet_2::Rank(); i++)
-        strides[i] = 1;
-      return detail::SliceOp<N,T_wShapet_2>(op, starts, ends, strides);
-    }
+  template <int N, typename OpType>
+  __MATX_INLINE__ auto slice (const OpType &op, 
+      const index_t (&starts)[OpType::Rank()],
+      const index_t (&ends)[OpType::Rank()]) 
+  {
+     typename OpType::shape_type strides[OpType::Rank()];
+     for (int i = 0; i < OpType::Rank(); i++)
+       strides[i] = 1;
+     return detail::SliceOp<N,OpType>(op, starts, ends, strides);
+  }
 } // end namespace matx

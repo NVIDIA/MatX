@@ -88,7 +88,7 @@ class tensor_impl_t {
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  ~tensor_impl_t() = default;
 
 
-    const std::string str() {
+    const std::string str() const {
       return std::string("T") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 

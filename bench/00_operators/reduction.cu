@@ -93,3 +93,45 @@ void reduce_0d_cub_permute(nvbench::state &state, nvbench::type_list<ValueType>)
 NVBENCH_BENCH_TYPES(reduce_0d_cub_permute, NVBENCH_TYPE_AXES(reduce_types))
   .add_int64_power_of_two_axis("Tensor Size", nvbench::range(6, 7, 1));  
 
+
+////////////////////////////////////////////////////////////////////////////////
+///
+///\brief benchmark for 1D Sorts across key element types
+///
+///\param nvbench::state &state,        benchmark state structutre
+///\param nvbench::type_list<ValueType> list of reduce data types to test
+///
+////////////////////////////////////////////////////////////////////////////////
+template <typename ValueType>
+void reduce_4d(
+           nvbench::state &state,
+           nvbench::type_list<ValueType>
+           )
+{
+  const int size0 = static_cast<int>(state.get_int64("Size0"));
+  const int size1 = static_cast<int>(state.get_int64("Size1"));
+  const int size2 = static_cast<int>(state.get_int64("Size2"));
+  const int size3 = static_cast<int>(state.get_int64("Size3"));
+
+  auto t1 = make_tensor<ValueType>({size3});
+  auto t4 = make_tensor<ValueType>({size3, size2, size1, size0});
+
+  t1.PrefetchDevice(0);
+  t4.PrefetchDevice(0);
+
+  randomGenerator_t < ValueType > randData(size0*size1*size2*size3, 0);
+
+  auto r4 = randData.template GetTensorView<t4.Rank()>(t4.Shape(), UNIFORM);
+
+  (t4 = r4).run();
+  cudaDeviceSynchronize();
+
+  state.exec([&t4, &t1](nvbench::launch &launch) { matx::sum(t1, t4, launch.get_stream()); });
+
+}
+
+NVBENCH_BENCH_TYPES(reduce_4d, NVBENCH_TYPE_AXES(reduce_types))
+  .add_int64_power_of_two_axis("Size0", nvbench::range(6, 8, 1))
+  .add_int64_power_of_two_axis("Size1", nvbench::range(5, 5, 1))
+  .add_int64_power_of_two_axis("Size2", nvbench::range(5, 5, 1))
+  .add_int64_power_of_two_axis("Size3", nvbench::range(5, 5, 1));

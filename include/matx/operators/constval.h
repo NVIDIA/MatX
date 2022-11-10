@@ -36,7 +36,7 @@
 namespace matx
 {
   namespace detail {
-    template <typename T, typename ShapeType> class ConstVal {
+    template <typename T, typename ShapeType> class ConstVal : public BaseOp<ConstVal<T,ShapeType>> {
       static constexpr int RANK = std::tuple_size<typename remove_cvref<ShapeType>::type>::value;
 
       private:
@@ -48,7 +48,7 @@ namespace matx
       using matxop = bool;
       using scalar_type = T;
 
-      __MATX_INLINE__ std::string str() { return  "constval"; }
+      __MATX_INLINE__ std::string str() const { return  "constval"; }
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
       template <typename... Is>

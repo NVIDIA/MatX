@@ -39,6 +39,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/transforms/cub.h"
 
 #ifdef __CUDACC__  
@@ -689,7 +690,8 @@ __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 
 
 template <typename OutType, typename InType, typename ReduceOp>
-__global__ void matxReduceKernel(OutType dest, InType in,
+__launch_bounds__(1024, 1)
+__global__ void matxReduceKernel(OutType dest, const InType in,
                                  ReduceOp red, [[maybe_unused]] index_t mult)
 {
   constexpr uint32_t RANK = OutType::Rank();
@@ -1013,7 +1015,7 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
  */
 template <typename OutType, typename TensorIndexType, typename InType, typename ReduceOp,
   std::enable_if_t<is_matx_reduction_v<ReduceOp>, bool> = true>
-void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest, InType in, ReduceOp op,
+void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
 #ifdef __CUDACC__  
@@ -1024,7 +1026,6 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
 
   static_assert(OutType::Rank() < InType::Rank());
   static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");    
-
 
   if constexpr (OutType::Rank() > 0) {
     for (int i = 0; i < OutType::Rank(); i++) {
@@ -1042,8 +1043,9 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
-
+  
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
+
   detail::matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
       dest, in, ReduceOp(), mult);
 
@@ -1155,6 +1157,21 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in,
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("mean(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  mean(dest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Calculate the median of values in a tensor
  *
@@ -1179,64 +1196,108 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in,
  * @param stream
  *   CUDA stream
  */
-template <typename OutType, typename TensorInType>
+template <typename OutType, typename InType>
 void __MATX_INLINE__ median(OutType dest,
-                   const TensorInType &in, cudaStream_t stream = 0)
+                   const InType &in, cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__  
-  MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  using T = typename OutType::scalar_type;
-  constexpr int RANK_IN = TensorInType::Rank();
-  static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
-  
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
+    MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+      using T = typename OutType::scalar_type;
+    constexpr int RANK_IN = InType::Rank();
+    static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
-  // If the rank is 0 we're finding the median of a vector
-  if constexpr (RANK_IN == 1) {
-    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    // Store median
-    if (tmp_sort.Lsize() & 1) {
-      auto middlev =
+      auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+
+    // If the rank is 0 we're finding the median of a vector
+    if constexpr (RANK_IN == 1) {
+      matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+
+      // Store median
+      if (tmp_sort.Lsize() & 1) {
+        auto middlev =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
-      matx::copy(dest, middlev, stream);
-    }
-    else {
-      auto middle1v =
+        matx::copy(dest, middlev, stream);
+      }
+      else {
+        auto middle1v =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2 - 1}, {matxDropDim});
-      auto middle2v =
+        auto middle2v =
           tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
-      (dest = (middle1v + middle2v) / 2.0f).run(stream);
+        (dest = (middle1v + middle2v) / 2.0f).run(stream);
+      }
     }
+    else if constexpr (RANK_IN == 2) {
+      MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
+
+      matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+
+      if (tmp_sort.Lsize() & 1) {
+        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+            {matxEnd, matxDropDim});
+        (dest = self(sv)).run(stream);
+      }
+      else {
+        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2 - 1},
+            {matxEnd, matxDropDim});
+        auto sv2 = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+            {matxEnd, matxDropDim});
+        (dest = (sv + sv2) / 2.0f).run(stream);
+      }
+    }
+  } else {
+
+#if 1  // sort doesn't currently work on non-tensor input
+    static_assert(InType::Rank() <= 2 && OutType::Rank() <= 1, "median only supported with output rank <= 1 and input rank <= 2");
+#else 
+    constexpr int out_dims = OutType::Rank();
+    constexpr int red_dims = InType::Rank() - OutType::Rank();
+
+    if constexpr ( out_dims > 1) {  
+      // collapse batch dimensions to a single dimension
+      auto oop = lcollapse<out_dims>(dest);
+      auto iop = lcollapse<out_dims>(in);
+
+      static_assert(oop.Rank() == 1);
+      median(oop, iop, stream);
+
+    } else if constexpr ( red_dims > 1) { 
+
+      // collapse reduction dim to a single dim
+      auto iop = rcollapse<red_dims>(in);
+
+      static_assert(dest.Rank() <= 1);
+      static_assert(iop.Rank() <= 2);
+      median(dest, iop, stream);
+    } else {
+      static_assert(false, "median ranks not supported");
+    }
+#endif
   }
-  else if (RANK_IN == 2) {
-    MATX_ASSERT(dest.Size(0) == in.Size(0), matxInvalidSize);
+#endif  
+}
 
-    matx::sort(tmp_sort, in, SORT_DIR_ASC, stream);
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
-    if (tmp_sort.Lsize() & 1) {
-      auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
-                                           {matxEnd, matxDropDim});
-      (dest = self(sv)).run(stream);
-    }
-    else {
-      auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2 - 1},
-                                           {matxEnd, matxDropDim});
-      auto sv2 = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
-                                            {matxEnd, matxDropDim});
-      (dest = (sv + sv2) / 2.0f).run(stream);
-    }
-  }
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
+  median(dest, permute(in, perm), stream);
 #endif  
 }
 
 /**
  * Compute sum of numbers
  *
- * Returns a vector representing the sum of all numbers in the reduction
+ * Returns a tensor representing the sum of all numbers in the reduction
  *
  * @tparam T
  *   Output data type
@@ -1257,7 +1318,7 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS
   if constexpr (use_cub) {
@@ -1269,10 +1330,26 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  sum(dest, permute(in, perm), stream);
+#endif  
+}
+
+
 /**
  * Compute product of numbers
  *
- * Returns a vector representing the product of all numbers in the reduction
+ * Returns a tensor representing the product of all numbers in the reduction
  *
  * @tparam T
  *   Output data type
@@ -1297,10 +1374,25 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaStream_t stream = 
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("prod(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  prod(dest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Compute max reduction of a tensor
  *
- * Returns a vector representing the max of all numbers in the reduction
+ * Returns a tensor representing the max of all numbers in the reduction
  *
  * @note This function uses the name rmax instead of max to not collide with the
  * element-wise operator max.
@@ -1336,6 +1428,21 @@ void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaStream_t stream = 
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("rmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  rmax(dest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Compute maxn reduction of a tensor and returns value + index
  *
@@ -1366,10 +1473,25 @@ void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &
 #endif  
 }
 
+template <typename OutType, typename TensorIndexType, typename InType, int D>
+void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("argmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  argmax(dest, idest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Compute min reduction of a tensor
  *
- * Returns a vector representing the min of all numbers in the reduction
+ * Returns a tensor representing the min of all numbers in the reduction
  *
  * @note This function uses the name rmin instead of min to not collide with the
  * element-wise operator min.
@@ -1405,6 +1527,22 @@ void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaStream_t stream = 
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("rmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  rmin(dest, permute(in, perm), stream);
+
+#endif  
+}
+
 /**
  * Compute min reduction of a tensor and returns value + index
  *
@@ -1433,6 +1571,21 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
 #ifdef __CUDACC__  
   MATX_NVTX_START("argmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
+#endif  
+}
+
+template <typename OutType, typename TensorIndexType, typename InType, int D>
+void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("argmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  argmin(dest, idest, permute(in, perm), stream);
 #endif  
 }
 
@@ -1466,6 +1619,21 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, cudaStream_t stream = 0
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("any(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  any(dest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Find if all values are != 0
  *
@@ -1496,6 +1664,21 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, cudaStream_t stream = 0
 #endif  
 }
 
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("all(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  all(dest, permute(in, perm), stream);
+#endif  
+}
+
 /**
  * Compute a variance reduction
  *
@@ -1521,7 +1704,7 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
 {
 #ifdef __CUDACC__    
   MATX_NVTX_START("var(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+ 
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
 
   auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -1529,12 +1712,25 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
   // Compute mean of each dimension
   mean(mean_tns, in, stream);
 
+  // need to clone along right most dims
+  std::array<index_t, InType::Rank()> cdims;
+ 
+  for(int i = 0; i < OutType::Rank(); i++) {
+    cdims[i] = matxKeepDim;
+  }
+  for(int i = OutType::Rank(); i < InType::Rank(); i++) {
+    cdims[i] = in.Size(i);
+  }
+
+  auto mean_op = mean_tns.template Clone<InType::Rank()>(cdims);
+  //auto mean_op = clone<InType::Rank()>(mean_tns, cdims);
+
   // Subtract means from each value, square the result, and sum
   if constexpr (is_complex_v<typename InType::scalar_type>) {
-    sum(dest, pow(abs(in - mean_tns), static_cast<inner_type>(2)), stream);
+    sum(dest, pow(abs(in - mean_op), static_cast<inner_type>(2)), stream);
   }
   else {
-    sum(dest, pow(in - mean_tns, 2), stream);
+    sum(dest, pow(in - mean_op, 2), stream);
   }
 
   // The length of what we are taking the variance over is equal to the product
@@ -1546,6 +1742,21 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
 
   // Sample variance for an unbiased estimate
   (dest = dest / static_cast<inner_type>(N - 1)).run(stream);
+#endif  
+}
+
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("var(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  var(dest, permute(in, perm), stream);
 #endif  
 }
 
@@ -1576,6 +1787,22 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, cudaStream_t stream = 
   MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   var(dest, in, stream);
   (dest = sqrt(dest)).run(stream);
+#endif  
+}
+
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  stdd(dest, permute(in, perm), stream);
+
 #endif  
 }
 

@@ -578,10 +578,10 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     }
   }
 
-  { // rcollapse 1 
+  { // rcollapse 2
     auto tov = make_tensor<TypeParam>({N,M*K});
   
-    auto op = rcollapse<1>(tiv);
+    auto op = rcollapse<2>(tiv);
 
     ASSERT_TRUE(op.Rank() == 2);
     ASSERT_TRUE(op.Size(0) == N);
@@ -599,10 +599,10 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     }
   }
   
-  { // lcollapse 1 
+  { // lcollapse 2
     auto tov = make_tensor<TypeParam>({N*M,K});
   
-    auto op = lcollapse<1>(tiv);
+    auto op = lcollapse<2>(tiv);
 
     ASSERT_TRUE(op.Rank() == 2);
     ASSERT_TRUE(op.Size(0) == N*M);
@@ -621,10 +621,10 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     }
   }
   
-  { // rcollapse 2 
+  { // rcollapse 3 
     auto tov = make_tensor<TypeParam>({N*M*K});
   
-    auto op = rcollapse<2>(tiv);
+    auto op = rcollapse<3>(tiv);
 
     ASSERT_TRUE(op.Rank() == 1);
     ASSERT_TRUE(op.Size(0) == N*M*K);
@@ -641,10 +641,10 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, CollapseOp)
     }
   }
 
-  { // lcollapse 2 
+  { // lcollapse 3 
     auto tov = make_tensor<TypeParam>({N*M*K});
   
-    auto op = lcollapse<2>(tiv);
+    auto op = lcollapse<3>(tiv);
 
     ASSERT_TRUE(op.Rank() == 1);
     ASSERT_TRUE(op.Size(0) == N*M*K);
@@ -2519,7 +2519,7 @@ TEST(HostOperatorTestsAdvanced, DISABLED_AdvancedRemapOp)
   (B = (ftype)0).run(SingleThreadHostExecutor());
 
   auto rop = remap<1>(A, idx);
-  auto lop = lcollapse<2>(rop);
+  auto lop = lcollapse<3>(rop);
 
   ASSERT_EQ(lop.Rank() , 2);
   ASSERT_EQ(lop.Size(1) , A.Size(3));
@@ -2593,13 +2593,13 @@ TEST(HostOperatorTestsAdvanced, DISABLED_AdvancedRemapOp)
   O3.PrefetchDevice(0);
   O4.PrefetchDevice(0);
 
-  auto o1op = lcollapse<2>(remap<1>(O1, idx));
-  auto o2op = lcollapse<2>(remap<1>(O2, idx));
-  auto o3op = lcollapse<2>(remap<1>(O3, idx));
-  auto o4op = lcollapse<2>(remap<1>(O4, idx));
+  auto o1op = lcollapse<3>(remap<1>(O1, idx));
+  auto o2op = lcollapse<3>(remap<1>(O2, idx));
+  auto o3op = lcollapse<3>(remap<1>(O3, idx));
+  auto o4op = lcollapse<3>(remap<1>(O4, idx));
 
   auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
-  auto rcop = lcollapse<2>(remap<1>(cop, idx));
+  auto rcop = lcollapse<3>(remap<1>(cop, idx));
 
   (O1 = (ftype)1).run(SingleThreadHostExecutor());
   (O2 = (ftype)2).run(SingleThreadHostExecutor());
