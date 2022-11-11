@@ -95,6 +95,9 @@ struct MatMulParams_t {
   index_t ldb;
   index_t ldc;
   int32_t batch; // Must be int32_t for cuBLASLt
+  index_t astride; // batch stride
+  index_t bstride; // batch stride
+  index_t cstride; // batch stride
   MatXMatMulProvider_t prov;
   cudaStream_t stream;
   MatXDataType_t dtype;
@@ -228,18 +231,28 @@ public:
 
     // Batches
     params.batch = 1;
+    params.astride = 0;
+    params.bstride = 0;
+    params.cstride = 0;
 
     // If we have a 3D or above tensor, the upper dims are batch dimensions. We
     // only batch on the third dimension and loop anything else above;
     if constexpr (RANK >= 3) {
       params.batch = static_cast<int32_t>(a.Size(RANK - 3));
-    }
+      params.astride = a.Stride(RANK-3);
+      params.bstride = b.Stride(RANK-3);
+      params.cstride = c.Stride(RANK-3);
+    } 
 
     // If the user wants C transposed (as a permuted view), we need the output
     // matrix to still be MxN in memory. The reason is the permuted view will
     // handle viewing it as an NxM. To accomplish this we use the identity C' =
     // B'A', so we swap A and B and permute them.
     if (c.Stride(RANK - 2) == 1 && c.Size(RANK - 1) != 1) {
+      // TODO this looks like repeat logic from what I put in elsewhere...
+      // track this down later.   For now adding an assert to see if it ever pops up.
+      // If it does not we should delete this code.
+      MATX_ASSERT_STR(false, matxInvalidDim, "Internal Matmul error.  This should not be hit\n");
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
         if (b.Stride(RANK - 2) == 1) {
           params.opA = CUBLAS_OP_N;
@@ -303,8 +316,21 @@ public:
         params.a_cols = a.Size(RANK - 1);
         params.b_rows = b.Size(RANK - 2);
         params.b_cols = b.Size(RANK - 1);
-        params.ldb = (params.opB == CUBLAS_OP_T && !is_complex_half_v<typename TensorTypeB::scalar_type>) ? b.Size(RANK - 2) : b.Size(RANK - 1);
-        params.lda = (params.opA == CUBLAS_OP_T && !is_complex_half_v<typename TensorTypeA::scalar_type>) ? a.Size(RANK - 2) : a.Size(RANK - 1);
+       
+        // set lda/ldb according to transpose modes
+        params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(RANK - 1) : b.Stride(RANK - 2); 
+        params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(RANK - 1) : a.Stride(RANK - 2);
+
+        // for complex half we have copied to planar row-major
+        if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+          params.ldb = b.Size(RANK-1);
+        }
+
+        // for complex half we have copied to planar row-major
+        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+          params.lda = a.Size(RANK-1);
+        }
+
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 2);
@@ -389,7 +415,7 @@ public:
  *   Beta value
  *
  */
-  inline void Exec(TensorTypeC &c, const TensorTypeA &a,
+  __MATX_INLINE__ void Exec(TensorTypeC &c, const TensorTypeA &a,
                    const TensorTypeB &b, cudaStream_t stream,
                    float alpha = 1.0f, float beta = 0.0f)
   {
@@ -544,39 +570,49 @@ private:
     index_t stride;
 
     if constexpr (is_complex_half_v<T2>) {
+      // for complex half we have copied to planar row major
+      // we know the layout of this matrix is compact
       stride = params_.a_rows * params_.a_cols * 2;
     }
     else {
-      stride = params_.a_rows * params_.a_cols;
+      stride = params_.astride;
     }
+
     ret = cublasLtMatrixLayoutSetAttribute(
                     Adesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     if constexpr (is_complex_half_v<T3>) {
+      // for complex half we have copied to planar row major
+      // we know the layout of this matrix is compact
       stride = params_.b_rows * params_.b_cols * 2;
     }
     else {
-      stride = params_.b_rows * params_.b_cols;
+      stride = params_.bstride;
     }
+
     ret = cublasLtMatrixLayoutSetAttribute(
                     Bdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     if constexpr (is_complex_half_v<T1>) {
+      // for complex half we have copied to planar row major
+      // we know the layout of this matrix is compact
       stride = params_.c_rows * params_.c_cols * 2;
     }
     else {
-      stride = params_.c_rows * params_.c_cols;
+      stride = params_.cstride;
     }
+
     ret = cublasLtMatrixLayoutSetAttribute(
                     Cdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);    
 
     if constexpr (is_complex_half_v<T1> && is_complex_half_v<T2>) {
+      // for complex half we have copied to planar row major
       size_t planarA = (params_.a_rows * params_.a_cols * sizeof(T1)) / 2;
       size_t planarB = (params_.b_rows * params_.b_cols * sizeof(T1)) / 2;
       size_t planarC = (params_.c_rows * params_.c_cols * sizeof(T1)) / 2;
@@ -608,7 +644,7 @@ private:
 
   // TODO: Fix the unused parameters once we support mixes of col/row on cublas
   template <MemOrder_t OrderA, MemOrder_t OrderB, MemOrder_t OrderC>
-  inline void
+  __MATX_INLINE__ void
   MatMulLaunch(const TensorTypeA &a, const TensorTypeB &b,
                TensorTypeC &c, cudaStream_t stream,
                [[maybe_unused]] float alpha, [[maybe_unused]] float beta)
@@ -858,7 +894,7 @@ private:
       (c = interleaved(c_planar)).run(stream);
     }
   }
-
+  
   template <MemOrder_t OrderA, MemOrder_t OrderB>
   inline void MatMulDispatchC(const TensorTypeA &a,
                               const TensorTypeB &b,
@@ -872,8 +908,13 @@ private:
                                                         beta);
     }
     else if (c.Stride(RANK - 2) == 1) {
-      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
+#if MATX_ENABLE_CUTLASS
+      MatMulLaunch<OrderA, OrderB, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
+#else
+      // This shouldn't ever kick up as transpose should happen earlier
+      MATX_ASSERT_STR(false, matxInvalidDim, "matmul:  column major order on C not supported with cublas.  Try cutlass.");
+#endif
     }
     else {
       MATX_THROW(matxNotSupported,
@@ -923,7 +964,6 @@ private:
   }
 };
 
-
 /**
  * Crude hash on GEMM to get a reasonably good delta for collisions. This
  * doesn't need to be perfect, but fast enough to not slow down lookups, and
@@ -971,14 +1011,12 @@ static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
  * decide if a plan is cached, it may be able to reused plans for different
  * A/B/C matrices as long as they were configured with the same dimensions.
  *
- * @tparam T1
+ * @tparam TensorTypeC
  *    Data type of C matrix
- * @tparam T2
+ * @tparam TensorTypeA
  *    Data type of A matrix
- * @tparam T3
+ * @tparam TensorTypeB
  *    Data type of B matrix
- * @tparam RANK
- *    Rank of A/B/C matrices
  * @tparam PROV
  *    Provider type chosen from MatXMatMulProvider_t type
  *
@@ -997,31 +1035,94 @@ static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-void matmul(TensorTypeC &c, const TensorTypeA &a,
-            const TensorTypeB &b, cudaStream_t stream = 0,
+void matmul(TensorTypeC c, const TensorTypeA a,
+            const TensorTypeB b, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  // Get parameters required by these tensors
-  auto params =
+ 
+#if MATX_ENABLE_CUTLASS != 1
+  // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
+  // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
+  // the rightmost stride is !=1 or this function will be an infinite recursion.
+  if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) != 1 ) {  // column major check
+    // Column major
+    matmul(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
+  } else 
+#endif
+  {
+    // Get parameters required by these tensors
+    auto params =
       detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);
-  params.stream = stream;
+    params.stream = stream;
 
-  // Get cache or new GEMM plan if it doesn't exist
-  auto ret = detail::gemm_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
-    detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
+    // Get cache or new GEMM plan if it doesn't exist
+    auto ret = detail::gemm_cache.Lookup(params);
+    if (ret == std::nullopt) {
+      auto tmp = new detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
+      detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
 
-    // Set the stream on this plan once on creation
-    tmp->Exec(c, a, b, stream, alpha, beta);
-  }
-  else {
-    auto gemm_type =
+      // Set the stream on this plan once on creation
+      tmp->Exec(c, a, b, stream, alpha, beta);
+    }
+    else {
+      auto gemm_type =
         static_cast<detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV> *>(ret.value());
-    gemm_type->Exec(c, a, b, stream, alpha, beta);
+      gemm_type->Exec(c, a, b, stream, alpha, beta);
+    }
   }
+}
+
+/**
+ * Run a GEMM without a plan
+ *
+ * Creates a new GEMM plan in the cache if none exists, and uses that to execute
+ * the GEMM. This function is preferred over creating a plan directly for both
+ * efficiency and simpler code. Since it only uses the signature of the GEMM to
+ * decide if a plan is cached, it may be able to reused plans for different
+ * A/B/C matrices as long as they were configured with the same dimensions.
+ *
+ * @tparam TensorTypeC
+ *    Data type of C matrix
+ * @tparam TensorTypeA
+ *    Data type of A matrix
+ * @tparam TensorTypeB
+ *    Data type of B matrix
+ * @tparam PROV
+ *    Provider type chosen from MatXMatMulProvider_t type
+ *
+ * @param c
+ *   C output operator
+ * @param a
+ *   A input opertor
+ * @param b
+ *   B input operator
+ * #param axis
+ *   the axis of the tensor or operator to perform the gemm along
+ * @param stream
+ *   CUDA stream
+ * @param alpha
+ *   Scalar multiplier to apply to matrix A
+ * @param beta
+ *   Scalar multiplier to apply to matrix C on input
+ */
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+void matmul(TensorTypeC c, const TensorTypeA a,
+            const TensorTypeB b, const int32_t (&axis)[2],
+            cudaStream_t stream = 0,
+            float alpha = 1.0, float beta = 0.0)
+{
+  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank(), "matmul: inputs must have same rank to use conv1d with axis parameter");
+  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeC::Rank(), "matmul: inputs and outputs must have same rank to use conv1d with axis parameter");
+
+  auto perm = detail::getPermuteDims<TensorTypeC::Rank()>(axis);
+  auto out = permute(c, perm);
+
+  auto in1 = permute(a, perm);
+  auto in2 = permute(b, perm);
+
+  matmul<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
 }
 
 } // end namespace matx

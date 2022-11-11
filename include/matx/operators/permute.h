@@ -186,7 +186,7 @@ namespace matx
       int32_t dim2 = T::Rank() - 2;
 
       std::swap(dims[dim1],dims[dim2]);
-      return detail::PermuteOp<T>(op, detail::to_array(dims));
+      return permute(op, detail::to_array(dims));
     }
 
 } // end namespace matx
