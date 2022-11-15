@@ -1002,73 +1002,25 @@ static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
     gemm_cache;
 
 }
-/**
- * Run a GEMM without a plan
- *
- * Creates a new GEMM plan in the cache if none exists, and uses that to execute
- * the GEMM. This function is preferred over creating a plan directly for both
- * efficiency and simpler code. Since it only uses the signature of the GEMM to
- * decide if a plan is cached, it may be able to reused plans for different
- * A/B/C matrices as long as they were configured with the same dimensions.
- *
- * @tparam TensorTypeC
- *    Data type of C matrix
- * @tparam TensorTypeA
- *    Data type of A matrix
- * @tparam TensorTypeB
- *    Data type of B matrix
- * @tparam PROV
- *    Provider type chosen from MatXMatMulProvider_t type
- *
- * @param c
- *   C matrix view
- * @param a
- *   A matrix view
- * @param b
- *   B matrix view
- * @param stream
- *   CUDA stream
- * @param alpha
- *   Scalar multiplier to apply to matrix A
- * @param beta
- *   Scalar multiplier to apply to matrix C on input
- */
-template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-void matmul(TensorTypeC c, const TensorTypeA a,
-            const TensorTypeB b, cudaStream_t stream = 0,
-            float alpha = 1.0, float beta = 0.0)
-{
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
- 
-#if MATX_ENABLE_CUTLASS != 1
-  // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
-  // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
-  // the rightmost stride is !=1 or this function will be an infinite recursion.
-  if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) != 1 ) {  // column major check
-    // Column major
-    matmul(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
-  } else 
-#endif
-  {
-    // Get parameters required by these tensors
-    auto params =
-      detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::GetGemmParams(c, a, b);
-    params.stream = stream;
 
-    // Get cache or new GEMM plan if it doesn't exist
-    auto ret = detail::gemm_cache.Lookup(params);
-    if (ret == std::nullopt) {
-      auto tmp = new detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>{c, a, b};
-      detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
+template <typename Op>
+__MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream) {
+  constexpr int RANK=Op::Rank();
 
-      // Set the stream on this plan once on creation
-      tmp->Exec(c, a, b, stream, alpha, beta);
+  if constexpr ( !(is_tensor_view_v<Op>)) {
+    return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  } else {
+    bool supported = true;
+
+    // either RANK-1 or RANK-2 stride must equal one in cublasLt
+    if(in.Stride(RANK-1) != 1 && in.Stride(RANK-2) != 1) {
+      supported = false;
     }
-    else {
-      auto gemm_type =
-        static_cast<detail::matxMatMulHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV> *>(ret.value());
-      gemm_type->Exec(c, a, b, stream, alpha, beta);
+
+    if(supported) {
+      return in;
+    } else {
+      return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
     }
   }
 }
@@ -1083,33 +1035,128 @@ void matmul(TensorTypeC c, const TensorTypeA a,
  * A/B/C matrices as long as they were configured with the same dimensions.
  *
  * @tparam TensorTypeC
- *    Data type of C matrix
+ *    Data type of C tensor or operator
  * @tparam TensorTypeA
- *    Data type of A matrix
+ *    Data type of A tensor or operator
  * @tparam TensorTypeB
- *    Data type of B matrix
+ *    Data type of B tensor or operator
+ * @tparam PROV
+ *    Provider type chosen from MatXMatMulProvider_t type
+ *
+ * @param C
+ *   C A Tensor or Operator
+ * @param A
+ *   A A Tensor or Operator
+ * @param B
+ *   B A Tensor or Operator
+ * @param stream
+ *   CUDA stream
+ * @param alpha
+ *   Scalar multiplier to apply to operator A
+ * @param beta
+ *   Scalar multiplier to apply to operator C on input
+ */
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+void matmul(TensorTypeC C, const TensorTypeA A,
+            const TensorTypeB B, cudaStream_t stream = 0,
+            float alpha = 1.0, float beta = 0.0)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  // CublasLt does not support operators and certain transpose modes.
+  // Gab a suppported tensor here and copy in if necessary.
+  auto c = getCublasSupportedTensor(C, stream);
+  auto a = getCublasSupportedTensor(A, stream);
+  auto b = getCublasSupportedTensor(B, stream);
+
+  typedef decltype(c) ctype;
+  typedef decltype(a) atype;
+  typedef decltype(b) btype;
+
+  if(!a.isSameView(A)) {
+    (a = A).run(stream);
+  }
+
+  if(!b.isSameView(B)) {
+    (b = B).run(stream);
+  }
+
+
+#if MATX_ENABLE_CUTLASS != 1
+  // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
+  // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
+  // the rightmost stride is !=1 or this function will be an infinite recursion.
+  if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) != 1 ) {  // column major check
+    // Column major
+    matmul(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
+  } else 
+#endif
+  {
+    // Get parameters required by these tensors
+    auto params =
+      detail::matxMatMulHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
+    params.stream = stream;
+
+    // Get cache or new GEMM plan if it doesn't exist
+    auto ret = detail::gemm_cache.Lookup(params);
+    if (ret == std::nullopt) {
+      auto tmp = new detail::matxMatMulHandle_t<ctype, atype, btype, PROV>{c, a, b};
+      detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
+
+      // Set the stream on this plan once on creation
+      tmp->Exec(c, a, b, stream, alpha, beta);
+    }
+    else {
+      auto gemm_type =
+        static_cast<detail::matxMatMulHandle_t<ctype, atype, btype, PROV> *>(ret.value());
+      gemm_type->Exec(c, a, b, stream, alpha, beta);
+    }
+  }
+
+  // if c and C are not the same then we need to copy results out.
+  if(!c.isSameView(C)) {
+    (C = c).run(stream);
+  }
+}
+
+/**
+ * Run a GEMM without a plan
+ *
+ * Creates a new GEMM plan in the cache if none exists, and uses that to execute
+ * the GEMM. This function is preferred over creating a plan directly for both
+ * efficiency and simpler code. Since it only uses the signature of the GEMM to
+ * decide if a plan is cached, it may be able to reused plans for different
+ * A/B/C matrices as long as they were configured with the same dimensions.
+ *
+ * @tparam TensorTypeC
+ *    Data type of C tensor or operator
+ * @tparam TensorTypeA
+ *    Data type of A tensor or operator
+ * @tparam TensorTypeB
+ *    Data type of B tensor or operator
  * @tparam PROV
  *    Provider type chosen from MatXMatMulProvider_t type
  *
  * @param c
- *   C output operator
+ *   C output tensor or operator
  * @param a
- *   A input opertor
+ *   A input tensor or operator
  * @param b
- *   B input operator
+ *   B input tensor or operator
  * #param axis
  *   the axis of the tensor or operator to perform the gemm along
  * @param stream
  *   CUDA stream
  * @param alpha
- *   Scalar multiplier to apply to matrix A
+ *   Scalar multiplier to apply to operator A
  * @param beta
- *   Scalar multiplier to apply to matrix C on input
+ *   Scalar multiplier to apply to operator C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-void matmul(TensorTypeC c, const TensorTypeA a,
-            const TensorTypeB b, const int32_t (&axis)[2],
+__MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
+            const TensorTypeB B, const int32_t (&axis)[2],
             cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
@@ -1117,10 +1164,10 @@ void matmul(TensorTypeC c, const TensorTypeA a,
   MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeC::Rank(), "matmul: inputs and outputs must have same rank to use conv1d with axis parameter");
 
   auto perm = detail::getPermuteDims<TensorTypeC::Rank()>(axis);
-  auto out = permute(c, perm);
+  auto out = permute(C, perm);
 
-  auto in1 = permute(a, perm);
-  auto in2 = permute(b, perm);
+  auto in1 = permute(A, perm);
+  auto in2 = permute(B, perm);
 
   matmul<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
 }
