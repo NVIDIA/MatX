@@ -183,7 +183,7 @@ inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
  */
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, cudaStream_t stream) {
+                   matxConvCorrMode_t mode, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
   if constexpr ( In1Type::Rank() >  In2Type::Rank() ) {
@@ -247,6 +247,34 @@ inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
     conv1d_impl(o, i1, i2, mode, stream);
   }
 }
+
+/**
+ * @brief 1D convolution
+ * 
+ * @tparam OutputType Type of output
+ * @tparam In1Type Type of first input
+ * @tparam In2Type Type of second input
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * #param axis the axis to perform convolution
+ * @param mode Convolution mode
+ * @param stream CUDA stream
+ */
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
+                   const int32_t (&axis)[1],
+                   matxConvCorrMode_t mode, cudaStream_t stream = 0) {
+  MATX_STATIC_ASSERT(In1Type::Rank() == In2Type::Rank(), "conv1d: inputs must have same rank to use conv1d with axis parameter");
+  MATX_STATIC_ASSERT(In1Type::Rank() == OutputType::Rank(), "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
+
+  auto perm = detail::getPermuteDims<OutputType::Rank()>(axis);
+  auto out = permute(o, perm);
+
+  auto in1 = permute(i1, perm);
+  auto in2 = permute(i2, perm);
+  conv1d(out, in1, in2, mode, stream);
+}
     
 /**
  * @brief 2D convolution
@@ -262,7 +290,7 @@ inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
  */
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, cudaStream_t stream)
+                   matxConvCorrMode_t mode, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
@@ -285,6 +313,34 @@ inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
   else {
     detail::matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
   }
+}
+
+/**
+ * @brief 2D convolution
+ * 
+ * @tparam OutputType Type of output
+ * @tparam In1Type Type of first input
+ * @tparam In2Type Type of second input
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * #param axis The axis that the convolution is performed on
+ * @param mode Convolution mode
+ * @param stream CUDA stream
+ */
+template <typename OutputType, typename In1Type, typename In2Type>
+inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
+                   const int32_t (&axis)[2],  matxConvCorrMode_t mode, cudaStream_t stream = 0)
+{
+  MATX_STATIC_ASSERT(In1Type::Rank() == In2Type::Rank(), "conv2d: inputs must have same rank to use conv1d with axis parameter");
+  MATX_STATIC_ASSERT(In1Type::Rank() == OutputType::Rank(), "conv2d: inputs and outputs must have same rank to use conv1d with axis parameter");
+
+  auto perm = detail::getPermuteDims<OutputType::Rank()>(axis);
+  auto out = permute(o, perm);
+
+  auto in1 = permute(i1, perm);
+  auto in2 = permute(i2, perm);
+  conv2d(out, in1, in2, mode, stream);
 }
 
 } // end namespace matx
