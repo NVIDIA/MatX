@@ -99,7 +99,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   float time_s = time_ms * .001f;
 
   printf("Pipeline rate: %f pulses/channel/sec\n",
-         static_cast<float>(iterations * numPulses) / time_s);
+         static_cast<float>(iterations * numChannels * numPulses) / time_s);
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
