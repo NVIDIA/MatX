@@ -16,9 +16,13 @@ class inv:
 
     def run(self):
         n = self.size[0]
+        batches = self.size[1]
 
         # Create a positive-definite matrix
-        A = matx_common.randn_ndarray((n,n), self.dtype)
+        if batches > 1:
+            A = matx_common.randn_ndarray((batches, n,n), self.dtype)
+        else:
+            A = matx_common.randn_ndarray((n,n), self.dtype)
         A_inv = np.linalg.inv(A)
 
         return {
