@@ -8,7 +8,7 @@ import matx_common
 from typing import Dict, List
 
 
-class cholesky:
+class inv:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
         self.dtype = dtype
@@ -18,6 +18,24 @@ class cholesky:
         n = self.size[0]
 
         # Create a positive-definite matrix
+        A = matx_common.randn_ndarray((n,n), self.dtype)
+        A_inv = np.linalg.inv(A)
+
+        return {
+            'A': A,
+            'A_inv': A_inv
+        }
+
+
+class cholesky:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)
+
+    def run(self):
+        n = self.size[0]
+
         A = np.random.randn(n, n)
         B = np.matmul(A, A.conj().T)
         B = B + n*np.eye(n)

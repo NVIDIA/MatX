@@ -21,6 +21,7 @@ set (test_sources
     00_solver/SVD.cu
     00_solver/Eigen.cu
     00_solver/Det.cu
+    00_solver/Inverse.cu
     00_operators/PythonEmbed.cu
     00_io/FileIOTests.cu
     01_radar/MultiChannelRadarPipeline.cu
