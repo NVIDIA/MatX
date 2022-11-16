@@ -151,12 +151,12 @@ public:
       return "f8";
     if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
                   std::is_same_v<T, std::complex<double>>) {
-      return "c8";
+      return "complex128";
     }
     if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
                   std::is_same_v<T, std::complex<float>> ||
                   is_complex_half_v<T>) {
-      return "c4";
+      return "complex64";
     }
 
     return "";

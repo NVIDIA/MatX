@@ -6,13 +6,13 @@ import os
 
 
 class csv:
-    def __init__(self, dtype: str, size: List[int]):
-        self.size = size
+    def __init__(self, dtype: str, sizes: List[int]):
         self.dtype = dtype
+        self.files = ("../test/00_io/small_csv_comma_nh.csv", "../test/00_io/small_csv_complex_comma_nh.csv")
 
     def run(self) -> Dict[str, np.array]:
-        small_csv = np.genfromtxt(
-            '../test/00_io/small_csv_comma_nh.csv', delimiter=',', skip_header=1)
-        return {
-            'small_csv': small_csv
-        }
+        res = {}
+        for file in self.files:
+            res[file] = np.genfromtxt(file, delimiter=',', skip_header=1, dtype=self.dtype)
+
+        return res
