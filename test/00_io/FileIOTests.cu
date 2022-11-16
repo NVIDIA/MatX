@@ -50,22 +50,32 @@ protected:
 
   std::unique_ptr<detail::MatXPybind> pb;
   const std::string small_csv = "../test/00_io/small_csv_comma_nh.csv";
-  tensor_t<float, 2> Av{{10, 2}};
+  const std::string small_complex_csv = "../test/00_io/small_csv_complex_comma_nh.csv";
+  tensor_t<T, 2> Av{{10, 2}};
 };
 
-template <typename TensorType>
-class FileIoTestsNonComplexFloatTypes : public FileIoTests<TensorType> {
-};
+template <typename TensorType> class FileIoTestsNonComplexFloatTypes : public FileIoTests<TensorType> {};
+template <typename TensorType> class FileIoTestsComplexFloatTypes : public FileIoTests<TensorType> {};
 
-TYPED_TEST_SUITE(FileIoTestsNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+TYPED_TEST_SUITE(FileIoTestsNonComplexFloatTypes, MatXFloatNonComplexNonHalfTypes);
+TYPED_TEST_SUITE(FileIoTestsComplexFloatTypes, MatXComplexNonHalfTypes);
 
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
   io::ReadCSV(this->Av, this->small_csv, ",");
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, "small_csv", 0.01);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_csv.c_str(), 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
+{
+  MATX_ENTER_HANDLER();
+
+  io::ReadCSV(this->Av, this->small_complex_csv, ",");
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_complex_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
 }
@@ -73,12 +83,12 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<float, 2> Avs{{10, 2}};
+  tensor_t<TypeParam, 2> Avs{{10, 2}};
 
-  this->pb->NumpyToTensorView(this->Av, "small_csv");
+  this->pb->NumpyToTensorView(this->Av, this->small_csv.c_str());
   io::WriteCSV(this->Av, "temp.csv", ",");
   io::ReadCSV(Avs, "temp.csv", ",", false);
-  MATX_TEST_ASSERT_COMPARE(this->pb, Avs, "small_csv", 0.01);
+  MATX_TEST_ASSERT_COMPARE(this->pb, Avs, this->small_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
 }
