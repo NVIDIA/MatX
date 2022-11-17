@@ -147,7 +147,7 @@ void ReadCSV(TensorType &t, const std::string fname,
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")("fname"_a = fname.c_str(), "delimiter"_a = delimiter,
                                    "skip_header"_a = header ? 1 : 0,
-                                   "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::scalar_type>().c_str());
+                                   "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::scalar_type>());
   pb->NumpyToTensorView(t, obj);
 }
 
