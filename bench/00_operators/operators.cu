@@ -79,5 +79,32 @@ void random(nvbench::state &state, nvbench::type_list<ValueType>)
     });
 }
 
-
 NVBENCH_BENCH_TYPES(random, NVBENCH_TYPE_AXES(random_types));
+
+using legendre_types = nvbench::type_list<float, double>;
+template <typename ValueType>
+void legendre(nvbench::state &state, nvbench::type_list<ValueType>)
+{
+  int size = 1e6;
+  int order = 24;
+
+  auto x = as_type<ValueType>(linspace<0>({size}, -1, 1));
+  auto leg = legendre(order,x,0);
+  auto out = make_tensor<ValueType>({order+1, size});
+  //auto leg = legendre(order,x);
+  //auto out = make_tensor<ValueType>({size, order+1});
+  out.PrefetchDevice(0);
+
+  state.add_element_count(size, "NumPolynomials");
+
+  cudaDeviceSynchronize();
+
+  state.exec( 
+    [&out, &leg](nvbench::launch &launch) {
+      (out = leg).run((cudaStream_t)launch.get_stream());
+    });
+
+}
+
+
+NVBENCH_BENCH_TYPES(legendre, NVBENCH_TYPE_AXES(legendre_types));

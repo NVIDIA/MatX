@@ -2704,6 +2704,111 @@ TEST(OperatorTests, Cast)
   MATX_EXIT_HANDLER();
 }
 
+template<class TypeParam>
+TypeParam legendre_check(int n, int m, TypeParam x) {
+	if (m > n ) return 0;
+
+	TypeParam a = cuda::std::sqrt(TypeParam(1)-x*x);
+	// first we will move move along diagonal
+
+	// initialize registers
+	TypeParam d1 = 1, d0;
+
+	for(int i=0; i < m; i++) {
+		// advance diagonal (shift)
+		d0 = d1;
+		// compute next term using recurrence relationship
+		d1 = -TypeParam(2*i+1)*a*d0;
+	}
+
+	// next we will move to the right till we get to the correct entry
+
+	// initialize registers
+	TypeParam p0, p1 = 0, p2 = d1;
+
+	for(int l=m; l<n; l++) {
+		// advance one step (shift)
+		p0 = p1;
+		p1 = p2;
+
+		// Compute next term using recurrence relationship
+		p2 = (TypeParam(2*l+1) * x * p1 - TypeParam(l+m)*p0)/(TypeParam(l-m+1));
+	}
+
+	return p2;
+
+}
+
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
+{
+  MATX_ENTER_HANDLER();
+  index_t size = 11;
+  int order = 5;
+
+  {
+    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+
+    auto out = make_tensor<TypeParam>({size, order+1});
+
+    (out = legendre(order, x)).run();
+
+    cudaStreamSynchronize(0);
+
+    for(int i = 0 ; i < size; i++) {
+      for(int p = 0; p < order; p++) {
+        ASSERT_NEAR(out(i,p), legendre_check(order, p, x(i)),.0001);
+      }
+    }
+  }
+ 
+  {
+    auto x = as_type<TypeParam>(linspace<0>({size}, float(0), float(1)));
+
+    auto out = make_tensor<TypeParam>({order+1, size});
+
+    (out = legendre(order, x, 0)).run();
+
+    cudaStreamSynchronize(0);
+
+    for(int i = 0 ; i < size; i++) {
+      for(int p = 0; p < order; p++) {
+        ASSERT_NEAR(out(p,i), legendre_check(order, p, x(i)),.0001);
+      }
+    }
+  }
+  
+  { // taking a constant for m
+    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+
+    auto out = make_tensor<TypeParam>({size});
+
+    (out = legendre(order, order,  x)).run();
+
+    cudaStreamSynchronize(0);
+
+    for(int i = 0 ; i < size; i++) {
+      ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+    }
+  }
+  
+  { // taking a rank0 tensor for m
+    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+    auto m = make_tensor<int>();
+    auto out = make_tensor<TypeParam>({size});
+    m() = order;
+
+    (out = legendre(order, m,  x)).run();
+
+    cudaStreamSynchronize(0);
+
+    for(int i = 0 ; i < size; i++) {
+      ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+    }
+  }
+ 
+  MATX_EXIT_HANDLER();
+}
+
 TEST(OperatorTestsAdvanced, AdvancedRemapOp)
 {
   typedef cuda::std::complex<float> complex;
@@ -2771,12 +2876,6 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
           complex lop_val = lop(fidx, l);
           complex rop_val = rop(i, m, k, l);
 
-          //	  printf("fidx: %d, i: %d, j: %d, k: %d, l: %d, val: %f,%f\n", fidx, i, j, k, l, val, val/100);
-          //	  printf("a_val: %f, %f, rop_val: %f, %f, lop_val: %f, %f, b_val: %f, %f\n",
-          //			  a_val.real(), a_val.imag(),
-          //			 rop_val.real(), rop_val.imag(),
-          //			lop_val.real(), lop_val.imag(),
-          //		       b_val.real(), b_val.imag());
           ASSERT_EQ(a_val, expected_val);
           ASSERT_EQ(rop_val, expected_val);
           ASSERT_EQ(lop_val, expected_val);
