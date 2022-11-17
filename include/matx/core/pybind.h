@@ -135,31 +135,31 @@ public:
     
   }
 
-  template <typename T> static std::string GetNumpyDtype()
+  template <typename T> static auto GetNumpyDtype()
   {
+    auto np = pybind11::module_::import("numpy");
     if constexpr (std::is_same_v<T, int32_t>)
-      return "i4";
+      return np.attr("dtype")("i4");
     if constexpr (std::is_same_v<T, uint32_t>)
-      return "u4";
+      return np.attr("dtype")("u4");
     if constexpr (std::is_same_v<T, int64_t>)
-      return "i8";
+      return np.attr("dtype")("i8");
     if constexpr (std::is_same_v<T, uint64_t>)
-      return "u8";
+      return np.attr("dtype")("u8");
     if constexpr (std::is_same_v<T, float> || is_matx_half_v<T>)
-      return "f4";
+      return np.attr("dtype")("float32");
     if constexpr (std::is_same_v<T, double>)
-      return "f8";
+      return np.attr("dtype")("float64");
     if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
                   std::is_same_v<T, std::complex<double>>) {
-      return "complex128";
+      return np.attr("dtype")("complex128");
     }
     if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
                   std::is_same_v<T, std::complex<float>> ||
                   is_complex_half_v<T>) {
-      return "complex64";
+      return np.attr("dtype")("complex64");
     }
 
-    return "";
   }
 
   template <typename TensorType>

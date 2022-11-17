@@ -17,7 +17,7 @@ def to_file(var, name):
 
 
 def randn_ndarray(tshape, dtype):
-    if dtype in ('f8', 'f4'):
+    if np.issubdtype(dtype, np.floating):
         return np.random.randn(*tshape)
-    elif dtype in ('c4', 'c8'):
+    else:
         return np.random.randn(*tshape) + 1j*np.random.randn(*tshape)
