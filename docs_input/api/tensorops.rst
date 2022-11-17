@@ -86,6 +86,7 @@ Advanced Operators
 .. doxygenfunction:: repmat(T1 t, const index_t(&reps)[])
 .. doxygenfunction:: repmat(T1 t, const index_t *reps)
 .. doxygenfunction:: kron
+.. doxygenfunction:: legendre
 .. doxygenfunction:: hermitianT
 .. doxygenfunction:: r2cop
 .. doxygenfunction:: flatten
