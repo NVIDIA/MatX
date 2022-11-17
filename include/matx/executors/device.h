@@ -94,19 +94,35 @@ namespace matx
               sizes[i] = op.Size(i);
             }        
 
-            detail::get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
+            bool stride = detail::get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
 
             if constexpr (op.Rank() == 1) {
-              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);      
+              if(stride) {
+                detail::matxOpT1StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else {
+                detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              }
             }
             else if constexpr (op.Rank() == 2) {
-              detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+              if(stride) {
+                detail::matxOpT2StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+              } else {
+                detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+              }
             }
             else if constexpr (op.Rank() == 3) {
-              detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+              if(stride) {
+                detail::matxOpT3StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+              } else {
+                detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+              }
             }
             else if constexpr (op.Rank() == 4) {
-              detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+              if(stride) {
+                detail::matxOpT4StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+              } else {
+                detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+              }
             }        
             else {
               index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());

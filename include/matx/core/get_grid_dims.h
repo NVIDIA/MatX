@@ -37,9 +37,10 @@ namespace matx {
 namespace detail {
 
 template <int RANK>
-inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
+inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
                           int max_cta_size = 1024)
 {
+  bool stride = false;
   [[maybe_unused]] int nt = 1;
   threads.x = 1;
   threads.y = 1;
@@ -71,7 +72,13 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     // launch as many blocks as necessary
     blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
-    blocks.z = 1;  
+    blocks.z = 1; 
+
+    if(blocks.y > 65535) {
+      blocks.y = 65535;
+      stride = true;
+    }
+
   }  
   else if constexpr (RANK == 3) {
     while (nt < max_cta_size) {
@@ -96,6 +103,16 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     blocks.x = static_cast<int>((sizes[2] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[1] + threads.y - 1) / threads.y);
     blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
+    
+    if(blocks.y > 65535) {
+      blocks.y = 65535;
+      stride = true;
+    }
+    if(blocks.z > 65535) {
+      blocks.z = 65535;
+      stride = true;
+    }
+
   }  
   else if constexpr (RANK == 4) {
     while (nt < max_cta_size) {
@@ -120,6 +137,15 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     blocks.x = static_cast<int>((sizes[3] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[1] * sizes[2] + threads.y - 1) / threads.y);
     blocks.z = static_cast<int>((sizes[0] + threads.z - 1) / threads.z);
+    
+    if(blocks.y > 65535) {
+      blocks.y = 65535;
+      stride = true;
+    }
+    if(blocks.z > 65535) {
+      blocks.z = 65535;
+      stride = true;
+    }
   }  
   else {
     size_t dims = std::accumulate(std::begin(sizes), std::end(sizes), 1, std::multiplies<index_t>());
@@ -130,6 +156,7 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     blocks.y = 1;
     blocks.z = 1;
   } 
+  return stride;
 }
 } // end namespace detail
 } // end namespace matx
