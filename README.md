@@ -51,7 +51,7 @@ MatX support is currently limited to **Linux only** due to the time to test Wind
 
 MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.4 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
-MatX has been tested on and supports Pascal, Turing, Volta, and Ampere GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
+MatX has been tested on and supports Pascal, Turing, Volta, Ampere, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
 **Note for CUDA 11.4**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5+. When building tests/examples directly the CMake file will grab the right version, but this can be overriden.
 
