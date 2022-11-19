@@ -223,7 +223,7 @@ namespace matx
         data_ = std::shared_ptr<T>(ptr, [](auto){});
       }
       else {
-        data_ = std::shared_ptr<T>(ptr, [&](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
+        data_ = std::shared_ptr<T>(ptr, [=](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
       }        
     }
   };
