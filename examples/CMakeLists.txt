@@ -7,6 +7,7 @@ set(examples
     mvdr_beamformer 
     spectrogram 
     spectrogram_graph
+    spherical_harmonics 
     black_scholes)
 
 add_library(example_lib INTERFACE)

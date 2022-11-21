@@ -2453,6 +2453,25 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Sphere2Cart)
+{
+  MATX_ENTER_HANDLER();
+  int n = 5;
+
+  auto xi = range<0>({n},(TypeParam)1,(TypeParam)1);
+  auto yi = range<0>({n},(TypeParam)1,(TypeParam)1);
+  auto zi = range<0>({n},(TypeParam)1,(TypeParam)1);
+
+  auto [theta, phi, r] = cart2sph(xi, yi, zi);
+  auto [x, y, z] = sph2cart(theta, phi, r);
+
+  for(int i=0; i<n; i++) {
+    ASSERT_NEAR(xi(i), x(i), .0001);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 {
   MATX_ENTER_HANDLER();
