@@ -226,12 +226,12 @@ public:
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       if constexpr (std::is_same_v<T1, float>) {
         ret =
-            cublasSgetrfBatched(handle, params.n, d_A_array, params.n, d_pivot,
+            cublasSgetrfBatched(handle, static_cast<int>(params.n), d_A_array, static_cast<int>(params.n), d_pivot,
                                 d_info, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<T1, double>) {
         ret =
-            cublasDgetrfBatched(handle, params.n, d_A_array, params.n, d_pivot,
+            cublasDgetrfBatched(handle, static_cast<int>(params.n), d_A_array, static_cast<int>(params.n), d_pivot,
                                 d_info, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
@@ -258,7 +258,7 @@ public:
       MATX_ASSERT(h_info == 0, matxLUError);
 
       if constexpr (std::is_same_v<T1, float>) {
-        ret = cublasSgetriBatched(handle, params.n, d_A_array,
+        ret = cublasSgetriBatched(handle, static_cast<int>(params.n), d_A_array,
                                   static_cast<int>(params.n), d_pivot,
                                   d_A_inv_array, static_cast<int>(params.n),
                                   d_info, static_cast<int>(params.batch_size));

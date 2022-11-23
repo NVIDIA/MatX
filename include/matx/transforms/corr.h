@@ -58,13 +58,10 @@ namespace matx {
  * @param stream CUDA stream
  */
 template <typename OutputTensor, typename In1Type, typename In2Type>
-void corr(OutputTensor &o, const In1Type &i1, const In2Type &i2,
+__MATX_INLINE__ void corr(OutputTensor o, const In1Type i1, const In2Type i2,
           matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
-          cudaStream_t stream)
+          cudaStream_t stream = 0)
 {
-  MATX_ASSERT_STR(mode == MATX_C_MODE_FULL, matxNotSupported,
-               "Only full correlation mode supported at this time");
-
   MATX_ASSERT_STR(method == MATX_C_METHOD_DIRECT, matxNotSupported,
                "Only direct correlation method supported at this time");
   
@@ -73,5 +70,37 @@ void corr(OutputTensor &o, const In1Type &i1, const In2Type &i2,
   auto i2r = reverse<In2Type::Rank()-1>(conj(i2));
   conv1d(o, i1, i2r, mode, stream);
 }
+
+/**
+ * @brief Correlate two input operators
+ * 
+ * @tparam OutputTensor Output tensor type
+ * @tparam In1Type First input operator type
+ * @tparam In2Type Second input operator type
+ * @param o Output tensor
+ * @param i1 First input operator
+ * @param i2 Second input operator
+ * #param axis The axis to perform correlationon
+ * @param mode Mode of correlation
+ * @param method Method for correlation
+ * @param stream CUDA stream
+ */
+template <typename OutputTensor, typename In1Type, typename In2Type>
+__MATX_INLINE__ void corr(OutputTensor o, const In1Type i1, const In2Type i2,
+          const int32_t (&axis)[1],
+          matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
+          cudaStream_t stream = 0)
+{
+  MATX_STATIC_ASSERT(In1Type::Rank() == In2Type::Rank(), "corr: inputs must have same rank to use conv1d with axis parameter");
+  MATX_STATIC_ASSERT(In1Type::Rank() == OutputTensor::Rank(), "corr: inputs and outputs must have same rank to use conv1d with axis parameter");
+
+  auto perm = detail::getPermuteDims<OutputTensor::Rank()>(axis);
+  auto out = permute(o, perm);
+
+  auto in1 = permute(i1, perm);
+  auto in2 = permute(i2, perm);
+  corr(out, in1, in2, mode, method, stream);
+}
+
 
 } // end namespace matx

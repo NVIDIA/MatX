@@ -48,6 +48,7 @@
 #include "matx/core/tensor.h"
 
 
+
 #if MATX_ENABLE_FILEIO
 
 namespace matx {
@@ -144,9 +145,9 @@ void ReadCSV(TensorType &t, const std::string fname,
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
-  auto obj = np.attr("genfromtxt")(fname, "delimiter"_a = delimiter,
-                                   "skip_header"_a = header ? 1 : 0);
-
+  auto obj = np.attr("genfromtxt")("fname"_a = fname.c_str(), "delimiter"_a = delimiter,
+                                   "skip_header"_a = header ? 1 : 0,
+                                   "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::scalar_type>());
   pb->NumpyToTensorView(t, obj);
 }
 

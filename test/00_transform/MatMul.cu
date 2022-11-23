@@ -62,8 +62,12 @@ protected:
 template <typename TensorType>
 class MatMulTestFloatTypes : public MatMulTest<TensorType> {
 };
+template <typename TensorType>
+class MatMulTestFloatNonHalfTypes : public MatMulTest<TensorType> {
+};
 
 TYPED_TEST_SUITE(MatMulTestFloatTypes, MatXFloatTypes);
+TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypes);
 
 TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 {
@@ -133,19 +137,26 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(MatMulTestFloatTypes, LargeData)
+TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
 {
   MATX_ENTER_HANDLER();
-  constexpr index_t i = 12;
-  constexpr index_t j = 12;
-  constexpr index_t k = 12;
-  constexpr index_t m = 12;
-  constexpr index_t n = 12;
-  tensor_t<TypeParam, 4> a{{i,j,m,k}}; 
-  tensor_t<TypeParam, 4> b{{i,j,k,n}}; 
-  tensor_t<TypeParam, 4> c{{i,j,m,n}};
-  
-  matmul(c, a, b);
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  tensor_t<TypeParam, 2> a{{m, k}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{n, m}};
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto ct = transpose(c);
+
+  matmul(ct, a, b);
+  MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", this->thresh);
 
 
   MATX_EXIT_HANDLER();
@@ -306,6 +317,165 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
   matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
+{
+  MATX_ENTER_HANDLER();
+   
+  constexpr index_t m = 16;
+  constexpr index_t k = 32;
+  constexpr index_t n = 64;
+  constexpr index_t b = 8;
+    
+  tensor_t<TypeParam, 3> a3{{b, m, k}};
+  tensor_t<TypeParam, 3> b3{{b, k, n}};
+  tensor_t<TypeParam, 3> c3{{b, m, n}};
+    
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+    "00_transforms", "matmul_operators", "run", {b, m, k, n});
+
+  this->pb->NumpyToTensorView(a3, "a");
+  this->pb->NumpyToTensorView(b3, "b");
+  
+  { // identity permute
+    const int axis[2] = {1, 2};
+    std::array<int, 3> perm({0, 1, 2});
+
+    tensor_t<TypeParam, 3> ai{{b, m, k}};
+    tensor_t<TypeParam, 3> bi{{b, k, n}};
+    tensor_t<TypeParam, 3> ci{{b, m, n}};
+
+    auto ap = permute(ai, perm);
+    auto bp = permute(bi, perm);
+    auto cp = permute(ci, perm);
+
+    (ap = a3).run();
+    (bp = b3).run();
+
+    matmul(ci, ai, bi, axis);
+    
+    (c3 = cp).run();
+
+    cudaStreamSynchronize(0);
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
+  }
+
+  { // transposing inner dims
+    const int axis[2] = {2, 1};
+    std::array<int, 3> perm({0, 2, 1});
+
+    tensor_t<TypeParam, 3> ai{{b, k, m}};
+    tensor_t<TypeParam, 3> bi{{b, n, k}};
+    tensor_t<TypeParam, 3> ci{{b, n, m}};
+
+    auto ap = permute(ai, perm);
+    auto bp = permute(bi, perm);
+    auto cp = permute(ci, perm);
+
+    // copy data into permuted inputs
+    (ap = a3).run();
+    (bp = b3).run();
+
+    matmul(ci, ai, bi, axis);
+    
+    // copy result from permuted output
+    (c3 = cp).run();
+
+    cudaStreamSynchronize(0);
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
+  }
+  
+  { // first and last
+    const int axis[2] = {0 ,2};
+    std::array<int, 3> perm({1, 0, 2});
+
+    tensor_t<TypeParam, 3> ai{{m, b, k}};
+    tensor_t<TypeParam, 3> bi{{k, b, n}};
+    tensor_t<TypeParam, 3> ci{{m, b, n}};
+
+    auto ap = permute(ai, perm);
+    auto bp = permute(bi, perm);
+    auto cp = permute(ci, perm);
+
+    // copy data into permuted inputs
+    (ap = a3).run();
+    (bp = b3).run();
+
+    matmul(ci, ai, bi, axis);
+    
+    // copy result from permuted output
+    (c3 = cp).run();
+
+    cudaStreamSynchronize(0);
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
+  }
+ 
+  {  // affine not supported
+    const int axis[2] = {0, 1};
+    std::array<int, 3> perm({2, 0, 1});
+
+    tensor_t<TypeParam, 3> ai{{m, k, b}};
+    tensor_t<TypeParam, 3> bi{{k, n, b}};
+    tensor_t<TypeParam, 3> ci{{m, n, b}};
+
+    auto ap = permute(ai, perm);
+    auto bp = permute(bi, perm);
+    auto cp = permute(ci, perm);
+
+    // copy data into permuted inputs
+    (ap = a3).run();
+    (bp = b3).run();
+
+    matmul(ci, ai, bi, axis);
+    
+    // copy result from permuted output
+    (c3 = cp).run();
+
+    cudaStreamSynchronize(0);
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
+{
+  MATX_ENTER_HANDLER();
+   
+  constexpr index_t m = 16;
+  constexpr index_t k = 32;
+  constexpr index_t n = 64;
+  constexpr index_t b = 8;
+    
+  tensor_t<TypeParam, 3> a3{{b, m, k}};
+  tensor_t<TypeParam, 3> b3{{b, k, n}};
+  tensor_t<TypeParam, 3> c3{{b, m, n}};
+    
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+    "00_transforms", "matmul_operators", "run", {b, m, k, n});
+
+  this->pb->NumpyToTensorView(a3, "a");
+  this->pb->NumpyToTensorView(b3, "b");
+  
+  { // simple identity remaps
+
+    auto rb = range<0>({b},0, 1);
+
+    auto ar = remap<0>(a3, rb);
+    auto br = remap<0>(b3, rb);
+    auto cr = remap<0>(c3, rb);
+
+    matmul(cr, ar, br);
+    
+    MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
+  }
 
   MATX_EXIT_HANDLER();
 }

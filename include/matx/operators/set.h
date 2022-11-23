@@ -87,8 +87,6 @@ public:
   {
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
 
-    MATX_STATIC_ASSERT(detail::get_rank<Op>() == -1 || Rank() == detail::get_rank<Op>(),
-                       matxInvalidDim);
     if constexpr (Rank() > 0) {
       for (int i = 0; i < Rank(); i++) {
         [[maybe_unused]] index_t size = detail::get_expanded_size<Rank()>(op_, i);
