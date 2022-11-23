@@ -44,7 +44,7 @@ namespace matx
       public:
         using scalar_type = T;
 
-        __MATX_INLINE__ std::string str() { return "logspace"; }
+        __MATX_INLINE__ std::string str() const { return "logspace"; }
 	
         inline Logspace(T first, T last, index_t count)
         {

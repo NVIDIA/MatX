@@ -57,7 +57,7 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
 
-        __MATX_INLINE__ std::string str() { return "reshape(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "reshape(" + op_.str() + ")"; }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

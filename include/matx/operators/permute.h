@@ -56,7 +56,7 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
         
-        __MATX_INLINE__ std::string str() { return "permute(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "permute(" + op_.str() + ")"; }
  
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -122,6 +122,28 @@ namespace matx
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
+  
+  /**
+   * @brief Operator to permute the dimensions of a tensor or operator.
+   *
+   * The each dimension must appear in the dims array once.
+   * This operator can appear as an rvalue or lvalue. 
+   *
+   * @tparam T Input operator/tensor type
+   * @param op Input operator
+   * @param dims the reordered dimensions of the operator.
+   * @return permuted operator
+   */
+  template <typename T>
+    __MATX_INLINE__ auto permute( const T &op, 
+        const std::array<int32_t, T::Rank()> &dims) {
+      if constexpr (is_tensor_view_v<T>) {
+        return op.Permute(dims);
+      } else {
+        return detail::PermuteOp<T>(op, dims);
+      }
+    }
+  
 
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
@@ -138,26 +160,9 @@ namespace matx
   template <typename T>
     __MATX_INLINE__ auto permute( const T &op, 
         const int32_t (&dims)[T::Rank()]) {
-      return detail::PermuteOp<T>(op, detail::to_array(dims));
+      return permute(op, detail::to_array(dims));
     }
 
-  /**
-   * @brief Operator to permute the dimensions of a tensor or operator.
-   *
-   * The each dimension must appear in the dims array once.
-   * This operator can appear as an rvalue or lvalue. 
-   *
-   * @tparam T Input operator/tensor type
-   * @param op Input operator
-   * @param dims the reordered dimensions of the operator.
-   * @return permuted operator
-   */
-  template <typename T>
-    __MATX_INLINE__ auto permute( const T &op, 
-        const std::array<int32_t, T::Rank()> &dims) {
-      return detail::PermuteOp<T>(op, dims);
-    }
-  
   /**
    * @brief Operator to transpose the dimensions of a tensor or operator.
    *

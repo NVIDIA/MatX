@@ -58,7 +58,7 @@ namespace matx
         using matxoplvalue = bool;
         using scalar_type = typename T1::scalar_type;
 
-        __MATX_INLINE__ std::string str() { return "reverse(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "reverse(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
 

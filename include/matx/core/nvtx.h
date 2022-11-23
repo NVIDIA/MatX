@@ -115,9 +115,9 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
   #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
 
-  #define MATX_NVTX_END_RANGE( id ) endEvent( id );
+  #define MATX_NVTX_END_RANGE( id ) matx::endEvent( id );
   
-  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) setNVTXLogLevel( nvtxLevel );
+  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) matx::setNVTXLogLevel( nvtxLevel );
   
 ////////////             Disable NVTX Macros          /////////////////
 

@@ -137,6 +137,27 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
 TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
 {
   MATX_ENTER_HANDLER();
+
+  {
+    int x = 273;
+    int y = 2;
+    int z = 4;
+    auto a = matx::make_tensor<TypeParam, 3>(
+        {x, y, z});
+    auto b = matx::make_tensor<TypeParam, 2>(
+        {x, y});
+    
+    (a = TypeParam(1)).run();
+
+    sum(b, a, {2}, 0);
+    cudaStreamSynchronize(0);
+    for(int i = 0 ; i < x ; i++) {
+      for(int j = 0; j < y ; j++) {
+        ASSERT_TRUE( b(i,j) == (TypeParam)z);
+      }
+    }
+  }
+
   {
     tensor_t<TypeParam, 0> t0;
 
@@ -147,22 +168,22 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
 
     sum(t0, t4, 0);
     cudaStreamSynchronize(0);
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(
         t0(), (TypeParam)(t4.Size(0) * t4.Size(1) * t4.Size(2) * t4.Size(3))));
 
      sum(t0, t3, 0);
      cudaStreamSynchronize(0);
-     EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+     ASSERT_TRUE(MatXUtils::MatXTypeCompare(
          t0(), (TypeParam)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
 
      sum(t0, t2, 0);
      cudaStreamSynchronize(0);
-     EXPECT_TRUE(
+     ASSERT_TRUE(
          MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t2.Size(0) * t2.Size(1))));
 
      sum(t0, t1, 0);
      cudaStreamSynchronize(0);
-     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
+     ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
   }
   {
     tensor_t<TypeParam, 1> t1({30});
@@ -175,21 +196,21 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i), (TypeParam)(t4.Size(1) * t4.Size(2) * t4.Size(3))));
     }
 
     sum(t1, t3, 0);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i), (TypeParam)(t3.Size(1) * t3.Size(2))));
     }
 
     sum(t1, t2, 0);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2.Size(1))));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2.Size(1))));
     }
 
     // Test tensor input too
@@ -197,10 +218,9 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     (t2t = ones<TypeParam>({30, 40})).run();
     sum(t1, t2t);
     for (index_t i = 0; i < t1.Size(0); i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2t.Size(1))));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2t.Size(1))));
     }    
   }
-
   {
     tensor_t<TypeParam, 2> t2({30, 40});
 
@@ -211,7 +231,7 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2(i, j), (TypeParam)(t4.Size(2) * t4.Size(3))));
       }
     }
@@ -220,7 +240,7 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2(i, j), (TypeParam)(t3.Size(2))));
       }
     }
@@ -238,12 +258,11 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2a(i, j), t2b(i,j)));
       }
     }
   }
-
   
   MATX_EXIT_HANDLER();
 }

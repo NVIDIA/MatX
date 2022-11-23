@@ -45,7 +45,7 @@ namespace matx
         using scalar_type = T;
         using matxop = bool;
 
-        __MATX_INLINE__ std::string str() { return "linspace"; }
+        __MATX_INLINE__ std::string str() const { return "linspace"; }
 
 
         inline LinspaceOp(T first, T last, index_t count)

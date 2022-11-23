@@ -86,6 +86,12 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
       }
       nt *= 2;
     }
+ 
+    // cuda restricts maximum block size in z to 64
+    if( threads.z > 64 ) {
+      threads.z = 64;
+    }
+
     // launch as many blocks as necessary
     blocks.x = static_cast<int>((sizes[2] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[1] + threads.y - 1) / threads.y);
@@ -104,6 +110,12 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
       }
       nt *= 2;
     }
+    
+    // cuda restricts maximum block size in z to 64
+    if( threads.z > 64 ) {
+      threads.z = 64;
+    }
+    
     // launch as many blocks as necessary
     blocks.x = static_cast<int>((sizes[3] + threads.x - 1) / threads.x);
     blocks.y = static_cast<int>((sizes[1] * sizes[2] + threads.y - 1) / threads.y);
@@ -117,7 +129,7 @@ inline void get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
     blocks.x = static_cast<int>((dims + threads.x - 1) / threads.x);
     blocks.y = 1;
     blocks.z = 1;
-  }  
+  } 
 }
 } // end namespace detail
 } // end namespace matx

@@ -60,7 +60,7 @@ namespace detail {
     }                                                                          \
   }                                                                            \
   template <typename T> struct OPNAME##F {                                     \
-    static std::string str() { return #FUNC; }                                 \
+    static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
                                                                                \
     static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)                            \
     {                                                                          \
@@ -148,7 +148,7 @@ MATX_UNARY_OP_GEN(sqrt, Sqrt);
 MATX_UNARY_OP_GEN(exp, Exp);
 
 template <typename T> struct ExpjF {
-  static std::string str() { return "expj"; }
+  static __MATX_INLINE__ std::string str() { return "expj"; }
   template <typename T2 = T,
             std::enable_if_t<std::is_floating_point_v<T2>, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ExpjF()
@@ -179,7 +179,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
   }
 }
 template <typename T> struct ConjF {
-  static std::string str() { return "conj"; }
+  static __MATX_INLINE__ std::string str() { return "conj"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
     if constexpr (is_complex_v<T>) {
@@ -216,7 +216,7 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
   }
 }
 template <typename T> struct SinF {
-  static std::string str() { return "sin"; }
+  static __MATX_INLINE__ std::string str() { return "sin"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_sin(v1); }
 };
 template <typename T> using SinOp = UnOp<T, SinF<T>>;
@@ -239,21 +239,21 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
   return normcdf(v1);
 }
 template <typename T> struct NormCdfF {
-  static std::string str() { return "normcdf"; }
+  static __MATX_INLINE__ std::string str() { return "normcdf"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_normcdf(v1); }
 };
 template <typename T> using NormCdfOp = UnOp<T, NormCdfF<T>>;
 
 
 template <typename T> struct RealF {
-  static std::string str() { return "real"; }
+  static __MATX_INLINE__ std::string str() { return "real"; }
   static_assert(is_complex_v<T>, "real() must have complex input");
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.real(); }
 };
 template <typename T> using RealOp = UnOp<T, RealF<T>>;
 
 template <typename T> struct ImagF {
-  static std::string str() { return "imag"; }
+  static __MATX_INLINE__ std::string str() { return "imag"; }
   static_assert(is_complex_v<T>, "imag() must have complex input");
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return v1.imag(); }
 };
@@ -277,7 +277,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
 }
 template <typename T>
 struct Angle {
-  static std::string str() { return "angle"; }
+  static __MATX_INLINE__ std::string str() { return "angle"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
     static_assert(is_complex_v<T>, "Angle operator must have complex value as input");
@@ -288,7 +288,7 @@ template <typename T> using AngleOp = UnOp<T, Angle<T>>;
 
 template<typename T> 
 struct SubNegF {
-  static std::string str() { return "-"; }
+  static __MATX_INLINE__ std::string str() { return "-"; }
   static __MATX_INLINE__ __MATX_HOST__  __MATX_DEVICE__ auto op(T v1) 
   { 
     return -v1; 
@@ -589,7 +589,7 @@ template <typename T1, typename T2> struct OrOrF {
 template <typename T1, typename T2> using OrOrOp = BinOp<T1, T2, OrOrF<T1, T2>>;
 
 template <typename T1> struct NotF {
-  static std::string str() { return "!"; }
+  static __MATX_INLINE__ std::string str() { return "!"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1) { return !v1; }
 };

@@ -51,7 +51,7 @@ namespace matx
 
         using scalar_type = typename T::scalar_type;
 
-        __MATX_INLINE__ std::string str() { return "clone(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 
         __MATX_INLINE__ CloneOp(T op, std::array<index_t, CRank> shape) : op_(op) {
           // create gather list
@@ -118,7 +118,11 @@ namespace matx
   template <int Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
     {
-      return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+      if constexpr (is_tensor_view_v<Op>) {
+        return t.template Clone<Rank>(shape);
+      } else {
+        return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+      }
     };   
   
   template <int Rank, typename Op>

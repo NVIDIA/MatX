@@ -133,6 +133,24 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatTypes, LargeData)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t i = 12;
+  constexpr index_t j = 12;
+  constexpr index_t k = 12;
+  constexpr index_t m = 12;
+  constexpr index_t n = 12;
+  tensor_t<TypeParam, 4> a{{i,j,m,k}}; 
+  tensor_t<TypeParam, 4> b{{i,j,k,n}}; 
+  tensor_t<TypeParam, 4> c{{i,j,m,n}};
+  
+  matmul(c, a, b);
+
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
 {
   MATX_ENTER_HANDLER();
