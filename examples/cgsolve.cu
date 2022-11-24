@@ -30,21 +30,63 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include <cassert>
+#include <cstdio>
+#include <math.h>
+#include <memory>
 
-#include "matx/transforms/ambgfun.h"
-#include "matx/transforms/cgsolve.h"
-#include "matx/transforms/conv.h"
-#include "matx/transforms/copy.h"
-#include "matx/transforms/corr.h"
-#include "matx/transforms/cov.h"
-#include "matx/transforms/cub.h"
-#include "matx/transforms/einsum.h"
-#include "matx/transforms/fft.h"
-#include "matx/transforms/filter.h"
-#include "matx/transforms/inverse.h"
-#include "matx/transforms/matmul.h"
-#include "matx/transforms/permute.h"
-#include "matx/transforms/reduce.h"
-#include "matx/transforms/solver.h"
-#include "matx/transforms/transpose.h"
+#include "matx.h"
+
+using namespace matx;
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+{
+  using TypeParam = double;
+  MATX_ENTER_HANDLER();
+
+  int max_iters=100;
+  int N = 120;
+  int BATCH = 900;
+
+  auto A = make_tensor<TypeParam, 3> ({BATCH, N, N});
+  auto X = make_tensor<TypeParam, 2> ({BATCH, N});
+  auto B = make_tensor<TypeParam, 2> ({BATCH, N});
+  auto Bout = make_tensor<TypeParam, 2> ({BATCH, N});
+  auto norm = make_tensor<TypeParam, 1>({BATCH});
+  auto maxn = make_tensor<TypeParam>();
+
+
+  // Simple Poisson matrix
+  for(int b = 0; b < BATCH; b++) {
+    for(int i = 0; i < N; i++) {
+      B(b,i) = TypeParam(1+b);
+
+      for(int j = 0; j < N; j++) {
+        if(i==j)
+          A(b,i,j) = 2;
+        else if( i == j-1)
+          A(b,i,j) = -1;
+        else if (i == j+1)
+          A(b,i,j) = -1;
+        else
+          A(b,i,j) = 0;
+      }
+    }
+  }
+  A.PrefetchDevice(0);
+  B.PrefetchDevice(0);
+  X.PrefetchDevice(0);
+
+  (X = TypeParam(1)).run();
+
+  cgsolve(X, A, B, .0001, max_iters);
+
+  matvec(Bout, A, X);
+  sum(norm, (Bout-B)*(Bout-B));
+  matx::rmax(maxn, sqrt(norm), 0);
+
+  cudaDeviceSynchronize();
+  printf ("max l2 norm: %f\n", (float)sqrt(maxn()));
+
+  CUDA_CHECK_LAST_ERROR();
+  MATX_EXIT_HANDLER();
+}

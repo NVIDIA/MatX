@@ -30,21 +30,61 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "assert.h"
+#include "matx.h"
+#include "test_types.h"
+#include "utilities.h"
+#include "gtest/gtest.h"
 
-#include "matx/transforms/ambgfun.h"
-#include "matx/transforms/cgsolve.h"
-#include "matx/transforms/conv.h"
-#include "matx/transforms/copy.h"
-#include "matx/transforms/corr.h"
-#include "matx/transforms/cov.h"
-#include "matx/transforms/cub.h"
-#include "matx/transforms/einsum.h"
-#include "matx/transforms/fft.h"
-#include "matx/transforms/filter.h"
-#include "matx/transforms/inverse.h"
-#include "matx/transforms/matmul.h"
-#include "matx/transforms/permute.h"
-#include "matx/transforms/reduce.h"
-#include "matx/transforms/solver.h"
-#include "matx/transforms/transpose.h"
+using namespace matx;
+
+
+template <typename TensorType>
+class SolveTestsFloatNonComplexNonHalf : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(SolveTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypes);
+
+TYPED_TEST(SolveTestsFloatNonComplexNonHalf, CGSolve)
+{
+  MATX_ENTER_HANDLER();
+
+  int gN = 4;
+  int N = gN * gN;
+  int BATCH = 4;
+
+  auto A = make_tensor<TypeParam, 3> ({BATCH, N, N}); 
+  auto X = make_tensor<TypeParam, 2> ({BATCH, N}); 
+  auto B = make_tensor<TypeParam, 2> ({BATCH, N}); 
+
+
+  // Simple 1D Poisson matrix
+  for(int b = 0; b < BATCH; b++) {
+    for(int i = 0; i < N; i++) {
+      X(b,i) = TypeParam(0+b);
+      B(b,i) = TypeParam(1+b);
+      for(int j = 0; j < N; j++) {
+        if(i==j) 
+          A(b,i,j) = 2;
+        else if( i == j-1) 
+          A(b,i,j) = -1;
+        else if (i == j+1) 
+          A(b,i,j) = -1;
+        else 
+          A(b,i,j) = 0;
+      }
+    }
+  }
+
+  cgsolve(X, A, B, .00001, 10);
+  matvec(B, A, X);
+  cudaDeviceSynchronize();
+
+  for(int i = 0; i < BATCH; i++) {
+    for(int j = 0; j < N; j++) {
+      ASSERT_NEAR(B(i,j), TypeParam(1+i), .0001);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
