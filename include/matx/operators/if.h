@@ -50,7 +50,7 @@ namespace matx
    *
    */
   template <typename T1, typename T2>
-    class IF : public BaseOp<IF<T1, T2>>
+    class IFOP : public BaseOp<IFOP<T1, T2>>
   {
     private:
       typename detail::base_type<T1>::type cond_;
@@ -60,14 +60,14 @@ namespace matx
     public:
       using scalar_type = void; ///< Scalar type for type extraction
 
-       __MATX_INLINE__ std::string str() const { return  "if(" + cond_.str() + ") then {" +  op_.str() + "}"; }
+      __MATX_INLINE__ std::string str() const { return  "if(" + cond_.str() + ") then {" +  op_.str() + "}"; }
       /**
        * @brief Constructor for an IF statement
        * 
        * @param cond Condition to perform the IF/ELSE on
        * @param op Operator if conditional branch is true
        */    
-      __MATX_INLINE__ IF(T1 cond, T2 op) : cond_(cond), op_(op)
+      __MATX_INLINE__ IFOP(T1 cond, T2 op) : cond_(cond), op_(op)
     {
       static_assert((!is_tensor_view_v<T2>),
           "Only operator emmitters are allowed in IF. Tensor views are "
@@ -124,4 +124,9 @@ namespace matx
         return size_[dim];
       }
   };
+
+  template <typename T1, typename T2>
+    auto IF(T1 t1, T2 t2) {
+      return IFOP<T1,T2>(t1,t2);
+    }
 } // end namespace matx
