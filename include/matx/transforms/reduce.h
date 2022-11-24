@@ -34,6 +34,7 @@
 
 #include <cfloat>
 
+#include "matx/core/cache.h"
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
 #include "matx/core/nvtx.h"
