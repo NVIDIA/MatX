@@ -279,7 +279,7 @@ public:
           params.b_cols = a.Size(RANK - 1);
           params.ldb = a.Stride(RANK - 2);
         }
-
+          
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 1);
@@ -298,18 +298,20 @@ public:
     }
     else {
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (a.Stride(RANK - 1) == 1 || is_complex_half_v<typename TensorTypeA::scalar_type>) {
+        if (a.Stride(RANK - 1) <= 1 || is_complex_half_v<typename TensorTypeA::scalar_type>) {
           params.opA = CUBLAS_OP_N;
         }
-        else if (a.Stride(RANK - 2) == 1) {
+        else if (a.Stride(RANK - 2) <= 1) {
           params.opA = CUBLAS_OP_T;
+        } else {
         }
 
-        if (b.Stride(RANK - 1) == 1  || is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        if (b.Stride(RANK - 1) <= 1  || is_complex_half_v<typename TensorTypeB::scalar_type>) {
           params.opB = CUBLAS_OP_N;
         }
-        else if (b.Stride(RANK - 2) == 1) {
+        else if (b.Stride(RANK - 2) <= 1) {
           params.opB = CUBLAS_OP_T;
+        } else {
         }
 
         params.a_rows = a.Size(RANK - 2);
@@ -334,6 +336,7 @@ public:
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 2);
+       
       }
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
@@ -903,11 +906,11 @@ private:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
-    if (c.Stride(RANK - 1) == 1) {
+    if (c.Stride(RANK - 1) <= 1) {
       MatMulLaunch<OrderA, OrderB, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha,
                                                         beta);
     }
-    else if (c.Stride(RANK - 2) == 1) {
+    else if (c.Stride(RANK - 2) <= 1) {
 #if MATX_ENABLE_CUTLASS
       MatMulLaunch<OrderA, OrderB, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
@@ -1082,12 +1085,11 @@ void matmul(TensorTypeC C, const TensorTypeA A,
     (b = B).run(stream);
   }
 
-
 #if MATX_ENABLE_CUTLASS != 1
   // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
   // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
   // the rightmost stride is !=1 or this function will be an infinite recursion.
-  if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) != 1 ) {  // column major check
+  if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) > 1 ) {  // column major check
     // Column major
     matmul(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
   } else 
@@ -1160,8 +1162,8 @@ __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
             cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
-  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank(), "matmul: inputs must have same rank to use conv1d with axis parameter");
-  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeC::Rank(), "matmul: inputs and outputs must have same rank to use conv1d with axis parameter");
+  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
+  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeC::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
 
   auto perm = detail::getPermuteDims<TensorTypeC::Rank()>(axis);
   auto out = permute(C, perm);
@@ -1170,6 +1172,65 @@ __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
   auto in2 = permute(B, perm);
 
   matmul<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
+}
+
+/**
+ * Run a GEMV without a plan
+ *
+ * Performs the GEMV:  C = beta*C + alpha*A*B where A is a matrix and B and C are vectors.
+ *
+ * Creates a new GEMM plan in the cache if none exists, and uses that to execute
+ * the GEMM. This function is preferred over creating a plan directly for both
+ * efficiency and simpler code. Since it only uses the signature of the GEMM to
+ * decide if a plan is cached, it may be able to reused plans for different
+ * A/B/C matrices as long as they were configured with the same dimensions.
+ *
+ * @tparam TensorTypeC
+ *    Data type of C tensor or operator
+ * @tparam TensorTypeA
+ *    Data type of A tensor or operator
+ * @tparam TensorTypeB
+ *    Data type of B tensor or operator
+ * @tparam PROV
+ *    Provider type chosen from MatXMatMulProvider_t type
+ *
+ * @param c
+ *   C output tensor or operator
+ * @param a
+ *   A input tensor or operator
+ * @param b
+ *   B input tensor or operator
+ * @param stream
+ *   CUDA stream
+ * @param alpha
+ *   Scalar multiplier to apply to operator A
+ * @param beta
+ *   Scalar multiplier to apply to operator C on input
+ */
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+__MATX_INLINE__ void matvec(TensorTypeC C, const TensorTypeA A,
+            const TensorTypeB B,
+            cudaStream_t stream = 0,
+            float alpha = 1.0, float beta = 0.0)
+{
+  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank()+1, "matvec: A rank must be one larger than B rank");
+  
+  MATX_ASSERT_STR(C.Shape() == B.Shape(), matxInvalidDim, "matvec:  A and B must have same shape");
+  MATX_ASSERT_STR(C.Size(TensorTypeC::Rank()-1) == A.Size(TensorTypeA::Rank()-1), matxInvalidDim, "matvec:  A last size must match C last size");
+
+  // need to clone c and b 1 along inner dim to use cublas
+  std::array<index_t, TensorTypeC::Rank()+1> shape;
+  for(int i = 0; i < TensorTypeC::Rank(); i++) {
+    shape[i] = matxKeepDim;
+  }
+  // clone last dim by 1 to create an Nx1 matrix
+  shape[TensorTypeC::Rank()]=1;
+
+  auto c = clone<TensorTypeC::Rank()+1>(C, shape);
+  auto b = clone<TensorTypeB::Rank()+1>(B, shape);
+
+  matmul<decltype(c), decltype(A), decltype(b), PROV>(c, A, b, stream, alpha, beta);
 }
 
 } // end namespace matx
