@@ -116,19 +116,20 @@ namespace matx
    * @return operator to compute the cloned value
    */
   template <int Rank, typename Op>
-    auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
+    auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> shape)
     {
       if constexpr (is_tensor_view_v<Op>) {
         return t.template Clone<Rank>(shape);
       } else {
-        return detail::CloneOp<Rank, Op, index_t>(t, detail::to_array(shape));
+        return detail::CloneOp<Rank, Op, index_t>(t, shape);
       }
+    };  
+
+  template <int Rank, typename Op>
+    auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
+    {
+      return clone<Rank, Op>(t, detail::to_array(shape));
     };   
   
-  template <int Rank, typename Op>
-    auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> &shape)
-    {
-      return detail::CloneOp<Rank, Op, index_t>(t, shape);
-    };   
 
 } // end namespace matx
