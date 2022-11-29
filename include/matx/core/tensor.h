@@ -227,6 +227,7 @@ public:
       return false;
     }
   }
+
   /** Perform a shallow copy of a tensor view
    *
    * Alternative to operator= since it's used for lazy evaluation. This function
@@ -242,6 +243,24 @@ public:
     storage_ = rhs.storage_;
     this->desc_ = rhs.desc_;
   }
+
+  /** Swaps two tensors
+   *
+   * Swaps members of two tensors, including pointers, shapes, and descriptors
+   *
+   * @param lhs
+   *   Left argument
+   * @param rhs
+   *   Right argument
+   */
+  friend void swap(self_type &lhs, self_type &rhs) noexcept
+  {
+    using std::swap;
+
+    std::swap(lhs.ldata_, rhs.ldata_);
+    swap(lhs.storage_, rhs.storage_);
+    swap(lhs.desc_, rhs.desc_);
+  }  
 
   __MATX_INLINE__  ~tensor_t() = default;
 

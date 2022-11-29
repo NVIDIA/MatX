@@ -126,6 +126,38 @@ TYPED_TEST(BasicTensorTestsAll, DataPointer)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicTensorTestsAll, Swap)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<TypeParam, 2> tmp{{10,4}};
+  tensor_t<TypeParam, 2> tmp2{{100,40}};
+
+  ASSERT_EQ(tmp.Rank(), 2);
+  ASSERT_EQ(tmp2.Rank(), 2);
+  ASSERT_EQ(tmp.Size(0), 10);
+  ASSERT_EQ(tmp.Size(1), 4);
+  ASSERT_EQ(tmp2.Size(0), 100);
+  ASSERT_EQ(tmp2.Size(1), 40);
+
+  auto ptr = tmp.Data();
+  auto ptr2 = tmp2.Data();
+  swap(tmp, tmp2);
+
+  ASSERT_EQ(tmp.Rank(), 2);
+  ASSERT_EQ(tmp2.Rank(), 2);
+  ASSERT_EQ(tmp2.Size(0), 10);
+  ASSERT_EQ(tmp2.Size(1), 4);
+  ASSERT_EQ(tmp.Size(0), 100);
+  ASSERT_EQ(tmp.Size(1), 40);  
+  ASSERT_EQ(tmp.Data(), ptr2);
+  ASSERT_EQ(tmp2.Data(), ptr);
+  ASSERT_EQ(tmp.GetRefCount(), 1);
+  ASSERT_EQ(tmp2.GetRefCount(), 1);    
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicTensorTestsAll, RefCnt)
 {
   MATX_ENTER_HANDLER();
