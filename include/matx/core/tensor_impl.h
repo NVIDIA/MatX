@@ -92,6 +92,23 @@ class tensor_impl_t {
       return std::string("T") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 
+    /** Swaps two raw_pointer_buffers
+     *
+     * Swaps members of two raw_pointer_buffers
+     *
+     * @param lhs
+     *   Left argument
+     * @param rhs
+     *   Right argument
+     */
+    friend void swap(tensor_impl_t<T, RANK, Desc> &lhs, tensor_impl_t<T, RANK, Desc> &rhs) noexcept
+    {
+      using std::swap;
+
+      swap(lhs.ldata_, rhs.ldata_);
+      swap(lhs.desc_, rhs.desc_);
+    }     
+
     /**
      * Constructor for a rank-0 tensor (scalar).
      */
