@@ -30,38 +30,59 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "matx.h"
+#include <cassert>
+#include <cstdio>
+#include <math.h>
 
-#include "matx/operators/unary_operators.h"
-#include "matx/operators/binary_operators.h"
+using namespace matx;
 
-#include "matx/operators/cart2sph.h"
-#include "matx/operators/collapse.h"
-#include "matx/operators/concat.h"
-#include "matx/operators/constval.h"
-#include "matx/operators/cast.h"
-#include "matx/operators/clone.h"
-#include "matx/operators/comma.h"
-#include "matx/operators/diag.h"
-#include "matx/operators/dct.h"
-#include "matx/operators/fftshift.h"
-#include "matx/operators/flatten.h"
-#include "matx/operators/hermitian.h"
-#include "matx/operators/if.h"
-#include "matx/operators/ifelse.h"
-#include "matx/operators/interleaved.h"
-#include "matx/operators/kronecker.h"
-#include "matx/operators/legendre.h"
-#include "matx/operators/permute.h"
-#include "matx/operators/planar.h"
-#include "matx/operators/r2c.h"
-#include "matx/operators/remap.h"
-#include "matx/operators/repmat.h"
-#include "matx/operators/reshape.h"
-#include "matx/operators/reverse.h"
-#include "matx/operators/select.h"
-#include "matx/operators/self.h"
-#include "matx/operators/set.h"
-#include "matx/operators/shift.h"
-#include "matx/operators/slice.h"
-#include "matx/operators/sph2cart.h"
+template<typename T> T factorial(int N) {
+  T prod = 1;
+  for(int i=2; i<=N; i++) {
+    prod = prod * i;
+  }
+  return prod;
+}
+
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+{
+  MATX_ENTER_HANDLER();
+
+  using ValueType = double;
+
+  int l = 3;
+  int m = 2;
+  int n = 60;
+  ValueType dx = M_PI/n;
+
+  auto col = range<0>({n+1},ValueType(0), ValueType(dx));
+  auto az = range<0>({2*n+1}, ValueType(0), ValueType(dx));
+
+  auto [phi, theta] = meshgrid(az, col);
+
+  auto Plm = legendre(l, m, cos(theta));
+
+  ValueType a = (2*l+1)*factorial<ValueType>(l-m);
+  ValueType b = 4*M_PI*factorial<ValueType>(l+m);
+  ValueType C = cuda::std::sqrt(a/b);
+
+  auto Ylm = C * Plm * exp(cuda::std::complex<ValueType>(0,1)*(m*phi));
+  auto [ Xm, Ym, Zm ] = sph2cart(phi, ValueType(M_PI)/2 - theta, abs(real(Ylm)));
+
+  // Output location
+  auto X = make_tensor<ValueType>(Xm.Shape());
+  auto Y = make_tensor<ValueType>(Ym.Shape());
+  auto Z = make_tensor<ValueType>(Zm.Shape());
+
+  (X = Xm, Y = Ym, Z=Zm).run();
+
+  cudaDeviceSynchronize();
+
+#if MATX_ENABLE_VIZ
+  matx::viz::surf(X, Y, Z, "test-viz.html");
+#endif
+  
+  CUDA_CHECK_LAST_ERROR();
+  MATX_EXIT_HANDLER();
+}
