@@ -292,6 +292,8 @@ inline void matxFree(void *ptr)
  */
 template <typename T>
 struct matx_allocator {
+  friend void swap([[maybe_unused]] matx_allocator<T> &lhs, [[maybe_unused]] matx_allocator<T> &rhs) noexcept  { }   
+
   /**
    * @brief Allocate memory of at least ``size`` bytes
    * 

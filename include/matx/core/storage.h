@@ -111,6 +111,25 @@ namespace matx
      */
     ~raw_pointer_buffer() = default;
 
+    /** Swaps two raw_pointer_buffers
+     *
+     * Swaps members of two raw_pointer_buffers
+     *
+     * @param lhs
+     *   Left argument
+     * @param rhs
+     *   Right argument
+     */
+    friend void swap(raw_pointer_buffer<T> &lhs, raw_pointer_buffer<T> &rhs) noexcept
+    {
+      using std::swap;
+
+      swap(lhs.size_, rhs.size_);
+      swap(lhs.owning_, rhs.owning_);
+      swap(lhs.alloc_, rhs.alloc_);
+      swap(lhs.data_, rhs.data_);
+    }          
+
     /**
      * @brief Get underlying data pointer
      * 
@@ -257,6 +276,23 @@ namespace matx
     smart_pointer_buffer<T>(T &&ptr, size_t size) : data_(std::forward<T>(ptr)), size_(size) {
       static_assert(is_smart_ptr_v<T>);
     }
+
+    /** Swaps two smart_pointer_buffer
+     *
+     * Swaps members of two smart_pointer_buffers
+     *
+     * @param lhs
+     *   Left argument
+     * @param rhs
+     *   Right argument
+     */
+    friend void swap(smart_pointer_buffer<T> &lhs, smart_pointer_buffer<T> &rhs) noexcept
+    {
+      using std::swap;
+
+      swap(lhs.size_, rhs.size_);
+      swap(lhs.data_, rhs.data_);
+    }      
 
     /**
      * @brief Default const copy constructor
@@ -405,6 +441,22 @@ namespace matx
     using citerator = value_type const *; ///< Type trait for const iterator value
     using matx_storage = bool; ///< Type trait to indicate this is a storage type
     using container = C; ///< Storage container type
+
+    /** Swaps two basic_storages
+     *
+     * Swaps members of two basic_storages
+     *
+     * @param lhs
+     *   Left argument
+     * @param rhs
+     *   Right argument
+     */
+    friend void swap(basic_storage<C> &lhs, basic_storage<C> &rhs) noexcept
+    {
+      using std::swap;
+
+      swap(lhs.container_, rhs.container_);
+    }      
 
     /**
      * @brief Set the data pointer in an object

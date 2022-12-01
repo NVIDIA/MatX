@@ -78,6 +78,24 @@ public:
    */    
   __MATX_INLINE__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
+  /** Swaps two raw_pointer_buffers
+   *
+   * Swaps members of two raw_pointer_buffers
+   *
+   * @param lhs
+   *   Left argument
+   * @param rhs
+   *   Right argument
+   */
+  friend void swap( tensor_desc_t<ShapeContainer, StrideContainer, RANK> &lhs, 
+                    tensor_desc_t<ShapeContainer, StrideContainer, RANK> &rhs) noexcept
+  {
+    using std::swap;
+
+    swap(lhs.shape_, rhs.shape_);
+    swap(lhs.stride_, rhs.stride_);
+  }   
+
   /**
    * @brief Construct a tensor_desc_t from a generic shape and stride
    * 

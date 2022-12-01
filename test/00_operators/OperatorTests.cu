@@ -1620,6 +1620,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
     dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
                 static_cast<detail::value_promote_t<TypeParam>>(i)};
   }
+  
 
   (dview = dview + fview).run();
   cudaDeviceSynchronize();
@@ -1628,7 +1629,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
               static_cast<detail::value_promote_t<TypeParam>>(i + i));
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(i + i));
+              static_cast<detail::value_promote_t<TypeParam>>(i));
   }
 
   // Subtract scalar
@@ -1645,7 +1646,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
               static_cast<detail::value_promote_t<TypeParam>>(-1));
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(-1));
+              static_cast<detail::value_promote_t<TypeParam>>(i));
   }
 
   MATX_EXIT_HANDLER();
@@ -2450,6 +2451,25 @@ TYPED_TEST(OperatorTestsAll, RepMat)
           MatXUtils::MatXTypeCompare(t2r(i, j), t2(i % count0, j % count1)));
     }
   }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Sphere2Cart)
+{
+  MATX_ENTER_HANDLER();
+  int n = 5;
+
+  auto xi = range<0>({n},(TypeParam)1,(TypeParam)1);
+  auto yi = range<0>({n},(TypeParam)1,(TypeParam)1);
+  auto zi = range<0>({n},(TypeParam)1,(TypeParam)1);
+
+  auto [theta, phi, r] = cart2sph(xi, yi, zi);
+  auto [x, y, z] = sph2cart(theta, phi, r);
+
+  for(int i=0; i<n; i++) {
+    ASSERT_NEAR(xi(i), x(i), .0001);
+  }
+
   MATX_EXIT_HANDLER();
 }
 
