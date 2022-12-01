@@ -263,11 +263,11 @@ namespace detail {
     if constexpr (is_matx_op<M>())
       return a.Size(dim);
     else
-      return 0;
+      return 1;
 
     // work around for compiler bug/warning
     if constexpr (!is_matx_op<M>())
-      return 0;
+      return 1;
     else
       return a.Size(dim);
   }
