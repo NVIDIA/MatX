@@ -2781,29 +2781,34 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
   MATX_ENTER_HANDLER();
   index_t size = 11;
   int order = 5;
+  
+  { // vector for n and m
+    auto n = range<0, 1, int>({order}, 0, 1);
+    auto m = range<0, 1, int>({order}, 0, 1);
+    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
 
-  {
-    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+    auto out = make_tensor<TypeParam>({order, order, size});
 
-    auto out = make_tensor<TypeParam>({size, order+1});
-
-    (out = legendre(order, x)).run();
+    (out = legendre(n, m, x)).run();
 
     cudaStreamSynchronize(0);
 
-    for(int i = 0 ; i < size; i++) {
+    for(int j = 0; j < order; j++) {
       for(int p = 0; p < order; p++) {
-        ASSERT_NEAR(out(i,p), legendre_check(order, p, x(i)),.0001);
+        for(int i = 0 ; i < size; i++) {
+          ASSERT_NEAR(out(p,j,i), legendre_check(p, j, x(i)),.0001);
+        }
       }
     }
   }
  
-  {
-    auto x = as_type<TypeParam>(linspace<0>({size}, float(0), float(1)));
+  { // constant for n
+    auto m = range<0, 1, int>({order}, 0, 1);
+    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
 
-    auto out = make_tensor<TypeParam>({order+1, size});
+    auto out = make_tensor<TypeParam>({order, size});
 
-    (out = legendre(order, x, 0)).run();
+    (out = lcollapse<2>(legendre(order, m, x))).run();
 
     cudaStreamSynchronize(0);
 
@@ -2813,13 +2818,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
       }
     }
   }
-  
-  { // taking a constant for m
-    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+
+  { // taking a constant for m and n;
+    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
 
     auto out = make_tensor<TypeParam>({size});
 
-    (out = legendre(order, order,  x)).run();
+    (out = lcollapse<3>(legendre(order, order,  x))).run();
 
     cudaStreamSynchronize(0);
 
@@ -2828,13 +2833,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
     }
   }
   
-  { // taking a rank0 tensor for m
-    auto x = as_type<TypeParam>(linspace<0>({size}, double(0), double(1)));
+  { // taking a rank0 tensor for m and constant for n
+    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
     auto m = make_tensor<int>();
     auto out = make_tensor<TypeParam>({size});
     m() = order;
 
-    (out = legendre(order, m,  x)).run();
+    (out = lcollapse<3>(legendre(order, m,  x))).run();
 
     cudaStreamSynchronize(0);
 
@@ -2842,7 +2847,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
       ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
     }
   }
- 
   MATX_EXIT_HANDLER();
 }
 
