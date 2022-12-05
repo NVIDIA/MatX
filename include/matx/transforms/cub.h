@@ -291,11 +291,17 @@ public:
   }
 
   static CubParams_t GetCubParams(OutputTensor &a_out,
-                                  const InputOperator &a)
+                                  const InputOperator &a,
+                                  cudaStream_t stream)
   {
     CubParams_t params;
-    for (int r = 0; r < std::min(a.Rank(), 2); r++) {
-      params.size[r] = a.Size(r);
+
+    for (int r = 0; r < 2; r++) {
+      if(r < a.Rank()) {
+        params.size[r] = a.Size(r);
+      } else {
+        params.size[r] = 0;
+      }
     }
 
     params.op = op;
@@ -304,9 +310,14 @@ public:
     }
     else if constexpr (op == CUB_OP_INC_SUM || op == CUB_OP_HIST_EVEN) {
       params.batches = TotalSize(a) / a.Size(a.Rank() - 1);
+    } else {
+      params.batches = 1;
     }
+
     params.a_out = a_out.Data();
     params.dtype = TypeToInt<T1>();
+
+    params.stream = stream;
 
     return params;
   }
@@ -1408,8 +1419,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
                             detail::CUB_OP_REDUCE,
-                            param_type>::GetCubParams(a_out, a);
-  params.stream = stream;
+                            param_type>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
@@ -1455,8 +1465,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
-                            detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a);
-  params.stream = stream;
+                            detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
 
 
   // Get cache or new Sort plan if it doesn't exist
@@ -1500,8 +1509,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
-                            detail::CUB_OP_REDUCE_MIN>::GetCubParams(a_out, a);
-  params.stream = stream;
+                            detail::CUB_OP_REDUCE_MIN>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
@@ -1544,8 +1552,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
-                            detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a);
-  params.stream = stream;
+                            detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
@@ -1600,8 +1607,7 @@ void sort(OutputTensor &a_out, const InputOperator &a,
   
   // Get parameters required by these tensors
   auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a);
-  params.stream = stream;
+      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
 
   detail::SortParams_t p{dir};
 
@@ -1647,8 +1653,7 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
   auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a);
-  params.stream = stream;
+      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
@@ -1703,8 +1708,7 @@ void hist(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   // Get parameters required by these tensors
   // auto params =
-  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a);
-  // params.stream = stream;
+  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a, stream);
 
   // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
@@ -1840,7 +1844,6 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   // Get parameters required by these tensors
   // auto params =
   //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
-  // params.stream = stream;
 
   // Get cache or new Sort plan if it doesn't exist
   //auto ret = detail::cub_cache.Lookup(params);
@@ -1903,8 +1906,7 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
   
   // Get parameters required by these tensors
   // auto params =
-  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a);
-  // params.stream = stream;
+  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   //auto ret = detail::cub_cache.Lookup(params);
@@ -1970,8 +1972,7 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
   // Get parameters required by these tensors
   auto params =
-      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, decltype(cparams)>::GetCubParams(a_out, sort_tensor);
-  params.stream = stream;
+      detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, decltype(cparams)>::GetCubParams(a_out, sort_tensor, stream);
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
