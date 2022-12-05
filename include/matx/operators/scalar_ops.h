@@ -316,12 +316,11 @@ template <typename T1, typename T2> struct AddF {
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2){v2.real() + static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1)),
+        return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1)) + v2.real(),
                     v2.imag() };
       }
       else {
-        return (T2){v2.real() + static_cast<typename T2::value_type>(v1),
+        return (T2){static_cast<typename T2::value_type>(v1) + v2.real(),
                     v2.imag() };
       }
     }
@@ -343,8 +342,7 @@ template <typename T1, typename T2> struct SubF {
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
-        return (T1){v1.real() - static_cast<typename T1::value_type>(
-                                    static_cast<float>(v2)),
+        return (T1){v1.real() - static_cast<typename T1::value_type>(static_cast<float>(v2)),
                     v1.imag() };
       }
       else {
@@ -354,13 +352,12 @@ template <typename T1, typename T2> struct SubF {
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2){v2.real() - static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1)),
-                    v2.imag() };
+        return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1) - static_cast<float>(v2.real()) ),
+                    -v2.imag() };
       }
       else {
-        return (T2){v2.real() - static_cast<typename T2::value_type>(v1),
-                    v2.imag() };
+        return (T2){static_cast<typename T2::value_type>(v1) - v2.real(),
+                    -v2.imag() };
       }
     }
     else {
@@ -392,14 +389,12 @@ template <typename T1, typename T2> struct MulF {
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2){v2.real() * static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1)),
-                    v2.imag() * static_cast<typename T2::value_type>(
-                                    static_cast<float>(v1))};
+        return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1)) * v2.real(),
+                    static_cast<typename T2::value_type>(static_cast<float>(v1)) * v2.imag()};
       }
       else {
-        return (T2){v2.real() * static_cast<typename T2::value_type>(v1),
-                    v2.imag() * static_cast<typename T2::value_type>(v1)};
+        return (T2){static_cast<typename T2::value_type>(v1) * v2.real(),
+                    static_cast<typename T2::value_type>(v1) * v2.imag()};
       }
     }
     else {

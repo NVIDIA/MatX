@@ -1632,7 +1632,7 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
               static_cast<detail::value_promote_t<TypeParam>>(i));
   }
 
-  // Subtract scalar
+  // Subtract scalar from complex
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i + 1);
     dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
@@ -1647,6 +1647,23 @@ TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
               static_cast<detail::value_promote_t<TypeParam>>(-1));
     ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
               static_cast<detail::value_promote_t<TypeParam>>(i));
+  }
+
+  // Subtract complex from scalar
+  for (index_t i = 0; i < count; i++) {
+    fview(i) = static_cast<float>(i + 1);
+    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
+                static_cast<detail::value_promote_t<TypeParam>>(i)};
+  }
+
+  (dview = fview - dview).run();
+  cudaDeviceSynchronize();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TypeParam>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TypeParam>>(-i));
   }
 
   MATX_EXIT_HANDLER();
