@@ -87,14 +87,7 @@ public:
   {
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
 
-    if constexpr (Rank() > 0) {
-      for (int i = 0; i < Rank(); i++) {
-        [[maybe_unused]] index_t size = detail::get_expanded_size<Rank()>(op_, i);
-        MATX_ASSERT_STR(
-            size == 0 || size == Size(i), matxInvalidSize,
-            "Size mismatch in source operator to destination tensor view");
-      }
-    }
+    ASSERT_COMPATIBLE_OP_SIZES(op);
   }
 
   set &operator=(const set &) = delete;
