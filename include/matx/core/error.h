@@ -146,6 +146,14 @@ namespace matx
       detail::printStackTrace(stack);
     }
 
+    matxException(matxError_t error, const std::string &s, const char *file, int line)
+        : e(error)
+    {
+      snprintf(str, s.size(), "matxException (%s: %s) - %s:%d\n",
+               matxErrorString(error), s.c_str(), file, line);
+      detail::printStackTrace(stack);
+    }
+
     const char *what() const throw() { return str; }
   };
   }
@@ -224,5 +232,15 @@ namespace matx
     const auto e = cudaGetLastError(); \
     MATX_CUDA_CHECK(e);                \
   }
+
+// This macro asserts compatible dimensions of current class to an operator.
+#define ASSERT_COMPATIBLE_OP_SIZES(op)                               \
+  if constexpr (Rank() > 0) {                                        \
+    _Pragma("unroll")                                                \
+    for (int32_t i = 0; i < Rank(); i++) {                           \
+      index_t size = detail::get_expanded_size<Rank()>(op, i);       \
+      MATX_ASSERT_STR(size == 0 || size == Size(i), matxInvalidSize, "incompatible op sizes:" + str());    \
+    }                                                                \
+  } 
 
 } // end namespace matx

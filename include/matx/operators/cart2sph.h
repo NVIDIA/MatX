@@ -59,6 +59,9 @@ namespace matx
 
         __MATX_INLINE__ Cart2SphOp(T1 x, T2 y, T3 z) : x_(x), y_(y), z_(z)
       {
+        ASSERT_COMPATIBLE_OP_SIZES(x);
+        ASSERT_COMPATIBLE_OP_SIZES(y);
+        ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
         template <typename... Is>

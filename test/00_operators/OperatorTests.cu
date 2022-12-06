@@ -118,14 +118,12 @@ TYPED_TEST(OperatorTestsAll, GetString)
   auto op2 = C = A + B + (TypeParam)5;
   auto op3 = C = A / B;
   auto op4 = C = cos(A * B) + sin(C);
-  auto op5 = concat<0>(A,A);
-  auto op6 = (op1,op2,op3,op4,op5);
+  auto op6 = (op1,op2,op3,op4);
 
   std::cout << "op1: " << op1.str() << std::endl;
   std::cout << "op2: " << op2.str() << std::endl;
   std::cout << "op3: " << op3.str() << std::endl;
   std::cout << "op4: " << op4.str() << std::endl;
-  std::cout << "op5: " << op5.str() << std::endl;
   std::cout << "op6: " << op6.str() << std::endl;
 
   MATX_EXIT_HANDLER();
