@@ -237,7 +237,7 @@ For example:
     auto c = make_tensor<float>({10, 20});
     (c = a + b).run();
 
-Ignoring that the data is unitialized, the first three lines simply create three 3D tensors with the same dimensions, while the last line runs an
+Ignoring that the data is unitialized, the first three lines simply create three 2D tensors with the same dimensions, while the last line runs an
 operator for the equation c = a + b. In MatX terminology, an operator is a type that creates a CUDA kernel at compile-time to perform the 
 element-wise operation c = a + b. The = operator is used as a deferred assignment operator expressions to avoid ambiguity with the regular assignment
 operator ``=``. The ``run`` method takes an optional stream parameter, and executes the operation in the CUDA stream specified. Operators can use 
@@ -273,7 +273,7 @@ the identity matrix are all examples of this. MatX provides "generators" that ca
 
     (c = (a*a) + ones(a.Shape())).run(stream);
 
-The example above uses the ``ones`` generator to create a tensor with only the value ``1`` matching the shape of a (10x20x5). ``ones`` simply returns the
+The example above uses the ``ones`` generator to create a tensor with only the value ``1`` matching the shape of a (10x20). ``ones`` simply returns the
 value ``1`` any time an element of it is requested, and no data is ever loaded from memory.
 
 Implicit in the ``run`` call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
