@@ -31,7 +31,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <matx.h>
-#include "matx_viz.h"
 
 int main(int argc, char **argv) {
     auto a = matx::make_tensor<float>({10});
