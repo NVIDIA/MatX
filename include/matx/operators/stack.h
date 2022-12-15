@@ -39,15 +39,14 @@
 namespace matx
 {
   /**
-   * ConcatOp operators
+   * StackOp operators
    *
-   * Class for concatening operators along a single dimension. Sizes of the operators not
-   * being concatenated must be the same, and the new operator has dimensions equal to the original
-   * operator on non-index dimension, and the sum of sizes along the index dimension.
+   * Class for stacking operators along a new dimension. Ranks and Sizes of the operators not
+   * being stacked must be the same. 
    */
   namespace detail {  
     template <typename... Ts>
-      class ConcatOp : public BaseOp<ConcatOp<Ts...>>
+      class StackOp : public BaseOp<StackOp<Ts...>>
     {
       using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
       using first_value_type = typename first_type::scalar_type;
@@ -64,7 +63,7 @@ namespace matx
 
       template <int I = -1>
         __MATX_INLINE__ std::string get_str() const {
-          if constexpr (I==-1) return "concat(" + get_str<I+1>();
+          if constexpr (I==-1) return "stack(" + get_str<I+1>();
           else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
           else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
           else return "";
@@ -74,65 +73,51 @@ namespace matx
         return get_str<-1>();
       }
 
-      __MATX_INLINE__ ConcatOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
+      __MATX_INLINE__ StackOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
       {
-        static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
-        static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
-        static_assert((... && (RANK == ts.Rank())), "concatenated ops must have the same rank");
+        static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
+        static_assert((... && (RANK == ts.Rank())), "stacked ops must have the same rank");
 
         for (int32_t i = 0; i < RANK; i++) {
-          if(i == axis_) {
-            size_ = (ts.Size(i) + ...);
-          } else {
-            MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
-                , matxInvalidSize, "concatenate operators must have the same size in non-axis dimension");
-          }
+          MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
+              , matxInvalidSize, "stacked operators must have the same size");
         }
       }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(std::array<index_t,RANK> &indices) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, std::array<index_t,RANK> &indices) const {
 
           if constexpr ( I == N ) {
             // This should never happen
             return scalar_type(-9999);
-            // returning this to satisfy lvalue requirements
           } else {
-            auto &op = cuda::std::get<I>(ops_);
-            auto idx = indices[axis_];
-            auto size = op.Size(axis_);
-            // If in range of this operator
-            if(idx < size) {
-              // evaluate operator
-              return mapply(op, indices);
+            if ( I < oidx ) {
+              // this is not the correct operator, recurse
+              return GetVal<I+1, N>(oidx, indices);
             } else {
-              // otherwise remove this operator and recurse
-              indices[axis_] -= size;
-              return GetVal<I+1, N>(indices);
+              // this is the correct operator, return it's value
+              auto &op = cuda::std::get<I>(ops_);
+              return mapply(op, indices);
             }
           }
         }
-      
+
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(std::array<index_t,RANK> &indices) {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, std::array<index_t,RANK> &indices) {
 
           if constexpr ( I == N ) {
             // This should never happen
-            // returning this to satisfy lvalue requirements
             auto &op = cuda::std::get<I-1>(ops_);
             return mapply(op, indices);
+
           } else {
-            auto &op = cuda::std::get<I>(ops_);
-            auto idx = indices[axis_];
-            auto size = op.Size(axis_);
-            // If in range of this operator
-            if(idx < size) {
-              // evaluate operator
-              return mapply(op, indices);
+            if ( I < oidx ) {
+              // this is not the correct operator, recurse
+              return GetVal<I+1, N>(oidx, indices);
             } else {
-              // otherwise remove this operator and recurse
-              indices[axis_] -= size;
-              return GetVal<I+1, N>(indices);
+              // this is the correct operator, return it's value
+              auto &op = cuda::std::get<I>(ops_);
+              return mapply(op, indices);
             }
           }
         }
@@ -140,54 +125,85 @@ namespace matx
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
         {
-          std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<0, sizeof...(Ts)>(indices);
+          std::array<index_t, RANK + 1> indices = {{is...}};
+          std::array<index_t, RANK> indices_o;
+
+          // operator index
+          index_t oidx = indices[axis_];
+
+          // removing operator axis from indices
+          for(int i = 0; i < axis_; i++) {
+            indices_o[i] = indices[i];
+          } 
+          
+          for(int i = axis_; i < (int)indices_o.size(); i++) {
+            indices_o[i] = indices[i+1];
+          }
+
+          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
         }
-      
+
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... is)
         {
-          std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<0, sizeof...(Ts)>(indices);
-        }
+          std::array<index_t, RANK + 1> indices = {{is...}};
+          std::array<index_t, RANK> indices_o;
 
+          // operator index
+          index_t oidx = indices[axis_];
+
+          // removing operator axis from indices
+          for(int i = 0; i < axis_; i++) {
+            indices_o[i] = indices[i];
+          } 
+          
+          for(int i = axis_; i < (int)indices_o.size(); i++) {
+            indices_o[i] = indices[i+1];
+          } 
+
+          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+        }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
       {
-        return RANK;
+        return RANK + 1;
       }
 
       constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
       {
         if(dim==axis_)
-          return size_;
-        else
+          return sizeof...(Ts);
+        else if (dim < axis_) {
           return cuda::std::get<0>(ops_).Size(dim);
+        } else {
+          // remove axis_ dim from dim.
+          return cuda::std::get<0>(ops_).Size(dim-1);
+        }
       }
 
-      template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+     template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
 
       private:
       cuda::std::tuple<Ts...> ops_;
       index_t size_;    
       int axis_;
-    }; // end class ConcatOp
+    }; // end class StackOp
   } // end namespace detail
 
   /**
-   * @brief ConcatOp multiple operators along a dimension
+   * @brief StackOp multiple operators along a dimension
    * 
-   * @tparam Dim dimension to concatenate
    * @tparam Ts operator types
+   * @param axis dimension to insert new dimension
    * @param ts operators
-   * @return concatenated operator 
+   * @return stacked operator 
    */
   template <typename... Ts>
-    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, Ts... ts)
+    __MATX_INLINE__ __MATX_HOST__  auto stack(int axis, Ts... ts)
     {
       auto first = detail::pp_get<0>(ts...);
 
-      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");
-      return detail::ConcatOp<Ts...>{axis, ts...};
+      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than or equal to the the rank of the operators");
+      return detail::StackOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx

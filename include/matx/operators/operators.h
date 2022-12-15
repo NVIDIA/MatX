@@ -65,3 +65,4 @@
 #include "matx/operators/shift.h"
 #include "matx/operators/slice.h"
 #include "matx/operators/sph2cart.h"
+#include "matx/operators/stack.h"

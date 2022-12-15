@@ -2332,6 +2332,44 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericNonComplex, Stack)
+{
+  MATX_ENTER_HANDLER();
+
+  auto in = range<0,1,TypeParam>({15}, 0, 1);
+
+  auto t1a = make_tensor<TypeParam>({5});
+  auto t1b = make_tensor<TypeParam>({5});
+  auto t1c = make_tensor<TypeParam>({5});
+ 
+  auto cop = concat(0, t1a, t1b, t1c);
+  
+  (cop = in).run();
+  cudaDeviceSynchronize();
+
+  {
+    auto op = stack(0, t1a, t1b, t1c);
+   
+    for(int i = 0; i < t1a.Size(0); i++) {
+      ASSERT_EQ(op(0,i), t1a(i));
+      ASSERT_EQ(op(1,i), t1b(i));
+      ASSERT_EQ(op(2,i), t1c(i));
+    }
+  }  
+ 
+  {
+    auto op = stack(1, t1a, t1b, t1c);
+    
+    for(int i = 0; i < t1a.Size(0); i++) {
+      ASSERT_EQ(op(i,0), t1a(i));
+      ASSERT_EQ(op(i,1), t1b(i));
+      ASSERT_EQ(op(i,2), t1c(i));
+    }
+  }  
+  
+  MATX_EXIT_HANDLER();
+}
+
 
 TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
 {
