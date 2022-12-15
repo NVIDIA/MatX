@@ -59,6 +59,9 @@ namespace matx
 
         __MATX_INLINE__ Sph2CartOp(T1 theta, T2 phi, T3 r) : theta_(theta), phi_(phi), r_(r)
       {
+        ASSERT_COMPATIBLE_OP_SIZES(theta);
+        ASSERT_COMPATIBLE_OP_SIZES(phi);
+        ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
         template <typename... Is>

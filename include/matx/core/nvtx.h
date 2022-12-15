@@ -213,6 +213,7 @@ class NvtxEvent
 
     if( nvtxLevel > globalNvtxLevel )
     {
+      userHandle_ = -1;
       return;
     }
 

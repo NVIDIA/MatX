@@ -53,7 +53,7 @@ namespace matx
         using matxoplvalue = bool;
 
         __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
-        __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
+        __MATX_INLINE__ LCollapseOp(const T1 op) : op_(op)
       {
         static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
         static_assert(DIM > 1, "Must collapse multiple dims");
@@ -152,7 +152,7 @@ namespace matx
    *   Operator with collapsed input
    */
   template <int DIM, typename T1>
-    auto __MATX_INLINE__ lcollapse(const T1 &a)
+    auto __MATX_INLINE__ lcollapse(const T1 a)
     {
       return detail::LCollapseOp<DIM, T1>(a);
     }
@@ -173,7 +173,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
+        __MATX_INLINE__ RCollapseOp(const T1 op) : op_(op)
       {
         static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
         static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
@@ -272,7 +272,7 @@ namespace matx
    *   Operator with collapsed input
    */
   template <int DIM, typename T1>
-    auto __MATX_INLINE__ rcollapse(const T1 &a)
+    auto __MATX_INLINE__ rcollapse(const T1 a)
     {
       return detail::RCollapseOp<DIM, T1>(a);
     }

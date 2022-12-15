@@ -41,25 +41,26 @@ namespace matx
   /**
    * Legendre polynomial
    *
-   * Calculates the Nth order legendre polynomial evaluated
+   * Calculates the terms of the legendre polyimial(n,m) evaluated
    * at the input X
    */
   namespace detail {
-    template <typename T1, typename T2>
-      class LegendreOp : public BaseOp<LegendreOp<T1,T2>>
+    template <typename T1, typename T2, typename T3>
+      class LegendreOp : public BaseOp<LegendreOp<T1,T2,T3>>
     {
       private:
-        typename base_type<T1>::type in_;
+        T1 n_;
         T2 m_;
-        int order_;
-        int axis_;
+        T3 in_;
+
+        std::array<int,2> axis_;
 
         template<class TypeParam>
           static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ TypeParam legendre(int n, int m, TypeParam x) {
             if (m > n ) return 0;
 
             TypeParam a = cuda::std::sqrt(TypeParam(1)-x*x);
-            // first we will move move along diagonal
+            // first we will move along diagonal
 
             // initialize registers
             TypeParam d1 = 1, d0;
@@ -89,46 +90,41 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using scalar_type = typename T3::scalar_type;
 
-        __MATX_INLINE__ std::string str() const { return "legendre(" + in_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
-        __MATX_INLINE__ LegendreOp(int order, T2 m, const T1 in, const int axis) : in_(in), m_(m), order_(order), axis_(axis) {
-          static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar or rank 0 or 1 operator");
+        __MATX_INLINE__ LegendreOp(T1 n, T2 m, const T3 in, std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
+          static_assert(get_rank<T1>() <= 1, "legendre op:  n must be a scalar, rank 0 or 1 operator");
+          static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T1::Rank()> xinds;
-
-            [[maybe_unused]] int mind;
-            int m;
+            std::array<index_t, T3::Rank()> xinds;
             
-            // if T2 has rank > 0 we need to compute the thread index for m
-            if constexpr (get_rank<T2>()  > 0) { 
-              mind = inds[axis_];
-              m = get_value(m_, mind);
-            } else {
-              m = get_value(m_);
-            }
+            int axis1 = axis_[0];
+            int axis2 = axis_[1];
+            
+            // compute n
+            index_t nind = inds[axis1];
+            int n = get_value(n_, nind);
             
             // compute m 
+            index_t mind = inds[axis2];
+            int m = get_value(m_, mind);
+            
+            if(axis1>axis2) 
+              cuda::std::swap(axis1, axis2);
 
-            if constexpr (get_rank<T2>()  <= 0) { 
-              // scalar output so just fill indices
-              xinds = inds;
-            } else {
-              // vector output so we need to delete the m axis from input
-              // fill indices before axis
-              for(int i = 0 ; i < axis_; i++) {
-                xinds[i] = inds[i];
-              }
-
-              // fill indices after axis
-              for(int i = axis_; i <  T1::Rank(); i++) {
-                xinds[i] = inds[i+1];
+            // compute indices for x
+            int idx = 0;
+            for(int i = 0; i < Rank(); i++) {
+              index_t ind = inds[i];
+              if(i != axis1 && i != axis2) {
+                xinds[idx++] = ind;
               }
             }
 
@@ -136,49 +132,38 @@ namespace matx
 
             scalar_type ret;
 
-
             // if we are half precision up cast to float
             if constexpr (is_complex_half_v<scalar_type>) {
-              ret = static_cast<scalar_type>(legendre(order_, m, cuda::std::complex<float>(x)));
+              ret = static_cast<scalar_type>(legendre(n, m, cuda::std::complex<float>(x)));
             } else if constexpr (is_matx_half_v<scalar_type>) {
-              ret = static_cast<scalar_type>(legendre(order_, m, float(x)));
+              ret = static_cast<scalar_type>(legendre(n, m, float(x)));
             } else {
-              ret = legendre(order_, m, x);
+              ret = legendre(n, m, x);
             }
-
+            
             return ret;
-
           }    
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          if constexpr (detail::get_rank<T2>() <= 0) {
-            // if m is a scalar or a rank 0 tensor rank will not increase
-            return detail::get_rank<T1>();
-          } else {
-            return detail::get_rank<T1>()+1;
-          }
+          return detail::get_rank<T3>() + 2;
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
-          // if m is rank0 or scalar just return input size
-          if constexpr (get_rank<T2>() <= 0) {
-            return get_size(in_, dim);
+          int axis1 = axis_[0];
+          int axis2 = axis_[1];
+          if(dim==axis1) {
+            return get_size(n_,0);
+          } else if (dim==axis2) {
+            return get_size(m_,0);
           } else {
-            if(dim == axis_) {
-              // requesting size of polygon coefficients.  Return size of m.
-              return m_.Size(0);
-            } else {
-              int d = dim; 
-
-              // remove axis dim
-              if (dim > axis_) {
-                d--;
-              }
-
-              return get_size(in_, d);
-            }
+            int d = dim;
+            if(dim>axis1) 
+              d--;
+            if(dim>axis2) 
+              d--;
+            return get_size(in_, d);
           }
         }
     };
@@ -205,12 +190,11 @@ namespace matx
    * @returns
    *   New operator with Rank+1 and size of last dimension = order.
    */
-  template <typename T1, typename T2>
-    auto __MATX_INLINE__ legendre(int n, T2 m, const T1 in, int axis = -1)
+  template <typename T1, typename T2, typename T3>
+    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in)
     {
-      if(axis == -1) axis = in.Rank();
-
-      return detail::LegendreOp<T1,T2>(n, m, in, axis);
+      int axis[2] = {0,1};
+      return detail::LegendreOp<T1,T2,T3>(n, m, in, detail::to_array(axis));
     };
 
   /**
@@ -231,14 +215,15 @@ namespace matx
    * @returns
    *   New operator with Rank+1 and size of last dimension = order.
    */
-  template <typename T1>
-    auto __MATX_INLINE__ legendre(int n, const T1 in, int axis = -1)
+  template <typename T1, typename T2, typename T3>
+    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, std::array<int, 2> axis)
     {
-      if(axis == -1) axis = in.Rank();
-
-      auto m = range<0, 1, int>({n+1}, 0, 1);
-
-      return detail::LegendreOp<T1,decltype(m)>(n, m, in, axis);
+      return detail::LegendreOp<T1,T2,T3>(n, m, in, axis);
     };
-  
+  template <typename T1, typename T2, typename T3>
+    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, int (&axis)[2])
+    {
+      return detail::LegendreOp<T1,T2,T3>(n, m, in, detail::to_array(axis));
+    };
+
 } // end namespace matx

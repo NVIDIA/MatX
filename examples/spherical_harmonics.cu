@@ -61,13 +61,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   auto [phi, theta] = meshgrid(az, col);
 
-  auto Plm = legendre(l, m, cos(theta));
-
+  auto Plm = lcollapse<3>(legendre(l, m, cos(theta)));
+ 
   ValueType a = (2*l+1)*factorial<ValueType>(l-m);
   ValueType b = 4*M_PI*factorial<ValueType>(l+m);
   ValueType C = cuda::std::sqrt(a/b);
 
   auto Ylm = C * Plm * exp(cuda::std::complex<ValueType>(0,1)*(m*phi));
+
   auto [ Xm, Ym, Zm ] = sph2cart(phi, ValueType(M_PI)/2 - theta, abs(real(Ylm)));
 
   // Output location
@@ -82,7 +83,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #if MATX_ENABLE_VIZ
   matx::viz::surf(X, Y, Z, "test-viz.html");
 #endif
-  
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }
