@@ -562,8 +562,8 @@ template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T 
 template <typename T> class reduceOpSum {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 + v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = v1 + v2; return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 + v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
 };
@@ -577,8 +577,8 @@ public:
 template <typename T> class reduceOpProd {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 * v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 *= v2; return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 * v2; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(1); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
 };

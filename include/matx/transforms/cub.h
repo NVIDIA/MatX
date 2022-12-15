@@ -44,6 +44,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 
+
 namespace matx {
 
 using namespace std::placeholders;
@@ -745,7 +746,7 @@ inline void ExecSort(OutputTensor &a_out,
         auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
 
         auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
@@ -763,7 +764,7 @@ inline void ExecSort(OutputTensor &a_out,
 
         auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
         auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream, false);
+            BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
