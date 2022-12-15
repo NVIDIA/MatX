@@ -39,15 +39,15 @@
 namespace matx
 {
   /**
-   * Concatenate operators
+   * ConcatOp operators
    *
    * Class for concatening operators along a single dimension. Sizes of the operators not
    * being concatenated must be the same, and the new operator has dimensions equal to the original
    * operator on non-index dimension, and the sum of sizes along the index dimension.
    */
   namespace detail {  
-    template <int Dim, typename... Ts>
-      class Concatenate : public BaseOp<Concatenate<Dim, Ts...>>
+    template <typename... Ts>
+      class ConcatOp : public BaseOp<ConcatOp<Ts...>>
     {
       using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
       using first_value_type = typename first_type::scalar_type;
@@ -59,56 +59,60 @@ namespace matx
       using scalar_type = first_value_type;
 
       template <int I = -1>
-      __MATX_INLINE__ std::string get_str() const {
-        if constexpr (I==-1) return "concat(" + get_str<I+1>();
-        else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
-        else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
-        else return "";
-      }
-	      
+        __MATX_INLINE__ std::string get_str() const {
+          if constexpr (I==-1) return "concat(" + get_str<I+1>();
+          else if constexpr (I < sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + "," + get_str<I+1>();
+          else if constexpr (I == sizeof...(Ts)-1) return cuda::std::get<I>(ops_).str() + ")";
+          else return "";
+        }
+
       __MATX_INLINE__ std::string str() const {
-         return get_str<-1>();
+        return get_str<-1>();
       }
 
-      __MATX_INLINE__ Concatenate(Ts... ts) : ops_(ts...)
+      __MATX_INLINE__ ConcatOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
-        static_assert(sizeof...(Ts) > 0, "Must have more than one tensor to concatenate");
-        static_assert((... && (RANK == ts.Rank())));
+        static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
+        static_assert((... && (RANK == ts.Rank())), "concatenated ops must have the same rank");
 
-        auto tsum = [&](int d, auto ...args){ return (args.Size(d) + ...); };
         for (int32_t i = 0; i < RANK; i++) {
-          size_[i] = (i == Dim) ? tsum(i, ts...) : pp_get<0>(ts...).Size(i);
-        }
-      }  
-
-      // Base case. Cannot be reached
-      template <size_t I = 0, typename... Is, std::enable_if_t<I == sizeof...(Ts), bool> = true>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup) const {
-          return static_cast<first_value_type>(0);
-        }
-
-      /* Check if the value of the index we're concatenating is smaller the size of the current
-         operator size in that dimension. If so, we're on the correct operator and just return
-         operator() from it. Otherwise we recursively call the same function moving to another 
-         operator with a smaller index. */
-      template <size_t I = 0, typename... Is, std::enable_if_t<I < sizeof...(Ts), bool> = true>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::tuple<Is...> tup) const
-        {
-          if (cuda::std::get<Dim>(tup) < cuda::std::get<I>(ops_).Size(Dim)) {
-            return mapply([&](auto &&...args) -> first_value_type {
-                return cuda::std::get<I>(ops_).operator()(args...);
-                }, tup);
+          if(i == axis_) {
+            size_ = (ts.Size(i) + ...);
+          } else {
+            MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
+                , matxInvalidSize, "concatenate operators must have the same size in non-axis dimension");
           }
+        }
+      }
 
-          cuda::std::get<Dim>(tup) -= cuda::std::get<I>(ops_).Size(Dim);
-          return static_cast<first_value_type>(GetVal<I + 1, Is...>(tup));
-        }    
+      template <int I = 0, int N>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(std::array<index_t,RANK> &indices) const {
+
+          if constexpr ( I == N ) {
+            // This should never happen
+            return scalar_type(-9999);
+          } else {
+            auto &op = cuda::std::get<I>(ops_);
+            auto idx = indices[axis_];
+            auto size = op.Size(axis_);
+            // If in range of this operator
+            if(idx < size) {
+              // evaluate operator
+              return mapply(op, indices);
+            } else {
+              // otherwise remove this operator and recurse
+              indices[axis_] -= size;
+              return GetVal<I+1, N>(indices);
+            }
+          }
+        }
 
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
         {
-          return static_cast<first_value_type>(GetVal<0, Is...>(cuda::std::make_tuple(is...)));
+          std::array<index_t, sizeof...(Is)> indices = {{is...}};
+          return GetVal<0, sizeof...(Ts)>(indices);
         }
 
 
@@ -119,27 +123,33 @@ namespace matx
 
       constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const noexcept
       {
-        return size_[dim];
+        if(dim==axis_)
+          return size_;
+        else
+          return cuda::std::get<0>(ops_).Size(dim);
       }
 
       private:
       cuda::std::tuple<Ts...> ops_;
-      std::array<index_t, RANK> size_;    
-    };
-  }
+      index_t size_;    
+      int axis_;
+    }; // end class ConcatOp
+  } // end namespace detail
 
   /**
-   * @brief Concatenate multiple operators along a dimension
+   * @brief ConcatOp multiple operators along a dimension
    * 
    * @tparam Dim dimension to concatenate
    * @tparam Ts operator types
    * @param ts operators
    * @return concatenated operator 
    */
-  template <int Dim, typename... Ts>
-    __MATX_INLINE__ __MATX_HOST__  auto concat(Ts... ts)
+  template <typename... Ts>
+    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, Ts... ts)
     {
-      static_assert(((Dim < ts.Rank()) && ...), "Concatenation dimension larger than tensor rank");
-      return detail::Concatenate<Dim, Ts...>{ts...};
+      auto first = detail::pp_get<0>(ts...);
+
+      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");
+      return detail::ConcatOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx
