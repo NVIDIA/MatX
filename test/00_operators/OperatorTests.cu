@@ -2238,7 +2238,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   t11.SetVals({0,1,2,3,4,5,6,7,8,9});
   t12.SetVals({0,1,2,3,4});
 
-  (t1o = concat<0>(t11, t12)).run();
+  (t1o = concat(0, t11, t12)).run();
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
@@ -2269,7 +2269,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
                {9,10,11},
                {10,11,12}});
 
-  (t2o1 = concat<0>(t21, t22)).run();
+  (t2o1 = concat(0, t21, t22)).run();
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
@@ -2283,7 +2283,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     }
   }
 
-  (t2o2 = concat<1>(t21, t23)).run(); 
+  (t2o2 = concat(1, t21, t23)).run(); 
   cudaStreamSynchronize(0);
   
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
@@ -2298,7 +2298,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   }  
 
   // Concatenating 3 tensors
-  (t1o1 = concat<0>(t11, t11, t11)).run();
+  (t1o1 = concat(0, t11, t11, t11)).run();
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t1o1.Size(0); i++) {
@@ -2319,9 +2319,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     c.SetVals({21,22,23,24,25,26,27,28,29,30});
     d.SetVals({31,32,33,34,35,36,37,38,39,40});
     
-    auto tempConcat1 = matx::concat<0>(a,b);
-    auto tempConcat2 = matx::concat<0>(c, d);
-    (result = matx::concat<0>(tempConcat1, tempConcat2 )).run();
+    auto tempConcat1 = matx::concat(0, a, b);
+    auto tempConcat2 = matx::concat(0, c, d);
+    (result = matx::concat(0, tempConcat1, tempConcat2 )).run();
 
     cudaStreamSynchronize(0);
     for (int cnt = 0; cnt < result.Size(0); cnt++) {
