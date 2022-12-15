@@ -1216,8 +1216,8 @@ __MATX_INLINE__ void matvec(TensorTypeC C, const TensorTypeA A,
 {
   MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank()+1, "matvec: A rank must be one larger than B rank");
   
-  MATX_ASSERT_STR(C.Shape() == B.Shape(), matxInvalidDim, "matvec:  A and B must have same shape");
-  MATX_ASSERT_STR(C.Size(TensorTypeC::Rank()-1) == A.Size(TensorTypeA::Rank()-1), matxInvalidDim, "matvec:  A last size must match C last size");
+  MATX_ASSERT_STR(C.Size(TensorTypeB::Rank()-1) == A.Size(TensorTypeA::Rank()-2), matxInvalidDim, "matvec: C last size must match A second last Size");
+  MATX_ASSERT_STR(B.Size(TensorTypeB::Rank()-1) == A.Size(TensorTypeA::Rank()-1), matxInvalidDim, "matvec: B last size must match A last size");
 
   // need to clone c and b 1 along inner dim to use cublas
   std::array<index_t, TensorTypeC::Rank()+1> shape;
