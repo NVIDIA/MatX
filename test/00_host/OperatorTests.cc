@@ -2040,7 +2040,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, Concatenate)
   t11.SetVals({0,1,2,3,4,5,6,7,8,9});
   t12.SetVals({0,1,2,3,4});
 
-  (t1o = concat<0>(t11, t12)).run(SingleThreadHostExecutor());
+  (t1o = concat(0, t11, t12)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
     if (i < t11.Size(0)) {
@@ -2070,7 +2070,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, Concatenate)
                {9,10,11},
                {10,11,12}});
 
-  (t2o1 = concat<0>(t21, t22)).run(SingleThreadHostExecutor());
+  (t2o1 = concat(0, t21, t22)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
     for (j = 0; j < t21.Size(1); j++) {
@@ -2083,7 +2083,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, Concatenate)
     }
   }
 
-  (t2o2 = concat<1>(t21, t23)).run(SingleThreadHostExecutor()); 
+  (t2o2 = concat(1, t21, t23)).run(SingleThreadHostExecutor()); 
   
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
     for (i = 0; i < t21.Size(0); i++) {
@@ -2097,7 +2097,7 @@ TYPED_TEST(HostOperatorTestsNumericNonComplex, Concatenate)
   }  
 
   // Concatenating 3 tensors
-  (t1o1 = concat<0>(t11, t11, t11)).run(SingleThreadHostExecutor());
+  (t1o1 = concat(0, t11, t11, t11)).run(SingleThreadHostExecutor());
 
   for (i = 0; i < t1o1.Size(0); i++) {
     ASSERT_EQ(t1o1(i), t11(i % t11.Size(0)));
