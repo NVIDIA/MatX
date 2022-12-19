@@ -97,6 +97,7 @@ Advanced Operators
 .. doxygenfunction:: rcollapse
 .. doxygenfunction:: lcollapse
 .. doxygenfunction:: clone
+.. doxygenfunction:: stack 
 .. doxygenfunction:: slice( const T_wStrideT op, const typename T_wStrideT::shape_type (&starts)[T_wStrideT::Rank()], const typename T_wStrideT::shape_type (&ends)[T_wStrideT::Rank()], const typename T_wStrideT::stride_type (&strides)[T_wStrideT::Rank()])                 
 .. doxygenfunction:: slice( const T_wShapeT op, const typename T_wShapeT::shape_type (&starts)[T_wShapeT::Rank()], const typename T_wShapeT::shape_type (&ends)[T_wShapeT::Rank()])
 .. doxygenfunction:: slice( const T_wStridet_2 op, const typename T_wStridet_2::shape_type (&starts)[T_wStridet_2::Rank()], const typename T_wStridet_2::shape_type (&ends)[T_wStridet_2::Rank()], const typename T_wStridet_2::stride_type (&strides)[T_wStridet_2::Rank()])
