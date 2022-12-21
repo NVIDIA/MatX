@@ -40,29 +40,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
-#if 0
-  index_t oN = 2;
-  index_t oM = 4;
-  
-  index_t iN = 4;
-  index_t iM = 6;
- 
-  index_t fN = 3;
-  index_t fM = 3;
-
-  auto out = make_tensor<int>({oN,oM});
-  auto in = make_tensor<int>({iN,iM});
-  auto filter = make_tensor<int>({fN,fM});
-
-  in.SetVals({ {1,2,3,4,5,6},
-               {5,4,3,2,1,0},
-               {3,4,5,6,7,8},
-               {1,2,3,4,5,6}});
-
-  filter.SetVals({ {1,2,3}, 
-                   {3,4,5},
-                   {5,6,7}});
-#else
   index_t oN = 7;
   index_t oM = 7;
   
@@ -86,7 +63,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                    {5,6},
                    {7,8}});
 
-#endif
   conv2d(out, in, filter, MATX_C_MODE_FULL, 0);
 
   printf("in:\n");
@@ -95,16 +71,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   Print(filter);
   printf("out:\n");
   Print(out);
-
-  conv2d(out, filter, in, MATX_C_MODE_FULL, 0);
-
-  printf("in:\n");
-  Print(filter);
-  printf("filter:\n");
-  Print(in);
-  printf("out:\n");
-  Print(out);
-
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
