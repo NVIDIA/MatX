@@ -100,7 +100,7 @@ protected:
     // Half precision needs a bit more tolerance when compared to
     // fp32
     if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
-      thresh = 0.2f;
+      thresh = .2f;
     }
   }
 
@@ -159,7 +159,7 @@ class CorrelationConvolution2DTestFloatTypes
 
 TYPED_TEST_SUITE(CorrelationConvolutionTestFloatTypes, MatXFloatTypes);
 TYPED_TEST_SUITE(CorrelationConvolutionLargeTestFloatTypes, MatXFloatNonHalfTypes);
-TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatTypes);
+TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatNonHalfTypes);
 
 // Real/real direct 1D convolution Large
 TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
@@ -190,7 +190,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
 }
 
 // Real/real direct 2D convolution
-TYPED_TEST(CorrelationConvolution2DTestFloatTypes, DISABLED_Direct2DConvolutionFullEven)
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
   this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
@@ -246,6 +246,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
+  this->pb->RunTVGenerator("conv2d");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv2d(this->cv_same, this->av, this->bv_even, MATX_C_MODE_SAME, 0);
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
@@ -254,6 +267,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
   conv1d(this->cv_valid_even, this->av, this->bv_even, MATX_C_MODE_VALID, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_even, "conv_valid", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidEven)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
+  this->pb->RunTVGenerator("conv2d");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  conv2d(this->cv_valid_even, this->av, this->bv_even, MATX_C_MODE_VALID, 0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_even, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -272,10 +298,10 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolution2DTestFloatTypes, DISABLED_Direct2DConvolutionFullOdd)
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
-  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len0_odd});  
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
@@ -298,6 +324,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameOdd)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
+  this->pb->RunTVGenerator("conv2d");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_odd, "b_op");
+  conv2d(this->cv_same, this->av, this->bv_odd, MATX_C_MODE_SAME, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
@@ -306,6 +345,19 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
   conv1d(this->cv_valid_odd, this->av, this->bv_odd, MATX_C_MODE_VALID, 0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_odd, "conv_valid", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidOdd)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
+  this->pb->RunTVGenerator("conv2d");
+  this->pb->NumpyToTensorView(this->av, "a_op");
+  this->pb->NumpyToTensorView(this->bv_odd, "b_op");
+  conv2d(this->cv_valid_odd, this->av, this->bv_odd, MATX_C_MODE_VALID, 0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_odd, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -324,14 +376,14 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolution2DTestFloatTypes, DISABLED_Direct2DConvolutionSwap)
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
   this->pb->template InitTVGenerator<TypeParam>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv1d(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, 0);
+  conv2d(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, 0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -468,7 +520,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
 {
   MATX_ENTER_HANDLER();
-#if 0  // currently doesn't work because Conv2D requires rank2 filter.
+#if 1  // currently doesn't work because Conv2D requires rank2 filter.
   const int d1 = 8;
   const int d2 = 512;
   const int d3 = 1024;
