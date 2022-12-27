@@ -39,31 +39,44 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-
-  index_t oN = 7;
-  index_t oM = 7;
   
   index_t iN = 4;
   index_t iM = 6;
  
   index_t fN = 4;
   index_t fM = 2;
-
-  auto out = make_tensor<int>({oN,oM});
+  
   auto in = make_tensor<int>({iN,iM});
   auto filter = make_tensor<int>({fN,fM});
-
+  
   in.SetVals({ {1,2,3,4,5,6},
                {5,4,3,2,1,0},
                {3,4,5,6,7,8},
-               {1,2,3,4,5,6}});
+               {1,2,3,4,5,6},
+               });
 
   filter.SetVals({ {1,2}, 
                    {3,4},
                    {5,6},
                    {7,8}});
 
-  conv2d(out, in, filter, MATX_C_MODE_FULL, 0);
+#if 1
+  index_t oN = iN + fN -1;
+  index_t oM = iM + fM -1;
+  auto mode = MATX_C_MODE_FULL;
+#elif 0
+  index_t oN = iN;
+  index_t oM = iM;
+  auto mode = MATX_C_MODE_SAME;
+#else
+  index_t oN = iN - fN + 1;
+  index_t oM = iM - fM + 1;
+  auto mode = MATX_C_MODE_VALID;
+#endif
+  
+  auto out = make_tensor<int>({oN,oM});
+  
+  conv2d(out, in, filter, mode, 0);
 
   printf("in:\n");
   Print(in);

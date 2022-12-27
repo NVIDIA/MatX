@@ -34,7 +34,7 @@ void pow2_matmul_bench(nvbench::state &state, nvbench::type_list<ValueType>)
   });
 
   auto seconds =
-      state.get_summary("Average GPU Time (Cold)").get_float64("value");
+      state.get_summary("Batch GPU").get_float64("value");
   auto &summ = state.add_summary("TFLOPS");
 
   summ.set_string("hint", "item_rate");
