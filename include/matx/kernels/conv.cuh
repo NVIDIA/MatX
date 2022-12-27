@@ -53,12 +53,13 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
-  int batch_idx = blockIdx.x;
   uint32_t filter_len = d_filter.Size(Rank-1);
   uint32_t full_len = signal_len + filter_len - 1;
 
+  int batch_idx = blockIdx.x;
+
   // All but the last dim will be populated
-  auto bdims = BlockToIdx(d_in, batch_idx, 1);
+  auto bdims = BlockToIdx(d_out, batch_idx, 1);
 
   ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch1d[0]);
 
@@ -187,91 +188,90 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   } // end chunk loop
 }
 
-template <typename OutType, typename InType, typename FilterType>
-__global__ void Conv2D(OutType d_out, InType d_in, FilterType d_filter,
-                       matxConvCorrMode_t mode)
+template <typename OutType, typename InType1, typename InType2>
+__launch_bounds__(1024)
+__global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
+                       matxConvCorrMode_t mode, int num_batch)
 {
-  extern __shared__ float s_exch[];
-  using ftype_strip = typename FilterType::scalar_type;
-  using intype_strip = typename InType::scalar_type;
-  using outtype_strip = typename OutType::scalar_type;
-  [[maybe_unused]] index_t bdims[2];
-  ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch[0]);
-  int tid_x = blockDim.x * blockIdx.x + threadIdx.x;
-  int tid_y = blockDim.y * blockIdx.y + threadIdx.y;
-  int ix_size, iy_size;
-  // For rank 4 we need to break up the batch dimensions into the two outer
-  // components. Other ranks store the batch index directly in the grid
-  // index
-  if constexpr (d_in.Rank() == 4) {
-    bdims[0] = blockIdx.z / d_in.Size(1);
-    bdims[1] = blockIdx.z - (bdims[0] * d_in.Size(1));
-    ix_size = d_in.Size(3);
-    iy_size = d_in.Size(2);
+  using in1type = typename InType1::scalar_type;
+  using in2type = typename InType1::scalar_type;
+  using outtype = typename OutType::scalar_type;
+
+  constexpr int Rank = OutType::Rank();
+
+  index_t oN = d_out.Size(Rank-2);
+  index_t oM = d_out.Size(Rank-1);
+
+  index_t i1N = d_in1.Size(Rank-2);
+  index_t i1M = d_in1.Size(Rank-1);
+
+  index_t i2N = d_in2.Size(Rank-2);
+  index_t i2M = d_in2.Size(Rank-1);
+
+  int dy = 0, dx = 0;
+
+  // TODO detect mode based on output size?
+  if( mode == MATX_C_MODE_SAME) {
+    dy = i2N / 2;
+    dx = i2M / 2;
+#if 0
+    // uncomment this to match matlab
+    if(i2N % 2 == 0) dy--;
+    if(i2M % 2 == 0) dx--;
+#endif
+
+  } else if ( mode == MATX_C_MODE_FULL) {
+    dy = i2N - 1;
+    dx = i2M - 1;
   }
-  if constexpr (d_in.Rank() == 3) {
-    ix_size = d_in.Size(2);
-    iy_size = d_in.Size(1);
-  }
-  else if constexpr (d_in.Rank() == 2) {
-    ix_size = d_in.Size(1);
-    iy_size = d_in.Size(0);
-  }
 
-  if ((threadIdx.x < d_filter.Size(1)) && (threadIdx.y < d_filter.Size(0))) {
-    s_filter[d_filter.Size(1) * threadIdx.y + threadIdx.x] =
-        d_filter(threadIdx.y, threadIdx.x);
-  }
+  // TODO benchmark
+  // TODO lots of optimization
 
-  __syncthreads();
+  for(int batch_idx = blockIdx.z; batch_idx < num_batch; batch_idx+=gridDim.z) {
+    // All but the last 2 dims will be populated
+    auto bdims = BlockToIdx(d_out, batch_idx, 2);
 
-  outtype_strip val = 0;
+    // for each output
+    for( index_t i = blockIdx.y * blockDim.y + threadIdx.y; i < oN; i+= blockDim.y * gridDim.y) {
+      for( index_t j = blockIdx.x * blockDim.x + threadIdx.x; j < oM; j+= blockDim.x * gridDim.x) {
 
-  for (int x = 0; x < d_filter.Size(1); x++) {
-    if ((tid_x - static_cast<int>(d_filter.Size(1)) + 1 + x < 0) ||
-        (tid_x - static_cast<int>(d_filter.Size(1)) + 1 + x >= ix_size)) {
-      continue;
-    }
+        outtype sum(0);
 
-    for (int y = 0; y < d_filter.Size(0); y++) {
-      if ((tid_y - static_cast<int>(d_filter.Size(0)) + 1 + y < 0) ||
-          (tid_y - static_cast<int>(d_filter.Size(0)) + 1 + y >= iy_size)) {
-        continue;
+        for (index_t n=0; n < i2N; n++) {
+          index_t k = i2N - 1 - n; // flip filter
+          index_t y = i + n - dy;
+          for (index_t m=0; m < i2M; m++) {
+            index_t l = i2M - 1 - m; // flip filter
+            index_t x = j + m - dx;
+
+//            if(i==0 && j == 0) printf("(i: %lld, j: %lld), (y:%lld, x: %lld), (k: %lld, l: %lld)\n",i,j,y,x,k,l);
+            if( x >= 0 && x < i1M && y >=0 && y < i1N) {
+
+              in1type i1; 
+              in2type i2;
+
+              // Signal Dims
+              bdims[Rank - 2] = y;
+              bdims[Rank - 1] = x;
+              detail::mapply([&](auto &&...args) { i1 = d_in1.operator()(args...); }, bdims);
+
+              // Filter Dims
+              bdims[Rank - 2] = k;
+              bdims[Rank - 1] = l;
+              detail::mapply([&](auto &&...args) { i2 = d_in2.operator()(args...); }, bdims);
+
+//              if(i==0 && j == 0) printf("madd: %d, %d)\n", i1, i2);
+              sum = detail::madd(i1, i2, sum);
+            }
+          }
+        }
+
+        bdims[Rank - 2] = i;
+        bdims[Rank - 1] = j;
+        detail::mapply([&](auto &&...args) { d_out.operator()(args...) = sum; }, bdims);        
+
       }
-
-      if constexpr (d_in.Rank() == 4) {
-      val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(bdims[0], bdims[1], tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-      else if constexpr (d_in.Rank() == 3) {
-        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(blockIdx.z, tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-      else if constexpr (d_in.Rank() == 2) {
-        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-    }
-  }
-
-  if constexpr (d_out.Rank() == 4) {
-    if (bdims[0] < d_out.Size(0) && bdims[1] < d_out.Size(1) &&
-        tid_y < d_out.Size(2) && tid_x < d_out.Size(3)) {
-      d_out(bdims[0], bdims[1], tid_y, tid_x) = val;
-    }
-  }
-  else if constexpr (d_out.Rank() == 3) {
-    if (blockIdx.z < d_out.Size(0) && tid_y < d_out.Size(1) &&
-        tid_x < d_out.Size(2)) {
-      d_out(blockIdx.z, tid_y, tid_x) = val;
-    }
-  }
-  else if constexpr (d_out.Rank() == 2) {
-    if (tid_y < d_out.Size(0) && tid_x < d_out.Size(1)) {
-      d_out(tid_y, tid_x) = val;
     }
   }
 }

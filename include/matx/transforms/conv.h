@@ -98,53 +98,30 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 }
 
 
-template <typename OutputType, typename InType, typename FilterType>
-void matxDirectConv2DInternal(OutputType &o, InType &i,
-                              FilterType &filter, matxConvCorrMode_t mode,
+template <typename OutputType, typename In1Type, typename In2Type>
+void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
+                              In2Type &in2, matxConvCorrMode_t mode,
                               cudaStream_t stream)
 {
-  MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
-  MATX_STATIC_ASSERT(FilterType::Rank() == 2, matxInvalidDim);
-
-  using filter_input_t = typename FilterType::scalar_type;
-  auto shmsize = sizeof(filter_input_t) * filter.Size(0) * filter.Size(1);
-
-#ifdef __CUDACC__  
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  if constexpr (OutputType::Rank() == 1) {
-    MATX_THROW(matxInvalidDim,
-               "matxDirectConv2D not supported on Rank 1 Tensors");
-  }
-  else if constexpr (OutputType::Rank() == 2) {
-    dim3 gsize(
-        static_cast<int>(std::ceil(static_cast<double>(o.Size(1)) / 32.0)),
-        static_cast<int>(std::ceil(static_cast<double>(o.Size(0)) / 32.0)), 1);
-    dim3 bsize(32, 32);
-    Conv2D<<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
-  }
-  else if constexpr (OutputType::Rank() == 3) {
-    dim3 gsize(static_cast<unsigned int>(
-                   std::ceil(static_cast<double>(o.Size(2)) / 32.0)),
-               static_cast<unsigned int>(
-                   std::ceil(static_cast<double>(o.Size(1)) / 32.0)),
-               static_cast<unsigned int>(o.Size(0)));
-    dim3 bsize(32, 32);
-    Conv2D<<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
-  }
-  else {
-    static_assert(OutputType::Rank() == 4);
-    dim3 gsize(static_cast<unsigned int>(
-                   std::ceil(static_cast<double>(o.Size(2)) / 32.0)),
-               static_cast<unsigned int>(
-                   std::ceil(static_cast<double>(o.Size(1)) / 32.0)),
-               static_cast<unsigned int>(o.Size(0) * o.Size(1)));
-    dim3 bsize(32, 32);
-    Conv2D<<<gsize, bsize, shmsize, stream>>>(o, i, filter, mode);
-  }
+  MATX_STATIC_ASSERT(OutputType::Rank() == In1Type::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() == In2Type::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() >= 2, matxInvalidDim);
+
+#ifdef __CUDACC__  
+  constexpr int Rank = OutputType::Rank();
+
+  dim3 threads(32, 32, 1);
+  int num_batch = int(TotalSize(o) / o.Size(Rank-1) / (o.Size(Rank-2)));
+  dim3 blocks( int( (o.Size(Rank-1) + threads.x - 1 ) / threads.x),
+               int((o.Size(Rank-2) + threads.x - 2 ) / threads.y),
+               num_batch);
+  
+  Conv2D<<<blocks, threads, 0, stream>>>(o, in1, in2, mode, num_batch);
 #endif  
 }
-}
+} // end namespace detail
 
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d_impl(OutputType &o, const In1Type &i1, const In2Type &i2,
@@ -289,29 +266,39 @@ inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
  * @param stream CUDA stream
  */
 template <typename OutputType, typename In1Type, typename In2Type>
-inline void conv2d(OutputType &o, const In1Type &i1, const In2Type &i2,
+inline void conv2d(OutputType o, const In1Type in1, const In2Type in2,
                    matxConvCorrMode_t mode, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
-  const typename detail::base_type<In1Type>::type &in1_base = i1;
-  const typename detail::base_type<In2Type>::type &in2_base = i2;
+  constexpr int Rank1 = In1Type::Rank();
+  constexpr int Rank2 = In2Type::Rank();
 
-  if constexpr (In1Type::Rank() < In2Type::Rank()) {
-    detail::matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
-  }
-  else if constexpr (In1Type::Rank() == In2Type::Rank()) {
-    MATX_STATIC_ASSERT(OutputType::Rank() == 2, matxInvalidDim);
-    if (i1.Size(0) * i1.Size(1) < i2.Size(0) * i2.Size(1)) {
-      detail::matxDirectConv2DInternal(o_base, in2_base, in1_base, mode, stream);
-    }
-    else {
-      detail::matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
-    }
-  }
-  else {
-    detail::matxDirectConv2DInternal(o_base, in1_base, in2_base, mode, stream);
+  if constexpr (In1Type::Rank() == In2Type::Rank()) {
+     index_t size1 = in1.Size(Rank1-1) * in1.Size(Rank1-2);
+     index_t size2 = in2.Size(Rank2-1) * in2.Size(Rank2-2);
+     // smaller size is the filter, set it as second input
+     if(size1 >= size2) {
+       detail::matxDirectConv2DInternal(o, in1, in2, mode, stream);
+     } else {  // swap in1/in2
+       detail::matxDirectConv2DInternal(o, in2, in1, mode, stream);
+     }
+  // These branches clone the inputs to match in rank
+  } else if constexpr (In1Type::Rank() <In2Type::Rank()) {
+      // in1 is smaller so clone it to match in2
+      auto shape = in2.Shape();
+      int d = Rank2 - Rank1;
+      for(int i = 0; i < Rank1; i++) {
+        shape[i+d] = matxKeepDim;
+      }
+      conv2d(o, clone<Rank2>(in1, shape), in2, mode, stream);
+  } else {
+      // in1 is smaller so clone it to match in2
+      auto shape = in1.Shape();
+      int d = Rank1 - Rank2;
+      for(int i = 0; i < Rank2; i++) {
+        shape[i+d] = matxKeepDim;
+      }
+      conv2d(o, in1, clone<Rank1>(in2, shape), mode, stream);
   }
 }
 

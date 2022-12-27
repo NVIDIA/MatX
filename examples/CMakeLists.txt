@@ -2,6 +2,7 @@ set(examples
     simple_radar_pipeline 
     recursive_filter 
     convolution 
+    conv2d
     cgsolve 
     fft_conv 
     resample 
