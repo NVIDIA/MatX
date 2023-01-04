@@ -89,7 +89,7 @@ public:
     }
     else {
       using shape_type = typename TensorType::desc_type::shape_type;
-      int batch_offset = 3;
+      int batch_offset = 2;
       std::array<shape_type, TensorType::Rank()> idx{0};
       auto a_shape = a.Shape();
       // Get total number of batches
@@ -395,6 +395,8 @@ public:
     cusolverDnSetStream(handle, stream);
     int info;
 
+    batch_piv_ptrs.clear();
+
     if constexpr (RANK == 2) {
       batch_piv_ptrs.push_back(&piv(0));
     }
@@ -564,6 +566,8 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
+    batch_tau_ptrs.clear();
+
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
@@ -685,6 +689,7 @@ class matxDnSVDSolverPlan_t : public matxDnSolver_t {
   static_assert(UTensor::Rank()-1 == STensor::Rank(), "S tensor must be 1 rank lower than U tensor in SVD");
   static_assert(UTensor::Rank() == ATensor::Rank(), "U tensor must match A tensor rank in SVD");
   static_assert(UTensor::Rank() == VTensor::Rank(), "U tensor must match V tensor rank in SVD");
+  static_assert(!is_complex_v<T3>, "S type must be real");
 
 public:
   /**
@@ -777,7 +782,10 @@ public:
             cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+    batch_s_ptrs.clear();
+    batch_v_ptrs.clear();
+    batch_u_ptrs.clear();
+        
     if constexpr (RANK == 2) {
       batch_s_ptrs.push_back(&s(0));
       batch_u_ptrs.push_back(&u(0, 0));
@@ -804,9 +812,10 @@ public:
     matx::copy(*scratch, a, stream);
     int info;
 
-    // At this time cuSolver does not have a batched 64-bit LU interface. Change
+    // At this time cuSolver does not have a batched 64-bit SVD interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < batch_a_ptrs.size(); i++) {
+
       auto ret = cusolverDnXgesvd(
           handle, dn_params, jobu, jobvt, params.m, params.n,
           MatXTypeToCudaType<T1>(), batch_a_ptrs[i], params.m,
@@ -835,10 +844,10 @@ public:
   ~matxDnSVDSolverPlan_t() {}
 
 private:
-  std::vector<T1 *> batch_s_ptrs;
-  std::vector<T1 *> batch_v_ptrs;
-  std::vector<T1 *> batch_u_ptrs;
   matx::tensor_t<T1, RANK> *scratch = nullptr;
+  std::vector<T3 *> batch_s_ptrs;
+  std::vector<T4 *> batch_v_ptrs;
+  std::vector<T2 *> batch_u_ptrs;  
   DnSVDParams_t params;
 };
 
@@ -975,6 +984,8 @@ public:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
+    batch_w_ptrs.clear();
+
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
