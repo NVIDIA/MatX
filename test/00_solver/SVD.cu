@@ -50,15 +50,17 @@ protected:
   }
 
   void TearDown() { pb.reset(); }
+  using scalar_type = typename inner_op_type_t<T>::type;
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Av{{m, n}};
   tensor_t<T, 2> Atv{{n, m}};
-  tensor_t<T, 1> Sv{{std::min(m, n)}};
+  tensor_t<scalar_type, 1> Sv{{std::min(m, n)}};
   tensor_t<T, 2> Uv{{m, m}};
   tensor_t<T, 2> Vv{{n, n}};
 
-  tensor_t<T, 2> Sav{{m, n}};
+  tensor_t<scalar_type, 2> Sav{{m, n}};
+  tensor_t<T, 2> SSolav{{m, n}};
   tensor_t<T, 2> Uav{{m, m}};
   tensor_t<T, 2> Vav{{n, n}};
 
@@ -67,13 +69,13 @@ protected:
 };
 
 template <typename TensorType>
-class SVDSolverTestNonComplexFloatTypes : public SVDSolverTest<TensorType> {
+class SVDSolverTestNonHalfTypes : public SVDSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(SVDSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes,
+                 MatXFloatNonHalfTypes);
 
-TYPED_TEST(SVDSolverTestNonComplexFloatTypes, SVDBasic)
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
 
@@ -94,7 +96,7 @@ TYPED_TEST(SVDSolverTestNonComplexFloatTypes, SVDBasic)
   transpose(this->Vav, this->Vv, 0);
 
   // Zero out s
-  (this->Sav = zeros({m, n})).run();
+  (this->Sav = zeros<typename inner_op_type_t<TypeParam>::type>({m, n})).run();
   cudaStreamSynchronize(0);
 
   // Construct S matrix since it's just a vector from cuSolver
@@ -104,13 +106,27 @@ TYPED_TEST(SVDSolverTestNonComplexFloatTypes, SVDBasic)
 
   cudaStreamSynchronize(0);
 
-  matmul(this->tmpV, this->Uav, this->Sav); // U * S
-  matmul(this->Sav, this->tmpV, this->Vav); // (U * S) * V'
+  (this->SSolav = 0).run();
+  if constexpr (is_complex_v<TypeParam>) {
+    (this->SSolav.RealView() = this->Sav).run();
+  }
+  else {
+    (this->SSolav = this->Sav).run();
+  }
+
+  matmul(this->tmpV, this->Uav, this->SSolav); // U * S
+  matmul(this->SSolav, this->tmpV, this->Vav); // (U * S) * V'
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < this->Av.Size(0); i++) {
     for (index_t j = 0; j < this->Av.Size(1); j++) {
-      ASSERT_NEAR(this->Av(i, j), this->Sav(i, j), 0.001) << i << " " << j;
+      if constexpr (is_complex_v<TypeParam>) {
+        ASSERT_NEAR(this->Av(i, j).real(), this->SSolav(i, j).real(), 0.001) << i << " " << j;
+        ASSERT_NEAR(this->Av(i, j).imag(), this->SSolav(i, j).imag(), 0.001) << i << " " << j;
+      }
+      else {
+        ASSERT_NEAR(this->Av(i, j), this->SSolav(i, j), 0.001) << i << " " << j;
+      }
     }
   }
 

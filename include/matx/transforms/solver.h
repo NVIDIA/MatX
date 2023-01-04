@@ -685,6 +685,7 @@ class matxDnSVDSolverPlan_t : public matxDnSolver_t {
   static_assert(UTensor::Rank()-1 == STensor::Rank(), "S tensor must be 1 rank lower than U tensor in SVD");
   static_assert(UTensor::Rank() == ATensor::Rank(), "U tensor must match A tensor rank in SVD");
   static_assert(UTensor::Rank() == VTensor::Rank(), "U tensor must match V tensor rank in SVD");
+  static_assert(!is_complex_v<T3>, "S type must be real");
 
 public:
   /**
@@ -835,9 +836,9 @@ public:
   ~matxDnSVDSolverPlan_t() {}
 
 private:
-  std::vector<T1 *> batch_s_ptrs;
-  std::vector<T1 *> batch_v_ptrs;
-  std::vector<T1 *> batch_u_ptrs;
+  std::vector<T3 *> batch_s_ptrs;
+  std::vector<T4 *> batch_v_ptrs;
+  std::vector<T2 *> batch_u_ptrs;
   matx::tensor_t<T1, RANK> *scratch = nullptr;
   DnSVDParams_t params;
 };
