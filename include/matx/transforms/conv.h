@@ -112,13 +112,22 @@ void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
 #ifdef __CUDACC__  
   constexpr int Rank = OutputType::Rank();
 
-  dim3 threads(32, 32, 1);
+  // TODO dispatch different sizes based on filter size?
+  const int BLOCK_X = 16;
+  const int BLOCK_Y = 8;
+  const int FILTER_SHARED_X = 16;
+  const int FILTER_SHARED_Y = 16;
+  const int FILTER_REG_X = 4;
+  const int FILTER_REG_Y = 8;
+  const int ILPY = 8;
+
+  dim3 threads(BLOCK_X, BLOCK_Y, 1);
   int num_batch = int(TotalSize(o) / o.Size(Rank-1) / (o.Size(Rank-2)));
   dim3 blocks( int( (o.Size(Rank-1) + threads.x - 1 ) / threads.x),
-               int((o.Size(Rank-2) + threads.x - 2 ) / threads.y),
+               int((o.Size(Rank-2) + (threads.y * ILPY) - 1 ) / (threads.y * ILPY)),
                num_batch);
   
-  Conv2D<<<blocks, threads, 0, stream>>>(o, in1, in2, mode, num_batch);
+  Conv2D<OutputType, In1Type, In2Type, BLOCK_X, BLOCK_Y, FILTER_SHARED_X, FILTER_SHARED_Y, FILTER_REG_X, FILTER_REG_Y, ILPY><<<blocks, threads, 0, stream>>>(o, in1, in2, mode, num_batch);
 #endif  
 }
 } // end namespace detail
