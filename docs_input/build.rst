@@ -36,9 +36,9 @@ Optional Thirdparty Dependencies
 -----------------
 .. _GoogleTest: https://github.com/google/googletest
 .. _pybind11: https://github.com/pybind/pybind11
-.. _nvbench:  https://github.com/NVIDIA/nvbench
+.. _nvbench: https://github.com/NVIDIA/nvbench
 .. _cutensor: https://developer.nvidia.com/cutensor
-.. _cutensornet:https://docs.nvidia.com/cuda/cuquantum/cutensornet 
+.. _cutensornet: https://docs.nvidia.com/cuda/cuquantum/cutensornet 
 
 Build Choices
 =============
