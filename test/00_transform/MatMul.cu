@@ -158,7 +158,6 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
   matmul(ct, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", this->thresh);
 
-
   MATX_EXIT_HANDLER();
 }
 
