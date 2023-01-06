@@ -53,12 +53,13 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
-  int batch_idx = blockIdx.x;
   uint32_t filter_len = d_filter.Size(Rank-1);
   uint32_t full_len = signal_len + filter_len - 1;
 
+  int batch_idx = blockIdx.x;
+
   // All but the last dim will be populated
-  auto bdims = BlockToIdx(d_in, batch_idx, 1);
+  auto bdims = BlockToIdx(d_out, batch_idx, 1);
 
   ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch1d[0]);
 
@@ -187,91 +188,196 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   } // end chunk loop
 }
 
-template <typename OutType, typename InType, typename FilterType>
-__global__ void Conv2D(OutType d_out, InType d_in, FilterType d_filter,
-                       matxConvCorrMode_t mode)
+
+template <typename T>
+union Uninitialized {
+    __host__ __device__ constexpr Uninitialized() {}
+    T data;
+};
+
+template <typename OutType, typename InType1, typename InType2, 
+  int BLOCK_DIM_X,      // blockDim.x
+  int BLOCK_DIM_Y,      // blockDim.y
+  int FILTER_SHARED_CHUNK_X, // Filter shared memory tile in X
+  int FILTER_SHARED_CHUNK_Y, // Filter shared memory tile in Y
+  int FILTER_REG_CHUNK_X, // Filter register tile in X
+  int FILTER_REG_CHUNK_Y, // Filter register tile in Y
+  int ILPY>  //  number of elements per thread in Y dimension.
+__launch_bounds__(BLOCK_DIM_X * BLOCK_DIM_Y)
+__global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
+                       matxConvCorrMode_t mode, int num_batch)
 {
-  extern __shared__ float s_exch[];
-  using ftype_strip = typename FilterType::scalar_type;
-  using intype_strip = typename InType::scalar_type;
-  using outtype_strip = typename OutType::scalar_type;
-  [[maybe_unused]] index_t bdims[2];
-  ftype_strip *s_filter = reinterpret_cast<ftype_strip *>(&s_exch[0]);
-  int tid_x = blockDim.x * blockIdx.x + threadIdx.x;
-  int tid_y = blockDim.y * blockIdx.y + threadIdx.y;
-  int ix_size, iy_size;
-  // For rank 4 we need to break up the batch dimensions into the two outer
-  // components. Other ranks store the batch index directly in the grid
-  // index
-  if constexpr (d_in.Rank() == 4) {
-    bdims[0] = blockIdx.z / d_in.Size(1);
-    bdims[1] = blockIdx.z - (bdims[0] * d_in.Size(1));
-    ix_size = d_in.Size(3);
-    iy_size = d_in.Size(2);
+  using in1type = typename InType1::scalar_type;
+  using in2type = typename InType2::scalar_type;
+  using outtype = typename OutType::scalar_type;
+
+  // length of signal chunk in shared memory
+  constexpr int SIGNAL_CHUNK_X = BLOCK_DIM_X + FILTER_SHARED_CHUNK_X;
+  constexpr int SIGNAL_CHUNK_Y = BLOCK_DIM_Y * ILPY + FILTER_SHARED_CHUNK_Y + ILPY;
+
+  constexpr int Rank = OutType::Rank();
+
+  __shared__ Uninitialized<in1type> s_signal[SIGNAL_CHUNK_Y][SIGNAL_CHUNK_X];
+  __shared__ Uninitialized<in2type> s_filter[FILTER_SHARED_CHUNK_Y][FILTER_SHARED_CHUNK_X];
+
+  in2type r_filter[FILTER_REG_CHUNK_Y][FILTER_REG_CHUNK_X];
+
+  index_t oN = d_out.Size(Rank-2);
+  index_t oM = d_out.Size(Rank-1);
+
+  index_t i1N = d_in1.Size(Rank-2);
+  index_t i1M = d_in1.Size(Rank-1);
+
+  index_t i2N = d_in2.Size(Rank-2);
+  index_t i2M = d_in2.Size(Rank-1);
+
+  int dy = 0, dx = 0;
+
+  if( mode == MATX_C_MODE_SAME) {
+    dy = i2N / 2;
+    dx = i2M / 2;
+#if 0
+    // uncomment this to match matlab
+    if(i2N % 2 == 0) dy--;
+    if(i2M % 2 == 0) dx--;
+#endif
+
+  } else if ( mode == MATX_C_MODE_FULL) {
+    dy = i2N - 1;
+    dx = i2M - 1;
   }
-  if constexpr (d_in.Rank() == 3) {
-    ix_size = d_in.Size(2);
-    iy_size = d_in.Size(1);
-  }
-  else if constexpr (d_in.Rank() == 2) {
-    ix_size = d_in.Size(1);
-    iy_size = d_in.Size(0);
-  }
 
-  if ((threadIdx.x < d_filter.Size(1)) && (threadIdx.y < d_filter.Size(0))) {
-    s_filter[d_filter.Size(1) * threadIdx.y + threadIdx.x] =
-        d_filter(threadIdx.y, threadIdx.x);
-  }
+  // grid stride loop over batches
+  for(int batch_idx = blockIdx.z; batch_idx < num_batch; batch_idx+=gridDim.z) {
+    // All but the last 2 dims will be populated
+    auto bdims = BlockToIdx(d_out, batch_idx, 2);
 
-  __syncthreads();
+    // for each output (converged loops), ILPY elements per thread
+    for( index_t bi = blockIdx.y * blockDim.y * ILPY; bi < oN; bi+= blockDim.y * gridDim.y * ILPY) {
+      for( index_t bj = blockIdx.x * blockDim.x; bj < oM; bj+= blockDim.x * gridDim.x) {
+        index_t i = bi + threadIdx.y * ILPY;
+        index_t j = bj + threadIdx.x;
 
-  outtype_strip val = 0;
+        outtype sum[ILPY] = {0};
 
-  for (int x = 0; x < d_filter.Size(1); x++) {
-    if ((tid_x - static_cast<int>(d_filter.Size(1)) + 1 + x < 0) ||
-        (tid_x - static_cast<int>(d_filter.Size(1)) + 1 + x >= ix_size)) {
-      continue;
-    }
+        // for each shared memory filter chunk
+        for (index_t nStart = 0; nStart < i2N; nStart+=FILTER_SHARED_CHUNK_Y) {
+          for (index_t mStart = 0; mStart < i2M; mStart+=FILTER_SHARED_CHUNK_X) {
+            __syncthreads();
+            // load filter from global to shared
+            for(int ii = threadIdx.y; ii < FILTER_SHARED_CHUNK_Y; ii+=blockDim.y) {
+              for(int jj = threadIdx.x; jj < FILTER_SHARED_CHUNK_X; jj+=blockDim.x) {
+                in2type val = in2type(0);
+                // compute filter index
+                index_t k = i2N - 1 - (nStart+ii);
+                index_t l = i2M - 1 - (mStart+jj);
+                // if filter in range
+                if( k >= 0 && l >= 0) {
+                  // Filter Dims
+                  bdims[Rank - 2] = k;
+                  bdims[Rank - 1] = l;
+                  // load filter value
+                  detail::mapply([&](auto &&...args) { val = d_in2.operator()(args...); }, bdims);
+                }
+                // store in shared
+                s_filter[ii][jj].data = val;
+              }
+            }
 
-    for (int y = 0; y < d_filter.Size(0); y++) {
-      if ((tid_y - static_cast<int>(d_filter.Size(0)) + 1 + y < 0) ||
-          (tid_y - static_cast<int>(d_filter.Size(0)) + 1 + y >= iy_size)) {
-        continue;
+            // load signal from global to shared, if out of range set to zero
+            for(int ii = threadIdx.y; ii < SIGNAL_CHUNK_Y; ii+=blockDim.y) {
+              for(int jj = threadIdx.x; jj < SIGNAL_CHUNK_X; jj+=blockDim.x) {
+                in1type val = in1type(0);
+                // compute filter index
+                index_t y = bi + nStart + ii - dy;
+                index_t x = bj + mStart + jj - dx;
+                
+                // if signal in range
+                if( x >= 0 && x < i1M && y >=0 && y < i1N) {
+                  // Signal Dims
+                  bdims[Rank - 2] = y;
+                  bdims[Rank - 1] = x;
+                  detail::mapply([&](auto &&...args) { val = d_in1.operator()(args...); }, bdims);
+                }
+                
+                // store in shared
+                s_signal[ii][jj].data = val;
+              }
+            }
+
+            __syncthreads();
+
+            in1type i1[ILPY];
+
+            // loop through shared memory filter one chunk at a time
+#pragma unroll
+            for (int mm = 0; mm < FILTER_SHARED_CHUNK_X; mm+=FILTER_REG_CHUNK_X) {
+#pragma unroll
+              for (int nn = 0; nn < FILTER_SHARED_CHUNK_Y; nn+=FILTER_REG_CHUNK_Y) {
+            
+
+                // Copy chunk from shared memory in to registers
+#pragma unroll
+                for(int ii = 0; ii < FILTER_REG_CHUNK_Y; ii++) {
+#pragma unroll
+                  for(int jj = 0; jj < FILTER_REG_CHUNK_X; jj++) {
+                    r_filter[ii][jj] = s_filter[nn+ii][mm+jj].data;
+                  }
+                }
+
+
+                // convolution loop:  convolve filter and signal.  
+                // Keep signal in registers as much as possible by shifting.
+#pragma unroll
+                for (int m = 0; m < FILTER_REG_CHUNK_X; m++) {
+              
+#pragma unroll
+                  for (int n = 0; n < FILTER_REG_CHUNK_Y; n++) {
+                
+                    in2type i2 = r_filter[n][m];
+
+                    // if FILTER_REG_CHUNK_X > 1 then we need to reload i1 every m loop
+                    if( nn == 0 ||  
+                        (FILTER_REG_CHUNK_X > 1 && n == 0)) { 
+                    // load ILPY signal points
+#pragma unroll
+                      for(int u = 0; u < ILPY; u++) {
+                        i1[u] = s_signal[nn+n+threadIdx.y*ILPY + u][mm+m+threadIdx.x].data;
+                      }
+                    } else {
+                      // advance/shift signal points in registers
+#pragma unroll
+                      for(int u = 0; u < ILPY - 1; u++) {
+                        i1[u]=i1[u+1];
+                      }
+
+                      // load new signal point at end of the array
+                      i1[ILPY-1] = s_signal[nn+n+threadIdx.y*ILPY + ILPY - 1][mm+m+threadIdx.x].data;
+                    }
+
+                    // inner convolution loop
+#pragma unroll
+                    for(int u = 0; u < ILPY; u++) {
+                      sum[u] = detail::madd(i1[u], i2, sum[u]);
+                    }
+                  } // end n loop
+                } // end m loop
+              } // end nn loop
+            } // end mm loop
+          }  // end jj loop
+        } // end ii loop
+
+        // finally output the solution
+#pragma unroll
+        for(int u = 0; u < ILPY; u++) {
+          if(i + u < oN && j < oM) {
+            bdims[Rank - 2] = i + u;
+            bdims[Rank - 1] = j;
+            detail::mapply([&](auto &&...args) { d_out.operator()(args...) = sum[u]; }, bdims);        
+          }
+        }
+
       }
-
-      if constexpr (d_in.Rank() == 4) {
-      val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(bdims[0], bdims[1], tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-      else if constexpr (d_in.Rank() == 3) {
-        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(blockIdx.z, tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-      else if constexpr (d_in.Rank() == 2) {
-        val = detail::madd(s_filter[y * d_filter.Size(1) + x],
-               d_in(tid_y - d_filter.Size(0) + 1 + y,
-                    tid_x - d_filter.Size(1) + 1 + x), val);
-      }
-    }
-  }
-
-  if constexpr (d_out.Rank() == 4) {
-    if (bdims[0] < d_out.Size(0) && bdims[1] < d_out.Size(1) &&
-        tid_y < d_out.Size(2) && tid_x < d_out.Size(3)) {
-      d_out(bdims[0], bdims[1], tid_y, tid_x) = val;
-    }
-  }
-  else if constexpr (d_out.Rank() == 3) {
-    if (blockIdx.z < d_out.Size(0) && tid_y < d_out.Size(1) &&
-        tid_x < d_out.Size(2)) {
-      d_out(blockIdx.z, tid_y, tid_x) = val;
-    }
-  }
-  else if constexpr (d_out.Rank() == 2) {
-    if (tid_y < d_out.Size(0) && tid_x < d_out.Size(1)) {
-      d_out(tid_y, tid_x) = val;
     }
   }
 }

@@ -30,39 +30,61 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "matx.h"
+#include <cassert>
+#include <cstdio>
 
-#include "matx/operators/unary_operators.h"
-#include "matx/operators/binary_operators.h"
+using namespace matx;
 
-#include "matx/operators/cart2sph.h"
-#include "matx/operators/collapse.h"
-#include "matx/operators/concat.h"
-#include "matx/operators/constval.h"
-#include "matx/operators/cast.h"
-#include "matx/operators/clone.h"
-#include "matx/operators/comma.h"
-#include "matx/operators/diag.h"
-#include "matx/operators/dct.h"
-#include "matx/operators/fftshift.h"
-#include "matx/operators/flatten.h"
-#include "matx/operators/hermitian.h"
-#include "matx/operators/if.h"
-#include "matx/operators/ifelse.h"
-#include "matx/operators/interleaved.h"
-#include "matx/operators/kronecker.h"
-#include "matx/operators/legendre.h"
-#include "matx/operators/permute.h"
-#include "matx/operators/planar.h"
-#include "matx/operators/r2c.h"
-#include "matx/operators/remap.h"
-#include "matx/operators/repmat.h"
-#include "matx/operators/reshape.h"
-#include "matx/operators/reverse.h"
-#include "matx/operators/select.h"
-#include "matx/operators/self.h"
-#include "matx/operators/set.h"
-#include "matx/operators/shift.h"
-#include "matx/operators/slice.h"
-#include "matx/operators/sph2cart.h"
-#include "matx/operators/stack.h"
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+{
+  MATX_ENTER_HANDLER();
+  
+  index_t iN = 4;
+  index_t iM = 6;
+ 
+  index_t fN = 4;
+  index_t fM = 2;
+  
+  auto in = make_tensor<int>({iN,iM});
+  auto filter = make_tensor<int>({fN,fM});
+  
+  in.SetVals({ {1,2,3,4,5,6},
+               {5,4,3,2,1,0},
+               {3,4,5,6,7,8},
+               {1,2,3,4,5,6},
+               });
+
+  filter.SetVals({ {1,2}, 
+                   {3,4},
+                   {5,6},
+                   {7,8}});
+
+#if 1
+  index_t oN = iN + fN -1;
+  index_t oM = iM + fM -1;
+  auto mode = MATX_C_MODE_FULL;
+#elif 0
+  index_t oN = iN;
+  index_t oM = iM;
+  auto mode = MATX_C_MODE_SAME;
+#else
+  index_t oN = iN - fN + 1;
+  index_t oM = iM - fM + 1;
+  auto mode = MATX_C_MODE_VALID;
+#endif
+  
+  auto out = make_tensor<int>({oN,oM});
+  
+  conv2d(out, in, filter, mode, 0);
+
+  printf("in:\n");
+  Print(in);
+  printf("filter:\n");
+  Print(filter);
+  printf("out:\n");
+  Print(out);
+
+  CUDA_CHECK_LAST_ERROR();
+  MATX_EXIT_HANDLER();
+}

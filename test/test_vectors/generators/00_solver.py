@@ -100,7 +100,7 @@ class svd:
     def run(self):
         m, n = self.size[0], self.size[1]
 
-        A = np.random.randn(m, n)
+        A = matx_common.randn_ndarray((m,n), self.dtype)
         U, S, V = np.linalg.svd(A)
 
         return {
