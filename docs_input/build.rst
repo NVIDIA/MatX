@@ -4,9 +4,10 @@ Building MatX
 =============
 
 As MatX is a header-only library, using it in your own projects is as simple as including only the core ``matx.h`` file. 
-The ``matx.h`` include file is intended to give full functionality of all MatX features that do not require downloading or
-including separate libraries. This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS, 
-CUB, cuSolver, cuRAND). Optional features of MatX that require downloading separate libraries use additional include files to
+The ``matx.h`` include file gives full functionality of all MatX features, without requiring additional includes or API 
+dependencies that the user must navigate. All classes required to use the MatX API is available from the ``matx.h`` include;
+This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS, CUB, cuSolver, cuRAND). 
+Optional features of MatX that require downloading separate libraries use additional include files to
 be explicit about their requirements.
 
 The MatX CMake build configuration is intented to help download any libraries for both the required and optional features.
@@ -15,16 +16,29 @@ from the internet. Alternatively, the option ``CPM_USE_LOCAL_PACKAGES`` can be u
 or offline environment. Choosing local versions of packages uses the typical ``find_packages`` CMake search methods. Please see 
 the CPM_ documentation or the documentation for each package for more information.
 
-.. _CPM: https://github.com/cpm-cmake/CPM.cmake
-.. _GoogleTest: https://github.com/google/googletest
-.. _pybind11: https://github.com/pybind/pybind11
 
-Core Requirements
+System Requirements
 -----------------
 MatX requires **CUDA 11.4** or higher, and **g++ 9.3** or higher for the host compiler. Clang may work as well, but it's currently 
 untested. Other requirements for optional components are listed below.
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
+
+Required Thirdparty Dependencies
+-----------------
+.. _CPM: https://github.com/cpm-cmake/CPM.cmake (this is included in the project source, so does not require a separate download)
+libcudacxx
+rapids cmake
+
+Optional Thirdparty Dependencies
+-----------------
+.. _GoogleTest: https://github.com/google/googletest
+.. _pybind11: https://github.com/pybind/pybind11
+nvbench
+cutensor
+cutensornet
+fmt
+nloghmann
 
 Build Choices
 =============
@@ -98,7 +112,7 @@ and all options to filter or modify benchmark runs can be found in the nvbench_ 
 Documentation
 -------------
 
-Building documentation has a separete list of requirements from all other build types. MatX requires the following packages to build
+Building documentation has a separate list of requirements from all other build types. MatX requires the following packages to build
 documentation:
 
 **Breate**: 4.31.0
@@ -120,3 +134,48 @@ to browse the documentation. Note that the most recent version of the documentat
 
 https://nvidia.github.io/MatX/
 
+MatX in Offline Environments
+=============
+The MatX build system and CPM provide an easy-to-use mechanism to build projects using MatX in computing environments that do not have access to the internet. 
+As described earlier, CPM provides a convenient mechanism to identify and locally cache all of the required thirdparty dependencies, which can 
+then be packaged and delivered to offline systems manually. It is easy to package a build of MatX in preparation of deployment to closed area, all you need is 
+an internet-enabled computer to prepare your package. The steps below outline the process for preparing your package, compressing it for transfer to your system,
+and building on the offline system.
+
+- Clone the MatX repository on an internet-enabled environment (this does not need to be identical to the deployment environment, but is simpler if it is / can build MatX)
+ 
+ .. code-block:: shell
+
+    git clone git@github.com:NVIDIA/MatX.git
+
+
+- Determine the location you would like to build the CPM cache at, and export the variable.
+
+  .. code-block:: shell
+
+    export CPM_SOURCE_CACHE $HOME_ONLINE/matx_cpm_cache
+    
+- Build MatX with the build options required by your project, following the steps outlined above
+
+- TAR and Compress the CPM cache for easy transport
+
+.. code-block:: shell
+
+    tar -czvf matx_cache_VERS_NUM_.tar.gz $HOME_ONLINE/matx_cpm_cache
+    
+- Transfer MatX Source code and CPM cache to your offline system 
+
+- Uncompress your cache TAR in a location available while building MatX
+
+.. code-block:: shell
+
+    tar -xvf matx_cache_VERS_NUM_.tar.gz  $HOME_OFFLINE
+    
+- Export the CPM_SOURCE_CACHE to your environment before building MatX
+
+.. code-block:: shell
+
+   export CPM_SOURCE_CACHE $HOME_OFFLINE/matx_cpm_cache
+
+    
+- Build your MatX project per your standard process, CPM will automatically use the cache
