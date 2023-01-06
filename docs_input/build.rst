@@ -27,18 +27,18 @@ untested. Other requirements for optional components are listed below.
 Required Thirdparty Dependencies
 -----------------
 .. _CPM: https://github.com/cpm-cmake/CPM.cmake (this is included in the project source, so does not require a separate download)
-libcudacxx
-rapids cmake
+.. _fmt: https://github.com/fmtlib/fmt          (CPM dependency)
+.. _nloghmann: https://github.com/nlohmann/json (CPM dependency)
+.. _rapids-cmake: https://github.com/rapidsai/rapids-cmake
+.. _libcudacxx: https://github.com/NVIDIA/libcudacxx
 
 Optional Thirdparty Dependencies
 -----------------
 .. _GoogleTest: https://github.com/google/googletest
 .. _pybind11: https://github.com/pybind/pybind11
-nvbench
-cutensor
-cutensornet
-fmt
-nloghmann
+.. _nvbench:  https://github.com/NVIDIA/nvbench
+.. _cutensor: https://developer.nvidia.com/cutensor
+.. _cutensornet:https://docs.nvidia.com/cuda/cuquantum/cutensornet 
 
 Build Choices
 =============
