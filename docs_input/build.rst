@@ -24,7 +24,7 @@ untested. Other requirements for optional components are listed below.
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
 
-Required Thirdparty Dependencies
+Required Third-party Dependencies
 -----------------
 .. _CPM: https://github.com/cpm-cmake/CPM.cmake (this is included in the project source, so does not require a separate download)
 .. _fmt: https://github.com/fmtlib/fmt          (CPM dependency)
@@ -32,7 +32,7 @@ Required Thirdparty Dependencies
 .. _rapids-cmake: https://github.com/rapidsai/rapids-cmake
 .. _libcudacxx: https://github.com/NVIDIA/libcudacxx
 
-Optional Thirdparty Dependencies
+Optional Third-party Dependencies
 -----------------
 .. _GoogleTest: https://github.com/google/googletest
 .. _pybind11: https://github.com/pybind/pybind11
@@ -137,7 +137,7 @@ https://nvidia.github.io/MatX/
 MatX in Offline Environments
 =============
 The MatX build system and CPM provide an easy-to-use mechanism to build projects using MatX in computing environments that do not have access to the internet. 
-As described earlier, CPM provides a convenient mechanism to identify and locally cache all of the required thirdparty dependencies, which can 
+As described earlier, CPM provides a convenient mechanism to identify and locally cache all of the required third-party dependencies, which can 
 then be packaged and delivered to offline systems manually. It is easy to package a build of MatX in preparation of deployment to closed area, all you need is 
 an internet-enabled computer to prepare your package. The steps below outline the process for preparing your package, compressing it for transfer to your system,
 and building on the offline system.
@@ -185,5 +185,5 @@ and building on the offline system.
 MatX Library Linking
 =============
 MatX defaults to Hidden Visibility due to compile requirements from pybind (https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes). 
-Hidden Visibility hides symbols from the C++ linker, and will prevent a user from accessing functions from other compile units. If inheriting the MatX Build system, this will also prevent user-space symbols from being enabled, which may be a problem for multi-library or resource projects intended 
+Hidden Visibility hides symbols from the C++ linker, and will prevent a user from accessing functions from other translation units. If inheriting the MatX Build system, this will also prevent user-space symbols from being enabled, which may be a problem for multi-library or resource projects intended 
 to be linked by later users. Visibility settings can be changed in the user's build environment, or specific symbols can be enabled through the C++ visibility support features (https://gcc.gnu.org/wiki/Visibility).
