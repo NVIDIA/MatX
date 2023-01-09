@@ -134,6 +134,13 @@ to browse the documentation. Note that the most recent version of the documentat
 
 https://nvidia.github.io/MatX/
 
+MatX Library Linking
+=============
+MatX defaults to Hidden Visibility due to compile requirements from pybind (https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes). 
+Hidden Visibility hides symbols from the C++ linker, and will prevent a user from accessing functions from other translation units. If inheriting the MatX Build system, this will also prevent user-space symbols from being enabled, which may be a problem for multi-library or resource projects intended 
+to be linked by later users. Visibility settings can be changed in the user's build environment, or specific symbols can be enabled through the C++ visibility support features (https://gcc.gnu.org/wiki/Visibility).
+
+
 MatX in Offline Environments
 =============
 The MatX build system and CPM provide an easy-to-use mechanism to build projects using MatX in computing environments that do not have access to the internet. 
@@ -182,8 +189,3 @@ and building on the offline system.
 
 
 
-MatX Library Linking
-=============
-MatX defaults to Hidden Visibility due to compile requirements from pybind (https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes). 
-Hidden Visibility hides symbols from the C++ linker, and will prevent a user from accessing functions from other translation units. If inheriting the MatX Build system, this will also prevent user-space symbols from being enabled, which may be a problem for multi-library or resource projects intended 
-to be linked by later users. Visibility settings can be changed in the user's build environment, or specific symbols can be enabled through the C++ visibility support features (https://gcc.gnu.org/wiki/Visibility).
