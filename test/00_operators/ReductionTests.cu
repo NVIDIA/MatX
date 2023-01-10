@@ -267,6 +267,32 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
+{
+  MATX_ENTER_HANDLER();
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  constexpr index_t size = 300;
+  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {8, size, size});
+
+  tensor_t<TypeParam, 1> t1({size});
+  tensor_t<TypeParam, 1> t1_out({size});
+  pb->NumpyToTensorView(t1, "t1");
+
+  softmax(t1_out, t1);
+
+  MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
+
+  auto t3    = make_tensor<TypeParam>({8,size,size});
+  auto t3_out = make_tensor<TypeParam>({8,size,size});
+  pb->NumpyToTensorView(t3, "t3");
+  softmax(t3_out, t3, {2});
+  
+  MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsNumericNoHalf, PermutedReduce)
 {
   MATX_ENTER_HANDLER();
