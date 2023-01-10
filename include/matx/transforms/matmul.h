@@ -1140,13 +1140,13 @@ void matmul(TensorTypeC C, const TensorTypeA A,
  * @tparam PROV
  *    Provider type chosen from MatXMatMulProvider_t type
  *
- * @param c
+ * @param C
  *   C output tensor or operator
- * @param a
+ * @param A
  *   A input tensor or operator
- * @param b
+ * @param B
  *   B input tensor or operator
- * #param axis
+ * @param axis
  *   the axis of the tensor or operator to perform the gemm along
  * @param stream
  *   CUDA stream
@@ -1194,11 +1194,11 @@ __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
  * @tparam PROV
  *    Provider type chosen from MatXMatMulProvider_t type
  *
- * @param c
+ * @param C
  *   C output tensor or operator
- * @param a
+ * @param A
  *   A input tensor or operator
- * @param b
+ * @param B
  *   B input tensor or operator
  * @param stream
  *   CUDA stream

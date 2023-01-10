@@ -243,7 +243,7 @@ inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
  * @param o Output tensor
  * @param i1 First input operator
  * @param i2 Second input operator
- * #param axis the axis to perform convolution
+ * @param axis the axis to perform convolution
  * @param mode Convolution mode
  * @param stream CUDA stream
  */
@@ -269,8 +269,8 @@ inline void conv1d(OutputType o, const In1Type &i1, const In2Type &i2,
  * @tparam In1Type Type of first input
  * @tparam In2Type Type of second input
  * @param o Output tensor
- * @param i1 First input operator
- * @param i2 Second input operator
+ * @param in1 First input operator
+ * @param in2 Second input operator
  * @param mode Convolution mode
  * @param stream CUDA stream
  */
@@ -320,7 +320,7 @@ inline void conv2d(OutputType o, const In1Type in1, const In2Type in2,
  * @param o Output tensor
  * @param i1 First input operator
  * @param i2 Second input operator
- * #param axis The axis that the convolution is performed on
+ * @param axis The axis that the convolution is performed on
  * @param mode Convolution mode
  * @param stream CUDA stream
  */

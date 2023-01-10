@@ -121,7 +121,7 @@ namespace matx
    * @tparam RANK the reshaped rank
    * @tparam T Input operator/tensor type
    * @param op Input operator
-   * @param sizes the size of each reshaped dimension
+   * @param s  the size of each reshaped dimension
    * @return reshaped operator
    */
   template <int RANK, typename T, typename ShapeType,

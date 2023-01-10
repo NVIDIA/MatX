@@ -883,7 +883,7 @@ __MATX_INLINE__ void fft(OutputTensor o, const InputTensor i,
  * Future releases may remove this restriction to where there is no copy.
  * @param in
  *   input tensor or operator
- * #param axis
+ * @param axis
  *   axis to perform FFT along
  * @param fft_size
  *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
@@ -985,8 +985,8 @@ __MATX_INLINE__ void ifft(OutputTensor o, const InputTensor i,
  * Future releases may remove this restriction to where there is no copy.
  * @param in
  *   input tensor or operator
- * #param axis
- *   axis to perform FFT along
+ * @param axis
+ *   axis to perform IFFT along
  * @param fft_size
  *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
  * @param stream
