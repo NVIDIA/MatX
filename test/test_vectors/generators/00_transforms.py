@@ -68,6 +68,10 @@ class matmul_operators:
 
     def run(self) -> Dict[str, np.ndarray]:
         self.res['c'] = self.res['a'] @ self.res['b']
+
+        # Create the strided batched version
+        if len(self.res['c'].shape) == 3:
+            self.res['cs'] = self.res['c'][::2,:,:]
         return self.res
 
     def run_a_transpose(self) -> Dict[str, np.ndarray]:

@@ -295,6 +295,36 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t batches = 16;
+  constexpr index_t m = 128;
+  constexpr index_t k = 256;
+  constexpr index_t n = 512;
+  
+  tensor_t<TypeParam, 3> a{{batches, m, k}};
+  tensor_t<TypeParam, 3> b{{batches, k, n}};
+  tensor_t<TypeParam, 3> c{{batches, m, n}};  
+
+  auto as = a.Slice({0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
+  auto bs = b.Slice({0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
+  tensor_t<TypeParam, 3> cs{{batches/2, m, n}};
+
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {batches, m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul(cs, as, bs);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, cs, "cs", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
 {
   MATX_ENTER_HANDLER();
