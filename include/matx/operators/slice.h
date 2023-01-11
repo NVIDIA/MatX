@@ -241,7 +241,7 @@ namespace matx
    *
    * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
-   * @param operator Input operator
+   * @param opIn Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
