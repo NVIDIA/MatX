@@ -565,7 +565,14 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 + v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
+    if constexpr (is_matx_half_v<T>) {
+      atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+    }
+    else {
+      atomicAdd(addr, val); 
+    }
+  }
 };
 
 /**
@@ -661,32 +668,62 @@ template <typename T, typename Op>
 __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 {
   // breaking this out so common case is faster without branches
-  if (size > 16) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  if constexpr (!is_matx_half_v<T>) {
+    if (size > 16) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 8) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 4) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 2) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 1) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    return val;
   }
-  else if (size > 8) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  else {
+    if (size > 16) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 8) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 4) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 2) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 1) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    return val;
   }
-  else if (size > 4) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  else if (size > 2) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  else if (size > 1) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  return val;
 }
 
 
@@ -1243,6 +1280,7 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
 
   // Create the shape of the summed tensor based on the permutation params
   std::array<index_t, in.Rank() - D> red_shape{};
+  #pragma unroll
   for (int r = 0; r < in.Rank() - D; r++) {
     red_shape[r] = in.Size(perm[r]);
   }
@@ -1254,6 +1292,7 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
   // We need to clone the summed tensor on the appropriate dims for the final divide.
   std::array<index_t, InType::Rank()> clone_dims;
   int axis_ptr = 0;
+  #pragma unroll
   for (int r = 0; r < InType::Rank(); r++) {
     if (axis_ptr >= 0 && dims[axis_ptr] == r) {
       clone_dims[r] = in.Size(r);

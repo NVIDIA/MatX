@@ -267,7 +267,7 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
+TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 {
   MATX_ENTER_HANDLER();
 
@@ -289,6 +289,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
   softmax(t3_out, t3, {2});
   
   MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
+
 
   MATX_EXIT_HANDLER();
 }

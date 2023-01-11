@@ -4,6 +4,28 @@
 using namespace matx;
 
 using reduce_types = nvbench::type_list<float, double>;
+using softmax_types = nvbench::type_list<float, double, matxFp16, matxBf16>;
+
+template <typename ValueType>
+void softmax(nvbench::state &state, nvbench::type_list<ValueType>)
+{
+  // Get current parameters:
+
+
+auto t2    = make_tensor<ValueType>({86760, 16});
+auto t2out    = make_tensor<ValueType>({86760, 16});
+  t2.PrefetchDevice(0);
+  t2out.PrefetchDevice(0);
+
+  softmax(t2out, t2, {1});
+
+  state.exec( 
+    [&t2, &t2out](nvbench::launch &launch) {
+      matx::softmax(t2out, t2, (cudaStream_t)launch.get_stream());
+    });
+
+}
+NVBENCH_BENCH_TYPES(softmax, NVBENCH_TYPE_AXES(softmax_types));
 
 
 template <typename ValueType>
