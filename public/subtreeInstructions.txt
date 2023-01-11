@@ -1,0 +1,8 @@
+git subtree add --prefix public/cpm-cmake    https://github.com/cpm-cmake/CPM.cmake.git v0.32.2 --squash ## only need to do once
+git subtree add --prefix public/rapids-cmake https://github.com/rapidsai/rapids-cmake.git  --squash ## only need to do once
+
+git subtree pull --prefix public/cpm-cmake https://github.com/cpm-cmake/CPM.cmake.git NEW_VERSION --squash ## to update
+git subtree pull --prefix public/cpm-cmake https://github.com/rapidsai/rapids-cmake.git NEW_VERSION --squash ## to update
+
+
+"git log | grep git-subtree-dir | tr -d ' ' | cut -d ":" -f2 | sort | uniq"  ## see what git subtrees exist

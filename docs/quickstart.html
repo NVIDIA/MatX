@@ -181,6 +181,11 @@
      einsum
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/nvtx.html">
+     NVTX Profiling
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toctree-l1">
@@ -557,7 +562,7 @@ For example:</p>
 <span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="p">).</span><span class="n">run</span><span class="p">();</span><span class="w"></span>
 </pre></div>
 </div>
-<p>Ignoring that the data is unitialized, the first three lines simply create three 3D tensors with the same dimensions, while the last line runs an
+<p>Ignoring that the data is unitialized, the first three lines simply create three 2D tensors with the same dimensions, while the last line runs an
 operator for the equation c = a + b. In MatX terminology, an operator is a type that creates a CUDA kernel at compile-time to perform the
 element-wise operation c = a + b. The = operator is used as a deferred assignment operator expressions to avoid ambiguity with the regular assignment
 operator <code class="docutils literal notranslate"><span class="pre">=</span></code>. The <code class="docutils literal notranslate"><span class="pre">run</span></code> method takes an optional stream parameter, and executes the operation in the CUDA stream specified. Operators can use
@@ -584,7 +589,7 @@ the identity matrix are all examples of this. MatX provides “generators” tha
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">a</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ones</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">Shape</span><span class="p">())).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
-<p>The example above uses the <code class="docutils literal notranslate"><span class="pre">ones</span></code> generator to create a tensor with only the value <code class="docutils literal notranslate"><span class="pre">1</span></code> matching the shape of a (10x20x5). <code class="docutils literal notranslate"><span class="pre">ones</span></code> simply returns the
+<p>The example above uses the <code class="docutils literal notranslate"><span class="pre">ones</span></code> generator to create a tensor with only the value <code class="docutils literal notranslate"><span class="pre">1</span></code> matching the shape of a (10x20). <code class="docutils literal notranslate"><span class="pre">ones</span></code> simply returns the
 value <code class="docutils literal notranslate"><span class="pre">1</span></code> any time an element of it is requested, and no data is ever loaded from memory.</p>
 <p>Implicit in the <code class="docutils literal notranslate"><span class="pre">run</span></code> call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
 To run the same code on the host, a <code class="docutils literal notranslate"><span class="pre">SingleThreadHostExecutor</span></code> can be passed into <code class="docutils literal notranslate"><span class="pre">run</span></code>:</p>

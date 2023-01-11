@@ -179,6 +179,7 @@ namespace matx
    * 
    * @tparam Dim dimension to concatenate
    * @tparam Ts operator types
+   * @param axis axis to operate along
    * @param ts operators
    * @return concatenated operator 
    */

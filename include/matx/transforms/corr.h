@@ -80,7 +80,7 @@ __MATX_INLINE__ void corr(OutputTensor o, const In1Type i1, const In2Type i2,
  * @param o Output tensor
  * @param i1 First input operator
  * @param i2 Second input operator
- * #param axis The axis to perform correlationon
+ * @param axis The axis to perform correlation
  * @param mode Mode of correlation
  * @param method Method for correlation
  * @param stream CUDA stream

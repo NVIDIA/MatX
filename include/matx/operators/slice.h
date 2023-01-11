@@ -211,7 +211,9 @@ namespace matx
 
    * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam N The Rank of the output operator
+   * The Rank template parameter N is optional when rank does not change
+   *
+   * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
@@ -234,22 +236,24 @@ namespace matx
    * The rank of the the operator must be greater than 0.
 
    * This operator can appear as an rvalue or lvalue. 
+   
+   * The Rank template parameter N is optional when rank does not change
    *
-   * @tparam N The Rank of the output operator
+   * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
-   * @param op Input operator
+   * @param opIn Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
    */
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType &op, 
+  __MATX_INLINE__ auto slice (const OpType opIn, 
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()]) 
   {
      typename OpType::shape_type strides[OpType::Rank()];
      for (int i = 0; i < OpType::Rank(); i++)
        strides[i] = 1;
-     return detail::SliceOp<N,OpType>(op, starts, ends, strides);
+     return detail::SliceOp<N,OpType>(opIn, starts, ends, strides);
   }
 } // end namespace matx

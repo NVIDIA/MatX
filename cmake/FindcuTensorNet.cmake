@@ -83,14 +83,17 @@ if(NOT cuTensorNet_FOUND)
 
   set(CUTENSORNET_VERSION 22.03.0.40)
   set(CUTENSORNET_FILENAME cuquantum-linux-x86_64-${CUTENSORNET_VERSION}-archive)
-
-  file(DOWNLOAD https://developer.download.nvidia.com/compute/cuquantum/redist/cuquantum/linux-x86_64/${CUTENSORNET_FILENAME}.tar.xz
-       ${CMAKE_BINARY_DIR}/${CUTENSORNET_FILENAME}.tar.xz)
   
-  file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/${CUTENSORNET_FILENAME}.tar.xz DESTINATION ${CMAKE_BINARY_DIR}/cutensornet/)
-  
-  set(cuTensorNet_LIBRARY ${CMAKE_BINARY_DIR}/cutensornet/${CUTENSORNET_FILENAME}/lib/libcutensornet.so) 
-  set(cuTensorNet_INCLUDE_DIR ${CMAKE_BINARY_DIR}/cutensornet/${CUTENSORNET_FILENAME}/include) 
+  CPMAddPackage(
+               NAME cutensornet
+               VERSION ${CUTENSORNET_VERSION}
+               URL https://developer.download.nvidia.com/compute/cuquantum/redist/cuquantum/linux-x86_64/${CUTENSORNET_FILENAME}.tar.xz
+               # Eigen's CMakelists are not intended for library use
+               DOWNLOAD_ONLY YES 
+               )
+      
+  set(cuTensorNet_LIBRARY ${cutensornet_SOURCE_DIR}/lib/libcutensornet.so) 
+  set(cuTensorNet_INCLUDE_DIR ${cutensornet_SOURCE_DIR}/include) 
 
   set(cuTensorNet_FOUND TRUE)
 endif()

@@ -184,8 +184,6 @@ namespace matx
    *   order of the polynomial produced
    * @param m
    *   operator specifing which degrees to output
-   * @param axis
-   *   The axis to write the polynomial coeffients into the output tensor
    *
    * @returns
    *   New operator with Rank+1 and size of last dimension = order.
@@ -209,6 +207,8 @@ namespace matx
    *   Operator that computes the location to evaluate the lengrande polynomial
    * @param n
    *   order of the polynomial produced
+   * @param m
+   *   operator specifing which degrees to output
    * @param axis
    *   The axis to write the polynomial coeffients into the output tensor
    *

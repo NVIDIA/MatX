@@ -41,12 +41,18 @@ namespace matx
   /**
    * Performs a complex gradient solve on a square matrix.  
    *
-   * @param out
-   *   Tensor to copy into
-   * @param in
-   *   Tensor to copy from
-   * @param exec
-   *   CUDA executor to run operation
+   * @param X
+   *   Tensor To Solve out
+   * @param A
+   *   Tensor A
+   * @param B
+   *   Tensor B 
+   * @param tol
+   *   tolerance to solve to  
+   * @param max_iters
+   *   max iterations for solve
+   * @param stream
+   *   cuda Stream to execute on
    *
    */
   template <typename XType, typename AType, typename BType>

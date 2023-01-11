@@ -68,7 +68,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CUDA_CXX_STANDARD 17)
 
 # CPM is required for all package management
-include(cmake/GetCPM.cmake)
+include(public/cpm-cmake/cmake/CPM.cmake)
 # Helper for selecting build type
 include(cmake/BuildType.cmake)
 
@@ -244,6 +244,7 @@ endif()
 
 if (MATX_NVTX_FLAGS)
     add_definitions(-DMATX_NVTX_FLAGS)
+    target_compile_definitions(matx INTERFACE MATX_NVTX_FLAGS)
 endif()
 if (MATX_BUILD_32_BIT)
     add_definitions(-DINDEX_32_BIT)

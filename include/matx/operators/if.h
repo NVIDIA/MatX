@@ -126,6 +126,19 @@ namespace matx
       }
   };
 
+  /**
+   *
+   * @brief Compares two operators or views and conditionally executes the second
+   * statement if the first is true. Values from an operator are executed
+   * individually, and the only requirement for the conditional is the comparison
+   * operator must be defined for the particular type. For example, operator< on
+   * two integers is okay, but the same operator on two complex numbers will give
+   * a compiler error.
+   * 
+   * @param t1 op1
+   *
+   * @param t2 op2
+   */
   template <typename T1, typename T2>
     auto IF(T1 t1, T2 t2) {
       return IFOP<T1,T2>(t1,t2);

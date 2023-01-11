@@ -1,0 +1,1 @@
+rapids-cmake is a public dependency as well, however it is stored in cmake/rapids-cmake due to keep it with it's functional cmake peers.

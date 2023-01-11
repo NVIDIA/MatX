@@ -75,7 +75,7 @@ Casting Operators
 Advanced Operators
 ------------------
 
-.. doxygenclass:: matx::IF 
+.. doxygenfunction:: matx::IF
 .. doxygenclass:: matx::IFELSE
 .. doxygenfunction:: reverse(Op t)
 .. doxygenfunction:: reverse(Op_type t)
@@ -88,19 +88,23 @@ Advanced Operators
 .. doxygenfunction:: cart2sph
 .. doxygenfunction:: sph2cart
 .. doxygenfunction:: kron
-.. doxygenfunction:: legendre
+.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in)
+.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in, int (&axis)[2])
+.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in, std::array<int, 2> axis)  
 .. doxygenfunction:: hermitianT
-.. doxygenfunction:: r2cop
+.. doxygenfunction:: r2c(T1 t, index_t orig) 
 .. doxygenfunction:: flatten
 .. doxygenfunction:: remap(Op t, Ind idx)
 .. doxygenfunction:: remap(Op t, Ind idx, Inds... inds)
 .. doxygenfunction:: rcollapse
 .. doxygenfunction:: lcollapse
-.. doxygenfunction:: clone
+.. doxygenfunction:: clone(Op t, const index_t (&shape)[Rank])
+.. doxygenfunction:: clone(Op t, const std::array<index_t, Rank> &shape)
 .. doxygenfunction:: stack 
-.. doxygenfunction:: slice( const T_wStrideT op, const typename T_wStrideT::shape_type (&starts)[T_wStrideT::Rank()], const typename T_wStrideT::shape_type (&ends)[T_wStrideT::Rank()], const typename T_wStrideT::stride_type (&strides)[T_wStrideT::Rank()])                 
-.. doxygenfunction:: slice( const T_wShapeT op, const typename T_wShapeT::shape_type (&starts)[T_wShapeT::Rank()], const typename T_wShapeT::shape_type (&ends)[T_wShapeT::Rank()])
-.. doxygenfunction:: slice( const T_wStridet_2 op, const typename T_wStridet_2::shape_type (&starts)[T_wStridet_2::Rank()], const typename T_wStridet_2::shape_type (&ends)[T_wStridet_2::Rank()], const typename T_wStridet_2::stride_type (&strides)[T_wStridet_2::Rank()])
-.. doxygenfunction:: slice( const T_wShapet_2 op, const typename T_wShapet_2::shape_type (&starts)[T_wShapet_2::Rank()], const typename T_wShapet_2::shape_type (&ends)[T_wShapet_2::Rank()])
-.. doxygenfunction:: permute(const T op, const int32_t (&dims)[T::Rank()])  
-.. doxygenfunction:: reshape(const T op, const int32_t (&sizes)[T::Rank()])  
+.. doxygenfunction:: slice(const OpType opIn, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
+.. doxygenfunction:: slice(const OpType op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()], const index_t (&strides)[OpType::Rank()])
+.. doxygenfunction:: permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in, const std::initializer_list<uint32_t> &dims, const cudaStream_t stream)
+.. doxygenfunction:: permute(const T &op, const int32_t (&dims)[T::Rank()])
+.. doxygenfunction:: permute(const T &op, const std::array<int32_t, T::Rank()> &dims)
+.. doxygenfunction:: reshape(const T &op, ShapeType &&s)
+.. doxygenfunction:: reshape(const T &op, const int32_t (&sizes)[RANK])  
