@@ -25,3 +25,5 @@ are listed in the :ref:`statistics` API guide section. Note that to avoid collis
 .. doxygenfunction:: find
 .. doxygenfunction:: find_idx
 .. doxygenfunction:: unique
+.. doxygenfunction:: softmax(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)  
+.. doxygenfunction:: softmax(OutType dest, const InType &in, cudaStream_t stream = 0)
