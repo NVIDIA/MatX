@@ -285,7 +285,7 @@ namespace detail {
       if constexpr (diff > 0)
       {
         // auto expansion case,  remap dimension by difference in ranks
-        if (dim > diff)
+        if (dim >= diff)
         {
           size = get_size(a, dim - diff);
         }
