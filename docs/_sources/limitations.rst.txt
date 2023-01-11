@@ -45,7 +45,7 @@ The table below describes the current state of limitations in MatX.
     - 11.4
   * - gemm
     - Yes
-    - No
+    - Yes
     - CUTLASS 2.6 provider only. No with cuBLAS/cuBLASLt
     - Yes
     - Yes
