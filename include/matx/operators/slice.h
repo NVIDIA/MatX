@@ -247,13 +247,13 @@ namespace matx
    * @return sliced operator
    */
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType operator, 
+  __MATX_INLINE__ auto slice (const OpType opIn, 
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()]) 
   {
      typename OpType::shape_type strides[OpType::Rank()];
      for (int i = 0; i < OpType::Rank(); i++)
        strides[i] = 1;
-     return detail::SliceOp<N,OpType>(operator, starts, ends, strides);
+     return detail::SliceOp<N,OpType>(opIn, starts, ends, strides);
   }
 } // end namespace matx
