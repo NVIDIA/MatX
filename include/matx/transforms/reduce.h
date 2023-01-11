@@ -565,7 +565,14 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 + v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAdd(addr, val); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
+    if constexpr (is_matx_half_v<T>) {
+      atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+    }
+    else {
+      atomicAdd(addr, val); 
+    }
+  }
 };
 
 /**
@@ -661,32 +668,62 @@ template <typename T, typename Op>
 __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 {
   // breaking this out so common case is faster without branches
-  if (size > 16) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  if constexpr (!is_matx_half_v<T>) {
+    if (size > 16) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 8) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 4) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 2) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    else if (size > 1) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+    return val;
   }
-  else if (size > 8) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  else {
+    if (size > 16) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 8) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 4) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 2) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    else if (size > 1) {
+      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    }
+    return val;
   }
-  else if (size > 4) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  else if (size > 2) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  else if (size > 1) {
-    val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-  }
-  return val;
 }
 
 
@@ -1174,6 +1211,105 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], 
 }
 
 /**
+ * Calculate the softmax of values in a tensor treated as a flat vector
+ *
+ * softmax computes the exponential of each value divided by the sum of the exponentials
+ * of items in the reduced set. By default the sum is performed over all dimensions.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam RANK
+ *   Rank of output tensor
+ *
+ * @param dest
+ *   Destination for softmax output
+ * @param in
+ *   Input data to compute the softmax 
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ softmax(OutType dest, const InType &in,
+                 cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__  
+  MATX_NVTX_START("softmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto tmp_sum = make_tensor<typename InType::scalar_type>(MATX_ASYNC_DEVICE_MEMORY, stream);
+  sum(tmp_sum, exp(in), stream);
+  (dest = exp(in) / tmp_sum).run(stream);
+#endif  
+}
+
+/**
+ * Calculate the softmax of values in a tensor treated as a flat vector
+ *
+ * softmax computes the exponential of each value divided by the sum of the exponentials
+ * of items in the reduced set. The axes in which to perform the softmax over determine
+ * which axes the sum will be computed over, but the input tensor rank and sizes match
+ * between input and output.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam RANK
+ *   Rank of output tensor
+ *
+ * @param dest
+ *   Destination for softmax output
+ * @param in
+ *   Input data to compute the softmax 
+ * @param dims
+ *   C-style array containing the dimensions to sum over
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutType, typename InType, int D>
+void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("softmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(D < InType::Rank(), "softmax dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() == InType::Rank(), "softmax output rank must equal input rank");
+
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+
+  // Create the shape of the summed tensor based on the permutation params
+  std::array<index_t, in.Rank() - D> red_shape{};
+  #pragma unroll
+  for (int r = 0; r < in.Rank() - D; r++) {
+    red_shape[r] = in.Size(perm[r]);
+  }
+
+  auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  sum(tmp_sum, exp(permute(in, perm)), stream);
+
+  // With the sum calculated, we have a tensor that's not compatible in sizes with the new one for dividing.
+  // We need to clone the summed tensor on the appropriate dims for the final divide.
+  std::array<index_t, InType::Rank()> clone_dims;
+  int axis_ptr = 0;
+  #pragma unroll
+  for (int r = 0; r < InType::Rank(); r++) {
+    if (axis_ptr >= 0 && dims[axis_ptr] == r) {
+      clone_dims[r] = in.Size(r);
+      if (++axis_ptr == D) {
+        axis_ptr = -1;
+      }
+    }
+    else {
+      clone_dims[r] = matxKeepDim;
+    }
+  }  
+
+  (dest = exp(in) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);
+#endif  
+}
+
+/**
  * Calculate the median of values in a tensor
  *
  * Calculates the median of rows in a tensor. The median is computed by sorting
@@ -1210,7 +1346,7 @@ void __MATX_INLINE__ median(OutType dest,
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-      auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
     // If the rank is 0 we're finding the median of a vector
     if constexpr (RANK_IN == 1) {
@@ -1488,6 +1624,7 @@ void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const In
   argmax(dest, idest, permute(in, perm), stream);
 #endif  
 }
+
 
 /**
  * Compute min reduction of a tensor
