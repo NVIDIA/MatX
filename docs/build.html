@@ -181,6 +181,11 @@
      einsum
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="api/nvtx.html">
+     NVTX Profiling
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toctree-l1">
@@ -287,15 +292,25 @@
   </a>
   <ul class="visible nav section-nav flex-column">
    <li class="toc-h2 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#core-requirements">
-     Core Requirements
+    <a class="reference internal nav-link" href="#system-requirements">
+     System Requirements
+    </a>
+   </li>
+   <li class="toc-h2 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#required-third-party-dependencies">
+     Required Third-party Dependencies
+    </a>
+   </li>
+   <li class="toc-h2 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#optional-third-party-dependencies">
+     Optional Third-party Dependencies
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h1 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#build-choices">
-   Build Choices
+  <a class="reference internal nav-link" href="#build-options">
+   Build Options
   </a>
   <ul class="visible nav section-nav flex-column">
    <li class="toc-h2 nav-item toc-entry">
@@ -320,6 +335,16 @@
    </li>
   </ul>
  </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-library-linking">
+   MatX Library Linking
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-in-offline-environments">
+   MatX in Offline Environments
+  </a>
+ </li>
 </ul>
 
             </nav>
@@ -334,17 +359,18 @@
   <section id="building-matx">
 <span id="building"></span><h1>Building MatX<a class="headerlink" href="#building-matx" title="Permalink to this headline"></a></h1>
 <p>As MatX is a header-only library, using it in your own projects is as simple as including only the core <code class="docutils literal notranslate"><span class="pre">matx.h</span></code> file.
-The <code class="docutils literal notranslate"><span class="pre">matx.h</span></code> include file is intended to give full functionality of all MatX features that do not require downloading or
-including separate libraries. This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS,
-CUB, cuSolver, cuRAND). Optional features of MatX that require downloading separate libraries use additional include files to
+The <code class="docutils literal notranslate"><span class="pre">matx.h</span></code> include file gives full functionality of all MatX features, without requiring additional includes or API
+dependencies that the user must navigate. All classes required to use the MatX API is available from the <code class="docutils literal notranslate"><span class="pre">matx.h</span></code> include;
+This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS, CUB, cuSolver, cuRAND).
+Optional features of MatX that require downloading separate libraries use additional include files to
 be explicit about their requirements.</p>
 <p>The MatX CMake build configuration is intented to help download any libraries for both the required and optional features.
 The <a class="reference external" href="https://github.com/cpm-cmake/CPM.cmake">CPM</a> build system is used to help with package management and version control. By default, CPM will fetch other packages
 from the internet. Alternatively, the option <code class="docutils literal notranslate"><span class="pre">CPM_USE_LOCAL_PACKAGES</span></code> can be used to point to local downloads in an air-gapped
 or offline environment. Choosing local versions of packages uses the typical <code class="docutils literal notranslate"><span class="pre">find_packages</span></code> CMake search methods. Please see
 the <a class="reference external" href="https://github.com/cpm-cmake/CPM.cmake">CPM</a> documentation or the documentation for each package for more information.</p>
-<section id="core-requirements">
-<h2>Core Requirements<a class="headerlink" href="#core-requirements" title="Permalink to this headline"></a></h2>
+<section id="system-requirements">
+<h2>System Requirements<a class="headerlink" href="#system-requirements" title="Permalink to this headline"></a></h2>
 <p>MatX requires <strong>CUDA 11.4</strong> or higher, and <strong>g++ 9.3</strong> or higher for the host compiler. Clang may work as well, but it’s currently
 untested. Other requirements for optional components are listed below.</p>
 <div class="admonition warning">
@@ -352,10 +378,30 @@ untested. Other requirements for optional components are listed below.</p>
 <p>Using MatX with an unsupported compiler may result in compiler and/or runtime errors.</p>
 </aside>
 </section>
+<section id="required-third-party-dependencies">
+<h2>Required Third-party Dependencies<a class="headerlink" href="#required-third-party-dependencies" title="Permalink to this headline"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/cpm-cmake/CPM.cmake">CPM</a> (this is included in the project source, so does not require a separate download)</p></li>
+<li><p><a class="reference external" href="https://github.com/fmtlib/fmt">fmt</a> (CPM dependency)</p></li>
+<li><p><a class="reference external" href="https://github.com/nlohmann/json">nloghmann::json</a> (CPM dependency)</p></li>
+<li><p><a class="reference external" href="https://github.com/rapidsai/rapids-cmake">rapids-cmake</a></p></li>
+<li><p><a class="reference external" href="https://github.com/NVIDIA/libcudacxx">libcudacxx</a></p></li>
+</ul>
 </section>
-<section id="build-choices">
-<h1>Build Choices<a class="headerlink" href="#build-choices" title="Permalink to this headline"></a></h1>
-<p>MatX provides 4 different types of build types, and can each be configured independently:</p>
+<section id="optional-third-party-dependencies">
+<h2>Optional Third-party Dependencies<a class="headerlink" href="#optional-third-party-dependencies" title="Permalink to this headline"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/google/googletest">GoogleTest</a></p></li>
+<li><p><a class="reference external" href="https://github.com/pybind/pybind11">pybind11</a></p></li>
+<li><p><a class="reference external" href="https://github.com/NVIDIA/nvbench">nvbench</a></p></li>
+<li><p><a class="reference external" href="https://developer.nvidia.com/cutensor">cutensor</a></p></li>
+<li><p><a class="reference external" href="https://docs.nvidia.com/cuda/cuquantum/cutensornet">cutensornet</a></p></li>
+</ul>
+</section>
+</section>
+<section id="build-options">
+<h1>Build Options<a class="headerlink" href="#build-options" title="Permalink to this headline"></a></h1>
+<p>MatX provides 5 primary options for builds, and each can be configured independently:</p>
 <table class="table">
 <colgroup>
 <col style="width: 60%" />
@@ -378,6 +424,9 @@ untested. Other requirements for optional components are listed below.</p>
 </tr>
 <tr class="row-odd"><td><p>Documentation</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">-DMATX_BUILD_DOCS=ON</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>NVTX Flags</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-DMATX_NVTX_FLAGS=ON</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -418,7 +467,7 @@ and all options to filter or modify benchmark runs can be found in the <a class=
 </section>
 <section id="documentation">
 <h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline"></a></h2>
-<p>Building documentation has a separete list of requirements from all other build types. MatX requires the following packages to build
+<p>Building documentation has a separate list of requirements from all other build types. MatX requires the following packages to build
 documentation:</p>
 <p><strong>Breate</strong>: 4.31.0</p>
 <p><strong>Doxygen</strong>: 1.9.1</p>
@@ -432,6 +481,50 @@ directory <code class="docutils literal notranslate"><span class="pre">build/doc
 to browse the documentation. Note that the most recent version of the documentation is also hosted at:</p>
 <p><a class="reference external" href="https://nvidia.github.io/MatX/">https://nvidia.github.io/MatX/</a></p>
 </section>
+</section>
+<section id="matx-library-linking">
+<h1>MatX Library Linking<a class="headerlink" href="#matx-library-linking" title="Permalink to this headline"></a></h1>
+<p>MatX defaults to Hidden Visibility due to compile requirements from pybind (<a class="reference external" href="https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes">https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes</a>).
+Hidden Visibility hides symbols from the C++ linker, and will prevent a user from accessing functions from other translation units. If inheriting the MatX Build system, this will also prevent user-space symbols from being enabled, which may be a problem for multi-library or resource projects intended
+to be linked by later users. Visibility settings can be changed in the user’s build environment, or specific symbols can be enabled through the C++ visibility support features (<a class="reference external" href="https://gcc.gnu.org/wiki/Visibility">https://gcc.gnu.org/wiki/Visibility</a>).</p>
+</section>
+<section id="matx-in-offline-environments">
+<h1>MatX in Offline Environments<a class="headerlink" href="#matx-in-offline-environments" title="Permalink to this headline"></a></h1>
+<p>The MatX build system and CPM provide an easy-to-use mechanism to build projects using MatX in computing environments that do not have access to the internet.
+As described earlier, CPM provides a convenient mechanism to identify and locally cache all of the required third-party dependencies, which can
+then be packaged and delivered to offline systems manually. It is easy to package a build of MatX in preparation of deployment to closed area, all you need is
+an internet-enabled computer to prepare your package. The steps below outline the process for preparing your package, compressing it for transfer to your system,
+and building on the offline system.</p>
+<ul>
+<li><p>Clone the MatX repository on an internet-enabled environment (this does not need to be identical to the deployment environment, but is simpler if it is / can build MatX)</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>git clone git@github.com:NVIDIA/MatX.git
+</pre></div>
+</div>
+</li>
+<li><p>Determine the location you would like to build the CPM cache at, and export the variable.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> CPM_SOURCE_CACHE <span class="nv">$HOME_ONLINE</span>/matx_cpm_cache
+</pre></div>
+</div>
+</li>
+<li><p>Build MatX with the build options required by your project, following the steps outlined above</p></li>
+<li><p>TAR and Compress the CPM cache for easy transport</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>tar -czvf matx_cache_VERS_NUM_.tar.gz <span class="nv">$HOME_ONLINE</span>/matx_cpm_cache
+</pre></div>
+</div>
+</li>
+<li><p>Transfer MatX Source code and CPM cache to your offline system</p></li>
+<li><p>Uncompress your cache TAR in a location available while building MatX</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>tar -xvf matx_cache_VERS_NUM_.tar.gz  <span class="nv">$HOME_OFFLINE</span>
+</pre></div>
+</div>
+</li>
+<li><p>Export the CPM_SOURCE_CACHE to your environment before building MatX</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> CPM_SOURCE_CACHE <span class="nv">$HOME_OFFLINE</span>/matx_cpm_cache
+</pre></div>
+</div>
+</li>
+<li><p>Build your MatX project per your standard process, CPM will automatically use the cache</p></li>
+</ul>
 </section>
 
 

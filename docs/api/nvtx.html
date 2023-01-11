@@ -1,0 +1,519 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>NVTX Profiling &#8212; matx  documentation</title>
+    
+  <link href="../_static/css/theme.css" rel="stylesheet">
+  <link href="../_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    
+  <link rel="preload" as="script" href="../_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="MATLAB/Python To MatX Translation" href="../matlabpython.html" />
+    <link rel="prev" title="einsum" href="einsum.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+      
+      
+      <h1 class="site-logo" id="site-title">matx  documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../build.html">
+   Building MatX
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../quickstart.html">
+   Quick Start
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../creation.html">
+   Creating Tensors
+  </a>
+ </li>
+ <li class="toctree-l1 current active has-children">
+  <a class="reference internal" href="index.html">
+   API Reference
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorview.html">
+     Tensors
+    </a>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="transformations.html">
+     Tensor Transformations
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+    <label for="toctree-checkbox-2">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="fft.html">
+       FFT
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="matmul.html">
+       Matrix Multiply (GEMM)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="solver.html">
+       Linear Solvers
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="inverse.html">
+       Matrix Inverse
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="filter.html">
+       Filtering (IIR and FIR)
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="reduce.html">
+       Reductions
+      </a>
+     </li>
+     <li class="toctree-l3">
+      <a class="reference internal" href="sort.html">
+       Sorting
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorops.html">
+     Tensor Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tensorgenerators.html">
+     Generator Operators
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="stats.html">
+     Statistics
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="random.html">
+     Random Number Generation
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="utilities.html">
+     Utilities
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="type_traits.html">
+     Type Traits
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="einsum.html">
+     einsum
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     NVTX Profiling
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../matlabpython.html">
+   MATLAB/Python To MatX Translation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../examples/index.html">
+   Example Applications
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../examples/fftconv.html">
+     FFT Convolution
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../limitations.html">
+   Limitations
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../_sources/api/nvtx.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#overview">
+   Overview
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#enabling-nvtx-api-and-setting-log-level">
+   Enabling NVTX API and Setting Log Level
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#using-the-nvtx-api">
+   Using the NVTX API
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#nvtx-examples">
+   NVTX Examples
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-nvtx-api">
+   MatX NVTX API
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-nvtx-logging-levels">
+   MatX NVTX Logging Levels
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#matx-nvtx-auto-range-colors">
+   MatX NVTX Auto Range Colors
+  </a>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <section id="nvtx-profiling">
+<h1>NVTX Profiling<a class="headerlink" href="#nvtx-profiling" title="Permalink to this headline"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline"></a></h2>
+<p>MatX provides an NVTX API to enable native compile-in profiling capabilities. The MatX NVTX API enable a user to
+easily profile all MatX calls using built-in NVTX ranges, while also providing a convenient API for the user to insert
+custom ranges in their own code. This API provides many convenience features such as:</p>
+<ul class="simple">
+<li><p>A convenient compile-in/compile-out MACRO based API</p></li>
+<li><p>verbosity levels allowing varying levels of profiling detail</p></li>
+<li><p>Built-in color rotation</p></li>
+<li><p>Automatic scope management and range naming</p></li>
+<li><p>Overloaded API for manual range specification</p></li>
+</ul>
+<p>The MatX NVTX API is implemented as a set of C++ Macros, allowing the user to compile all calls out of the project for
+maximum performance when profiling is not needed.</p>
+</section>
+<section id="enabling-nvtx-api-and-setting-log-level">
+<h2>Enabling NVTX API and Setting Log Level<a class="headerlink" href="#enabling-nvtx-api-and-setting-log-level" title="Permalink to this headline"></a></h2>
+<p>To enable the NVTX Profiling API, simple compile with the <code class="docutils literal notranslate"><span class="pre">MATX_NVTX_FLAG=ON</span></code> enabled in the cmake command.
+Once the flags are enabled at compile time, the project defaults to logging at the API level, which will provide NVTX
+ranges for all MatX API calls. If another logging level is desired, this can be changed using the <code class="docutils literal notranslate"><span class="pre">matx::setNVTXLogLevel()</span></code> call.
+Possible log levels are defined in <code class="docutils literal notranslate"><span class="pre">matx_nvxtLogLevels</span></code>.</p>
+</section>
+<section id="using-the-nvtx-api">
+<h2>Using the NVTX API<a class="headerlink" href="#using-the-nvtx-api" title="Permalink to this headline"></a></h2>
+<p>The MatX NVTX API consists of two modes: auto managed, and manual range. The auto-managed API will automatically match the NVTX range to
+the scope in which it is declared, establishing the NVTX range from the call’s instantiation to the end of its parent scope. Only a single
+call is needed, with optional inputs defined below. If no message is provided, the call defaults to using the calling function’s name as
+the NVTX range’s message.</p>
+<p>The Manual Range NVTX API requires the user to make a call to the NVTX API at both the beginning and end of the desired range. The Manual
+Range API uses a user defined handle (int) to reference the NVTX range. A Manual NVTX Range must be fully qualified on every instantiation.</p>
+</section>
+<section id="nvtx-examples">
+<h2>NVTX Examples<a class="headerlink" href="#nvtx-examples" title="Permalink to this headline"></a></h2>
+<table class="table">
+<colgroup>
+<col style="width: 60%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command</p></th>
+<th class="head"><p>Result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MATX_NVTX_START(“”)</p></td>
+<td><p>NVTX range scoped to this function, named the same as function with log level of Internal</p></td>
+</tr>
+<tr class="row-odd"><td><p>MATX_NVTX_START(“MY_MESSAGE”)</p></td>
+<td><p>NVTX range scoped to this function, named “MY_MESSAGE” with log level of Internal</p></td>
+</tr>
+<tr class="row-even"><td><p>MATX_NVTX_START(“MY_MESSAGE”, matx::MATX_NVTX_LOG_API )</p></td>
+<td><p>NVTX range scoped to this function, named “MY_MESSAGE” with log level of API</p></td>
+</tr>
+<tr class="row-odd"><td><p>MATX_NVTX_START_RANGE( “MY_MESSAGE”, matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1 )</p></td>
+<td><p>NVTX range with manual scope, named “MY_MESSAGE”, log level of USER, and handle ID of 1</p></td>
+</tr>
+<tr class="row-even"><td><p>MATX_NVTX_END_RANGE(1)</p></td>
+<td><p>Ends the NVTX range of range with a handle of 1 used in NVTX_START_RANGE</p></td>
+</tr>
+</tbody>
+</table>
+<p>Code examples are provided in the <code class="docutils literal notranslate"><span class="pre">simple_radar_pipeline</span></code> code to show user utilization of the MatX NVTX API.</p>
+</section>
+<section id="matx-nvtx-api">
+<h2>MatX NVTX API<a class="headerlink" href="#matx-nvtx-api" title="Permalink to this headline"></a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx15setNVTXLogLevelE18matx_nvxtLogLevels">
+<span id="_CPPv3N4matx15setNVTXLogLevelE18matx_nvxtLogLevels"></span><span id="_CPPv2N4matx15setNVTXLogLevelE18matx_nvxtLogLevels"></span><span id="matx::setNVTXLogLevel__matx_nvxtLogLevels"></span><span class="target" id="namespacematx_1a35ebcc6aba59b17bb55cb2fc45f9bbb7"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">setNVTXLogLevel</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N4matx18matx_nvxtLogLevelsE" title="matx::matx_nvxtLogLevels"><span class="n"><span class="pre">matx_nvxtLogLevels</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">newNVTXLevel</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx15setNVTXLogLevelE18matx_nvxtLogLevels" title="Permalink to this definition"></a><br /></dt>
+<dd><p>Utility Function to set Global Log Level. should be called through the MATX_NVTX_SET_LOG_LEVEL macro with the same parameters. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx13registerEventEi13nvtxRangeId_t">
+<span id="_CPPv3N4matx13registerEventEi13nvtxRangeId_t"></span><span id="_CPPv2N4matx13registerEventEi13nvtxRangeId_t"></span><span id="matx::registerEvent__i.nvtxRangeId_t"></span><span class="target" id="namespacematx_1aff911bec33abf296249b47954a4000cb"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">registerEvent</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">registerId</span></span>, <span class="n"><span class="pre">nvtxRangeId_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">eventId</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx13registerEventEi13nvtxRangeId_t" title="Permalink to this definition"></a><br /></dt>
+<dd><p>fucntion wrapping NVTX management for automatic creation/deletion MATX_NVTX_START or MATX_NVTX_START_RANGE macro with the same parameters </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx8endEventEi">
+<span id="_CPPv3N4matx8endEventEi"></span><span id="_CPPv2N4matx8endEventEi"></span><span id="matx::endEvent__i"></span><span class="target" id="namespacematx_1a0bf77386e620c22372ec8483c0f4d694"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">endEvent</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">id</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8endEventEi" title="Permalink to this definition"></a><br /></dt>
+<dd><p>fucntion wrapping NVTX management for automatic creation/deletion MATX_NVTX_END_RANGE macro with the same parameters </p>
+</dd></dl>
+
+</section>
+<section id="matx-nvtx-logging-levels">
+<h2>MatX NVTX Logging Levels<a class="headerlink" href="#matx-nvtx-logging-levels" title="Permalink to this headline"></a></h2>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevelsE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevelsE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevelsE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matx_nvxtLogLevels</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevelsE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>levels of NVTX Logging. Lower level is more selective (prints less) </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_NONEE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_NONEE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_NONEE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141aa834c34f500b4502d40265bf7ca19034"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MATX_NVTX_LOG_NONE</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_NONEE" title="Permalink to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141aaf75f95294654cfce5e3c0d339c3066f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MATX_NVTX_LOG_USER</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE" title="Permalink to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_APIE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_APIE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_APIE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141a830d169e19dfd645b423e799ef58575f"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MATX_NVTX_LOG_API</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_APIE" title="Permalink to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevels22MATX_NVTX_LOG_INTERNALE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevels22MATX_NVTX_LOG_INTERNALE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevels22MATX_NVTX_LOG_INTERNALE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141ab6999e133d190969631af854bd7bfb33"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MATX_NVTX_LOG_INTERNAL</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevels22MATX_NVTX_LOG_INTERNALE" title="Permalink to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_ALLE">
+<span id="_CPPv3N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_ALLE"></span><span id="_CPPv2N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_ALLE"></span><span class="target" id="namespacematx_1a505928bb43e19d4d9383f8a4bb4b8141a414df1d49a720538267b29c42cce65a8"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MATX_NVTX_LOG_ALL</span></span></span><a class="headerlink" href="#_CPPv4N4matx18matx_nvxtLogLevels17MATX_NVTX_LOG_ALLE" title="Permalink to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="matx-nvtx-auto-range-colors">
+<h2>MatX NVTX Auto Range Colors<a class="headerlink" href="#matx-nvtx-auto-range-colors" title="Permalink to this headline"></a></h2>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx10nvtxColorsE">
+<span id="_CPPv3N4matx10nvtxColorsE"></span><span id="_CPPv2N4matx10nvtxColorsE"></span><span id="matx::nvtxColors__int32_tCA"></span><span class="target" id="namespacematx_1a6ed1b55a903019a267669b2a2c326818"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">nvtxColors</span></span></span><span class="p"><span class="pre">[</span></span><span class="n"><span class="pre">nunNvtxColors</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="n"><span class="pre">NVTX_BLACK</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_RED</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_GREEN</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_BLUE</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_ORANGE</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_PURPLE</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_YELLOW</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_TEAL</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_PINK</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">NVTX_WHITE</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N4matx10nvtxColorsE" title="Permalink to this definition"></a><br /></dt>
+<dd><p>automatic NVTX Colors </p>
+</dd></dl>
+
+</section>
+</section>
+
+
+              </div>
+              
+        
+            <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="einsum.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">einsum</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="../matlabpython.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">MATLAB/Python To MatX Translation</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer">
+    <div class="container">
+      <p>
+        
+          By Nvidia<br/>
+        
+            &copy; Copyright 2021, Nvidia.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="../_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+ 
+
+  <style>
+         .wy-nav-content { max-width: 1600px; }
+         .wy-table-responsive table td, .wy-table-responsive table th {
+            white-space: normal;
+          }          
+  </style>
+
+
+  </body>
+</html>
