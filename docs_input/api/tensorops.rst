@@ -101,10 +101,8 @@ Advanced Operators
 .. doxygenfunction:: clone(Op t, const index_t (&shape)[Rank])
 .. doxygenfunction:: clone(Op t, const std::array<index_t, Rank> &shape)
 .. doxygenfunction:: stack 
-.. doxygenfunction:: slice(const OpType &op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
-.. doxygenfunction:: slice(const OpType opN, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
+.. doxygenfunction:: slice(const OpType operator, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
 .. doxygenfunction:: slice(const OpType op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()], const index_t (&strides)[OpType::Rank()])
-.. doxygenfunction:: slice(const OpType &op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()], const index_t (&strides)[OpType::Rank()])
 .. doxygenfunction:: permute(detail::tensor_impl_t<T, Rank> &out, const detail::tensor_impl_t<T, Rank> &in, const std::initializer_list<uint32_t> &dims, const cudaStream_t stream)
 .. doxygenfunction:: permute(const T &op, const int32_t (&dims)[T::Rank()])
 .. doxygenfunction:: permute(const T &op, const std::array<int32_t, T::Rank()> &dims)

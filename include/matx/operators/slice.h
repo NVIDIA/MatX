@@ -211,7 +211,9 @@ namespace matx
 
    * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam N The Rank of the output operator
+   * The Rank template parameter N is optional when rank does not change
+   *
+   * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
    * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
@@ -234,8 +236,10 @@ namespace matx
    * The rank of the the operator must be greater than 0.
 
    * This operator can appear as an rvalue or lvalue. 
+   
+   * The Rank template parameter N is optional when rank does not change
    *
-   * @tparam N The Rank of the output operator
+   * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
    * @param operator Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
