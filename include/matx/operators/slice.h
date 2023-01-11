@@ -237,19 +237,19 @@ namespace matx
    *
    * @tparam N The Rank of the output operator
    * @tparam OpType Input operator/tensor type
-   * @param opN Input operator
+   * @param operator Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
    */
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType opN, 
+  __MATX_INLINE__ auto slice (const OpType operator, 
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()]) 
   {
      typename OpType::shape_type strides[OpType::Rank()];
      for (int i = 0; i < OpType::Rank(); i++)
        strides[i] = 1;
-     return detail::SliceOp<N,OpType>(opN, starts, ends, strides);
+     return detail::SliceOp<N,OpType>(operator, starts, ends, strides);
   }
 } // end namespace matx
