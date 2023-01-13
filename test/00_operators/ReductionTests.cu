@@ -283,15 +283,22 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
 
-  auto t2    = make_tensor<TypeParam>({86760, 16});
-  auto t2out    = make_tensor<TypeParam>({86760, 16});
-  softmax(t2out, t2, {1});  
 
   auto t3    = make_tensor<TypeParam>({8,size,size});
   auto t3_out = make_tensor<TypeParam>({8,size,size});
 
   pb->NumpyToTensorView(t3, "t3");
   softmax(t3_out, t3, {2});
+  MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
+
+  if constexpr (std::is_same_v<TypeParam, float>) {
+    auto t3h    = make_tensor<float>({2, 2, 8,size,size});
+    auto t3_outh = make_tensor<matxFp16>({2, 2, 8,size,size});
+
+    softmax(t3_outh, as_type<matxFp16>(t3h), {4});    
+
+//t3_outh.Print();
+  }
   
 
   MATX_EXIT_HANDLER();

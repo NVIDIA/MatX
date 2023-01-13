@@ -160,14 +160,14 @@ namespace detail {
   template <typename Func, typename Tuple, size_t... S>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
     
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
     }
     else {
       return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
             return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
     else {
@@ -178,52 +178,52 @@ namespace detail {
   template <class Func, class Tuple>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t)
   {
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
   }
 
   template <class Func, class Tuple>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t)
   {
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
   }
 
