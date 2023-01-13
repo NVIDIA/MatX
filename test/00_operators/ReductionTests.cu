@@ -283,9 +283,9 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
 
-  // auto t2    = make_tensor<TypeParam>({86760, 16});
-  // auto t2out    = make_tensor<TypeParam>({86760, 16});
-  // softmax(t2out, t2, {1});  
+  auto t2    = make_tensor<TypeParam>({86760, 16});
+  auto t2out    = make_tensor<TypeParam>({86760, 16});
+  softmax(t2out, t2, {1});  
 
   auto t3    = make_tensor<TypeParam>({8,size,size});
   auto t3_out = make_tensor<TypeParam>({8,size,size});

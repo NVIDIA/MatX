@@ -68,6 +68,9 @@ struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
 };  
 
+template <typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
