@@ -21,6 +21,6 @@ class softmax:
     def run(self):
         self.res['t1'] = self.t1
         self.res['t3'] = self.t3
-        self.res['t1_sm'] = special.softmax(self.t1)
+        self.res['t1_sm'] = special.softmax(self.t1)   
         self.res['t3_sm_axis2'] = special.softmax(self.t3, axis=2)
         return self.res

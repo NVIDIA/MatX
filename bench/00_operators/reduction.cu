@@ -10,10 +10,9 @@ template <typename ValueType>
 void softmax(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
-
-
-auto t2    = make_tensor<ValueType>({86760, 16});
-auto t2out    = make_tensor<ValueType>({86760, 16});
+  
+  auto t2    = make_tensor<ValueType>({8,300,300});
+  auto t2out    = make_tensor<ValueType>({8,300,300});
   t2.PrefetchDevice(0);
   t2out.PrefetchDevice(0);
 

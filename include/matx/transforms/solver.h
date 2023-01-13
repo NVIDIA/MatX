@@ -142,7 +142,9 @@ public:
   {
     matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
     matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_DEVICE_MEMORY);
+    matxAlloc((void **)&h_info, batches * sizeof(*h_info), MATX_HOST_MEMORY);
     matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
+    printf("Allocating %zu batches %zu %zu\n", batches, hspace, dspace);
   }
 
   virtual void GetWorkspaceSize(size_t *host, size_t *device) = 0;
@@ -152,6 +154,7 @@ protected:
   cusolverDnParams_t dn_params;
   std::vector<void *> batch_a_ptrs;
   int *d_info;
+  int *h_info;
   void *d_workspace = nullptr;
   void *h_workspace = nullptr;
   size_t hspace;
@@ -735,9 +738,26 @@ public:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
+    // Batching -- check if we can use the older API that allows batching. The 64-bit API doesn't
+    // have batching yet
+    if (a.Rank() > 2) {
+      legacy_batched = true;
+
+      #pragma unroll
+      for (int r = 0; r < a.Rank(); r++) {
+        if (a.Size(r) > std::numeric_limits<int>::max()) {
+          legacy_batched = false;
+          break;
+        }
+      }
+    }
+    else {
+      legacy_batched = false;
+    }
+
     scratch = make_tensor_p<T1>(a.Shape(), MATX_DEVICE_MEMORY);
     params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
-
+    
     GetWorkspaceSize(&hspace, &dspace);
 
     SetBatchPointers(*scratch);
@@ -746,13 +766,98 @@ public:
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
   {
-    cusolverStatus_t ret =
-        cusolverDnXgesvd_bufferSize(
-            handle, dn_params, params.jobu, params.jobvt, params.m, params.n,
-            MatXTypeToCudaType<T1>(), params.A, params.m,
-            MatXTypeToCudaType<T3>(), params.S, MatXTypeToCudaType<T2>(),
-            params.U, params.m, MatXTypeToCudaType<T4>(), params.V, params.n,
-            MatXTypeToCudaType<T1>(), device, host);
+    cusolverStatus_t ret;
+
+    if (legacy_batched) {
+      ret = cusolverDnCreateGesvdjInfo(&gesvdj_params);
+      cusolverDnXgesvdjSetTolerance(gesvdj_params, 1e-7);
+      cusolverDnXgesvdjSetMaxSweeps(gesvdj_params, 15);
+      cusolverDnXgesvdjSetSortEig(gesvdj_params, 0);
+      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
+      int host_mem;
+      if (std::is_same_v<typename ATensor::value_type, float>) {
+
+        ret =
+            cusolverDnSgesvdjBatched_bufferSize(
+                handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<float*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<float*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<float*>(params.V), 
+                static_cast<int>(params.n),
+                &host_mem, 
+                gesvdj_params, 
+                static_cast<int>(1));  
+        printf("%d %d %p %d %p %p %d %p %d %d %d\n", static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<float*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<float*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<float*>(params.V), 
+                static_cast<int>(params.n), ret, host_mem);                      
+      }
+      else if (std::is_same_v<typename ATensor::value_type, double>) {
+        ret =
+            cusolverDnDgesvdjBatched_bufferSize(
+                handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<double*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<double*>(params.S), 
+                reinterpret_cast<double*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<double*>(params.V), 
+                static_cast<int>(params.n),
+                &host_mem, 
+                gesvdj_params, 
+                static_cast<int>(params.batch_size));        
+      }
+      else if (std::is_same_v<typename ATensor::value_type, cuda::std::complex<float>>) {
+        ret =
+            cusolverDnCgesvdjBatched_bufferSize(
+                handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<cuComplex*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<cuComplex*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<cuComplex*>(params.V), 
+                static_cast<int>(params.n),
+                &host_mem, 
+                gesvdj_params, 
+                static_cast<int>(params.batch_size));        
+      }
+      else if (std::is_same_v<typename ATensor::value_type, cuda::std::complex<double>>) {
+        ret =
+            cusolverDnZgesvdjBatched_bufferSize(
+                handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<cuDoubleComplex*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<double*>(params.S), 
+                reinterpret_cast<cuDoubleComplex*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<cuDoubleComplex*>(params.V), 
+                static_cast<int>(params.n),
+                &host_mem, 
+                gesvdj_params, 
+                static_cast<int>(params.batch_size));        
+      }           
+      
+      *host = host_mem;    
+      *device = host_mem;   
+    }
+    else {
+      ret =
+          cusolverDnXgesvd_bufferSize(
+              handle, dn_params, params.jobu, params.jobvt, params.m, params.n,
+              MatXTypeToCudaType<T1>(), params.A, params.m,
+              MatXTypeToCudaType<T3>(), params.S, MatXTypeToCudaType<T2>(),
+              params.U, params.m, MatXTypeToCudaType<T4>(), params.V, params.n,
+              MatXTypeToCudaType<T1>(), device, host);
+    }
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
 
@@ -782,55 +887,107 @@ public:
             cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    batch_s_ptrs.clear();
-    batch_v_ptrs.clear();
-    batch_u_ptrs.clear();
-        
-    if constexpr (RANK == 2) {
-      batch_s_ptrs.push_back(&s(0));
-      batch_u_ptrs.push_back(&u(0, 0));
-      batch_v_ptrs.push_back(&v(0, 0));
-    }
-    else if constexpr (RANK == 3) {
-      for (int i = 0; i < a.Size(0); i++) {
-        batch_s_ptrs.push_back(&s(i, 0));
-        batch_u_ptrs.push_back(&u(i, 0, 0));
-        batch_v_ptrs.push_back(&v(i, 0, 0));
-      }
-    }
-    else {
-      for (int i = 0; i < a.Size(0); i++) {
-        for (int j = 0; j < a.Size(1); j++) {
-          batch_s_ptrs.push_back(&s(i, j, 0));
-          batch_u_ptrs.push_back(&u(i, j, 0, 0));
-          batch_v_ptrs.push_back(&v(i, j, 0, 0));
-        }
-      }
-    }
+
+    cusolverStatus_t ret; 
 
     cusolverDnSetStream(handle, stream);
     matx::copy(*scratch, a, stream);
-    int info;
 
-    // At this time cuSolver does not have a batched 64-bit SVD interface. Change
-    // this to use the batched version once available.
-    for (size_t i = 0; i < batch_a_ptrs.size(); i++) {
-
-      auto ret = cusolverDnXgesvd(
-          handle, dn_params, jobu, jobvt, params.m, params.n,
-          MatXTypeToCudaType<T1>(), batch_a_ptrs[i], params.m,
-          MatXTypeToCudaType<T3>(), batch_s_ptrs[i], MatXTypeToCudaType<T2>(),
-          batch_u_ptrs[i], params.m, MatXTypeToCudaType<T4>(), batch_v_ptrs[i],
-          params.n, MatXTypeToCudaType<T1>(),
-          reinterpret_cast<uint8_t *>(d_workspace) + i * dspace, dspace,
-          reinterpret_cast<uint8_t *>(h_workspace) + i * hspace, hspace,
-          d_info + i);
+    if (legacy_batched) {
+          if constexpr(scratch->Rank() == 3)scratch->Print(1, 1, 10);
+      if (std::is_same_v<typename ATensor::value_type, float>) {
+        ret =
+            cusolverDnSgesvdjBatched(
+                handle, CUSOLVER_EIG_MODE_VECTOR , static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<float*>(params.A), static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<float*>(params.U), static_cast<int>(params.m), reinterpret_cast<float*>(params.V), static_cast<int>(params.n),
+                reinterpret_cast<float*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(1));        
+      }
+      else if (std::is_same_v<typename ATensor::value_type, double>) {
+        ret =
+            cusolverDnDgesvdjBatched(
+                handle, CUSOLVER_EIG_MODE_VECTOR , static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<double*>(params.A), static_cast<int>(params.m),
+                reinterpret_cast<double*>(params.S), 
+                reinterpret_cast<double*>(params.U), static_cast<int>(params.m), reinterpret_cast<double*>(params.V), static_cast<int>(params.n),
+                reinterpret_cast<double*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(params.batch_size));        
+      }
+      else if (std::is_same_v<typename ATensor::value_type, cuda::std::complex<float>>) {
+        ret =
+            cusolverDnCgesvdjBatched(
+                handle, CUSOLVER_EIG_MODE_VECTOR , static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<cuComplex*>(params.A), static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<cuComplex*>(params.U), static_cast<int>(params.m), reinterpret_cast<cuComplex*>(params.V), static_cast<int>(params.n),
+                reinterpret_cast<cuComplex*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(params.batch_size));        
+      }
+      else if (std::is_same_v<typename ATensor::value_type, cuda::std::complex<double>>) {
+        ret =
+            cusolverDnZgesvdjBatched(
+                handle, CUSOLVER_EIG_MODE_VECTOR , static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<cuDoubleComplex*>(params.A), static_cast<int>(params.m),
+                reinterpret_cast<double*>(params.S), 
+                reinterpret_cast<cuDoubleComplex*>(params.U), static_cast<int>(params.m), reinterpret_cast<cuDoubleComplex*>(params.V), static_cast<int>(params.n),
+                reinterpret_cast<cuDoubleComplex*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(params.batch_size));        
+      }  
+      printf("%d\n", ret);
 
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
       // This will block. Figure this out later
-      cudaMemcpy(&info, d_info + i, sizeof(info), cudaMemcpyDeviceToHost);
-      MATX_ASSERT(info == 0, matxSolverError);
+      cudaMemcpy(h_info, d_info, sizeof(*h_info) * params.batch_size, cudaMemcpyDeviceToHost);
+      for (size_t b = 0; b < params.batch_size; b++) {
+        MATX_ASSERT(*(h_info+b) == 0, matxSolverError);
+      }        
+    }
+    else {     
+      batch_s_ptrs.clear();
+      batch_v_ptrs.clear();
+      batch_u_ptrs.clear();
+          
+      if constexpr (RANK == 2) {
+        batch_s_ptrs.push_back(&s(0));
+        batch_u_ptrs.push_back(&u(0, 0));
+        batch_v_ptrs.push_back(&v(0, 0));
+      }
+      else if constexpr (RANK == 3) {
+        for (int i = 0; i < a.Size(0); i++) {
+          batch_s_ptrs.push_back(&s(i, 0));
+          batch_u_ptrs.push_back(&u(i, 0, 0));
+          batch_v_ptrs.push_back(&v(i, 0, 0));
+        }
+      }
+      else {
+        for (int i = 0; i < a.Size(0); i++) {
+          for (int j = 0; j < a.Size(1); j++) {
+            batch_s_ptrs.push_back(&s(i, j, 0));
+            batch_u_ptrs.push_back(&u(i, j, 0, 0));
+            batch_v_ptrs.push_back(&v(i, j, 0, 0));
+          }
+        }
+      }
+
+      int info;
+      // At this time cuSolver does not have a batched 64-bit SVD interface. Change
+      // this to use the batched version once available.
+      for (size_t i = 0; i < batch_a_ptrs.size(); i++) {
+        ret = cusolverDnXgesvd(
+            handle, dn_params, jobu, jobvt, params.m, params.n,
+            MatXTypeToCudaType<T1>(), batch_a_ptrs[i], params.m,
+            MatXTypeToCudaType<T3>(), batch_s_ptrs[i], MatXTypeToCudaType<T2>(),
+            batch_u_ptrs[i], params.m, MatXTypeToCudaType<T4>(), batch_v_ptrs[i],
+            params.n, MatXTypeToCudaType<T1>(),
+            reinterpret_cast<uint8_t *>(d_workspace) + i * dspace, dspace,
+            reinterpret_cast<uint8_t *>(h_workspace) + i * hspace, hspace,
+            d_info + i);
+
+        MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
+        // This will block. Figure this out later
+        cudaMemcpy(&info, d_info + i, sizeof(info), cudaMemcpyDeviceToHost);
+        MATX_ASSERT(info == 0, matxSolverError);
+      }
     }
   }
 
@@ -848,6 +1005,8 @@ private:
   std::vector<T3 *> batch_s_ptrs;
   std::vector<T4 *> batch_v_ptrs;
   std::vector<T2 *> batch_u_ptrs;  
+  gesvdjInfo_t gesvdj_params = NULL;
+  bool legacy_batched;
   DnSVDParams_t params;
 };
 
