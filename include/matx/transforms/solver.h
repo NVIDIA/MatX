@@ -1464,4 +1464,300 @@ void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
   matx::copy(out, tv.PermuteMatrix(), stream);  
 }
 
+
+
+/**
+ * Perform a SVD decomposition using the power iteration.  This version of
+ * SVD works well on small n/m with large batch.
+ *
+ *
+ * @tparam UType
+ *   Tensor or operator type for output of U eigen vectors.
+ * @tparam SType
+ *   Tensor or operator type for output of S eigen values. SType must have Rank one less than AType.
+ * @tparam VType
+ *   Tensor or operator type for output of VT eigen vectors.
+ * @tparam AType
+ *   Tensor or operator type for output of A input tensors.
+ * @tparam X0Type
+ *   Tensor or operator type for X0 initial guess in power iteration.
+ *
+ * @param U
+ *   U tensor or operator for left eigen vectors output with size "batches by m by k"
+ * @param S
+ *   S tensor or operator for eigen values output with size "batches by k"
+ * @param VT
+ *   VT tensor or operator for right eigen vectors output as VH with size "batches by k by n"
+ * @param A
+ *   Input tensor or operator for tensor A input with size "batches by m by n"
+ * @param x0
+ *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
+ *   Random tensor of size min(n,m) is suggested.
+ * @param iterations
+ *   The number of power iterations to perform for each eigen value.  
+ * @param stream
+ *   CUDA stream
+ * @param k
+ *    The number of eigen values to find.  Default is all eigen values: min(m,n).
+ */
+template<typename UType, typename SType, typename VTType, typename AType, typename X0Type>
+void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  static_assert(U.Rank() == A.Rank());
+  static_assert(VT.Rank() == A.Rank());
+  static_assert(S.Rank() == A.Rank()-1);
+
+  using ATypeS = typename AType::scalar_type;
+  using STypeS = typename SType::scalar_type;
+  const int RANK = AType::Rank();
+
+  auto m = A.Size(RANK-2);  // rows
+  auto n = A.Size(RANK-1);  // cols
+  auto d = std::min(n,m); // dim for AAT or ATA
+
+  MATX_ASSERT_STR(x0.Size(x0.Rank()-1) == d, matxInvalidSize, "svdpi: Initial guess x0 must have the last dimension equal to min(m,n)");
+
+  // compute u or v first.  Depending on n and m one is more efficient than the other
+  bool ufirst = (n >= m);
+
+  // if sential found get all eigenvalues
+  if( k == -1 ) k = (int) d;
+
+  // Create shapes for tensors below
+  auto AShape = A.Shape();
+
+  // AT will be dxd
+  auto ATShape = A.Shape();
+  ATShape[RANK-1] = d;
+  ATShape[RANK-2] = d;
+
+  //XM will be dx1
+  auto xmShape = ATShape;
+  xmShape[RANK-1] = 1;
+
+  // create x slice parameters
+  // begin is zeros, last dim is dropped
+  auto xSliceB = A.Shape();
+  auto xSliceE = A.Shape();
+
+  xSliceB.fill(0);
+  xSliceE.fill(matxEnd);
+  xSliceE[RANK-1] = matxDropDim;
+
+  //one per batch dim
+  std::array<index_t, RANK-2> sumsShape;
+  for(int i=0;i<RANK-2;i++) {
+    sumsShape[i] = AShape[i];
+  }
+
+#if 1
+  auto Ap = make_tensor<ATypeS>(AShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto uv = make_tensor<ATypeS>(AShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto xm = make_tensor<ATypeS>(xmShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  
+  // we shouldn't need sums but cub doesn't support strided tensors so we cannot write directly at this time.
+  auto sums = make_tensor<STypeS>(sumsShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+#else
+  auto Ap = make_tensor<ATypeS>(AShape);
+  auto uv = make_tensor<ATypeS>(AShape);
+  auto AT = make_tensor<ATypeS>(ATShape);
+  auto xm = make_tensor<ATypeS>(xmShape);
+
+  // we shouldn't need sums but cub doesn't support strided tensors so we cannot write directly at this time.
+  auto sums = make_tensor<STypeS>(sumsShape);
+#endif
+  auto x = slice<RANK-1>(xm, xSliceB, xSliceE);
+
+  (Ap = A).run(stream);
+
+  //printf("Ap:\n"); Print(Ap);
+  // for each eigen value
+  for(int i = 0; i < k; i++) {
+
+    std::array<index_t, S.Rank()> sShapeB, sShapeE;
+
+    sShapeB.fill(0);
+    sShapeE.fill(matxEnd);
+
+    sShapeB[RANK-2] = i;
+    sShapeE[RANK-2] = matxDropDim;
+
+    // storing eigen values/nrms in current value of S
+    auto s = slice<RANK-2>(S,sShapeB, sShapeE);
+
+    // power iteration to extract dominant eigen vector
+    {
+      // initialize x randomly
+      (x = x0).run(stream);
+      //printf("x0:\n"); Print(x);
+
+      if( ufirst ) {
+        // compute A*AT
+        if constexpr (is_complex_v<ATypeS>) {
+          // use conj transpose for complex
+          matmul(AT, Ap, conj(transpose(Ap)), stream);
+        } else {
+          matmul(AT, Ap, transpose(Ap), stream);
+        }
+      } else { // !ufirst
+        // compute AT*A
+        if constexpr (is_complex_v<ATypeS>) {
+          // use conj transpose for complex
+          matmul(AT, conj(transpose(Ap)), Ap, stream);
+        } else {
+          matmul(AT, transpose(Ap), Ap, stream);
+        }
+      } // end ufirst
+
+      //printf("AT:\n"); Print(AT);
+      // for each fixed point iteration
+      for(int it = 0; it < iterations; it++) {
+
+        matmul(xm, AT, xm, stream);
+        //printf("x unnormalized:\n"); Print(x);
+
+        // normalize x at each iteration to avoid instability
+        // first compute sum of squares, norm will work for complex and real
+#if 0
+        sum(s, norm(x), stream);
+#else
+        //WAR cub not supporting strided output
+        sum(sums, norm(x), stream);
+        (s = sums).run(stream);;
+#endif
+        //printf("s:\n"); Print(s);
+        //printf("sums:\n"); Print(sums);
+
+        const int CRANK = s.Rank()+1;  // adding one more dim to s
+        std::array<index_t, CRANK> sCloneShape;
+        sCloneShape.fill(matxKeepDim);
+        sCloneShape[CRANK-1] = d;  // last dim is cloned d ways
+
+        (x = x / sqrt(clone(s, sCloneShape))).run(stream);
+        //printf("x normalized:\n"); Print(x);
+      }
+    }
+    //printf("x:\n"); Print(x);
+
+    // slice out current eigen vectors and eigen value we are working on
+    std::array<index_t, RANK> umShapeB, umShapeE;
+    std::array<index_t, RANK> vmShapeB, vmShapeE;
+
+    umShapeB.fill(0);
+    vmShapeB.fill(0);
+
+    umShapeE.fill(matxEnd);
+    vmShapeE.fill(matxEnd);
+
+    // making this dim only 1 element in size
+    umShapeB[RANK-1] = i;
+    umShapeE[RANK-1] = i+1;
+
+    // making this dim only 1 element in size
+    vmShapeB[RANK-2] = i;
+    vmShapeE[RANK-2] = i+1;
+
+    auto um = slice<RANK>(U, umShapeB, umShapeE);         // as matrix for matmul
+    auto vm = slice<RANK>(VT, vmShapeB, vmShapeE);         // as matrix for matmul
+
+    // u/v will drop the dim that is one element a vector
+    umShapeE[RANK-1] = matxDropDim;
+    vmShapeE[RANK-2] = matxDropDim;
+
+    auto u = slice<RANK-1>(U, umShapeB, umShapeE);  // as vector
+    auto v = slice<RANK-1>(VT,vmShapeB, vmShapeE);  // as vector
+
+    if( ufirst ) {
+      // copy eigen vector to u
+      (u = x).run(stream);
+
+      // compute v
+      if constexpr (is_complex_v<ATypeS>) {
+      // for complex we need the conj transpose of Ap
+        matmul(transpose(vm), conj(transpose(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      } else {
+        matmul(transpose(vm), transpose(Ap), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      }
+
+      // compute eigen value as L2 norm of v
+      // first compute sum of squares, norm will work for complex and real
+#if 0
+      sum(s, norm(v), stream);
+#else
+      //WAR cub not supporting strided output
+      sum(sums, norm(v), stream);
+      (s = sums).run(stream);;
+#endif
+      (s = sqrt(s)).run(stream);
+
+      // normalize v
+
+      const int CRANK = s.Rank()+1;  // adding one more dim to s
+      std::array<index_t, CRANK> sCloneShape;
+      sCloneShape.fill(matxKeepDim);
+      sCloneShape[CRANK-1] = n;  // last dim is cloned n ways
+
+      if constexpr (is_complex_v<ATypeS>) {
+        // since v is stored as the transpose we should also store it as the conj
+        (v = conj(v / clone(s, sCloneShape))).run(stream);
+      } else  {
+        (v = v / clone(s, sCloneShape)).run(stream);
+      }
+    } else {  // !ufirst
+      // copy eigen vector to v
+      if constexpr (is_complex_v<ATypeS>) {
+        // store V as the conj transpose
+        (v = conj(x)).run(stream);
+      } else {
+        (v = x).run(stream);
+      }
+
+      if constexpr (is_complex_v<ATypeS>) {
+        // compute u, undo conj
+        matmul(um, Ap, conj(transpose(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
+      } else {
+        matmul(um, Ap, transpose(vm), stream);    // (m x 1) = (m x n) ( (n x 1)
+      }
+      // compute eigen value as L2 norm of v
+      // first compute sum of squares, norm will work for complex and real
+#if 0
+      sum(s, norm(u), stream);
+#else
+      //WAR cub not supporting strided output
+      sum(sums, norm(u), stream);
+      (s = sums).run(stream);;
+#endif
+      (s = sqrt(s)).run(stream);
+      // normalize u
+      const int CRANK = s.Rank()+1;  // adding one more dim to s
+      std::array<index_t, CRANK> sCloneShape;
+      sCloneShape.fill(matxKeepDim);
+      sCloneShape[CRANK-1] = m;  // last dim is cloned m ways
+
+      (u = u / clone(s, sCloneShape)).run(stream);
+    } // end ufirst
+    
+    //printf("vm:\n"); Print(vm);
+    //printf("um:\n"); Print(um);
+    //printf("uv:\n"); Print(uv);
+
+    // Remove current eigen vectors from matrix
+    if(i < k - 1) {
+
+      // vm is already conj for complex so no need to conj here
+      matmul(uv, um, vm, stream);
+
+      const int CRANK = s.Rank()+ 2;  // adding one more dim to s
+      std::array<index_t, CRANK> sCloneShape;
+      sCloneShape.fill(matxKeepDim);
+      sCloneShape[CRANK-2] = m;  // second to last dim is cloned m ways
+      sCloneShape[CRANK-1] = n;  // last dim is cloned n ways
+
+      (Ap = Ap - clone(s, sCloneShape)  * uv).run(stream);
+    }
+  }
+}
+
 } // end namespace matx

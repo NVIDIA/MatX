@@ -202,9 +202,8 @@ public:
    * @returns
    *   A randomTensorView_t with given parameters
    */
-  template <int RANK, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-  inline auto GetTensorView(ShapeType &&shape, Distribution_t dist,
+  template <std::size_t RANK>
+  inline auto GetTensorView(const std::array<index_t, RANK> &shape, Distribution_t dist,
                             T alpha = 1, T beta = 0)
 {
   return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
@@ -228,7 +227,7 @@ public:
   inline auto GetTensorView(const index_t (&sizes)[RANK], Distribution_t dist,
                             T alpha = 1, T beta = 0)
   {
-    return GetTensorView<RANK>(detail::to_array(sizes), dist, alpha, beta);
+    return GetTensorView(detail::to_array(sizes), dist, alpha, beta);
   }
 
   /**
