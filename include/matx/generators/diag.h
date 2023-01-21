@@ -139,6 +139,6 @@ namespace matx
    */
   template <typename T = int, int RANK> inline auto eye(const index_t (&s)[RANK])
   {
-    return eye(detail::to_array(s));
+    return eye<T>(detail::to_array(s));
   }
 } // end namespace matx

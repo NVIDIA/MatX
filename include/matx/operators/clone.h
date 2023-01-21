@@ -115,7 +115,7 @@ namespace matx
    * Each element is either the size of the cloned dimension or matxKeepDim to be from the source tensor
    * @return operator to compute the cloned value
    */
-  template <int Rank, typename Op>
+  template <std::size_t Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> &shape)
     {
       if constexpr (is_tensor_view_v<Op>) {
