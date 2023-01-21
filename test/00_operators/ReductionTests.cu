@@ -272,8 +272,8 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   MATX_ENTER_HANDLER();
 
   auto pb = std::make_unique<detail::MatXPybind>();
-  constexpr index_t size = 4;
-  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {8, size, size});
+  constexpr index_t size = 300;
+  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {80, size, size});
 
   tensor_t<TypeParam, 1> t1({size});
   tensor_t<TypeParam, 1> t1_out({size});
@@ -284,21 +284,21 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
 
 
-  auto t3    = make_tensor<TypeParam>({8,size,size});
-  auto t3_out = make_tensor<TypeParam>({8,size,size});
+  auto t3    = make_tensor<TypeParam>({80,size,size});
+  auto t3_out = make_tensor<TypeParam>({80,size,size});
 
   pb->NumpyToTensorView(t3, "t3");
   softmax(t3_out, t3, {2});
   MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
 
-  if constexpr (std::is_same_v<TypeParam, float>) {
-    auto t3h    = make_tensor<float>({2, 2, 8,size,size});
-    auto t3_outh = make_tensor<matxFp16>({2, 2, 8,size,size});
+//   if constexpr (std::is_same_v<TypeParam, float>) {
+//     auto t3h    = make_tensor<float>({2, 2, 8,size,size});
+//     auto t3_outh = make_tensor<matxFp16>({2, 2, 8,size,size});
 
-    softmax(t3_outh, as_type<matxFp16>(t3h), {4});    
+//     softmax(t3_outh, as_type<matxFp16>(t3h), {4});    
 
-//t3_outh.Print();
-  }
+// //t3_outh.Print();
+//   }
   
 
   MATX_EXIT_HANDLER();

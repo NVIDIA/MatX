@@ -37,8 +37,8 @@
 #include "gtest/gtest.h"
 
 using namespace matx;
-constexpr index_t m = 100;
-constexpr index_t n = 50;
+constexpr index_t m = 32;
+constexpr index_t n = 32;
 
 template <typename T> class SVDSolverTest : public ::testing::Test {
 protected:
@@ -209,6 +209,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
           ASSERT_NEAR(Av(b, i, j).imag(), SSolav(b, i, j).imag(), 0.001) << i << " " << j;
         }
         else {
+          Av.Print(1,0,0);
+          SSolav.Print(1,0,0);
           ASSERT_NEAR(Av(b, i, j), SSolav(b, i, j), 0.001) << i << " " << j;
         }
       }

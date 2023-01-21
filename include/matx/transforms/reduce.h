@@ -1406,7 +1406,7 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto tmp_max = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  rmax(tmp_max, exp(permute(in, perm)), stream);
+  rmax(tmp_max, permute(in, perm), stream);
   sum(tmp_sum, exp(permute(in, perm) - clone<InType::Rank()>(tmp_max, clone_dims)), stream);
 
   (dest = exp(in - clone<InType::Rank()>(tmp_max, clone_dims)) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);

@@ -138,12 +138,12 @@ public:
     return cnt;
   }
 
-  void AllocateWorkspace(size_t batches)
+  void AllocateWorkspace(size_t batches, int legacy_mult = 1)
   {
-    matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
+    matxAlloc(&d_workspace, batches * dspace * legacy_mult, MATX_DEVICE_MEMORY);
     matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_DEVICE_MEMORY);
     matxAlloc((void **)&h_info, batches * sizeof(*h_info), MATX_HOST_MEMORY);
-    matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
+    matxAlloc(&h_workspace, batches * hspace * legacy_mult, MATX_HOST_MEMORY);
     printf("Allocating %zu batches %zu %zu\n", batches, hspace, dspace);
   }
 
@@ -761,7 +761,7 @@ public:
     GetWorkspaceSize(&hspace, &dspace);
 
     SetBatchPointers(*scratch);
-    AllocateWorkspace(params.batch_size);
+    AllocateWorkspace(params.batch_size, sizeof(T1));
   }
 
   void GetWorkspaceSize(size_t *host, size_t *device) override
@@ -902,7 +902,15 @@ public:
                 reinterpret_cast<float*>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<float*>(params.S), 
                 reinterpret_cast<float*>(params.U), static_cast<int>(params.m), reinterpret_cast<float*>(params.V), static_cast<int>(params.n),
-                reinterpret_cast<float*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(1));        
+                reinterpret_cast<float*>(d_workspace), static_cast<int>(hspace), d_info, gesvdj_params, static_cast<int>(params.batch_size));        
+        printf("%d %d %p %d %p %p %d %p %d %p %d %d\n", static_cast<int>(params.m), static_cast<int>(params.n),
+                reinterpret_cast<float*>(params.A), 
+                static_cast<int>(params.m),
+                reinterpret_cast<float*>(params.S), 
+                reinterpret_cast<float*>(params.U), 
+                static_cast<int>(params.m), 
+                reinterpret_cast<float*>(params.V), 
+                static_cast<int>(params.n), d_workspace, static_cast<int>(hspace), static_cast<int>(params.batch_size));                    
       }
       else if (std::is_same_v<typename ATensor::value_type, double>) {
         ret =
