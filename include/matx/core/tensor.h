@@ -80,10 +80,12 @@ enum {
  * @tparam Desc Descriptor for tensor
  * 
  */
-template <typename OperatorType>
+template <typename OperatorType, typename ConvertMatX = std::false_type>
 struct RandomOperatorIterator {
-  using self_type = RandomOperatorIterator<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using self_type = RandomOperatorIterator<OperatorType, ConvertMatX>;
+  using value_type = std::conditional_t<std::is_same_v<ConvertMatX, std::false_type>, 
+                                        typename OperatorType::scalar_type, 
+                                        detail::convert_matx_type_t<typename OperatorType::scalar_type>>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;

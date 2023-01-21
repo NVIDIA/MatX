@@ -68,6 +68,9 @@ struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
 };  
 
+template <typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
@@ -431,6 +434,9 @@ struct is_half
           bool, std::is_same_v<__half, std::remove_cv_t<T>> ||
                     std::is_same_v<__nv_bfloat16, std::remove_cv_t<T>>> {
 };
+
+
+
 }
 /**
  * @brief Determine if a type is half precision (either __half or __nv_bfloat16)
@@ -488,6 +494,26 @@ using promote_half_t = typename std::conditional_t<is_half_v<T>, float, T>;
 
 
 namespace detail {
+
+template <typename T> 
+struct convert_matx_type {
+  using type = T;
+};
+
+template <> 
+struct convert_matx_type<matxFp16> {
+  using type = __half;
+};
+
+template <> 
+struct convert_matx_type<matxBf16> {
+  using type = __nv_bfloat16;
+};
+
+template <typename T> 
+using convert_matx_type_t = typename convert_matx_type<T>::type;
+
+
 
 template <class T, std::size_t N, std::size_t... I>
 constexpr std::array<std::remove_cv_t<T>, N>

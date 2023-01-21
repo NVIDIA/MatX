@@ -103,12 +103,13 @@ namespace matx
         // dummy type to signal this is a matxop
         using matxop = bool;
         using scalar_type = typename Op::scalar_type;
+        using self_type = matxBinaryOp<I1, I2, Op>;
 
       __MATX_INLINE__ const std::string str() const {
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
+      __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {
@@ -123,24 +124,32 @@ namespace matx
         }
       }
 
-        template <typename... Is>
-          __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
-          {
-            // Rank 0
-            auto i1 = get_value(in1_, indices...);
-            auto i2 = get_value(in2_, indices...);
-            return op_(i1, i2);
-          }
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(
+        const std::array<index_t, detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>())> &idx) const noexcept
+      {
+        return mapply([&](auto &&...args)  {
+            return this->operator()(args...);
+          }, idx);      
+      }        
 
-        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-        {
-          return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());
-        }
+      template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
+      {
+        // Rank 0
+        auto i1 = get_value(in1_, indices...);
+        auto i2 = get_value(in2_, indices...);
+        return op_(i1, i2);
+      }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
-        {
-          return size_[dim];
-        }
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
+      {
+        return size_[dim];
+      }
     };
   }
 

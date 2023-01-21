@@ -115,7 +115,7 @@ struct EmptyParams_t {};
 template <typename OperatorType>
 struct BeginOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -174,7 +174,7 @@ struct BeginOffset {
 template <typename OperatorType>
 struct EndOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -1078,22 +1078,25 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
+    using in_type = convert_matx_type_t<typename InputOperator::value_type>;
+    using out_type = convert_matx_type_t<typename OutputTensor::value_type>;
     if constexpr (RANK == 0) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+        
         if (a.IsContiguous()) {
           cub::DeviceReduce::Max(d_temp,
                                     temp_storage_bytes,
-                                    a.Data(),
-                                    a_out.Data(),
+                                    reinterpret_cast<in_type *>(a.Data()),
+                                    reinterpret_cast<out_type *>(a_out.Data()),
                                     static_cast<int>(TotalSize(a)),
                                     stream);
         }
         else {
           cub::DeviceReduce::Max(d_temp,
                                     temp_storage_bytes,
-                                    RandomOperatorIterator{base},
-                                    a_out.Data(),
+                                    RandomOperatorIterator<remove_cvref_t<decltype(base)>, std::true_type>{base},
+                                    reinterpret_cast<out_type *>(a_out.Data()),
                                     static_cast<int>(TotalSize(a)),
                                     stream);
         }
@@ -1101,8 +1104,8 @@ inline void ExecSort(OutputTensor &a_out,
       else {
         cub::DeviceReduce::Max(d_temp,
                                   temp_storage_bytes,
-                                  RandomOperatorIterator{a},
-                                  a_out.Data(),
+                                  RandomOperatorIterator<remove_cvref_t<decltype(a)>, std::true_type>{a},
+                                  reinterpret_cast<out_type *>(a_out.Data()),
                                   static_cast<int>(TotalSize(a)),
                                   stream);
       }
@@ -1113,8 +1116,8 @@ inline void ExecSort(OutputTensor &a_out,
         if (a.IsContiguous()) {
           cub::DeviceSegmentedReduce::Max( d_temp,
                                               temp_storage_bytes,
-                                              a.Data(),
-                                              a_out.Data(),
+                                              reinterpret_cast<in_type *>(a.Data()),
+                                              reinterpret_cast<out_type *>(a_out.Data()),
                                               static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
                                               stream);
@@ -1122,8 +1125,8 @@ inline void ExecSort(OutputTensor &a_out,
         else {
           cub::DeviceSegmentedReduce::Max( d_temp,
                                               temp_storage_bytes,
-                                              RandomOperatorIterator{base},
-                                              a_out.Data(),
+                                              RandomOperatorIterator<remove_cvref_t<decltype(base)>, std::true_type>{base},
+                                              reinterpret_cast<out_type *>(a_out.Data()),
                                               static_cast<int>(a_out.Size(0)),
                                               BeginOffset{a}, EndOffset{a},
                                               stream);
@@ -1132,8 +1135,8 @@ inline void ExecSort(OutputTensor &a_out,
       else {
         cub::DeviceSegmentedReduce::Max( d_temp,
                                             temp_storage_bytes,
-                                            RandomOperatorIterator{a},
-                                            a_out.Data(),
+                                            RandomOperatorIterator<remove_cvref_t<decltype(a)>, std::true_type>{a},
+                                            reinterpret_cast<out_type *>(a_out.Data()),
                                             static_cast<int>(a_out.Size(0)),
                                             BeginOffset{a}, EndOffset{a},
                                             stream);
