@@ -1072,22 +1072,24 @@ void matmul(TensorTypeC C, const TensorTypeA A,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+  auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
+  auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
   // CublasLt does not support operators and certain transpose modes.
-  // Gab a suppported tensor here and copy in if necessary.
+  // Grab a suppported tensor here and copy in if necessary.
   auto c = getCublasSupportedTensor(C, stream);
-  auto a = getCublasSupportedTensor(A, stream);
-  auto b = getCublasSupportedTensor(B, stream);
+  auto a = getCublasSupportedTensor(A_, stream);
+  auto b = getCublasSupportedTensor(B_, stream);
 
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
 
-  if(!a.isSameView(A)) {
-    (a = A).run(stream);
+  if(!a.isSameView(A_)) {
+    (a = A_).run(stream);
   }
 
-  if(!b.isSameView(B)) {
-    (b = B).run(stream);
+  if(!b.isSameView(B_)) {
+    (b = B_).run(stream);
   }
 
 #if MATX_ENABLE_CUTLASS != 1
