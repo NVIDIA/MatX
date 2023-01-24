@@ -66,8 +66,31 @@ template <typename TensorType>
 class MatMulTestFloatNonHalfTypes : public MatMulTest<TensorType> {
 };
 
+template <typename TensorType>
+class MatMulTestFloatNonComplexTypes : public MatMulTest<TensorType> {
+};
+
 TYPED_TEST_SUITE(MatMulTestFloatTypes, MatXFloatTypes);
 TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypes);
+TYPED_TEST_SUITE(MatMulTestFloatNonComplexTypes, MatXFloatNonComplexTypes);
+
+template <typename T>
+struct float_to_complex_t
+{
+  using t = cuda::std::complex<T>;
+};
+
+template <>
+struct float_to_complex_t<matxFp16>
+{
+  using t = matxFp16Complex;
+};
+
+template <>
+struct float_to_complex_t<matxBf16>
+{
+  using t = matxBf16Complex;
+};
 
 TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 {
@@ -323,6 +346,58 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
   MATX_TEST_ASSERT_COMPARE(this->pb, cs, "cs", this->thresh);
 
   MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
+{
+  using ComplexTypeParam = typename float_to_complex_t<TypeParam>::t;
+  // a -> real, b -> real, c -> complex
+  {
+    MATX_ENTER_HANDLER();
+
+    constexpr index_t m = 4;
+    constexpr index_t k = 8;
+    constexpr index_t n = 16;
+
+    tensor_t<TypeParam, 2> a{{m, k}};
+    tensor_t<TypeParam, 2> b{{k, n}};
+    tensor_t<ComplexTypeParam, 2> c{{m, n}};
+
+    this->pb->template InitAndRunTVGenerator<TypeParam>(
+        "00_transforms", "matmul_operators", "run", {m, k, n});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
+
+    matmul(c, a, b);
+    MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+    MATX_EXIT_HANDLER();
+  }
+
+  // a -> real, b -> complex, c -> complex
+  {
+    MATX_ENTER_HANDLER();
+
+    constexpr index_t m = 4;
+    constexpr index_t k = 8;
+    constexpr index_t n = 16;
+
+    tensor_t<TypeParam, 2> a{{m, k}};
+    tensor_t<ComplexTypeParam, 2> b{{k, n}};
+    tensor_t<ComplexTypeParam, 2> c{{m, n}};
+
+    this->pb->template InitAndRunTVGenerator<TypeParam>(
+        "00_transforms", "matmul_operators", "run", {m, k, n});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
+
+    matmul(c, a, b);
+    MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+    MATX_EXIT_HANDLER();
+  }
 }
 
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
