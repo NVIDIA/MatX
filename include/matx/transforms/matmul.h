@@ -1072,8 +1072,10 @@ void matmul(TensorTypeC C, const TensorTypeA A,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+  // promote A and B to the type of C
   auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
   auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
+
   // CublasLt does not support operators and certain transpose modes.
   // Grab a suppported tensor here and copy in if necessary.
   auto c = getCublasSupportedTensor(C, stream);
