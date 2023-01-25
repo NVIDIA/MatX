@@ -87,6 +87,13 @@ class matmul_operators:
         self.res['c'] = np.transpose(self.res['a'] @ self.res['b'])
         return self.res        
 
+    def run_mixed(self) -> Dict[str, np.ndarray]:
+        float_to_complex_dtype = {np.float32 : np.complex64, np.float64 : np.complex128}
+        a = self.res['a']
+        complex_type = float_to_complex_dtype[a.dtype.type]
+        complex_a = a.astype(complex_type)
+        self.res['c'] = complex_a @ self.res['b']
+        return self.res
 
 class cov_operators:
     def __init__(self, dtype: str, size: List[int]):
