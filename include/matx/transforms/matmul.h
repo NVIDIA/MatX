@@ -1072,11 +1072,11 @@ void matmul(TensorTypeC C, const TensorTypeA A,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::scalar_type>;
-  constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::scalar_type>;
   constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::scalar_type>;
 
   if constexpr (is_c_complex) {
+    constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::scalar_type>;
+    constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::scalar_type>;
     static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex ");
   }
 
