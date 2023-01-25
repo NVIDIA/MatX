@@ -75,22 +75,25 @@ TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypes);
 TYPED_TEST_SUITE(MatMulTestFloatNonComplexTypes, MatXFloatNonComplexTypes);
 
 template <typename T>
-struct float_to_complex_t
+struct float_to_complex
 {
-  using t = cuda::std::complex<T>;
+  using type = cuda::std::complex<T>;
 };
 
 template <>
-struct float_to_complex_t<matxFp16>
+struct float_to_complex<matxFp16>
 {
-  using t = matxFp16Complex;
+  using type = matxFp16Complex;
 };
 
 template <>
-struct float_to_complex_t<matxBf16>
+struct float_to_complex<matxBf16>
 {
-  using t = matxBf16Complex;
+  using type = matxBf16Complex;
 };
+
+template <typename T>
+using float_to_complex_t = typename float_to_complex<T>::type;
 
 TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 {
@@ -350,7 +353,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
 
 TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
 {
-  using ComplexTypeParam = typename float_to_complex_t<TypeParam>::t;
+  using ComplexTypeParam = float_to_complex_t<TypeParam>;
   // a -> real, b -> real, c -> complex
   {
     MATX_ENTER_HANDLER();
