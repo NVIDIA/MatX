@@ -660,11 +660,23 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
-    if constexpr (is_matx_half_v<T>) {
-      atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+    if constexpr (is_complex_v<T>) {
+      if constexpr (is_matx_half_v<typename T::value_type>) {
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[0], static_cast<typename T::value_type::value_type>(val.real())); 
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[1], static_cast<typename T::value_type::value_type>(val.imag())); 
+      }
+      else {
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[0], val.real()); 
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[1], val.imag()); 
+      }      
     }
     else {
-      atomicAdd(addr, val); 
+      if constexpr (is_matx_half_v<T>) {
+        atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+      }
+      else {
+        atomicAdd(addr, val); 
+      }
     }
   }
 };
@@ -763,62 +775,184 @@ public:
 template <typename T, typename Op>
 __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 {
-  // breaking this out so common case is faster without branches
-  if constexpr (!is_matx_half_v<T>) {
-    if (size > 16) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  // breaking this out so common case is faster without branches  
+  if constexpr (is_complex_v<T>) {
+    typename T::value_type re;
+    typename T::value_type im;
+    if constexpr (!is_matx_half_v<typename T::value_type>) {
+      if (size > 16) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 16);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 16);
+        val = op.Reduce(val, {re, im});
+        re = __shfl_down_sync(0xffffffff, val.real(), 8);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});                                       
+      }
+      else if (size > 8) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 8);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});    
+      }
+      else if (size > 4) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});   
+      }
+      else if (size > 2) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      else if (size > 1) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      return val;
     }
-    else if (size > 8) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    else {
+      if (size > 16) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 16);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 16);
+        val = op.Reduce(val, {re, im});
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});                                       
+      }
+      else if (size > 8) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});    
+      }
+      else if (size > 4) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});   
+      }
+      else if (size > 2) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      else if (size > 1) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      return val;      
     }
-    else if (size > 4) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    else if (size > 2) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    else if (size > 1) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    return val;
   }
   else {
-    if (size > 16) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    if constexpr (!is_matx_half_v<T>) {
+      if (size > 16) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 8) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 4) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 2) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 1) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      return val;
     }
-    else if (size > 8) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    else {
+      if (size > 16) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 8) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 4) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 2) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 1) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      return val;
     }
-    else if (size > 4) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    else if (size > 2) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    else if (size > 1) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    return val;
   }
 }
 
@@ -1972,7 +2106,7 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
     sum(dest, pow(abs(in - mean_op), static_cast<inner_type>(2)), stream);
   }
   else {
-    sum(dest, pow(in - mean_op, 2), stream);
+    sum(dest, pow(in - mean_op, static_cast<inner_type>(2)), stream);
   }
 
   // The length of what we are taking the variance over is equal to the product

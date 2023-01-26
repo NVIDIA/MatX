@@ -92,7 +92,7 @@ TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNoHalfTypes);
 TYPED_TEST_SUITE(ReductionTestsComplexNonHalfTypes, MatXComplexNonHalfTypes);
 
 
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
+TYPED_TEST(ReductionTestsFloatNonComplex, VarianceStd)
 {
   MATX_ENTER_HANDLER();
 
@@ -113,7 +113,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
+TYPED_TEST(ReductionTestsComplex, VarianceStdComplex)
 {
   MATX_ENTER_HANDLER();
 
@@ -134,7 +134,7 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
+TYPED_TEST(ReductionTestsNumeric, Sum)
 {
   MATX_ENTER_HANDLER();
 
@@ -161,10 +161,10 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   {
     tensor_t<TypeParam, 0> t0;
 
-    auto t4 = ones<TypeParam>({30, 40, 50, 60});
-    auto t3 = ones<TypeParam>({30, 40, 50});
-    auto t2 = ones<TypeParam>({30, 40});
-    auto t1 = ones<TypeParam>({30});
+    auto t4 = ones<TypeParam>({3, 4, 5, 6});
+    auto t3 = ones<TypeParam>({3, 4, 5});
+    auto t2 = ones<TypeParam>({3, 4});
+    auto t1 = ones<TypeParam>({3});
 
     sum(t0, t4, 0);
     cudaStreamSynchronize(0);
