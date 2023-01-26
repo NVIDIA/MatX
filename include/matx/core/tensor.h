@@ -1521,9 +1521,9 @@ public:
    *
    */
   template <int N = RANK>
-  __MATX_INLINE__ auto Slice([[maybe_unused]] const typename Desc::shape_type (&firsts)[RANK],
-                              [[maybe_unused]] const typename Desc::shape_type (&ends)[RANK],
-                              [[maybe_unused]] const typename Desc::stride_type (&strides)[RANK]) const
+  __MATX_INLINE__ auto Slice([[maybe_unused]] const std::array<typename Desc::shape_type, RANK> &firsts,
+                             [[maybe_unused]] const std::array<typename Desc::shape_type, RANK> &ends,
+                             [[maybe_unused]] const std::array<typename Desc::stride_type, RANK> &strides) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
     
@@ -1578,6 +1578,14 @@ public:
     tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};  
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
+  
+  template <int N = RANK>
+  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
+                             const typename Desc::shape_type (&ends)[RANK],
+                             const typename Desc::stride_type (&strides)[RANK]) const
+  {
+    return Slice<N>(detail::to_array(firsts), detail::to_array(ends), detail::to_array(strides));
+  }
 
   /**
    * Slice a tensor either within the same dimension or to a lower dimension
@@ -1604,15 +1612,23 @@ public:
    *
    */
   template <int N = RANK>
-  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
-                              const typename Desc::shape_type (&ends)[RANK]) const
+  __MATX_INLINE__ auto Slice(const std::array<typename Desc::shape_type, RANK> &firsts,
+                             const std::array<typename Desc::shape_type, RANK> &ends) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
     
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+   
+    const std::array<typename Desc::stride_type, RANK> strides = {-1};
     
-    const typename Desc::stride_type strides[RANK] = {-1};
     return Slice<N>(firsts, ends, strides);
+  }
+
+  template <int N = RANK>
+  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
+                              const typename Desc::shape_type (&ends)[RANK]) const
+  {
+    return Slice<N>(detail::to_array(firsts), detail::to_array(ends));
   }
 
 
