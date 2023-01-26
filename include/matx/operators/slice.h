@@ -201,7 +201,7 @@ namespace matx
     index_t strides[OpType::Rank()];
     for(int i = 0; i < OpType::Rank(); i++)
       strides[i] = 1;
-    return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
+    return slice(op, starts, ends, strides);
   }
 
   /**
@@ -227,7 +227,11 @@ namespace matx
         const index_t (&ends)[OpType::Rank()],
         const index_t (&strides)[OpType::Rank()]) 
   {
-    return detail::SliceOp<N,OpType>(op, starts, ends, strides);
+    if constexpr (is_tensor_view_v<OpType>) {
+      return op.template Slice<N>(starts, ends, strides);
+    } else {
+      return detail::SliceOp<N,OpType>(op, starts, ends, strides);
+    }
   }
 
   /**
@@ -254,6 +258,6 @@ namespace matx
      typename OpType::shape_type strides[OpType::Rank()];
      for (int i = 0; i < OpType::Rank(); i++)
        strides[i] = 1;
-     return detail::SliceOp<N,OpType>(opIn, starts, ends, strides);
+     return slice<N, OpType>(opIn, starts, ends, strides);
   }
 } // end namespace matx
