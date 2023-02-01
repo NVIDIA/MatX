@@ -55,7 +55,7 @@ perform any reference counting or deallocations when out of scope.
 Tensor Descriptors
 ------------------
 Tensor descriptors are a template type inside ``tensor_impl_t`` that provide information about the size and strides of the tensor. While descriptors
-are a simply concept, the implementation can have a large impact on performance if not tuned properly. Both the sizes and strides of the tensor are
+are a simple concept, the implementation can have a large impact on performance if not tuned properly. Both the sizes and strides of the tensor are
 a template class supporting iterators to access the metadata directly, and utility functions for accessing and computing other values from the metadata.
 Descriptors are commonly stored as ``std::array`` types given its compile-time features, but any class meeting the accessor properties can be used.
 
