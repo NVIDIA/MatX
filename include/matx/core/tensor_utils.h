@@ -313,7 +313,7 @@ namespace detail {
   template <class T, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, Is... indices)
   {
-    if constexpr (T::Rank() == sizeof...(Is)) {
+    if constexpr (T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank) {
       return i(indices...);
     }
     else
@@ -327,7 +327,7 @@ namespace detail {
       }, sliced_tup);
     }
 
-    if constexpr (!(T::Rank() == sizeof...(Is))) {
+    if constexpr (!(T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank)) {
       // Construct an integer sequence of the length of the tuple, but only using the last indices
       using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
       auto tup = cuda::std::make_tuple(indices...);

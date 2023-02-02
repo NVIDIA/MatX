@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/tensor_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
@@ -61,7 +62,7 @@ namespace matx
     public:
       using scalar_type = void; ///< Scalar type for type extraction
 
-      __MATX_INLINE__ std::string str() const { return  "if(" + cond_.str() + ") then {" +  op1_.str() + "} else {" + op2_.str() + "}"; }
+      __MATX_INLINE__ std::string str() const { return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}"; }
 
       /**
        * @brief Constructor for an IFELSE statement
@@ -78,9 +79,9 @@ namespace matx
       constexpr int32_t rank0 = detail::get_rank<C1>();
       constexpr int32_t rank1 = detail::get_rank<T1>();
       constexpr int32_t rank2 = detail::get_rank<T2>();
-      static_assert(rank0 == -1 || rank0 == Rank());
-      static_assert(rank1 == -1 || rank1 == Rank());
-      static_assert(rank2 == -1 || rank2 == Rank());
+      static_assert(rank0 == matxNoRank || rank0 == Rank());
+      static_assert(rank1 == matxNoRank || rank1 == Rank());
+      static_assert(rank2 == matxNoRank || rank2 == Rank());
 
       if constexpr (Rank() > 0)
       {

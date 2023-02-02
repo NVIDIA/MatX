@@ -32,39 +32,49 @@
 
 #pragma once
 
-#include "matx/operators/unary_operators.h"
-#include "matx/operators/binary_operators.h"
 
-#include "matx/operators/cart2sph.h"
-#include "matx/operators/collapse.h"
-#include "matx/operators/concat.h"
-#include "matx/operators/constval.h"
-#include "matx/operators/cast.h"
-#include "matx/operators/clone.h"
-#include "matx/operators/comma.h"
-#include "matx/operators/diag.h"
-#include "matx/operators/dct.h"
-#include "matx/operators/fftshift.h"
-#include "matx/operators/flatten.h"
-#include "matx/operators/hermitian.h"
-#include "matx/operators/if.h"
-#include "matx/operators/ifelse.h"
-#include "matx/operators/index.h"
-#include "matx/operators/interleaved.h"
-#include "matx/operators/kronecker.h"
-#include "matx/operators/legendre.h"
-#include "matx/operators/permute.h"
-#include "matx/operators/planar.h"
-#include "matx/operators/r2c.h"
-#include "matx/operators/remap.h"
-#include "matx/operators/repmat.h"
-#include "matx/operators/reshape.h"
-#include "matx/operators/reverse.h"
-#include "matx/operators/select.h"
-#include "matx/operators/self.h"
-#include "matx/operators/set.h"
-#include "matx/operators/shift.h"
-#include "matx/operators/sign.h"
-#include "matx/operators/slice.h"
-#include "matx/operators/sph2cart.h"
-#include "matx/operators/stack.h"
+#include "matx/core/type_utils.h"
+#include "matx/operators/base_operator.h"
+
+namespace matx
+{
+
+  /**
+   * Returns the current tensor index for the given dimension.
+   */
+  namespace detail {
+      class IndexOp : public BaseOp<IndexOp>
+    {
+      private:
+        int dim_;
+
+      public:
+        using matxop = bool;
+        using scalar_type = index_t;
+
+        __MATX_INLINE__ std::string str() const { return "index()"; } 
+        __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
+
+        template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          {
+            std::array<index_t, int(sizeof...(Is))> inds{indices...};
+            return inds[dim_];
+          }
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          return matxNoRank;
+        }
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+        {
+          return index_t(0);
+        }
+    };
+  }   
+
+
+  __MATX_INLINE__ auto index(int dim) {
+    return detail::IndexOp(dim);
+  }
+} // end namespace matx
