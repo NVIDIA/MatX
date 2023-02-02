@@ -30,65 +30,62 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "assert.h"
 #include "matx.h"
-#include "test_types.h"
-#include "utilities.h"
-#include "gtest/gtest.h"
+#include <cassert>
+#include <cstdio>
+#include <math.h>
 
 using namespace matx;
-constexpr int m = 100;
-constexpr int n = 50;
 
-template <typename T> class QRSolverTest : public ::testing::Test {
-protected:
-  using dtype = float;
-  void SetUp() override
-  {
-    pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "qr", "run", {m, n});
-    pb->NumpyToTensorView(Av, "A");
-    pb->NumpyToTensorView(Qv, "Q");
-    pb->NumpyToTensorView(Rv, "R");
-  }
-
-  void TearDown() { pb.reset(); }
-
-  std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Av{{m, n}};
-  tensor_t<T, 2> Atv{{n, m}};
-  tensor_t<T, 1> TauV{{std::min(m, n)}};
-  tensor_t<T, 2> Qv{{m, std::min(m, n)}};
-  tensor_t<T, 2> Rv{{std::min(m, n), n}};
-};
-
-template <typename TensorType>
-class QRSolverTestNonComplexFloatTypes : public QRSolverTest<TensorType> {
-};
-
-TYPED_TEST_SUITE(QRSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
-
-TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
-  // cuSolver only supports col-major solving today, so we need to transpose,
-  // solve, then transpose again to compare to Python
-  cusolver_qr(this->Av, this->TauV, this->Av);
-  cudaStreamSynchronize(0);
+  //using AType = double;
+  using AType = cuda::std::complex<float>;
+  
+  cudaStream_t stream = 0;
+  int batch = 1; 
 
-  // For now we're only verifying R. Q is a bit more complex to compute since
-  // cuSolver/BLAS don't return Q, and instead return Householder reflections
-  // that are used to compute Q. Eventually compute Q here and verify
-  for (index_t i = 0; i < this->Av.Size(0); i++) {
-    for (index_t j = 0; j < this->Av.Size(1); j++) {
-      // R is stored only in the top triangle of A
-      if (i <= j) {
-        ASSERT_NEAR(this->Av(i, j), this->Rv(i, j), 0.001);
-      }
-    }
-  }
+  int m = 4;
+  int n = 5;
+ 
+  auto A = make_tensor<AType>({batch, m, n});
+  auto QR = make_tensor<AType>({batch, m, n});
+  auto QTQ = make_tensor<AType>({batch, m, m});
+  auto Q = make_tensor<AType>({batch, m, m});
+  auto R = make_tensor<AType>({batch, m, n});
 
+  randomGenerator_t<AType> gen(A.TotalSize(),0);
+  
+  auto random = gen.GetTensorView(A.Shape(), NORMAL);
+  (A = random).run(stream);
+
+#if 0
+  cudaDeviceSynchronize();
+  A(0,0,0) = 10000; A(0,0,1) = 10001;
+  A(0,1,0) = 10001; A(0,1,1) = 10002;
+  A(0,2,0) = 10002; A(0,2,1) = 10003;
+  A(0,3,0) = 10003; A(0,3,1) = 10004;
+  A(0,4,0) = 10004; A(0,4,1) = 10005;
+#endif
+
+  A.PrefetchDevice(stream);
+  Q.PrefetchDevice(stream);
+  R.PrefetchDevice(stream);
+
+  qr(Q, R, A, stream);
+
+  matmul(QR, Q, R, stream);
+  matmul(QTQ, conj(transpose(Q)), Q, stream);
+  cudaDeviceSynchronize();
+  
+  printf("Q:\n"); Print(Q);
+  printf("R:\n"); Print(R);
+  printf("QTQ:\n"); Print(QTQ);
+  printf("QR:\n"); Print(QR);
+  printf("A:\n"); Print(A);
+
+  CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

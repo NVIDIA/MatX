@@ -45,6 +45,7 @@
 #include "matx/transforms/inverse.h"
 #include "matx/transforms/matmul.h"
 #include "matx/transforms/permute.h"
+#include "matx/transforms/qr.h"
 #include "matx/transforms/reduce.h"
 #include "matx/transforms/solver.h"
 #include "matx/transforms/transpose.h"
