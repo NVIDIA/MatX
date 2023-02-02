@@ -19,6 +19,7 @@ set (test_sources
     00_solver/Cholesky.cu
     00_solver/LU.cu
     00_solver/QR.cu
+    00_solver/QR2.cu
     00_solver/SVD.cu
     00_solver/Eigen.cu
     00_solver/Det.cu

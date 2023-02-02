@@ -51,21 +51,27 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = int;
+        using scalar_type = typename T::scalar_type;
+
+        scalar_type zval_; 
 
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
-        __MATX_INLINE__ SignOp(T op) : op_(op){};  
+        __MATX_INLINE__ SignOp(T op, scalar_type zval) : op_(op), zval_(zval) {};  
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             auto v = get_value(op_,indices...);
-            if( v < 0) 
-              return -1;
-            else if ( v > 0 ) 
-              return 1;
-            else 
-              return 0;
+            if constexpr (is_complex_v<scalar_type> ) {
+              return v / abs(v); // sign defintion for complex values
+            } else {  // real branch
+              if( v < 0) 
+                return scalar_type(-1);
+              else if ( v > 0 ) 
+                return scalar_type(1);
+              else 
+                return zval_;
+            }
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -80,8 +86,8 @@ namespace matx
   } // end namespace detail   
 
   template <typename T>
-  __MATX_INLINE__ auto sign(T op) {
-    return detail::SignOp(op);
+  __MATX_INLINE__ auto sign(T op, typename T::scalar_type zval=0) {
+    return detail::SignOp(op,zval);
   }
 
 } // end namespace matx

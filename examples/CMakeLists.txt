@@ -11,6 +11,7 @@ set(examples
     spectrogram_graph
     spherical_harmonics 
     svd_power
+    qr
     black_scholes)
 
 add_library(example_lib INTERFACE)

@@ -1280,7 +1280,7 @@ void det(OutputTensor &out, const InputTensor &a,
  *   CUDA stream
  */
 template <typename OutTensor, typename TauTensor, typename ATensor>
-void qr(OutTensor &out, TauTensor &tau,
+void cusolver_qr(OutTensor &out, TauTensor &tau,
         const ATensor &a, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
