@@ -298,22 +298,26 @@ public:
     }
     else {
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (a.Stride(RANK - 1) <= 1 || is_complex_half_v<typename TensorTypeA::scalar_type>) {
+        if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
+          // For half complex we always copy to a new tensor so it is always cublas op N
+          params.opA = CUBLAS_OP_N;
+        } else if ( a.Stride(RANK-1) > 1 // last stride > 1
+                  || (a.Stride(RANK-1) == 1 && a.Stride(RANK-2) == 1 && a.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+          params.opA = CUBLAS_OP_T;
+        } else { // otherwise row major
           params.opA = CUBLAS_OP_N;
         }
-        else if (a.Stride(RANK - 2) <= 1) {
-          params.opA = CUBLAS_OP_T;
-        } else {
-        }
 
-        if (b.Stride(RANK - 1) <= 1  || is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+          // For half complex we always copy to a new tensor so it is always cublas op N
+          params.opB = CUBLAS_OP_N;
+        } else if ( b.Stride(RANK-1) > 1 // last stride > 1
+                  || (b.Stride(RANK-1) == 1 && b.Stride(RANK-2) == 1 && b.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+          params.opB = CUBLAS_OP_T;
+        } else { // otherwise row major
           params.opB = CUBLAS_OP_N;
         }
-        else if (b.Stride(RANK - 2) <= 1) {
-          params.opB = CUBLAS_OP_T;
-        } else {
-        }
-
+        
         params.a_rows = a.Size(RANK - 2);
         params.a_cols = a.Size(RANK - 1);
         params.b_rows = b.Size(RANK - 2);
