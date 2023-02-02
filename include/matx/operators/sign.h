@@ -32,39 +32,56 @@
 
 #pragma once
 
-#include "matx/operators/unary_operators.h"
-#include "matx/operators/binary_operators.h"
 
-#include "matx/operators/cart2sph.h"
-#include "matx/operators/collapse.h"
-#include "matx/operators/concat.h"
-#include "matx/operators/constval.h"
-#include "matx/operators/cast.h"
-#include "matx/operators/clone.h"
-#include "matx/operators/comma.h"
-#include "matx/operators/diag.h"
-#include "matx/operators/dct.h"
-#include "matx/operators/fftshift.h"
-#include "matx/operators/flatten.h"
-#include "matx/operators/hermitian.h"
-#include "matx/operators/if.h"
-#include "matx/operators/ifelse.h"
-#include "matx/operators/index.h"
-#include "matx/operators/interleaved.h"
-#include "matx/operators/kronecker.h"
-#include "matx/operators/legendre.h"
-#include "matx/operators/permute.h"
-#include "matx/operators/planar.h"
-#include "matx/operators/r2c.h"
-#include "matx/operators/remap.h"
-#include "matx/operators/repmat.h"
-#include "matx/operators/reshape.h"
-#include "matx/operators/reverse.h"
-#include "matx/operators/select.h"
-#include "matx/operators/self.h"
-#include "matx/operators/set.h"
-#include "matx/operators/shift.h"
-#include "matx/operators/sign.h"
-#include "matx/operators/slice.h"
-#include "matx/operators/sph2cart.h"
-#include "matx/operators/stack.h"
+#include "matx/core/type_utils.h"
+#include "matx/operators/base_operator.h"
+
+namespace matx
+{
+
+  /**
+   * Returns the sign of an element.  -1 if negative, 0 if 0, 1 if positive.
+   */
+  namespace detail {
+    template <typename T>
+      class SignOp : public BaseOp<SignOp<T>>
+    {
+      private:
+        typename base_type<T>::type op_;
+
+      public:
+        using matxop = bool;
+        using scalar_type = int;
+
+        __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
+        __MATX_INLINE__ SignOp(T op) : op_(op){};  
+
+        template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          {
+            auto v = get_value(op_,indices...);
+            if( v < 0) 
+              return -1;
+            else if ( v > 0 ) 
+              return 1;
+            else 
+              return 0;
+          }
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          return detail::get_rank<T>();
+        }
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        {
+          return op_.Size(dim);
+        }
+    };
+  } // end namespace detail   
+
+  template <typename T>
+  __MATX_INLINE__ auto sign(T op) {
+    return detail::SignOp(op);
+  }
+
+} // end namespace matx

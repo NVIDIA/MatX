@@ -97,7 +97,6 @@ namespace matx
         typename base_type<I1>::type in1_;
         typename base_type<I2>::type in2_;
         typename base_type<Op>::type op_;
-        std::array<index_t, detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>())> size_;
 
       public:
         // dummy type to signal this is a matxop
@@ -112,12 +111,6 @@ namespace matx
       {
         if constexpr (Rank() > 0)
         {
-          for (int32_t i = 0; i < Rank(); i++)
-          {
-            index_t size1 = detail::get_expanded_size<Rank()>(in1_, i);
-            index_t size2 = detail::get_expanded_size<Rank()>(in2_, i);
-            size_[i] = detail::matx_max(size1, size2);
-          }
           ASSERT_COMPATIBLE_OP_SIZES(in1_);
           ASSERT_COMPATIBLE_OP_SIZES(in2_);
         }
@@ -139,7 +132,9 @@ namespace matx
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          return size_[dim];
+          index_t size1 = detail::get_expanded_size<Rank()>(in1_, dim);
+          index_t size2 = detail::get_expanded_size<Rank()>(in2_, dim);
+          return detail::matx_max(size1,size2);
         }
     };
   }

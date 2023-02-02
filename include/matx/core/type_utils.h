@@ -52,6 +52,10 @@
 
 namespace matx {
 
+enum {
+  matxNoRank = -1
+};
+
 enum class MemoryLayout {
   MEMORY_LAYOUT_ROW_MAJOR,
   MEMORY_LAYOUT_COL_MAJOR,
