@@ -206,7 +206,7 @@ public:
   inline auto GetTensorView(const std::array<index_t, RANK> &shape, Distribution_t dist,
                             T alpha = 1, T beta = 0)
 {
-  return randomTensorView_t<T, RANK>(shape, states_, dist, alpha, beta);
+  return randomTensorView_t<T, static_cast<int>(RANK)>(shape, states_, dist, alpha, beta);
 }
 
   /**
