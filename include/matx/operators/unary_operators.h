@@ -310,7 +310,24 @@ namespace matx
   DEFINE_UNARY_OP(log2, detail::Log2Op);
   DEFINE_UNARY_OP(log, detail::LogOp);
   DEFINE_UNARY_OP(loge, detail::LogOp);
+#if 0
   DEFINE_UNARY_OP(conj, detail::ConjOp);
+#else
+  // implementing without a macro so we can optimize conj(real)
+  template <typename I1,                        
+            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
+    using I1Type = extract_scalar_type_t<I1>;
+    if constexpr (is_complex_v<I1Type>) {
+      using Op = detail::ConjOp<I1Type>;
+      const typename detail::base_type<I1>::type &base = i1;
+      return detail::matxUnaryOp(base, Op());
+    } else {
+      // real type conj is a no-op so return original op.
+      return i1;
+    }
+  }
+#endif
   DEFINE_UNARY_OP(norm, detail::NormOp);
   DEFINE_UNARY_OP(abs, detail::AbsOp);
   DEFINE_UNARY_OP(sin, detail::SinOp);
