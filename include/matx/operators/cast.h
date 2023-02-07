@@ -98,7 +98,12 @@ namespace matx
   template <typename NewType, typename T>
     auto __MATX_INLINE__ as_type(T t)
     {
-      return detail::CastOp<T, NewType>(t);
+      if constexpr (std::is_same_v<NewType, typename T::scalar_type>) {
+        // optimized path when type is the same to avoid creating unecessary operators
+        return t;
+      } else {
+        return detail::CastOp<T, NewType>(t);
+      }
     };   
 
 
@@ -112,7 +117,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_int(T t)
     {
-      return detail::CastOp<T, int>(t);
+      return as_type<int>(t);
     };   
 
   /**
@@ -125,7 +130,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_float(T t)
     {
-      return detail::CastOp<T, float>(t);
+      return as_type<float>(t);
     };   
 
   /**
@@ -138,7 +143,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_double(T t)
     {
-      return detail::CastOp<T, double>(t);
+      return as_type<double>(t);
     };   
 
   /**
@@ -151,7 +156,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_uint32(T t)
     {
-      return detail::CastOp<T, uint32_t>(t);
+      return as_type<uint32_t>(t);
     };   
 
   /**
@@ -164,7 +169,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_int32(T t)
     {
-      return detail::CastOp<T, int32_t>(t);
+      return as_type<int32_t>(t);
     }; 
 
   /**
@@ -177,7 +182,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_int16(T t)
     {
-      return detail::CastOp<T, int16_t>(t);
+      return as_type<int16_t>(t);
     }; 
 
   /**
@@ -190,7 +195,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_uint16(T t)
     {
-      return detail::CastOp<T, uint16_t>(t);
+      return as_type<uint16_t>(t);
     }; 
 
   /**
@@ -203,7 +208,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_int8(T t)
     {
-      return detail::CastOp<T, int8_t>(t);
+      return as_type<int8_t>(t);
     }; 
 
   /**
@@ -216,7 +221,7 @@ namespace matx
   template <typename T>
     auto __MATX_INLINE__ as_uint8(T t)
     {
-      return detail::CastOp<T, uint8_t>(t);
+      return as_type<uint8_t>(t);
     }; 
 
 } // end namespace matx
