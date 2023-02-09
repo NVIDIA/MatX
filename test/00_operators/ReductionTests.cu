@@ -153,7 +153,7 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     cudaStreamSynchronize(0);
     for(int i = 0 ; i < x ; i++) {
       for(int j = 0; j < y ; j++) {
-        ASSERT_TRUE( b(i,j) == (TypeParam)z);
+        ASSERT_TRUE( MatXUtils::MatXTypeCompare(b(i,j), (TypeParam)z));
       }
     }
   }
