@@ -348,7 +348,24 @@ namespace matx
   DEFINE_UNARY_OP(ceil, detail::CeilOp);
   DEFINE_UNARY_OP(round, detail::RoundOp);
   DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
+#if 0
   DEFINE_UNARY_OP(real, detail::RealOp);
+#else
+  // implementing without a macro so we can optimize away real on a real operator
+  template <typename I1,                        
+            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
+    using I1Type = extract_scalar_type_t<I1>;
+    if constexpr (is_complex_v<I1Type>) {
+      using Op = detail::RealOp<I1Type>;
+      const typename detail::base_type<I1>::type &base = i1;
+      return detail::matxUnaryOp(base, Op());
+    } else {
+      // already real just return i1
+      return i1;
+    }
+  }
+#endif
   DEFINE_UNARY_OP(imag, detail::ImagOp);  
   DEFINE_UNARY_OP(operator-, detail::SubNegOp );
 #endif

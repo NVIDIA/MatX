@@ -8,4 +8,6 @@ cuSolver as the backend.
 .. doxygenfunction:: lu
 .. doxygenfunction:: qr
 .. doxygenfunction:: svd
+.. doxygenfunction:: svdpi
+.. doxygenfunction:: svdbpi
 .. doxygenfunction:: eig

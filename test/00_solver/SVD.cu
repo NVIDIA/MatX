@@ -225,10 +225,6 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 
   std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
-  SType epsilon = SType(.0001);
-  SType delta = SType(.97);
-  SType lamda = SType(2);
-
   cudaStream_t stream = 0;
 
   index_t mm = Ashape[RANK-2];
@@ -356,5 +352,144 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDPI)
   svdpi_test<TypeParam>({5,5,4,16});
   svdpi_test<TypeParam>({5,5,16,4});
   
+  MATX_EXIT_HANDLER();
+}
+
+template <typename TypeParam, int RANK>
+void svdbpi_test( const index_t (&AshapeA)[RANK]) {
+  using AType = TypeParam;
+  using SType = typename inner_op_type_t<AType>::type;
+
+  std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+
+  cudaStream_t stream = 0;
+  cudaDeviceSynchronize();
+
+  index_t mm = Ashape[RANK-2];
+  index_t nn = Ashape[RANK-1];
+  index_t r = std::min(nn,mm);
+
+  auto Ushape = Ashape;
+  Ushape[RANK-1] = r;
+
+  auto VTshape = Ashape;
+  VTshape[RANK-2] = r;
+
+  std::array<index_t, RANK-1> Sshape;
+  for(index_t i = 0; i < RANK-2; i++) {
+    Sshape[i] = Ashape[i];
+  }
+  Sshape[RANK-2] = r;
+
+  auto A = make_tensor<AType>(Ashape);
+  auto U = make_tensor<AType>(Ushape);
+  auto VT = make_tensor<AType>(VTshape);
+  auto S = make_tensor<SType>(Sshape);
+  
+  A.PrefetchDevice(stream);
+  U.PrefetchDevice(stream);
+  VT.PrefetchDevice(stream);
+  S.PrefetchDevice(stream);
+
+  int iterations = 100;
+
+  randomGenerator_t<AType> gen(A.TotalSize(),0);
+  auto random = gen.GetTensorView(Ashape, NORMAL);
+  (A = random).run(stream);
+
+
+  (U = 0).run(stream);
+  (S = 0).run(stream);
+  (VT = 0).run(stream);
+
+  svdbpi(U, S, VT, A, iterations, stream);
+
+  auto Rshape = Ushape;
+  Rshape[RANK-1] = r;
+  Rshape[RANK-2] = r;
+
+  auto UD = make_tensor<AType>(Ushape);
+  auto UDVT = make_tensor<AType>(Ashape);
+  auto UTU = make_tensor<AType>(Rshape);
+  auto VTV = make_tensor<AType>(Rshape);
+
+  auto UTUd = make_tensor<SType>(Rshape);
+  auto VTVd = make_tensor<SType>(Rshape);
+  auto Ad = make_tensor<SType>(Ashape);
+
+  matmul(UTU, conj(transpose(U)) , U, stream);
+  matmul(VTV, VT, conj(transpose(VT)), stream); 
+
+  std::array<index_t, RANK> Dshape;
+  Dshape.fill(matxKeepDim);
+  Dshape[RANK-2] = mm;
+
+  // cloning D across matrix
+  auto D = clone<RANK>(S, Dshape);
+  // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+  (UD = U * D).run(stream);
+
+  matmul(UDVT, UD, VT, stream);
+
+  auto e = eye<SType>({r,r});
+  auto eShape = Rshape;
+  eShape[RANK-1] = matxKeepDim;
+  eShape[RANK-2] = matxKeepDim;
+
+  auto mdiffU = make_tensor<SType>();
+  auto mdiffV = make_tensor<SType>();
+  auto mdiffA = make_tensor<SType>();
+
+  auto I = clone<RANK>(e, eShape);
+
+  (UTUd = abs(UTU - I)).run(stream);
+  (VTVd = abs(VTV - I)).run(stream);
+  (Ad = abs(A - UDVT)).run(stream);
+
+  rmax(mdiffU, UTUd, stream);
+  rmax(mdiffV, VTVd, stream);
+  rmax(mdiffA, Ad, stream);
+
+  cudaDeviceSynchronize();
+
+#if 0
+  printf("A\n"); Print(A);
+  printf("U\n"); Print(U);
+  printf("VT\n"); Print(VT);
+  printf("S\n"); Print(S);
+
+  printf("UTU\n"); Print(UTU);
+  printf("VTV\n"); Print(VTV);
+  printf("A\n"); Print(A);
+  printf("UDVT\n"); Print(UDVT);
+
+  printf("mdiffU: %f\n", (float)mdiffU());
+  printf("mdiffV: %f\n", (float)mdiffV());
+  printf("mdiffA: %f\n", (float)mdiffA());
+#endif
+
+  ASSERT_NEAR( mdiffU(), SType(0), .1);
+  ASSERT_NEAR( mdiffV(), SType(0), .1);
+  ASSERT_NEAR( mdiffA(), SType(0), .00001);
+  
+  cudaDeviceSynchronize();
+}
+
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBPI)
+{
+  MATX_ENTER_HANDLER();
+
+  svdbpi_test<TypeParam>({4,4});
+  svdbpi_test<TypeParam>({4,16});
+  svdbpi_test<TypeParam>({16,4});
+
+  svdbpi_test<TypeParam>({25,4,4});
+  svdbpi_test<TypeParam>({25,4,16});
+  svdbpi_test<TypeParam>({25,16,4});
+
+  svdbpi_test<TypeParam>({5,5,4,4});
+  svdbpi_test<TypeParam>({5,5,4,16});
+  svdbpi_test<TypeParam>({5,5,16,4});
+
   MATX_EXIT_HANDLER();
 }

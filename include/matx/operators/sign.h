@@ -63,7 +63,11 @@ namespace matx
           {
             auto v = get_value(op_,indices...);
             if constexpr (is_complex_v<scalar_type> ) {
-              return v / abs(v); // sign defintion for complex values
+              if ( v == scalar_type(0)) {
+                return zval_;
+              } else {
+                return v / abs(v); // sign defintion for complex values
+              }
             } else {  // real branch
               if( v < 0) 
                 return scalar_type(-1);

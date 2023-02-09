@@ -298,6 +298,7 @@ public:
     }
   }
 
+  __MATX_INLINE__ auto Shape() const noexcept { return shape_; }
   /**
    * Get the random number at an index
    *
