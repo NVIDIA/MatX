@@ -45,58 +45,57 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using AType = cuda::std::complex<float>;
   using SType = float;
 
-  SType epsilon = SType(.0001);
-  SType delta = SType(.97);
-  SType lamda = SType(2);
-
   cudaStream_t stream = 0;
-  int batch = 2; 
+  int batch = 1; 
 
-  int m = 4;
+  int m = 5;
   int n = 4;
- 
+
   int d = std::min(m,n);
+  int k = d;  // number of singular values to find
 
-  int r = std::min(n,m);
   auto A = make_tensor<AType>({batch, m, n});
-  auto U = make_tensor<AType>({batch, m, r});
-  auto VT = make_tensor<AType>({batch, r, n});
-  auto S = make_tensor<SType>({batch, r});
-  
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  auto x0 = gen.GetTensorView({batch, d}, NORMAL);
-  
-  int iterations = int(log(SType(4) * log ( SType(2 * n) / delta) / (epsilon * delta)) / (SType(2) * lamda));
-  iterations = 10;
-  printf("iterations: %d\n", iterations);
+  auto U = make_tensor<AType>({batch, m, k});
+  auto VT = make_tensor<AType>({batch, k, n});
+  auto S = make_tensor<SType>({batch, k});
 
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-  (A = random).run(stream);
-  
-  A.PrefetchDevice(stream);
-  U.PrefetchDevice(stream);
-  S.PrefetchDevice(stream);
-  VT.PrefetchDevice(stream);
-
-  (U = 0).run(stream);
-  (S = 0).run(stream);
-  (VT = 0).run(stream);
-
-  for(int i = 0; i < 1; i++) {
-    svdpi(U, S, VT, A, x0, iterations, stream, r);
-  }
-
-#if 1
-  cudaDeviceSynchronize();
-  
-  auto UD = make_tensor<AType>({batch, m, r});
+  // for correctness checking
+  auto UD = make_tensor<AType>({batch, m, k});
   auto UDVT = make_tensor<AType>({batch, m, n});
   auto UUT = make_tensor<AType>({batch, m, m});
-  auto UTU = make_tensor<AType>({batch, r, r});
+  auto UTU = make_tensor<AType>({batch, k, k});
   auto VVT = make_tensor<AType>({batch, n, n});
-  auto VTV = make_tensor<AType>({batch, r, r});
-  
-  if(batch == 1) {
+  auto VTV = make_tensor<AType>({batch, k, k});
+  std::array<index_t, U.Rank()> Dshape;
+  Dshape.fill(matxKeepDim);
+  Dshape[U.Rank()-2] = m;
+  // cloning D across
+  auto D = clone<U.Rank()>(S, Dshape);
+
+  int iterations = 10;
+  {
+    randomGenerator_t<AType> gen(A.TotalSize(),0);
+    auto x0 = gen.GetTensorView({batch, d}, NORMAL);
+
+    printf("iterations: %d\n", iterations);
+
+    auto random = gen.GetTensorView({batch, m, n}, NORMAL);
+    (A = random).run(stream);
+
+    A.PrefetchDevice(stream);
+    U.PrefetchDevice(stream);
+    S.PrefetchDevice(stream);
+    VT.PrefetchDevice(stream);
+
+    (U = 0).run(stream);
+    (S = 0).run(stream);
+    (VT = 0).run(stream);
+
+    svdpi(U, S, VT, A, x0, iterations, stream, k);
+
+    cudaDeviceSynchronize();
+    printf("svdpi:\n");
+
     printf("S\n");
     Print(S);
     printf("U\n");
@@ -125,23 +124,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     Print(VTV);
 
-#if 0
-    matmul(UD, U, D, stream);
-#else
-    std::array<index_t, U.Rank()> Dshape;
-    Dshape.fill(matxKeepDim);
-    Dshape[U.Rank()-2] = m;
-    // cloning D across
-    auto D = clone<U.Rank()>(S, Dshape);
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
     (UD = U * D).run(stream);
-#endif
+
     matmul(UDVT, UD, VT, stream);
-    
+
     printf("A\n");
     Print(A);
 
-    printf("UDV\n");
+    printf("UDVT\n");
     Print(UDVT);
 
     (A = A - UDVT).run(stream);
@@ -149,7 +140,62 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("A-UDVT\n");
     Print(A);
   }
-#endif
+  // Same as above but with svdbpi
+  {
+
+    (U = 0).run(stream);
+    (S = 0).run(stream);
+    (VT = 0).run(stream);
+    // TODO add k
+    svdbpi(U, S, VT, A, iterations, stream);
+
+    cudaDeviceSynchronize();
+    printf("svdbpi:\n");
+
+    printf("S\n");
+    Print(S);
+    printf("U\n");
+    Print(U);
+    printf("VT\n");
+    Print(VT);
+
+    if( m <=  n) {
+      printf("UUT:\n");
+      matmul(UUT, U, conj(transpose(U)), stream);
+      Print(UUT);
+    }
+
+    printf("UTU:\n");
+    matmul(UTU, conj(transpose(U)) , U, stream);
+    Print(UTU);
+
+    if( n >= m) {
+      printf("VVT:\n");
+      matmul(VVT, conj(transpose(VT)), VT, stream);
+      Print(VVT);
+    }
+
+    printf("VTV:\n");
+    matmul(VTV, VT, conj(transpose(VT)), stream); // works on r x r
+
+    Print(VTV);
+
+    // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+    (UD = U * D).run(stream);
+
+    matmul(UDVT, UD, VT, stream);
+
+    printf("A\n");
+    Print(A);
+
+    printf("UDVT\n");
+    Print(UDVT);
+
+    (A = A - UDVT).run(stream);
+
+    printf("A-UDVT\n");
+    Print(A);
+  }
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
