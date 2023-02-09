@@ -1456,14 +1456,7 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0
 #ifdef __CUDACC__
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
-  // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (use_cub) {
-    cub_sum<OutType, InType>(dest, in, stream);
-  }
-  else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpSum<typename OutType::scalar_type>(), stream, true);
-  }
+  cub_sum<OutType, InType>(dest, in, stream);
 #endif  
 }
 

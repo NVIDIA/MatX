@@ -697,6 +697,19 @@ class tensor_impl_t {
         }, idx);      
     }  
 
+    /**
+     * operator() getter with an array index
+     *
+     * @returns value in tensor
+     *
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    {
+      return std::apply([&](auto &&...args) -> T& {
+          return this->operator()(args...);
+        }, idx);      
+    }      
+
 
     /**
      * operator() setter with an array index
