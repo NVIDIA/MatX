@@ -25,6 +25,9 @@ set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 
+# Enable compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (MATX_BUILD_DOCS)
     project(MATX_DOCS)
