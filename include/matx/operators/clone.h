@@ -39,8 +39,8 @@
 namespace matx
 {
   namespace detail {
-    template <int CRank, typename T, typename Ind>
-      class CloneOp : public BaseOp<CloneOp<CRank, T, Ind>>
+    template <std::size_t CRank, typename T>
+      class CloneOp : public BaseOp<CloneOp<CRank, T>>
     {
       private:
         mutable typename base_type<T>::type op_;
@@ -121,7 +121,7 @@ namespace matx
       if constexpr (is_tensor_view_v<Op>) {
         return t.template Clone<Rank>(shape);
       } else {
-        return detail::CloneOp<Rank, Op, index_t>(t, shape);
+        return detail::CloneOp<Rank, Op>(t, shape);
       }
     };  
 
