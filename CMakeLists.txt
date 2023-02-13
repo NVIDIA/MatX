@@ -104,7 +104,7 @@ include(cmake/FindLibcudacxx.cmake)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 
 # Set flags for compiling tests faster
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit 100)
+set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
 if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -g -lineinfo)
 endif()
