@@ -519,7 +519,7 @@ struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
   using type = tensor_impl_t<typename T::scalar_type, T::Rank(), typename T::desc_type>;
 };
 
-template <typename T> using base_type_t = typename base_type<T>::type;
+template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
 
 // Type traits to help with the lack of short-circuit template logic. Numpy
 // doesn't support bfloat16 at all, we just use fp32 for the numpy side

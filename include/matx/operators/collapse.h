@@ -154,7 +154,7 @@ namespace matx
   template <int DIM, typename T1>
     auto __MATX_INLINE__ lcollapse(const T1 a)
     {
-      if constexpr (DIM == 1) {
+      if constexpr (DIM <= 1) {
         return a;
       }      
       else {
@@ -279,7 +279,7 @@ namespace matx
   template <int DIM, typename T1>
     auto __MATX_INLINE__ rcollapse(const T1 a)
     {
-      if constexpr (DIM == 1) {
+      if constexpr (DIM <= 1) {
         return a;
       }
       else {

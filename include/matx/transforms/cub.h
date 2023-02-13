@@ -43,11 +43,10 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/core/iterator.h"
 
 
 namespace matx {
-
-using namespace std::placeholders;
 
 /**
  * @brief Direction for sorting
@@ -290,49 +289,37 @@ public:
 #endif
   }
 
-  static auto GetCubInputReductionType(const InputOperator &a) {
-    // If the output operator rank is 0 or the input tensor is rank 1, there is no collapsing
-    // and we only need to determine if we return a raw pointer/tensor for speed, or wrap it
-    // in an iterator. 
-    static_assert(InputOperator::Rank() - OutputTensor::Rank() > 0, "Output reduction rank must be smaller than input rank");
-    if constexpr (OutputTensor::Rank() == 0 || InputOperator::Rank() <= 2) {
-      if constexpr (is_tensor_view_v<InputOperator>) {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> in_base = a;   
-        return in_base;
-      }
-      else {
-        return RandomOperatorIterator{a};
-      }
-    }
-    else {
-      // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
-      // then collapse the left size by the output rank to get the batch dimensions      
-      if constexpr (is_tensor_view_v<InputOperator>) {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> in_base = a;   
-        return RandomOperatorIterator{lcollapse<OutputTensor::Rank()>(
-                                      rcollapse<InputOperator::Rank() - OutputTensor::Rank()>(in_base))};        
-      }
-      else {
-        return RandomOperatorIterator{lcollapse<OutputTensor::Rank()>(
-                                      rcollapse<InputOperator::Rank() - OutputTensor::Rank()>(a))};
-      }
-    }
-  }
 
-  /* Get the output type used for a reduction. We'd like to stay with pointers if possible since the performance is slightly higher, 
-     but if we can't, we convert the operator into an output iterator. Since CUB only supports segmented reductions with a single
-     vector output, we must pretend that any output iterator is flat, while still pretending to have a shape of the original
-     output. This is done inside of RandomOperatorOutputIterator. */
-  static auto GetCubOutputReductionType(OutputTensor &a_out) {
-      if constexpr (is_tensor_view_v<OutputTensor> && OutputTensor::Rank() <= 1 || InputOperator::Rank() == 1) {
-        const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-        return out_base;
+  template <typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
+  static inline void ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
+    if constexpr (out.Rank() <= 1 && is_tensor_view_v<OutputOp>) {
+      if (out.IsContiguous()) {
+        MATX_ASSERT_STR_EXP(func(in, out.Data(), bi, ei), cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
+        return;
       }
-      else {
-        const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-        return RandomOperatorOutputIterator{out_base};
+    }
+  
+    detail::base_type_t<OutputOp> out_base = out;
+    auto iter = RandomOperatorOutputIterator{out_base};
+    MATX_ASSERT_STR_EXP(func(in, iter, bi, ei), cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
+  }  
+
+  template <typename Func, typename OutputOp, typename InputOp>
+  static inline void ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
+    typename detail::base_type_t<InputOp> in_base = in;
+    if constexpr (in_base.Rank() <= 2 && is_tensor_view_v<InputOp>) {
+      if (in_base.IsContiguous()) {
+        ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), in_base.Data(), BeginOffset{in_base}, EndOffset{in_base});
+        return;
       }
-  }
+    }
+
+    // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
+    // then collapse the left size by the output rank to get the batch dimensions      
+    const auto &iter = RandomOperatorIterator{lcollapse<OutputTensor::Rank()>(
+                                    rcollapse<InputOperator::Rank() - OutputTensor::Rank()>(in_base))};    
+    ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
+  }  
 
 
   static CubParams_t GetCubParams([[maybe_unused]] OutputTensor &a_out,
@@ -485,7 +472,7 @@ public:
     }
     else { // Batch higher dims
       auto ft = [&](auto ...p){ return cub::DeviceHistogram::HistogramEven(p...); };
-      auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+      auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
             static_cast<int>(a.Size(a.Rank() - 1)), stream);
       RunBatches(a_out, a, f, 2);
     }
@@ -536,7 +523,7 @@ public:
     }
     else {
         auto ft = [&](auto ...p){ cub::DeviceScan::InclusiveSum(p...); };
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(a.Rank()-1)), stream);
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(a.Rank()-1)), stream);
         RunBatches(a_out, a, f, 1);
     }
 #endif
@@ -641,7 +628,7 @@ public:
       {
         auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
 
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
             BeginOffset{a}, EndOffset{a}, stream, false);
 
         for (size_t iter = 0; iter < total_iter; iter++)
@@ -659,7 +646,7 @@ public:
       else
       {
         auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
             BeginOffset{a}, EndOffset{a}, stream, false);
 
         for (size_t iter = 0; iter < total_iter; iter++)
@@ -789,7 +776,7 @@ inline void ExecSort(OutputTensor &a_out,
 
         auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeys(p...); };
 
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
             BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
@@ -807,7 +794,7 @@ inline void ExecSort(OutputTensor &a_out,
       {
 
         auto ft = [&](auto ...p){ cub::DeviceSegmentedRadixSort::SortKeysDescending(p...); };
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, _1, _2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
+        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
             BeginOffset{a}, EndOffset{a}, static_cast<int>(0), static_cast<int>(sizeof(T1) * 8), stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
@@ -922,6 +909,7 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
+
   /**
    * Execute a sum on an operator
    *
@@ -944,105 +932,25 @@ inline void ExecSort(OutputTensor &a_out,
                        const cudaStream_t stream)
   {
 #ifdef __CUDACC__
-    /* This function is very ugly and repetitive for a reason. CUB relies on template deduction for functions, so to take advantage of
-       that, we need a single line where the template type can be reduced. That means no conditionals in the function call itself. CUB
-       also has slightly higher performance when the input and output types are pointers rather than iterators. To maintain the highest
-       performance, we only pass in iterators when absolutely necessary, and pointers when possible.  */
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    if constexpr (OutputTensor::Rank() == 0) {
-      if constexpr (is_tensor_view_v<InputOperator>) {   
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> in_base = a;
-        if constexpr (is_tensor_view_v<OutputTensor>) {
-          const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-          
-          if (a.IsContiguous()) {
-            if (a_out.IsContiguous()) {
-              cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a.Data(), a_out.Data(), static_cast<int>(TotalSize(a)), stream);
-            }
-            else {
-              cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a.Data(), RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a)), stream);
-            }
-          }
-          else {
-            if (a_out.IsContiguous()) {
-              cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, a_out.Data(), static_cast<int>(TotalSize(a)), stream);
-            }
-            else {
-              cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a)), stream);
-            }            
-          }
-        }
-        else {
-          if (a.IsContiguous()) {
-            cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a.Data(), a_out, static_cast<int>(TotalSize(a)), stream);
-          }
-          else {
-            cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, a_out, static_cast<int>(TotalSize(a)), stream);
-          }
-        }
-      }
-      else {
-        if constexpr (is_tensor_view_v<OutputTensor>) {
-          const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-          if (a_out.IsContiguous()) {
-            cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a, a_out.Data(), static_cast<int>(TotalSize(a)), stream);
-          }
-          else {
-            cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a, RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a)), stream);
-          }
-        }
-        else {
-          cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, a, a_out, static_cast<int>(TotalSize(a)), stream);
-        }
-      }      
+    
+    typename detail::base_type_t<InputOperator> in_base = a;
+    typename detail::base_type_t<OutputTensor> out_base = a_out;  
+
+    // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
+    // type of reduction where there's not a single output, since any type of reduction can be generalized
+    // to a segmented type
+    if constexpr (OutputTensor::Rank() > 0) {
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) { 
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream); 
+      };
+      ReduceInput(ft, out_base, in_base);
     }
     else {
-      if constexpr (is_tensor_view_v<InputOperator>) {   
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> in_base = a;
-        if constexpr (is_tensor_view_v<OutputTensor>) {
-          const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-          if (a.IsContiguous()) {
-
-            if (a_out.IsContiguous()) {
-              cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a.Data(), a_out.Data(), static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-            }
-            else {
-              cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a.Data(), RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-            }
-          }
-          else {
-            if (a_out.IsContiguous()) {
-              cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, a_out.Data(), static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-            }
-            else {
-              cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-            }            
-          }
-        }
-        else {
-          if (a.IsContiguous()) {
-            cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a.Data(), a_out, static_cast<int>(TotalSize(a_out)), stream);
-          }
-          else {
-            cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, RandomOperatorIterator{in_base}, a_out, static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-          }
-        }
-      }
-      else {
-        if constexpr (is_tensor_view_v<OutputTensor>) {
-          const tensor_impl_t<typename OutputTensor::scalar_type, OutputTensor::Rank(), typename OutputTensor::desc_type> out_base = a_out;
-          if (a_out.IsContiguous()) {
-            cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a, a_out.Data(), static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-          }
-          else {
-          
-            cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a, RandomOperatorOutputIterator{out_base}, static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-          }
-        }
-        else {
-          cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, a, a_out, static_cast<int>(TotalSize(a_out)), BeginOffset{a}, EndOffset{a}, stream);
-        }
-      }        
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) { 
+        return cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream); 
+      };
+      ReduceInput(ft, out_base, in_base);
     }
 #endif
   }
@@ -1546,26 +1454,24 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 
   using rtype = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>;
   
-  auto in  = rtype::GetCubInputReductionType(a);
-  auto out = rtype::GetCubOutputReductionType(a_out);
+  // auto in  = rtype::GetCubInputReductionType(a);
+  // auto out = rtype::GetCubOutputReductionType(a_out);
   auto params =
-      detail::matxCubPlan_t<decltype(out), decltype(in),
-                            detail::CUB_OP_REDUCE_SUM>::GetCubParams(out, in, stream);
+      detail::matxCubPlan_t<OutputTensor, InputOperator,
+                            detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
 
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t<decltype(out), decltype(in), detail::CUB_OP_REDUCE_SUM>{
-        out, in, {}, stream};
+    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecSum(out, in, stream);
+    tmp->ExecSum(a_out, a, stream);
   }
   else {
     auto type =
-        static_cast<detail::matxCubPlan_t<decltype(out), decltype(in), detail::CUB_OP_REDUCE_SUM> *>(
-            ret.value());
-    type->ExecSum(out, in, stream);
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM> *>(ret.value());
+    type->ExecSum(a_out, a, stream);
   }
 #endif
 }
