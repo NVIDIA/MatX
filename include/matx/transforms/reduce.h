@@ -1546,15 +1546,8 @@ void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaStream_t stream = 
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("rmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
-  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
-  // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (use_cub) {
-    cub_max<OutType, InType>(dest, in, stream);
-  }
-  else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
-  }
+
+  cub_max<OutType, InType>(dest, in, stream);
 #endif  
 }
 
@@ -1646,15 +1639,7 @@ void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaStream_t stream = 
 {
 #ifdef __CUDACC__  
   MATX_NVTX_START("rmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
-  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
-  // Use CUB implementation if we have a tensor on the RHS
-  if constexpr (use_cub) {
-    cub_min<OutType, InType>(dest, in, stream);
-  }
-  else { // Fall back to the slow path of custom implementation
-    reduce(dest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
-  }
+  cub_min<OutType, InType>(dest, in, stream);
 #endif  
 }
 

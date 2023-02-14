@@ -61,6 +61,21 @@ __MATX_INLINE__ bool IsAmpereOrAbove() {
     return GetComputeCapabilityMajor() >= AMPERE_CC;
 }
 
+template <typename Op1, typename Op2>
+bool SizesMatch(const Op1 &op1, const Op2 &op2) {
+  if constexpr (Op1::Rank() != Op2::Rank()) {
+    return false;
+  }
+
+  for (int r = 0; r < Op1::Rank(); r++) {
+    if (op1.Size(r) != op2.Size(r)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 template <typename T1, typename T2, typename T3>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &y, const T3 &z) {
   using T4 = decltype(x*y+z); 
