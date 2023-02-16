@@ -120,7 +120,7 @@ struct BeginOffset {
   using pointer = value_type*;
   using reference = value_type;
   using iterator_category = std::random_access_iterator_tag;
-  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+  using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
@@ -179,7 +179,7 @@ struct EndOffset {
   using pointer = value_type*;
   using reference = value_type;
   using iterator_category = std::random_access_iterator_tag;
-  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+  using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
