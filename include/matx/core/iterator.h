@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/defines.h"
+#include "matx/core/tensor_utils.h"
 
 namespace matx {
 /**
@@ -56,8 +57,12 @@ struct RandomOperatorIterator {
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const RandomOperatorIterator &) = default;
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(RandomOperatorIterator &&) = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t) : t_(t), offset_(0) { }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorType &&t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   /**
    * @brief Dereference value at a pre-computed offset
@@ -75,6 +80,15 @@ struct RandomOperatorIterator {
           return static_cast<value_type>(t_.operator()(args...));
         }, arrs);     
     }
+  }  
+
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator=(const self_type &rhs)
+  {
+    if constexpr (is_tensor_view_v<OperatorType>) {
+      t_.copy(rhs.t_);
+    }
+    offset_ = rhs.offset_;
+    return *this;
   }  
 
 
@@ -101,22 +115,31 @@ struct RandomOperatorIterator {
       return *this;
   }  
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ difference_type offset()
+  {
+      return offset_;
+  }    
+
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
   {
       offset_ += offset;
       return *this;
   }
 
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator-(difference_type offset) const
-  {
-      return self_type{t_, offset_ - offset};
-  }
-
-
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator-=(difference_type offset)
   {
       offset_ -= offset;
       return *this;
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator!=(const self_type &a, const self_type &b)
+  {
+    return a.offset_ != b.offset_;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator==(const self_type &a, const self_type &b)
+  {
+    return a.offset_ == b.offset_;
   }  
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
@@ -131,6 +154,12 @@ struct RandomOperatorIterator {
   typename detail::base_type_t<OperatorType> t_;
   stride_type offset_;  
 };
+
+template <typename OperatorType>
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorIterator<OperatorType> &a, const RandomOperatorIterator<OperatorType> &b)
+{
+  return a.offset_ - b.offset_;
+}    
 
 
 
@@ -155,8 +184,12 @@ struct RandomOperatorOutputIterator {
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(RandomOperatorOutputIterator &&) = default;
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const RandomOperatorOutputIterator &) = default;
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorType &&t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*()
   {
@@ -202,6 +235,13 @@ struct RandomOperatorOutputIterator {
       return *this;
   }
 
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator=(const self_type &rhs)
+  {
+    t_.copy(rhs.t_);
+    offset_ = rhs.offset_;
+    return *this;
+  }
+
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator-(difference_type offset) const
   {
       return self_type{t_, offset_ - offset};
@@ -213,6 +253,21 @@ struct RandomOperatorOutputIterator {
       offset_ -= offset;
       return *this;
   }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator--() {
+    --offset_;
+    return *this;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator!=(const self_type &a, const self_type &b)
+  {
+    return a.offset_ != b.offset_;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator==(const self_type &a, const self_type &b)
+  {
+    return a.offset_ == b.offset_;
+  }    
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
     return OperatorType::Rank();
@@ -226,5 +281,134 @@ struct RandomOperatorOutputIterator {
   typename detail::base_type_t<OperatorType> t_;
   stride_type offset_;  
 };
+
+
+template <typename OperatorType>
+struct BeginOffset {
+  using self_type = BeginOffset<OperatorType>;
+  using value_type = typename OperatorType::scalar_type;
+  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  //                         index_t>;
+  using stride_type = index_t;
+  using pointer = value_type*;
+  using reference = value_type;
+  using iterator_category = std::random_access_iterator_tag;
+  using difference_type = index_t;
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(stride_type size, stride_type offset) : size_(size), offset_(offset) {}
+
+  /**
+   * @brief Dereference value at a pre-computed offset
+   *
+   * @return Value at offset
+   */
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator*() const
+  {
+    return offset_ * size_;
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
+  {
+    return self_type{size_, offset_ + offset};
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type offset) const
+  {
+    return *self_type{size_, offset_ + offset};
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
+  {
+      self_type retval = *this;
+      offset_++;
+      return retval;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
+  {
+      offset_++;
+      return *this;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
+  {
+      offset_ += offset;
+      return *this;
+  }
+
+  stride_type size_;
+  stride_type offset_;
+};
+
+template <typename OperatorType>
+struct EndOffset {
+  using self_type = BeginOffset<OperatorType>;
+  using value_type = typename OperatorType::scalar_type;
+  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  //                         index_t>;
+  using stride_type = index_t;
+  using pointer = value_type*;
+  using reference = value_type;
+  using iterator_category = std::random_access_iterator_tag;
+  using difference_type = index_t;
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(stride_type size, stride_type offset) : size_(size), offset_(offset) {}
+
+  /**
+   * @brief Dereference value at a pre-computed offset
+   *
+   * @return Value at offset
+   */
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator*() const
+  {
+    return (offset_ + 1) * size_;
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
+  {
+    return self_type{size_, offset_ + offset};
+  }
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type offset) const
+  {
+    return ( offset + 1) * size_;
+  }
+
+  stride_type size_;
+  stride_type offset_;
+};
+
+
+
+template <typename OperatorType>
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorOutputIterator<OperatorType> &a, const RandomOperatorOutputIterator<OperatorType> &b)
+{
+  return a.offset_ - b.offset_;
+}    
+
+
+template <typename Op>
+auto  __MATX_INLINE__ __MATX_HOST__  cbegin(Op &&op) {
+  return RandomOperatorIterator{static_cast<typename detail::base_type_t<Op>>(op)};
+}
+
+template <typename Op>
+auto  __MATX_INLINE__ __MATX_HOST__  cend(Op &&op) {
+  return RandomOperatorIterator{static_cast<typename detail::base_type_t<Op>>(op), TotalSize(op)};
+}
+
+template <typename Op>
+auto  __MATX_INLINE__ __MATX_HOST__  begin(Op &&op) {
+  return RandomOperatorOutputIterator{static_cast<typename detail::base_type_t<Op>>(op)};
+}
+
+template <typename Op>
+auto  __MATX_INLINE__ __MATX_HOST__  end(Op &&op) {
+  return RandomOperatorOutputIterator{static_cast<typename detail::base_type_t<Op>>(op), TotalSize(op)};
+}
 
 };

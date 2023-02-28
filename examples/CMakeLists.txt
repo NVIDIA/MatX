@@ -12,6 +12,7 @@ set(examples
     spherical_harmonics 
     svd_power
     qr
+    example
     black_scholes)
 
 add_library(example_lib INTERFACE)

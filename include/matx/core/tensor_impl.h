@@ -41,7 +41,7 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
 //#include "matx_exec_kernel.h"
-//#include "matx_executor.h"
+#include "iterator.h"
 #include "matx/core/make_tensor.h"
 
 namespace matx {
@@ -227,7 +227,23 @@ class tensor_impl_t {
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
     {
-    }        
+    }      
+
+    /**
+     * Lazy assignment operator=. Used to create a "set" object for deferred
+     * execution on a device
+     *
+     * @param op
+     *   Tensor view source
+     *
+     * @returns set object containing the destination view and source object
+     *
+     */
+    [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto copy(const tensor_impl_t<T, RANK> &op)
+    {
+      ldata_ = op.ldata_;
+      desc_ = op.desc_;
+    }      
 
 
     // Lazy operators

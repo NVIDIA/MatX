@@ -311,7 +311,17 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
   int assumed;
   int old = *addr;
 
-  // nan should be ok here but should verify
+  while (val == 0 && old != 0) {
+    assumed = old;
+    old = atomicCAS(addr, assumed, 0);
+  }
+};
+
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(unsigned int *addr, unsigned int val)
+{
+  unsigned int assumed;
+  unsigned int old = *addr;
+
   while (val == 0 && old != 0) {
     assumed = old;
     old = atomicCAS(addr, assumed, 0);
@@ -1397,18 +1407,21 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ mean(OutType dest, const InType &in,
-                 cudaStream_t stream = 0)
+                 cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__  
   MATX_NVTX_START("mean(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
   
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
   inner_type scale = 1;
+
+  cudaStream_t stream = exec.getStream();
 
   sum(dest, in, stream);
 
@@ -1422,8 +1435,82 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in,
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Calculate the mean of values in a tensor
+ *
+ * Performs a sum reduction from tensor "in" into tensor "dest" , followed by
+ * a division by the number of elements in the reduction. Similar to the reduce
+ * function, the type of reduction is dependent on the rank of the output
+ * tensor. A single value denotes a reduction over the entire input, a 1D tensor
+ * denotes a reduction over each row independently, etc.
+ *
+ * @tparam T
+ *   Output data type
+ * @tparam RANK
+ *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single thread host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ mean(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("mean(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+  inner_type scale = 1;
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      auto ts = TotalSize(in);
+      *lout = std::reduce(lin, lin + ts) / static_cast<inner_type>(ts); 
+    }
+    else {
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        *(lout + b) = std::reduce(lin + lbegin[b], lin + lend[b]) / static_cast<inner_type>(lin.Size(1)); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);
+}
+
+/**
+ * Calculate the mean of values in a tensor
+ *
+ * Performs a sum reduction from tensor "in" into tensor "dest" , followed by
+ * a division by the number of elements in the reduction. Similar to the reduce
+ * function, the type of reduction is dependent on the rank of the output
+ * tensor. A single value denotes a reduction over the entire input, a 1D tensor
+ * denotes a reduction over each row independently, etc.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Rank of dimension array
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Dimensions to compute the mean over
+ * @param exec
+ *   Executor type
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("mean(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1432,10 +1519,12 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  mean(dest, permute(in, perm), stream);
+  mean(dest, permute(in, perm), etype);
 #endif  
 }
+
 
 /**
  * Calculate the softmax of values in a tensor treated as a flat vector
@@ -1488,8 +1577,8 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in,
  *   Output data type
  * @tparam InType
  *   Input data type
- * @tparam RANK
- *   Rank of output tensor
+ * @tparam D
+ *   Rank of dimension array
  *
  * @param dest
  *   Destination for softmax output
@@ -1565,21 +1654,23 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ median(OutType dest,
-                   const InType &in, cudaStream_t stream = 0)
+                   const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__  
   if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
     MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-      using T = typename OutType::scalar_type;
+    using T = typename OutType::scalar_type;
     constexpr int RANK_IN = InType::Rank();
     static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+    cudaStream_t stream = exec.getStream();
 
     auto tmp_sort = make_tensor<T>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
@@ -1651,8 +1742,105 @@ void __MATX_INLINE__ median(OutType dest,
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Calculate the median of values in a tensor
+ *
+ * Calculates the median of rows in a tensor. The median is computed by sorting
+ * the data into a temporary tensor, then picking the middle element of each
+ * row. For an even number of items, the mean of the two middle elements is
+ * selected. Currently only works on tensor views as input since it uses CUB
+ * sorting as a backend, and the tensor views must be rank 2 reducing to rank 1,
+ * or rank 1 reducing to rank 0.
+ *
+ * @tparam T
+ *   Output data type
+ * @tparam RANK
+ *   Rank of output tensor
+ * @tparam RANK_IN
+ *   Input rank
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single thread host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ median(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      auto insize = TotalSize(in);
+      auto tin = new typename InType::scalar_type[insize];      
+      std::partial_sort_copy( lin, 
+                              lin + insize, 
+                              tin, 
+                              tin + insize);
+      if ((insize % 2) == 0) {
+        *lout = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
+      }
+      else {
+        *lout = tin[insize / 2];
+      }
+
+      delete [] tin;          
+    }
+    else {
+      auto insize = lin.Size(1);
+      auto tin = new typename InType::scalar_type[insize];      
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        std::partial_sort_copy( lin + lbegin[b], 
+                                lin + lend[b], 
+                                tin, 
+                                tin + insize);
+
+        if ((insize % 2) == 0) {        
+          *(lout + b) = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
+        }
+        else {
+          *(lout + b) = tin[insize / 2];
+        }     
+      }
+
+      delete [] tin;            
+    }
+  };
+  
+  ReduceInput(ft, dest, in);  
+}
+
+/**
+ * Calculate the median of values in a tensor
+ *
+ * Calculates the median of rows in a tensor. The median is computed by sorting
+ * the data into a temporary tensor, then picking the middle element of each
+ * row. For an even number of items, the mean of the two middle elements is
+ * selected. Currently only works on tensor views as input since it uses CUB
+ * sorting as a backend, and the tensor views must be rank 2 reducing to rank 1,
+ * or rank 1 reducing to rank 0.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Rank of dimension array
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Dimensions to compute the mean over
+ * @param exec
+ *   Single thread host executor
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("median(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1662,19 +1850,19 @@ void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D]
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
-  median(dest, permute(in, perm), stream);
+  typename detail::exec_type_t<Executor> etype{exec};
+
+  median(dest, permute(in, perm), etype);
 #endif  
 }
 
 /**
  * Compute sum of numbers
  *
- * Returns a tensor representing the sum of all numbers in the reduction
+ * Returns a tensor representing the sum of all items in the reduction
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -1682,23 +1870,81 @@ void __MATX_INLINE__ median(OutType dest, const InType &in, const int (&dims)[D]
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ sum(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
+  cudaStream_t stream = exec.getStream();
   cub_sum<OutType, InType>(dest, in, stream);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute sum of numbers
+ *
+ * Returns a tensor representing the sum of all items in the reduction
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single thread host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ sum(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
-#ifdef __CUDACC__
+  MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0)); 
+    }
+    else {
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);  
+}
+
+/**
+ * Compute sum of numbers
+ *
+ * Returns a tensor representing the sum of all items in the reduction
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Rank of dimension array
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Dimensions to compute the mean over
+ * @param exec
+ *   Executor type
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
+{
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
@@ -1706,20 +1952,21 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], c
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
-  sum(dest, permute(in, perm), stream);
-#endif  
+  typename detail::exec_type_t<Executor> etype{exec};
+
+  sum(dest, permute(in, perm), etype);
 }
+
+
 
 
 /**
  * Compute product of numbers
  *
- * Returns a tensor representing the product of all numbers in the reduction
+ * Returns a tensor representing the product of all items in the reduction
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -1727,20 +1974,86 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, const int (&dims)[D], c
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("prod(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  cudaStream_t stream = exec.getStream();
   reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute product of numbers
+ *
+ * Returns a tensor representing the product of all items in the reduction
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single thread host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ prod(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("prod(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::accumulate(lin, 
+                              lin + TotalSize(in), 
+                              static_cast<typename InType::scalar_type>(1), 
+                              std::multiplies<typename InType::scalar_type>()); 
+    }
+    else {
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        *(lout + b) = std::accumulate(lin + lbegin[b], 
+                                      lin + lend[b], 
+                                      static_cast<typename InType::scalar_type>(1), 
+                                      std::multiplies<typename InType::scalar_type>()); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);  
+}
+
+/**
+ * Compute product of numbers
+ *
+ * Returns a tensor representing the product of all items in the reduction
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Rank of dimension array
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Dimensions to compute the mean over
+ * @param exec
+ *   Executor for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("prod(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1749,8 +2062,9 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  prod(dest, permute(in, perm), stream);
+  prod(dest, permute(in, perm), etype);
 #endif  
 }
 
@@ -1762,10 +2076,8 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], 
  * @note This function uses the name rmax instead of max to not collide with the
  * element-wise operator max.
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -1773,21 +2085,88 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, const int (&dims)[D], 
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ rmax(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("rmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
+  cudaStream_t stream = exec.getStream();
   cub_max<OutType, InType>(dest, in, stream);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute max reduction of a tensor
+ *
+ * Returns a tensor representing the max of all numbers in the reduction
+ *
+ * @note This function uses the name rmax instead of max to not collide with the
+ * element-wise operator max.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ rmax(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("rmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = *std::max_element(lin, lin + TotalSize(in)); 
+    }
+    else {
+      auto els = lend[1] - lbegin[0];
+      for (index_t b = 0; b < els; b++) {
+        lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);    
+}
+
+/**
+ * Compute max reduction of a tensor
+ *
+ * Returns a tensor representing the max of all numbers in the reduction
+ *
+ * @note This function uses the name rmax instead of max to not collide with the
+ * element-wise operator max.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("rmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1796,8 +2175,9 @@ void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  rmax(dest, permute(in, perm), stream);
+  rmax(dest, permute(in, perm), etype);
 #endif  
 }
 
@@ -1806,33 +2186,106 @@ void __MATX_INLINE__ rmax(OutType dest, const InType &in, const int (&dims)[D], 
  *
  * Returns a tensor with maximums and indices
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
+ * @tparam TensorIndexType
+ *   Output type stpring indices
  * @tparam InType
  *   Input data type
  *
  * @param dest
- *   Destination view of reduction values
+ *   Destination view of reduction
  * @param idest
- *   Destination view of reduction indices
+ *   Destination for indices
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__  
   MATX_NVTX_START("argmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  cudaStream_t stream = exec.getStream();
   reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
-template <typename OutType, typename TensorIndexType, typename InType, int D>
-void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute maxn reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with maximums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param idest
+ *   Destination for indices
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("argmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::max_element(lin, lin + TotalSize(in)) - lin; 
+    }
+    else {
+      auto els = lend[0] - lbegin[0];
+      for (index_t b = 0; b < els; b++) {
+        lout[b] = std::max_element(lin + lbegin[b], lin + lend[b]) - lin; 
+      }
+    }
+  };
+  
+  // This could be more efficient by not running two reductions to find the same values, but
+  // for brevity this is faster
+  ReduceInput(ft, idest, in);
+  rmax(dest, in, exec);
+}
+
+/**
+ * Compute maxn reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with maximums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param idest
+ *   Destination for indices
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename TensorIndexType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("argmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1841,8 +2294,9 @@ void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const In
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  argmax(dest, idest, permute(in, perm), stream);
+  argmax(dest, idest, permute(in, perm), etype);
 #endif  
 }
 
@@ -1855,10 +2309,8 @@ void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const In
  * @note This function uses the name rmin instead of min to not collide with the
  * element-wise operator min.
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -1866,20 +2318,87 @@ void __MATX_INLINE__ argmax(OutType dest, const TensorIndexType &idest, const In
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ rmin(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__  
   MATX_NVTX_START("rmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  cudaStream_t stream = exec.getStream();
   cub_min<OutType, InType>(dest, in, stream);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute min reduction of a tensor
+ *
+ * Returns a tensor representing the min of all numbers in the reduction
+ *
+ * @note This function uses the name rmin instead of min to not collide with the
+ * element-wise operator min.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ rmin(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{ 
+  MATX_NVTX_START("rmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = *std::min_element(lin, lin + TotalSize(in)); 
+    }
+    else {
+      auto els = lend[1] - lbegin[0];
+      for (index_t b = 0; b < els; b++) {
+        lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);   
+}
+
+/**
+ * Compute min reduction of a tensor
+ *
+ * Returns a tensor representing the min of all numbers in the reduction
+ *
+ * @note This function uses the name rmin instead of min to not collide with the
+ * element-wise operator min.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("rmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1888,8 +2407,9 @@ void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], 
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  rmin(dest, permute(in, perm), stream);
+  rmin(dest, permute(in, perm), etype);
 
 #endif  
 }
@@ -1899,34 +2419,107 @@ void __MATX_INLINE__ rmin(OutType dest, const InType &in, const int (&dims)[D], 
  *
  * Returns a tensor with minimums and indices
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
+ * @tparam TensorIndexType
+ *   Output type stpring indices
  * @tparam InType
  *   Input data type
  *
  * @param dest
- *   Destination view of reduction values
+ *   Destination view of reduction
  * @param idest
- *   Destination view of reduction indices
+ *   Destination for indices
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__  
   MATX_NVTX_START("argmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  cudaStream_t stream = exec.getStream();
   reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
-template <typename OutType, typename TensorIndexType, typename InType, int D>
-void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute min reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with minimums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param idest
+ *   Destination for indices
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   SIngle host executor
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("argmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::min_element(lin, lin + TotalSize(in)) - lin; 
+    }
+    else {
+      auto els = lend[1] - lbegin[0];
+      for (index_t b = 0; b < els; b++) {
+        lout[b] = std::min_element(lin + lbegin[b], lin + lend[b]) - lin; 
+      }
+    }
+  };
+  
+  // This could be more efficient by not running two reductions to find the same values, but
+  // for brevity this is faster
+  ReduceInput(ft, idest, in);
+  rmin(dest, in, exec);
+}
+
+/**
+ * Compute min reduction of a tensor and returns value + index
+ *
+ * Returns a tensor with minimums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param idest
+ *   Destination for indices
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename TensorIndexType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("argmin(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1935,8 +2528,9 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  argmin(dest, idest, permute(in, perm), stream);
+  argmin(dest, idest, permute(in, perm), etype);
 #endif  
 }
 
@@ -1947,10 +2541,8 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
  * non-zero. The same aggregation rules apply for input vs output tensor size
  * and what type of reduction is done.
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -1958,20 +2550,88 @@ void __MATX_INLINE__ argmin(OutType dest, TensorIndexType &idest, const InType &
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ any(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ any(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__  
   MATX_NVTX_START("any(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  cudaStream_t stream = exec.getStream();
   reduce(dest, in, detail::reduceOpAny<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Find if any value is != 0
+ *
+ * Returns a boolean value indicating whether any value in the set of inputs are
+ * non-zero. The same aggregation rules apply for input vs output tensor size
+ * and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ any(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("any(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
+          return vin != 0;
+        }); 
+    }
+    else {
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
+          return vin != 0;
+        }); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);
+}
+
+/**
+ * Find if any value is != 0
+ *
+ * Returns a boolean value indicating whether any value in the set of inputs are
+ * non-zero. The same aggregation rules apply for input vs output tensor size
+ * and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("any(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1981,7 +2641,8 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], c
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
-  any(dest, permute(in, perm), stream);
+  typename detail::exec_type_t<Executor> etype{exec};
+  any(dest, permute(in, perm), etype);
 #endif  
 }
 
@@ -1992,10 +2653,8 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], c
  * are non-zero. The same aggregation rules apply for input vs output tensor
  * size and what type of reduction is done.
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -2003,20 +2662,88 @@ void __MATX_INLINE__ any(OutType dest, const InType &in, const int (&dims)[D], c
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ all(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ all(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__ 
   MATX_NVTX_START("all(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  cudaStream_t stream = exec.getStream();
   reduce(dest, in, detail::reduceOpAll<typename OutType::scalar_type>(), stream, true);
 #endif  
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Find if all values are != 0
+ *
+ * Returns a boolean value indicating whether all values in the set of inputs
+ * are non-zero. The same aggregation rules apply for input vs output tensor
+ * size and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename InType>
+void __MATX_INLINE__ all(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("all(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    if constexpr (OutType::Rank() == 0) {
+      *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
+          return vin != 0;
+        }); 
+    }
+    else {
+      for (index_t b = 0; b < lin.Size(0); b++) {
+        lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
+          return vin != 0;
+        }); 
+      }
+    }
+  };
+  
+  ReduceInput(ft, dest, in);
+}
+
+/**
+ * Find if all values are != 0
+ *
+ * Returns a boolean value indicating whether all values in the set of inputs
+ * are non-zero. The same aggregation rules apply for input vs output tensor
+ * size and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("all(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2025,8 +2752,9 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  typename detail::exec_type_t<Executor> etype{exec};
 
-  all(dest, permute(in, perm), stream);
+  all(dest, permute(in, perm), etype);
 #endif  
 }
 
@@ -2036,10 +2764,8 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], c
  * Computes the variance of the input according to the output tensor rank and
  * size
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
  * @tparam InType
  *   Input data type
  *
@@ -2048,24 +2774,53 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], c
  * @param in
  *   Input data to reduce
  * @param stream
- *   CUDA stream
+ *   CUDA stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ var(OutType dest, const InType &in, int stream = 0)
 {
-#ifdef __CUDACC__    
+  var(dest, in, cudaExecutor{stream});
+}
+
+/**
+ * Compute a variance reduction
+ *
+ * Computes the variance of the input according to the output tensor rank and
+ * size
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Executor type
+ */
+template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+void __MATX_INLINE__ var(OutType dest, const InType &in, Executor &&exec)
+{
   MATX_NVTX_START("var(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
- 
+  matxMemorySpace_t space;
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
 
-  auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  if constexpr (is_device_executor_v<Executor>) {
+    space = MATX_ASYNC_DEVICE_MEMORY;
+  }
+  else {
+    space = MATX_HOST_MALLOC_MEMORY;
+  }
 
-  // Compute mean of each dimension
-  mean(mean_tns, in, stream);
+  auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), space);
+  mean(mean_tns, in, exec);
 
   // need to clone along right most dims
   std::array<index_t, InType::Rank()> cdims;
- 
   for(int i = 0; i < OutType::Rank(); i++) {
     cdims[i] = matxKeepDim;
   }
@@ -2074,15 +2829,7 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
   }
 
   auto mean_op = mean_tns.template Clone<InType::Rank()>(cdims);
-  //auto mean_op = clone<InType::Rank()>(mean_tns, cdims);
-
-  // Subtract means from each value, square the result, and sum
-  if constexpr (is_complex_v<typename InType::scalar_type>) {
-    sum(dest, pow(abs(in - mean_op), static_cast<inner_type>(2)), stream);
-  }
-  else {
-    sum(dest, pow(in - mean_op, static_cast<inner_type>(2)), stream);
-  }
+  sum(dest, pow(abs(in - mean_op), static_cast<inner_type>(2)), exec);
 
   // The length of what we are taking the variance over is equal to the product
   // of the outer dimensions covering the different in input/output ranks
@@ -2092,12 +2839,35 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
   }
 
   // Sample variance for an unbiased estimate
-  (dest = dest / static_cast<inner_type>(N - 1)).run(stream);
-#endif  
+  (dest = dest / static_cast<inner_type>(N - 1)).run(exec);
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute a variance reduction
+ *
+ * Computes the variance of the input according to the output tensor rank and
+ * size
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("var(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2106,8 +2876,9 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], c
   static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  //typename detail::exec_type_t<Executor> etype{exec};
 
-  var(dest, permute(in, perm), stream);
+  var(dest, permute(in, perm), std::forward<Executor>(exec));
 #endif  
 }
 
@@ -2117,10 +2888,34 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], c
  * Computes the standard deviation of the input according to the output tensor
  * rank and size
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Executor type
+ */
+template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+void __MATX_INLINE__ stdd(OutType dest, const InType &in, Executor &&exec)
+{
+  MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  var(dest, in, exec);
+  (dest = sqrt(dest)).run(exec);
+}
+
+/**
+ * Compute a standard deviation reduction
+ *
+ * Computes the standard deviation of the input according to the output tensor
+ * rank and size
+ *
+ * @tparam OutType
+ *   Output data type
  * @tparam InType
  *   Input data type
  *
@@ -2132,17 +2927,37 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], c
  *   CUDA stream
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ stdd(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ stdd(OutType dest, const InType &in, int stream = 0)
 {
-#ifdef __CUDACC__  
-  MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  var(dest, in, stream);
-  (dest = sqrt(dest)).run(stream);
-#endif  
+  stdd(dest, in, cudaExecutor{stream});
 }
 
-template <typename OutType, typename InType, int D>
-void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
+/**
+ * Compute a standard deviation reduction
+ *
+ * Computes the standard deviation of the input according to the output tensor
+ * rank and size
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ * @tparam Executor
+ *   Executor type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
+ * @param exec
+ *   Executor to use for reduction
+ */
+template <typename OutType, typename InType, int D, typename Executor>
+void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2152,7 +2967,7 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], 
 
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
-  stdd(dest, permute(in, perm), stream);
+  stdd(dest, permute(in, perm), std::forward<Executor>(exec));
 
 #endif  
 }
@@ -2162,10 +2977,34 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], 
  *
  * Computes the trace of a square matrix by summing the diagonal
  *
- * @tparam T
+ * @tparam OutType
  *   Output data type
- * @tparam RANK
- *   Rank of output tensor
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Executor type
+ */
+template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+void __MATX_INLINE__ trace(OutType dest, const InType &in, Executor &&exec)
+{
+  MATX_NVTX_START("trace(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto d = diag(in);
+  sum(dest, d, exec);
+}
+
+/**
+ * Computes the trace of a tensor
+ *
+ * Computes the trace of a square matrix by summing the diagonal
+ *
+ * @tparam OutType
+ *   Output data type
  * @tparam InType
  *   Input data type
  *
@@ -2174,16 +3013,12 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], 
  * @param in
  *   Input data to reduce
  * @param stream
- *   CUDA stream
+ *   CUDA stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ trace(OutType dest, const InType &in, cudaStream_t stream = 0)
+void __MATX_INLINE__ trace(OutType dest, const InType &in, int stream)
 {
-#ifdef __CUDACC__
-  MATX_NVTX_START("trace(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  auto d = diag(in);
-  sum(dest, d, stream);
-#endif  
+  return trace(dest, in, cudaExecutor{stream});
 }
 
 } // end namespace matx
