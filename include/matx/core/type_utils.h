@@ -43,6 +43,7 @@
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
+#include "matx/executors/device.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -137,13 +138,9 @@ template< class T >
 inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
 
 namespace detail {
-template <typename T, typename = void> struct is_executor : std::false_type {
-};
-
-template <typename T>
-struct is_executor<T, std::void_t<typename T::matx_executor>>
-    : std::true_type {
-};
+template <typename T> struct is_executor : std::false_type {};
+template <> struct is_executor<cudaExecutor> : std::true_type {};
+template <> struct is_executor<SingleThreadHostExecutor> : std::true_type {};
 }
 
 /**
@@ -151,10 +148,25 @@ struct is_executor<T, std::void_t<typename T::matx_executor>>
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_executor_t()
+template <typename T> 
+constexpr bool is_executor_t()
 {
-  return detail::is_executor<T>::value;
+  return detail::is_executor<typename remove_cvref<T>::type>::value;
 }
+
+
+namespace detail {
+template<typename T> struct is_device_executor : std::false_type {};
+template<> struct is_device_executor<matx::cudaExecutor> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a device executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+inline constexpr bool is_device_executor_v = detail::is_device_executor<typename remove_cvref<T>::type>::value;
 
 
 namespace detail {
@@ -541,6 +553,19 @@ struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
 };
 
 template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+
+
+template <typename T, typename = void> 
+struct exec_type {
+  using type = T;
+};
+
+template <typename T> 
+struct exec_type<T, typename std::enable_if_t<std::is_same_v<T, int>>> {
+  using type = cudaExecutor;
+};
+
+template <typename T> using exec_type_t = typename exec_type<typename remove_cvref<T>::type>::type;
 
 // Type traits to help with the lack of short-circuit template logic. Numpy
 // doesn't support bfloat16 at all, we just use fp32 for the numpy side

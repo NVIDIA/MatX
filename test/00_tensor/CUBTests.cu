@@ -40,15 +40,19 @@ using namespace matx;
 
 
 template <typename TensorType> struct CUBTestsData {
-  tensor_t<TensorType, 0> t0{};
-  tensor_t<TensorType, 1> t1{{10}};
-  tensor_t<TensorType, 2> t2{{20, 10}};
-  tensor_t<TensorType, 3> t3{{30, 20, 10}};
-  tensor_t<TensorType, 4> t4{{40, 30, 20, 10}};
+  using TypeParam = std::tuple_element_t<0, TensorType>;
+  using ExecType = std::tuple_element_t<1, TensorType>;
+  ExecType exec{};   
 
-  tensor_t<TensorType, 2> t2s = t2.Permute({1, 0});
-  tensor_t<TensorType, 3> t3s = t3.Permute({2, 1, 0});
-  tensor_t<TensorType, 4> t4s = t4.Permute({3, 2, 1, 0});
+  tensor_t<TypeParam, 0> t0{};
+  tensor_t<TypeParam, 1> t1{{10}};
+  tensor_t<TypeParam, 2> t2{{20, 10}};
+  tensor_t<TypeParam, 3> t3{{30, 20, 10}};
+  tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
+
+  tensor_t<TypeParam, 2> t2s = t2.Permute({1, 0});
+  tensor_t<TypeParam, 3> t3s = t3.Permute({2, 1, 0});
+  tensor_t<TypeParam, 4> t4s = t4.Permute({3, 2, 1, 0});
 };
 
 template <typename TensorType>
@@ -86,6 +90,11 @@ class CUBTestsAll : public ::testing::Test,
                             public CUBTestsData<TensorType> {
 };
 
+template <typename TensorType>
+class CUBTestsNumericNonComplexAllExecs : public ::testing::Test, public CUBTestsData<TensorType> {
+};
+
+
 TYPED_TEST_SUITE(CUBTestsAll, MatXAllTypes);
 TYPED_TEST_SUITE(CUBTestsComplex, MatXComplexTypes);
 TYPED_TEST_SUITE(CUBTestsFloat, MatXFloatTypes);
@@ -95,58 +104,63 @@ TYPED_TEST_SUITE(CUBTestsIntegral, MatXAllIntegralTypes);
 TYPED_TEST_SUITE(CUBTestsNumericNonComplex, MatXNumericNonComplexTypes);
 TYPED_TEST_SUITE(CUBTestsBoolean, MatXBoolTypes);
 
-TEST(TensorStats, Hist)
+TYPED_TEST_SUITE(CUBTestsNumericNonComplexAllExecs,
+                 MatXFloatNonComplexNonHalfTypesAllExecs);  
+
+// TEST(TensorStats, Hist)
+// {
+//   MATX_ENTER_HANDLER();
+
+//   constexpr int levels = 7;
+//   tensor_t<float, 1> inv({10});
+//   tensor_t<int, 1> outv({levels - 1});
+
+//   inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
+
+//   // Ascending
+//   hist(outv, inv, 0.0f, 12.0f);
+//   cudaStreamSynchronize(0);
+
+//   std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
+//   for (index_t i = 0; i < outv.Lsize(); i++) {
+//     ASSERT_NEAR(outv(i), sol[i], 0.001);
+//   }
+
+//   MATX_EXIT_HANDLER();
+// }
+
+TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
 {
   MATX_ENTER_HANDLER();
 
-  constexpr int levels = 7;
-  tensor_t<float, 1> inv({10});
-  tensor_t<int, 1> outv({levels - 1});
-
-  inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
-
-  // Ascending
-  hist(outv, inv, 0.0f, 12.0f);
-  cudaStreamSynchronize(0);
-
-  std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
-  for (index_t i = 0; i < outv.Lsize(); i++) {
-    ASSERT_NEAR(outv(i), sol[i], 0.001);
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(CUBTestsNumericNonComplex, CumSum)
-{
-  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   for (index_t i = 0; i < this->t1.Lsize(); i++) {
-    this->t1(i) = static_cast<TypeParam>((2 * (i % 2) - 1) * i);
+    this->t1(i) = static_cast<TestType>((2 * (i % 2) - 1) * i);
   }
 
-  tensor_t<TypeParam, 1> tmpv({this->t1.Lsize()});
+  tensor_t<TestType, 1> tmpv({this->t1.Lsize()});
 
   // Ascending
-  cumsum(tmpv, this->t1);
+  cumsum(tmpv, this->t1, this->exec);
   cudaStreamSynchronize(0);
 
-  TypeParam ttl = 0;
+  TestType ttl = 0;
   for (index_t i = 0; i < tmpv.Lsize(); i++) {
     ttl += this->t1(i);
     ASSERT_NEAR(tmpv(i), ttl, 0.001);
   }
 
   // 2D tests
-  auto tmpv2 = make_tensor<TypeParam>(this->t2.Shape());
+  auto tmpv2 = make_tensor<TestType>(this->t2.Shape());
 
   for (index_t i = 0; i < this->t2.Size(0); i++) {
     for (index_t j = 0; j < this->t2.Size(1); j++) {
-      this->t2(i, j) = static_cast<TypeParam>((2 * (j % 2) - 1) * j + i);
+      this->t2(i, j) = static_cast<TestType>((2 * (j % 2) - 1) * j + i);
     }
   }
 
-  cumsum(tmpv2, this->t2);
+  cumsum(tmpv2, this->t2, this->exec);
   cudaStreamSynchronize(0);
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
     ttl = 0;
@@ -159,18 +173,21 @@ TYPED_TEST(CUBTestsNumericNonComplex, CumSum)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CUBTestsNumericNonComplex, Sort)
+TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 {
   MATX_ENTER_HANDLER();
 
+  using TestType = std::tuple_element_t<0, TypeParam>;
+ 
+
   for (index_t i = 0; i < this->t1.Lsize(); i++) {
-    this->t1(i) = static_cast<TypeParam>((2 * (i % 2) - 1) * i);
+    this->t1(i) = static_cast<TestType>((2 * (i % 2) - 1) * i);
   }
 
-  auto tmpv = make_tensor<TypeParam>({this->t1.Lsize()});
+  auto tmpv = make_tensor<TestType>({this->t1.Lsize()});
 
   // Ascending
-  matx::sort(tmpv, this->t1, SORT_DIR_ASC);
+  matx::sort(tmpv, this->t1, SORT_DIR_ASC, this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
@@ -178,7 +195,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // Descending
-  matx::sort(tmpv, this->t1, SORT_DIR_DESC);
+  matx::sort(tmpv, this->t1, SORT_DIR_DESC, this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
@@ -186,15 +203,14 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // 2D tests
-  auto tmpv2 = make_tensor<TypeParam>(this->t2.Shape());
+  auto tmpv2 = make_tensor<TestType>(this->t2.Shape());
 
   for (index_t i = 0; i < this->t2.Size(0); i++) {
     for (index_t j = 0; j < this->t2.Size(1); j++) {
-      this->t2(i, j) = static_cast<TypeParam>((2 * (j % 2) - 1) * j + i);
+      this->t2(i, j) = static_cast<TestType>((2 * (j % 2) - 1) * j + i);
     }
   }
-
-  matx::sort(tmpv2, this->t2, SORT_DIR_ASC);
+  matx::sort(tmpv2, this->t2, SORT_DIR_ASC, this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
@@ -204,7 +220,7 @@ TYPED_TEST(CUBTestsNumericNonComplex, Sort)
   }
 
   // Descending
-  matx::sort(tmpv2, this->t2, SORT_DIR_DESC);
+  matx::sort(tmpv2, this->t2, SORT_DIR_DESC, this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {

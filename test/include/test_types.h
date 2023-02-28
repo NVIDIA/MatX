@@ -32,6 +32,8 @@
 #pragma once
 
 #include <cuda/std/ccomplex>
+#include "matx/executors/device.h"
+#include "matx/executors/host.h"
 #include "gtest/gtest.h"
 #include "matx.h"
 
@@ -70,42 +72,85 @@ template <> auto inline GenerateData<cuda::std::complex<double>>()
   return cuda::std::complex<double>(1.5, -2.5);
 }
 
+using ExecutorTypesAll = std::tuple<matx::cudaExecutor, matx::SingleThreadHostExecutor>;
+
 // Define the types to test for each group. If a type is put into a list that
 // isn't compatible with a test type, a compiler error will occur
 
-typedef Types<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
+using MatXAllTypes = Types<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
               int64_t, float, double, cuda::std::complex<float>,
               cuda::std::complex<double>, matx::matxFp16Complex,
-              matx::matxBf16Complex>
-    MatXAllTypes;
-typedef Types<matx::matxFp16, matx::matxBf16, float, double,
+              matx::matxBf16Complex>;
+using MatXFloatTypes = Types<matx::matxFp16, matx::matxBf16, float, double,
               cuda::std::complex<float>, cuda::std::complex<double>,
-              matx::matxFp16Complex, matx::matxBf16Complex>
-    MatXFloatTypes;
-typedef Types<float, double,
-              cuda::std::complex<float>, cuda::std::complex<double>>
-    MatXFloatNonHalfTypes;
-typedef Types<matx::matxFp16, matx::matxBf16, float, double>
-    MatXFloatNonComplexTypes;
-typedef Types<matx::matxFp16, matx::matxBf16> MatXFloatHalfTypes;
-typedef Types<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
+              matx::matxFp16Complex, matx::matxBf16Complex>;
+using MatXFloatNonHalfTypes = Types<float, double,
+              cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXFloatNonComplexTypes = Types<matx::matxFp16, matx::matxBf16, float, double>;
+  
+using MatXFloatHalfTypes = Types<matx::matxFp16, matx::matxBf16>;
+using MatXNumericTypes = Types<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
               int64_t, float, double, cuda::std::complex<float>,
               cuda::std::complex<double>, matx::matxFp16Complex,
-              matx::matxBf16Complex>
-    MatXNumericTypes;
+              matx::matxBf16Complex>;
 
-typedef Types<uint32_t, int32_t, uint64_t, int64_t, float, double,
-              cuda::std::complex<float>, cuda::std::complex<double>>
-    MatXNumericNoHalfTypes;
-typedef Types<bool> MatXBoolTypes;
-typedef Types<float, double> MatXFloatNonComplexNonHalfTypes;
-typedef Types<cuda::std::complex<float>, cuda::std::complex<double>,
-              matx::matxFp16Complex, matx::matxBf16Complex>
-    MatXComplexTypes;
-typedef Types<cuda::std::complex<float>, cuda::std::complex<double>>
-    MatXComplexNonHalfTypes;
-typedef Types<uint32_t, int32_t, uint64_t, int64_t, float, double>
-    MatXNumericNonComplexTypes;
-typedef Types<uint32_t, int32_t, uint64_t, int64_t> MatXAllIntegralTypes;
-typedef Types<int32_t, int64_t> MatXSignedIntegralTypes;
-typedef Types<uint32_t, uint64_t> MatXUnsignedIntegralTypes;
+using MatXNumericNoHalfTypes = Types<uint32_t, int32_t, uint64_t, int64_t, float, double,
+              cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXBoolTypes =  Types<bool>;
+using MatXFloatNonComplexNonHalfTypes = Types<float, double>;
+using MatXComplexTypes = Types<cuda::std::complex<float>, cuda::std::complex<double>,
+              matx::matxFp16Complex, matx::matxBf16Complex>;
+using MatXComplexNonHalfTypes = Types<cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXNumericNonComplexTypes = Types<uint32_t, int32_t, uint64_t, int64_t, float, double>;
+using MatXAllIntegralTypes = Types<uint32_t, int32_t, uint64_t, int64_t>;
+using MatXSignedIntegralTypes = Types<int32_t, int64_t>;
+using MatXUnsignedIntegralTypes = Types<uint32_t, uint64_t>;
+
+
+/* Taken from https://stackoverflow.com/questions/70404549/cartesian-product-of-stdtuple */
+template<typename T1, typename T2>
+class TypedCartesianProduct {
+  template<typename T, typename... Ts>
+  static auto innerHelper(T&&, std::tuple<Ts...>&&) 
+  -> decltype(
+       std::make_tuple(
+         std::make_tuple(std::declval<T>(), std::declval<Ts>())...));
+
+  template <typename... Ts, typename T>
+  static auto outerHelper(std::tuple<Ts...>&&, T&&) 
+  -> decltype(
+       std::tuple_cat(innerHelper(std::declval<Ts>(), std::declval<T>())...));
+
+ public:
+  using type = decltype(outerHelper(std::declval<T1>(), std::declval<T2>()));
+};
+
+
+template <typename Tuple>
+struct TupleToTypes {};
+
+template <typename... T>
+struct TupleToTypes<std::tuple<T...>>
+{
+  using type = ::Types<T...>;
+};
+// template< template<typename... Args> typename Ts, typename... Args>
+// struct TupleToTypes {
+//   using type = typename ::Types<Args...>;
+// };
+
+
+
+using MatXFloatNonComplexNonHalfTypes2 = std::tuple<float, double>;
+using MatXNumericNoHalfTypes2                 = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double,
+                                                          cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXComplexNonHalfTypes2                = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXNumericNonComplexTypes2             = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
+
+using MatXNumericNonComplexTypesAllExecs      = TupleToTypes<TypedCartesianProduct<MatXNumericNonComplexTypes2, ExecutorTypesAll>::type>::type;
+using MatXFloatNonComplexNonHalfTypesAllExecs = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexNonHalfTypes2, ExecutorTypesAll>::type>::type;
+using MatXNumericNoHalfTypesAllExecs          = TupleToTypes<TypedCartesianProduct<MatXNumericNoHalfTypes2, ExecutorTypesAll>::type>::type;
+using MatXComplexNonHalfTypesAllExecs         = TupleToTypes<TypedCartesianProduct<MatXComplexNonHalfTypes2, ExecutorTypesAll>::type>::type;
+///using mytype = Types<std::tuple_element_t<MatXFloatNonComplexNonHalfTypesAllExecs>, ...>;
+// static_assert(std::is_same_v<MatXFloatNonComplexNonHalfTypesAllExecs,
+//   std::tuple<std::tuple<float, matx::cudaExecutor>, std::tuple<double, matx::cudaExecutor>, std::tuple<float, matx::SingleThreadHostExecutor>, std::tuple<double, matx::SingleThreadHostExecutor> >>);

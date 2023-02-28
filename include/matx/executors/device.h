@@ -55,6 +55,7 @@ namespace matx
        * @param stream CUDA stream
        */
       cudaExecutor(cudaStream_t stream) : stream_(stream) {}
+      cudaExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {}
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
