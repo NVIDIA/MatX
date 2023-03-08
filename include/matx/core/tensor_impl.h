@@ -65,7 +65,7 @@ namespace detail {
  * @tparam T Type of tensor
  * @tparam RANK Rank of tensor
  */
-template <typename T, int RANK, typename Desc = tensor_desc_cr_ds_64_64_t<RANK>> 
+template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>> 
 class tensor_impl_t {
   public:
     // Type specifier for reflection on class

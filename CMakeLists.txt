@@ -19,6 +19,7 @@ option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
+option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -139,6 +140,11 @@ if (MATX_EN_CUTLASS)
 else()
     set (CUTLASS_INC "")
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
+endif()
+
+message(status ${MATX_DISABLE_CUB_CACHE})
+if (MATX_DISABLE_CUB_CACHE)
+    target_compile_definitions(matx INTERFACE MATX_DISABLE_CUB_CACHE=1)
 endif()
 
 # Get the tensor libraries if we need them
