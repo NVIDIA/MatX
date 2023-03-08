@@ -379,7 +379,7 @@ public:
     }
 
     // Get total indices per batch
-    size_t total_per_batch = 1;
+    index_t total_per_batch = 1;
     index_t offset = 0;
     for (int i = InputOperator::Rank() - batch_offset; i < InputOperator::Rank(); i++) {
       total_per_batch *= a.Size(i);
@@ -1287,19 +1287,22 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
   // Get parameters required by these tensors
   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
   auto reduce_params = param_type{ReduceOp{}, init};
+
+#ifndef MATX_DISABLE_CUB_CACHE
+  // Get cache or new Sort plan if it doesn't exist
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
                             detail::CUB_OP_REDUCE,
-                            param_type>::GetCubParams(a_out, a, stream);
-
-  // Get cache or new Sort plan if it doesn't exist
+                            param_type>::GetCubParams(a_out, a, stream);  
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>{
         a_out, a, reduce_params, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+
+      detail::cub_cache.Insert(params, static_cast<void *>(tmp));  
     tmp->ExecReduce(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto type =
@@ -1307,6 +1310,11 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
             ret.value());
     type->ExecReduce(a_out, a, stream);
   }
+#else
+    auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>{
+        a_out, a, reduce_params, stream};
+    tmp.ExecReduce(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1334,10 +1342,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using rtype = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>;
-  
-  // auto in  = rtype::GetCubInputReductionType(a);
-  // auto out = rtype::GetCubOutputReductionType(a_out);
+#ifndef MATX_DISABLE_CUB_CACHE  
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
@@ -1347,14 +1352,18 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecSum(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));   
   }
   else {
     auto type =
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM> *>(ret.value());
     type->ExecSum(a_out, a, stream);
   }
+#else      
+    auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
+    tmp.ExecSum(a_out, a, stream);
+#endif    
 #endif
 }
 
@@ -1378,7 +1387,8 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
+#ifndef MATX_DISABLE_CUB_CACHE  
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1389,8 +1399,9 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN>{
         a_out, a, {}, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecMin(a_out, a, stream);
+
+    tmp->ExecMin(a_out, a, stream);  
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));        
   }
   else {
     auto type =
@@ -1398,6 +1409,12 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     type->ExecMin(a_out, a, stream);
   }
+#else
+  auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN>{
+      a_out, a, {}, stream};
+
+  tmp.ExecMin(a_out, a, stream);     
+#endif  
 #endif
 }
 
@@ -1421,7 +1438,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+#ifndef MATX_DISABLE_CUB_CACHE
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1431,9 +1448,9 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
-        a_out, a, {}, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecMax(a_out, a, stream);
+        a_out, a, {}, stream};   
+    tmp->ExecMax(a_out, a, stream); 
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));   
   }
   else {
     auto type =
@@ -1441,6 +1458,11 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     type->ExecMax(a_out, a, stream);
   }
+#else
+    auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
+        a_out, a, {}, stream};   
+    tmp.ExecMax(a_out, a, stream);     
+#endif    
 #endif
 }
 
@@ -1478,19 +1500,20 @@ void sort(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
+  detail::SortParams_t p{dir};
+
+#ifndef MATX_DISABLE_CUB_CACHE  
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
-
-  detail::SortParams_t p{dir};
 
   // Get cache or new Sort plan if it doesn't exist
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
-        a_out, a, p, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecSort(a_out, a, stream, dir);
+        a_out, a, p, stream};  
+    tmp->ExecSort(a_out, a, stream, dir);   
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));  
   }
   else {
     auto sort_type =
@@ -1498,6 +1521,11 @@ void sort(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     sort_type->ExecSort(a_out, a, stream, dir);
   }
+#else
+    auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
+        a_out, a, p, stream};  
+    tmp.ExecSort(a_out, a, stream, dir);      
+#endif    
 #endif
 }
 
@@ -1524,6 +1552,8 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+#ifndef MATX_DISABLE_CUB_CACHE    
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a, stream);
@@ -1532,15 +1562,20 @@ void cumsum(OutputTensor &a_out, const InputOperator &a,
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp =
-        new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};
+        new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};   
+    tmp->ExecPrefixScanEx(a_out, a, stream); 
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecPrefixScanEx(a_out, a, stream);
   }
   else {
     auto sort_type =
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM> *>(ret.value());
     sort_type->ExecPrefixScanEx(a_out, a, stream);
   }
+#else 
+    auto tmp =
+        detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};   
+    tmp.ExecPrefixScanEx(a_out, a, stream);     
+#endif      
 #endif
 }
 
@@ -1575,37 +1610,46 @@ void hist(OutputTensor &a_out, const InputOperator &a,
           const typename InputOperator::scalar_type upper, const cudaStream_t stream = 0)
 {
   static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram tensor must use int type");
- 
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
 #ifdef __CUDACC__
-  // Get parameters required by these tensors
-  // auto params =
-  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a, stream);
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
+#ifndef MATX_DISABLE_CUB_CACHE   
+  // Get parameters required by these tensors  
+  auto params =
+       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a, stream);
+
 
   // Don't cache until we have a good plan for hashing parameters here
   // Get cache or new Sort plan if it doesn't exist
-  // auto ret = detail::cub_cache.Lookup(params);
-  // if (ret == std::nullopt) {
-    detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
+   auto ret = detail::cub_cache.Lookup(params);
+  if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_HIST_EVEN,
                                           detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
-    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecHistEven(a_out, a, lower, upper, stream);
-  // }
-  // else {
-  //   auto sort_type =
-  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator,
-  //           detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
-  //           ret.value());
-  //   sort_type->ExecHistEven(a_out, a, lower, upper, stream);
-  // }
+ 
+    tmp->ExecHistEven(a_out, a, lower, upper, stream);  
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp)); 
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator,
+            detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
+            ret.value());
+    sort_type->ExecHistEven(a_out, a, lower, upper, stream);
+  }
+#else 
+    auto tmp = detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_HIST_EVEN,
+                                          detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
+        a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
+ 
+    tmp.ExecHistEven(a_out, a, lower, upper, stream);      
+#endif    
 
-  // Remove once caching fixed
-  delete tmp;
 #endif
 }
 
@@ -1713,32 +1757,38 @@ void find(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, S
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};  
+#ifndef MATX_DISABLE_CUB_CACHE  
   // Get parameters required by these tensors
-  // auto params =
-  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a);
+  auto params =
+       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, SelectType>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
-  //auto ret = detail::cub_cache.Lookup(params);
-  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
+  auto ret = detail::cub_cache.Lookup(params);
+
 
   // Don't cache until we have a good plan for hashing parameters here
-  //if (ret == std::nullopt) {
+  if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT,
-                                          decltype(cparams)>{a_out, a, cparams, stream};
-    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->ExecSelect(a_out, a, stream);
-  // }
-  // else {
-  //   auto sort_type =
-  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, decltype(cparams)> *>(
-  //           ret.value());
-  //   sort_type->ExecSelect(a_out, a, stream);
-  // }
-  // Remove once caching fixed
-  delete tmp;
+                                          decltype(cparams)>{a_out, a, cparams, stream}; 
+    tmp->ExecSelect(a_out, a, stream); 
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp)); 
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, decltype(cparams)> *>(
+            ret.value());
+    sort_type->ExecSelect(a_out, a, stream);
+  }
+#else 
+    auto tmp = detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_SELECT,
+                                          decltype(cparams)>{a_out, a, cparams, stream}; 
+    tmp.ExecSelect(a_out, a, stream);     
+#endif    
 #endif
 }
 
@@ -1776,32 +1826,38 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
+  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
+#ifndef MATX_DISABLE_CUB_CACHE   
   // Get parameters required by these tensors
-  // auto params =
-  //     detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a, stream);
+  auto params =
+       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a, stream);
 
   // Get cache or new Sort plan if it doesn't exist
-  //auto ret = detail::cub_cache.Lookup(params);
-  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
+  auto ret = detail::cub_cache.Lookup(params);
 
   // Don't cache until we have a good plan for hashing parameters here
-  //if (ret == std::nullopt) {
+  if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT_IDX,
-                                          decltype(cparams)>{a_out, a, cparams, stream};
-    //detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+                                          decltype(cparams)>{a_out, a, cparams, stream}; 
     tmp->ExecSelectIndex(a_out, a, stream);
-  // }
-  // else {
-  //   auto sort_type =
-  //       static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, decltype(cparams)> *>(
-  //           ret.value());
-  //   sort_type->ExecSelectIndex(a_out, a, stream);
-  // }
-  // Remove once caching fixed
-  delete tmp;
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+  }
+  else {
+    auto sort_type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, decltype(cparams)> *>(
+            ret.value());
+    sort_type->ExecSelectIndex(a_out, a, stream);
+  }
+#else 
+    auto tmp = detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_SELECT_IDX,
+                                          decltype(cparams)>{a_out, a, cparams, stream}; 
+    tmp.ExecSelectIndex(a_out, a, stream); 
+#endif  
 #endif
 }
 
@@ -1843,6 +1899,8 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
   matx::sort(sort_tensor, a, SORT_DIR_ASC, stream);
 
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
+
+#ifndef MATX_DISABLE_CUB_CACHE 
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, decltype(cparams)>::GetCubParams(a_out, sort_tensor, stream);
@@ -1856,8 +1914,8 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
                                           InputOperator,
                                           detail::CUB_OP_UNIQUE,
                                           decltype(cparams)>{a_out, sort_tensor, cparams, stream};
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
     tmp->ExecUnique(a_out, sort_tensor, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto sort_type =
@@ -1865,6 +1923,13 @@ void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,
             ret.value());
     sort_type->ExecUnique(a_out, sort_tensor, stream);
   }
+#else 
+    auto tmp = detail::matxCubPlan_t< OutputTensor,
+                                          InputOperator,
+                                          detail::CUB_OP_UNIQUE,
+                                          decltype(cparams)>{a_out, sort_tensor, cparams, stream};
+    tmp.ExecUnique(a_out, sort_tensor, stream);
+#endif   
 #endif
 }
 }; // namespace matx

@@ -562,7 +562,7 @@ namespace detail {
     else if constexpr (sizeof...(Args) == 1) {
       auto& k =detail:: pp_get<0>(dims...);
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
-        printf("%06lld: ", _k);
+        printf("%06" INDEX_T_FMT ": ", _k);
         PrintVal(op.operator()(_k));
         printf("\n");
       }
@@ -573,7 +573,7 @@ namespace detail {
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
         for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
           if (_l == 0)
-            printf("%06lld: ", _k);
+            printf("%06" INDEX_T_FMT ": ", _k);
 
           PrintVal(op.operator()(_k, _l));
         }
@@ -585,11 +585,11 @@ namespace detail {
       auto& k = detail::pp_get<1>(dims...);
       auto& l = detail::pp_get<2>(dims...);
       for (index_t _j = 0; _j < ((j == 0) ? op.Size(0) : j); _j++) {
-        printf("[%06lld,:,:]\n", _j);
+        printf("[%06" INDEX_T_FMT ",:,:]\n", _j);
         for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
             if (_l == 0)
-              printf("%06lld: ", _k);
+              printf("%06" INDEX_T_FMT ": ", _k);
 
             PrintVal(op.operator()(_j, _k, _l));
           }
@@ -605,11 +605,11 @@ namespace detail {
       auto& l = detail::pp_get<3>(dims...);
       for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
         for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
-          printf("[%06lld,%06lld,:,:]\n", _i, _j);
+          printf("[%06" INDEX_T_FMT ",%06" INDEX_T_FMT "lld,:,:]\n", _i, _j);
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
               if (_l == 0)
-                printf("%06lld: ", _k);
+                printf("%06" INDEX_T_FMT ": ", _k);
 
               PrintVal(op.operator()(_i, _j, _k, _l));
             }
@@ -649,7 +649,7 @@ void Print(const Op &op, Args... dims)
   
   for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
   {
-    printf("%lld", op.Size(static_cast<int>(dimIdx)) );
+    printf("%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
     if( dimIdx < (op.Rank() - 1) )
       printf(", ");
   }
@@ -661,7 +661,7 @@ void Print(const Op &op, Args... dims)
     {
       for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ) 
       {
-        printf("%lld", op.Stride(static_cast<int>(dimIdx)) );
+        printf("%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
         {
           printf(",");

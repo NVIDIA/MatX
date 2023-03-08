@@ -664,7 +664,7 @@ static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_2d;
 
 template <typename OutputTensor, typename InputTensor>
 auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
-                    const InputTensor &i, index_t fft_size,
+                    const InputTensor &i, uint64_t fft_size,
                     [[maybe_unused]] cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -710,7 +710,7 @@ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
   }
   else {
     // Force FFT size
-    act_fft_size = fft_size;
+    act_fft_size = static_cast<index_type>(fft_size);
   }
 
   // Set up new shape if transform size doesn't match tensor
@@ -815,6 +815,9 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
  * size of FFT. If this size is longer than the length of the input tensor, the
  * tensor will potentially be copied and zero-padded to a new block of memory.
  * Future releases may remove this restriction to where there is no copy.
+ * 
+ * Note: fft_size must be unsigned so that the axis overload does not match both 
+ * prototypes with index_t. 
  * @param i
  *   input tensor or operator
  * @param fft_size
@@ -824,7 +827,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
  */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft(OutputTensor o, const InputTensor i,
-         index_t fft_size = 0, cudaStream_t stream = 0)
+         uint64_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
@@ -881,6 +884,9 @@ __MATX_INLINE__ void fft(OutputTensor o, const InputTensor i,
  * size of FFT. If this size is longer than the length of the input tensor, the
  * tensor will potentially be copied and zero-padded to a new block of memory.
  * Future releases may remove this restriction to where there is no copy.
+ * 
+ * Note: fft_size must be unsigned so that the axis overload does not match both 
+ * prototypes with index_t. 
  * @param in
  *   input tensor or operator
  * @param axis
@@ -892,7 +898,7 @@ __MATX_INLINE__ void fft(OutputTensor o, const InputTensor i,
  */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft(OutputTensor out, const InputTensor in, const int32_t (&axis)[1], 
-         index_t fft_size = 0, cudaStream_t stream = 0)
+         uint64_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
@@ -917,6 +923,9 @@ __MATX_INLINE__ void fft(OutputTensor out, const InputTensor in, const int32_t (
  * size of FFT. If this size is longer than the length of the input tensor, the
  * tensor will potentially be copied and zero-padded to a new block of memory.
  * Future releases may remove this restriction to where there is no copy.
+ * 
+ * Note: fft_size must be unsigned so that the axis overload does not match both 
+ * prototypes with index_t. 
  * @param i
  *   input tensor or operator
  * @param fft_size
@@ -926,7 +935,7 @@ __MATX_INLINE__ void fft(OutputTensor out, const InputTensor in, const int32_t (
  */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void ifft(OutputTensor o, const InputTensor i,
-          index_t fft_size = 0, cudaStream_t stream = 0)
+          uint64_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
@@ -983,6 +992,9 @@ __MATX_INLINE__ void ifft(OutputTensor o, const InputTensor i,
  * size of IFFT. If this size is longer than the length of the input tensor, the
  * tensor will potentially be copied and zero-padded to a new block of memory.
  * Future releases may remove this restriction to where there is no copy.
+ * 
+ * Note: fft_size must be unsigned so that the axis overload does not match both 
+ * prototypes with index_t. 
  * @param in
  *   input tensor or operator
  * @param axis
@@ -994,7 +1006,7 @@ __MATX_INLINE__ void ifft(OutputTensor o, const InputTensor i,
  */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void ifft(OutputTensor out, const InputTensor in, const int (&axis)[1], 
-         index_t fft_size = 0, cudaStream_t stream = 0)
+         uint64_t fft_size = 0, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
