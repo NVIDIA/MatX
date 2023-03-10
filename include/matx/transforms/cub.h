@@ -294,14 +294,16 @@ public:
   static inline void ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
     if constexpr (out.Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
-        MATX_ASSERT_STR_EXP(func(in, out.Data(), bi, ei), cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
+        auto res = func(in, out.Data(), bi, ei);
+        MATX_ASSERT_STR_EXP(res, cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
         return;
       }
     }
   
     detail::base_type_t<OutputOp> out_base = out;
     auto iter = RandomOperatorOutputIterator{out_base};
-    MATX_ASSERT_STR_EXP(func(in, iter, bi, ei), cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
+    auto res = func(in, iter, bi, ei);
+    MATX_ASSERT_STR_EXP(res, cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
   }  
 
   template <typename Func, typename OutputOp, typename InputOp>
@@ -1216,7 +1218,7 @@ private:
 struct CubParamsKeyHash {
   std::size_t operator()(const CubParams_t &k) const noexcept
   {
-    uint64_t shash;
+    uint64_t shash = 0;
     for (size_t r = 0; r < k.size.size(); r++) {
       shash += std::hash<uint64_t>()(k.size[r]);
     }

@@ -238,7 +238,7 @@ namespace matx
   if constexpr (Rank() > 0) {                                        \
     _Pragma("unroll")                                                \
     for (int32_t i = 0; i < Rank(); i++) {                           \
-      index_t size = detail::get_expanded_size<Rank()>(op, i);       \
+      [[maybe_unused]] index_t size = detail::get_expanded_size<Rank()>(op, i);       \
       MATX_ASSERT_STR(size == 0 || size == Size(i), matxInvalidSize, "incompatible op sizes:" + str());    \
     }                                                                \
   } 
