@@ -45,6 +45,7 @@
 #include "matx/core/storage.h"
 #include "matx/core/tensor_impl.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/dlpack.h"
 #include "matx/kernels/utility.cuh"
 
 static constexpr int MAX_TENSOR_DIM = 4;
@@ -1744,6 +1745,91 @@ public:
       }, tup);
   }   
 
+  /**
+   * @brief Get a DLPack v0.8 structure representing the tensor
+   * 
+   * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
+   * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
+   * by calling ->deleter(self).
+   * 
+   * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
+   */
+  DLManagedTensor *GetDLPackTensor() const {
+  //DLManagedTensorVersioned *GetDLPackTensor() const {
+    //auto mt = new DLManagedTensorVersioned;
+    auto mt = new DLManagedTensor;
+    DLTensor *t = &mt->dl_tensor;
+    CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
+    CUmemorytype mem_type;
+    int dev_ord;
+    void *data[2] = {&mem_type, &dev_ord};
+
+    t->data   = static_cast<void*>(this->ldata_);
+    t->device.device_id = 0;
+
+    // Determine where this memory resides
+    auto kind = GetPointerKind(this->ldata_);
+    auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->ldata_));
+    MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
+    if (kind == MATX_INVALID_MEMORY) {
+      if (mem_type == CU_MEMORYTYPE_DEVICE) {
+        t->device.device_type = kDLCUDA; 
+        t->device.device_id = dev_ord;        
+      }
+      else {
+        t->device.device_type = kDLCPU;        
+      }
+    }
+    else {
+      // We have a record of this pointer and can map it from the record
+      switch (kind) {
+        case MATX_MANAGED_MEMORY: 
+        case MATX_DEVICE_MEMORY:
+        case MATX_ASYNC_DEVICE_MEMORY:
+          t->device.device_type = kDLCUDA; 
+          t->device.device_id = dev_ord;
+          break;
+        case MATX_HOST_MEMORY:
+          t->device.device_type = kDLCUDAHost;
+          t->device.device_id = dev_ord;
+          break;
+        case MATX_HOST_MALLOC_MEMORY:
+          t->device.device_type = kDLCPU;
+          break;
+        default: 
+          MATX_ASSERT_STR(false, matxCudaError, "Cannot determine kind of memory");
+          break;
+      }
+    }
+
+    t->ndim = RANK;
+    t->dtype = detail::TypeToDLPackType<T>();
+    t->shape = new int64_t[RANK];
+    t->strides = new int64_t[RANK];
+    for (int r = 0; r < RANK; r++) {
+      t->shape[r] = this->Size(r);
+      t->strides[r] = this->Stride(r);
+    }
+    t->byte_offset = 0;
+
+    mt->manager_ctx = nullptr;
+    //mt->flags = 0; // Only for v1.0
+
+    //auto deleter = [](struct DLManagedTensorVersioned *mtv) { // v1.0
+    auto deleter = [](struct DLManagedTensor *mtv) {
+      delete [] mtv->dl_tensor.shape;
+      delete [] mtv->dl_tensor.strides;
+      delete mtv;
+
+      mtv->dl_tensor.shape = nullptr;
+      mtv->dl_tensor.strides = nullptr;
+      mtv = nullptr;
+    };
+
+    mt->deleter = deleter;
+
+    return mt;
+  }
 
 private:
   Storage storage_;
