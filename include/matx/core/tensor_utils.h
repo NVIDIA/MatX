@@ -703,10 +703,9 @@ void PrintData(const Op &op, Args... dims) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
 #ifdef __CUDACC__
+  cudaDeviceSynchronize();
   if constexpr (is_tensor_view_v<Op>) {
-
     auto kind = GetPointerKind(op.Data());
-    cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
       detail::InternalPrint(op, dims...);
     }

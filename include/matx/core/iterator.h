@@ -54,7 +54,7 @@ struct RandomOperatorIterator {
   using pointer = value_type*;
   using reference = value_type&;
   using iterator_category = std::random_access_iterator_tag;
-  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+  using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
@@ -153,7 +153,7 @@ struct RandomOperatorOutputIterator {
   using pointer = value_type*;
   using reference = value_type&;
   using iterator_category = std::random_access_iterator_tag;
-  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
+  using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}

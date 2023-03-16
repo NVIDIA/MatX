@@ -42,6 +42,7 @@
 
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
+#include "matx/core/dlpack.h"
 #include "matx/core/half_complex.h"
 
 /**
@@ -657,6 +658,46 @@ template <typename T> constexpr MatXDataType_t TypeToInt()
     return MATX_TYPE_UINT64;
 
   return MATX_TYPE_INVALID;
+}
+
+template <typename T> constexpr DLDataType TypeToDLPackType()
+{
+  if constexpr (std::is_same_v<T, cuda::std::complex<float>>)
+    return {kDLComplex, 64, 1};
+  if constexpr (std::is_same_v<T, cuda::std::complex<double>>)
+    return {kDLComplex, 128, 1};
+  if constexpr (std::is_same_v<T, matxFp16>)
+    return {kDLFloat, 16, 1};
+  if constexpr (std::is_same_v<T, matxBf16>)
+    return {kDLBfloat, 16, 1};
+  if constexpr (std::is_same_v<T, matxFp16Complex>)
+    return {kDLComplex, 32, 1};
+  if constexpr (std::is_same_v<T, matxBf16Complex>)
+    return {kDLComplex, 32, 1}; // Wrong, but no other choice
+  if constexpr (std::is_same_v<T, float>)
+    return {kDLFloat, 32, 1};
+  if constexpr (std::is_same_v<T, double>)
+    return {kDLFloat, 64, 1};
+  if constexpr (std::is_same_v<T, int8_t>)
+    return {kDLInt, 8, 1};
+  if constexpr (std::is_same_v<T, int16_t>)
+    return {kDLInt, 16, 1};
+  if constexpr (std::is_same_v<T, int32_t>)
+    return {kDLInt, 32, 1};
+  if constexpr (std::is_same_v<T, int64_t>)
+    return {kDLInt, 64, 1};
+  if constexpr (std::is_same_v<T, uint8_t>)
+    return {kDLUInt, 8, 1};
+  if constexpr (std::is_same_v<T, uint16_t>)
+    return {kDLUInt, 16, 1};
+  if constexpr (std::is_same_v<T, uint32_t>)
+    return {kDLUInt, 32, 1};
+  if constexpr (std::is_same_v<T, uint64_t>)
+    return {kDLUInt, 64, 1};
+  if constexpr (std::is_same_v<T, bool>)
+    return {kDLBool, 8, 1};
+
+  return {kDLOpaqueHandle, 1, 1};
 }
 
 template <MatXDataType_t IntType> struct IntToType {

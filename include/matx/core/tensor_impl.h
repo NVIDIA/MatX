@@ -817,7 +817,6 @@ class tensor_impl_t {
       ldata_ = data;
     }
 
-
   protected:
     T *ldata_;
     Desc desc_;
