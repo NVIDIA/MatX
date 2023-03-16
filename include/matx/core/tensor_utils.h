@@ -36,6 +36,7 @@
 #include <functional>
 
 #include "matx/core/nvtx.h"
+#include "matx/core/dlpack.h"
 #include "matx/core/make_tensor.h"
 
 namespace matx
@@ -446,6 +447,51 @@ namespace detail {
       }
     }
   }
+
+
+  template <typename T> constexpr DLDataType TypeToDLPackType()
+  {
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>>)
+      return {kDLComplex, 64, 1};
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>>)
+      return {kDLComplex, 128, 1};
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return {kDLFloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return {kDLBfloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return {kDLComplex, 32, 1};
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return {kDLComplex, 32, 1}; // Wrong, but no other choice
+    if constexpr (std::is_same_v<T, float>)
+      return {kDLFloat, 32, 1};
+    if constexpr (std::is_same_v<T, double>)
+      return {kDLFloat, 64, 1};
+    if constexpr (std::is_same_v<T, int8_t>)
+      return {kDLInt, 8, 1};
+    if constexpr (std::is_same_v<T, int16_t>)
+      return {kDLInt, 16, 1};
+    if constexpr (std::is_same_v<T, int32_t>)
+      return {kDLInt, 32, 1};
+    if constexpr (std::is_same_v<T, int64_t>)
+      return {kDLInt, 64, 1};
+    if constexpr (std::is_same_v<T, uint8_t>)
+      return {kDLUInt, 8, 1};
+    if constexpr (std::is_same_v<T, uint16_t>)
+      return {kDLUInt, 16, 1};
+    if constexpr (std::is_same_v<T, uint32_t>)
+      return {kDLUInt, 32, 1};
+    if constexpr (std::is_same_v<T, uint64_t>)
+      return {kDLUInt, 64, 1};    
+    if constexpr (std::is_same_v<T, bool>)
+#if DLPACK_VERSION >= 80      
+      return {kDLBool, 8, 1};
+#else
+      return {kDLUInt, 8, 1};
+#endif      
+
+    return {kDLOpaqueHandle, 1, 1};
+  }  
 
 
   /**
