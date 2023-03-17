@@ -238,12 +238,22 @@ namespace matx
     std::shared_ptr<T> data_;
     
     void ConfigureShared(T *ptr, [[maybe_unused]] size_t size) {
-      if (!owning_) {
-        data_ = std::shared_ptr<T>(ptr, [](auto){});
+      if constexpr (std::is_const_v<T>) {
+        if (!owning_) {
+          data_ = std::shared_ptr<T>(ptr, [](auto){});
+        }
+        else {
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot use an owning tensor type with const data");
+        }
       }
       else {
-        data_ = std::shared_ptr<T>(ptr, [=](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
-      }        
+        if (!owning_) {
+          data_ = std::shared_ptr<T>(ptr, [](auto){});
+        }
+        else {
+          data_ = std::shared_ptr<T>(ptr, [=](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
+        }
+      }   
     }
   };
 
