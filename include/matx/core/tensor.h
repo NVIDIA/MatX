@@ -1034,7 +1034,6 @@ public:
     return storage_.use_count();
   }  
 
-
   /**
    * Create an overlapping tensor view
    *
@@ -1752,6 +1751,10 @@ public:
    * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
    * by calling ->deleter(self).
    * 
+   * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
+   * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
+   * will occur.
+   * 
    * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
    */
   DLManagedTensor *GetDLPackTensor() const {
@@ -1762,14 +1765,14 @@ public:
     CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
     CUmemorytype mem_type;
     int dev_ord;
-    void *data[2] = {&mem_type, &dev_ord};
+    void *data[2]       = {&mem_type, &dev_ord};
 
-    t->data   = static_cast<void*>(this->ldata_);
+    t->data             = static_cast<void*>(this->ldata_);
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    auto kind = GetPointerKind(this->ldata_);
-    auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->ldata_));
+    auto kind     = GetPointerKind(this->ldata_);
+    auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->ldata_));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {
@@ -1802,28 +1805,33 @@ public:
       }
     }
 
-    t->ndim = RANK;
-    t->dtype = detail::TypeToDLPackType<T>();
-    t->shape = new int64_t[RANK];
-    t->strides = new int64_t[RANK];
+    t->ndim         = RANK;
+    t->dtype        = detail::TypeToDLPackType<T>();
+    t->shape        = new int64_t[RANK];
+    t->strides      = new int64_t[RANK];
     for (int r = 0; r < RANK; r++) {
-      t->shape[r] = this->Size(r);
+      t->shape[r]   = this->Size(r);
       t->strides[r] = this->Stride(r);
     }
-    t->byte_offset = 0;
+    t->byte_offset  = 0;
 
-    mt->manager_ctx = nullptr;
+    // Increment reference count by making a copy of the shared_ptr by allocating on the heap and
+    // setting it as the context
+    auto t_copy = new self_type{*this};
+    //*t_copy = *this;
+    mt->manager_ctx = t_copy;
     //mt->flags = 0; // Only for v1.0
 
     //auto deleter = [](struct DLManagedTensorVersioned *mtv) { // v1.0
     auto deleter = [](struct DLManagedTensor *mtv) {
       delete [] mtv->dl_tensor.shape;
       delete [] mtv->dl_tensor.strides;
+      delete static_cast<self_type *>(mtv->manager_ctx);
       delete mtv;
 
-      mtv->dl_tensor.shape = nullptr;
-      mtv->dl_tensor.strides = nullptr;
-      mtv = nullptr;
+      mtv->dl_tensor.shape    = nullptr;
+      mtv->dl_tensor.strides  = nullptr;
+      mtv                     = nullptr;
     };
 
     mt->deleter = deleter;

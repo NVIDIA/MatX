@@ -471,9 +471,11 @@ TYPED_TEST(BasicTensorTestsAll, DLPack)
   ASSERT_EQ(dl->dl_tensor.strides[0], t.Stride(0));
   ASSERT_EQ(dl->dl_tensor.strides[1], t.Stride(1));
   ASSERT_EQ(dl->dl_tensor.strides[2], t.Stride(2));
+  ASSERT_EQ(t.GetRefCount(), 2);
   dl->deleter(dl);
   ASSERT_EQ(dl->dl_tensor.shape, nullptr);
   ASSERT_EQ(dl->dl_tensor.strides, nullptr);
+  ASSERT_EQ(t.GetRefCount(), 1);
 
   MATX_EXIT_HANDLER();
 }
