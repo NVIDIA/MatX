@@ -533,7 +533,7 @@ public:
 #endif
   }
 
-#if CUB_MINOR_VERSION  >  14
+#if (CUB_MAJOR_VERSION == 1 && CUB_MINOR_VERSION  >  14) || (CUB_MAJOR_VERSION > 1)
   /**
    * Execute an optimized sort based on newer CUB
    *
@@ -700,7 +700,7 @@ inline void ExecSort(OutputTensor &a_out,
   
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-#if CUB_MINOR_VERSION  >  14
+#if (CUB_MAJOR_VERSION == 1 && CUB_MINOR_VERSION  >  14) || (CUB_MAJOR_VERSION > 1)
   // use optimized segmented sort if:
   //    - it is available (cub > 1.4)
   //    - it is greater than Rank 1 Tensor
