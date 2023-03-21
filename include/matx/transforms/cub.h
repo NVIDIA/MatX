@@ -560,7 +560,6 @@ public:
 {
 
 #ifdef __CUDACC__
-  std::cout << "using optimized sort" << std::endl;
   if constexpr (is_tensor_view_v<InputOperator>)
   {
 
