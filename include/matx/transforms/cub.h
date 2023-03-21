@@ -560,7 +560,7 @@ public:
 {
 
 #ifdef __CUDACC__
-
+  std::cout << "using optimized sort" << std::endl;
   if constexpr (is_tensor_view_v<InputOperator>)
   {
 
@@ -633,7 +633,7 @@ public:
         auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
 
         auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream, false);
+            BeginOffset{a}, EndOffset{a}, stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
@@ -651,7 +651,7 @@ public:
       {
         auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
         auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream, false);
+            BeginOffset{a}, EndOffset{a}, stream);
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
@@ -668,7 +668,7 @@ public:
   }
 #endif // end CUDACC
 }
-#endif //cub > 14
+#endif //cub > 1.14
 
 
 /**
