@@ -61,19 +61,19 @@ public:
         snap_len_(snap_len)
   {
     // Create data objects and views
-    vView = new tensor_t<complex, 2>({num_el, num_beams});
-    vhView = new tensor_t<complex, 2>({num_beams, num_el});
-    cbfView = new tensor_t<complex, 2>({num_beams, data_len});
-    inVecView = new tensor_t<complex, 2>({num_el, data_len});
+    make_tensor(vView, {num_el, num_beams});
+    make_tensor(vhView, {num_beams, num_el});
+    make_tensor(cbfView, {num_beams, data_len});
+    make_tensor(inVecView, {num_el, data_len});
 
-    ivsView = new tensor_t<complex, 2>({num_el, snap_len});
-    ivshView = new tensor_t<complex, 2>({snap_len, num_el});
-    covMatView = new tensor_t<complex, 2>({num_el, num_el});
-    invCovMatView = new tensor_t<complex, 2>({num_el, num_el});
-    abfBView = new tensor_t<complex, 2>({num_el, num_beams});
-    abfAView = new tensor_t<complex, 2>({num_beams, num_beams});
-    abfAInvView = new tensor_t<complex, 2>({num_beams, num_beams});
-    abfWeightsView = new tensor_t<complex, 2>({num_el, num_beams});
+    make_tensor(ivsView, {num_el, snap_len});
+    make_tensor(ivshView, {snap_len, num_el});
+    make_tensor(covMatView, {num_el, num_el});
+    make_tensor(invCovMatView, {num_el, num_el});
+    make_tensor(abfBView, {num_el, num_beams});
+    make_tensor(abfAView, {num_beams, num_beams});
+    make_tensor(abfAInvView, {num_beams, num_beams});
+    make_tensor(abfWeightsView, {num_el, num_beams});
   }
 
   /**
@@ -83,17 +83,17 @@ public:
    */
   void Prefetch(cudaStream_t stream)
   {
-    covMatView->PrefetchDevice(stream);
-    vView->PrefetchDevice(stream);
-    vhView->PrefetchDevice(stream);
-    cbfView->PrefetchDevice(stream);
-    inVecView->PrefetchDevice(stream);
-    ivsView->PrefetchDevice(stream);
-    ivshView->PrefetchDevice(stream);
-    invCovMatView->PrefetchDevice(stream);
-    abfBView->PrefetchDevice(stream);
-    abfAView->PrefetchDevice(stream);
-    abfAInvView->PrefetchDevice(stream);
+    covMatView.PrefetchDevice(stream);
+    vView.PrefetchDevice(stream);
+    vhView.PrefetchDevice(stream);
+    cbfView.PrefetchDevice(stream);
+    inVecView.PrefetchDevice(stream);
+    ivsView.PrefetchDevice(stream);
+    ivshView.PrefetchDevice(stream);
+    invCovMatView.PrefetchDevice(stream);
+    abfBView.PrefetchDevice(stream);
+    abfAView.PrefetchDevice(stream);
+    abfAInvView.PrefetchDevice(stream);
   }
 
   /**
@@ -103,28 +103,28 @@ public:
    */
   void Run(cudaStream_t stream)
   {
-    (*vhView = hermitianT(*vView)).run(stream);
+    (vhView = hermitianT(vView)).run(stream);
 
-    matmul(*cbfView, *vhView, *inVecView, stream);
+    matmul(cbfView, vhView, inVecView, stream);
 
-    matx::copy(*ivsView, inVecView->Slice({0, 0}, {matxEnd, snap_len_}), stream);
+    matx::copy(ivsView, inVecView.Slice({0, 0}, {matxEnd, snap_len_}), stream);
 
-    (*ivshView = hermitianT(*ivsView)).run(stream);
+    (ivshView = hermitianT(ivsView)).run(stream);
 
-    matmul(*covMatView, *ivsView, *ivshView, stream);
+    matmul(covMatView, ivsView, ivshView, stream);
 
-    (*covMatView = (*covMatView * (1.0f / static_cast<float>(snap_len_))) +
+    (covMatView = (covMatView * (1.0f / static_cast<float>(snap_len_))) +
                    eye<complex>({num_el_, num_el_}) * load_coeff_)
         .run(stream);
-    inv(*invCovMatView, *covMatView, stream);
+    inv(invCovMatView, covMatView, stream);
 
     // Find A and B to solve xA=B. Matlab uses A/B to solve for x, which is the
     // same as x = BA^-1
-    matmul(*abfBView, *invCovMatView, *vView, stream);
-    matmul(*abfAView, *vhView, *abfBView, stream);
+    matmul(abfBView, invCovMatView, vView, stream);
+    matmul(abfAView, vhView, abfBView, stream);
 
-    inv(*abfAInvView, *abfAView, stream);
-    matmul(*abfWeightsView, *abfBView, *abfAInvView, stream);
+    inv(abfAInvView, abfAView, stream);
+    matmul(abfWeightsView, abfBView, abfAInvView, stream);
   }
 
   /**
@@ -132,35 +132,35 @@ public:
    * 
    * @return tensor_t view 
    */
-  auto GetInVec() { return *inVecView; }
+  auto GetInVec() { return inVecView; }
 
   /**
    * @brief Get the cbfView object
    * 
    * @return tensor_t view 
    */  
-  auto GetCBFView() { return *cbfView; }
+  auto GetCBFView() { return cbfView; }
 
   /**
    * @brief Get the vView object
    * 
    * @return tensor_t view 
    */  
-  auto GetV() { return *vView; }
+  auto GetV() { return vView; }
 
   /**
    * @brief Get the covMatView object
    * 
    * @return tensor_t view 
    */
-  auto GetCovMatView() { return *covMatView; }
+  auto GetCovMatView() { return covMatView; }
 
   /**
    * @brief Get the invCovMatView object
    * 
    * @return tensor_t view 
    */  
-  auto GetCovMatInvView() { return *invCovMatView; }
+  auto GetCovMatInvView() { return invCovMatView; }
 
 private:
   index_t num_beams_;
@@ -169,17 +169,17 @@ private:
   index_t snap_len_;
   cuda::std::complex<float> load_coeff_ = {0.1f, 0.f};
 
-  tensor_t<complex, 2> *vView;
-  tensor_t<complex, 2> *vhView;
-  tensor_t<complex, 2> *cbfView;
-  tensor_t<complex, 2> *inVecView;
-  tensor_t<complex, 2> *ivsView;
-  tensor_t<complex, 2> *ivshView;
-  tensor_t<complex, 2> *covMatView;
-  tensor_t<complex, 2> *invCovMatView;
-  tensor_t<complex, 2> *abfWeightsView;
+  tensor_t<complex, 2> vView;
+  tensor_t<complex, 2> vhView;
+  tensor_t<complex, 2> cbfView;
+  tensor_t<complex, 2> inVecView;
+  tensor_t<complex, 2> ivsView;
+  tensor_t<complex, 2> ivshView;
+  tensor_t<complex, 2> covMatView;
+  tensor_t<complex, 2> invCovMatView;
+  tensor_t<complex, 2> abfWeightsView;
 
-  tensor_t<complex, 2> *abfAView;
-  tensor_t<complex, 2> *abfBView;
-  tensor_t<complex, 2> *abfAInvView;
+  tensor_t<complex, 2> abfAView;
+  tensor_t<complex, 2> abfBView;
+  tensor_t<complex, 2> abfAInvView;
 };

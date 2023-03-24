@@ -89,20 +89,20 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
   this->pb->NumpyToTensorView(x_in, "x_init");
 
   // Copy the replicated data into the actual data pointer
-  matx::copy(*d, x_clone, 0);
+  matx::copy(d, x_clone, 0);
 
-  d->PrefetchDevice(0);
+  d.PrefetchDevice(0);
 
   auto wfd = p.GetwaveformView();
-  auto wf = wfd->Slice({0}, {this->waveformLength});
+  auto wf = wfd.Slice({0}, {this->waveformLength});
 
   this->pb->NumpyToTensorView(wf, "waveform");
 
-  wfd->PrefetchDevice(0);
+  wfd.PrefetchDevice(0);
 
   p.PulseCompression();
 
-  auto xc = d->Slice({0, 0, 0}, {this->numChannels, this->numPulses,
+  auto xc = d.Slice({0, 0, 0}, {this->numChannels, this->numPulses,
                                  this->numCompressedSamples});
 
   MATX_TEST_ASSERT_COMPARE(this->pb, xc, "x_compressed", 0.01);
@@ -123,16 +123,16 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
   // {this->numPulses, this->numCompressedSamples}); auto x_clone =
   // data.View().Clone<3>({this->numChannels, matxKeepDim, matxKeepDim});
 
-  auto v = d->Slice({0, 0, 0}, {this->numChannels, this->numPulses,
+  auto v = d.Slice({0, 0, 0}, {this->numChannels, this->numPulses,
                                 this->numCompressedSamples});
   this->pb->NumpyToTensorView(v, "x_compressed");
 
-  // copy(d->View(), x_clone, 0);
+  // copy(d.View(), x_clone, 0);
 
   p.ThreePulseCanceller();
 
   auto out = p.GetTPCView();
-  auto tpcView = out->Slice({0, 1, 0}, {this->numChannels, this->numPulses - 1,
+  auto tpcView = out.Slice({0, 1, 0}, {this->numChannels, this->numPulses - 1,
                                         this->numCompressedSamples});
 
   MATX_TEST_ASSERT_COMPARE(this->pb, tpcView, "x_conv2", 0.01);
@@ -147,17 +147,17 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
                                     this->waveformLength, this->numChannels, 0);
   auto in = p.GetTPCView();
 
-  auto v = in->Slice({0, 0, 0}, {this->numChannels, this->numPulses - 2,
+  auto v = in.Slice({0, 0, 0}, {this->numChannels, this->numPulses - 2,
                                  this->numCompressedSamples});
   this->pb->NumpyToTensorView(v, "x_conv2");
 
-  in->PrefetchHost(0);
+  in.PrefetchHost(0);
 
   p.DopplerProcessing();
 
   auto out = p.GetTPCView();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, *out, "X_window", 0.01);
+  MATX_TEST_ASSERT_COMPARE(this->pb, out, "X_window", 0.01);
   MATX_EXIT_HANDLER();
 }
 
@@ -172,7 +172,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, CFARDetection)
                                     this->waveformLength, this->numChannels, 0);
   auto inView = p.GetTPCView();
 
-  this->pb->NumpyToTensorView(*inView, "X_window");
+  this->pb->NumpyToTensorView(inView, "X_window");
 
   p.CFARDetections();
 

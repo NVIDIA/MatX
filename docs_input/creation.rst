@@ -115,6 +115,27 @@ is passed to MatX rather than having the allocation done when the tensor is crea
 
 Each of these 4 variants can be used with all of the construction types when applicable.
 
+Tensor Class Members
+####################
+When creating a class that has tensors as member variables there's an issue with the ``make_tensor`` syntax above, in that it depends on
+being able to use the ``auto`` keyword to deduce the type. Since type deduction is not possible with member variables, the type must be
+declared in the variable list. Once declared, a special version of ``make_tensor`` can be used in the constructor or initialization function
+of the class to create the tensor in-place. This allows the user to specify only the rank and type in the member list, and the size can be
+specified at initialization without repeating the rank and type. 
+
+.. code-block:: cpp
+    class MyClass {
+        public:
+            MyClass() {
+                make_tensor(t, {10, 20});
+            }
+        private:
+            tensor_t<float, 2> t;
+    };
+
+In the example above ``make_tensor`` takes an existing tensor as input to construct it in-place. Allocation is only performed once during initialization
+and not when the tensor is declared. 
+
 Creating From C Array Or a Brace-Enclosed list
 ##############################################
 Tensors can be created using a C-style shape array from an lvalue, or a brace-enclosed list as an rvalue. The following call the same ``make_`` call:
@@ -225,5 +246,4 @@ To create a descriptor:
     DefaultDescriptor<RANK> desc{arr};
 
 In this case we create a default descriptor (based on ``index_t`` sizes) using a C-style array.
-
 
