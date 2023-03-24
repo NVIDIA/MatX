@@ -54,7 +54,11 @@ namespace matx
     using citerator = T const *; ///< Type trait for const iterator value
     using matx_storage_container = bool; ///< Type trait to indicate this is a storage type
 
-    raw_pointer_buffer() = delete;
+    /** 
+     * @brief Default construct a raw_pointer_buffer. This should only be used when temporarily
+     * creating an empty tensor for construction later.
+    */
+    raw_pointer_buffer() { }
     
     /**
      * @brief Construct a new raw pointer buffer object and allocate space
@@ -274,8 +278,11 @@ namespace matx
     using citerator = T const *; ///< Type trait for const iterator value
     using matx_storage_container = bool; ///< Type trait to indicate this is a container
 
-
-    smart_pointer_buffer<T>() = delete;
+    /** 
+     * @brief Default construct a smart_pointer_buffer. This should only be used when temporarily
+     * creating an empty tensor for construction later.
+    */
+    smart_pointer_buffer<T>() {};
 
     /**
      * @brief Construct a new smart pointer buffer from an existing object
@@ -479,6 +486,14 @@ namespace matx
       
       container_.SetData(data);
     }
+
+    /**
+     * @brief Construct an empty storage container
+     * 
+     */
+    __MATX_INLINE__ basic_storage()
+    {
+    }    
 
     /**
      * @brief Construct a storage container

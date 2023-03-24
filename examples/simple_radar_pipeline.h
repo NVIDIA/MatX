@@ -121,16 +121,7 @@ public:
   RadarPipeline() = delete;
   ~RadarPipeline()
   {
-    delete waveformView;
-    delete norms;
-    delete inputView;
-    delete tpcView;
-    delete cancelMask;
-    delete normT;
-    delete ba;
-    delete dets;
-    delete xPow;
-    delete cfarMaskView;
+
   }
 
   /**
@@ -160,32 +151,32 @@ public:
     numCompressedSamples = numSamples - waveformLength + 1;
 
     // waveform is of length waveform data but we pad to numSamples for fft
-    waveformView = new tensor_t<ComplexType, 1>({numSamplesRnd});
-    norms = new tensor_t<typename ComplexType::value_type, 0>();
-    inputView = new tensor_t<ComplexType, 3>(
+    make_tensor(waveformView, {numSamplesRnd});
+    make_tensor(norms);
+    make_tensor(inputView,
         {numChannels, numPulses, numSamplesRnd});
-    tpcView = new tensor_t<ComplexType, 3>(
+    make_tensor(tpcView,
         {numChannels, numPulsesRnd, numCompressedSamples});
-    cancelMask = new tensor_t<typename ComplexType::value_type, 1>({3});
-    normT = new tensor_t<typename ComplexType::value_type, 3>(
+    make_tensor(cancelMask, {3});
+    make_tensor(normT, 
         {numChannels, numPulsesRnd + cfarMaskY - 1,
          numCompressedSamples + cfarMaskX - 1});
-    ba = new tensor_t<typename ComplexType::value_type, 3>(
+    make_tensor(ba, 
         {numChannels, numPulsesRnd + cfarMaskY - 1,
          numCompressedSamples + cfarMaskX - 1});
-    dets = new tensor_t<int, 3>(
+    make_tensor(dets, 
         {numChannels, numPulsesRnd, numCompressedSamples});
-    xPow = new tensor_t<typename ComplexType::value_type, 3>(
+    make_tensor(xPow, 
         {numChannels, numPulsesRnd, numCompressedSamples});
 
-    cudaMemset(waveformView->Data(), 0, numSamplesRnd * sizeof(ComplexType));
-    cudaMemset(inputView->Data(), 0,
-               inputView->TotalSize() * sizeof(ComplexType));
-    cudaMemset(tpcView->Data(), 0, tpcView->TotalSize() * sizeof(ComplexType));
+    cudaMemset(waveformView.Data(), 0, numSamplesRnd * sizeof(ComplexType));
+    cudaMemset(inputView.Data(), 0,
+               inputView.TotalSize() * sizeof(ComplexType));
+    cudaMemset(tpcView.Data(), 0, tpcView.TotalSize() * sizeof(ComplexType));
 
-    cancelMask->SetVals({1, -2, 1});
+    cancelMask.SetVals({1, -2, 1});
 
-    cfarMaskView = new tensor_t<typename ComplexType::value_type, 2>(
+    make_tensor(cfarMaskView, 
         {cfarMaskY, cfarMaskX});
     // Mask for cfar detection
     // G == guard, R == reference, C == CUT
@@ -204,26 +195,26 @@ public:
     //    R R R R R ;
     //    R R R R R ];
     //  }
-    cfarMaskView->SetVals({{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    cfarMaskView.SetVals({{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
                            {1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1},
                            {1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1},
                            {1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1},
                            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}});
 
     // Pre-process CFAR convolution
-    conv2d(*normT, ones({numChannels, numPulsesRnd, numCompressedSamples}),
-           *cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL, stream);
+    conv2d(normT, ones({numChannels, numPulsesRnd, numCompressedSamples}),
+           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL, stream);
 
-    cancelMask->PrefetchDevice(stream);
-    ba->PrefetchDevice(stream);
-    normT->PrefetchDevice(stream);
-    cfarMaskView->PrefetchDevice(stream);
-    dets->PrefetchDevice(stream);
-    waveformView->PrefetchDevice(stream);
-    norms->PrefetchDevice(stream);
-    inputView->PrefetchDevice(stream);
-    tpcView->PrefetchDevice(stream);
-    xPow->PrefetchDevice(stream);
+    cancelMask.PrefetchDevice(stream);
+    ba.PrefetchDevice(stream);
+    normT.PrefetchDevice(stream);
+    cfarMaskView.PrefetchDevice(stream);
+    dets.PrefetchDevice(stream);
+    waveformView.PrefetchDevice(stream);
+    norms.PrefetchDevice(stream);
+    inputView.PrefetchDevice(stream);
+    tpcView.PrefetchDevice(stream);
+    xPow.PrefetchDevice(stream);
   }
 
   /**
@@ -239,13 +230,13 @@ public:
   void PulseCompression()
   {
     // reshape waveform to be waveformLength
-    auto waveformPart = waveformView->Slice({0}, {waveformLength});
+    auto waveformPart = waveformView.Slice({0}, {waveformLength});
     auto waveformT =
-        waveformView->template Clone<3>({numChannels, numPulses, matxKeepDim});
+        waveformView.template Clone<3>({numChannels, numPulses, matxKeepDim});
 
-    auto waveformFull = waveformView->Slice({0}, {numSamplesRnd});
+    auto waveformFull = waveformView.Slice({0}, {numSamplesRnd});
 
-    auto x = *inputView;
+    auto x = inputView;
 
     // create waveform (assuming waveform is the same for every pulse)
     // this allows us to precompute waveform in frequency domain
@@ -255,10 +246,10 @@ public:
     (waveformPart = waveformPart * hamming<0>({waveformLength})).run(stream);
 
     // compute L2 norm
-    sum(*norms, norm(waveformPart), stream);
-    (*norms = sqrt(*norms)).run(stream);
+    sum(norms, norm(waveformPart), stream);
+    (norms = sqrt(norms)).run(stream);
 
-    (waveformPart = waveformPart / *norms).run(stream);
+    (waveformPart = waveformPart / norms).run(stream);
     fft(waveformFull, waveformPart, 0, stream);
     (waveformFull = conj(waveformFull)).run(stream);
 
@@ -287,11 +278,11 @@ public:
    */
   void ThreePulseCanceller()
   {
-    auto x = inputView->Permute({0, 2, 1}).Slice(
+    auto x = inputView.Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    auto xo = tpcView->Permute({0, 2, 1}).Slice(
+    auto xo = tpcView.Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    conv1d(xo, x, *cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
+    conv1d(xo, x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
   }
 
   /**
@@ -310,14 +301,14 @@ public:
    */
   void DopplerProcessing()
   {
-    const index_t cpulses = numPulses - (cancelMask->Size(0) - 1);
+    const index_t cpulses = numPulses - (cancelMask.Size(0) - 1);
 
     auto xc =
-        tpcView->Slice({0, 0, 0}, {numChannels, cpulses, numCompressedSamples});
+        tpcView.Slice({0, 0, 0}, {numChannels, cpulses, numCompressedSamples});
 
-    auto xf = tpcView->Permute({0, 2, 1});
+    auto xf = tpcView.Permute({0, 2, 1});
 
-    (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask->Size(0) - 1),
+    (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask.Size(0) - 1),
                           numCompressedSamples}))
         .run(stream);
     fft(xf, xf, 0, stream);
@@ -360,22 +351,22 @@ public:
    */
   void CFARDetections()
   {
-    (*xPow = norm(*tpcView)).run(stream);
+    (xPow = norm(tpcView)).run(stream);
 
     // Estimate the background average power in each cell
     // background_averages = conv2(Xpow, mask, 'same') ./ norm;
-    conv2d(*ba, *xPow, *cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL,
+    conv2d(ba, xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL,
            stream);
 
     // Computing number of cells contributing to each cell.
     // This can be done with a convolution of the cfarMask with
     // ones.
     // norm = conv2(ones(size(X)), mask, 'same');
-    auto normTrim = normT->Slice({0, cfarMaskY / 2, cfarMaskX / 2},
+    auto normTrim = normT.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
                                  {numChannels, numPulsesRnd + cfarMaskY / 2,
                                   numCompressedSamples + cfarMaskX / 2});
 
-    auto baTrim = ba->Slice({0, cfarMaskY / 2, cfarMaskX / 2},
+    auto baTrim = ba.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
                             {numChannels, numPulsesRnd + cfarMaskY / 2,
                              numCompressedSamples + cfarMaskX / 2});
     (baTrim = baTrim / normTrim).run(stream);
@@ -394,10 +385,10 @@ public:
     // These 2 branches are functionally equivalent.  A custom op is more
     // efficient as it can avoid repeated loads.
 #if 0
-            IFELSE(*xPow > normTrim*(pow(pfa, -1.0f/normTrim) - 1.0f)*baTrim,
-                        *dets = 1, *dets = 0).run(stream);
+    IFELSE(xPow > normTrim*(pow(pfa, -1.0f/normTrim) - 1.0f)*baTrim,
+                dets = 1, dets = 0).run(stream);
 #else
-    calcDets(*dets, *xPow, baTrim, normTrim, pfa).run(stream);
+    calcDets(dets, xPow, baTrim, normTrim, pfa).run(stream);
 #endif
   }
 
@@ -427,21 +418,21 @@ public:
    * 
    * @return tensor_t view 
    */
-  auto GetDetections() { return *dets; }
+  auto GetDetections() { return dets; }
 
   /**
    * @brief Get the Background Averages object
    * 
    * @return tensor_t view 
    */
-  auto GetBackgroundAverages() { return *ba; }
+  auto GetBackgroundAverages() { return ba; }
 
   /**
    * @brief Get norm object
    * 
    * @return tensor_t view 
    */
-  auto GetnormT() { return *normT; }
+  auto GetnormT() { return normT; }
 
 private:
   index_t numPulses;
@@ -456,16 +447,16 @@ private:
 
   static const constexpr float pfa = 1e-5f;
 
-  tensor_t<typename ComplexType::value_type, 3> *normT = nullptr;
-  tensor_t<typename ComplexType::value_type, 3> *ba = nullptr;
-  tensor_t<int, 3> *dets = nullptr;
-  tensor_t<typename ComplexType::value_type, 1> *cancelMask = nullptr;
-  tensor_t<typename ComplexType::value_type, 3> *xPow = nullptr;
-  tensor_t<ComplexType, 1> *waveformView = nullptr;
-  tensor_t<typename ComplexType::value_type, 0> *norms = nullptr;
-  tensor_t<ComplexType, 3> *inputView = nullptr;
-  tensor_t<ComplexType, 3> *tpcView = nullptr;
-  tensor_t<typename ComplexType::value_type, 2> *cfarMaskView = nullptr;
+  tensor_t<typename ComplexType::value_type, 3> normT;
+  tensor_t<typename ComplexType::value_type, 3> ba;
+  tensor_t<int, 3> dets;
+  tensor_t<typename ComplexType::value_type, 1> cancelMask;
+  tensor_t<typename ComplexType::value_type, 3> xPow;
+  tensor_t<ComplexType, 1> waveformView;
+  tensor_t<typename ComplexType::value_type, 0> norms;
+  tensor_t<ComplexType, 3> inputView;
+  tensor_t<ComplexType, 3> tpcView;
+  tensor_t<typename ComplexType::value_type, 2> cfarMaskView;
 
   cudaStream_t stream;
 };
