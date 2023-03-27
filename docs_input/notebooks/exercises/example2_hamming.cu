@@ -9,7 +9,7 @@ int main() {
   // TODO: Set tensor B such that it forms a Hamming window
 
 
-  B.Print();
+  print(B);
 
   return 0;
 }

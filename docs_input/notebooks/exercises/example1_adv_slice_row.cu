@@ -13,13 +13,11 @@ int main() {
         {13, 14, 15, 16},
         {17, 18, 19, 20}});
 
-  t2.PrefetchDevice(0);
-
   // TODO: reduce tensor t2 to a 1D tensor by pulling all columns and the
   // second row
   auto t1 = ...;
 
-  t1.Print();
+  print(t1);
 
   return 0;
 }

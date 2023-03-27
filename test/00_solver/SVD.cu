@@ -316,15 +316,15 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   cudaDeviceSynchronize();
 
 #if 0
-  printf("A\n"); Print(A);
-  printf("U\n"); Print(U);
-  printf("VT\n"); Print(VT);
-  printf("S\n"); Print(S);
+  printf("A\n"); print(A);
+  printf("U\n"); print(U);
+  printf("VT\n"); print(VT);
+  printf("S\n"); print(S);
 
-  printf("UTU\n"); Print(UTU);
-  printf("VTV\n"); Print(VTV);
-  printf("A\n"); Print(A);
-  printf("UDVT\n"); Print(UDVT);
+  printf("UTU\n"); print(UTU);
+  printf("VTV\n"); print(VTV);
+  printf("A\n"); print(A);
+  printf("UDVT\n"); print(UDVT);
 
   printf("mdiffU: %f\n", (float)mdiffU());
   printf("mdiffV: %f\n", (float)mdiffV());
@@ -453,15 +453,15 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   cudaDeviceSynchronize();
 
 #if 0
-  printf("A\n"); Print(A);
-  printf("U\n"); Print(U);
-  printf("VT\n"); Print(VT);
-  printf("S\n"); Print(S);
+  printf("A\n"); print(A);
+  printf("U\n"); print(U);
+  printf("VT\n"); print(VT);
+  printf("S\n"); print(S);
 
-  printf("UTU\n"); Print(UTU);
-  printf("VTV\n"); Print(VTV);
-  printf("A\n"); Print(A);
-  printf("UDVT\n"); Print(UDVT);
+  printf("UTU\n"); print(UTU);
+  printf("VTV\n"); print(VTV);
+  printf("A\n"); print(A);
+  printf("UDVT\n"); print(UDVT);
 
   printf("mdiffU: %f\n", (float)mdiffU());
   printf("mdiffV: %f\n", (float)mdiffV());

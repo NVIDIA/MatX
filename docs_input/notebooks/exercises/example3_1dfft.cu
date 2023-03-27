@@ -11,17 +11,17 @@ int main() {
   (C = randTensor1).run();
 
   printf("Initial C tensor:\n");
-  C.Print();
+  print(C);
 
   // TODO: Perform an in-place FFT on C across rows
 
   printf("After FFT:\n");
-  C.Print();
+  print(C);
 
   // TODO: Perform an in-place IFFT on C across rows.
 
   printf("After IFFT and normalization:\n");
-  C.Print();
+  print(C);
 
   return 0;
 }

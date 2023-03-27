@@ -21,11 +21,11 @@ int main() {
 
 
   printf("A:\n");
-  A.Print();
+  print(A);
   printf("Max:\n");
-  MD1.Print();
+  print(MD1);
   printf("Sum:\n");
-  AD1.Print();
+  print(AD1);
 
   return 0;
 }

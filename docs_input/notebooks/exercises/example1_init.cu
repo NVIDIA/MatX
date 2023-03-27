@@ -16,10 +16,7 @@ int main() {
           {13, 14, 15, 16},
           {17, 18, 19, 20}});
 
-
-  t2.PrefetchDevice(0);
-
-  t2.Print();
+  print(t2);
 
   return 0;
 }

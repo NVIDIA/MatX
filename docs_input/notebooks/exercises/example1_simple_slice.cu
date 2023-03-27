@@ -13,13 +13,11 @@ int main() {
         {13, 14, 15, 16},
         {17, 18, 19, 20}});
 
-  t2.PrefetchDevice(0);
-
   // TODO: Create a slide of the view t2 starting at the second element and
   // ending at the third element (inclusive) in both dimensions
   auto t2s = ...;
 
-  t2s.Print();
+  print(t2s);
 
   return 0;
 }

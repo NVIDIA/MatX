@@ -7,7 +7,7 @@ int main() {
 
   // TODO: Set tensor B such that it forms an identity matrix
 
-  B.Print();
+  print(B);
 
   return 0;
 }

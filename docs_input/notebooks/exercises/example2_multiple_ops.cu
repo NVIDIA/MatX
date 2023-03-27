@@ -16,7 +16,7 @@ int main() {
   // TODO: Add A to itself plus 1, divide the result by 2, and add vector V. 
 
   
-  C.Print();
+  print(C);
   
   return 0;
 }

@@ -41,8 +41,8 @@ int main() {
     }
   }
 
-  A.Print();
-  V.Print();
+  print(A);
+  print(V);
   printf("Init verification passed!\n");
 
   /****************************************************************************************************
@@ -65,7 +65,7 @@ int main() {
     }
   }
 
-  A.Print();
+  print(A);
   printf("Sum verification passed!\n");
 
   /****************************************************************************************************
@@ -92,8 +92,8 @@ int main() {
   //   }
   // }
 
-  // A.Print();
-  // tvs.Print();
+  // print(A);
+  // print(tvs);
   // printf("Clone verification passed!\n");
 
   /****************************************************************************************************
@@ -117,7 +117,7 @@ int main() {
     }
   }
 
-  B.Print();
+  print(B);
   printf("Mixed verification passed!\n");
 
   return 0;

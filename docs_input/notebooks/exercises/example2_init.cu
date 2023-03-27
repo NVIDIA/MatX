@@ -13,9 +13,9 @@ int main() {
   A = {};
   V = {};
 
-  A.Print();
+  print(A);
   printf("\n");
-  V.Print();
+  print(V);
   
   return 0;
 }

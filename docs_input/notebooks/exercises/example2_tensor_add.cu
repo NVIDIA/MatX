@@ -17,9 +17,9 @@ int main() {
   // TODO: Add tensors A and B and store the result in C
 
   
-  A.Print();
+  print(A);
   printf("\n");
-  B.Print();
+  print(B);
   printf("\n");
-  C.Print();
+  print(C);
 }

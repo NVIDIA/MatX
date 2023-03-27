@@ -16,9 +16,9 @@ int main() {
   // TODO: Add the value 1 to all elements of A and store the result in B
 
 
-  A.Print();
+  print(A);
   printf("\n");
-  B.Print();
+  print(B);
   
   return 0;
 }
