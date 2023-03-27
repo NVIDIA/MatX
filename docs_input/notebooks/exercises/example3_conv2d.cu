@@ -15,14 +15,14 @@ int main() {
   (C = randTensor1).run();  
 
   printf("Initial C tensor:\n");
-  C.Print();
+  print(C);
 
   // TODO: Perform a 2D direct convolution on C with filter filt
 
   
 
   printf("After conv2d:\n");
-  Co.Print();
+  print(Co);
 
   return 0;
 }

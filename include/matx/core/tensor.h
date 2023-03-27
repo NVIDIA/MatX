@@ -1704,6 +1704,7 @@ public:
    * @param end End indices to stop
    */
   template <int NRANK>
+  [[deprecated("Using the free-standing print() function instead")]]
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK]) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1733,7 +1734,9 @@ public:
    * @param end End indices to stop
    * @param strides Strides of each dimension
    */
+
   template <int NRANK>
+  [[deprecated("Using the free-standing print() function instead")]] 
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK], const index_t (&strides)[NRANK]) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

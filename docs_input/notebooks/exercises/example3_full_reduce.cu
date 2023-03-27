@@ -20,7 +20,7 @@ int main() {
 
 
   printf("A:\n");
-  A.Print();
+  print(A);
   printf("Max: %f\n", MD0());
   printf("Sum: %f\n", AD0());  
 

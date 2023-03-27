@@ -29,8 +29,8 @@ int main() {
   // Verify init is correct
   B.SetVals({{{0.5927, -0.3677}, {-2.6895, 1.8154}, {-0.0129, 0.9246}},
        {{0.5646, 0.8638}, {1.6400, 0.3494}, {-0.5709, 0.5919}}});
-  A.Print();
-  B.Print();
+  A.print();
+  B.print();
   cudaStreamSynchronize(0);
   for (int row = 0; row < A.Size(0); row++) {
     for (int col = 0; col < A.Size(1); col++) {

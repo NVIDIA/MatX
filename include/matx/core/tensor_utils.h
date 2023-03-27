@@ -668,7 +668,7 @@ namespace detail {
   }
 } // end namespace detail
 
-static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
+static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
 
 /**
  * @brief Print a tensor's values to stdout
@@ -684,7 +684,7 @@ template <typename Op, typename... Args,
           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
-void Print(const Op &op, Args... dims) 
+void print(const Op &op, Args... dims) 
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
@@ -724,18 +724,18 @@ void Print(const Op &op, Args... dims)
 /**
  * @brief Print a tensor's values to stdout
  *
- * This is the interal `Print()` takes integral values for each index, and prints that as many values
+ * This is the internal `PrintData()` that takes integral values for each index, and prints that as many values
  * in each dimension as the arguments specify. For example:
  *
- * `a.Print(2, 3, 2);`
+ * `print(a, 2, 3, 2);`
  *
  * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
  * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
  * 0 can be used if the entire tensor should be printed:
  *
- * `a.Print(0, 0, 0);` // Prints the whole tensor
+ * `print(a, 0, 0, 0);` // Prints the whole tensor
  *
- * For more fine-grained printing, see the over `Print()` overloads.
+ * For more fine-grained printing, see the over `print()` overloads.
  *
  * @tparam Args Integral argument types
  * @param op input Operator
@@ -777,19 +777,19 @@ void PrintData(const Op &op, Args... dims) {
 /**
  * @brief Print a tensor's all values to stdout
  *
- * This form of `Print()` is an alias of `Print(0)`, `Print(0, 0)`,
- * `Print(0, 0, 0)` and `Print(0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
- * respectively. It passes the proper number of zeros to `Print(...)`
+ * This form of `print()` is an alias of `print(op, 0)`, `print(op, 0, 0)`,
+ * `print(op, 0, 0, 0)` and `print(op, 0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
+ * respectively. It passes the proper number of zeros to `print(...)`
  * automatically according to the rank of this tensor. The user only have to
- * invoke `.Print()` to print the whole tensor, instead of passing zeros
+ * invoke `print(op)` to print the whole tensor, instead of passing zeros
  * manually.
  */
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-void Print(const Op &op, Args... dims) {
+void print(const Op &op, Args... dims) {
   std::array<int, Op::Rank()> arr = {0};
   auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { Print(op, args...); }, tp);
+  std::apply([&](auto &&...args) { print(op, args...); }, tp);
 }
 
 }

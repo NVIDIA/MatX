@@ -97,32 +97,32 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("svdpi:\n");
 
     printf("S\n");
-    Print(S);
+    print(S);
     printf("U\n");
-    Print(U);
+    print(U);
     printf("VT\n");
-    Print(VT);
+    print(VT);
 
     if( m <=  n) {
       printf("UUT:\n");
       matmul(UUT, U, conj(transpose(U)), stream);
-      Print(UUT);
+      print(UUT);
     }
 
     printf("UTU:\n");
     matmul(UTU, conj(transpose(U)) , U, stream);
-    Print(UTU);
+    print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
       matmul(VVT, conj(transpose(VT)), VT, stream);
-      Print(VVT);
+      print(VVT);
     }
 
     printf("VTV:\n");
     matmul(VTV, VT, conj(transpose(VT)), stream); // works on r x r
 
-    Print(VTV);
+    print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
     (UD = U * D).run(stream);
@@ -130,15 +130,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     matmul(UDVT, UD, VT, stream);
 
     printf("A\n");
-    Print(A);
+    print(A);
 
     printf("UDVT\n");
-    Print(UDVT);
+    print(UDVT);
 
     (A = A - UDVT).run(stream);
 
     printf("A-UDVT\n");
-    Print(A);
+    print(A);
   }
   // Same as above but with svdbpi
   {
@@ -153,32 +153,32 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("svdbpi:\n");
 
     printf("S\n");
-    Print(S);
+    print(S);
     printf("U\n");
-    Print(U);
+    print(U);
     printf("VT\n");
-    Print(VT);
+    print(VT);
 
     if( m <=  n) {
       printf("UUT:\n");
       matmul(UUT, U, conj(transpose(U)), stream);
-      Print(UUT);
+      print(UUT);
     }
 
     printf("UTU:\n");
     matmul(UTU, conj(transpose(U)) , U, stream);
-    Print(UTU);
+    print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
       matmul(VVT, conj(transpose(VT)), VT, stream);
-      Print(VVT);
+      print(VVT);
     }
 
     printf("VTV:\n");
     matmul(VTV, VT, conj(transpose(VT)), stream); // works on r x r
 
-    Print(VTV);
+    print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
     (UD = U * D).run(stream);
@@ -186,15 +186,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     matmul(UDVT, UD, VT, stream);
 
     printf("A\n");
-    Print(A);
+    print(A);
 
     printf("UDVT\n");
-    Print(UDVT);
+    print(UDVT);
 
     (A = A - UDVT).run(stream);
 
     printf("A-UDVT\n");
-    Print(A);
+    print(A);
   }
 
   CUDA_CHECK_LAST_ERROR();

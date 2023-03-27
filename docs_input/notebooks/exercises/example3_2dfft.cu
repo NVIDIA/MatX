@@ -10,17 +10,17 @@ int main() {
   auto randTensor1 = randData.GetTensorView<2>({2, 4}, NORMAL);
   (C = randTensor1).run();
   printf("Initial C tensor:\n");
-  C.Print();
+  print(C);
 
   // TODO: Perform an in-place 2D FFT on C across rows
 
   printf("After FFT:\n");
-  C.Print();
+  print(C);
 
   // TODO: Perform an in-place 2D IFFT on C across rows
 
   printf("After IFFT and normalization:\n");
-  C.Print();
+  print(C);
 
   return 0;
 }

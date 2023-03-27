@@ -16,11 +16,11 @@ int main() {
   // TODO: Perform a GEMM of C = A*B
   
   printf("A:\n");
-  A.Print();
+  print(A);
   printf("B:\n");
-  B.Print();  
+  print(B);  
   printf("C:\n");
-  C.Print();    
+  print(C);    
 
   return 0;
 }

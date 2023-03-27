@@ -13,7 +13,7 @@ int main() {
   // TODO: Conditionally assign elements of A the value of 1 if the same element in C is > 3, or 0 otherwise
   
 
-  A.Print();
+  print(A);
 
   return 0;
 }

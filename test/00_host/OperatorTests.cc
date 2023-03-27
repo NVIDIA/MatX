@@ -2639,6 +2639,6 @@ TYPED_TEST(HostOperatorTestsFloat, Print)
   auto t = make_tensor<TypeParam>({3});
   auto r = ones(t.Shape());
 
-  Print(r);
+  print(r);
   MATX_EXIT_HANDLER();
 }

@@ -9,5 +9,5 @@ int main() {
 
   // TODO: Divide tensor C by 2 and store in C
 
-  C.Print();
+  print(C);
 }

@@ -79,11 +79,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   conv2d(out, in, filter, mode, 0);
 
   printf("in:\n");
-  Print(in);
+  print(in);
   printf("filter:\n");
-  Print(filter);
+  print(filter);
   printf("out:\n");
-  Print(out);
+  print(out);
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
