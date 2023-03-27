@@ -153,7 +153,7 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     cudaStreamSynchronize(0);
     for(int i = 0 ; i < x ; i++) {
       for(int j = 0; j < y ; j++) {
-        ASSERT_TRUE( b(i,j) == (TypeParam)z);
+        ASSERT_TRUE( MatXUtils::MatXTypeCompare(b(i,j), (TypeParam)z));
       }
     }
   }
@@ -267,7 +267,10 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
+
+// This works with half precision, but we need the proper test infrastructure to prevent compiling
+// half types for CCs that don't support it. Disable half on this test for now
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
 {
   MATX_ENTER_HANDLER();
 
@@ -289,7 +292,6 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   softmax(t3_out, t3, {2});
   
   MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
-
 
   MATX_EXIT_HANDLER();
 }

@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/iterator.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx

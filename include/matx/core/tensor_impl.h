@@ -65,7 +65,7 @@ namespace detail {
  * @tparam T Type of tensor
  * @tparam RANK Rank of tensor
  */
-template <typename T, int RANK, typename Desc = tensor_desc_cr_ds_64_64_t<RANK>> 
+template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>> 
 class tensor_impl_t {
   public:
     // Type specifier for reflection on class
@@ -696,6 +696,19 @@ class tensor_impl_t {
           return this->operator()(args...);
         }, idx);      
     }  
+
+    /**
+     * operator() getter with an array index
+     *
+     * @returns value in tensor
+     *
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    {
+      return std::apply([&](auto &&...args) -> T& {
+          return this->operator()(args...);
+        }, idx);      
+    }      
 
 
     /**

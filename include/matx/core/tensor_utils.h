@@ -36,6 +36,7 @@
 #include <functional>
 
 #include "matx/core/nvtx.h"
+#include "matx/core/dlpack.h"
 #include "matx/core/make_tensor.h"
 
 namespace matx
@@ -448,6 +449,51 @@ namespace detail {
   }
 
 
+  template <typename T> constexpr DLDataType TypeToDLPackType()
+  {
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>>)
+      return {kDLComplex, 64, 1};
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>>)
+      return {kDLComplex, 128, 1};
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return {kDLFloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return {kDLBfloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return {kDLComplex, 32, 1};
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return {kDLComplex, 32, 1}; // Wrong, but no other choice
+    if constexpr (std::is_same_v<T, float>)
+      return {kDLFloat, 32, 1};
+    if constexpr (std::is_same_v<T, double>)
+      return {kDLFloat, 64, 1};
+    if constexpr (std::is_same_v<T, int8_t>)
+      return {kDLInt, 8, 1};
+    if constexpr (std::is_same_v<T, int16_t>)
+      return {kDLInt, 16, 1};
+    if constexpr (std::is_same_v<T, int32_t>)
+      return {kDLInt, 32, 1};
+    if constexpr (std::is_same_v<T, int64_t>)
+      return {kDLInt, 64, 1};
+    if constexpr (std::is_same_v<T, uint8_t>)
+      return {kDLUInt, 8, 1};
+    if constexpr (std::is_same_v<T, uint16_t>)
+      return {kDLUInt, 16, 1};
+    if constexpr (std::is_same_v<T, uint32_t>)
+      return {kDLUInt, 32, 1};
+    if constexpr (std::is_same_v<T, uint64_t>)
+      return {kDLUInt, 64, 1};    
+    if constexpr (std::is_same_v<T, bool>)
+#if DLPACK_VERSION >= 80      
+      return {kDLBool, 8, 1};
+#else
+      return {kDLUInt, 8, 1};
+#endif      
+
+    return {kDLOpaqueHandle, 1, 1};
+  }  
+
+
   /**
    * Print a value
    *
@@ -562,7 +608,7 @@ namespace detail {
     else if constexpr (sizeof...(Args) == 1) {
       auto& k =detail:: pp_get<0>(dims...);
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
-        printf("%06lld: ", _k);
+        printf("%06" INDEX_T_FMT ": ", _k);
         PrintVal(op.operator()(_k));
         printf("\n");
       }
@@ -573,7 +619,7 @@ namespace detail {
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
         for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
           if (_l == 0)
-            printf("%06lld: ", _k);
+            printf("%06" INDEX_T_FMT ": ", _k);
 
           PrintVal(op.operator()(_k, _l));
         }
@@ -585,11 +631,11 @@ namespace detail {
       auto& k = detail::pp_get<1>(dims...);
       auto& l = detail::pp_get<2>(dims...);
       for (index_t _j = 0; _j < ((j == 0) ? op.Size(0) : j); _j++) {
-        printf("[%06lld,:,:]\n", _j);
+        printf("[%06" INDEX_T_FMT ",:,:]\n", _j);
         for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
             if (_l == 0)
-              printf("%06lld: ", _k);
+              printf("%06" INDEX_T_FMT ": ", _k);
 
             PrintVal(op.operator()(_j, _k, _l));
           }
@@ -605,11 +651,11 @@ namespace detail {
       auto& l = detail::pp_get<3>(dims...);
       for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
         for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
-          printf("[%06lld,%06lld,:,:]\n", _i, _j);
+          printf("[%06" INDEX_T_FMT ",%06" INDEX_T_FMT "lld,:,:]\n", _i, _j);
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
               if (_l == 0)
-                printf("%06lld: ", _k);
+                printf("%06" INDEX_T_FMT ": ", _k);
 
               PrintVal(op.operator()(_i, _j, _k, _l));
             }
@@ -623,7 +669,6 @@ namespace detail {
 } // end namespace detail
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
-
 
 /**
  * @brief Print a tensor's values to stdout
@@ -653,10 +698,9 @@ void PrintData(const Op &op, Args... dims) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
 #ifdef __CUDACC__
+  cudaDeviceSynchronize();
   if constexpr (is_tensor_view_v<Op>) {
-
     auto kind = GetPointerKind(op.Data());
-    cudaDeviceSynchronize();
     if (HostPrintable(kind)) {
       detail::InternalPrint(op, dims...);
     }
@@ -705,7 +749,7 @@ void Print(const Op &op, Args... dims)
   
   for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
   {
-    printf("%d", static_cast<int>(op.Size(static_cast<int>(dimIdx))));
+    printf("%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
     if( dimIdx < (op.Rank() - 1) )
       printf(", ");
   }
@@ -717,7 +761,7 @@ void Print(const Op &op, Args... dims)
     {
       for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ) 
       {
-        printf("%d", static_cast<int>(op.Stride(static_cast<int>(dimIdx))));
+        printf("%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
         {
           printf(",");

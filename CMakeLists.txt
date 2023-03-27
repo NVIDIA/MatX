@@ -19,11 +19,15 @@ option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
+option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
+
+# Enable compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (MATX_BUILD_DOCS)
@@ -101,7 +105,7 @@ include(cmake/FindLibcudacxx.cmake)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 
 # Set flags for compiling tests faster
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0)
+set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
 if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -g -lineinfo)
 endif()
@@ -136,6 +140,11 @@ if (MATX_EN_CUTLASS)
 else()
     set (CUTLASS_INC "")
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
+endif()
+
+message(status ${MATX_DISABLE_CUB_CACHE})
+if (MATX_DISABLE_CUB_CACHE)
+    target_compile_definitions(matx INTERFACE MATX_DISABLE_CUB_CACHE=1)
 endif()
 
 # Get the tensor libraries if we need them

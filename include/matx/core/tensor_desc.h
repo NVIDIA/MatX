@@ -308,7 +308,13 @@ public:
       return static_cast<stride_type>(0);
     }
 
+    /*  In release mode with O3 on g++ seems to give incorrect warnings on this line from Clone()
+        and clone(). It appears there's no valid code path that would cause this to be unitialized,
+        so we're ignoring the warning in this one spot. */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     return *(stride_.begin() + dim); 
+    #pragma GCC diagnostic pop
   }
 
   /**
@@ -467,8 +473,12 @@ using tensor_desc_cr_disi_dist = tensor_desc_cr_ds_t<index_t, index_t, RANK>;
  *
  * @tparam RANK Rank of shape
  */
-template <int RANK>
-using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
-
+#ifdef INDEX_64_BIT 
+  template <int RANK>
+  using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
+#else
+  template <int RANK>
+  using DefaultDescriptor = tensor_desc_cr_ds_32_32_t<RANK>;
+#endif
 
 }; // namespace matx

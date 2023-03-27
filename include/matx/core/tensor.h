@@ -45,6 +45,7 @@
 #include "matx/core/storage.h"
 #include "matx/core/tensor_impl.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/dlpack.h"
 #include "matx/kernels/utility.cuh"
 
 static constexpr int MAX_TENSOR_DIM = 4;
@@ -72,86 +73,6 @@ enum {
 };
 #endif
 
-/**
- * @brief Iterator for TensorImpl for libraries that can take iterators as input (CUB).
- * 
- * @tparam T Data type
- * @tparam RANK Rank of tensor
- * @tparam Desc Descriptor for tensor
- * 
- */
-template <typename OperatorType>
-struct RandomOperatorIterator {
-  using self_type = RandomOperatorIterator<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
-  //                         index_t>;
-  using stride_type = index_t;
-  using pointer = value_type*;
-  using reference = value_type;
-  using iterator_category = std::random_access_iterator_tag;
-  using difference_type = typename std::iterator<iterator_category, value_type>::difference_type;
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t) : t_(t), offset_(0) { }
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
-
-  /**
-   * @brief Dereference value at a pre-computed offset
-   * 
-   * @return Value at offset 
-   */
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
-  {
-    auto arrs = detail::GetIdxFromAbs(t_, offset_);
-    return detail::mapply([&](auto &&...args) {
-        return t_.operator()(args...);
-      }, arrs);     
-  }  
-
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
-  {
-    return self_type{t_, offset_ + offset};
-  }
-
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
-  {
-    return *self_type{t_, offset_ + offset};
-  }  
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
-  {
-      self_type retval = *this;
-      offset_++;
-      return retval;
-  }  
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
-  {
-      offset_++;
-      return *this;
-  }  
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
-  {
-      offset_ += offset;
-      return *this;
-  }
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator-(difference_type offset) const
-  {
-      return self_type{t_, offset_ - offset};
-  }
-
-
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator-=(difference_type offset)
-  {
-      offset_ -= offset;
-      return *this;
-  }  
-
-  OperatorType t_;
-  stride_type offset_;  
-};
 
 /**
  * View of an underlying tensor data object
@@ -1113,7 +1034,6 @@ public:
     return storage_.use_count();
   }  
 
-
   /**
    * Create an overlapping tensor view
    *
@@ -1824,6 +1744,100 @@ public:
       }, tup);
   }   
 
+  /**
+   * @brief Get a DLPack v0.8 structure representing the tensor
+   * 
+   * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
+   * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
+   * by calling ->deleter(self).
+   * 
+   * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
+   * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
+   * will occur.
+   * 
+   * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
+   */
+  DLManagedTensor *GetDLPackTensor() const {
+  //DLManagedTensorVersioned *GetDLPackTensor() const {
+    //auto mt = new DLManagedTensorVersioned;
+    auto mt = new DLManagedTensor;
+    DLTensor *t = &mt->dl_tensor;
+    CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
+    CUmemorytype mem_type;
+    int dev_ord;
+    void *data[2]       = {&mem_type, &dev_ord};
+
+    t->data             = static_cast<void*>(this->ldata_);
+    t->device.device_id = 0;
+
+    // Determine where this memory resides
+    auto kind     = GetPointerKind(this->ldata_);
+    auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->ldata_));
+    MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
+    if (kind == MATX_INVALID_MEMORY) {
+      if (mem_type == CU_MEMORYTYPE_DEVICE) {
+        t->device.device_type = kDLCUDA; 
+        t->device.device_id = dev_ord;        
+      }
+      else {
+        t->device.device_type = kDLCPU;        
+      }
+    }
+    else {
+      // We have a record of this pointer and can map it from the record
+      switch (kind) {
+        case MATX_MANAGED_MEMORY: 
+        case MATX_DEVICE_MEMORY:
+        case MATX_ASYNC_DEVICE_MEMORY:
+          t->device.device_type = kDLCUDA; 
+          t->device.device_id = dev_ord;
+          break;
+        case MATX_HOST_MEMORY:
+          t->device.device_type = kDLCUDAHost;
+          t->device.device_id = dev_ord;
+          break;
+        case MATX_HOST_MALLOC_MEMORY:
+          t->device.device_type = kDLCPU;
+          break;
+        default: 
+          MATX_ASSERT_STR(false, matxCudaError, "Cannot determine kind of memory");
+          break;
+      }
+    }
+
+    t->ndim         = RANK;
+    t->dtype        = detail::TypeToDLPackType<T>();
+    t->shape        = new int64_t[RANK];
+    t->strides      = new int64_t[RANK];
+    for (int r = 0; r < RANK; r++) {
+      t->shape[r]   = this->Size(r);
+      t->strides[r] = this->Stride(r);
+    }
+    t->byte_offset  = 0;
+
+    // Increment reference count by making a copy of the shared_ptr by allocating on the heap and
+    // setting it as the context
+    auto t_copy = new self_type{*this};
+    //*t_copy = *this;
+    mt->manager_ctx = t_copy;
+    //mt->flags = 0; // Only for v1.0
+
+    //auto deleter = [](struct DLManagedTensorVersioned *mtv) { // v1.0
+    auto deleter = [](struct DLManagedTensor *mtv) {
+      delete [] mtv->dl_tensor.shape;
+      delete [] mtv->dl_tensor.strides;
+      delete static_cast<self_type *>(mtv->manager_ctx);
+      delete mtv;
+
+      mtv->dl_tensor.shape    = nullptr;
+      mtv->dl_tensor.strides  = nullptr;
+      mtv                     = nullptr;
+    };
+
+    mt->deleter = deleter;
+
+    return mt;
+  }
 
 private:
   Storage storage_;

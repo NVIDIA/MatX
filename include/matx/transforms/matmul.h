@@ -574,7 +574,7 @@ private:
                     sizeof(params_.batch));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    index_t stride;
+    int64_t stride;
 
     if constexpr (is_complex_half_v<T2>) {
       // for complex half we have copied to planar row major
