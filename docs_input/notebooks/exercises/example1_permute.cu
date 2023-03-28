@@ -13,12 +13,10 @@ int main() {
         {13, 14, 15, 16},
         {17, 18, 19, 20}});
 
-  t2.PrefetchDevice(0);
-
   // TODO: Permute the view t2 such that the two dimensions are swapped
   auto t2p = ...;
 
-  t2p.Print();
+  print(t2p);
 
   return 0;
 }

@@ -57,7 +57,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     radar.PulseCompression();
 
     auto rv = radar.GetInputView()->Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16});
-    rv.Print();
+    rv.print();
     cudaStreamDestroy(stream);
 
     return 0;

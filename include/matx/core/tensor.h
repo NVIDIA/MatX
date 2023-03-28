@@ -112,12 +112,15 @@ public:
    * @brief Construct a new 0-D tensor t object
    * 
    */
-  tensor_t() :
-    detail::tensor_impl_t<T, RANK, Desc>{}, 
-    storage_{typename Storage::container{sizeof(T)}}
+  tensor_t() : detail::tensor_impl_t<T, RANK, Desc>{}
   {
-    this->SetLocalData(storage_.data());
-    //static_assert(RANK == 0, "Default tensor constructor only works for rank-0 tensors.");
+    if constexpr (RANK == 0) {
+      storage_ = typename Storage::container{sizeof(T)};
+      this->SetLocalData(storage_.data());
+    }
+    else {
+      this->SetLocalData(nullptr);
+    }
   }
 
   /**
@@ -1701,6 +1704,7 @@ public:
    * @param end End indices to stop
    */
   template <int NRANK>
+  [[deprecated("Using the free-standing print() function instead")]]
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK]) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1730,7 +1734,9 @@ public:
    * @param end End indices to stop
    * @param strides Strides of each dimension
    */
+
   template <int NRANK>
+  [[deprecated("Using the free-standing print() function instead")]] 
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK], const index_t (&strides)[NRANK]) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

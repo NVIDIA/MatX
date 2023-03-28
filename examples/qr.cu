@@ -80,11 +80,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   matmul(QTQ, conj(transpose(Q)), Q, stream);
   cudaDeviceSynchronize();
   
-  printf("Q:\n"); Print(Q);
-  printf("R:\n"); Print(R);
-  printf("QTQ:\n"); Print(QTQ);
-  printf("QR:\n"); Print(QR);
-  printf("A:\n"); Print(A);
+  printf("Q:\n"); print(Q);
+  printf("R:\n"); print(R);
+  printf("QTQ:\n"); print(QTQ);
+  printf("QR:\n"); print(QR);
+  printf("A:\n"); print(A);
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();

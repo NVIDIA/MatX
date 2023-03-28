@@ -11,5 +11,5 @@ int main() {
   // TODO: Set tensor A to normally-distributed random numbers
 
 
-  A.Print();
+  print(A);
 }

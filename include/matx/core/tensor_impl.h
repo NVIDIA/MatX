@@ -113,7 +113,7 @@ class tensor_impl_t {
      * Constructor for a rank-0 tensor (scalar).
      */
     tensor_impl_t() {
-      static_assert(RANK == 0, "Default constructor is only for rank 0 tensors.");
+      
     }
 
     /**

@@ -17,7 +17,7 @@ int main() {
   // TODO: Add vector V to matrix C using rank expansion. Store result in C
 
 
-  C.Print();
+  print(C);
 
   return 0;
 }

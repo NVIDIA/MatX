@@ -44,7 +44,7 @@ int main() {
   //   }
   // }
 
-  // t2s.Print();
+  // print(t2s);
   // printf("Slice verification passed!\n");
 
   /****************************************************************************************************
@@ -68,7 +68,7 @@ int main() {
   //   }
   // }
 
-  // t3c.Print();
+  // print(t3c);
   // printf("Clone verification passed!\n");
 
   /****************************************************************************************************
@@ -90,7 +90,7 @@ int main() {
   //   }
   // }
 
-  // t3p.Print();
+  // print(t3p);
   // printf("Permute verification passed!\n");
 
   return 0;

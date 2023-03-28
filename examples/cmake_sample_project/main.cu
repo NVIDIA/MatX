@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     a.SetVals({1,2,3,4,5,6,7,8,9,10});
 
     printf("You should see the values 1-10 printed\n");
-    a.Print();
+    a.print();
 
 #if MATX_ENABLE_VIZ
     // If you enabled visualization support, uncomment this line and
