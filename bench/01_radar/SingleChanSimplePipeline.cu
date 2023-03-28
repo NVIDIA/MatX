@@ -20,7 +20,7 @@ void simple_radar_pipeline_pulse_compression(nvbench::state &state, nvbench::typ
   state.exec( nvbench::exec_tag::timer, 
     [&numPulses, &numChannels, &numSamples, &waveformLength](nvbench::launch &launch, auto &timer) {
       auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, launch.get_stream());
-      radar.GetInputView()->PrefetchDevice(launch.get_stream());      
+      radar.GetInputView().PrefetchDevice(launch.get_stream());      
 
       timer.start();
       radar.PulseCompression();
@@ -46,7 +46,7 @@ void simple_radar_pipeline_three_pulse_canceller(nvbench::state &state, nvbench:
   state.exec( nvbench::exec_tag::timer, 
     [&numPulses, &numChannels, &numSamples, &waveformLength](nvbench::launch &launch, auto &timer) {
       auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, launch.get_stream());
-      radar.GetInputView()->PrefetchDevice(launch.get_stream());      
+      radar.GetInputView().PrefetchDevice(launch.get_stream());      
 
       timer.start();
       radar.ThreePulseCanceller();
@@ -72,7 +72,7 @@ void simple_radar_pipeline_doppler(nvbench::state &state, nvbench::type_list<Val
   state.exec( nvbench::exec_tag::timer, 
     [&numPulses, &numChannels, &numSamples, &waveformLength](nvbench::launch &launch, auto &timer) {
       auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, launch.get_stream());
-      radar.GetInputView()->PrefetchDevice(launch.get_stream());      
+      radar.GetInputView().PrefetchDevice(launch.get_stream());      
 
       timer.start();
       radar.DopplerProcessing();
@@ -99,7 +99,7 @@ void simple_radar_pipeline_cfar(nvbench::state &state, nvbench::type_list<ValueT
   state.exec( nvbench::exec_tag::timer, 
     [&numPulses, &numChannels, &numSamples, &waveformLength](nvbench::launch &launch, auto &timer) {
       auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, launch.get_stream());
-      radar.GetInputView()->PrefetchDevice(launch.get_stream());      
+      radar.GetInputView().PrefetchDevice(launch.get_stream());      
 
       timer.start();
       radar.CFARDetections();
@@ -125,7 +125,7 @@ void simple_radar_pipeline_end_to_end(nvbench::state &state, nvbench::type_list<
   state.exec( nvbench::exec_tag::timer, 
     [&numPulses, &numChannels, &numSamples, &waveformLength](nvbench::launch &launch, auto &timer) {
       auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, launch.get_stream());
-      radar.GetInputView()->PrefetchDevice(launch.get_stream());      
+      radar.GetInputView().PrefetchDevice(launch.get_stream());      
 
       timer.start();
       radar.PulseCompression();

@@ -53,7 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     radar.ThreePulseCanceller();
 
     printf("x input:\n");
-    radar.GetInputView()->Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16}).Print();
+    radar.GetInputView().Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16}).Print();
     printf("Convolution output:\n");
     radar.GetTPCView()->Slice<1>({0,0,0}, {matxSliceDim, matxSliceDim, 10}).Print();     
     cudaStreamDestroy(stream);
