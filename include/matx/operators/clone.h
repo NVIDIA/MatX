@@ -119,9 +119,10 @@ namespace matx
     auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> &shape)
     {
       if constexpr (is_tensor_view_v<Op>) {
-        return t.template Clone<Rank>(shape);
+        return t.template Clone<static_cast<int>(Rank)>(shape);
       } else {
-        return detail::CloneOp<Rank, Op>(t, shape);
+        return detail::CloneOp<static_cast<int>(Rank), Op>(t, shape);
+
       }
     };  
 

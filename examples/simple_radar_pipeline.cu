@@ -63,7 +63,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   printf("Initializing data structures...\n");
   auto radar =
       RadarPipeline(numPulses, numSamples, waveformLength, numChannels, stream);
-  radar.GetInputView()->PrefetchDevice(stream);
+  radar.GetInputView().PrefetchDevice(stream);
   MATX_NVTX_END_RANGE(1)
   
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
