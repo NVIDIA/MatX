@@ -58,7 +58,7 @@ namespace matx
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
-            std::array<index_t, int(sizeof...(Is))> inds{indices...};
+            std::array<index_t, sizeof...(Is)> inds{indices...};
             return inds[dim_];
           }
 

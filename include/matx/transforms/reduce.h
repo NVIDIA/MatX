@@ -42,6 +42,15 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/transforms/cub.h"
+#include "matx/core/half.h"
+
+union HalfBits {
+  constexpr HalfBits(short x) : i(x) {}
+  HalfBits() = default;
+  short i;
+  __half h;
+  __nv_bfloat16 b;
+};
 
 #ifdef __CUDACC__  
 /**
@@ -136,6 +145,63 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicMax(float *addr, float val)
     assumed = old;
     old = atomicCAS(address_as_uint, assumed, val_uint);
   }
+};
+
+/**
+ * Atomic max version for bfloat16
+ *
+ * Computes the maximum of two matxBf16 values atomically
+ *
+ * @param addr
+ *   Source and destination for new maximum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __nv_bfloat16 val)
+{
+  HalfBits tmpval;
+  HalfBits old;
+  unsigned short *address_as_ushort = (unsigned short *)addr;
+  unsigned short assumed;
+  old.i = *address_as_ushort;
+  tmpval.b = val;
+
+  // nan should be ok here but should verify
+  while (val > old.b) {
+    assumed = old.i;
+    old.b = static_cast<float>(atomicCAS(address_as_ushort, assumed, tmpval.i));
+  }
+
+  return old.b;
+};
+
+
+/**
+ * Atomic max version for fp16
+ *
+ * Computes the maximum of two matxFp16 values atomically
+ *
+ * @param addr
+ *   Source and destination for new maximum
+ * @param val
+ *   Value to compare against
+ */
+__MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
+{
+  HalfBits tmpval;
+  HalfBits old;
+  unsigned short *address_as_ushort = (unsigned short *)addr;
+  unsigned short assumed;
+  old.i = *address_as_ushort;
+  tmpval.h = val;
+
+  // nan should be ok here but should verify
+  while (val > old.h) {
+    assumed = old.i;
+    old.h = atomicCAS(address_as_ushort, assumed, tmpval.i);
+  }
+
+  return old.h;
 };
 
 /**
@@ -549,8 +615,33 @@ namespace matx {
 namespace detail {
 
 #ifdef __CUDACC__  
-template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() { return std::numeric_limits<T>::max(); }
-template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() { return std::numeric_limits<T>::lowest(); }
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() { 
+  if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
+    constexpr HalfBits tmp{0x7BFF};
+    return tmp.h;
+  }
+  if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
+    constexpr HalfBits tmp{0x7F7F};
+    return tmp.b;
+  }  
+  else {
+    return cuda::std::numeric_limits<T>::max(); 
+  }
+}
+
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() { 
+  if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
+    constexpr HalfBits tmp{0x0400};
+    return tmp.h;
+  }
+  if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
+    constexpr HalfBits tmp{0x0080};
+    return tmp.b;
+  }  
+  else {  
+    return cuda::std::numeric_limits<T>::lowest(); 
+  }
+}
 
 
 /**
@@ -566,11 +657,23 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
-    if constexpr (is_matx_half_v<T>) {
-      atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+    if constexpr (is_complex_v<T>) {
+      if constexpr (is_matx_half_v<typename T::value_type>) {
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[0], static_cast<typename T::value_type::value_type>(val.real())); 
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[1], static_cast<typename T::value_type::value_type>(val.imag())); 
+      }
+      else {
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[0], val.real()); 
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[1], val.imag()); 
+      }      
     }
-    else {
-      atomicAdd(addr, val); 
+    else {    
+      if constexpr (is_matx_half_v<T>) {
+        atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+      }
+      else {
+        atomicAdd(addr, val); 
+      }
     }
   }
 };
@@ -604,7 +707,9 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 > v2 ? v1 : v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }  
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return minVal<T>(); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMax(addr, val); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
+    atomicMax(reinterpret_cast<convert_matx_type_t<T> *>(addr), static_cast<convert_matx_type_t<T>>(val)); 
+  }
 };
 
 /**
@@ -667,62 +772,184 @@ public:
 template <typename T, typename Op>
 __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
 {
-  // breaking this out so common case is faster without branches
-  if constexpr (!is_matx_half_v<T>) {
-    if (size > 16) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+  if constexpr (is_complex_v<T>) {
+    typename T::value_type re;
+    typename T::value_type im;
+    if constexpr (!is_matx_half_v<typename T::value_type>) {
+      if (size > 16) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 16);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 16);
+        val = op.Reduce(val, {re, im});
+        re = __shfl_down_sync(0xffffffff, val.real(), 8);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});                                       
+      }
+      else if (size > 8) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 8);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});    
+      }
+      else if (size > 4) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 4);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im});   
+      }
+      else if (size > 2) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 2);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      else if (size > 1) {
+        re = __shfl_down_sync(0xffffffff, val.real(), 1);
+        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      return val;
     }
-    else if (size > 8) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+    else {
+      if (size > 16) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 16);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 16);
+        val = op.Reduce(val, {re, im});
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});                                       
+      }
+      else if (size > 8) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
+        val = op.Reduce(val, {re, im});        
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});    
+      }
+      else if (size > 4) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im});   
+      }
+      else if (size > 2) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
+        val = op.Reduce(val, {re, im});  
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      else if (size > 1) {
+        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
+        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
+        val = op.Reduce(val, {re, im}); 
+      }
+      return val;      
     }
-    else if (size > 4) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    else if (size > 2) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    else if (size > 1) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-    }
-    return val;
   }
-  else {
-    if (size > 16) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+  else {  
+    // breaking this out so common case is faster without branches
+    if constexpr (!is_matx_half_v<T>) {
+      if (size > 16) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 8) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 4) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 2) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      else if (size > 1) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
+      }
+      return val;
     }
-    else if (size > 8) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+    else {
+      if (size > 16) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 8) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 4) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 2) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      else if (size > 1) {
+        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
+      }
+      return val;
     }
-    else if (size > 4) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    else if (size > 2) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    else if (size > 1) {
-      val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-    }
-    return val;
   }
 }
 
@@ -1214,7 +1441,9 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, const int (&dims)[D], 
  * Calculate the softmax of values in a tensor treated as a flat vector
  *
  * softmax computes the exponential of each value divided by the sum of the exponentials
- * of items in the reduced set. By default the sum is performed over all dimensions.
+ * of items in the reduced set. By default the sum is performed over all dimensions. Note
+ * that traditional definitions of softmax are simply exp(x)/sum(exp(x)), but this is not
+ * how most libraries are implemented. Instead, x is biased by a correction factor of max(x).
  *
  * @tparam OutType
  *   Output data type
@@ -1238,8 +1467,10 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in,
   MATX_NVTX_START("softmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>(MATX_ASYNC_DEVICE_MEMORY, stream);
-  sum(tmp_sum, exp(in), stream);
-  (dest = exp(in) / tmp_sum).run(stream);
+  auto tmp_max = make_tensor<typename InType::scalar_type>(MATX_ASYNC_DEVICE_MEMORY, stream);
+  rmax(tmp_max, in);
+  sum(tmp_sum, exp(in - tmp_max), stream);
+  (dest = exp(in - tmp_max) / tmp_sum).run(stream);
 #endif  
 }
 
@@ -1249,7 +1480,9 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in,
  * softmax computes the exponential of each value divided by the sum of the exponentials
  * of items in the reduced set. The axes in which to perform the softmax over determine
  * which axes the sum will be computed over, but the input tensor rank and sizes match
- * between input and output.
+ * between input and output. Note that traditional definitions of softmax are simply 
+ * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x 
+ * is biased by a correction factor of max(x).
  *
  * @tparam OutType
  *   Output data type
@@ -1285,9 +1518,6 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
     red_shape[r] = in.Size(perm[r]);
   }
 
-  auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  sum(tmp_sum, exp(permute(in, perm)), stream);
-
   // With the sum calculated, we have a tensor that's not compatible in sizes with the new one for dividing.
   // We need to clone the summed tensor on the appropriate dims for the final divide.
   std::array<index_t, InType::Rank()> clone_dims;
@@ -1305,7 +1535,12 @@ void __MATX_INLINE__ softmax(OutType dest, const InType &in, const int (&dims)[D
     }
   }  
 
-  (dest = exp(in) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);
+  auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_max = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  rmax(tmp_max, permute(in, perm), stream);
+  sum(tmp_sum, exp(permute(in, perm) - clone<InType::Rank()>(tmp_max, clone_dims)), stream);
+
+  (dest = exp(in - clone<InType::Rank()>(tmp_max, clone_dims)) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);
 #endif  
 }
 
@@ -1846,7 +2081,7 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, cudaStream_t stream = 0
     sum(dest, pow(abs(in - mean_op), static_cast<inner_type>(2)), stream);
   }
   else {
-    sum(dest, pow(in - mean_op, 2), stream);
+    sum(dest, pow(in - mean_op, static_cast<inner_type>(2)), stream);
   }
 
   // The length of what we are taking the variance over is equal to the product

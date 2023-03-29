@@ -46,8 +46,8 @@ namespace matx {
 template <typename OperatorType>
 struct RandomOperatorIterator {
   using self_type = RandomOperatorIterator<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
-  using scalar_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
+  using scalar_type = value_type;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -67,12 +67,12 @@ struct RandomOperatorIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator*() const
   {
     if constexpr (OperatorType::Rank() == 0) {
-      return t_.operator()();
+      return static_cast<value_type>(t_.operator()());
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
       return detail::mapply([&](auto &&...args) {
-          return t_.operator()(args...);
+          return static_cast<value_type>(t_.operator()(args...));
         }, arrs);     
     }
   }  
@@ -145,8 +145,8 @@ struct RandomOperatorIterator {
 template <typename OperatorType>
 struct RandomOperatorOutputIterator {
   using self_type = RandomOperatorOutputIterator<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
-  using scalar_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
+  using scalar_type = value_type;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -161,13 +161,13 @@ struct RandomOperatorOutputIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*()
   {
     if constexpr (OperatorType::Rank() == 0) {
-      return t_.operator()();
+      return (reference)(t_.operator()());
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
 
       return std::apply([&](auto &&...args) -> reference {
-          return t_.operator()(args...);
+          return (reference)(t_.operator()(args...));
         }, arrs);    
     }
   }  

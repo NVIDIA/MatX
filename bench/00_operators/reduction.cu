@@ -10,20 +10,17 @@ template <typename ValueType>
 void softmax(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
+  auto t4    = make_tensor<ValueType>({1,10845,8,16});
+  auto t4out    = make_tensor<ValueType>({1,10845,8,16});
+  t4.PrefetchDevice(0);
+  t4out.PrefetchDevice(0);
 
-
-auto t2    = make_tensor<ValueType>({86760, 16});
-auto t2out    = make_tensor<ValueType>({86760, 16});
-  t2.PrefetchDevice(0);
-  t2out.PrefetchDevice(0);
-
-  softmax(t2out, t2, {1});
+  softmax(t4out, t4, {3});
 
   state.exec( 
-    [&t2, &t2out](nvbench::launch &launch) {
-      matx::softmax(t2out, t2, (cudaStream_t)launch.get_stream());
+    [&t4, &t4out](nvbench::launch &launch) {
+      matx::softmax(t4out, t4, (cudaStream_t)launch.get_stream());
     });
-
 }
 NVBENCH_BENCH_TYPES(softmax, NVBENCH_TYPE_AXES(softmax_types));
 
