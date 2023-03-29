@@ -92,7 +92,7 @@ TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNoHalfTypes);
 TYPED_TEST_SUITE(ReductionTestsComplexNonHalfTypes, MatXComplexNonHalfTypes);
 
 
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, VarianceStd)
+TYPED_TEST(ReductionTestsFloatNonComplex, VarianceStd)
 {
   MATX_ENTER_HANDLER();
 
@@ -134,7 +134,7 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypes, VarianceStdComplex)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
+TYPED_TEST(ReductionTestsNumeric, Sum)
 {
   MATX_ENTER_HANDLER();
 
@@ -161,10 +161,10 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   {
     tensor_t<TypeParam, 0> t0;
 
-    auto t4 = ones<TypeParam>({30, 40, 50, 60});
-    auto t3 = ones<TypeParam>({30, 40, 50});
-    auto t2 = ones<TypeParam>({30, 40});
-    auto t1 = ones<TypeParam>({30});
+    auto t4 = ones<TypeParam>({3, 4, 5, 6});
+    auto t3 = ones<TypeParam>({3, 4, 5});
+    auto t2 = ones<TypeParam>({3, 4});
+    auto t1 = ones<TypeParam>({3});
 
     sum(t0, t4, 0);
     cudaStreamSynchronize(0);
@@ -186,11 +186,11 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TypeParam)(t1.Size(0))));
   }
   {
-    tensor_t<TypeParam, 1> t1({30});
+    tensor_t<TypeParam, 1> t1({3});
 
-    auto t4 = ones<TypeParam>({30, 40, 50, 60});
-    auto t3 = ones<TypeParam>({30, 40, 50});
-    auto t2 = ones<TypeParam>({30, 40});
+    auto t4 = ones<TypeParam>({3, 4, 5, 6});
+    auto t3 = ones<TypeParam>({3, 4, 5});
+    auto t2 = ones<TypeParam>({3, 4});
 
     sum(t1, t4, 0);
 
@@ -214,18 +214,18 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
     }
 
     // Test tensor input too
-    auto t2t = make_tensor<TypeParam>({30, 40});
-    (t2t = ones<TypeParam>({30, 40})).run();
+    auto t2t = make_tensor<TypeParam>({3, 4});
+    (t2t = ones<TypeParam>({3, 4})).run();
     sum(t1, t2t);
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)(t2t.Size(1))));
     }    
   }
   {
-    tensor_t<TypeParam, 2> t2({30, 40});
+    tensor_t<TypeParam, 2> t2({3, 4});
 
-    auto t4 = ones<TypeParam>({30, 40, 50, 60});
-    auto t3 = ones<TypeParam>({30, 40, 50});
+    auto t4 = ones<TypeParam>({3, 4, 5, 6});
+    auto t3 = ones<TypeParam>({3, 4, 5});
 
     sum(t2, t4, 0);
     cudaStreamSynchronize(0);
@@ -247,10 +247,10 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
   }
   
   {
-    tensor_t<TypeParam, 2> t2a({30, 40});
-    tensor_t<TypeParam, 2> t2b({30, 40});
+    tensor_t<TypeParam, 2> t2a({3, 4});
+    tensor_t<TypeParam, 2> t2b({3, 4});
     
-    auto t4 = ones<TypeParam>({30, 40, 50, 60});
+    auto t4 = ones<TypeParam>({3, 4, 5, 6});
 
     sum(t2a, t4, 0);
     sum(t2b, t4, {2,3}, 0);
@@ -270,13 +270,13 @@ TYPED_TEST(ReductionTestsNumericNoHalf, Sum)
 
 // This works with half precision, but we need the proper test infrastructure to prevent compiling
 // half types for CCs that don't support it. Disable half on this test for now
-TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
+TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 {
   MATX_ENTER_HANDLER();
 
   auto pb = std::make_unique<detail::MatXPybind>();
   constexpr index_t size = 300;
-  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {8, size, size});
+  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {80, size, size});
 
   tensor_t<TypeParam, 1> t1({size});
   tensor_t<TypeParam, 1> t1_out({size});
@@ -286,8 +286,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, Softmax)
 
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
 
-  auto t3    = make_tensor<TypeParam>({8,size,size});
-  auto t3_out = make_tensor<TypeParam>({8,size,size});
+  auto t3    = make_tensor<TypeParam>({80,size,size});
+  auto t3_out = make_tensor<TypeParam>({80,size,size});
   pb->NumpyToTensorView(t3, "t3");
   softmax(t3_out, t3, {2});
   

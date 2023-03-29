@@ -72,6 +72,9 @@ struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
 };  
 
+template <typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
@@ -492,6 +495,24 @@ using promote_half_t = typename std::conditional_t<is_half_v<T>, float, T>;
 
 
 namespace detail {
+  
+template <typename T> 
+struct convert_matx_type {
+  using type = T;
+};
+
+template <> 
+struct convert_matx_type<matxFp16> {
+  using type = __half;
+};
+
+template <> 
+struct convert_matx_type<matxBf16> {
+  using type = __nv_bfloat16;
+};
+
+template <typename T> 
+using convert_matx_type_t = typename convert_matx_type<T>::type;
 
 template <class T, std::size_t N, std::size_t... I>
 constexpr std::array<std::remove_cv_t<T>, N>
@@ -554,8 +575,11 @@ template <typename T> using value_promote_t = promote_half_t<value_type_t<T>>;
 
 template <typename> struct is_std_tuple: std::false_type {};
 template <typename ...T> struct is_std_tuple<std::tuple<T...>>: std::true_type {};
-template <typename T> struct is_std_array : std::false_type {};
-template <typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template<typename T> struct is_std_array : std::false_type {};
+template<typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
+
 
 
 // Get the n-th element from a parameter pack

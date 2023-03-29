@@ -113,7 +113,7 @@ struct EmptyParams_t {};
 template <typename OperatorType>
 struct BeginOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -121,6 +121,7 @@ struct BeginOffset {
   using reference = value_type;
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
+  
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t, stride_type offset) : size_(t.Size(t.Rank() - 1)), offset_(offset) {}
@@ -172,7 +173,7 @@ struct BeginOffset {
 template <typename OperatorType>
 struct EndOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -290,11 +291,14 @@ public:
   }
 
 
+  /* Convert the output type into the optimized type for the reduction, and run the reduction function */
   template <typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
   static inline void ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
+    using dtype = detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type>;    
+
     if constexpr (out.Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
-        auto res = func(in, out.Data(), bi, ei);
+        auto res = func(in, reinterpret_cast<dtype*>(out.Data()), bi, ei);
         MATX_ASSERT_STR_EXP(res, cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
         return;
       }
@@ -306,12 +310,15 @@ public:
     MATX_ASSERT_STR_EXP(res, cudaSuccess, matxCudaError, "Error when calling CUB reduction function");
   }  
 
+  /* Convert the input type to the optimal input type for the reduction, and call the output reduce stage */
   template <typename Func, typename OutputOp, typename InputOp>
   static inline void ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
+    using dtype = detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::scalar_type>;   
     typename detail::base_type_t<InputOp> in_base = in;
+
     if constexpr (in_base.Rank() <= 2 && is_tensor_view_v<InputOp>) {
       if (in_base.IsContiguous()) {
-        ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), in_base.Data(), BeginOffset{in_base}, EndOffset{in_base});
+        ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), reinterpret_cast<dtype*>(in_base.Data()), BeginOffset{in_base}, EndOffset{in_base});
         return;
       }
     }
@@ -980,7 +987,7 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     typename detail::base_type_t<InputOperator> in_base = a;
-    typename detail::base_type_t<OutputTensor> out_base = a_out;  
+    typename detail::base_type_t<OutputTensor> out_base = a_out;   
 
     // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
     // type of reduction where there's not a single output, since any type of reduction can be generalized
