@@ -561,3 +561,107 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 128;
+  constexpr index_t k = 256;
+  constexpr index_t n = 1;
+
+  tensor_t<TypeParam, 2> a{{m, k}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto cs = c.template Slice<1>({0,0}, {matxEnd, matxDropDim});
+  auto bs = b.template Slice<1>({0,0}, {matxEnd, matxDropDim});
+  matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  // Test also with rank-1 tensors rather than just slices
+  tensor_t<TypeParam, 1> bv{{k}};
+  tensor_t<TypeParam, 1> cv{{m}};
+  (bv = bs).run();
+  (cv = cs).run();
+  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 128;
+  constexpr index_t k = 256;
+  constexpr index_t n = 1;
+  constexpr index_t blocks = 8;
+
+  tensor_t<TypeParam, 3> a{{blocks, m, k}};
+  tensor_t<TypeParam, 3> b{{blocks, k, n}};
+  tensor_t<TypeParam, 3> c{{blocks, m, n}};
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {blocks, m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto cs = c.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto bs = b.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  tensor_t<TypeParam, 2> bv{{blocks, k}};
+  tensor_t<TypeParam, 2> cv{{blocks, m}};
+  (bv = bs).run();
+  (cv = cs).run();
+  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
+{
+  MATX_ENTER_HANDLER();
+  // Test that the second-to-last dimension of A can be 1 (i.e. A can be a row
+  // vector). In the case of matvec, this means that A*b is effectively a dot product.
+  constexpr index_t m = 1;
+  constexpr index_t k = 256;
+  constexpr index_t n = 1;
+  constexpr index_t blocks = 8;
+
+  tensor_t<TypeParam, 3> a{{blocks, m, k}};
+  tensor_t<TypeParam, 3> b{{blocks, k, n}};
+  tensor_t<TypeParam, 3> c{{blocks, m, n}};
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {blocks, m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  auto cs = c.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto bs = b.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  tensor_t<TypeParam, 2> bv{{blocks, k}};
+  tensor_t<TypeParam, 2> cv{{blocks, m}};
+  (bv = bs).run();
+  (cv = cs).run();
+  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
