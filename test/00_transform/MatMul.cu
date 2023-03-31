@@ -578,8 +578,8 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  auto cs = c.template Slice<1>({0,0}, {matxEnd, matxDropDim});
-  auto bs = b.template Slice<1>({0,0}, {matxEnd, matxDropDim});
+  auto cs = slice<1>(c, {0,0}, {matxEnd, matxDropDim});
+  auto bs = slice<1>(b, {0,0}, {matxEnd, matxDropDim});
   matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
@@ -613,8 +613,8 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  auto cs = c.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
-  auto bs = b.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto cs = slice<2>(c, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto bs = slice<2>(b, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
   matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
@@ -649,8 +649,8 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  auto cs = c.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
-  auto bs = b.template Slice<2>({0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto cs = slice<2>(c, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
+  auto bs = slice<2>(b, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
   matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
