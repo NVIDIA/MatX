@@ -53,12 +53,12 @@ namespace matx
    *   Tensor to copy into
    * @param in
    *   Tensor to copy from
-   * @param stream
-   *   CUDA stream to operate in
+   * @param exec
+   *   Executor to run copy in
    */
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
-        const cudaStream_t stream)
+        Executor exec)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)      
       for (int i = 0; i < OutputTensor::Rank(); i++)
@@ -66,6 +66,14 @@ namespace matx
         MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
       }
 
-      (out = in).run(stream);
+      (out = in).run(exec);
     };
+
+  template <typename OutputTensor, typename InputTensor>
+    __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
+        cudaStream_t stream = 0)
+    {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)      
+      matx::copy(out, in, cudaExecutor(stream));
+    };    
 } // end namespace matx

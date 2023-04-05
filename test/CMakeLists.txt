@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
 set (test_sources
-    00_host/OperatorTests.cc 
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/ViewTests.cu

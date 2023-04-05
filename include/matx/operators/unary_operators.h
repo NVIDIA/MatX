@@ -351,7 +351,6 @@ namespace matx
   DEFINE_UNARY_OP(acosh, detail::AcoshOp);
   DEFINE_UNARY_OP(atanh, detail::AtanhOp);
   DEFINE_UNARY_OP(angle, detail::AngleOp);
-  DEFINE_UNARY_OP(atan2, detail::AngleOp);
   DEFINE_UNARY_OP(floor, detail::FloorOp);
   DEFINE_UNARY_OP(ceil, detail::CeilOp);
   DEFINE_UNARY_OP(round, detail::RoundOp);

@@ -38,32 +38,63 @@
 
 namespace matx {
 
-  template <typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
+  template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
     if constexpr (out.Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
-        return func(in, reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type> *>(out.Data()), bi, ei);
+        if constexpr(ConvertType) {
+          return func(  in, 
+                        reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type> *>(out.Data()), 
+                        bi, 
+                        ei);
+        }
+        else {
+          return func(  in, 
+                        reinterpret_cast<typename remove_cvref_t<OutputOp>::scalar_type *>(out.Data()), 
+                        bi, 
+                        ei);
+        }
       }
     }
-  
+    
     detail::base_type_t<OutputOp> out_base = out;
-    auto iter = RandomOperatorOutputIterator{out_base};
+    auto iter = RandomOperatorOutputIterator<decltype(out_base), ConvertType>{out_base};
     return func(in, iter, bi, ei);
   }  
 
-  template <typename Func, typename OutputOp, typename InputOp>
+  template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
     typename detail::base_type_t<InputOp> in_base = in;
     if constexpr (in_base.Rank() < 2 && is_tensor_view_v<InputOp>) {
       if (in_base.IsContiguous()) {
-        return ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::scalar_type> *>(in_base.Data()), BeginOffset{in_base}, EndOffset{in_base});
+        if constexpr (ConvertType) {
+          return ReduceOutput<ConvertType>( std::forward<Func>(func), 
+                                            std::forward<OutputOp>(out), 
+                                            reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::scalar_type> *>(in_base.Data()), 
+                                            BeginOffset{in_base}, 
+                                            EndOffset{in_base});
+        }
+        else {
+          return ReduceOutput<ConvertType>( std::forward<Func>(func), 
+                                            std::forward<OutputOp>(out), 
+                                            reinterpret_cast<typename remove_cvref_t<InputOp>::scalar_type *>(in_base.Data()), 
+                                            BeginOffset{in_base}, 
+                                            EndOffset{in_base});
+        }
       }
     }
 
     // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
-    // then collapse the left size by the output rank to get the batch dimensions      
-    const auto &iter = matx::RandomOperatorIterator{matx::lcollapse<out.Rank()>(
-                                    rcollapse<in.Rank() - out.Rank()>(in_base))};    
-    return ReduceOutput(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
+    // then collapse the left size by the output rank to get the batch dimensions  
+    auto collapsed = matx::lcollapse<out.Rank()>(rcollapse<in.Rank() - out.Rank()>(in_base));
+    const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
+
+  
+    return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
   } 
+
+  template <typename Func, typename OutputOp, typename InputOp>
+  __MATX_HOST__ __MATX_INLINE__ auto ReduceInputNoConvert(Func &&func, OutputOp &&out, InputOp &&in) {
+    return ReduceInput<Func, OutputOp, InputOp, false>(std::forward<Func>(func), std::forward<OutputOp>(out), std::forward<InputOp>(in));
+  }
 }; 

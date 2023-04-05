@@ -97,6 +97,21 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
   }
 
   /**
+   * @brief Construct a half complex from two matx half scalars
+   * 
+   * @tparam T2 Scalar type
+   * @param x_ Real value
+   * @param y_ Imaginary value
+   */
+  template <typename T2, std::enable_if_t<std::is_same_v<std::decay<T2>, matxFp16> || 
+                                          std::is_same_v<std::decay<T2>, matxBf16>, bool> = true>
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(T2 &&x_, T2 &&y_) noexcept
+      : x(static_cast<T>(x_)), 
+        y(static_cast<T>(y_))
+  {
+  }  
+
+  /**
    * @brief Default destructor
    * 
    */
@@ -167,6 +182,24 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
     y = rhs.y;
     return *this;
   }
+
+  /**
+   * @brief Copy assignment operator
+   * 
+   * @tparam X Type of complex to copy from
+   * @param rhs Value to copy from
+   * @return Reference to copied object
+   */
+  template <typename X, std::enable_if_t< std::is_same_v<std::decay<X>, cuda::std::complex<float>> || 
+                                          std::is_same_v<std::decay<X>, cuda::std::complex<double>>, bool> = true>
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
+  operator=(X rhs)
+  {
+    matxHalfComplex<X> tmp{rhs};
+    x = static_cast<T>(tmp.real());
+    y = static_cast<T>(tmp.imag());
+    return *this;
+  }  
 
   /**
    * @brief Increment and assign operator
@@ -297,7 +330,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator+(const matxHalfComplex<T> &lhs, const T &rhs)
 {
   matxHalfComplex<T> tmp{rhs};
-  return lhs + rhs;
+  return lhs + tmp;
 }
 
 /**
@@ -313,7 +346,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator+(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return lhs + rhs;
+  return tmp + rhs;
 }
 
 /**
@@ -329,7 +362,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const matxHalfComplex<T> &lhs, const T &rhs)
 {
   matxHalfComplex<T> tmp{rhs};
-  return lhs - rhs;
+  return lhs - tmp;
 }
 
 /**
@@ -345,7 +378,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator-(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return lhs - rhs;
+  return tmp - rhs;
 }
 
 /**
@@ -361,7 +394,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator*(const matxHalfComplex<T> &lhs, const T &rhs)
 {
   matxHalfComplex<T> tmp{rhs};
-  return lhs * rhs;
+  return lhs * tmp;
 }
 
 
@@ -378,7 +411,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T>
 operator*(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return lhs * rhs;
+  return tmp * rhs;
 }
 
 /**
@@ -394,7 +427,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T2>
 operator*(const T1 &lhs, const matxHalfComplex<T2> &rhs)
 {
   matxHalfComplex<T2> tmp{lhs};
-  return lhs * rhs;
+  return tmp * rhs;
 }
 
 /**
@@ -410,7 +443,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T1>
 operator*(const matxHalfComplex<T1> &lhs, const T2 &rhs)
 {
   matxHalfComplex<T1> tmp{rhs};
-  return lhs * rhs;
+  return lhs * tmp;
 }
 
 /**

@@ -294,6 +294,18 @@ public:
     return {in.real(), in.imag()};
   }
 
+  template <typename T>
+  inline matxFp16Complex ConvertComplex(const matxFp16Complex in)
+  {
+    return {in.real(), in.imag()};
+  }
+
+  template <typename T>
+  inline matxBf16Complex ConvertComplex(const matxBf16Complex in)
+  {
+    return {in.real(), in.imag()};
+  }  
+
   template <typename TensorType>
   void NumpyToTensorView(TensorType &ten,
                          const std::string fname)

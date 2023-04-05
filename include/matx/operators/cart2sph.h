@@ -72,11 +72,11 @@ namespace matx
             [[maybe_unused]] auto z = get_value(z_, indices...);
 
             if constexpr (WHICH==0) { // theta
-              return cuda::std::atan2(y, x);
+              return _internal_atan2(y, x);
             } else if constexpr (WHICH==1) { // phi
-              return cuda::std::atan2(z, cuda::std::sqrt(x * x + y * y));
+              return _internal_atan2(z, _internal_sqrt(x * x + y * y));
             } else {  // r
-              return cuda::std::sqrt(x * x + y * y + z * z);
+              return _internal_sqrt(x * x + y * y + z * z);
             }
           }    
 

@@ -1907,6 +1907,10 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, [[maybe_unused]] Single
   MATX_NVTX_START("sum(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
     if constexpr (OutType::Rank() == 0) {
+      // auto b = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0)); 
+      // std::string aa = b;
+      // std::string aad = *lout;
+      // std::string aagd = lout;
       *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0)); 
     }
     else {
@@ -1916,7 +1920,7 @@ void __MATX_INLINE__ sum(OutType dest, const InType &in, [[maybe_unused]] Single
     }
   };
   
-  ReduceInput(ft, dest, in);  
+  ReduceInputNoConvert(ft, dest, in);  
 }
 
 /**

@@ -72,11 +72,11 @@ namespace matx
             auto r = get_value(r_, indices...);
 
             if constexpr (WHICH==0) { // X
-              return r * cuda::std::cos(phi) * cuda::std::cos(theta);
+              return r * _internal_cos(phi) * _internal_cos(theta);
             } else if constexpr (WHICH==1) { // Y
-              return r * cuda::std::cos(phi) * cuda::std::sin(theta);
+              return r * _internal_cos(phi) * _internal_sin(theta);
             } else {  // Z
-              return r * cuda::std::sin(phi);
+              return r * _internal_sin(phi);
             }
           }    
 

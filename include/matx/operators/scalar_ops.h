@@ -144,23 +144,34 @@ public:
 MATX_UNARY_OP_GEN(ceil, Ceil);
 MATX_UNARY_OP_GEN(floor, Floor);
 MATX_UNARY_OP_GEN(round, Round);
-MATX_UNARY_OP_GEN(sqrt, Sqrt);
 MATX_UNARY_OP_GEN(exp, Exp);
 
-template <typename T> struct ExpjF {
-  static __MATX_INLINE__ std::string str() { return "expj"; }
-  template <typename T2 = T,
-            std::enable_if_t<std::is_floating_point_v<T2>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ExpjF()
-  {
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sqrt(T v1)
+{
+  if constexpr (!is_matx_type_v<T>) {
+    return cuda::std::sqrt(v1);
   }
-
+  else {
+    return sqrt(v1);
+  }
+  if constexpr (is_matx_type_v<T>) {
+    return sqrt(v1);
+  }
+  else {
+    return cuda::std::sqrt(v1);
+  }
+}
+template <typename T> struct SqrtF {
+  static __MATX_INLINE__ std::string str() { return "sqrt"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
   {
-    return cuda::std::complex<T>{cuda::std::cos(v1), cuda::std::sin(v1)};
+    return _internal_sqrt(v1);
   }
 };
-template <typename T> using ExpjOp = UnOp<T, ExpjF<T>>;
+
+template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
+
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
@@ -199,7 +210,6 @@ MATX_UNARY_OP_GEN(abs, Abs);
 MATX_UNARY_OP_GEN(norm, Norm);
 
 // Trigonometric functions
-// MATX_UNARY_OP_GEN(sin, Sin);
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)
 {
   if constexpr (is_matx_type_v<T>) {
@@ -221,7 +231,28 @@ template <typename T> struct SinF {
 };
 template <typename T> using SinOp = UnOp<T, SinF<T>>;
 
-MATX_UNARY_OP_GEN(cos, Cos);
+template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_cos(T v1)
+{
+  if constexpr (is_matx_type_v<T>) {
+    return cos(v1);
+  }
+  else {
+    return cuda::std::cos(v1);
+  }
+  if constexpr (!is_matx_type_v<T>) {
+    return cuda::std::cos(v1);
+  }
+  else {
+    return cos(v1);
+  }
+}
+template <typename T> struct CosF {
+  static __MATX_INLINE__ std::string str() { return "cos"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1) { return _internal_cos(v1); }
+};
+template <typename T> using CosOp = UnOp<T, CosF<T>>;
+
+
 MATX_UNARY_OP_GEN(tan, Tan);
 MATX_UNARY_OP_GEN(asin, Asin);
 MATX_UNARY_OP_GEN(acos, Acos);
@@ -232,6 +263,27 @@ MATX_UNARY_OP_GEN(tanh, Tanh);
 MATX_UNARY_OP_GEN(asinh, Asinh);
 MATX_UNARY_OP_GEN(acosh, Acosh);
 MATX_UNARY_OP_GEN(atanh, Atanh);
+
+
+template <typename T> struct ExpjF {
+  static __MATX_INLINE__ std::string str() { return "expj"; }
+  template <typename T2 = T,
+            std::enable_if_t<std::is_floating_point_v<T2>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ExpjF()
+  {
+  }
+
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    if constexpr (is_matx_type_v<T>) {
+      return matxHalfComplex<T>{_internal_cos(v1), _internal_sin(v1)};
+    }
+    else {
+      return cuda::std::complex<T>{_internal_cos(v1), _internal_sin(v1)};
+    }
+  }
+};
+template <typename T> using ExpjOp = UnOp<T, ExpjF<T>>;
 
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
@@ -472,6 +524,30 @@ template <typename T1, typename T2> struct FModF {
   }
 };
 template <typename T1, typename T2> using FModOp = BinOp<T1, T2, FModF<T1, T2>>;
+
+
+template <typename T1, typename T2>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_atan2(T1 v1, T2 v2) { 
+  if constexpr (is_matx_half_v<T1> || is_matx_half_v<T2>) {
+    return atan2(v1, v2);
+  }
+  else {
+    // We should not have to cast here, but libcudacxx doesn't support the double version
+    return cuda::std::atan2(v1, v2);
+  }  
+}
+
+template <typename T1, typename T2> struct Atan2F {
+  static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "%" + str2 + ")"; }
+
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
+    return _internal_atan2(v1, v2); 
+
+    // Unreachable, but required by the compiler
+    return typename std::invoke_result_t<decltype(op), T1, T2>{0};    
+  }
+};
+template <typename T1, typename T2> using Atan2Op = BinOp<T1, T2, Atan2F<T1, T2>>;
 
 // MATX_BINARY_OP_GEN(pow, Pow);
 

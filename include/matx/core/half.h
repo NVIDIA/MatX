@@ -1140,6 +1140,20 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atan(const matxHalf<T>
 }
 
 /**
+ * @brief Two argument Arctangent function
+ * 
+ * @tparam T Type of half
+ * @param x Value of half
+ * @return Arctangent of input
+ */
+template <class T>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atan2(const matxHalf<T> x, const matxHalf<T> y)
+{
+  return static_cast<T>(cuda::std::atan2(static_cast<float>(x.x), static_cast<float>(y.x)));
+}
+
+
+/**
  * @brief Hyperbolic arcsine function
  * 
  * @tparam T Type of half
