@@ -1833,10 +1833,11 @@ public:
       delete [] mtv->dl_tensor.shape;
       delete [] mtv->dl_tensor.strides;
       delete static_cast<self_type *>(mtv->manager_ctx);
-      delete mtv;
 
       mtv->dl_tensor.shape    = nullptr;
       mtv->dl_tensor.strides  = nullptr;
+      
+      delete mtv;      
       mtv                     = nullptr;
     };
 
