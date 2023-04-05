@@ -49,12 +49,12 @@ template <> auto inline GenerateData<matx::matxBf16>()
 {
   return matx::matxBf16{1.0f};
 }
-template <> auto inline GenerateData<int32_t>() { return -1; }
-template <> auto inline GenerateData<uint32_t>() { return 1; }
-template <> auto inline GenerateData<int64_t>() { return -1; }
-template <> auto inline GenerateData<uint64_t>() { return 1; }
-template <> auto inline GenerateData<float>() { return 1.0f; }
-template <> auto inline GenerateData<double>() { return 1.5; }
+template <> auto inline GenerateData<int32_t>() { return (int32_t)-1; }
+template <> auto inline GenerateData<uint32_t>() { return (uint32_t)1; }
+template <> auto inline GenerateData<int64_t>() { return (int64_t)-1; }
+template <> auto inline GenerateData<uint64_t>() { return(uint64_t) 1; }
+template <> auto inline GenerateData<float>() { return (float)1.0f; }
+template <> auto inline GenerateData<double>() { return (double)1.5; }
 template <> auto inline GenerateData<matx::matxFp16Complex>()
 {
   return matx::matxFp16Complex(1.5, -2.5);
@@ -134,23 +134,42 @@ struct TupleToTypes<std::tuple<T...>>
 {
   using type = ::Types<T...>;
 };
-// template< template<typename... Args> typename Ts, typename... Args>
-// struct TupleToTypes {
-//   using type = typename ::Types<Args...>;
-// };
 
 
-
-using MatXFloatNonComplexNonHalfTypes2 = std::tuple<float, double>;
-using MatXNumericNoHalfTypes2                 = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double,
+using MatXFloatNonComplexNonHalfTuple        = std::tuple<float, double>;
+using MatXNumericNoHalfTuple                 = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double,
                                                           cuda::std::complex<float>, cuda::std::complex<double>>;
-using MatXComplexNonHalfTypes2                = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
-using MatXNumericNonComplexTypes2             = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
+using MatXComplexNonHalfTuple                = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXNumericNonComplexTuple             = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
+using MatXComplexTuple                       = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>,
+                                                          matx::matxFp16Complex, matx::matxBf16Complex>;
+                                                          
+using MatXAllTuple                           = std::tuple<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
+                                                      int64_t, float, double, cuda::std::complex<float>,
+                                                      cuda::std::complex<double>, matx::matxFp16Complex,
+                                                      matx::matxBf16Complex>;
+using MatXFloatTuple                         = std::tuple< matx::matxFp16, matx::matxBf16, float, double,
+                                                           cuda::std::complex<float>, cuda::std::complex<double>,
+                                                           matx::matxFp16Complex, matx::matxBf16Complex>;    
 
-using MatXNumericNonComplexTypesAllExecs      = TupleToTypes<TypedCartesianProduct<MatXNumericNonComplexTypes2, ExecutorTypesAll>::type>::type;
-using MatXFloatNonComplexNonHalfTypesAllExecs = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexNonHalfTypes2, ExecutorTypesAll>::type>::type;
-using MatXNumericNoHalfTypesAllExecs          = TupleToTypes<TypedCartesianProduct<MatXNumericNoHalfTypes2, ExecutorTypesAll>::type>::type;
-using MatXComplexNonHalfTypesAllExecs         = TupleToTypes<TypedCartesianProduct<MatXComplexNonHalfTypes2, ExecutorTypesAll>::type>::type;
-///using mytype = Types<std::tuple_element_t<MatXFloatNonComplexNonHalfTypesAllExecs>, ...>;
-// static_assert(std::is_same_v<MatXFloatNonComplexNonHalfTypesAllExecs,
-//   std::tuple<std::tuple<float, matx::cudaExecutor>, std::tuple<double, matx::cudaExecutor>, std::tuple<float, matx::SingleThreadHostExecutor>, std::tuple<double, matx::SingleThreadHostExecutor> >>);
+using MatXNumericTuple                       = std::tuple<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
+                                              int64_t, float, double, cuda::std::complex<float>,
+                                              cuda::std::complex<double>, matx::matxFp16Complex,
+                                              matx::matxBf16Complex>;     
+using MatXIntegralTuple                      = std::tuple<uint32_t, int32_t, uint64_t, int64_t>;                                                                                                                                                         
+
+using MatXFloatNonComplexTuple               = std::tuple<matx::matxFp16, matx::matxBf16, float, double>;                                                      
+using MatXBooleanTuple                       = std::tuple<bool>;   
+
+using MatXNumericNonComplexTypesAllExecs      = TupleToTypes<TypedCartesianProduct<MatXNumericNonComplexTuple, ExecutorTypesAll>::type>::type;
+using MatXFloatNonComplexNonHalfTypesAllExecs = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexNonHalfTuple, ExecutorTypesAll>::type>::type;
+using MatXNumericNoHalfTypesAllExecs          = TupleToTypes<TypedCartesianProduct<MatXNumericNoHalfTuple, ExecutorTypesAll>::type>::type;
+using MatXComplexNonHalfTypesAllExecs         = TupleToTypes<TypedCartesianProduct<MatXComplexNonHalfTuple, ExecutorTypesAll>::type>::type;
+using MatXComplexTypesAllExecs                = TupleToTypes<TypedCartesianProduct<MatXComplexTuple, ExecutorTypesAll>::type>::type;
+
+using MatXTypesAllExecs                       = TupleToTypes<TypedCartesianProduct<MatXAllTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesFloatNonComplexAllExecs        = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesFloatAllExecs                  = TupleToTypes<TypedCartesianProduct<MatXFloatTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesNumericAllExecs                  = TupleToTypes<TypedCartesianProduct<MatXNumericTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesIntegralAllExecs                  = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesBooleanAllExecs                  = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAll>::type>::type;

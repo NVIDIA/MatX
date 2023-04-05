@@ -74,6 +74,45 @@ template <typename TensorType>
 class OperatorTestsAll : public ::testing::Test {
 };
 
+template <typename TensorType>
+class OperatorTestsNumericNonComplexAllExecs : public ::testing::Test {
+};
+template <typename TensorType>
+class OperatorTestsFloatNonComplexNonHalfAllExecs : public ::testing::Test {
+};
+template <typename TensorType>
+class OperatorTestsNumericNoHalfAllExecs : public ::testing::Test {
+};
+template <typename TensorType>
+class OperatorTestsComplexNonHalfTypesAllExecs : public ::testing::Test {
+};
+template <typename TensorType>
+class OperatorTestsComplexTypesAllExecs : public ::testing::Test {
+};
+template <typename TensorType>
+class OperatorTestsAllExecs : public ::testing::Test {
+};
+
+template <typename TensorType>
+class OperatorTestsFloatAllExecs : public ::testing::Test {
+};
+
+template <typename TensorType>
+class OperatorTestsFloatNonComplexAllExecs : public ::testing::Test {
+};
+
+template <typename TensorType>
+class OperatorTestsNumericAllExecs : public ::testing::Test {
+};
+
+template <typename TensorType>
+class OperatorTestsIntegralAllExecs : public ::testing::Test {
+};
+
+template <typename TensorType>
+class OperatorTestsBooleanAllExecs : public ::testing::Test {
+};
+
 TYPED_TEST_SUITE(OperatorTestsAll, MatXAllTypes);
 TYPED_TEST_SUITE(OperatorTestsComplex, MatXComplexTypes);
 TYPED_TEST_SUITE(OperatorTestsFloat, MatXFloatTypes);
@@ -88,10 +127,33 @@ TYPED_TEST_SUITE(OperatorTestsBoolean, MatXBoolTypes);
 TYPED_TEST_SUITE(OperatorTestsFloatHalf, MatXFloatHalfTypes);
 TYPED_TEST_SUITE(OperatorTestsNumericNoHalf, MatXNumericNoHalfTypes);
 
-TYPED_TEST(OperatorTestsComplex, BaseOp)
+
+TYPED_TEST_SUITE(OperatorTestsNumericNonComplexAllExecs,
+                 MatXNumericNonComplexTypesAllExecs);  
+TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalfAllExecs,
+                 MatXFloatNonComplexNonHalfTypesAllExecs);  
+TYPED_TEST_SUITE(OperatorTestsFloatNonComplexAllExecs,
+                 MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(OperatorTestsNumericAllExecs,
+                 MatXTypesNumericAllExecs);                                
+TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);          
+TYPED_TEST_SUITE(OperatorTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
+TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXTypesAllExecs);
+TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecs);
+TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
+TYPED_TEST_SUITE(OperatorTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
+
+TYPED_TEST(OperatorTestsAllExecs, BaseOp)
 {
   MATX_ENTER_HANDLER();
-  auto A = make_tensor<TypeParam>({10,20});
+
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  auto A = make_tensor<TestType>({10,20});
   auto op = A + A;
 
   EXPECT_TRUE(op.Size(0) == A.Size(0));
@@ -107,15 +169,20 @@ TYPED_TEST(OperatorTestsComplex, BaseOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, GetString)
+TYPED_TEST(OperatorTestsAllExecs, GetString)
 {
   MATX_ENTER_HANDLER();
-  auto A = make_tensor<TypeParam>({10,20});
-  auto B = make_tensor<TypeParam>({20});
-  auto C = make_tensor<TypeParam>({10,20});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  auto A = make_tensor<TestType>({10,20});
+  auto B = make_tensor<TestType>({20});
+  auto C = make_tensor<TestType>({10,20});
 
   auto op1 = C = A;
-  auto op2 = C = A + B + (TypeParam)5;
+  auto op2 = C = A + B + (TestType)5;
   auto op3 = C = A / B;
   auto op4 = C = cos(A * B) + sin(C);
   auto op6 = (op1,op2,op3,op4);
@@ -129,14 +196,19 @@ TYPED_TEST(OperatorTestsAll, GetString)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
+TYPED_TEST(OperatorTestsAllExecs, PermuteOp)
 {
   MATX_ENTER_HANDLER();
-  auto A = make_tensor<TypeParam>({10,20,30});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  auto A = make_tensor<TestType>({10,20,30});
   for(int i=0; i < A.Size(0); i++) {
     for(int j=0; j < A.Size(1); j++) {
       for(int k=0; k < A.Size(2); k++) {
-        A(i,j,k) = TypeParam( i * A.Size(1)*A.Size(2) +
+        A(i,j,k) = static_cast<typename inner_op_type_t<TestType>::type>( i * A.Size(1)*A.Size(2) +
 	       j * A.Size(2) + k);	
       }
     }
@@ -165,12 +237,17 @@ TYPED_TEST(OperatorTestsNumericNonComplex, PermuteOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, ReshapeOp)
+TYPED_TEST(OperatorTestsAllExecs, ReshapeOp)
 {
   MATX_ENTER_HANDLER();
-  auto A = make_tensor<TypeParam>({2*4*8*16});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  auto A = make_tensor<TestType>({2*4*8*16});
   for(int i = 0; i < A.Size(0); i++) {
-    A(i) = (TypeParam)i;
+    A(i) = static_cast<typename inner_op_type_t<TestType>::type>(i);
   }
 
   auto op = reshape(A, {2, 4, 8, 16});
@@ -202,106 +279,126 @@ TYPED_TEST(OperatorTestsNumericNonComplex, ReshapeOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplex, FMod)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, FMod)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tiv1;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  tiv0() = (TypeParam)5.0;
-  tiv1() = (TypeParam)3.1;
-  (tov0 = fmod(tiv0, tiv1)).run();
+  ExecType exec{}; 
+
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tiv1;
+  tensor_t<TestType, 0> tov0;
+
+  tiv0() = (TestType)5.0;
+  tiv1() = (TestType)3.1;
+  (tov0 = fmod(tiv0, tiv1)).run(exec);
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TypeParam)5.0, (TypeParam)3.1)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TestType)5.0, (TestType)3.1)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloat, TrigFuncs)
+TYPED_TEST(OperatorTestsFloatAllExecs, TrigFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{}; 
+
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
-  (tov0 = sin(tiv0)).run();
+  (tov0 = sin(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
 
-  (tov0 = cos(tiv0)).run();
+  (tov0 = cos(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
 
-  (tov0 = tan(tiv0)).run();
+  (tov0 = tan(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
 
-  (tov0 = asin(tiv0)).run();
+  (tov0 = asin(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
 
-  (tov0 = acos(tiv0)).run();
+  (tov0 = acos(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
 
-  (tov0 = atan(tiv0)).run();
+  (tov0 = atan(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
 
-  (tov0 = sinh(tiv0)).run();
+  (tov0 = sinh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
 
-  (tov0 = cosh(tiv0)).run();
+  (tov0 = cosh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
 
-  (tov0 = tanh(tiv0)).run();
+  (tov0 = tanh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
 
-  (tov0 = asinh(tiv0)).run();
+  (tov0 = asinh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
 
-  (tov0 = acosh(tiv0)).run();
+  (tov0 = acosh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
 
-  (tov0 = atanh(tiv0)).run();
+  (tov0 = atanh(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, AngleOp)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, AngleOp)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<typename TypeParam::value_type, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{}; 
+
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<typename TestType::value_type, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = angle(tiv0)).run();
+  (tov0 = angle(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
 
   MATX_EXIT_HANDLER();
 }
-TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 {
   constexpr int N = 10;
   constexpr int M = 12;
   constexpr int K = 14;
 
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};   
+
   MATX_ENTER_HANDLER();
   { // clone from 0D
-    auto tiv = make_tensor<TypeParam>();
-    auto tov = make_tensor<TypeParam>({N,M,K});
+    auto tiv = make_tensor<TestType>();
+    auto tov = make_tensor<TestType>({N,M,K});
 
     tiv() = 3;
 
@@ -319,7 +416,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
+    (tov = op).run(exec);
     cudaDeviceSynchronize();
 
     for(int n = 0; n < N; n++) {
@@ -332,11 +429,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
   }    
 
   { // clone from 1D
-    auto tiv = make_tensor<TypeParam>({K});
-    auto tov = make_tensor<TypeParam>({N,M,K});
+    auto tiv = make_tensor<TestType>({K});
+    auto tov = make_tensor<TestType>({N,M,K});
 
     for(int k = 0; k < K; k++) {
-      tiv(k) = TypeParam(k);
+      tiv(k) = static_cast<typename inner_op_type_t<TestType>::type>(k);
     }
 
     auto op = clone<3>(tiv, {N, M, matxKeepDim});
@@ -354,7 +451,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
+    (tov = op).run(exec);
     cudaDeviceSynchronize();
 
     for(int n = 0; n < N; n++) {
@@ -367,11 +464,11 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
   }    
 
   { // clone from 1D
-    auto tiv = make_tensor<TypeParam>({M});
-    auto tov = make_tensor<TypeParam>({N,M,K});
+    auto tiv = make_tensor<TestType>({M});
+    auto tov = make_tensor<TestType>({N,M,K});
 
     for(int m = 0; m < K; m++) {
-      tiv(m) = TypeParam(m);
+      tiv(m) = static_cast<typename inner_op_type_t<TestType>::type>(m);
     }
 
     auto op = clone<3>(tiv, {N, matxKeepDim, K});
@@ -389,7 +486,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
+    (tov = op).run(exec);
     cudaDeviceSynchronize();
 
     for(int n = 0; n < N; n++) {
@@ -402,12 +499,12 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
   }    
 
   { // clone from 2D and operator
-    auto tiv = make_tensor<TypeParam>({M,K});
-    auto tov = make_tensor<TypeParam>({N,M,K});
+    auto tiv = make_tensor<TestType>({M,K});
+    auto tov = make_tensor<TestType>({N,M,K});
 
     for(int m = 0; m < M; m++) {
       for(int k = 0; k < K; k++) {
-        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+        tiv(m,k) = static_cast<typename inner_op_type_t<TestType>::type>(m*K)+static_cast<typename inner_op_type_t<TestType>::type>(k);
       }
     }
 
@@ -426,7 +523,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
       }
     }
 
-    (tov = op).run();
+    (tov = op).run(exec);
     cudaDeviceSynchronize();
 
     for(int n = 0; n < N; n++) {
@@ -439,16 +536,16 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
   }    
 
   { // clone from 2D
-    auto tiv = make_tensor<TypeParam>({M,K});
-    auto tov = make_tensor<TypeParam>({N,M,K});
+    auto tiv = make_tensor<TestType>({M,K});
+    auto tov = make_tensor<TestType>({N,M,K});
 
     for(int m = 0; m < M; m++) {
       for(int k = 0; k < K; k++) {
-        tiv(m,k) = TypeParam(m*K)+TypeParam(k);
+        tiv(m,k) = static_cast<typename inner_op_type_t<TestType>::type>(m*K)+static_cast<typename inner_op_type_t<TestType>::type>(k);
       }
     }
 
-    auto op = clone<3>(TypeParam(2)*tiv, {N, matxKeepDim, matxKeepDim});
+    auto op = clone<3>(static_cast<typename inner_op_type_t<TestType>::type>(2)*tiv, {N, matxKeepDim, matxKeepDim});
 
     ASSERT_EQ(op.Size(0), N);
     ASSERT_EQ(op.Size(1), M);
@@ -458,18 +555,18 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          ASSERT_EQ(op(n,m,k) , TypeParam(2)*tiv(m,k));
+          ASSERT_EQ(op(n,m,k) , TestType(2)*tiv(m,k));
         }
       }
     }
 
-    (tov = op).run();
+    (tov = op).run(exec);
     cudaDeviceSynchronize();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          ASSERT_EQ(tov(n,m,k) , TypeParam(2)*tiv(m,k));
+          ASSERT_EQ(tov(n,m,k) , TestType(2)*tiv(m,k));
         }
       }
     }
@@ -480,10 +577,14 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CloneOp)
 
 
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, SliceStrideOp)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 1> t1{{10}};
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};   
+  tensor_t<TestType, 1> t1{{10}};
 
   t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
   auto t1t = slice(t1, {0}, {matxEnd}, {2});
@@ -495,23 +596,28 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceStrideOp)
   auto t1t2 = slice(t1, {2}, {matxEnd}, {2});
 
   for (index_t i = 0; i < t1t2.Size(0); i++) {
-    ASSERT_EQ(TypeParam(30 + 20 * i), t1t2(i));
+    ASSERT_EQ(TestType(30 + 20 * i), t1t2(i));
   }
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
 {
   MATX_ENTER_HANDLER();
-  
-  tensor_t<TypeParam, 2> t2{{20, 10}};
-  tensor_t<TypeParam, 3> t3{{30, 20, 10}};
-  tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  (t2 = linspace<1>(t2.Shape(), 0, 10)).run();
-  (t3 = linspace<2>(t3.Shape(), 0, 10)).run();
-  (t4 = linspace<3>(t4.Shape(), 0, 10)).run();
+  ExecType exec{}; 
+
+  tensor_t<TestType, 2> t2{{20, 10}};
+  tensor_t<TestType, 3> t3{{30, 20, 10}};
+  tensor_t<TestType, 4> t4{{40, 30, 20, 10}};
+
+  (t2 = linspace<1>(t2.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  (t3 = linspace<2>(t3.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  (t4 = linspace<3>(t4.Shape(), (inner_type)0, (inner_type)10)).run(exec);
 
   auto t2t = slice(t2, {1, 2}, {3, 5});
   auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
@@ -555,14 +661,18 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, SliceAndReduceOp)
 {
   MATX_ENTER_HANDLER();
- 
-  tensor_t<TypeParam, 2> t2t{{20, 10}};
-  tensor_t<TypeParam, 3> t3t{{30, 20, 10}};
-  (t2t = linspace<1>(t2t.Shape(), 0, 10)).run();
-  (t3t = linspace<2>(t3t.Shape(), 0, 10)).run();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+  ExecType exec{}; 
+
+  tensor_t<TestType, 2> t2t{{20, 10}};
+  tensor_t<TestType, 3> t3t{{30, 20, 10}};
+  (t2t = linspace<1>(t2t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  (t3t = linspace<2>(t3t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
 
   {
     index_t j = 0;
@@ -639,26 +749,32 @@ TYPED_TEST(OperatorTestsNumericNonComplex, SliceAndReduceOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 {
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   int N = 10;
   int M = 12;
   int K = 14;
 
 
   MATX_ENTER_HANDLER();
-  auto tiv = make_tensor<TypeParam>({N,M,K});
+  auto tiv = make_tensor<TestType>({N,M,K});
 
   for(int n = 0; n < N; n++) {
     for(int m = 0; m < M; m++) {
       for(int k = 0; k < K; k++) {
-        tiv(n,m,k) = TypeParam(n*M*K + m*K + k);
+        tiv(n,m,k) = inner_type(n*M*K + m*K + k);
       }
     }
   }
 
   { // rcollapse 2
-    auto tov = make_tensor<TypeParam>({N,M*K});
+    auto tov = make_tensor<TestType>({N,M*K});
   
     auto op = rcollapse<2>(tiv);
 
@@ -666,8 +782,8 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     EXPECT_TRUE(op.Size(0) == N);
     EXPECT_TRUE(op.Size(1) == M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
     cudaStreamSynchronize(0);
 
     for(int n = 0; n < N; n++) {
@@ -680,7 +796,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   }
   
   { // lcollapse 12
-    auto tov = make_tensor<TypeParam>({N*M,K});
+    auto tov = make_tensor<TestType>({N*M,K});
   
     auto op = lcollapse<2>(tiv);
 
@@ -689,8 +805,8 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
     EXPECT_TRUE(op.Size(1) == K);
     
     
-    (tov = 0).run();
-    (tov = op).run();
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
     cudaStreamSynchronize(0);
 
     for(int n = 0; n < N; n++) {
@@ -703,15 +819,15 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   }
   
   { // rcollapse 3
-    auto tov = make_tensor<TypeParam>({N*M*K});
+    auto tov = make_tensor<TestType>({N*M*K});
   
     auto op = rcollapse<3>(tiv);
 
     EXPECT_TRUE(op.Rank() == 1);
     EXPECT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
     cudaStreamSynchronize(0);
 
     for(int n = 0; n < N; n++) {
@@ -724,15 +840,15 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
   }
 
   { // lcollapse 3 
-    auto tov = make_tensor<TypeParam>({N*M*K});
+    auto tov = make_tensor<TestType>({N*M*K});
   
     auto op = lcollapse<3>(tiv);
 
     EXPECT_TRUE(op.Rank() == 1);
     EXPECT_TRUE(op.Size(0) == N*M*K);
 
-    (tov = 0).run();
-    (tov = op).run();
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
     cudaStreamSynchronize(0);
 
     for(int n = 0; n < N; n++) {
@@ -748,29 +864,35 @@ TYPED_TEST(OperatorTestsNumericNonComplex, CollapseOp)
 }
 
 
-TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
 {
   int N = 10;
 
   MATX_ENTER_HANDLER();
-  auto tiv = make_tensor<TypeParam>({N,N});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
+  auto tiv = make_tensor<TestType>({N,N});
 
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) {
-      tiv(i,j) = TypeParam(i*N+j);
+      tiv(i,j) = inner_type(i*N+j);
     }
   }
 
   { // Identity Gather test
 
-    auto tov = make_tensor<TypeParam>({N, N});
+    auto tov = make_tensor<TestType>({N, N});
     auto idx = make_tensor<int>({N});
     
     for(int i = 0; i < N; i++) {
       idx(i) = i;
     }
 
-    (tov = remap<0>(tiv, idx)).run();
+    (tov = remap<0>(tiv, idx)).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -779,7 +901,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = remap<1>(tiv, idx)).run();
+    (tov = remap<1>(tiv, idx)).run(exec);
     cudaStreamSynchronize(0);
     
     for( int i = 0; i < N ; i++) {
@@ -788,7 +910,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
 
-    (tov = remap<0,1>(tiv, idx, idx)).run();
+    (tov = remap<0,1>(tiv, idx, idx)).run(exec);
     cudaStreamSynchronize(0);
     
     for( int i = 0; i < N ; i++) {
@@ -800,15 +922,15 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
   
   { // Identity lvalue test
 
-    auto tov = make_tensor<TypeParam>({N, N});
+    auto tov = make_tensor<TestType>({N, N});
     auto idx = make_tensor<int>({N});
     
     for(int i = 0; i < N; i++) {
       idx(i) = i;
     }
 
-    (tov = 0).run();
-    (remap<0>(tov, idx) = tiv).run();
+    (tov = (TestType)0).run(exec);
+    (remap<0>(tov, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -817,8 +939,8 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = 0).run();
-    (remap<1>(tov, idx) = tiv).run();
+    (tov = (TestType)0).run(exec);
+    (remap<1>(tov, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
     
     for( int i = 0; i < N ; i++) {
@@ -827,8 +949,8 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = 0).run();
-    (remap<0,1>(tov, idx, idx) = tiv).run();
+    (tov = (TestType)0).run(exec);
+    (remap<0,1>(tov, idx, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
     
     for( int i = 0; i < N ; i++) {
@@ -840,14 +962,14 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
 
   { // Reverse test
     
-    auto tov = make_tensor<TypeParam>({N,N});
+    auto tov = make_tensor<TestType>({N,N});
     auto idx = make_tensor<int>({N});
     
     for(int i = 0; i < N; i++) {
       idx(i) = N-i-1;
     }
 
-    (tov = remap<0>(tiv, idx)).run();
+    (tov = remap<0>(tiv, idx)).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -856,7 +978,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = remap<1>(tiv, idx)).run();
+    (tov = remap<1>(tiv, idx)).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -865,7 +987,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (tov = remap<0,1>(tiv, idx, idx)).run();
+    (tov = remap<0,1>(tiv, idx, idx)).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -877,14 +999,14 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
   
   { // Reverse lvalue test
     
-    auto tov = make_tensor<TypeParam>({N,N});
+    auto tov = make_tensor<TestType>({N,N});
     auto idx = make_tensor<int>({N});
     
     for(int i = 0; i < N; i++) {
       idx(i) = N-i-1;
     }
 
-    (remap<0>(tov, idx) = tiv).run();
+    (remap<0>(tov, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -893,7 +1015,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (remap<1>(tov, idx) = tiv).run();
+    (remap<1>(tov, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -902,7 +1024,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
       }
     }
     
-    (remap<0,1>(tov, idx, idx) = tiv).run();
+    (remap<0,1>(tov, idx, idx) = tiv).run(exec);
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -921,9 +1043,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
 
     {
-      auto tov = make_tensor<TypeParam>({M, N});
+      auto tov = make_tensor<TestType>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
+      (tov = remap<0>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < M ; i++) {
@@ -934,9 +1056,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
     
     {
-      auto tov = make_tensor<TypeParam>({N, M});
+      auto tov = make_tensor<TestType>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
+      (tov = remap<1>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < N ; i++) {
@@ -947,9 +1069,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
     
     {
-      auto tov = make_tensor<TypeParam>({M, M});
+      auto tov = make_tensor<TestType>({M, M});
 
-      (tov = remap<0,1>(tiv, idx, idx)).run();
+      (tov = remap<0,1>(tiv, idx, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < M ; i++) {
@@ -969,9 +1091,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
 
     {
-      auto tov = make_tensor<TypeParam>({M, N});
+      auto tov = make_tensor<TestType>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
+      (tov = remap<0>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < M ; i++) {
@@ -982,9 +1104,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
     
     {
-      auto tov = make_tensor<TypeParam>({N, M});
+      auto tov = make_tensor<TestType>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
+      (tov = remap<1>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < N ; i++) {
@@ -995,7 +1117,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
   }
 
-  { // Andvanced test
+  { // Advanced test
     int M = N*2;
     auto idx = make_tensor<int>({M});
     
@@ -1004,9 +1126,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
 
     {
-      auto tov = make_tensor<TypeParam>({M, N});
+      auto tov = make_tensor<TestType>({M, N});
 
-      (tov = remap<0>(tiv, idx)).run();
+      (tov = remap<0>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < M ; i++) {
@@ -1017,9 +1139,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
     
     {
-      auto tov = make_tensor<TypeParam>({N, M});
+      auto tov = make_tensor<TestType>({N, M});
 
-      (tov = remap<1>(tiv, idx)).run();
+      (tov = remap<1>(tiv, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < N ; i++) {
@@ -1030,9 +1152,9 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
     }
     
     {
-      auto tov = make_tensor<TypeParam>({M, M});
+      auto tov = make_tensor<TestType>({M, M});
 
-      (tov = remap<0,1>(tiv, idx, idx)).run();
+      (tov = remap<0,1>(tiv, idx, idx)).run(exec);
       cudaStreamSynchronize(0);
 
       for( int i = 0; i < M ; i++) {
@@ -1046,52 +1168,62 @@ TYPED_TEST(OperatorTestsNumericNonComplex, RemapOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, RealImagOp)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, RealImagOp)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<typename TypeParam::value_type, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{};   
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<typename TestType::value_type, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = real(tiv0)).run();
+  (tov0 = real(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.real()));  
 
-  (tov0 = imag(tiv0)).run();
+  (tov0 = imag(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.imag()));   
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, OperatorFuncs)
+TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
-  TypeParam d = c;
-  TypeParam z = 0;
+  ExecType exec{};   
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
+  TestType d = c;
+  TestType z = 0;
   tiv0() = c;
 
-  tensor_t<TypeParam, 0> tov00;
+  tensor_t<TestType, 0> tov00;
 
-  IFELSE(tiv0 == d, tov0 = z, tov0 = d).run();
+  IFELSE(tiv0 == d, tov0 = z, tov0 = d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
-  IFELSE(tiv0 == d, tov0 = tiv0, tov0 = d).run();
+  IFELSE(tiv0 == d, tov0 = tiv0, tov0 = d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tiv0()));
 
-  IFELSE(tiv0 != d, tov0 = d, tov0 = z).run();
+  IFELSE(tiv0 != d, tov0 = d, tov0 = z).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
-  (tov0 = c, tov00 = c).run();
+  (tov0 = c, tov00 = c).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  
@@ -1099,269 +1231,322 @@ TYPED_TEST(OperatorTestsAll, OperatorFuncs)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, OperatorFuncs)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncsR2C)
 {
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<cuda::std::complex<TypeParam>, 0> tov0;
-  TypeParam c = GenerateData<TypeParam>();
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<typename detail::complex_from_scalar_t<TestType>, 0> tov0;
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = expj(tiv0)).run();
+  (tov0 = expj(tiv0)).run(exec);
   cudaStreamSynchronize(0);
 
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(
       tov0(),
-      cuda::std::complex(cuda::std::cos(tiv0()), cuda::std::sin(tiv0()))));
+      typename detail::complex_from_scalar_t<TestType>(detail::_internal_cos(tiv0()), detail::_internal_sin(tiv0()))));  
+  MATX_EXIT_HANDLER();      
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplex, OperatorFuncs)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{};    
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = log10(tiv0)).run();
+  (tov0 = log10(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
 
-  (tov0 = log(tiv0)).run();
+  (tov0 = log(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
 
-  (tov0 = log2(tiv0)).run();
+  (tov0 = log2(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
 
-  (tov0 = floor(tiv0)).run();   
+  (tov0 = floor(tiv0)).run(exec);   
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
 
-  (tov0 = ceil(tiv0)).run();
+  (tov0 = ceil(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
 
-  (tov0 = round(tiv0)).run();
+  (tov0 = round(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, NDOperatorFuncs)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  auto a = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
-  auto b = make_tensor<TypeParam>({1,2,3,4,5,6,7,8});
-  (a = ones(a.Shape())).run();
-  cudaDeviceSynchronize();
-  (b = ones(b.Shape())).run();
-  cudaDeviceSynchronize();
-  (a = a + b).run();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  auto t0 = make_tensor<TypeParam>();
-  sum(t0, a);
+  ExecType exec{};   
+
+  auto a = make_tensor<TestType>({1,2,3,4,5});
+  auto b = make_tensor<TestType>({1,2,3,4,5});
+  (a = ones<TestType>(a.Shape())).run(exec);
+  cudaDeviceSynchronize();
+  (b = ones<TestType>(b.Shape())).run(exec);
+  cudaDeviceSynchronize();
+  (a = a + b).run(exec);
+
+  auto t0 = make_tensor<TestType>();
+  sum(t0, a, exec);
   cudaStreamSynchronize(0);
-  ASSERT_EQ(t0(), 2 * a.TotalSize());
+  ASSERT_EQ(t0(), static_cast<TestType>(2 * a.TotalSize()));
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, OperatorFuncs)
+TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{};     
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
-  TypeParam d = c + 1;
+  TestType d = c + 1;
 
-  (tov0 = max(tiv0, d)).run();
+  (tov0 = max(tiv0, d)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), max(c, d)));
 
-  (tov0 = min(tiv0, d)).run();
+  (tov0 = min(tiv0, d)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), min(c, d)));
 
   // These operators convert type T into bool
   tensor_t<bool, 0> tob;
 
-  (tob = tiv0 < d).run();
+  (tob = tiv0 < d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c < d));
 
-  (tob = tiv0 > d).run();
+  (tob = tiv0 > d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c > d));
 
-  (tob = tiv0 <= d).run();
+  (tob = tiv0 <= d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c <= d));
 
-  (tob = tiv0 >= d).run();
+  (tob = tiv0 >= d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c >= d));
 
-  (tob = tiv0 == d).run();
+  (tob = tiv0 == d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c == d));
 
-  (tob = tiv0 != d).run();
+  (tob = tiv0 != d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c != d));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, OperatorFuncDivComplex)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncDivComplex)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0; 
-  typename TypeParam::value_type s = 5.0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();  
+  ExecType exec{};  
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0; 
+  typename TestType::value_type s = 5.0;
+
+  TestType c = GenerateData<TestType>();  
   tiv0() = c;
 
-  (tov0 = s / tiv0).run();
+  (tov0 = s / tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), s / tiv0()));
 
   MATX_EXIT_HANDLER();  
 }
 
-TYPED_TEST(OperatorTestsNumeric, OperatorFuncs)
+TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{};    
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = tiv0 + tiv0).run();
+  (tov0 = tiv0 + tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c + c));
 
-  (tov0 = tiv0 - tiv0).run();
+  (tov0 = tiv0 - tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c - c));
 
-  (tov0 = tiv0 * tiv0).run();
+  (tov0 = tiv0 * tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c * c));
 
-  (tov0 = tiv0 / tiv0).run();
+  (tov0 = tiv0 / tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
-  (tov0 = -tiv0).run();
+  (tov0 = -tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
 
-  IF(tiv0 == tiv0, tov0 = c).run();
+  IF(tiv0 == tiv0, tov0 = c).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
-  TypeParam p = 2.0f;
-  (tov0 = pow(tiv0, p)).run();
+  TestType p = 2.0f;
+  (tov0 = as_type<TestType>(pow(tiv0, p))).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
-  TypeParam three = 3.0f;
+  TestType three = 3.0f;
 
   (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run();
   cudaStreamSynchronize(0);
 
-  TypeParam res;
+  TestType res;
   res = c * c * (c + c) / c + three;
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), res, 0.07));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsIntegral, OperatorFuncs)
+TYPED_TEST(OperatorTestsIntegralAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
+  ExecType exec{};    
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
-  TypeParam mod = 2;
+  TestType mod = 2;
 
-  (tov0 = tiv0 % mod).run();
+  (tov0 = tiv0 % mod).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c % mod));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsBoolean, OperatorFuncs)
+TYPED_TEST(OperatorTestsBooleanAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  TypeParam c = GenerateData<TypeParam>();
-  TypeParam d = false;
+  ExecType exec{};   
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
+  TestType d = false;
   tiv0() = c;
 
-  (tov0 = tiv0 && d).run();
+  (tov0 = tiv0 && d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c && d));
 
-  (tov0 = tiv0 || d).run();
+  (tov0 = tiv0 || d).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c || d));
 
-  (tov0 = !tiv0).run();
+  (tov0 = !tiv0).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), !c));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, OperatorFuncs)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  tensor_t<TypeParam, 0> tiv0;
-  tensor_t<TypeParam, 0> tov0;
+  ExecType exec{};   
 
-  TypeParam c = GenerateData<TypeParam>();
+  tensor_t<TestType, 0> tiv0;
+  tensor_t<TestType, 0> tov0;
+
+  TestType c = GenerateData<TestType>();
   tiv0() = c;
 
-  (tov0 = exp(tiv0)).run();
+  (tov0 = exp(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
 
-  (tov0 = conj(tiv0)).run();
+  (tov0 = conj(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
   // abs and norm take a complex and output a floating point value
-  tensor_t<typename TypeParam::value_type, 0> tdd0;
-  (tdd0 = norm(tiv0)).run();
+  tensor_t<typename TestType::value_type, 0> tdd0;
+  (tdd0 = norm(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
 
-  (tdd0 = abs(tiv0)).run();
+  (tdd0 = abs(tiv0)).run(exec);
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, Flatten)
+TYPED_TEST(OperatorTestsAllExecs, Flatten)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  auto t2 = make_tensor<TypeParam>({10, 2});
-  auto val = GenerateData<TypeParam>();
+  ExecType exec{};  
+
+  auto t2 = make_tensor<TestType>({10, 2});
+  auto val = GenerateData<TestType>();
 
   for (index_t i = 0; i < t2.Size(0); i++) {
     for (index_t j = 0; j < t2.Size(1); j++) {
@@ -1369,8 +1554,8 @@ TYPED_TEST(OperatorTestsAll, Flatten)
     }
   }
 
-  auto t1 = make_tensor<TypeParam>({t2.Size(0)*t2.Size(1)});
-  (t1 = flatten(t2)).run();
+  auto t1 = make_tensor<TestType>({t2.Size(0)*t2.Size(1)});
+  (t1 = flatten(t2)).run(exec);
   cudaStreamSynchronize(0);
   
   for (index_t i = 0; i < t2.Size(0)*t2.Size(1); i++) {
@@ -1380,169 +1565,123 @@ TYPED_TEST(OperatorTestsAll, Flatten)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNoHalf, AdvancedOperators)
+TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t count = 100;
 
-  tensor_t<TypeParam, 1> a({count});
-  tensor_t<TypeParam, 1> b({count});
-  tensor_t<TypeParam, 1> c({count});
+  tensor_t<TestType, 1> a({count});
+  tensor_t<TestType, 1> b({count});
+  tensor_t<TestType, 1> c({count});
 
   for (index_t i = 0; i < count; i++) {
-    a(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
-    b(i) = static_cast<detail::value_promote_t<TypeParam>>(i + 100);
+    a(i) = static_cast<detail::value_promote_t<TestType>>(i);
+    b(i) = static_cast<detail::value_promote_t<TestType>>(i + 100);
   }
 
   {
-    (c = a + b).run();
+    (c = a + b).run(exec);
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
+          MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TestType)100)));
     }
   }
 
   {
-    (c = a * b).run();
+    (c = a * b).run(exec);
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
+          MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TestType)100)));
     }
   }
 
   {
-    (c = a * b + a).run();
+    (c = a * b + a).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
+          c(i), tcnt * (tcnt + (TestType)100) + tcnt));
     }
   }
 
   {
 
-    (c = a * b + a * (TypeParam)4.0f).run();
+    (c = a * b + a * (TestType)4.0f).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
+          c(i), tcnt * (tcnt + (TestType)100.0f) + tcnt * (TestType)4));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-// TODO: add more host testing on everything that supports it
-TYPED_TEST(OperatorTestsNumericNoHalf, HostAdvancedOperators)
+
+
+TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
 {
   MATX_ENTER_HANDLER();
-  index_t count = 100;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  tensor_t<TypeParam, 1> a({count});
-  tensor_t<TypeParam, 1> b({count});
-  tensor_t<TypeParam, 1> c({count});
-
-  for (index_t i = 0; i < count; i++) {
-    a(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
-    b(i) = static_cast<detail::value_promote_t<TypeParam>>(i + 100);
-  }
-
-  {
-    (c = a + b).run(SingleThreadHostExecutor{});
-    for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(c(i), tcnt + (tcnt + (TypeParam)100)));
-    }
-  }
-
-  {
-    (c = a * b).run(SingleThreadHostExecutor{});
-
-    for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(c(i), tcnt * (tcnt + (TypeParam)100)));
-    }
-  }
-
-  {
-    (c = a * b + a).run(SingleThreadHostExecutor{});
-
-    for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          c(i), tcnt * (tcnt + (TypeParam)100) + tcnt));
-    }
-  }
-
-  {
-
-    (c = a * b + a * (TypeParam)4.0f).run(SingleThreadHostExecutor{});
-
-    for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = static_cast<detail::value_promote_t<TypeParam>>(i);
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          c(i), tcnt * (tcnt + (TypeParam)100.0f) + tcnt * (TypeParam)4));
-    }
-  }
-  MATX_EXIT_HANDLER();
-}
-
-TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
-{
-  MATX_ENTER_HANDLER();
+  ExecType exec{};   
   index_t count = 10;
 
-  tensor_t<TypeParam, 1> a({count});
-  tensor_t<TypeParam, 1> b({count});
-  tensor_t<TypeParam, 1> c({count});
+  tensor_t<TestType, 1> a({count});
+  tensor_t<TestType, 1> b({count});
+  tensor_t<TestType, 1> c({count});
 
   for (index_t i = 0; i < count; i++) {
-    a(i) = (double)i;
-    b(i) = (double)(i + 2);
+    a(i) = (TestType)i;
+    b(i) = (TestType)(i + 2);
   }
 
   {
-    (c = a + b).run();
+    (c = a + b).run(exec);
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = (double)i;
-      EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(c(i), (float)tcnt + ((float)tcnt + 2.0f)));
+      TestType tcnt = (TestType)i;
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(c(i), (TestType)((float)tcnt + ((float)tcnt + 2.0f))));
     }
   }
 
   {
-    (c = a * b).run();
+    (c = a * b).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = (double)i;
+      TestType tcnt = (TestType)i;
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(c(i), (float)tcnt * ((float)tcnt + 2.0f)));
     }
   }
 
   {
-    (c = a * b + a).run();
+    (c = a * b + a).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = (double)i;
+      TestType tcnt = (TestType)i;
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), (float)tcnt * ((float)tcnt + 2.0f) + (float)tcnt));
     }
@@ -1550,11 +1689,11 @@ TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
 
   {
 
-    (c = a * b + a * (TypeParam)2.0f).run();
+    (c = a * b + a * (TestType)2.0f).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam tcnt = (double)i;
+      TestType tcnt = (TestType)i;
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           c(i), (float)tcnt * ((float)tcnt + 2.0f) + (float)tcnt * 2.0f));
     }
@@ -1564,125 +1703,136 @@ TYPED_TEST(OperatorTestsFloatHalf, AdvancedOperators)
 
 
 // Testing 4 basic arithmetic operations with complex numbers and non-complex
-TYPED_TEST(OperatorTestsComplex, ComplexTypeCompatibility)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t count = 10;
 
   tensor_t<float, 1> fview({count});
-  tensor_t<TypeParam, 1> dview({count});
+  tensor_t<TestType, 1> dview({count});
 
   using data_type =
-      typename std::conditional_t<is_complex_half_v<TypeParam>, float,
-                                  typename TypeParam::value_type>;
+      typename std::conditional_t<is_complex_half_v<TestType>, float,
+                                  typename TestType::value_type>;
 
   // Multiply by scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i);
-    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
-                static_cast<detail::value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview * fview).run();
+  (dview = dview * fview).run(exec);
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<detail::value_promote_t<TypeParam>>(i * i));
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(i * i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TestType>>(i * i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TestType>>(i * i));
   }
 
   // Divide by scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = i == 0 ? static_cast<float>(1) : static_cast<float>(i);
-    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
-                static_cast<detail::value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview / fview).run();
+  (dview = dview / fview).run(exec);
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
-              i == 0 ? static_cast<detail::value_promote_t<TypeParam>>(0)
-                     : static_cast<detail::value_promote_t<TypeParam>>(1));
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              i == 0 ? static_cast<detail::value_promote_t<TypeParam>>(0)
-                     : static_cast<detail::value_promote_t<TypeParam>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
+              i == 0 ? static_cast<detail::value_promote_t<TestType>>(0)
+                     : static_cast<detail::value_promote_t<TestType>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).imag()),
+              i == 0 ? static_cast<detail::value_promote_t<TestType>>(0)
+                     : static_cast<detail::value_promote_t<TestType>>(1));
   }
 
   // Add scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i);
-    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
-                static_cast<detail::value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i)};
   }
   
 
-  (dview = dview + fview).run();
+  (dview = dview + fview).run(exec);
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<detail::value_promote_t<TypeParam>>(i + i));
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TestType>>(i + i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TestType>>(i));
   }
 
   // Subtract scalar from complex
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i + 1);
-    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
-                static_cast<detail::value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview - fview).run();
+  (dview = dview - fview).run(exec);
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<detail::value_promote_t<TypeParam>>(-1));
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TestType>>(-1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TestType>>(i));
   }
 
   // Subtract complex from scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i + 1);
-    dview(i) = {static_cast<detail::value_promote_t<TypeParam>>(i),
-                static_cast<detail::value_promote_t<TypeParam>>(i)};
+    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = fview - dview).run();
+  (dview = fview - dview).run(exec);
   cudaDeviceSynchronize();
 
   for (index_t i = 0; i < count; i++) {
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).real()),
-              static_cast<detail::value_promote_t<TypeParam>>(1));
-    ASSERT_EQ(static_cast<detail::value_promote_t<TypeParam>>(dview(i).imag()),
-              static_cast<detail::value_promote_t<TypeParam>>(-i));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
+              static_cast<detail::value_promote_t<TestType>>(1));
+    ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).imag()),
+              static_cast<detail::value_promote_t<TestType>>(-i));
   }
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
+TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t count = 512;
-  tensor_t<TypeParam, 2> t2({count, count});
-  tensor_t<TypeParam, 2> t2t({count, count});
+  tensor_t<TestType, 2> t2({count, count});
+  tensor_t<TestType, 2> t2t({count, count});
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
-      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i * count + j);
     }
   }
 
   t2.PrefetchDevice(0);
   t2t.PrefetchDevice(0);
-  matx::copy(t2t, t2, 0);
+  matx::copy(t2t, t2, exec);
 
   t2t.PrefetchHost(0);
   cudaStreamSynchronize(0);
@@ -1690,12 +1840,12 @@ TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
-                                             TypeParam(i * count + (double)j)));
+                                             TestType(i * count + (double)j)));
     }
   }
 
   t2t.PrefetchDevice(0);
-  transpose(t2t, t2, 0);
+  transpose(t2t, t2, exec);
 
   t2t.PrefetchHost(0);
   cudaStreamSynchronize(0);
@@ -1703,63 +1853,69 @@ TYPED_TEST(OperatorTestsNumeric, SquareCopyTranspose)
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
+                                             TestType(i * count + (double)j)));
       EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2t(j, i), TypeParam(i * count + j)));
+          MatXUtils::MatXTypeCompare(t2t(j, i), TestType(i * count + j)));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, NonSquareTranspose)
+TYPED_TEST(OperatorTestsNumericAllExecs, NonSquareTranspose)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t count = 100;
   index_t count1 = 200, count2 = 100;
-  tensor_t<TypeParam, 2> t2({count1, count2});
-  tensor_t<TypeParam, 2> t2t({count2, count1});
+  tensor_t<TestType, 2> t2({count1, count2});
+  tensor_t<TestType, 2> t2t({count2, count1});
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
-      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i * count + j);
     }
   }
 
-  t2.PrefetchDevice(0);
-  t2t.PrefetchDevice(0);
-  transpose(t2t, t2, 0);
-
-  t2t.PrefetchHost(0);
+  transpose(t2t, t2, exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TypeParam(i * count + (double)j)));
+                                             TestType(i * count + (double)j)));
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(j, i),
-                                             TypeParam(i * count + (double)j)));
+                                             TestType(i * count + (double)j)));
     }
   }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Transpose3D)
+TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};     
 
   index_t num_rows = 5998;
   index_t num_cols = 64;
 
-  tensor_t<TypeParam, 3> t3 ({1, num_rows, num_cols});
-  tensor_t<TypeParam, 3> t3t({1, num_cols, num_rows});
+  tensor_t<TestType, 3> t3 ({1, num_rows, num_cols});
+  tensor_t<TestType, 3> t3t({1, num_cols, num_rows});
 
   for (index_t i = 0; i < num_rows; i++) {
     for (index_t j = 0; j < num_cols; j++) {
-       t3(0, i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * num_cols + j);
+       t3(0, i, j) = static_cast<detail::value_promote_t<TestType>>(i * num_cols + j);
     }
   }
 
-  transpose(t3t, t3, 0);
+  transpose(t3t, t3, exec);
   cudaError_t error = cudaStreamSynchronize(0);
   ASSERT_EQ(error, cudaSuccess);
 
@@ -1772,37 +1928,43 @@ TYPED_TEST(OperatorTestsNumeric, Transpose3D)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, CloneAndAdd)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};  
+
   index_t numSamples = 8;
   index_t numPulses = 4;
   index_t numPairs = 2;
   index_t numBeams = 2;
 
-  tensor_t<float, 4> beamwiseRangeDoppler(
+  tensor_t<TestType, 4> beamwiseRangeDoppler(
       {numBeams, numPulses, numPairs, numSamples});
-  tensor_t<float, 2> steeredMx({numBeams, numSamples});
-  tensor_t<float, 3> velAccelHypoth({numPulses, numPairs, numSamples});
+  tensor_t<TestType, 2> steeredMx({numBeams, numSamples});
+  tensor_t<TestType, 3> velAccelHypoth({numPulses, numPairs, numSamples});
 
   for (index_t i = 0; i < numBeams; i++) {
     for (index_t j = 0; j < numSamples; j++) {
-      steeredMx(i, j) = static_cast<float>((i + 1) * 10 + (j + 1));
+      steeredMx(i, j) = static_cast<TestType>((i + 1) * 10 + (j + 1));
     }
   }
 
   for (index_t i = 0; i < numPulses; i++) {
     for (index_t j = 0; j < numPairs; j++) {
       for (index_t k = 0; k < numSamples; k++) {
-        velAccelHypoth(i, j, k) = static_cast<float>(
-            (i + 1) * 10000 + (j + 1) * 1000 + (k + 1) * 100);
+        velAccelHypoth(i, j, k) = static_cast<TestType>(
+            (i + 1) * 10 + (j + 1) * 1 + (k + 1) * 1);
       }
     }
   }
 
   auto smx = 
-     steeredMx.Clone<4>({matxKeepDim, numPulses, numPairs, matxKeepDim});
-  auto vah = velAccelHypoth.Clone<4>(
+     clone<4>(steeredMx, {matxKeepDim, numPulses, numPairs, matxKeepDim});
+  auto vah = clone<4>(velAccelHypoth,
       {numBeams, matxKeepDim, matxKeepDim, matxKeepDim});
 
   (beamwiseRangeDoppler = smx + vah).run();
@@ -1818,8 +1980,8 @@ TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
           EXPECT_TRUE(MatXUtils::MatXTypeCompare(
               beamwiseRangeDoppler(i, j, k, l),
               ((i + 1) * 10 + (l + 1)) // steeredMx
-                  + ((j + 1) * 10000 + (k + 1) * 1000 +
-                     (l + 1) * 100) // velAccelHypoth
+                  + ((j + 1) * 10 + (k + 1) * 1 +
+                     (l + 1) * 1) // velAccelHypoth
               ));
         }
       }
@@ -1828,22 +1990,27 @@ TYPED_TEST(OperatorTestsNumeric, CloneAndAdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Reshape)
+TYPED_TEST(OperatorTestsNumericAllExecs, Reshape)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t count = 10;
-  tensor_t<TypeParam, 4> t4({count, count, count, count});
-  tensor_t<TypeParam, 1> t1({count * count * count * count});
+  tensor_t<TestType, 4> t4({count, count, count, count});
+  tensor_t<TestType, 1> t1({count * count * count * count});
 
   for (index_t i = 0; i < t4.Size(0); i++) {
     for (index_t j = 0; j < t4.Size(1); j++) {
       for (index_t k = 0; k < t4.Size(2); k++) {
         for (index_t l = 0; l < t4.Size(3); l++) {
           t4(i, j, k, l) =
-              static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+              static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
           t1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
              i * t4.Size(3) * t4.Size(2) * t4.Size(1)) =
-              static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+              static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
         }
       }
     }
@@ -1857,7 +2024,7 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
         for (index_t l = 0; l < t4.Size(3); l++) {
           MATX_ASSERT_EQ(rsv1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
                               i * t4.Size(3) * t4.Size(2) * t4.Size(1)),
-                         (TypeParam)(i + j + k + (double)l));
+                         (TestType)(i + j + k + (double)l));
         }
       }
     }
@@ -1898,36 +2065,42 @@ TYPED_TEST(OperatorTestsNumeric, Reshape)
 }
 
 
-TYPED_TEST(OperatorTestsNumeric, Broadcast)
+TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
 {
   MATX_ENTER_HANDLER();
-  {
-    tensor_t<TypeParam, 0> t0;
-    tensor_t<TypeParam, 4> t4i({10, 20, 30, 40});
-    tensor_t<TypeParam, 4> t4o({10, 20, 30, 40});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-    t0() = (TypeParam)2.0f;
+  ExecType exec{}; 
+
+  {
+    tensor_t<TestType, 0> t0;
+    tensor_t<TestType, 4> t4i({10, 20, 30, 40});
+    tensor_t<TestType, 4> t4o({10, 20, 30, 40});
+
+    t0() = (TestType)2.0f;
     for (index_t i = 0; i < t4i.Size(0); i++) {
       for (index_t j = 0; j < t4i.Size(1); j++) {
         for (index_t k = 0; k < t4i.Size(2); k++) {
           for (index_t l = 0; l < t4i.Size(3); l++) {
             t4i(i, j, k, l) =
-                static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+                static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
           }
         }
       }
     }
 
-    (t4o = t4i * t0).run();
+    (t4o = t4i * t0).run(exec);
     cudaStreamSynchronize(0);
   
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
           for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
+            if constexpr (IsHalfType<TestType>()) {
               MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t4i(i, j, k, l) * (double)t0());
+                             (TestType)t4i(i, j, k, l) * (TestType)t0());
             }
             else {
               MATX_ASSERT_EQ(t4o(i, j, k, l), t4i(i, j, k, l) * t0());
@@ -1936,16 +2109,16 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
         }
       }
     }
-    (t4o = t0 * t4i).run();
+    (t4o = t0 * t4i).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
         for (index_t k = 0; k < t4o.Size(2); k++) {
           for (index_t l = 0; l < t4o.Size(3); l++) {
-            if constexpr (IsHalfType<TypeParam>()) {
+            if constexpr (IsHalfType<TestType>()) {
               MATX_ASSERT_EQ(t4o(i, j, k, l),
-                             (double)t0() * (double)t4i(i, j, k, l));
+                             (TestType)t0() * (TestType)t4i(i, j, k, l));
             }
             else {
               MATX_ASSERT_EQ(t4o(i, j, k, l), t0() * t4i(i, j, k, l));
@@ -1956,12 +2129,12 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
     }
   // }
   // {
-  //   tensor_t<TypeParam, 1> t1({4});
-  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  //   tensor_t<TestType, 1> t1({4});
+  //   tensor_t<TestType, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TestType, 4> t4o({1, 2, 3, 4});
 
   //   for (index_t i = 0; i < t1.Size(0); i++) {
-  //     t1(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
+  //     t1(i) = static_cast<detail::value_promote_t<TestType>>(i);
   //   }
 
   //   for (index_t i = 0; i < t4i.Size(0); i++) {
@@ -1969,7 +2142,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -1982,7 +2155,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t4i(i, j, k, l) * (double)t1(l));
   //           }
@@ -2001,7 +2174,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t1(l) * (double)t4i(i, j, k, l));
   //           }
@@ -2015,13 +2188,13 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   // }
 
   // {
-  //   tensor_t<TypeParam, 2> t2({3, 4});
-  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  //   tensor_t<TestType, 2> t2({3, 4});
+  //   tensor_t<TestType, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TestType, 4> t4o({1, 2, 3, 4});
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
   //     for (index_t j = 0; j < t2.Size(1); j++) {
-  //       t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i + j);
+  //       t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i + j);
   //     }
   //   }
 
@@ -2030,7 +2203,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -2043,7 +2216,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t4i(i, j, k, l) * (double)t2(k, l));
   //           }
@@ -2062,7 +2235,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t2(k, l) * (double)t4i(i, j, k, l));
   //           }
@@ -2076,14 +2249,14 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   // }
 
   // {
-  //   tensor_t<TypeParam, 3> t3({2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  //   tensor_t<TestType, 3> t3({2, 3, 4});
+  //   tensor_t<TestType, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TestType, 4> t4o({1, 2, 3, 4});
 
   //   for (index_t i = 0; i < t3.Size(0); i++) {
   //     for (index_t j = 0; j < t3.Size(1); j++) {
   //       for (index_t k = 0; k < t3.Size(2); k++) {
-  //         t3(i, j, k) = static_cast<detail::value_promote_t<TypeParam>>(i + j + k);
+  //         t3(i, j, k) = static_cast<detail::value_promote_t<TestType>>(i + j + k);
   //       }
   //     }
   //   }
@@ -2093,7 +2266,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -2106,7 +2279,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t4i(i, j, k, l) * (double)t3(j, k, l));
   //           }
@@ -2125,7 +2298,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t3(j, k, l) * (double)t4i(i, j, k, l));
   //           }
@@ -2139,29 +2312,29 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   // }
 
   // {
-  //   tensor_t<TypeParam, 0> t0;
-  //   tensor_t<TypeParam, 1> t1({4});
-  //   tensor_t<TypeParam, 2> t2({3, 4});
-  //   tensor_t<TypeParam, 3> t3({2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4i({1, 2, 3, 4});
-  //   tensor_t<TypeParam, 4> t4o({1, 2, 3, 4});
+  //   tensor_t<TestType, 0> t0;
+  //   tensor_t<TestType, 1> t1({4});
+  //   tensor_t<TestType, 2> t2({3, 4});
+  //   tensor_t<TestType, 3> t3({2, 3, 4});
+  //   tensor_t<TestType, 4> t4i({1, 2, 3, 4});
+  //   tensor_t<TestType, 4> t4o({1, 2, 3, 4});
 
-  //   t0() = (TypeParam)200.0f;
+  //   t0() = (TestType)200.0f;
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
-  //     t1(i) = static_cast<detail::value_promote_t<TypeParam>>(i);
+  //     t1(i) = static_cast<detail::value_promote_t<TestType>>(i);
   //   }
 
   //   for (index_t i = 0; i < t2.Size(0); i++) {
   //     for (index_t j = 0; j < t2.Size(1); j++) {
-  //       t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i + j);
+  //       t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i + j);
   //     }
   //   }
 
   //   for (index_t i = 0; i < t3.Size(0); i++) {
   //     for (index_t j = 0; j < t3.Size(1); j++) {
   //       for (index_t k = 0; k < t3.Size(2); k++) {
-  //         t3(i, j, k) = static_cast<detail::value_promote_t<TypeParam>>(i + j + k);
+  //         t3(i, j, k) = static_cast<detail::value_promote_t<TestType>>(i + j + k);
   //       }
   //     }
   //   }
@@ -2171,7 +2344,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //       for (index_t k = 0; k < t4i.Size(2); k++) {
   //         for (index_t l = 0; l < t4i.Size(3); l++) {
   //           t4i(i, j, k, l) =
-  //               static_cast<detail::value_promote_t<TypeParam>>(i + j + k + l);
+  //               static_cast<detail::value_promote_t<TestType>>(i + j + k + l);
   //         }
   //       }
   //     }
@@ -2184,7 +2357,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t4i(i, j, k, l) + (double)t3(j, k, l) +
   //                                (double)t2(k, l) + (double)t1(l) +
@@ -2206,7 +2379,7 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
   //       for (index_t k = 0; k < t4o.Size(2); k++) {
   //         for (index_t l = 0; l < t4o.Size(3); l++) {
-  //           if constexpr (IsHalfType<TypeParam>()) {
+  //           if constexpr (IsHalfType<TestType>()) {
   //             MATX_ASSERT_EQ(t4o(i, j, k, l),
   //                            (double)t0() + (double)t1(l) + (double)t2(k, l) +
   //                                (double)t3(j, k, l) + (double)t4i(i, j, k, l));
@@ -2224,21 +2397,25 @@ TYPED_TEST(OperatorTestsNumeric, Broadcast)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
+  ExecType exec{}; 
   index_t i, j;
 
-  auto t11 = make_tensor<TypeParam>({10});
-  auto t12 = make_tensor<TypeParam>({5});
-  auto t1o = make_tensor<TypeParam>({15});
-  auto t1o1 = make_tensor<TypeParam>({30});
+  auto t11 = make_tensor<TestType>({10});
+  auto t12 = make_tensor<TestType>({5});
+  auto t1o = make_tensor<TestType>({15});
+  auto t1o1 = make_tensor<TestType>({30});
 
   t11.SetVals({0,1,2,3,4,5,6,7,8,9});
   t12.SetVals({0,1,2,3,4});
 
-  (t1o = concat(0, t11, t12)).run();
+  (t1o = concat(0, t11, t12)).run(exec);
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
@@ -2251,12 +2428,12 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   }
 
   // 2D tensors
-  auto t21 = make_tensor<TypeParam>({4, 4});
-  auto t22 = make_tensor<TypeParam>({3, 4});
-  auto t23 = make_tensor<TypeParam>({4, 3});
+  auto t21 = make_tensor<TestType>({4, 4});
+  auto t22 = make_tensor<TestType>({3, 4});
+  auto t23 = make_tensor<TestType>({4, 3});
 
-  auto t2o1 = make_tensor<TypeParam>({7,4});  
-  auto t2o2 = make_tensor<TypeParam>({4,7});  
+  auto t2o1 = make_tensor<TestType>({7,4});  
+  auto t2o2 = make_tensor<TestType>({4,7});  
   t21.SetVals({{1,2,3,4},
                {2,3,4,5},
                {3,4,5,6},
@@ -2269,7 +2446,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
                {9,10,11},
                {10,11,12}});
 
-  (t2o1 = concat(0, t21, t22)).run();
+  (t2o1 = concat(0, t21, t22)).run(exec);
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
@@ -2283,7 +2460,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     }
   }
 
-  (t2o2 = concat(1, t21, t23)).run(); 
+  (t2o2 = concat(1, t21, t23)).run(exec); 
   cudaStreamSynchronize(0);
   
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
@@ -2298,7 +2475,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   }  
 
   // Concatenating 3 tensors
-  (t1o1 = concat(0, t11, t11, t11)).run();
+  (t1o1 = concat(0, t11, t11, t11)).run(exec);
   cudaStreamSynchronize(0);
 
   for (i = 0; i < t1o1.Size(0); i++) {
@@ -2321,7 +2498,7 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
     
     auto tempConcat1 = matx::concat(0, a, b);
     auto tempConcat2 = matx::concat(0, c, d);
-    (result = matx::concat(0, tempConcat1, tempConcat2 )).run();
+    (result = matx::concat(0, tempConcat1, tempConcat2 )).run(exec);
 
     cudaStreamSynchronize(0);
     for (int cnt = 0; cnt < result.Size(0); cnt++) {
@@ -2332,19 +2509,22 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Concatenate)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericNonComplex, Stack)
+TYPED_TEST(OperatorTestsNumericAllExecs, Stack)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  auto in = range<0,1,TypeParam>({15}, 0, 1);
+  ExecType exec{}; 
 
-  auto t1a = make_tensor<TypeParam>({5});
-  auto t1b = make_tensor<TypeParam>({5});
-  auto t1c = make_tensor<TypeParam>({5});
+  auto t1a = make_tensor<TestType>({5});
+  auto t1b = make_tensor<TestType>({5});
+  auto t1c = make_tensor<TestType>({5});
  
   auto cop = concat(0, t1a, t1b, t1c);
   
-  (cop = in).run();
+  (cop = (TestType)2).run(exec);
   cudaDeviceSynchronize();
 
   {
@@ -2371,21 +2551,27 @@ TYPED_TEST(OperatorTestsNumericNonComplex, Stack)
 }
 
 
-TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, HermitianTranspose)
 {
   MATX_ENTER_HANDLER();
+
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t count0 = 100;
   index_t count1 = 200;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count1, count0});
+  tensor_t<TestType, 2> t2({count0, count1});
+  tensor_t<TestType, 2> t2s({count1, count0});
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      TypeParam tmp = {(float)i, (float)-j};
+      TestType tmp = {(float)i, (float)-j};
       t2(i, j) = tmp;
     }
   }
 
-  (t2s = hermitianT(t2)).run();
+  (t2s = hermitianT(t2)).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count0; i++) {
@@ -2401,21 +2587,26 @@ TYPED_TEST(OperatorTestsComplex, HermitianTranspose)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, PlanarTransform)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, PlanarTransform)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};   
   index_t m = 10;
   index_t k = 20;
-  tensor_t<TypeParam, 2> t2({m, k});
-  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
+  tensor_t<TestType, 2> t2({m, k});
+  tensor_t<typename TestType::value_type, 2> t2p({m * 2, k});
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
-      TypeParam tmp = {(float)i, (float)-j};
+      TestType tmp = {(float)i, (float)-j};
       t2(i, j) = tmp;
     }
   }
 
-  (t2p = planar(t2)).run();
+  (t2p = planar(t2)).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < m; i++) {
@@ -2428,13 +2619,19 @@ TYPED_TEST(OperatorTestsComplex, PlanarTransform)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
+TYPED_TEST(OperatorTestsComplexTypesAllExecs, InterleavedTransform)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t m = 10;
   index_t k = 20;
-  tensor_t<TypeParam, 2> t2({m, k});
-  tensor_t<typename TypeParam::value_type, 2> t2p({m * 2, k});
+  tensor_t<TestType, 2> t2({m, k});
+  tensor_t<typename TestType::value_type, 2> t2p({m * 2, k});
   for (index_t i = 0; i < 2 * m; i++) {
     for (index_t j = 0; j < k; j++) {
       if (i >= m) {
@@ -2446,7 +2643,7 @@ TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
     }
   }
 
-  (t2 = interleaved(t2p)).run();
+  (t2 = interleaved(t2p)).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < m; i++) {
@@ -2459,18 +2656,24 @@ TYPED_TEST(OperatorTestsComplex, InterleavedTransform)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsAll, RepMat)
+TYPED_TEST(OperatorTestsAllExecs, RepMat)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t count0 = 4;
   index_t count1 = 4;
   index_t same_reps = 10;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count0 * same_reps, count1 * same_reps});
+  tensor_t<TestType, 2> t2({count0, count1});
+  tensor_t<TestType, 2> t2s({count0 * same_reps, count1 * same_reps});
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i);
+      t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i);
     }
   }
 
@@ -2478,7 +2681,7 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   ASSERT_TRUE(repop.Size(0) == same_reps * t2.Size(0));
   ASSERT_TRUE(repop.Size(1) == same_reps * t2.Size(1));
 
-  (t2s = repop).run();
+  (t2s = repop).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
@@ -2489,13 +2692,13 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   }
 
   // Now a rectangular repmat
-  tensor_t<TypeParam, 2> t2r({count0 * same_reps, count1 * same_reps * 2});
+  tensor_t<TestType, 2> t2r({count0 * same_reps, count1 * same_reps * 2});
 
   auto rrepop = repmat(t2, {same_reps, same_reps * 2});
   ASSERT_TRUE(rrepop.Size(0) == same_reps * t2.Size(0));
   ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
 
-  (t2r = rrepop).run();
+  (t2r = rrepop).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
@@ -2507,44 +2710,56 @@ TYPED_TEST(OperatorTestsAll, RepMat)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Sphere2Cart)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Sphere2Cart)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   int n = 5;
 
-  auto xi = range<0>({n},(TypeParam)1,(TypeParam)1);
-  auto yi = range<0>({n},(TypeParam)1,(TypeParam)1);
-  auto zi = range<0>({n},(TypeParam)1,(TypeParam)1);
+  auto xi = range<0>({n},(TestType)1,(TestType)1);
+  auto yi = range<0>({n},(TestType)1,(TestType)1);
+  auto zi = range<0>({n},(TestType)1,(TestType)1);
 
   auto [theta, phi, r] = cart2sph(xi, yi, zi);
   auto [x, y, z] = sph2cart(theta, phi, r);
 
   for(int i=0; i<n; i++) {
-    ASSERT_NEAR(xi(i), x(i), .0001);
+    ASSERT_NEAR(xi(i), x(i), .01);
   }
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, ShiftOp)
+TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t count0 = 100;
   index_t count1 = 201;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2s({count0, count1});
-  tensor_t<TypeParam, 2> t2s2({count0, count1});
+  tensor_t<TestType, 2> t2({count0, count1});
+  tensor_t<TestType, 2> t2s({count0, count1});
+  tensor_t<TestType, 2> t2s2({count0, count1});
   tensor_t<int, 0> t0;
   t0() = -5;
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count1 + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i * count1 + j);
     }
   }
 
   {
-    (t2s = shift<0>(t2, -5)).run();
+    (t2s = shift<0>(t2, -5)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2556,7 +2771,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
   
   {
-    (t2s = shift<0>(t2, t0)).run();
+    (t2s = shift<0>(t2, t0)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2568,7 +2783,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, -5)).run();
+    (t2s = shift<1>(t2, -5)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2580,7 +2795,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1,0>(t2, -5, -6)).run();
+    (t2s = shift<1,0>(t2, -5, -6)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2592,7 +2807,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = fftshift2D(t2)).run();
+    (t2s = fftshift2D(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2605,7 +2820,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = ifftshift2D(t2)).run();
+    (t2s = ifftshift2D(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2619,7 +2834,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 
   // Right shifts
   {
-    (t2s = shift<0>(t2, 5)).run();
+    (t2s = shift<0>(t2, 5)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2631,7 +2846,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   }
 
   {
-    (t2s = shift<1>(t2, 5)).run();
+    (t2s = shift<1>(t2, 5)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2644,7 +2859,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
 
   // Large shifts
   {
-    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run();
+    (t2s = shift<0>(t2, -t2.Size(0) * 4)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2657,7 +2872,7 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   {
     // Shift 4 times the size back, minus one. This should be equivalent to
     // simply shifting by -1
-    (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run();
+    (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run(exec);
     (t2s2 = shift<0>(t2, -1)).run();
     cudaStreamSynchronize(0);
 
@@ -2671,22 +2886,28 @@ TYPED_TEST(OperatorTestsNumeric, ShiftOp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumeric, Reverse)
+TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t count0 = 100;
   index_t count1 = 200;
-  tensor_t<TypeParam, 2> t2({count0, count1});
-  tensor_t<TypeParam, 2> t2r({count0, count1});
+  tensor_t<TestType, 2> t2({count0, count1});
+  tensor_t<TestType, 2> t2r({count0, count1});
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      t2(i, j) = static_cast<detail::value_promote_t<TypeParam>>(i * count1 + j);
+      t2(i, j) = static_cast<detail::value_promote_t<TestType>>(i * count1 + j);
     }
   }
 
   {
-    (t2r = reverse<0>(t2)).run();
+    (t2r = reverse<0>(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2698,7 +2919,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverse<1>(t2)).run();
+    (t2r = reverse<1>(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2710,7 +2931,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = reverse<0,1>(t2)).run();
+    (t2r = reverse<0,1>(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2723,7 +2944,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
 
   // Flip versions
   {
-    (t2r = flipud(t2)).run();
+    (t2r = flipud(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2735,7 +2956,7 @@ TYPED_TEST(OperatorTestsNumeric, Reverse)
   }
 
   {
-    (t2r = fliplr(t2)).run();
+    (t2r = fliplr(t2)).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count0; i++) {
@@ -2781,7 +3002,7 @@ template<class TypeParam>
 TypeParam legendre_check(int n, int m, TypeParam x) {
 	if (m > n ) return 0;
 
-	TypeParam a = cuda::std::sqrt(TypeParam(1)-x*x);
+	TypeParam a = detail::_internal_sqrt(TypeParam(1)-x*x);
 	// first we will move move along diagonal
 
 	// initialize registers
@@ -2812,27 +3033,38 @@ TypeParam legendre_check(int n, int m, TypeParam x) {
 
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{}; 
+
   index_t size = 11;
   int order = 5;
   
   { // vector for n and m
     auto n = range<0, 1, int>({order}, 0, 1);
     auto m = range<0, 1, int>({order}, 0, 1);
-    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
+    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
 
-    auto out = make_tensor<TypeParam>({order, order, size});
+    auto out = make_tensor<TestType>({order, order, size});
 
-    (out = legendre(n, m, x)).run();
+    (out = legendre(n, m, x)).run(exec);
 
     cudaStreamSynchronize(0);
 
     for(int j = 0; j < order; j++) {
       for(int p = 0; p < order; p++) {
         for(int i = 0 ; i < size; i++) {
-          ASSERT_NEAR(out(p,j,i), legendre_check(p, j, x(i)),.0001);
+          if constexpr (is_matx_half_v<TestType>) {
+            ASSERT_NEAR(out(p,j,i), legendre_check(p, j, x(i)),50.0);
+          }
+          else {
+            ASSERT_NEAR(out(p,j,i), legendre_check(p, j, x(i)),.0001);
+          }
         }
       }
     }
@@ -2840,47 +3072,62 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, Legendre)
  
   { // constant for n
     auto m = range<0, 1, int>({order}, 0, 1);
-    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
+    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
 
-    auto out = make_tensor<TypeParam>({order, size});
+    auto out = make_tensor<TestType>({order, size});
 
-    (out = lcollapse<2>(legendre(order, m, x))).run();
+    (out = lcollapse<2>(legendre(order, m, x))).run(exec);
 
     cudaStreamSynchronize(0);
 
     for(int i = 0 ; i < size; i++) {
       for(int p = 0; p < order; p++) {
-        ASSERT_NEAR(out(p,i), legendre_check(order, p, x(i)),.0001);
+        if constexpr (is_matx_half_v<TestType>) {
+          ASSERT_NEAR(out(p,i), legendre_check(order, p, x(i)),50.0);
+        }
+        else {
+          ASSERT_NEAR(out(p,i), legendre_check(order, p, x(i)),.0001);
+        }        
       }
     }
   }
 
   { // taking a constant for m and n;
-    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
+    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
 
-    auto out = make_tensor<TypeParam>({size});
+    auto out = make_tensor<TestType>({size});
 
-    (out = lcollapse<3>(legendre(order, order,  x))).run();
+    (out = lcollapse<3>(legendre(order, order,  x))).run(exec);
 
     cudaStreamSynchronize(0);
 
     for(int i = 0 ; i < size; i++) {
-      ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+      if constexpr (is_matx_half_v<TestType>) {
+        ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),50.0);
+      }
+      else {
+        ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+      }        
     }
   }
   
   { // taking a rank0 tensor for m and constant for n
-    auto x = as_type<TypeParam>(linspace<0>({size}, TypeParam(0), TypeParam(1)));
+    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
     auto m = make_tensor<int>();
-    auto out = make_tensor<TypeParam>({size});
+    auto out = make_tensor<TestType>({size});
     m() = order;
 
-    (out = lcollapse<3>(legendre(order, m,  x))).run();
+    (out = lcollapse<3>(legendre(order, m,  x))).run(exec);
 
     cudaStreamSynchronize(0);
 
     for(int i = 0 ; i < size; i++) {
-      ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+      if constexpr (is_matx_half_v<TestType>) {
+        ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),50.0);
+      }
+      else {
+        ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
+      }        
     }
   }
   MATX_EXIT_HANDLER();
@@ -3043,11 +3290,13 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
 }
 
 
-TYPED_TEST(OperatorTestsFloat, Print)
+TYPED_TEST(OperatorTestsFloatAllExecs, Print)
 {
   MATX_ENTER_HANDLER();
-  auto t = make_tensor<TypeParam>({3});
-  auto r = ones<TypeParam>(t.Shape());
+  using TestType = std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({3});
+  auto r = ones<TestType>(t.Shape());
 
   print(r);
   MATX_EXIT_HANDLER();

@@ -250,7 +250,7 @@ struct is_cuda_complex<cuda::std::complex<T>> : std::true_type {
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<T>::value;
+inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<remove_cvref_t<T>>::value;
 
 
 
@@ -293,7 +293,6 @@ template <typename T>
 struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> { 
   using type = typename T::value_type;
 };
-
 
 
 namespace detail {
@@ -526,6 +525,26 @@ struct convert_matx_type<matxBf16> {
 template <typename T> 
 using convert_matx_type_t = typename convert_matx_type<T>::type;
 
+template <typename T> 
+struct convert_half_to_matx_half {
+  using type = T;
+};
+
+template <> 
+struct convert_half_to_matx_half<__half> {
+  using type = matxFp16;
+};
+
+template <> 
+struct convert_half_to_matx_half<__nv_bfloat16> {
+  using type = matxBf16;
+};
+
+template <typename T> 
+using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
+
+
+
 template <class T, std::size_t N, std::size_t... I>
 constexpr std::array<std::remove_cv_t<T>, N>
     to_array_impl(T (&a)[N], std::index_sequence<I...>)
@@ -553,6 +572,23 @@ struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
 };
 
 template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+
+template <typename T, typename = void> 
+struct complex_from_scalar {
+  using type = T;
+};
+
+template <typename T> 
+struct complex_from_scalar<T, typename std::enable_if_t<std::is_same_v<float, T> || std::is_same_v<double, T>>> {
+  using type = cuda::std::complex<T>;
+};
+
+template <typename T> 
+struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_half_v<T> > > {
+  using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
+};
+
+template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
 
 
 template <typename T, typename = void> 

@@ -44,10 +44,10 @@ namespace matx {
  * @tparam Desc Descriptor for tensor
  * 
  */
-template <typename OperatorType>
+template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorIterator {
-  using self_type = RandomOperatorIterator<OperatorType>;
-  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
+  using self_type = RandomOperatorIterator<OperatorType, ConvertType>;
+  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::scalar_type>, typename OperatorType::scalar_type>;
   using scalar_type = value_type;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
@@ -155,8 +155,8 @@ struct RandomOperatorIterator {
   stride_type offset_;  
 };
 
-template <typename OperatorType>
-__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorIterator<OperatorType> &a, const RandomOperatorIterator<OperatorType> &b)
+template <typename OperatorType, bool ConvertType = true>
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorIterator<OperatorType, ConvertType> &a, const RandomOperatorIterator<OperatorType, ConvertType> &b)
 {
   return a.offset_ - b.offset_;
 }    
@@ -171,10 +171,10 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOper
  * @tparam Desc Descriptor for tensor
  * 
  */
-template <typename OperatorType>
+template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorOutputIterator {
-  using self_type = RandomOperatorOutputIterator<OperatorType>;
-  using value_type = detail::convert_matx_type_t<typename OperatorType::scalar_type>;
+  using self_type = RandomOperatorOutputIterator<OperatorType, ConvertType>;
+  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::scalar_type>, typename OperatorType::scalar_type>;
   using scalar_type = value_type;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;

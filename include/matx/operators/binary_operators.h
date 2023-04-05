@@ -312,6 +312,15 @@ namespace matx
    *   RHS tensor or operator input
    */
   Op operator||(Op t, Op t2) {}
+
+  /**
+   * Compute the arctangent of two inputs
+   * @param t
+   *   X value of input
+   * @param t2
+   *   Y value of input
+   */
+  Op atan2(Op t, Op t2) {}  
 #else
   DEFINE_BINARY_OP(operator+, detail::AddOp);
   DEFINE_BINARY_OP(operator-, detail::SubOp);
@@ -325,6 +334,7 @@ namespace matx
   DEFINE_BINARY_OP(operator^, detail::XorOp);
   DEFINE_BINARY_OP(pow, detail::PowOp);
   DEFINE_BINARY_OP(max, detail::MaxOp);
+  DEFINE_BINARY_OP(atan2, detail::Atan2Op);
   DEFINE_BINARY_OP(min, detail::MinOp);
   DEFINE_BINARY_OP(operator<, detail::LTOp);
   DEFINE_BINARY_OP(operator>, detail::GTOp);
