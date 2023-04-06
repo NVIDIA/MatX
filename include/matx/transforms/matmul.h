@@ -452,7 +452,7 @@ private:
   void *c_hp = nullptr; // Make these void since they only work on complex types
   void *a_hp = nullptr;
   void *b_hp = nullptr;
-  size_t workspaceSize = 1 << 25UL; // 16MB buffer suggested by cuBLAS team
+  size_t workspaceSize = 1 << 22UL; // 4MB buffer suggested by cuBLAS team
   void *workspace = nullptr;
   detail::MatMulParams_t params_;
 
