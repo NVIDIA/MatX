@@ -145,7 +145,7 @@ void reduce_4d(
   (t4 = r4).run();
   cudaDeviceSynchronize();
 
-  state.exec([&t4, &t1](nvbench::launch &launch) { matx::sum(t1, t4, launch.get_stream()); });
+  state.exec([&t4, &t1](nvbench::launch &launch) { matx::sum(t1, t4, (cudaStream_t)launch.get_stream()); });
 
 }
 

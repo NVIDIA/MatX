@@ -39,7 +39,7 @@ void sort1d(
 
   (randomData = randTensorView).run();
 
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
 
 }
 
@@ -77,7 +77,7 @@ void sort2d(
 
   (randomData = randTensorView).run();
 
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
 
 }
 
