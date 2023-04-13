@@ -32,6 +32,8 @@
 #pragma once
 #include<functional>
 #include<map>
+#include <mutex>
+#include <shared_mutex>
 #include<string>
 #include<utility>
 #include <nvToolsExt.h>
