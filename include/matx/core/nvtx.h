@@ -33,7 +33,6 @@
 #include<functional>
 #include<map>
 #include <mutex>
-#include <shared_mutex>
 #include<string>
 #include<utility>
 #include <nvToolsExt.h>
@@ -87,7 +86,7 @@ static const int32_t nvtxColors[nunNvtxColors] = {
 
 inline uint64_t                      curColorIdx;     ///< counter for rotation of colors for sequential ranges
 inline std::map< int, nvtxRangeId_t> nvtx_eventMap;   ///< map of currently active NVTX ranges
-inline std::shared_mutex             nvtx_memory_mtx; ///< Mutex protecting updates from map
+inline std::mutex                    nvtx_memory_mtx; ///< Mutex protecting updates from map
 
 inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_API;
 
