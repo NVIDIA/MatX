@@ -41,7 +41,7 @@ namespace matx
 
 /**
  * @brief levels of NVTX Logging. Lower level is more selective (prints less)
- * 
+ *
  */
 enum matx_nvxtLogLevels
 {
@@ -68,7 +68,7 @@ static const int32_t nunNvtxColors = 10;
 
 /**
  * @brief automatic NVTX Colors
- * 
+ *
  */
 static const int32_t nvtxColors[nunNvtxColors] = {
                                              NVTX_BLACK,
@@ -83,8 +83,9 @@ static const int32_t nvtxColors[nunNvtxColors] = {
                                              NVTX_WHITE
                                              };
 
-inline uint64_t curColorIdx;
-inline std::map< int, nvtxRangeId_t>  eventMap;
+inline uint64_t                      curColorIdx;     ///< counter for rotation of colors for sequential ranges
+inline std::map< int, nvtxRangeId_t> nvtx_eventMap;   ///< map of currently active NVTX ranges
+inline std::shared_mutex             nvtx_memory_mtx; ///< Mutex protecting updates from map
 
 inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_API;
 
@@ -116,11 +117,10 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
   #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
 
   #define MATX_NVTX_END_RANGE( id ) matx::endEvent( id );
-  
-  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) matx::setNVTXLogLevel( nvtxLevel );
-  
-////////////             Disable NVTX Macros          /////////////////
 
+  #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) matx::setNVTXLogLevel( nvtxLevel );
+
+////////////             Disable NVTX Macros          /////////////////
 #else
 
   #define MATX_NVTX_1( message );
@@ -134,9 +134,9 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                   MATX_NVTX_2(__VA_ARGS__),\
                                   MATX_NVTX_1(__VA_ARGS__)\
                                   )
-                                  
+
   #define MATX_NVTX_END_RANGE( id );
-  
+
   #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel );
 
 #endif
@@ -146,7 +146,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief Utility Function to set Global Log Level. should be called through the 
+///\brief Utility Function to set Global Log Level. should be called through the
 ///       MATX_NVTX_SET_LOG_LEVEL macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,33 +157,36 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief fucntion wrapping NVTX management for automatic creation/deletion 
+///\brief fucntion wrapping NVTX management for automatic creation/deletion
 ///       MATX_NVTX_START or MATX_NVTX_START_RANGE macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void registerEvent( int registerId, nvtxRangeId_t eventId )
-{ 
+{
+  std::unique_lock lck(nvtx_memory_mtx);
+
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
-  eventMap.insert(newPair);
+  nvtx_eventMap.insert(newPair);
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
-///\brief fucntion wrapping NVTX management for automatic creation/deletion 
+///\brief fucntion wrapping NVTX management for automatic creation/deletion
 ///       MATX_NVTX_END_RANGE macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
 static void endEvent( int id )
-{    
-  auto foundIter = eventMap.find( id );
+{
+  std::unique_lock lck(nvtx_memory_mtx);
 
-  if( foundIter != eventMap.end())
+  auto foundIter = nvtx_eventMap.find( id );
+
+  if( foundIter != nvtx_eventMap.end())
   {
     nvtxRangeEnd(foundIter->second);
-    eventMap.erase( foundIter );
+    nvtx_eventMap.erase( foundIter );
   }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -194,7 +197,7 @@ static void endEvent( int id )
 class NvtxEvent
 {
   public:
-  
+
   ////////////////////////////////////////////////////////////////////////////////
   ///
   ///\brief ctor
@@ -205,7 +208,7 @@ class NvtxEvent
   ///                    which uses function name instead
   ///\param nvtxLevel    level of NVTX events to use higher number reduces scope
   ///\param registerId   customID (integer) used to reference ranges you wish to manually end
-  
+
   ///
   ////////////////////////////////////////////////////////////////////////////////
   NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL, int registerId = -1 )
@@ -264,7 +267,7 @@ class NvtxEvent
     {
       endEvent( userHandle_ );
     }
-    
+
     nvtxRangeEnd(rangeId_);
   }
 
