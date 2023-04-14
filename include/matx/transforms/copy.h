@@ -60,7 +60,7 @@ namespace matx
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
         Executor exec)
     {
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)      
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       for (int i = 0; i < OutputTensor::Rank(); i++)
       {
         MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
@@ -69,11 +69,39 @@ namespace matx
       (out = in).run(exec);
     };
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, std::enable_if_t<is_tensor_view_v<InputTensor>, bool> = true>
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
         cudaStream_t stream = 0)
     {
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)      
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       matx::copy(out, in, cudaExecutor(stream));
-    };    
+    };
+
+  /**
+   * Make a deep copy of a view into a new tensor.
+   *
+   * Creates a new tensor of the same rank and dimension as the input view.
+   * Copies the data from the input view into the new tensor and returns it.
+   *
+   * @param in
+   *   Tensor to copy from
+   * @param exec
+   *   Executor to run copy in
+   * @return New tensor into which the input view has been copied
+   */
+  template <typename Tensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+  __MATX_INLINE__ Tensor copy(const Tensor &in, Executor exec)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    Tensor out({in.Shape()});
+    matx::copy(out, in, exec);
+    return out;
+  };
+
+  template <typename Tensor>
+  __MATX_INLINE__ Tensor copy(const Tensor &in, cudaStream_t stream = 0)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    return matx::copy(in, cudaExecutor(stream));
+  };
 } // end namespace matx

@@ -12,6 +12,7 @@ set (test_sources
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
     00_transform/MatMul.cu
+    00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
     00_transform/Solve.cu
