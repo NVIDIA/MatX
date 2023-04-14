@@ -93,7 +93,7 @@ namespace matx
   __MATX_INLINE__ Tensor copy(const Tensor &in, Executor exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    Tensor out({in.Shape()});
+    Tensor out(in.Descriptor());
     matx::copy(out, in, exec);
     return out;
   };
