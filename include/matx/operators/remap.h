@@ -58,7 +58,7 @@ namespace matx
         using shape_type = typename T::shape_type; 
         using index_type = typename IdxType::scalar_type;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
-        static_assert(IdxType::Rank() <= 1, "RemapOp: Rank of index operator must be 1");
+        static_assert(IdxType::Rank() <= 1, "RemapOp: Rank of index operator must be 0 or 1");
         static_assert(DIM<T::Rank(), "RemapOp: DIM must be less than Rank of tensor");
 
         __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
