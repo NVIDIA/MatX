@@ -58,7 +58,7 @@ namespace matx
         using shape_type = typename T::shape_type; 
         using index_type = typename IdxType::scalar_type;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
-        static_assert(IdxType::Rank() == 1, "RemapOp: Rank of index operator must be 1");
+        static_assert(IdxType::Rank() <= 1, "RemapOp: Rank of index operator must be 1");
         static_assert(DIM<T::Rank(), "RemapOp: DIM must be less than Rank of tensor");
 
         __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
@@ -76,7 +76,11 @@ namespace matx
             // get current index for dim
             auto i = ind[DIM];
             // remap current index for dim
-            ind[DIM] = idx_(i);
+            if constexpr (IdxType::Rank() == 0) {
+              ind[DIM] = idx_();
+            } else {
+              ind[DIM] = idx_(i);
+            }
             //return op_(ind);
             return mapply(op_, ind);
           }
@@ -92,7 +96,11 @@ namespace matx
             // get current index for dim
             auto i = ind[DIM];
             // remap current index for dim
-            ind[DIM] = idx_(i);
+            if constexpr (IdxType::Rank() == 0) {
+              ind[DIM] = idx_();
+            } else {
+              ind[DIM] = idx_(i);
+            }
             //return op_(ind);
             return mapply(op_, ind);
           }
@@ -103,10 +111,15 @@ namespace matx
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
-          if(dim == DIM)
-            return idx_.Size(0);
-          else 
+          if(dim == DIM) {
+            if constexpr (IdxType::Rank() == 0) {
+              return 1;
+            } else {
+              return idx_.Size(0);
+            }
+          } else {
             return op_.Size(dim);
+          }
         }
 
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
@@ -117,10 +130,12 @@ namespace matx
    * @brief Operator to logically remap elements of an operator based on an index array/operator.
    *
    * The rank of the output tensor is equal to the rank of the input tensor.
-   * The rank of the index tensor must be 1.  
+   * The rank of the index tensor must be 0 or 1.
    *
    * The size of the output tensor is the same as the input tensor except in the applied dimenions.
    * In the applied dimension the size of the output tensor is equal to the size of the index tensor.
+   * In the case of a 0-rank index tensor, the size of the output tensor in the corresponding
+   * dimension is always 1.
    * 
    * This operator can appear as an rvalue or lvalue. 
    *
@@ -141,11 +156,13 @@ namespace matx
    * @brief Operator to logically remap elements of an operator based on an index array/operator.
    *
    * The rank of the output tensor is equal to the rank of the input tensor.
-   * The rank of the index tensor must be 1.  
+   * The rank of the index tensor must be 0 or 1.
    * The number of DIMS and the number of Inds provided must be the same.
    *
    * The size of the output tensor is the same as the input tensor except in the applied dimenions.
    * In the applied dimension the size of the output tensor is equal to the size of the index tensor.
+   * In the case of a 0-rank index tensor, the size of the output tensor in the corresponding
+   * dimension is always 1.
    * 
    * This operator can appear as an rvalue or lvalue. 
    *
