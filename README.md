@@ -49,6 +49,8 @@ are necessary
 ## Requirements
 MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
+**Note**: Both CUDA 12.0.0 and CUDA 12.1.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. We are looking into this issue. CUDA 11.8 does not have either of these issues.
+
 MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.4 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
 MatX has been tested on and supports Pascal, Turing, Volta, Ampere, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
