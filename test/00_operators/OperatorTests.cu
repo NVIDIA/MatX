@@ -618,6 +618,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   (t2 = linspace<1>(t2.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t3 = linspace<2>(t3.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t4 = linspace<3>(t4.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  cudaStreamSynchronize(0);
 
   auto t2t = slice(t2, {1, 2}, {3, 5});
   auto t3t = slice(t3, {1, 2, 3}, {3, 5, 7});
@@ -673,6 +674,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceAndReduceOp)
   tensor_t<TestType, 3> t3t{{30, 20, 10}};
   (t2t = linspace<1>(t2t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t3t = linspace<2>(t3t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  cudaStreamSynchronize(0);
 
   {
     index_t j = 0;
