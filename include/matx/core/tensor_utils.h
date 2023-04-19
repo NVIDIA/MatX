@@ -38,7 +38,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/dlpack.h"
 #include "matx/core/make_tensor.h"
-
+#include "matx/kernels/utility.cuh"
 
 namespace matx
 {

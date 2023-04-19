@@ -1167,7 +1167,8 @@ public:
 
   __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
     bool managed;
-    MATX_ASSERT(cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)Data()) == CUDA_SUCCESS, matxNotSupported);
+    const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)Data());
+    MATX_ASSERT(retval == CUDA_SUCCESS, matxNotSupported);
     return managed;
   }
 
