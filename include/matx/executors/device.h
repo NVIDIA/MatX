@@ -84,41 +84,41 @@ namespace matx
           MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
-          if constexpr (op.Rank() == 0) {
+          if constexpr (Op::Rank() == 0) {
             threads = 1;
             blocks = 1;
             detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
           }
           else {
-            std::array<index_t, op.Rank()> sizes;
-            for (int i = 0; i < op.Rank(); i++) {
+            std::array<index_t, Op::Rank()> sizes;
+            for (int i = 0; i < Op::Rank(); i++) {
               sizes[i] = op.Size(i);
             }        
 
-            bool stride = detail::get_grid_dims<op.Rank()>(blocks, threads, sizes, 256);
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
 
-            if constexpr (op.Rank() == 1) {
+            if constexpr (Op::Rank() == 1) {
               if(stride) {
                 detail::matxOpT1StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else {
                 detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               }
             }
-            else if constexpr (op.Rank() == 2) {
+            else if constexpr (Op::Rank() == 2) {
               if(stride) {
                 detail::matxOpT2StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
               } else {
                 detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
               }
             }
-            else if constexpr (op.Rank() == 3) {
+            else if constexpr (Op::Rank() == 3) {
               if(stride) {
                 detail::matxOpT3StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
               } else {
                 detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
               }
             }
-            else if constexpr (op.Rank() == 4) {
+            else if constexpr (Op::Rank() == 4) {
               if(stride) {
                 detail::matxOpT4StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
               } else {
@@ -131,7 +131,7 @@ namespace matx
             } 
           }
 #else
-          MATX_THROW(matxNotSupported, "Cannot execute device function from host compiler");    
+          #error "Cannot execute device function from host compiler"
 #endif    
         }
 
