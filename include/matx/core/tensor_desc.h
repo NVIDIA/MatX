@@ -162,7 +162,7 @@ public:
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) : 
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(*(shape + i) > 0, matxInvalidSize,
+      MATX_ASSERT_STR(*(shape.begin() + i) > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
       *(stride_.begin() + i) = strides[i];
     }

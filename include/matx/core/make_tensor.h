@@ -607,7 +607,7 @@ auto make_tensor( T *const data,
   DefaultDescriptor<RANK>  desc{shape, strides};
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize()*sizeof(T)), owning};
   basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T,RANK, decltype(s), decltype(desc)>{data, shape, strides};
+  return tensor_t<T,RANK, decltype(s), decltype(desc)>{s, std::move(desc), data};
 }
 
 /**
