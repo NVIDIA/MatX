@@ -80,7 +80,7 @@ By default CMake will target the GPU architecture(s) of the system you're compil
 `CMAKE_CUDA_ARCHITECTURES` flag with a list of architectures to build for:
 
 ```sh
-cmake .. -DCMAKE_CUDA_ARCHITECTURES="60;70"
+cmake .. -DCMAKE_CUDA_ARCHITECTURES="80;90"
 ```
 
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
@@ -195,6 +195,22 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+*v0.4.0*:
+* SVD power iteration function
+* `sign`, and `index` operators
+* Batched QR for small matrices
+* dlpack export support
+* 16-bit float reductions
+* Output iterator support in CUB
+
+*v0.3.0*:
+* Many new operators, including `flatten`, `remap`, `lcollapse`. `rcollapse`, `fmod`, `clone`, `slice`
+* Extended N-D tensor support to more functions
+* Allow operators on reduction inputs
+* g++11 support
+* NVTX support
+* Many, many bug fixes
+
 *v0.2.3*:
 * Several new functions: `find`, `find_idx`, `unique`, and `chirp`
 * cuTENSOR and cuTensorNet integration for new `einsum` function
@@ -203,11 +219,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
    
 *v0.2.2*:
 * Arbitrary tensor ranks
-   
-*v0.2.1*:
-* Generic storage and descriptor types
-* Static tensor dimensions for compile-time sizes and strides
-* Slew of new ``make_`` helper functions and documentation
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
