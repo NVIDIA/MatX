@@ -11,9 +11,7 @@ set (bench_sources
     01_radar/SingleChanSimplePipeline.cu
 )
 
-set(target_inc  ${CMAKE_SOURCE_DIR}/include/
-                ${CMAKE_SOURCE_DIR}/include/kernels/
-                ${CMAKE_SOURCE_DIR}/test/include
+set(target_inc  ${CMAKE_SOURCE_DIR}/test/include
                 ${CMAKE_SOURCE_DIR}/examples/)
 set(system_inc  ${CUTLASS_INC}
                 ${pybind11_INCLUDE_DIR}
