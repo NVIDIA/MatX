@@ -40,7 +40,7 @@ foreach (ptest ${proprietary_sources})
     list(APPEND proprietary_inc_list ${incdir}/../examples)
 endforeach()
 
-set(target_inc ${CMAKE_SOURCE_DIR}/include/ ${CMAKE_SOURCE_DIR}/include/kernels/ ${CMAKE_SOURCE_DIR}/test/include ${CMAKE_SOURCE_DIR}/examples/ ${proprietary_inc_list})
+set(target_inc ${CMAKE_SOURCE_DIR}/test/include ${CMAKE_SOURCE_DIR}/examples/ ${proprietary_inc_list})
 set(system_inc ${CUTLASS_INC} ${GTEST_INC_DIRS} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
 set(all_test_srcs ${test_sources} ${proprietary_sources})

@@ -16,10 +16,6 @@ set(examples
 
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS}) 
-target_include_directories( example_lib INTERFACE 
-                            ${CMAKE_SOURCE_DIR}/include/ 
-                            ${CMAKE_SOURCE_DIR}/include/kernels/ 
-                            ${CMAKE_SOURCE_DIR}/include/common) 
 
 target_link_libraries(example_lib INTERFACE matx::matx) # Transitive properties                        
 
