@@ -100,7 +100,7 @@ endif()
 
 # We typically need newer versions libcudacxx than availabled in the toolkit.  pull down specific version here
 message(STATUS "Need libcuda++. Finding...")
-set(LIBCUDACXX_VERSION "1.8.1" CACHE STRING "Version of libcudacxx to use")
+set(LIBCUDACXX_VERSION "2.1.0" CACHE STRING "Version of libcudacxx to use")
 include(cmake/FindLibcudacxx.cmake)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 
