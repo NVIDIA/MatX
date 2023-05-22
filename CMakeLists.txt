@@ -142,7 +142,6 @@ else()
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
 endif()
 
-message(status ${MATX_DISABLE_CUB_CACHE})
 if (MATX_DISABLE_CUB_CACHE)
     target_compile_definitions(matx INTERFACE MATX_DISABLE_CUB_CACHE=1)
 endif()
