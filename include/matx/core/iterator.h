@@ -57,8 +57,8 @@ struct RandomOperatorIterator {
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
 
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const RandomOperatorIterator &) = default;
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(RandomOperatorIterator &&) = default;
+  __MATX_INLINE__ RandomOperatorIterator(const RandomOperatorIterator &) = default;
+  __MATX_INLINE__ RandomOperatorIterator(RandomOperatorIterator &&) = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorType &&t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
@@ -184,8 +184,8 @@ struct RandomOperatorOutputIterator {
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
 
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(RandomOperatorOutputIterator &&) = default;
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const RandomOperatorOutputIterator &) = default;
+  __MATX_INLINE__ RandomOperatorOutputIterator(RandomOperatorOutputIterator &&) = default;
+  __MATX_INLINE__ RandomOperatorOutputIterator(const RandomOperatorOutputIterator &) = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorType &&t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t) : t_(t), offset_(0) { }
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}

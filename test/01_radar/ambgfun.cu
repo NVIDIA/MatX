@@ -57,7 +57,11 @@ protected:
   std::unique_ptr<detail::MatXPybind> pb;
 };
 
+#ifdef CUPY_INSTALLED
 TEST_F(RadarAmbiguityFunction, Cut2D)
+#else
+TEST_F(RadarAmbiguityFunction, DISABLED_Cut2D)
+#endif
 {
   MATX_ENTER_HANDLER();
 
@@ -71,7 +75,11 @@ TEST_F(RadarAmbiguityFunction, Cut2D)
   MATX_EXIT_HANDLER();
 }
 
+#ifdef CUPY_INSTALLED
 TEST_F(RadarAmbiguityFunction, CutDelay)
+#else
+TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
+#endif
 {
   MATX_ENTER_HANDLER();
 
@@ -86,7 +94,11 @@ TEST_F(RadarAmbiguityFunction, CutDelay)
   MATX_EXIT_HANDLER();
 }
 
+#ifdef CUPY_INSTALLED
 TEST_F(RadarAmbiguityFunction, CutDoppler)
+#else
+TEST_F(RadarAmbiguityFunction, DISABLED_CutDoppler)
+#endif
 {
   MATX_ENTER_HANDLER();
 

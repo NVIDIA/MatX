@@ -186,6 +186,7 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     # Check for python libs
     include(cmake/CheckPythonLibs.cmake)
     check_python_libs("numpy")
+    check_optional_python_libs("cupy")
 
     # Required by pybind
     # https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-
