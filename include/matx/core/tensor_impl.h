@@ -80,12 +80,12 @@ class tensor_impl_t {
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t(const tensor_impl_t &) = default;
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t(tensor_impl_t &&) = default;
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
+    __MATX_INLINE__ tensor_impl_t(const tensor_impl_t &) = default;
+    __MATX_INLINE__ tensor_impl_t(tensor_impl_t &&) = default;
+    __MATX_INLINE__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
 
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  ~tensor_impl_t() = default;
+    __MATX_INLINE__ ~tensor_impl_t() = default;
 
 
     const std::string str() const {

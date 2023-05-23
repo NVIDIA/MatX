@@ -33,6 +33,30 @@ set (test_sources
     main.cu
 )
 
+# Some of <00_io> tests need csv files and the binary 'test.mat' which all 
+# are located under 'CMAKE_SOURCE_DIR/test/00_io'. When calling the test
+# executable <matx_test> from its location in 'CMAKE_BINARY_DIR/test' the
+# search paths according <FileIOTests.cu> are 
+# '../test/00_io/small_csv_comma_nh.csv' and 
+# '../test/00_io/small_csv_complex_comma_nh.csv' respectively. Therefore
+# they must be copied to the correct location:
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/00_io)
+file(COPY_FILE
+	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_comma_nh.csv
+	${CMAKE_BINARY_DIR}/test/00_io/small_csv_comma_nh.csv
+	ONLY_IF_DIFFERENT
+)
+file(COPY_FILE
+	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_complex_comma_nh.csv
+	${CMAKE_BINARY_DIR}/test/00_io/small_csv_complex_comma_nh.csv
+	ONLY_IF_DIFFERENT
+)
+file(COPY_FILE
+	${CMAKE_SOURCE_DIR}/test/00_io/test.mat
+	${CMAKE_BINARY_DIR}/test/00_io/test.mat
+	ONLY_IF_DIFFERENT
+)
+
 # Find proprietary parameters
 file (GLOB_RECURSE proprietary_sources ../proprietary/*/tests/*.cu)
 foreach (ptest ${proprietary_sources})
@@ -49,6 +73,10 @@ add_executable(matx_test main.cu ${all_test_srcs})
 
 # Set all the flags/other properties
 set_property(TARGET matx_test PROPERTY ENABLE_EXPORTS 1)
+
+if (DEFINED cupy_PYTHON_PACKAGE)
+    target_compile_definitions(matx_test PRIVATE CUPY_INSTALLED)
+endif()
 
 if (MSVC)
     target_compile_options(matx_test  PRIVATE /W4 /WX)
