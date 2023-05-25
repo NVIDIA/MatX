@@ -136,7 +136,10 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, VarianceStd)
   pb->NumpyToTensorView(t1, "x");
 
   var(t0, t1, exec);
-  MATX_TEST_ASSERT_COMPARE(pb, t0, "var", 0.01);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ub", 0.01);
+
+  var(t0, t1, exec, 0);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);  
 
   stdd(t0, t1, exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
@@ -162,7 +165,10 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
   pb->NumpyToTensorView(t1, "x");
 
   var(t0, t1, exec);
-  MATX_TEST_ASSERT_COMPARE(pb, t0, "var", 0.01);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ub", 0.01);
+
+  var(t0, t1, exec, 0);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);    
 
   stdd(t0, t1, exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);

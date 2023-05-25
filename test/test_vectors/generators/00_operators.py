@@ -63,12 +63,14 @@ class stats:
 
     def run(self) -> Dict[str, np.array]:
         x = np.random.rand(self.size[0])
-        var = np.var(x)
+        var_ub = np.var(x)
+        var_ml = np.var(x, ddof = 0)
         std = np.std(x)
 
         return {
             'x': x,
-            'var': var,
+            'var_ub': var_ub,
+            'var_ml': var_ml,
             'std': std
         }
 
