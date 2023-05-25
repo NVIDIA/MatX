@@ -2845,6 +2845,9 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], E
  *   Destination view of reduction
  * @param in
  *   Input data to reduce
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  * @param stream
  *   CUDA stream ID
  */
@@ -2873,6 +2876,9 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, int ddof = 1, int strea
  *   Input data to reduce
  * @param exec
  *   Executor type
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  */
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
 void __MATX_INLINE__ var(OutType dest, const InType &in, Executor &&exec, int ddof = 1)
@@ -2937,6 +2943,9 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, Executor &&exec, int dd
  *   Array containing dimensions to reduce over
  * @param exec
  *   Executor to use for reduction
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  */
 template <typename OutType, typename InType, int D, typename Executor>
 void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec, int ddof = 1)
