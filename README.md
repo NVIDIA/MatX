@@ -63,7 +63,8 @@ MatX has been tested on and supports Pascal, Turing, Volta, Ampere, and Hopper G
 ## Installation
 MatX is a header-only library that does not require compiling for using in your applications. However, building unit tests, benchmarks, 
 or examples must be compiled. CPM is used as a package manager for CMake to download and configure any dependencies. If MatX is to
-be used in an air-gapped environment, CPM [can be configured](https://github.com/cpm-cmake/CPM.cmake#cpm_source_cache) to search locally for files.
+be used in an [air-gapped environment](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments), 
+CPM [can be configured](https://github.com/cpm-cmake/CPM.cmake#cpm_source_cache) to search locally for files.
 Depending on what options are enabled, compiling could take very long without parallelism enabled. Using the ``-j`` flag on ``make`` is
 suggested with the highest number your system will accommodate. 
 
