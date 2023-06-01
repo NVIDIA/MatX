@@ -1749,7 +1749,19 @@ public:
       [&](auto&&... args) {
         detail::InternalPrint(s, args...);
       }, tup);
-  }   
+  }
+
+  static void FreeDLPack(struct DLManagedTensor *mtv) {
+      delete [] mtv->dl_tensor.shape;
+      delete [] mtv->dl_tensor.strides;
+      delete static_cast<self_type *>(mtv->manager_ctx);
+
+      mtv->dl_tensor.shape    = nullptr;
+      mtv->dl_tensor.strides  = nullptr;
+
+      delete mtv;
+      mtv                     = nullptr;
+    };
 
   /**
    * @brief Get a DLPack v0.8 structure representing the tensor
@@ -1765,8 +1777,6 @@ public:
    * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
    */
   DLManagedTensor *GetDLPackTensor() const {
-  //DLManagedTensorVersioned *GetDLPackTensor() const {
-    //auto mt = new DLManagedTensorVersioned;
     auto mt = new DLManagedTensor;
     DLTensor *t = &mt->dl_tensor;
     CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
@@ -1784,10 +1794,10 @@ public:
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {
         t->device.device_type = kDLCUDA; 
-        t->device.device_id = dev_ord;        
+        t->device.device_id = dev_ord;
       }
       else {
-        t->device.device_type = kDLCPU;        
+        t->device.device_type = kDLCPU;
       }
     }
     else {
@@ -1825,27 +1835,15 @@ public:
     // Increment reference count by making a copy of the shared_ptr by allocating on the heap and
     // setting it as the context
     auto t_copy = new self_type{*this};
-    //*t_copy = *this;
     mt->manager_ctx = t_copy;
     //mt->flags = 0; // Only for v1.0
 
-    //auto deleter = [](struct DLManagedTensorVersioned *mtv) { // v1.0
-    auto deleter = [](struct DLManagedTensor *mtv) {
-      delete [] mtv->dl_tensor.shape;
-      delete [] mtv->dl_tensor.strides;
-      delete static_cast<self_type *>(mtv->manager_ctx);
-
-      mtv->dl_tensor.shape    = nullptr;
-      mtv->dl_tensor.strides  = nullptr;
-      
-      delete mtv;      
-      mtv                     = nullptr;
-    };
-
+    auto deleter = &self_type::FreeDLPack;
     mt->deleter = deleter;
 
     return mt;
   }
+  
 
 private:
   Storage storage_;
