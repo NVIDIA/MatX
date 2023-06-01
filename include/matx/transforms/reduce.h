@@ -1538,11 +1538,11 @@ void __MATX_INLINE__ mean(OutType dest, const InType &in, [[maybe_unused]] Singl
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
     if constexpr (OutType::Rank() == 0) {
       auto ts = TotalSize(in);
-      *lout = std::reduce(lin, lin + ts) / static_cast<inner_type>(ts); 
+      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(ts); 
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::reduce(lin + lbegin[b], lin + lend[b]) / static_cast<inner_type>(lin.Size(1)); 
+        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(lin.Size(1)); 
       }
     }
   };
