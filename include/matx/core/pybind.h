@@ -32,7 +32,7 @@
 #pragma once
 
 #include "matx/core/type_utils.h"
-
+#include "matx/core/make_tensor.h"
 
 #if MATX_ENABLE_PYBIND11
 
@@ -356,6 +356,26 @@ public:
         ten(s1) = ConvertComplex(ften.at(s1));
       }
     }
+  }
+
+  template <typename TensorType>
+  auto NumpyToTensorView(const pybind11::object &np_ten)
+  {
+    using T = typename TensorType::scalar_type;
+    constexpr int RANK = TensorType::Rank();
+    using ntype = matx_convert_complex_type<T>;
+    auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(np_ten);
+
+    auto info = ften.request();
+
+    assert(info.ndim == RANK);
+
+    std::array<matx::index_t, RANK> shape;
+    std::copy_n(info.shape.begin(), RANK, std::begin(shape));
+
+    auto ten =  make_tensor<T> (shape);
+    std::copy(ften.data(), ften.data() + ften.size(), ten.Data() );
+    return ten;
   }
 
   template <typename TensorType>

@@ -155,3 +155,34 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
   }
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({2,3,1,2,3});
+  tensor_t<TypeParam,5> t2;
+
+  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
+  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
+  (t = random).run();
+
+  cudaDeviceSynchronize();
+
+  // Read "myvar" from mat file
+  io::WriteMAT(t, "test_write.mat", "myvar");
+  t2.Shallow(io::ReadMAT<decltype(t2)>("test_write.mat", "myvar"));
+
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
+      for (index_t k = 0; k < t.Size(2); k++) {
+        for (index_t l = 0; l < t.Size(3); l++) {
+          for (index_t m = 0; m < t.Size(4); m++) {
+            ASSERT_EQ(t(i,j,k,l,m), t2(i,j,k,l,m));
+          }
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}

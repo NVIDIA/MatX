@@ -220,6 +220,44 @@ void ReadMAT(TensorType &t, const std::string fname,
 }
 
 /**
+ * @brief Read a MAT file into a tensor view
+ *
+ * MAT files use SciPy's loadmat() function to read various MATLAB file
+ * types in. MAT files are supersets of HDF5 files, and are allowed to
+ * have multiple fields in them.
+ *
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File name of .mat file
+ * @param var
+ *   Variable name inside of .mat to read
+ *
+ **/
+template <typename TensorType>
+auto ReadMAT(const std::string fname,
+             const std::string var)
+{
+
+  if (!std::filesystem::exists(fname)) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+
+  auto sp = pybind11::module_::import("scipy.io");
+  auto obj = (pybind11::dict)sp.attr("loadmat")("file_name"_a = fname);
+  auto v = obj[var.c_str()];
+
+  return pb->NumpyToTensorView<TensorType>(v);
+}
+
+/**
  * @brief Write a MAT file from a tensor view
  *
  * Writes a single tensor value into a .mat file.
