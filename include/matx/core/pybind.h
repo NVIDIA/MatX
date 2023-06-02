@@ -320,6 +320,8 @@ public:
   {
     using T = typename TensorType::scalar_type;
     constexpr int RANK = TensorType::Rank();
+    static_assert(RANK <=5, "NumpyToTensorView only supports max(RANK) = 5 at the moment.");
+
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype>(np_ten);
 
@@ -330,7 +332,14 @@ public:
             for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
               if constexpr (RANK > 3) {
                 for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                  ten(s1, s2, s3, s4) = ConvertComplex(ften.at(s1, s2, s3, s4));
+                  if constexpr (RANK > 4) {
+                    for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
+                      ten(s1, s2, s3, s4, s5) = ConvertComplex(ften.at(s1, s2, s3, s4, s5));
+                    }
+                  }
+                  else {
+                    ten(s1, s2, s3, s4) = ConvertComplex(ften.at(s1, s2, s3, s4));
+                  }
                 }
               }
               else {
@@ -353,6 +362,7 @@ public:
   auto TensorViewToNumpy(const TensorType &ten)
   {
     constexpr int RANK = TensorType::Rank();
+    static_assert(RANK <=5, "TensorViewToNumpy only supports max(RANK) = 5 at the moment.");
 
     using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
     auto ften = pybind11::array_t<ntype>(ten.Shape());
@@ -364,8 +374,15 @@ public:
             for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
               if constexpr (RANK > 3) {
                 for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                  ften.mutable_at(s1, s2, s3, s4) =
-                      ConvertComplex(ten(s1, s2, s3, s4));
+                  if constexpr (RANK > 4) {
+                    for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
+                      ften.mutable_at(s1, s2, s3, s4, s5) =
+                          ConvertComplex(ten(s1, s2, s3, s4, s5));
+                    }
+                  } else {
+                    ften.mutable_at(s1, s2, s3, s4) =
+                        ConvertComplex(ten(s1, s2, s3, s4));
+                  }
                 }
               }
               else {
