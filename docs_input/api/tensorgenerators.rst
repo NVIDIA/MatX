@@ -30,6 +30,7 @@ since their only purpose is to compute a single value at a particular location b
 .. doxygenfunction:: matx::linspace(const index_t (&s)[RANK], T first, T last)
 .. doxygenfunction:: matx::logspace(ShapeType &&s, T first, T last)
 .. doxygenfunction:: matx::logspace(const index_t (&s)[RANK], T first, T last)
+.. doxygenfunction:: matx::fftfreq(index_t n, float d = 1.0)
 .. doxygenfunction:: matx::meshgrid(Ts&&... ts)
 .. doxygenfunction:: matx::chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method )
 .. doxygenfunction:: matx::chirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1, ChirpMethod method)

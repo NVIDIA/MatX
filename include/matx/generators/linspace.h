@@ -103,10 +103,10 @@ namespace matx
    * spaced apart over the set of values. Distance is determined
    * by the shape and selected dimension.
    * 
-   * @tparam T Operator type
    * @tparam Dim Dimension to operate over
-   * @tparam ShapeType Shape type
-   * @param s Shape object
+   * @tparam RANK Rank of shape
+   * @tparam T Operator type
+   * @param s Array of sizes
    * @param first First value
    * @param last Last value
    * @return Operator with linearly-spaced values 
