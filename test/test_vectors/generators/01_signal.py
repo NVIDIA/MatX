@@ -41,3 +41,21 @@ class chirp:
         return {
             'Y': Y
         }
+
+class fftfreq:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+
+    def run(self):
+        N = self.size[0]
+
+        F1 = sf.fftfreq(N)
+        F2 = sf.fftfreq(N+1)
+        F3 = sf.fftfreq(N, 0.5)
+
+        return {
+            'F1':F1,
+            'F2':F2,
+            'F3':F3,
+        }

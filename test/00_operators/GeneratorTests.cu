@@ -218,6 +218,31 @@ TEST(OperatorTests, MeshGrid)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
+{
+  MATX_ENTER_HANDLER();
+  auto pb = std::make_unique<detail::MatXPybind>();
+  pb->template InitAndRunTVGenerator<TypeParam>(
+      "01_signal", "fftfreq", "run", {100});
+
+
+  auto t1 = make_tensor<TypeParam>({100});
+  auto t2 = make_tensor<TypeParam>({101});
+
+  (t1 = fftfreq(t1.Size(0))).run();
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(pb, t1, "F1", 0.1);
+
+  (t2 = fftfreq(t2.Size(0))).run();
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(pb, t2, "F2", 0.1);
+
+  (t1 = fftfreq(t1.Size(0), 0.5)).run();
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);  
+
+  MATX_EXIT_HANDLER();
+}
 
 
 TYPED_TEST(BasicGeneratorTestsAll, Zeros)

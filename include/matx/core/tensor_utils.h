@@ -671,6 +671,75 @@ namespace detail {
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
 
+
+/**
+ * @brief Print a tensor's values to stdout
+ *
+ * This is the interal `Print()` takes integral values for each index, and prints that as many values
+ * in each dimension as the arguments specify. For example:
+ *
+ * `a.Print(2, 3, 2);`
+ *
+ * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
+ * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
+ * 0 can be used if the entire tensor should be printed:
+ *
+ * `a.Print(0, 0, 0);` // Prints the whole tensor
+ *
+ * For more fine-grained printing, see the over `Print()` overloads.
+ *
+ * @tparam Args Integral argument types
+ * @param op input Operator
+ * @param dims Number of values to print for each dimension
+ */
+template <typename Op, typename... Args,
+          std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
+                                (Op::Rank() == 0 || sizeof...(Args) > 0),
+                            bool> = true>
+void PrintData(const Op &op, Args... dims) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+#ifdef __CUDACC__
+  cudaDeviceSynchronize();
+  if constexpr (is_tensor_view_v<Op>) {
+    auto kind = GetPointerKind(op.Data());
+
+    // Try to get pointer from cuda 
+    if (kind == MATX_INVALID_MEMORY) {
+      CUmemorytype mtype;
+      void *data[] = {&mtype};
+      CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+      auto ret = cuPointerGetAttributes(1, 
+                                        &attrs[0], 
+                                        data, 
+                                        reinterpret_cast<CUdeviceptr>(op.Data()));
+      MATX_ASSERT_STR_EXP(ret, CUDA_SUCCESS, matxCudaError, "Failed to get memory type");
+      MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0, matxNotSupported, "Invalid memory type for printing");
+
+      detail::InternalPrint(op, dims...);
+    }
+    else if (kind == MATX_INVALID_MEMORY || HostPrintable(kind)) {
+      detail::InternalPrint(op, dims...);
+    }
+    else if (DevicePrintable(kind)) {
+      if constexpr (PRINT_ON_DEVICE) {
+        PrintKernel<<<1, 1>>>(op, dims...);
+      }
+      else {
+        auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+        (tmpv = op).run();
+        PrintData(tmpv, dims...);
+      }
+    }
+  }
+  else {
+    InternalPrint(op, dims...);
+  }
+#else
+  InternalPrint(op, dims...);
+#endif
+}
+
 /**
  * @brief Print a tensor's values to stdout
  *
@@ -777,73 +846,6 @@ void print(const Op &op, Args... dims)
   
 }
 
-/**
- * @brief Print a tensor's values to stdout
- *
- * This is the interal `Print()` takes integral values for each index, and prints that as many values
- * in each dimension as the arguments specify. For example:
- *
- * `a.Print(2, 3, 2);`
- *
- * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
- * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
- * 0 can be used if the entire tensor should be printed:
- *
- * `a.Print(0, 0, 0);` // Prints the whole tensor
- *
- * For more fine-grained printing, see the over `Print()` overloads.
- *
- * @tparam Args Integral argument types
- * @param op input Operator
- * @param dims Number of values to print for each dimension
- */
-template <typename Op, typename... Args,
-          std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                (Op::Rank() == 0 || sizeof...(Args) > 0),
-                            bool> = true>
-void PrintData(const Op &op, Args... dims) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-#ifdef __CUDACC__
-  cudaDeviceSynchronize();
-  if constexpr (is_tensor_view_v<Op>) {
-    auto kind = GetPointerKind(op.Data());
-
-    // Try to get pointer from cuda 
-    if (kind == MATX_INVALID_MEMORY) {
-      CUmemorytype mtype;
-      void *data[] = {&mtype};
-      CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-      auto ret = cuPointerGetAttributes(1, 
-                                        &attrs[0], 
-                                        data, 
-                                        reinterpret_cast<CUdeviceptr>(op.Data()));
-      MATX_ASSERT_STR_EXP(ret, CUDA_SUCCESS, matxCudaError, "Failed to get memory type");
-      MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0, matxNotSupported, "Invalid memory type for printing");
-
-      detail::InternalPrint(op, dims...);
-    }
-    else if (kind == MATX_INVALID_MEMORY || HostPrintable(kind)) {
-      detail::InternalPrint(op, dims...);
-    }
-    else if (DevicePrintable(kind)) {
-      if constexpr (PRINT_ON_DEVICE) {
-        PrintKernel<<<1, 1>>>(op, dims...);
-      }
-      else {
-        auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
-        (tmpv = op).run();
-        PrintData(tmpv, dims...);
-      }
-    }
-  }
-  else {
-    InternalPrint(op, dims...);
-  }
-#else
-  InternalPrint(op, dims...);
-#endif
-}
 
 /**
  * @brief Print a tensor's all values to stdout

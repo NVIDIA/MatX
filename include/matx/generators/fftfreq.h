@@ -32,19 +32,51 @@
 
 #pragma once
 
-#include "matx/generators/alternate.h"
-#include "matx/generators/bartlett.h"
-#include "matx/generators/blackman.h"
-#include "matx/generators/chirp.h"
-#include "matx/generators/diag.h"
-#include "matx/generators/flattop.h"
-#include "matx/generators/hamming.h"
-#include "matx/generators/hanning.h"
-#include "matx/generators/linspace.h"
-#include "matx/generators/logspace.h"
-#include "matx/generators/meshgrid.h"
-#include "matx/generators/ones.h"
-#include "matx/generators/random.h"
-#include "matx/generators/range.h"
-#include "matx/generators/zeros.h"
-#include "matx/generators/fftfreq.h"
+#include "matx/generators/generator1d.h"
+
+namespace matx
+{
+  namespace detail {
+    template <class T> class FFTFreqOp {
+      private:
+        index_t n_;
+        float d_;
+
+      public:
+        using scalar_type = T;
+        using matxop = bool;
+
+        __MATX_INLINE__ std::string str() const { return "fftfreq"; }
+
+        inline FFTFreqOp(index_t n, float d = 1.0)
+        {
+          n_ = n;
+          d_ = d;
+        }
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const {
+          index_t offset = idx >= (n_+1)/2 ? -n_ : 0;
+          return static_cast<T>(idx + offset) / (d_*(T)n_);
+        }
+    };
+  }
+
+
+  /**
+   * @brief Return FFT sample frequencies
+   *
+   * Returns the bin centers in cycles/unit of the sampling frequency known by the user.
+   *
+   * @tparam T Type of output
+   * @param n Number of elements
+   * @param d Sample spacing (defaults to 1.0)
+   * @return Operator with sampling frequencies
+   */
+  template <typename T = float>
+    inline auto fftfreq(index_t n, float d = 1.0)
+    {
+      detail::FFTFreqOp<T> l(n, d);
+      std::array<index_t, 1> s{n};
+      return detail::matxGenerator1D_t<detail::FFTFreqOp<T>, 0, decltype(s)>(std::move(s), l);
+    }
+} // end namespace matx
