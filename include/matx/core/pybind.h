@@ -374,7 +374,9 @@ public:
     std::copy_n(info.shape.begin(), RANK, std::begin(shape));
 
     auto ten =  make_tensor<T> (shape);
-    std::copy(ften.data(), ften.data() + ften.size(), ten.Data() );
+    for (int n = 0; n < ften.size(); ++n) {
+      ten.Data()[n] = ConvertComplex(ften.data()[n]);
+    }
     return ten;
   }
 
