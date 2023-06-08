@@ -64,7 +64,9 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
-  io::ReadCSV(this->Av, this->small_csv, ",");
+  // example-begin read_csv-test-1
+  io::read_csv(this->Av, this->small_csv, ",");
+  // example-end read_csv-test-1
   MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -74,7 +76,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
-  io::ReadCSV(this->Av, this->small_complex_csv, ",");
+  io::read_csv(this->Av, this->small_complex_csv, ",");
   MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_complex_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -86,8 +88,10 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
   tensor_t<TypeParam, 2> Avs{{10, 2}};
 
   this->pb->NumpyToTensorView(this->Av, this->small_csv.c_str());
-  io::WriteCSV(this->Av, "temp.csv", ",");
-  io::ReadCSV(Avs, "temp.csv", ",", false);
+  // example-begin write_csv-test-1
+  io::write_csv(this->Av, "temp.csv", ",");
+  // example-end write_csv-test-1
+  io::read_csv(Avs, "temp.csv", ",", false);
   MATX_TEST_ASSERT_COMPARE(this->pb, Avs, this->small_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -99,8 +103,10 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
 
   auto t = make_tensor<TypeParam>({1,10});
 
+  // example-begin read_mat-test-1
   // Read "myvar" from mat file
-  io::ReadMAT(t, "../test/00_io/test.mat", "myvar");
+  io::read_mat(t, "../test/00_io/test.mat", "myvar");
+  // example-end read_mat-test-1
   ASSERT_NEAR(t(0,0), 1.456, 0.001);
 
   MATX_EXIT_HANDLER();
@@ -114,9 +120,11 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
   auto t2 = make_tensor<TypeParam>({2,3});
   t.SetVals({{1,2,3},{4,5,6}});
 
-  // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  io::ReadMAT(t2, "test_write.mat", "myvar");
+  // Write "myvar" to mat file
+  // example-begin write_mat-test-1
+  io::write_mat(t, "test_write.mat", "myvar");
+  // example-end write_mat-test-1
+  io::read_mat(t2, "test_write.mat", "myvar");
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
       ASSERT_EQ(t(i,j), t2(i,j));
@@ -140,8 +148,8 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  io::ReadMAT(t2, "test_write.mat", "myvar");
+  io::write_mat(t, "test_write.mat", "myvar");
+  io::read_mat(t2, "test_write.mat", "myvar");
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
       for (index_t k = 0; k < t.Size(2); k++) {
@@ -170,8 +178,8 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  t2.Shallow(io::ReadMAT<decltype(t2)>("test_write.mat", "myvar"));
+  io::write_mat(t, "test_write.mat", "myvar");
+  t2.Shallow(io::read_mat<decltype(t2)>("test_write.mat", "myvar"));
 
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
@@ -201,8 +209,8 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  t2.Shallow(io::ReadMAT<decltype(t2)>("test_write.mat", "myvar"));
+  io::write_mat(t, "test_write.mat", "myvar");
+  t2.Shallow(io::read_mat<decltype(t2)>("test_write.mat", "myvar"));
 
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {

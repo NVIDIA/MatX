@@ -86,7 +86,9 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
   tensor_t<float, 2> amf_delay_v(
       {1, (index_t)pow(2, std::ceil(std::log2(2 * sig_size - 1)))});
 
+  // example-begin ambgfun-test-1
   ambgfun(amf_delay_v, xv, 1e3, AMGBFUN_CUT_TYPE_DELAY, 1.0);
+  // example-end ambgfun-test-1
 
   auto delay1d = amf_delay_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
   MATX_TEST_ASSERT_COMPARE(pb, delay1d, "amf_delay", 0.01);
@@ -104,8 +106,9 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDoppler)
 
   tensor_t<float, 2> amf_doppler_v({1, xv.Size(0) * 2 - 1});
 
-  ambgfun(amf_doppler_v, xv, 1e3, AMGBFUN_CUT_TYPE_DOPPLER,
-                  1.0);
+  // example-begin ambgfun-test-2
+  ambgfun(amf_doppler_v, xv, 1e3, AMGBFUN_CUT_TYPE_DOPPLER, 1.0);
+  // example-end ambgfun-test-2
 
   auto doppler1d = amf_doppler_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
   MATX_TEST_ASSERT_COMPARE(pb, doppler1d, "amf_doppler", 0.01);

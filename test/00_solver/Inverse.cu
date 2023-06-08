@@ -70,7 +70,10 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
-  inv(Ainv, A, 0);
+  // example-begin inv-test-1
+  // Perform an inverse on matrix "A" and store the output in "Ainv"
+  inv(Ainv, A);
+  // example-end inv-test-1  
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < A.Size(0); i++) {

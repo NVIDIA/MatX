@@ -104,6 +104,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   this->pb->template InitAndRunTVGenerator<TypeParam>(
       "00_operators", "contraction", "run", {});  
 
+  // example-begin einsum-contraction-1
   auto a1 = make_tensor<TypeParam>({60});
   auto b1 = make_tensor<TypeParam>({24});
   auto c2 = make_tensor<TypeParam>({5,2});
@@ -113,7 +114,9 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   auto a = a1.View({3,4,5});
   auto b = b1.View({4,3,2});
 
+  // Perform a 3D tensor contraction
   cutensor::einsum(c2, "ijk,jil->kl", 0, a, b);
+  // example-end einsum-contraction-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
 
@@ -124,12 +127,16 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 {
   MATX_ENTER_HANDLER();
 
+  // example-begin einsum-dot-1
   auto a1 = make_tensor<TypeParam>({60});
   auto b1 = make_tensor<TypeParam>({60});
   auto c0 = make_tensor<TypeParam>();
   (a1 = ones(a1.Shape()) * 2).run();
   (b1 = ones(b1.Shape()) * 2).run(); 
-  cutensor::einsum(c0, "i,i->", 0, a1, b1);   
+
+  // Perform a dot product of b1 with itself and store in a1
+  cutensor::einsum(c0, "i,i->", 0, a1, b1);
+  // example-end einsum-dot-1
   cudaStreamSynchronize(0);
   MATX_ASSERT_EQ(c0(), 4 * a1.Size(0));
 
@@ -140,6 +147,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 {
   MATX_ENTER_HANDLER();
 
+  // example-begin einsum-gemm-1
   auto a2 = make_tensor<TypeParam>({10,20});
   auto b2 = make_tensor<TypeParam>({20,10});
   auto c2 = make_tensor<TypeParam>({10,10});    
@@ -147,8 +155,10 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
   (a2 = ones(a2.Shape())).run();
   (b2 = ones(b2.Shape())).run(); 
 
+  // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   cutensor::einsum(c2, "mk,kn->mn", 0, a2, b2);
   matmul(c22, a2, b2);
+  // example-end einsum-gemm-1
   cudaStreamSynchronize(0);
 
   for (auto i = 0; i < c2.Size(0); i++) {
@@ -162,6 +172,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
 {
+    // example-begin einsum-gemm-2
     auto a2 = make_tensor<TypeParam>({5,20});
     auto b2 = make_tensor<TypeParam>({20,10});
     auto c2 = make_tensor<TypeParam>({10,5});    
@@ -169,7 +180,9 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
     (a2 = ones(a2.Shape())).run();
     (b2 = ones(b2.Shape())).run(); 
 
+    // Perform a GEMM of a2 * b2 and store the results transposed
     cutensor::einsum(c2, "mk,kn->nm", 0, a2, b2);
+    // example-end einsum-gemm-2
     matmul(c22, a2, b2);
     cudaStreamSynchronize(0);
 
@@ -184,14 +197,17 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 {
+  // example-begin einsum-permute-1
   auto a = make_tensor<TypeParam>({5,20,4,3});
-  auto b = make_tensor<TypeParam>({20,3,4,5});  
-  auto b2 = make_tensor<TypeParam>({20,3,4,5});  
+  auto b = make_tensor<TypeParam>({20,3,4,5});
+  auto b2 = make_tensor<TypeParam>({20,3,4,5});
   (a = ones(a.Shape())).run();
-  (b = ones(b.Shape())).run(); 
+  (b = ones(b.Shape())).run();
 
+  // Permute a 4D tensor. This gives the same output as Permute, but is much faster
   cutensor::einsum(b, "ijkl->jlki", 0, a);
   (b2 = a.Permute({1,3,2,0})).run();
+  // example-end einsum-permute-1
   cudaStreamSynchronize(0);
 
   for (auto i = 0; i < b.Size(0); i++) {
@@ -207,14 +223,17 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
 {
-  auto a = matx::make_tensor<TypeParam, 2>({2, 3});
+  // example-begin einsum-sum-1
+  auto a = matx::make_tensor<TypeParam>({2, 3});
   a.SetVals({
       {1, 2, 3},
       {4, 5, 6}
   });  
 
-  auto b = matx::make_tensor<TypeParam, 1>({3});
+  auto b = matx::make_tensor<TypeParam>({3});
+  // Sum the columns of "a"
   matx::cutensor::einsum(b, "ij->j", 0, a);
+  // example-end einsum-sum-1
     
   cudaStreamSynchronize(0);
   for (auto i = 0; i < a.Size(1); i++) {

@@ -61,7 +61,6 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
@@ -82,7 +81,6 @@ __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
@@ -103,7 +101,6 @@ __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
@@ -127,7 +124,6 @@ __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
  * @param val Value to store in
  * @param state Generator state
  * @param dist Distribution
- * @return __inline__
  */
 template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,

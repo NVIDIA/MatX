@@ -72,7 +72,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t nfft = 256;
   index_t noverlap = nperseg / 8;
   index_t nstep = nperseg - noverlap;
-  constexpr uint32_t num_iterations = 100;
+  constexpr uint32_t num_iterations = 20;
   float time_ms;
 
   std::array<index_t, 1> num_samps{N};
@@ -147,11 +147,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
+  auto f = make_tensor<float>({2000,2000});
+  auto f2 = make_tensor<float>({2000,2000});
+  randomGenerator_t<float> randData2({2000*2000}, 0);
+  auto randDataView2 = randData2.GetTensorView<2>({2000,2000}, NORMAL);  
+  (f = randDataView2).run(stream);
+  inv(f2, f, stream);
+
   // Time graph execution of same kernels
   cudaEventRecord(start, stream);
-  for (uint32_t i = 0; i < num_iterations; i++) {
-    cudaGraphLaunch(instance, stream);
-  }
+   for (uint32_t i = 0; i < num_iterations; i++) {
+  //   cudaGraphLaunch(instance, stream);
+  inv(f2, f, stream);
+   }
   cudaEventRecord(stop, stream);
   cudaStreamSynchronize(stream);
   cudaEventElapsedTime(&time_ms, start, stop);

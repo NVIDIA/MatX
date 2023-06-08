@@ -314,6 +314,33 @@ namespace matx
   Op operator||(Op t, Op t2) {}
 
   /**
+   * Compute t & t2 (bitwise AND) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator&(Op t, Op t2) {}
+
+  /**
+   * Compute t | t2 (bitwise OR) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator|(Op t, Op t2) {}  
+
+  /**
+   * Compute t ^ t2 (bitwise XOR) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator^(Op t, Op t2) {}    
+
+  /**
    * Compute the arctangent of two inputs
    * @param t
    *   X value of input

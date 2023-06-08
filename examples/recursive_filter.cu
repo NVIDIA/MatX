@@ -117,7 +117,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < iterations; i++) {
+    // example-begin filter-example-1
+    // Perform an IIR filter on "inView" with rCoeffs and nrCoeffs recursive/non-recursive
+    // coefficients, respectively
     filter(outView, inView, rCoeffs, nrCoeffs, stream);
+    // example-end filter-example-1
   }
 
   cudaEventRecord(stop, stream);

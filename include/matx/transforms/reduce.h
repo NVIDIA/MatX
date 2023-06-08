@@ -2056,7 +2056,10 @@ void __MATX_INLINE__ prod(OutType dest, const InType &in, cudaExecutor exec = 0)
   MATX_NVTX_START("prod(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
+  // example-begin reduce-1
+  // Reduce "in" into "dest" using a product operation as the reduction type
   reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
+  // example-end reduce-1
 #endif  
 }
 
@@ -2281,7 +2284,11 @@ void __MATX_INLINE__ argmax(OutType dest, TensorIndexType &idest, const InType &
   MATX_NVTX_START("argmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
+  // example-begin reduce-2
+  // Reduce "in" into both "dest" and "idest" using a max operation for the reduction. "dest" will contain
+  // the reduced values while "idest" will include the indices of the reduced values
   reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
+  // example-end reduce-2
 #endif  
 }
 
@@ -2880,7 +2887,11 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, int ddof = 1, int strea
  *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
  *   to 1 to give an unbiased estimate
  */
+#ifndef DOXYGEN_ONLY
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+#else
+template <typename OutType, typename InType, typename Executor>
+#endif
 void __MATX_INLINE__ var(OutType dest, const InType &in, Executor &&exec, int ddof = 1)
 {
   MATX_NVTX_START("var(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2981,7 +2992,11 @@ void __MATX_INLINE__ var(OutType dest, const InType &in, const int (&dims)[D], E
  * @param exec
  *   Executor type
  */
+#ifndef DOXYGEN_ONLY
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+#else
+template <typename OutType, typename InType, typename Executor>
+#endif
 void __MATX_INLINE__ stdd(OutType dest, const InType &in, Executor &&exec)
 {
   MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -3070,7 +3085,11 @@ void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], 
  * @param exec
  *   Executor type
  */
+#ifndef DOXYGEN_ONLY
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+#else
+template <typename OutType, typename InType, typename Executor>
+#endif
 void __MATX_INLINE__ trace(OutType dest, const InType &in, Executor &&exec)
 {
   MATX_NVTX_START("trace(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)

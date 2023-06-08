@@ -77,7 +77,6 @@ public:
    * @param idz Z position
    * @param idy Y position
    * @param idx X position
-   * @return Detection value 
    */
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {

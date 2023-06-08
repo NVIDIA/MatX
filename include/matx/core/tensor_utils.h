@@ -819,10 +819,14 @@ void PrintData(const Op &op, Args... dims) {
  * @param op input Operator
  * @param dims Number of values to print for each dimension
  */
+#ifndef DOXYGEN_ONLY
 template <typename Op, typename... Args,
           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
+#else
+template <typename Op, typename... Args>
+#endif
 void print(const Op &op, Args... dims) 
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -870,13 +874,22 @@ void print(const Op &op, Args... dims)
  * automatically according to the rank of this tensor. The user only have to
  * invoke `print(op)` to print the whole tensor, instead of passing zeros
  * manually.
+ * 
+ * @tparam Op Operator input type
+ * @tparam Args Bounds type
+ * @param oper Operator input
+ * @param dims Bounds for printing
  */
+#ifndef DOXYGEN_ONLY
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-void print(const Op &op, Args... dims) {
+#else
+template <typename Op, typename... Args>
+#endif
+void print(const Op &oper, Args... dims) {
   std::array<int, Op::Rank()> arr = {0};
   auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { print(op, args...); }, tp);
+  std::apply([&](auto &&...args) { print(oper, args...); }, tp);
 }
 
 }

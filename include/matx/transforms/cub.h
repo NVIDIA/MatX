@@ -1366,8 +1366,8 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
  *   Input tensor
  * @param dir
  *   Direction to sort (either SORT_DIR_ASC or SORT_DIR_DESC)
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename OutputTensor, typename InputOperator>
 void sort(OutputTensor &a_out, const InputOperator &a,
@@ -1468,8 +1468,8 @@ void sort(OutputTensor &a_out, const InputOperator &a,
  *   Sorted tensor
  * @param a
  *   Input tensor
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   Executor
  */
 template <typename OutputTensor, typename InputOperator>
 void cumsum(OutputTensor &a_out, const InputOperator &a,
@@ -1943,8 +1943,8 @@ void find_idx(OutputTensor &a_out, CountTensor &num_found, const InputOperator &
  *   Sorted tensor
  * @param a
  *   Input tensor
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename CountTensor, typename OutputTensor, typename InputOperator>
 void unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,  cudaExecutor exec = 0)

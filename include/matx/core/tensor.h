@@ -918,12 +918,6 @@ public:
    * useful in the numerous operations that take a permuted matrix as input, but
    * we don't want to permute the inner dimensions of a larger tensor.
    *
-   * @tparam M
-   *  Rank of tensor
-   *
-   * @param dims
-   *  Dimensions of tensors
-   *
    * @returns tensor view with last two dims permuted
    *
    */
@@ -1181,8 +1175,6 @@ public:
    * @param val
    *   0 initializer list value
    *
-   * @returns reference to view
-   *
    */
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
@@ -1202,8 +1194,6 @@ public:
    *
    * @param vals
    *   1D initializer list of values
-   *
-   * @returns reference to view
    *
    */
   __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals)
@@ -1234,8 +1224,6 @@ public:
    *
    * @param vals
    *   1D/2D initializer list of values
-   *
-   * @returns reference to view
    *
    */
   __MATX_INLINE__ __MATX_HOST__ void
@@ -1273,8 +1261,6 @@ public:
    *
    * @param vals
    *   3D/2D initializer list of values
-   *
-   * @returns reference to view
    *
    */
   __MATX_INLINE__ __MATX_HOST__ void
@@ -1316,8 +1302,6 @@ public:
    *
    * @param vals
    *   3D/4D initializer list of values
-   *
-   * @returns reference to view
    *
    */
   __MATX_INLINE__ __MATX_HOST__ void
@@ -1368,8 +1352,6 @@ public:
    *
    * @param vals
    *   4D initializer list of values
-   *
-   * @returns reference to view
    *
    */
   __MATX_INLINE__ __MATX_HOST__ void

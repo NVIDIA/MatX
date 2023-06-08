@@ -98,8 +98,11 @@ namespace matx
    * 0 otherwise. In other words, if the index of every dimension is the same, the
    * value is returned, otherwise a zero is returned.
    *
-   * @tparam T
-   *   Data type
+   * @tparam T Data type
+   * @tparam RANK Rank of input
+   * 
+   * @param s Array of operator dimensions
+   * @param val Value to return
    *
    */
   template <typename T = int, int RANK>

@@ -465,10 +465,16 @@ TEST(ViewTests, Random)
 {
   MATX_ENTER_HANDLER();
   {
+    // example-begin random-test-1
     index_t count = 100;
     randomGenerator_t<float> rfloat(count * count * count, 0);
     auto t3fu = rfloat.GetTensorView<3>({count, count, count}, UNIFORM);
     auto t3fn = rfloat.GetTensorView<3>({count, count, count}, NORMAL);
+
+    // t3fu and t3fn can now be used as 3D tensors in places where tensors
+    // are taken as input. Each time the tensor is accessed a new random value
+    // is emitted
+    // example-end random-test-1
 
     tensor_t<float, 3> t3f({count, count, count});
 

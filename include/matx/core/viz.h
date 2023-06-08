@@ -39,7 +39,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/pybind.h"
 
-#if MATX_ENABLE_VIZ
+#if MATX_ENABLE_VIZ || DOXYGEN_ONLY
 
 namespace matx {
 namespace viz {
