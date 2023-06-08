@@ -1249,6 +1249,113 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericAllExecs, Upsample)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  uint32_t us_rate;
+
+  ExecType exec{};
+  auto t1 = make_tensor<TestType>({10});
+  auto t1o2 = make_tensor<TestType>({t1.Size(0) * 2}); // Upsample 2
+  auto t1o3 = make_tensor<TestType>({t1.Size(0) * 3}); // Upsample 3
+
+  TestType c = GenerateData<TestType>();
+  (t1 = c).run(exec);
+
+  us_rate = 2;
+  (t1o2 = upsample(t1, 0, us_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t1o2.Size(0); i++) {
+    if ((i % us_rate) == 0) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o2(i), t1(i/us_rate)));
+    }
+    else {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o2(i), (TestType)0));
+    }
+  }
+
+  us_rate = 3;
+  (t1o3 = upsample(t1, 0, us_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t1o3.Size(0); i++) {
+    if ((i % us_rate) == 0) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o3(i), t1(i/us_rate)));
+    }
+    else {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o3(i), (TestType)0));
+    }
+  }
+
+  auto t2 = make_tensor<TestType>({10, 10});
+  auto t2o2 = make_tensor<TestType>({t1.Size(0) * 2, 10}); // Upsample 2
+
+  (t2 = c).run(exec);
+
+  us_rate = 2;
+  (t2o2 = upsample(t2, 0, us_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t2o2.Size(0); i++) {
+    for (int j = 0; j < t2o2.Size(1); j++) {
+      if ((i % us_rate) == 0) {
+        ASSERT_EQ(t2o2(i, j), t2(i/us_rate, j));
+      }
+      else {
+        ASSERT_EQ(t2o2(i, j), (TestType)0);
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  uint32_t ds_rate;
+
+  ExecType exec{};
+  auto t1 = make_tensor<TestType>({10});
+  auto t1o2 = make_tensor<TestType>({(t1.Size(0) + 1) / 2}); // Downsample 2
+  auto t1o3 = make_tensor<TestType>({(t1.Size(0) + 2) / 3}); // Downsample 3
+
+  TestType c = GenerateData<TestType>();
+  (t1 = c).run(exec);
+
+  ds_rate = 2;
+  (t1o2 = downsample(t1, 0, ds_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t1o2.Size(0); i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o2(i), t1(i * ds_rate)));
+  }
+
+  ds_rate = 3;
+  (t1o3 = downsample(t1, 0, ds_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t1o3.Size(0); i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1o3(i), t1(i * ds_rate)));
+  }
+
+  auto t2 = make_tensor<TestType>({10, 10});
+  auto t2o2 = make_tensor<TestType>({(t1.Size(0) + 1) / 2, 10}); // Downsample 2
+
+  (t2 = c).run(exec);
+
+  ds_rate = 2;
+  (t2o2 = downsample(t2, 0, ds_rate)).run(exec);
+  cudaStreamSynchronize(0);
+  for (int i = 0; i < t2o2.Size(0); i++) {
+    for (int j = 0; j < t2o2.Size(1); j++) {
+      ASSERT_EQ(t2o2(i, j), t2(i * ds_rate, j));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsComplexTypesAllExecs, RealImagOp)
 {
   MATX_ENTER_HANDLER();
