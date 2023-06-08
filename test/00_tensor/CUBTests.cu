@@ -107,27 +107,28 @@ TYPED_TEST_SUITE(CUBTestsBoolean, MatXBoolTypes);
 TYPED_TEST_SUITE(CUBTestsNumericNonComplexAllExecs,
                  MatXFloatNonComplexNonHalfTypesAllExecs);  
 
-// TEST(TensorStats, Hist)
-// {
-//   MATX_ENTER_HANDLER();
+TEST(TensorStats, Hist)
+{
+  MATX_ENTER_HANDLER();
 
-//   constexpr int levels = 7;
-//   tensor_t<float, 1> inv({10});
-//   tensor_t<int, 1> outv({levels - 1});
+  constexpr int levels = 7;
+  tensor_t<float, 1> inv({10});
+  tensor_t<int, 1> outv({levels - 1});
 
-//   inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
+  inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
 
-//   // Ascending
-//   hist(outv, inv, 0.0f, 12.0f);
-//   cudaStreamSynchronize(0);
+  // example-begin hist-test-1
+  hist(outv, inv, 0.0f, 12.0f);
+  // example-end hist-test-1
+  cudaStreamSynchronize(0);
 
-//   std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
-//   for (index_t i = 0; i < outv.Lsize(); i++) {
-//     ASSERT_NEAR(outv(i), sol[i], 0.001);
-//   }
+  std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
+  for (index_t i = 0; i < outv.Lsize(); i++) {
+    ASSERT_NEAR(outv(i), sol[i], 0.001);
+  }
 
-//   MATX_EXIT_HANDLER();
-// }
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
 {
@@ -142,7 +143,10 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
   tensor_t<TestType, 1> tmpv({this->t1.Lsize()});
 
   // Ascending
+  // example-begin cumsum-test-1
+  // Compute the cumulative sum/exclusive scan across "t1"
   cumsum(tmpv, this->t1, this->exec);
+  // example-end cumsum-test-1
   cudaStreamSynchronize(0);
 
   TestType ttl = 0;
@@ -186,16 +190,20 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 
   auto tmpv = make_tensor<TestType>({this->t1.Lsize()});
 
-  // Ascending
+  // example-begin sort-test-1
+  // Ascending sort of 1D input
   matx::sort(tmpv, this->t1, SORT_DIR_ASC, this->exec);
+  // example-end sort-test-1
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
     ASSERT_TRUE(tmpv(i) > tmpv(i - 1));
   }
 
-  // Descending
+  // example-begin sort-test-2
+  // Descending sort of 1D input
   matx::sort(tmpv, this->t1, SORT_DIR_DESC, this->exec);
+  // example-end sort-test-2
   cudaStreamSynchronize(0);
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
@@ -210,6 +218,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
       this->t2(i, j) = static_cast<TestType>((2 * (j % 2) - 1) * j + i);
     }
   }
+
   matx::sort(tmpv2, this->t2, SORT_DIR_ASC, this->exec);
   cudaStreamSynchronize(0);
 

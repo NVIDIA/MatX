@@ -171,7 +171,9 @@ public:
       (*devsT = hermitianT(*devs)).run(stream);      
     }
     else {
+      // example-begin transpose-test-1
       transpose(*devsT, *devs, stream);
+      // example-end transpose-test-1
     }
 
     // Multiply by itself and scale by N-1 for the final covariance

@@ -49,7 +49,7 @@
 
 
 
-#if MATX_ENABLE_FILEIO
+#if MATX_ENABLE_FILEIO || DOXYGEN_ONLY
 
 namespace matx {
 namespace io {
@@ -73,7 +73,7 @@ using namespace pybind11::literals;
 //  * we have to convert ours to.
 //  **/
 // template <typename T, int RANK>
-// void ReadCSV(tensor_t<T, RANK> &t, [[maybe_unused]] const std::string
+// void read_csv(tensor_t<T, RANK> &t, [[maybe_unused]] const std::string
 // fname, [[maybe_unused]] bool header=true) {
 //   if (!t.IsLinear()) {
 //     MATX_THROW(matxInvalidParameter, "Tensor reading into a CSV must have
@@ -126,7 +126,7 @@ using namespace pybind11::literals;
  *1D and 2D tensors are supported only.
  **/
 template <typename TensorType>
-void ReadCSV(TensorType &t, const std::string fname,
+void read_csv(TensorType &t, const std::string fname,
              const std::string delimiter, bool header = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -160,7 +160,7 @@ void ReadCSV(TensorType &t, const std::string fname,
  *1D and 2D tensors are supported only.
  **/
 template <typename TensorType>
-void WriteCSV(const TensorType &t, const std::string fname,
+void write_csv(const TensorType &t, const std::string fname,
               const std::string delimiter)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -196,7 +196,7 @@ void WriteCSV(const TensorType &t, const std::string fname,
  *
  **/
 template <typename TensorType>
-void ReadMAT(TensorType &t, const std::string fname,
+void read_mat(TensorType &t, const std::string fname,
              const std::string var)
 {
 
@@ -228,8 +228,6 @@ void ReadMAT(TensorType &t, const std::string fname,
  *
  * @tparam TensorType
  *   Data type of tensor
- * @param t
- *   Tensor to read data into
  * @param fname
  *   File name of .mat file
  * @param var
@@ -237,7 +235,7 @@ void ReadMAT(TensorType &t, const std::string fname,
  *
  **/
 template <typename TensorType>
-auto ReadMAT(const std::string fname,
+auto read_mat(const std::string fname,
              const std::string var)
 {
 
@@ -272,7 +270,7 @@ auto ReadMAT(const std::string fname,
  *   Variable name to save inside of mat file
  */
 template <typename TensorType>
-void WriteMAT(const TensorType &t, const std::string fname,
+void write_mat(const TensorType &t, const std::string fname,
               const std::string var)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

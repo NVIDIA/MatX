@@ -67,7 +67,9 @@ TYPED_TEST(CholSolverTestNonComplexFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();
 
+  // example-begin chol-test-1
   chol(this->Bv, this->Bv, 0, CUBLAS_FILL_MODE_LOWER);
+  // example-end chol-test-1
   cudaStreamSynchronize(0);
 
   // Cholesky only saves the upper triangle by default, and the lower triangle

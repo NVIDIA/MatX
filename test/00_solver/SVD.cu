@@ -79,14 +79,16 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   this->pb->NumpyToTensorView(Av, "A");
 
   // Used only for validation
-  tensor_t<TypeParam, 2> tmpV{{m, n}};
+  auto tmpV = make_tensor<TypeParam>({m, n});
 
+  // example-begin svd-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
   transpose(Atv, Av, 0);
 
   auto Atv2 = Atv.View({m, n});
   svd(Uv, Sv, Vv, Atv2);
+  // example-end svd-test-1
 
   cudaStreamSynchronize(0);
 
@@ -243,6 +245,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   }
   Sshape[RANK-2] = r;
 
+  // example-begin svdpi-test-1
   auto A = make_tensor<AType>(Ashape);
   auto U = make_tensor<AType>(Ushape);
   auto VT = make_tensor<AType>(VTshape);
@@ -256,16 +259,12 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 
   auto x0 = gen.GetTensorView(Sshape, NORMAL);
 
-  A.PrefetchDevice(stream);
-  U.PrefetchDevice(stream);
-  VT.PrefetchDevice(stream);
-  S.PrefetchDevice(stream);
-
   (U = 0).run(stream);
   (S = 0).run(stream);
   (VT = 0).run(stream);
 
   svdpi(U, S, VT, A, x0, iterations, stream, r);
+  // example-end svdpi-test-1
 
   auto Rshape = Ushape;
   Rshape[RANK-1] = r;
@@ -381,15 +380,11 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   }
   Sshape[RANK-2] = r;
 
+  // example-begin svdbpi-test-1
   auto A = make_tensor<AType>(Ashape);
   auto U = make_tensor<AType>(Ushape);
   auto VT = make_tensor<AType>(VTshape);
   auto S = make_tensor<SType>(Sshape);
-  
-  A.PrefetchDevice(stream);
-  U.PrefetchDevice(stream);
-  VT.PrefetchDevice(stream);
-  S.PrefetchDevice(stream);
 
   int iterations = 100;
 
@@ -403,6 +398,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   (VT = 0).run(stream);
 
   svdbpi(U, S, VT, A, iterations, stream);
+  // example-end svdbpi-test-1
 
   auto Rshape = Ushape;
   Rshape[RANK-1] = r;

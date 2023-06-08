@@ -98,19 +98,34 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   std::array<index_t, 1> shape({win_size});
   auto ov = make_tensor<TypeParam>(shape);
 
-  (ov = hanning<0>(shape)).run();
+  // example-begin hanning-gen-test-1
+  // Assign a Hanning window of size `win_size` to `ov`
+  (ov = hanning<0>({win_size})).run();
+  // example-end hanning-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hanning", 0.01);
 
-  (ov = hamming<0>(shape)).run();
+  // example-begin hamming-gen-test-1
+  // Assign a Hamming window of size `win_size` to `ov`
+  (ov = hamming<0>({win_size})).run();
+  // example-end hamming-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hamming", 0.01);
 
-  (ov = bartlett<0>(shape)).run();
+  // example-begin bartlett-gen-test-1
+  // Assign a bartlett window of size `win_size` to `ov`
+  (ov = bartlett<0>({win_size})).run();
+  // example-end bartlett-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "bartlett", 0.01);
 
-  (ov = blackman<0>(shape)).run();
+  // example-begin blackman-gen-test-1
+  // Assign a blackman window of size `win_size` to `ov`
+  (ov = blackman<0>({win_size})).run();
+  // example-end blackman-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "blackman", 0.01);
 
-  (ov = flattop<0>(shape)).run();  
+  // example-begin flattop-gen-test-1
+  // Assign a flattop window of size `win_size` to `ov`
+  (ov = flattop<0>({win_size})).run();
+  // example-end flattop-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "flattop", 0.01);
 
 
@@ -121,20 +136,23 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 {
   MATX_ENTER_HANDLER();
   {
-    tensor_t<TypeParam, 2> tc({10, 10});
-    tensor_t<TypeParam, 1> td({10});
+    // example-begin diag-op-test-1
+    // The generator form of `diag()` takes an operator input and returns only
+    // the diagonal elements as output
+    auto tc = make_tensor<TypeParam>({10, 10});
+    auto td = make_tensor<TypeParam>({10});
 
+    // Initialize the diagonal elements of `tc`
     for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 10; j++) {
-
-        // The half precision headers define competing constructors for
-        // double/float, so we need to cast
         TypeParam val(static_cast<detail::value_promote_t<TypeParam>>(i * 10 + j));
         tc(i, j) = val;
       }
     }
 
+    // Assign the diagonal elements of `tc` to `td`.
     (td = diag(tc)).run();
+    // example-end diag-op-test-1
     cudaStreamSynchronize(0);
 
     for (int i = 0; i < 10; i++) {
@@ -152,9 +170,12 @@ TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
 {
   MATX_ENTER_HANDLER();
 
-  tensor_t<TypeParam, 1> td({10});
+  // example-begin alternate-gen-test-1
+  auto td = make_tensor<TypeParam>({10});
 
-  (td = alternate<0>(td.Shape())).run();
+  // td contains the sequence 1, -1, 1, -1, 1, -1, 1, -1, 1, -1
+  (td = alternate(10)).run();
+  // example-end alternate-gen-test-1
 
   cudaStreamSynchronize(0);
 
@@ -173,11 +194,13 @@ TEST(OperatorTests, Kron)
   pb->InitTVGenerator<dtype>("00_operators", "kron_operator", {});
   pb->RunTVGenerator("run");
 
-  tensor_t<dtype, 2> bv({2, 2});
-  tensor_t<dtype, 2> ov({8, 8});
+  // example-begin kron-gen-test-1
+  auto bv = make_tensor<dtype>({2, 2});
+  auto ov = make_tensor<dtype>({8, 8});
   bv.SetVals({{1, -1}, {-1, 1}});
 
   (ov = kron(eye({4, 4}), bv)).run();
+  // example-end kron-gen-test-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, ov, "square", 0);
 
@@ -200,16 +223,20 @@ TEST(OperatorTests, MeshGrid)
   constexpr dtype xd = 3;
   constexpr dtype yd = 5;
   pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run", {xd, yd});
-  tensor_t<dtype, 2> xv({yd, xd});
-  tensor_t<dtype, 2> yv({yd, xd});
+
+  // example-begin meshgrid-gen-test-1
+  auto xv = make_tensor<dtype>({yd, xd});
+  auto yv = make_tensor<dtype>({yd, xd});
 
   auto x = linspace<0>({xd}, 1, xd);
   auto y = linspace<0>({yd}, 1, yd);
 
+  // Create a mesh grid with "x" as x extents and "y" as y extents and assign it to "xv"/"yv"
   auto [xx, yy] = meshgrid(x, y);
 
   (xv = xx).run();
   (yv = yy).run();
+  // example-end meshgrid-gen-test-1
 
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, xv, "X", 0);
@@ -229,7 +256,10 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
   auto t1 = make_tensor<TypeParam>({100});
   auto t2 = make_tensor<TypeParam>({101});
 
+  // example-begin fftfreq-gen-test-1
+  // Generate FFT frequencies using the length of the "t1" tensor and assign to t1
   (t1 = fftfreq(t1.Size(0))).run();
+  // example-end fftfreq-gen-test-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F1", 0.1);
 
@@ -237,7 +267,10 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t2, "F2", 0.1);
 
+  // example-begin fftfreq-gen-test-2
+  // Generate FFT frequencies using the length of the "t1" tensor and a sample spacing of 0.5 and assign to t1
   (t1 = fftfreq(t1.Size(0), 0.5)).run();
+  // example-end fftfreq-gen-test-2
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);  
 
@@ -248,12 +281,15 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 {
   MATX_ENTER_HANDLER();
+  // example-begin zeros-gen-test-1    
   index_t count = 100;
-  std::array<index_t, 1> s({count});
 
+  std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TypeParam>(s);
 
   (t1 = zeros(s)).run();
+  // example-end zeros-gen-test-1
+
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
@@ -270,11 +306,13 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 TYPED_TEST(BasicGeneratorTestsAll, Ones)
 {
   MATX_ENTER_HANDLER();
+  // example-begin ones-gen-test-1    
   index_t count = 100;
   std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TypeParam>(s);
 
   (t1 = ones(s)).run();
+  // example-end ones-gen-test-1    
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
@@ -291,10 +329,13 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
+  // example-begin range-gen-test-1
   index_t count = 100;
   tensor_t<TypeParam, 1> t1{{count}};
 
+  // Generate a sequence of 100 numbers starting at 1 and spaced by 1
   (t1 = range<0>(t1.Shape(), 1, 1)).run();
+  // example-end range-gen-test-1  
   cudaStreamSynchronize(0);
 
   TypeParam one = 1;
@@ -344,10 +385,14 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 {
   MATX_ENTER_HANDLER();
+  // example-begin linspace-gen-test-1
   index_t count = 100;
-  tensor_t<TypeParam, 1> t1{{count}};
-  auto s = t1.Shape();
-  (t1 = linspace<0>(s, (TypeParam)1, (TypeParam)100)).run();
+  auto t1 = make_tensor<TypeParam>({count});
+
+  // Create a set of linearly-spaced numbers starting at 1, ending at 100, and 
+  // with `count` points in between
+  (t1 = linspace<0>(t1.Shape(), (TypeParam)1, (TypeParam)100)).run();
+  // example-end linspace-gen-test-1
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
@@ -388,12 +433,16 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 {
   MATX_ENTER_HANDLER();
+  // example-begin logspace-gen-test-1
   index_t count = 20;
   tensor_t<TypeParam, 1> t1{{count}};
   TypeParam start = 1.0f;
   TypeParam stop = 2.0f;
   auto s = t1.Shape();
+
+  // Create a logarithmically-spaced sequence of numbers and assign to tensor "t1"
   (t1 = logspace<0>(s, start, stop)).run();
+  // example-end logspace-gen-test-1
 
   cudaStreamSynchronize(0);
 
@@ -428,27 +477,23 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
   MATX_ENTER_HANDLER();
+  // example-begin eye-gen-test-1
   index_t count = 10;
 
-  tensor_t<TypeParam, 2> t2({count, count});
-  tensor_t<TypeParam, 3> t3({count, count, count});
-  tensor_t<TypeParam, 4> t4({count, count, count, count});
+  auto t2 = make_tensor<TypeParam>({count, count});
+  auto t3 = make_tensor<TypeParam>({count, count, count});
+  auto t4 = make_tensor<TypeParam>({count, count, count, count});
 
-  t2.PrefetchDevice(0);
-  t3.PrefetchDevice(0);
-  t4.PrefetchDevice(0);
- 
   auto eye2 = eye<TypeParam>({count, count});
   auto eye3 = eye<TypeParam>({count, count, count});
   auto eye4 = eye<TypeParam>({count, count, count, count});
 
+  // For each of t2, t3, and t4 the values on the diagonal where each index is the same
+  // is 1, and 0 everywhere else
   (t2 = eye2).run();
   (t3 = eye3).run();
   (t4 = eye4).run();
-
-  t2.PrefetchHost(0);
-  t3.PrefetchHost(0);
-  t4.PrefetchHost(0);
+  // example-end eye-gen-test-1
 
   TypeParam one = 1.0f;
   TypeParam zero = 0.0f;
@@ -496,13 +541,11 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   index_t count = 10;
   TypeParam c = GenerateData<TypeParam>();
 
-  tensor_t<TypeParam, 2> t2({count, count});
-  tensor_t<TypeParam, 3> t3({count, count, count});
-  tensor_t<TypeParam, 4> t4({count, count, count, count});
-
-  t2.PrefetchDevice(0);
-  t3.PrefetchDevice(0);
-  t4.PrefetchDevice(0);
+  // example-begin diag-gen-test-1
+  // Create a 2D, 3D, and 4D tensor and make only their diagonal elements set to `c`
+  auto t2 = make_tensor<TypeParam>({count, count});
+  auto t3 = make_tensor<TypeParam>({count, count, count});
+  auto t4 = make_tensor<TypeParam>({count, count, count, count});
 
   auto diag2 = diag<TypeParam>({count, count}, c);
   auto diag3 = diag<TypeParam>({count, count, count}, c);
@@ -511,10 +554,7 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   (t2 = diag2).run();
   (t3 = diag3).run();
   (t4 = diag4).run();
-
-  t2.PrefetchHost(0);
-  t3.PrefetchHost(0);
-  t4.PrefetchHost(0);
+  // example-end diag-gen-test-1
 
   TypeParam zero = 0.0f;
 
@@ -567,12 +607,19 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
   pb->template InitAndRunTVGenerator<TypeParam>(
       "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
 
+  // example-begin chirp-gen-test-1
   auto t1 = make_tensor<TypeParam>({count});
+  // Create a chirp of length "count" and assign it to tensor "t1"
   (t1 = chirp(count, end, f0, end, f1)).run();
+  // example-end chirp-gen-test-1
+
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
+  // example-begin cchirp-gen-test-1
   auto t1c = make_tensor<cuda::std::complex<TypeParam>>({count});
+  // Create a complex chirp of length "count" and assign it to tensor "t1"
   (t1c = cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
+  // example-end cchirp-gen-test-1
 
   pb.reset();
   MATX_EXIT_HANDLER();

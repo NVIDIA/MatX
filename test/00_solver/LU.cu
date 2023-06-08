@@ -71,7 +71,9 @@ TYPED_TEST_SUITE(LUSolverTestNonComplexFloatTypes,
 TYPED_TEST(LUSolverTestNonComplexFloatTypes, LUBasic)
 {
   MATX_ENTER_HANDLER();
+  // example-begin lu-test-1
   lu(this->Av, this->PivV, this->Av);
+  // example-end lu-test-1
   cudaStreamSynchronize(0);
 
   // The upper and lower triangle components are saved in Av. Python saves them

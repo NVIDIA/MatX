@@ -399,6 +399,27 @@ inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename
 
 
 namespace detail {
+template <typename T, typename = void>
+struct has_shape_type : std::false_type {
+};
+template <typename T>
+struct has_shape_type<T, std::void_t<typename T::shape_type>>
+    : std::true_type {
+};
+}
+
+/**
+ * @brief Determine if a type has a shape_type attribute
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool has_shape_type_v = detail::has_shape_type<typename remove_cvref<T>::type>::value;
+
+
+
+
+namespace detail {
 template <typename T>
 struct is_complex_half
     : std::integral_constant<

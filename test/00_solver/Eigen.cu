@@ -72,7 +72,11 @@ TYPED_TEST_SUITE(EigenSolverTestNonComplexFloatTypes,
 TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
 {
   MATX_ENTER_HANDLER();
+  // example-begin eig-test-1
+  // Note that eigenvalue/vector solutions are not necessarily ordered in the same way other libraries
+  // may order them. When comparing against other libraries it's best to check A*v = lambda * v
   eig(this->Evv, this->Wov, this->Bv);
+  // example-end eig-test-1
 
   // Now we need to go through all the eigenvectors and eigenvalues and make
   // sure the results match the equation A*v = lambda*v, where v are the

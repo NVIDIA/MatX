@@ -309,7 +309,21 @@ namespace matx
  * @param t
  *   LHS tensor or operator input
  */
-  Op operator-(Op t) {}  
+  Op operator-(Op t) {}
+
+ /**
+ * Return real components of an operator
+ * @param t
+ *   Input operator
+ */
+  Op real(Op t) {}  
+
+ /**
+ * Return imaginary components of an operator
+ * @param t
+ *   Input operator
+ */
+  Op imag(Op t) {}  
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
   DEFINE_UNARY_OP(exp, detail::ExpOp);

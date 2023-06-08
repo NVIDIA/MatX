@@ -56,7 +56,11 @@ namespace matx
    * @param exec
    *   Executor to run copy in
    */
+#ifndef DOXYGEN_ONLY  
   template <typename OutputTensor, typename InputTensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+#else
+  template <typename OutputTensor, typename InputTensor, typename Executor>  
+#endif
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
         Executor exec)
     {
@@ -69,7 +73,11 @@ namespace matx
       (out = in).run(exec);
     };
 
+#ifndef DOXYGEN_ONLY  
   template <typename OutputTensor, typename InputTensor, std::enable_if_t<is_tensor_view_v<InputTensor>, bool> = true>
+#else
+  template <typename OutputTensor, typename InputTensor>
+#endif  
     __MATX_INLINE__ void copy(OutputTensor &out, const InputTensor &in,
         cudaStream_t stream = 0)
     {
@@ -89,7 +97,11 @@ namespace matx
    *   Executor to run copy in
    * @return New tensor into which the input view has been copied
    */
+#ifndef DOXYGEN_ONLY    
   template <typename Tensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+#else
+  template <typename Tensor, typename Executor>
+#endif  
   __MATX_INLINE__ Tensor copy(const Tensor &in, Executor exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

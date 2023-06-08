@@ -169,7 +169,10 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv, "b_op");
+  // example-begin conv1d-test-1
+  // 1D convolution in FULL mode where every output is stored
   conv1d(this->cv, this->av, this->bv, MATX_C_MODE_FULL, 0);
+  // example-end conv1d-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -225,7 +228,10 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionRemap)
   (in = 1).run();
   (filt = 1).run();
 
+  // example-begin conv1d-test-2
+  // 1D convolution in SAME mode where the output size matches the input
   conv1d(out, in, filt, MATX_C_MODE_SAME, 0);
+  // example-end conv1d-test-2
   
   conv1d(remap<0>(out,idx), remap<0>(in,idx), filt, MATX_C_MODE_SAME, 0);
 
@@ -253,7 +259,9 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  // example-begin conv2d-test-1
   conv2d(this->cv_same, this->av, this->bv_even, MATX_C_MODE_SAME, 0);
+  // example-end conv2d-test-1
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
   MATX_EXIT_HANDLER();
@@ -396,7 +404,10 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
   this->pb->RunTVGenerator("corr");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
+  // example-begin corr-test-1
+  // Full correlation mode with direct correlation
   corr(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
+  // example-end corr-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "corr", this->thresh);
   MATX_EXIT_HANDLER();
@@ -437,7 +448,9 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   }
 
   conv1d(out1, in1, in2, MATX_C_MODE_SAME);
+  // example-begin conv1d-test-1
   conv1d(out2, in1, in2, {2}, MATX_C_MODE_SAME);
+  // example-end conv1d-test-1
 
   cudaStreamSynchronize(0);
 
@@ -450,7 +463,9 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   }
 
   conv1d(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME);
+  // example-begin conv1d-test-3
   conv1d(out2, in1, in2, {1}, MATX_C_MODE_SAME);
+  // example-end conv1d-test-3
 
   cudaStreamSynchronize(0);
 

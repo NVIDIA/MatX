@@ -61,8 +61,11 @@ TEST_F(DctTests, Real1DN100)
 {
   MATX_ENTER_HANDLER();
 
-  tensor_t<float, 1> out{{sig_size}};
+  // example-begin dct-1
+  auto out = make_tensor<float>({sig_size});
+  // Perform a DCT from input "xv" into output "out"
   dct(out, xv);
+  // example-end dct-1
   MATX_TEST_ASSERT_COMPARE(pb, out, "Y", 0.01);
 
   MATX_EXIT_HANDLER();

@@ -119,7 +119,10 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     auto b = make_tensor<TypeParam>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
+    // example-begin resample_poly-test-1
+    // Resample "a" using input signal "f" by rate up/down
     resample_poly(b, a, f, up, down);
+    // example-end resample_poly-test-1
 
     cudaStreamSynchronize(0);
 

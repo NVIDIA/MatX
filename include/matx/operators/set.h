@@ -68,7 +68,7 @@ private:
 public:
   // Type specifier for reflection on class
   using scalar_type = typename T::scalar_type;
-  using shape_type = typename T::shape_type;
+  using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>;
 
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);

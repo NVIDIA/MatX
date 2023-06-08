@@ -1145,7 +1145,7 @@ void chol(OutputTensor &out, const ATensor &a,
 
 
 /**
- * Perform a LU decomposition using a cached plan
+ * Perform an LU decomposition
  *
  * See documentation of matxDnLUSolverPlan_t for a description of how the
  * algorithm works. This function provides a simple interface to the cuSolver
@@ -1417,7 +1417,7 @@ void svd(UTensor &u, STensor &s,
  *   CUDA stream
  * @param jobz
  *   CUSOLVER_EIG_MODE_VECTOR to compute eigenvectors or
- * CUSOLVER_EIG_MODE_NOVECTOR to not compute
+ *   CUSOLVER_EIG_MODE_NOVECTOR to not compute
  * @param uplo
  *   Where to store data in A
  */

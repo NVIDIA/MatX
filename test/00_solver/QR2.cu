@@ -77,7 +77,9 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   Q.PrefetchDevice(stream);
   R.PrefetchDevice(stream);
   
+  // example-begin qr-test-1
   qr(Q, R, A, stream);
+  // example-end qr-test-1
 
   auto mdiffQTQ = make_tensor<SType>();
   auto mdiffQR = make_tensor<SType>();

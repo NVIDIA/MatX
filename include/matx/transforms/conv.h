@@ -63,7 +63,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
-  using shape_type = typename OutputType::shape_type;
+  using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>; 
   
   size_t filter_len = filter.Size(filter.Rank()-1);
   size_t signal_len = i.Size(i.Rank()-1);

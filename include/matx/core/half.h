@@ -1143,7 +1143,8 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atan(const matxHalf<T>
  * @brief Two argument Arctangent function
  * 
  * @tparam T Type of half
- * @param x Value of half
+ * @param x Numerator
+ * @param y Denominator
  * @return Arctangent of input
  */
 template <class T>

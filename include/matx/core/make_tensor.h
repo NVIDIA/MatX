@@ -70,7 +70,6 @@ auto make_tensor( const index_t (&shape)[RANK],
  * @param shape Shape of tensor
  * @param space  memory space to allocate in.  Default is manged memory.
  * @param stream cuda stream to allocate in (only applicable to async allocations)
- * @returns New tensor
  **/
 template <typename TensorType, std::enable_if_t< is_tensor_view_v<TensorType>, bool> = true>
 void make_tensor( TensorType &tensor, 

@@ -73,9 +73,11 @@ TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
 {
   MATX_ENTER_HANDLER();
 
+  // example-begin cusolver_qr-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
   cusolver_qr(this->Av, this->TauV, this->Av);
+  // example-end cusolver_qr-test-1
   cudaStreamSynchronize(0);
 
   // For now we're only verifying R. Q is a bit more complex to compute since
