@@ -73,13 +73,12 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             std::array<index_t, Rank()> ind{indices...};
-            // get current index for dim
-            auto i = ind[DIM];
+
             // remap current index for dim
             if constexpr (IdxType::Rank() == 0) {
               ind[DIM] = idx_();
             } else {
-              ind[DIM] = idx_(i);
+              ind[DIM] = idx_(ind[DIM]);
             }
             //return op_(ind);
             return mapply(op_, ind);
@@ -93,13 +92,12 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             std::array<index_t, Rank()> ind{indices...};
-            // get current index for dim
-            auto i = ind[DIM];
+
             // remap current index for dim
             if constexpr (IdxType::Rank() == 0) {
               ind[DIM] = idx_();
             } else {
-              ind[DIM] = idx_(i);
+              ind[DIM] = idx_(ind[DIM]);
             }
             //return op_(ind);
             return mapply(op_, ind);
