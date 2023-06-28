@@ -47,6 +47,7 @@
 #include "matx/transforms/permute.h"
 #include "matx/transforms/qr.h"
 #include "matx/transforms/reduce.h"
+#include "matx/transforms/resample_poly.h"
 #include "matx/transforms/solver.h"
 #include "matx/transforms/svd.h"
 #include "matx/transforms/transpose.h"

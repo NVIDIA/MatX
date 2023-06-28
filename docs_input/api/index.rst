@@ -12,6 +12,7 @@ API Reference
    tensorgenerators.rst
    stats.rst
    random.rst
+   resample_poly.rst
    utilities.rst
    type_traits.rst
    einsum.rst

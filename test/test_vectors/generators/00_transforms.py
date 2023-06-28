@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 import numpy as np
 import sys
 from scipy import io
@@ -114,6 +115,46 @@ class cov_operators:
 
         return self.res
 
+class resample_poly_operators:
+    np_random_state = None
+    def __init__(self, dtype: str, size: List[int]):
+        if not resample_poly_operators.np_random_state:
+            # We want reproducible results, but do not want to create random vectors that
+            # are too similar between test cases. If we seed every time with the same value
+            # and then create test cases with e.g. 1000 and 2000 samples, the first 1000
+            # samples will be identical in both case. Thus, we seed only once and store the
+            # state from one call to the next thereafter.
+            np.random.seed(1234)
+        else:
+            np.random.set_state(resample_poly_operators.np_random_state)
+
+        self.size = size
+        up = size[2]
+        down = size[3]
+        gcd = math.gcd(up, down)
+        up //= gcd
+        down //= gcd
+        self.res = {
+            'a': matx_common.randn_ndarray((size[0],), dtype),
+            'filter_random': matx_common.randn_ndarray((size[1],), dtype),
+            'up': up,
+            'down': down
+        }
+
+        # Create a filter compatible with scipy's resample_poly
+        max_rate = max(up, down)
+        f_c = 1. / max_rate
+        half_len = 10 * max_rate
+        if up != 1 or down != 1:
+            self.res['filter_default'] = signal.firwin(2 * half_len + 1, f_c, window=('kaiser',5.0)).astype(dtype)
+
+        resample_poly_operators.np_random_state = np.random.get_state()
+
+    def resample(self) -> Dict[str, np.ndarray]:
+        self.res['b_random'] = signal.resample_poly(self.res['a'], self.res['up'], self.res['down'], window=self.res['filter_random'])
+        if 'filter_default' in self.res:
+            self.res['b_default'] = signal.resample_poly(self.res['a'], self.res['up'], self.res['down'])
+        return self.res
 
 class fft_operators:
     def __init__(self, dtype: str, size: List[int]):
