@@ -72,7 +72,7 @@ Tensors can also be initialized using initializer list syntax using the ``SetVal
 .. code-block:: cpp
 
     auto myT = make_tensor<float>({3, 3});
-    myT.SetVals({ {1,2,3}, {4,5,6}, {7,8,9} });
+    myT.SetVals({{1,2,3}, {4,5,6}, {7,8,9}});
 
 In other languages it's very common to initialize a tensor with a set of values on creation (ones, zeros, ranges). This will be covered later 
 in the tutorial when we discuss operators, and it should become clear why we initialize this way.
@@ -110,16 +110,16 @@ Slicing and dicing
 ------------------
 As the name implies, ``t`` is a view into a region of memory. When the initial view is created and memory is allocated, the tensor view is
 of the entire 10x20 contiguous block of memory. Often we don't want to see the entire block of memory, but only want to view a subset of the
-underlying data. To do this, we use the ``Slice`` member function of the view class:
+underlying data. To do this, we use the ``slice`` operator:
 
 .. code-block:: cpp
 
-    auto tCube  = t.Slice({3, 5}, {6, 8});                      // Cube of t using rows 3-5 and cols 5-7
-    auto tRectS = t.Slice({0, 0}, {matxEnd, matxEnd}, {2, 2});  // Rectangle with stride of 2 in both dimensions
-    auto tCol   = t.Slice<1>({0, 4}, {matxEnd, matxDropDim});   // Create a 1D tensor with only column 5
-    auto tRow   = t.Slice<1>({4, 0}, {matxDropDim, matxEnd});   // Create a 1D tensor with only row 5
+    auto tCube  = slice(t, {3, 5}, {6, 8});                      // Cube of t using rows 3-5 and cols 5-7
+    auto tRectS = slice(t, {0, 0}, {matxEnd, matxEnd}, {2, 2});  // Rectangle with stride of 2 in both dimensions
+    auto tCol   = slice<1>(t, {0, 4}, {matxEnd, matxDropDim});   // Create a 1D tensor with only column 5
+    auto tRow   = slice<1>(t, {4, 0}, {matxDropDim, matxEnd});   // Create a 1D tensor with only row 5
     
-``Slice`` returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
+``slice`` returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
 light-weight views into memory, none of these variants modify the data; they return an object with new parameters describing
 how the data is viewed. The resulting variables can be used exactly as the original view above:
 
@@ -134,27 +134,34 @@ All view functions can be used on any type of existing view:
 
 .. code-block:: cpp
 
-    auto tCubeP  = t.Slice({3, 5}, {6, 8}).Permute({1, 0});
+    auto tCubeP  = permute(slice(t, {3, 5}, {6, 8}), {1, 0});
 
 The above code takes the same cube as before, but permutes the cube view by swapping the two dimensions. 
 
+``slice`` is not limited to only tensors; it can be used on any operator as input:
+
+.. code-block:: cpp
+
+    slice(eye(t.Shape()), {3, 5}, {6, 8});
+
 Permuting
 ---------
-Permuting a tensor is done using the ``Permute`` member function of a view:
+Permuting a tensor is done using the ``permute`` function:
 
 .. code-block:: cpp
 
     auto t = make_tensor<float>({10, 20});
-    auto tp = t.Permute({1,0});
+    auto tp = permute(t, {1,0});
 
-``tp`` is now a view into ``t`` where the rows and columns are swapped (transpose). ``Permute`` is not limited to matrices, though:
+``tp`` is now a view into ``t`` where the rows and columns are swapped (transpose). ``permute`` is not limited to matrices, though:
 
 .. code-block:: cpp
 
     auto t4 = make_tensor<float>({10, 20, 5, 2});
-    auto tp4 = t.Permute({1,3,2,0});
+    auto tp4 = permute(t, {1,3,2,0});
 
-``t4p`` is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list.
+``t4p`` is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list. Just like
+with ``slice``, ``permute`` works on operators as well.
 
 Note that since no data is moved, permuting a tensor can be detrimental to performance, depending on the context. Permuting usually
 changes the strides of dimensions such that the memory access patterns are no longer optimal, and accessing the permuted view
@@ -166,7 +173,13 @@ a new tensor so that the new layout is contiguous. Using the variables from abov
     auto t4pc = make_tensor<float>(tp4.Shape());
     copy(t4pc, t4p);
 
-``t4pc`` will now contain the permuted data, but in contiguous memory.
+``t4pc`` will now contain the permuted data, but in contiguous memory. Copying a tensor (or operator) can also be done by the assignment 
+operator:
+
+.. code-block:: cpp
+
+    (t4pc = t4p).run();
+
 
 Reshaping
 ---------
@@ -192,7 +205,7 @@ all rows in a matrix, you can clone the tensor to a higher rank to match the oth
     auto t2 = make_tensor<float>({16, 16});
     // ... Initialize tensors
 
-    auto t1c = t1.Clone<2>({16, matxKeepDim});
+    auto t1c = clone<2>(t1, {16, matxKeepDim});
 
 ``t1c`` is now a new tensor view where each row is a replica of the tensor ``t1``. Again, this is just a view and no data was modified or
 allocated, so modifying a row/column in either of these tensors will affect the other. 
@@ -201,9 +214,9 @@ The keyword ``matxKeepDim`` tells MatX which dimensions should be kept from the 
 In this example we used it in the columns place of the shape, but we also could have used ``{matxKeepDim, 16}`` and we would have a 2D
 view where all columns of ``t1c`` matches ``t1``.
 
-Note in some cases MatX's *broadcasting* feature can be used instead of ``Clone``. This allows an implicit expansion of ranks during an 
+Note in some cases MatX's *broadcasting* feature can be used instead of ``clone``. This allows an implicit expansion of ranks during an 
 element-wise operation. For example, adding a 4D tensor to a 1D tensor will work as long as the outer dimension of the 4D tensor matches
-that of the 1D tensor. Broadcasting is covered in the documentation. ``Clone`` is much more powerful since it gives more control over which 
+that of the 1D tensor. Broadcasting is covered in the documentation. ``clone`` is much more powerful since it gives more control over which 
 dimensions are cloned instead of assuming the outer dimensions.
 
 Creating a view from an existing pointer
@@ -319,6 +332,7 @@ device, at which point only *one* of these assignments will occur.
 
 Initialization of operators and generators
 ##########################################
+
 As mentioned above, it's common in high-level languages to initialize a tensor/array with a known set of values. For example, generating a range of linearly-
 spaced values, all ones, or a diagonal matrix. These are all operations that do not need to be generated and stored in memory before using since they are 
 all generated from a formula. MatX calls these types of operators a *generator*, indicating that they generate data without storage. 
