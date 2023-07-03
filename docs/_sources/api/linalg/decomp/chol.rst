@@ -3,7 +3,7 @@
 chol
 ####
 
-Perform a Cholesky factorization and saves the result in either the uppoer or lower triangle of the output. 
+Perform a Cholesky factorization and saves the result in either the upper or lower triangle of the output. 
 
 .. note::
   The input matrix must be positive semidefinite
