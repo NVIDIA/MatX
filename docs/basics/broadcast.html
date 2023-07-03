@@ -599,7 +599,41 @@ document.write(`
                   
   <section id="broadcasting">
 <span id="broadcast"></span><h1>Broadcasting<a class="headerlink" href="#broadcasting" title="Permalink to this heading">#</a></h1>
-<p>TODO</p>
+<p>MatX supports broadcasting of values to operators. Broadcasting allows lower-ranked operators to have
+their values repeated into a higher-ranked operator. Broadcasting may allow for both memory and cache improvements
+by storing fewer values in memory and loading the same value from cache.</p>
+<p>In its simplest form, scalars can be broadcast to an arbitrary-sized tensor:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>In the example above the value <cite>4</cite> is broadcast to every value in <cite>t</cite>, regardless of the rank and sizes
+of <cite>t</cite>. This same rule applies with 0D operators, which are effectively scalar values:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t0</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Besides scalars, other rank operators can also be broadcasted:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">20</span><span class="p">});</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t1</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>In fact, any operator can be broadcasted to another operator as long as the dimensions are <em>compatible</em>. For
+broadcasting, compatible means either:</p>
+<ul class="simple">
+<li><p>The value being broadcasted from is either a scalar or 0D operator</p></li>
+<li><p>The operator being broadcasted from matches all the right-most dimensions of the operator assigned to</p></li>
+</ul>
+<p>The first rule is discussed above. The second rule can be explained with this example:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">});</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t3</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>In this example <cite>t3</cite>’s dimensions (3, 4, 20) match the right-most (fastest-changing) dimensions in <cite>t5</cite>, so
+the values in <cite>t3</cite> can be broadcasted to <cite>t5</cite>. During this assignment the same values in memory in <cite>t3</cite> are
+loaded repeatedly into the left-most dimensions of <cite>t5</cite> (10, 6).</p>
 </section>
 
 
