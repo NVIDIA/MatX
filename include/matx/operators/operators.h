@@ -58,6 +58,7 @@
 #include "matx/operators/r2c.h"
 #include "matx/operators/remap.h"
 #include "matx/operators/repmat.h"
+#include "matx/operators/resample.h"
 #include "matx/operators/reshape.h"
 #include "matx/operators/reverse.h"
 #include "matx/operators/select.h"

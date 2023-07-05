@@ -1,7 +1,7 @@
 .. _chirp_func:
 
 chirp
-=========
+=====
 
 Creates a real chirp signal (swept-frequency cosine)
 
@@ -19,7 +19,7 @@ Examples
 
 
 cchirp
-=========
+======
 
 Creates a complex chirp signal (swept-frequency cosine)
 
