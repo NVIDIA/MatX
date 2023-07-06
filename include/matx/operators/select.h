@@ -60,11 +60,18 @@ namespace matx
         __MATX_INLINE__ SelectOp(T op, IdxType idx) : op_(op), idx_(idx) {};  
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) const 
-          {
-            auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
-            return op_(arrs);     
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) const 
+        {
+          auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
+          return op_(arrs);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(index_t i) 
+        {
+          auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
+          return op_(arrs);
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

@@ -584,7 +584,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
       }
     }
 
-    auto op = clone<3>(static_cast<typename inner_op_type_t<TestType>::type>(2)*tiv, {N, matxKeepDim, matxKeepDim});
+    const auto op = clone<3>(static_cast<typename inner_op_type_t<TestType>::type>(2)*tiv, {N, matxKeepDim, matxKeepDim});
 
     ASSERT_EQ(op.Size(0), N);
     ASSERT_EQ(op.Size(1), M);
@@ -594,7 +594,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
         for(int k = 0; k < K; k++) {
-          ASSERT_EQ(op(n,m,k) , TestType(2)*tiv(m,k));
+          ASSERT_EQ(op(n,m,k), TestType(2)*tiv(m,k));
         }
       }
     }
