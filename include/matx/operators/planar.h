@@ -57,17 +57,30 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
-            auto tup = cuda::std::make_tuple(indices...);
-            if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
-              cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
-              return mapply(op_, tup).imag();
-            }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+          auto tup = cuda::std::make_tuple(indices...);
+          if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
+            cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
+            return mapply(op_, tup).imag();
+          }
 
-            return op_(indices...).real();      
-          }   
+          return op_(indices...).real();      
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+        {
+          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+          auto tup = cuda::std::make_tuple(indices...);
+          if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
+            cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
+            return mapply(op_, tup).imag();
+          }
+
+          return op_(indices...).real();
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

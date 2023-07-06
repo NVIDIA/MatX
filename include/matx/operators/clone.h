@@ -76,21 +76,38 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
 
-            // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> sind{indices...};
-            std::array<index_t, T::Rank()> gind;
+          // convert variadic type to tuple so we can read/update
+          std::array<index_t, Rank()> sind{indices...};
+          std::array<index_t, T::Rank()> gind;
 
-            // gather indices
-            for(int i = 0; i < T::Rank(); i++) {
-              auto idx = dims_[i];
-              gind[i] = sind[idx];
-            }
-
-            return mapply(op_, gind);
+          // gather indices
+          for(int i = 0; i < T::Rank(); i++) {
+            auto idx = dims_[i];
+            gind[i] = sind[idx];
           }
+
+          return mapply(op_, gind);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+        {
+
+          // convert variadic type to tuple so we can read/update
+          std::array<index_t, Rank()> sind{indices...};
+          std::array<index_t, T::Rank()> gind;
+
+          // gather indices
+          for(int i = 0; i < T::Rank(); i++) {
+            auto idx = dims_[i];
+            gind[i] = sind[idx];
+          }
+
+          return mapply(op_, gind);
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

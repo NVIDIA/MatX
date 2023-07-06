@@ -73,7 +73,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // load filter
   for (uint32_t idx = threadIdx.x;  idx < filter_len; idx += THREADS) {
     bdims[Rank - 1] = idx;
-    detail::mapply([&](auto &&...args) {
+    detail::mapply([&, d_filter](auto &&...args) {
         s_filter[idx] = d_filter.operator()(args...);
         }, bdims);
   }
@@ -103,7 +103,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
       if( gidx >= 0 && gidx < signal_len) { 
         bdims[Rank - 1] = gidx;
-        detail::mapply([&](auto &&...args) {
+        detail::mapply([&val, d_in](auto &&...args) {
             val = d_in.operator()(args...);
             }, bdims);
       }

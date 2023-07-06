@@ -57,18 +57,32 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            auto tup = cuda::std::make_tuple(indices...);
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
 
-            // If we're on the upper part of the spectrum, return the conjugate of the first half
-            if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
-              cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
-              return cuda::std::conj(mapply(op_, tup));
-            }
+          // If we're on the upper part of the spectrum, return the conjugate of the first half
+          if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
+            cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
+            return cuda::std::conj(mapply(op_, tup));
+          }
 
-            return mapply(op_, tup);
-          }   
+          return mapply(op_, tup);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
+
+          // If we're on the upper part of the spectrum, return the conjugate of the first half
+          if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
+            cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
+            return cuda::std::conj(mapply(op_, tup));
+          }
+
+          return mapply(op_, tup);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

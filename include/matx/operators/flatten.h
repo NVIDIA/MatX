@@ -53,15 +53,21 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "flatten(" + op1_.str() + ")"; }
  
         __MATX_INLINE__ FlattenOp(const T1 &op1) : op1_(op1)
-      {
-        static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
-      }
+        {
+          static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
+        }
 
         template <typename Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
-          {
-            return *RandomOperatorIterator{op1_, id0};
-          }    
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
+        {
+          return *RandomOperatorIterator{op1_, id0};
+        }
+
+        template <typename Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is id0) 
+        {
+          return *RandomOperatorOutputIterator{op1_, id0};
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
