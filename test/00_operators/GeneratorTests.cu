@@ -484,15 +484,14 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   auto t3 = make_tensor<TypeParam>({count, count, count});
   auto t4 = make_tensor<TypeParam>({count, count, count, count});
 
-  auto eye2 = eye<TypeParam>({count, count});
-  auto eye3 = eye<TypeParam>({count, count, count});
-  auto eye4 = eye<TypeParam>({count, count, count, count});
+  auto eye_op = eye<TypeParam>();
+
 
   // For each of t2, t3, and t4 the values on the diagonal where each index is the same
   // is 1, and 0 everywhere else
-  (t2 = eye2).run();
-  (t3 = eye3).run();
-  (t4 = eye4).run();
+  (t2 = eye_op).run();
+  (t3 = eye_op).run();
+  (t4 = eye_op).run();
   // example-end eye-gen-test-1
 
   TypeParam one = 1.0f;

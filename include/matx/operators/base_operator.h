@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/operator_utils.h"
 
 namespace matx
 {

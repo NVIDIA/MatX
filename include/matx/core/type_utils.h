@@ -62,6 +62,22 @@ enum class MemoryLayout {
   MEMORY_LAYOUT_COL_MAJOR,
 };
 
+struct NoShape{};
+
+namespace detail {
+template <typename T>
+struct is_noshape : std::integral_constant<bool, std::is_same_v<NoShape, T>> {};
+};
+
+/**
+ * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
+ * 
+ * @tparam T Type to test
+ */
+template <class T>
+inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
+
+
 
 /**
  * @brief Removes cv and reference qualifiers on a type

@@ -88,7 +88,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
     // QTQ == Identity
     auto QTQ = make_tensor<AType>(Qshape);
     matmul(QTQ, conj(transpose(Q)), Q, stream);
-    auto e = eye<SType>({m,m});
+    auto e = eye<SType>({m, m});
 
     auto eShape = Qshape;
     eShape[RANK-1] = matxKeepDim;
