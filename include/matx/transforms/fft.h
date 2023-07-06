@@ -841,7 +841,7 @@ __MATX_INLINE__ void fft(OutputTensor o, const InputTensor i,
   auto in_t = getCufft1DSupportedTensor(i, stream); 
   
   if(!in_t.isSameView(i)) {
-   (in_t = i).run(stream);
+    (in_t = i).run(stream);
   }
  
   // TODO should combine this function with above...
