@@ -114,7 +114,7 @@ public:
     matmul(covMatView, ivsView, ivshView, stream);
 
     (covMatView = (covMatView * (1.0f / static_cast<float>(snap_len_))) +
-                   eye<complex>({num_el_, num_el_}) * load_coeff_)
+                   eye<complex>() * load_coeff_)
         .run(stream);
     inv(invCovMatView, covMatView, stream);
 

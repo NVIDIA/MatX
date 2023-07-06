@@ -61,11 +61,11 @@ namespace matx
 
         __MATX_INLINE__ KronOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
       {
-        static_assert(Rank() >= 2, "Kronecker product must be used on tensors with rank 2 or higher");
+        static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
       }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           auto tup1 = cuda::std::make_tuple(indices...);
           auto tup2 = cuda::std::make_tuple(indices...);
@@ -73,7 +73,7 @@ namespace matx
           cuda::std::get<Rank() - 1>(tup2) = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
 
           cuda::std::get<Rank() - 2>(tup1) = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
-          cuda::std::get<Rank() - 1>(tup1) = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);      
+          cuda::std::get<Rank() - 1>(tup1) = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
 
           return mapply(op2_, tup2) * mapply(op1_, tup1);
         }

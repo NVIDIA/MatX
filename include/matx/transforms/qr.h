@@ -66,7 +66,7 @@ namespace detail {
         if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
 
         // Create Identity matrix
-        auto E = eye<ATypeS>({m,m});
+        auto E = eye<ATypeS>({m, m});
 
         // Clone over batch Dims
         auto ECShape = Q.Shape();
