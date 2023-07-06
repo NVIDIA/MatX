@@ -892,4 +892,13 @@ void print(const Op &oper, Args... dims) {
   std::apply([&](auto &&...args) { print(oper, args...); }, tp);
 }
 
+template <typename Op>
+auto OpToTensor(Op &&op, cudaStream_t stream) {
+  if constexpr (!is_tensor_view_v<Op>) {
+    return make_tensor<typename remove_cvref<Op>::scalar_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream); 
+  } else {
+    return op;
+  }
+}
+
 }
