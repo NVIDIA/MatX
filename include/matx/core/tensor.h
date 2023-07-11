@@ -77,8 +77,7 @@ enum {
 /**
  * View of an underlying tensor data object
  *
- * The tensor_t class provides multiple ways to view the data inside of a
- * matxTensorData_t object. Views do not modify the underlying data; they simply
+ * Tensor views do not modify the underlying data; they simply
  * present a different way to look at the data. This includes where the data
  * begins and ends, the stride, the rank, etc. Views are very lightweight, and
  * any number of views can be generated from the same data object. Since views

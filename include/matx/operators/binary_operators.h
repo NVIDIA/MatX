@@ -145,6 +145,30 @@ namespace matx
         index_t size2 = detail::get_expanded_size<Rank()>(in2_, dim);
         return detail::matx_max(size1,size2);
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<I1>()) {
+          in1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<I2>()) {
+          in2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept  
+      {
+        if constexpr (is_matx_op<I1>()) {
+          in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<I2>()) {
+          in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }      
     };
   }
 

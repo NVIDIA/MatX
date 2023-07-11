@@ -63,9 +63,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<complex, 1> sigViewComplex({num_samp / 2 + 1});
   tensor_t<float, 1> resampView({num_samp_resamp});
 
-  randomGenerator_t<double> randData(num_samp, 0);
-  auto randTensor = randData.GetTensorView<1>({num_samp}, NORMAL);
-  (sigView = randTensor).run(stream);
+  (sigView = random<float>({num_samp}, NORMAL)).run(stream);
 
   fft(sigViewComplex, sigView, 0, stream);
 

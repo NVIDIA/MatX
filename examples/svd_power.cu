@@ -74,13 +74,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   int iterations = 10;
   {
-    randomGenerator_t<AType> gen(A.TotalSize(),0);
-    auto x0 = gen.GetTensorView({batch, d}, NORMAL);
+    auto x0 = random<float>({batch, d}, NORMAL);
 
     printf("iterations: %d\n", iterations);
 
-    auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-    (A = random).run(stream);
+    (A = random<float>({batch, m, n}, NORMAL)).run(stream);
 
     A.PrefetchDevice(stream);
     U.PrefetchDevice(stream);

@@ -50,11 +50,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, stream);
 
-    randomGenerator_t<float> rfloat(radar.GetInputView().TotalSize(), 0);
-    auto t3fu = rfloat.GetTensorView<3>({radar.GetInputView().TotalSize()}, NORMAL);
-    auto t1fu = rfloat.GetTensorView<3>({radar.GetWaveformView().TotalSize()}, NORMAL);
-    (*(radar.GetInputView()) = t3fu).run();
-    (*(radar.GetWaveformView()) = t1fu).run();
+    (*(radar.GetInputView()) = random<float>(radar.GetInputView().Shape(), NORMAL)).run();
+    (*(radar.GetWaveformView()) = random<float>(radar.GetWaveformView().Shape(), NORMAL)).run();
 
     radar.PulseCompression();
 

@@ -141,9 +141,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
   auto t = make_tensor<TypeParam>({2,3,1,2,3});
   auto t2 = make_tensor<TypeParam>({2,3,1,2,3});
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  (t = random<float>(t.Shape(), UNIFORM)).run();
 
   cudaDeviceSynchronize();
 
@@ -171,9 +169,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
   auto t = make_tensor<TypeParam>({2,3,1,2,3});
   tensor_t<TypeParam,5> t2;
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  (t = random<float>(t.Shape(), UNIFORM)).run();
 
   cudaDeviceSynchronize();
 
@@ -202,9 +198,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
   auto t = make_tensor<TypeParam>({2,3,1,2,3});
   tensor_t<TypeParam,5> t2;
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  (t = random<float>(t.Shape(), UNIFORM)).run();
 
   cudaDeviceSynchronize();
 

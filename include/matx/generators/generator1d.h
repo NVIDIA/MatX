@@ -36,7 +36,8 @@
 namespace matx
 {
   namespace detail {
-    template <typename Generator1D, int Dim, typename ShapeType> class matxGenerator1D_t {
+    template <typename Generator1D, int Dim, typename ShapeType> 
+    class matxGenerator1D_t : public BaseOp<matxGenerator1D_t<Generator1D, Dim, ShapeType>>{
       public:
         // dummy type to signal this is a matxop
         using matxop = bool;

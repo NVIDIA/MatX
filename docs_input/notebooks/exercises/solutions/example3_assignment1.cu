@@ -51,9 +51,7 @@ int main() {
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/quickstart.html#random-numbers
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/api/random.html
    ****************************************************************************************************/
-  randomGenerator_t<complex> rgen(A.TotalSize(), 12345);
-  auto rt = rgen.GetTensorView<2>(A.Shape(), NORMAL);
-  (A = rt).run();
+  (A = random<float>(A.Shape(), NORMAL, 12345)).run();
 
   auto At = A.Permute({1, 0});
   fft(At, At);
@@ -95,11 +93,9 @@ int main() {
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/api/reduce.html
    ****************************************************************************************************/
   // Create and initialize 3D tensor
-  tensor_t<float, 3> dv({10, 5, 15});
-  randomGenerator_t<float> rgen2(dv.TotalSize(), 0);
-  auto rt2 = rgen2.GetTensorView<3>(dv.Shape(), NORMAL);
+  auto dv = make_tensor<float>({10, 5, 15});
 
-  (dv = rt2).run();
+  (dv = random<float>(dv.Shape(), NORMAL)).run();
 
   tensor_t<float, 0> redv;
   rmax(redv, dv, 0);

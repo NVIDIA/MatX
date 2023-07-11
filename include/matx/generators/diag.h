@@ -36,7 +36,8 @@
 namespace matx
 {
   namespace detail {
-    template <typename T, typename ShapeType> class Diag {
+    template <typename T, typename ShapeType> 
+      class Diag : public BaseOp<Diag<T, ShapeType>>{
       static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
       private:

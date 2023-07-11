@@ -25,16 +25,12 @@ void qr_batch(nvbench::state &state,
   auto A = make_tensor<AType>({batch, m, n});
   auto Q = make_tensor<AType>({batch, m, m});
   auto R = make_tensor<AType>({batch, m, n});
-
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
   
   A.PrefetchDevice(stream);
   Q.PrefetchDevice(stream);
   R.PrefetchDevice(stream);
   
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
 
   // warm up
   nvtxRangePushA("Warmup");

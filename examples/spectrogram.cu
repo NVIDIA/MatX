@@ -89,9 +89,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto fftStackedMatrix = make_tensor<complex>({(N - noverlap) / nstep, nfft / 2 + 1});
   auto s_time = make_tensor<float>({(N - noverlap) / nstep});
 
-  randomGenerator_t<float> randData({N}, 0);
-  auto randDataView = randData.GetTensorView<1>(num_samps, NORMAL);
-
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
   (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
@@ -101,7 +98,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
   (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(stream);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * randDataView).run(stream);
+  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(stream);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(stream);
   // x = carrier + noise

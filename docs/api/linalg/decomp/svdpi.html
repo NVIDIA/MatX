@@ -132,6 +132,7 @@
 
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../basics/index.html">Basics</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/broadcast.html">Broadcasting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
@@ -651,11 +652,8 @@ better than <cite>svd</cite> where the matrices are small and batches are large<
 
 <span class="kt">int</span><span class="w"> </span><span class="n">iterations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
 
-<span class="n">randomGenerator_t</span><span class="o">&lt;</span><span class="n">AType</span><span class="o">&gt;</span><span class="w"> </span><span class="n">gen</span><span class="p">(</span><span class="n">A</span><span class="p">.</span><span class="n">TotalSize</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">random</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">gen</span><span class="p">.</span><span class="n">GetTensorView</span><span class="p">(</span><span class="n">Ashape</span><span class="p">,</span><span class="w"> </span><span class="n">NORMAL</span><span class="p">);</span>
-<span class="p">(</span><span class="n">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">random</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
-
-<span class="k">auto</span><span class="w"> </span><span class="n">x0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">gen</span><span class="p">.</span><span class="n">GetTensorView</span><span class="p">(</span><span class="n">Sshape</span><span class="p">,</span><span class="w"> </span><span class="n">NORMAL</span><span class="p">);</span>
+<span class="p">(</span><span class="n">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">random</span><span class="o">&lt;</span><span class="n">AType</span><span class="o">&gt;</span><span class="p">(</span><span class="n">AshapeA</span><span class="p">,</span><span class="w"> </span><span class="n">NORMAL</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">x0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">random</span><span class="o">&lt;</span><span class="n">SType</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">Sshape</span><span class="p">),</span><span class="w"> </span><span class="n">NORMAL</span><span class="p">);</span>
 
 <span class="p">(</span><span class="n">U</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
 <span class="p">(</span><span class="n">S</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>

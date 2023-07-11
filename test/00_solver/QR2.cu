@@ -69,9 +69,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   auto Q = make_tensor<AType>(Qshape);
   auto R = make_tensor<AType>(Rshape);
   
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  auto random = gen.GetTensorView(Ashape, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>(Ashape, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   Q.PrefetchDevice(stream);

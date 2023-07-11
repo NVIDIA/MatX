@@ -47,7 +47,7 @@ namespace matx
 
   namespace detail {
     template <typename SpaceOp, typename FreqType> 
-      class Chirp {
+      class Chirp : public BaseOp<Chirp<SpaceOp, FreqType>> {
         using space_type = typename SpaceOp::scalar_type;
 
 
@@ -89,7 +89,7 @@ namespace matx
       };
 
     template <typename SpaceOp, typename FreqType> 
-      class ComplexChirp {
+      class ComplexChirp  : public BaseOp<ComplexChirp<SpaceOp, FreqType>> {
         using space_type = typename SpaceOp::scalar_type;
 
 

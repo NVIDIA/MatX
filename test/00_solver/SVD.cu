@@ -253,11 +253,8 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 
   int iterations = 100;
 
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  auto random = gen.GetTensorView(Ashape, NORMAL);
-  (A = random).run(stream);
-
-  auto x0 = gen.GetTensorView(Sshape, NORMAL);
+  (A = random<AType>(AshapeA, NORMAL)).run(stream);
+  auto x0 = random<SType>(std::move(Sshape), NORMAL);
 
   (U = 0).run(stream);
   (S = 0).run(stream);
@@ -388,9 +385,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
 
   int iterations = 100;
 
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  auto random = gen.GetTensorView(Ashape, NORMAL);
-  (A = random).run(stream);
+  (A = random<AType>(std::move(Ashape), NORMAL)).run(stream);
 
 
   (U = 0).run(stream);
