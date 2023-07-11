@@ -144,6 +144,22 @@ public:
     return res;
   }
 
+  template <typename ShapeType, typename Executor>
+  __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) noexcept
+  {
+    if constexpr (is_matx_op<Op>()) {
+      op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+  }
+
+  template <typename ShapeType, typename Executor>
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept  
+  {
+    if constexpr (is_matx_op<Op>()) {
+      op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+  }
+
   /**
    * Get the rank of the operator
    *

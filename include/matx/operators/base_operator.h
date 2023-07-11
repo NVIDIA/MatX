@@ -59,8 +59,17 @@ namespace matx
         __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
         {
           MATX_NVTX_START(get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
+          auto tp = static_cast<T *>(this);
           auto ex = cudaExecutor(stream);
-          ex.Exec(*static_cast<T *>(this));
+          if constexpr (is_matx_op<T>()) {
+            tp->PreRun(tp->Shape(), ex);
+          }
+
+          ex.Exec(*tp);
+
+          if constexpr (is_matx_op<T>()) {
+            tp->PostRun(tp->Shape(), ex);
+          }
         }
 
         /**
@@ -73,8 +82,45 @@ namespace matx
         {
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
           auto ex = cudaExecutor(stream);
-          ex.Exec(*static_cast<T *>(this));
+          auto tp = static_cast<T *>(this);
+
+          if constexpr (is_matx_op<T>()) {
+            tp->PreRun(tp->Shape(), ex);
+          }
+
+          ex.Exec(*tp);
+
+          if constexpr (is_matx_op<T>()) {
+            tp->PostRun(tp->Shape(), ex);
+          }
+
           cudaEventRecord(ev, stream);
+        }
+
+        /**
+         * @brief Function to run before the executor
+         * 
+         * @tparam ShapeType Type of shape
+         * @tparam Executor Executor type
+         * @param shape Shape
+         * @param ex Executor
+         */
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+        {
+        }
+
+        /**
+         * @brief Function to run before the executor
+         * 
+         * @tparam ShapeType Type of shape
+         * @tparam Executor Executor type
+         * @param shape Shape
+         * @param ex Executor
+         */
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+        {
         }
 
         /**
@@ -84,19 +130,35 @@ namespace matx
          * @param ex Executor
          */
         template <typename Ex>
-          __MATX_INLINE__ void run (Ex ex) {
+          __MATX_INLINE__ void run (Ex &&ex) {
             MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
             static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
-            ex.Exec(*static_cast<T *>(this));
+
+            auto tp = static_cast<T *>(this);
+            if constexpr (is_matx_op<T>()) {
+              tp->PreRun(tp->Shape(), ex);
+            }
+
+            ex.Exec(*tp);
+
+            if constexpr (is_matx_op<T>()) {
+              tp->PostRun(tp->Shape(), ex);
+            }
           }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
-          std::array<index_t, T::Rank()> sizes_;
-
-          for(int i = 0 ; i < T::Rank(); i++) {
-            sizes_[i] = static_cast<const T*>(this)->Size(i);
+          if constexpr (T::Rank() == 0) {
+            std::array<index_t, 1> sizes_{1};
+            return sizes_;
           }
-          return sizes_;
+          else {
+            std::array<index_t, T::Rank()> sizes_;
+
+            for(int i = 0 ; i < T::Rank(); i++) {
+              sizes_[i] = static_cast<const T*>(this)->Size(i);
+            }
+            return sizes_;
+          }
         }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() const {

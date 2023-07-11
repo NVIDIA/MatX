@@ -90,6 +90,11 @@ class ViewTestsFloatNonComplexNonHalf : public ::testing::Test,
                             public ViewTestsData<TensorType> {
 };
 
+template <typename TensorType>
+class ViewTestsFloatNonComplexNonHalfAllExecs : public ::testing::Test,
+                            public ViewTestsData<TensorType> {
+};
+
 
 
 TYPED_TEST_SUITE(ViewTestsAll, MatXAllTypes);
@@ -101,6 +106,22 @@ TYPED_TEST_SUITE(ViewTestsIntegral, MatXAllIntegralTypes);
 TYPED_TEST_SUITE(ViewTestsNumericNonComplex, MatXNumericNonComplexTypes);
 TYPED_TEST_SUITE(ViewTestsBoolean, MatXBoolTypes);
 TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypes);
+
+TYPED_TEST_SUITE(ViewTestsNumericNonComplexAllExecs,
+                 MatXNumericNonComplexTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalfAllExecs,
+                 MatXFloatNonComplexNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloatNonComplexAllExecs,
+                 MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(ViewTestsNumericAllExecs,
+                 MatXTypesNumericAllExecs);
+TYPED_TEST_SUITE(ViewTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsAllExecs, MatXTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloatAllExecs, MatXTypesFloatAllExecs);
+TYPED_TEST_SUITE(ViewTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
+TYPED_TEST_SUITE(ViewTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
 
 
 TYPED_TEST(ViewTestsNumericNonComplex, OverlapView)
@@ -461,33 +482,30 @@ TEST(BasicTensorTest, Clone)
   MATX_EXIT_HANDLER();
 }
 
-TEST(ViewTests, Random)
+TYPED_TEST(ViewTestsFloatNonComplexNonHalfAllExecs, Random)
 {
   MATX_ENTER_HANDLER();
   {
+    using TestType = std::tuple_element_t<0, TypeParam>;
+    using ExecType = std::tuple_element_t<1, TypeParam>;
+
+    ExecType exec{}; 
+
     // example-begin random-test-1
-    index_t count = 100;
-    randomGenerator_t<float> rfloat(count * count * count, 0);
-    auto t3fu = rfloat.GetTensorView<3>({count, count, count}, UNIFORM);
-    auto t3fn = rfloat.GetTensorView<3>({count, count, count}, NORMAL);
+    index_t count = 50;
 
-    // t3fu and t3fn can now be used as 3D tensors in places where tensors
-    // are taken as input. Each time the tensor is accessed a new random value
-    // is emitted
-    // example-end random-test-1
+    tensor_t<TestType, 3> t3f({count, count, count});
 
-    tensor_t<float, 3> t3f({count, count, count});
-
-    (t3f = -1000000).run();
-    (t3f = t3fu).run();
-    t3f.PrefetchHost(0);
+    (t3f = (TestType)-1000000).run(exec);
+    (t3f = random<TestType>({count, count, count}, UNIFORM)).run(exec);
+    // example-end random-test-1    
     cudaDeviceSynchronize();
 
-    float total = 0;
+    TestType total = 0;
     for (index_t i = 0; i < count; i++) {
       for (index_t j = 0; j < count; j++) {
         for (index_t k = 0; k < count; k++) {
-          float val = t3f(i, j, k) - 0.5f; // mean centered at zero
+          TestType val = t3f(i, j, k) - 0.5f; // mean centered at zero
           ASSERT_NE(val, -1000000);
           total += val;
           ASSERT_LE(val, 0.5f);
@@ -498,9 +516,8 @@ TEST(ViewTests, Random)
 
     ASSERT_LT(fabs(total / (count * count * count)), .05);
 
-    (t3f = -1000000).run();
-    (t3f = t3fn).run();
-    t3f.PrefetchHost(0);
+    (t3f = (TestType)-1000000).run(exec);
+    (t3f = random<TestType>({count, count, count}, NORMAL)).run(exec);
     cudaDeviceSynchronize();
 
     total = 0;
@@ -508,7 +525,7 @@ TEST(ViewTests, Random)
     for (index_t i = 0; i < count; i++) {
       for (index_t j = 0; j < count; j++) {
         for (index_t k = 0; k < count; k++) {
-          float val = t3f(i, j, k);
+          TestType val = t3f(i, j, k);
           ASSERT_NE(val, -1000000);
           total += val;
         }

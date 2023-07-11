@@ -28,13 +28,9 @@ void svdpi_batch(nvbench::state &state,
   auto VT = make_tensor<AType>({batch, r, n});
   auto S = make_tensor<SType>({batch, r});
 
-  randomGenerator_t<AType> gen(batch*m*n,0);
-  auto x0 = gen.GetTensorView({batch, r}, NORMAL);
-
   int iterations = 10;
 
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   U.PrefetchDevice(stream);
@@ -44,6 +40,7 @@ void svdpi_batch(nvbench::state &state,
   (U = 0).run(stream);
   (S = 0).run(stream);
   (VT = 0).run(stream);
+  auto x0 = random<float>({batch, r}, NORMAL);
 
   // warm up
   nvtxRangePushA("Warmup");
@@ -86,10 +83,7 @@ void svdbpi_batch(nvbench::state &state,
 
   int iterations = 10;
   
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   U.PrefetchDevice(stream);

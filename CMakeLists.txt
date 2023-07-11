@@ -214,7 +214,8 @@ target_link_libraries(matx INTERFACE    CUDA::cudart
                                         CUDA::cublasLt 
                                         CUDA::cufft 
                                         CUDA::cusolver
-                                        CUDA::cuda_driver)
+                                        CUDA::cuda_driver
+                                        CUDA::curand)
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
 # should have all build properties needed based on the options passed in

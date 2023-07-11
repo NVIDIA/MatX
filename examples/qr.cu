@@ -56,10 +56,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Q = make_tensor<AType>({batch, m, m});
   auto R = make_tensor<AType>({batch, m, n});
 
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  
-  auto random = gen.GetTensorView(A.Shape(), NORMAL);
-  (A = random).run(stream);
+  (A = random<float>(A.Shape(), NORMAL)).run(stream);
 
 #if 0
   cudaDeviceSynchronize();

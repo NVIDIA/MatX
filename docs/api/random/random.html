@@ -132,6 +132,7 @@
 
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../basics/index.html">Basics</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/broadcast.html">Broadcasting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/datatype.html">Data Types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
@@ -611,169 +612,72 @@ document.write(`
                   
   <section id="random-number-generation">
 <span id="rand-func"></span><h1>Random Number Generation<a class="headerlink" href="#random-number-generation" title="Permalink to this heading">#</a></h1>
-<p>MatX provides the capability to generate random numbers and treat them as tensors that generate a new random
-number each time they’re accessed. On the device the generation is done using the cuRAND library.
-It is advised to create as few <code class="docutils literal notranslate"><span class="pre">randomGenerator_t</span></code> objects as possible since they can consume a large amount of memory on the
-device. If possible, create many <code class="docutils literal notranslate"><span class="pre">randomTensorView_t</span></code> views from a single <code class="docutils literal notranslate"><span class="pre">randomGenerator_t</span></code>.</p>
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx17randomGenerator_tE">
-<span id="_CPPv3I0EN4matx17randomGenerator_tE"></span><span id="_CPPv2I0EN4matx17randomGenerator_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomGenerator__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">randomGenerator_t</span></span></span><a class="headerlink" href="#_CPPv4I0EN4matx17randomGenerator_tE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Generates random numbers</p>
-<p>
-Generate random numbers based on a size and seed. Uses the Philox 4x32 generator with 10 rounds. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>Type</strong> – of random number</p>
-</dd>
-</dl>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx17randomGenerator_t17randomGenerator_tE7index_t8uint64_t">
-<span id="_CPPv3N4matx17randomGenerator_t17randomGenerator_tE7index_t8uint64_t"></span><span id="_CPPv2N4matx17randomGenerator_t17randomGenerator_tE7index_t8uint64_t"></span><span id="matx::randomGenerator_t::randomGenerator_t__index_t.uint64_t"></span><span class="target" id="classmatx_1_1randomGenerator__t_1aba6b3dcc52210aa98c312f81d9251d09"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">randomGenerator_t</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">total_threads</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx17randomGenerator_t17randomGenerator_tE7index_t8uint64_t" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Constructs a random number generator</p>
-<p>This call will allocate memory sufficiently large enough to store state of the RNG</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>total_threads</strong> – Number of random values to generate </p></li>
-<li><p><strong>seed</strong> – Seed for the RNG </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewEDaRKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T">
-<span id="_CPPv3I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewERKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T"></span><span id="_CPPv2I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewERKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomGenerator__t_1a386c0c48f8121d0368a133b56e0ab2ac"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GetTensorView</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">index_t</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewEDaRKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T" title="matx::randomGenerator_t::GetTensorView::RANK"><span class="n"><span class="pre">RANK</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">shape</span></span>, <span class="n"><span class="pre">Distribution_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dist</span></span>, <a class="reference internal" href="#_CPPv4I0EN4matx17randomGenerator_tE" title="matx::randomGenerator_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span>, <a class="reference internal" href="#_CPPv4I0EN4matx17randomGenerator_tE" title="matx::randomGenerator_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewEDaRKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Get a tensor view of the random numbers</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>shape</strong> – Dimensions of the view in the form of a Shape </p></li>
-<li><p><strong>dist</strong> – Distribution to use </p></li>
-<li><p><strong>alpha</strong> – Alpha value </p></li>
-<li><p><strong>beta</strong> – Beta value </p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A <a class="reference internal" href="#classmatx_1_1randomTensorView__t"><span class="std std-ref">randomTensorView_t</span></a> with given parameters </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I_iEN4matx17randomGenerator_t13GetTensorViewEDaRA4RANK_K7index_t14Distribution_t1T1T">
-<span id="_CPPv3I_iEN4matx17randomGenerator_t13GetTensorViewERA4RANK_K7index_t14Distribution_t1T1T"></span><span id="_CPPv2I_iEN4matx17randomGenerator_t13GetTensorViewERARANK_K7index_t14Distribution_t1T1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomGenerator__t_1a637e3ea1f725c40bc2bec2940fba4a73"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GetTensorView</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sizes</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I_iEN4matx17randomGenerator_t13GetTensorViewEDaRA4RANK_K7index_t14Distribution_t1T1T" title="matx::randomGenerator_t::GetTensorView::RANK"><span class="n"><span class="pre">RANK</span></span></a><span class="p"><span class="pre">]</span></span>, <span class="n"><span class="pre">Distribution_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dist</span></span>, <a class="reference internal" href="#_CPPv4I0EN4matx17randomGenerator_tE" title="matx::randomGenerator_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span>, <a class="reference internal" href="#_CPPv4I0EN4matx17randomGenerator_tE" title="matx::randomGenerator_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_iEN4matx17randomGenerator_t13GetTensorViewEDaRA4RANK_K7index_t14Distribution_t1T1T" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Get a tensor view of the random numbers</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>sizes</strong> – Dimensions of the view in the form of an initializer list </p></li>
-<li><p><strong>dist</strong> – Distribution to use </p></li>
-<li><p><strong>alpha</strong> – Alpha value </p></li>
-<li><p><strong>beta</strong> – Beta value </p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A <a class="reference internal" href="#classmatx_1_1randomTensorView__t"><span class="std std-ref">randomTensorView_t</span></a> with given parameters </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx17randomGenerator_tD0Ev">
-<span id="_CPPv3N4matx17randomGenerator_tD0Ev"></span><span id="_CPPv2N4matx17randomGenerator_tD0Ev"></span><span id="matx::randomGenerator_t::~randomGenerator_t"></span><span class="target" id="classmatx_1_1randomGenerator__t_1a59e0d5f3d8310d63852cbbb9d39e5fc1"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~randomGenerator_t</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx17randomGenerator_tD0Ev" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Destroy the RNG and free all memory </p>
-</dd></dl>
-
+<p>MatX provides the capability to generate random numbers on the host and device using the <code class="docutils literal notranslate"><span class="pre">random()</span></code> operator. <code class="docutils literal notranslate"><span class="pre">random()</span></code>
+uses cuRAND on the device to generate random numbers from device code.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>randomGenerator_t has been deprecated after release 0.5.0. Please use the <code class="docutils literal notranslate"><span class="pre">random()</span></code> operator instead</p>
 </div>
-</dd></dl>
-
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx18randomTensorView_tE">
-<span id="_CPPv3I0_iEN4matx18randomTensorView_tE"></span><span id="_CPPv2I0_iEN4matx18randomTensorView_tE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomTensorView__t"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">randomTensorView_t</span></span></span><a class="headerlink" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Random number generator view</p>
-<p>
-Provides a view into a previously-allocated <a class="reference internal" href="#classmatx_1_1randomGenerator__t"><span class="std std-ref">randomGenerator_t</span></a> </p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T">
+<span id="_CPPv3I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomERR9ShapeType14Distribution_t8uint64_t1T1T"></span><span id="_CPPv2I00_NSt11enable_if_tIX!std::is_array_v<remove_cvref_t<ShapeType>>EbEEEN4matx6randomERR9ShapeType14Distribution_t8uint64_t1T1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ShapeType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><span class="o"><span class="pre">!</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">is_array_v</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">remove_cvref_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T" title="matx::random::ShapeType"><span class="n"><span class="pre">ShapeType</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0fd1cd70a0c7fa0d730c70bfaa8626dd"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">random</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T" title="matx::random::ShapeType"><span class="n"><span class="pre">ShapeType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">s</span></span>, <span class="n"><span class="pre">Distribution_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dist</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <a class="reference internal" href="#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T" title="matx::random::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span>, <a class="reference internal" href="#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T" title="matx::random::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Return a random number with a specified shape. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>Type</strong> – of random number </p></li>
-<li><p><strong>Rank</strong> – of view</p></li>
+<li><p><strong>ShapeType</strong> – Shape type </p></li>
+<li><p><strong>T</strong> – Type of output </p></li>
 </ul>
 </dd>
-</dl>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
-<dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx18randomTensorView_t4typeE">
-<span id="_CPPv3N4matx18randomTensorView_t4typeE"></span><span id="_CPPv2N4matx18randomTensorView_t4typeE"></span><span class="target" id="classmatx_1_1randomTensorView__t_1aa23977f2eefc3a666a7d4552e09f135c"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><a class="headerlink" href="#_CPPv4N4matx18randomTensorView_t4typeE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Type trait to get type. </p>
-</dd></dl>
-
-<dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx18randomTensorView_t11scalar_typeE">
-<span id="_CPPv3N4matx18randomTensorView_t11scalar_typeE"></span><span id="_CPPv2N4matx18randomTensorView_t11scalar_typeE"></span><span class="target" id="classmatx_1_1randomTensorView__t_1a9612a8c62f45aab434d52cca8d86e502"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">scalar_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><a class="headerlink" href="#_CPPv4N4matx18randomTensorView_t11scalar_typeE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Type trait to get type. </p>
-</dd></dl>
-
-<dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv4N4matx18randomTensorView_t6matxopE">
-<span id="_CPPv3N4matx18randomTensorView_t6matxopE"></span><span id="_CPPv2N4matx18randomTensorView_t6matxopE"></span><span class="target" id="classmatx_1_1randomTensorView__t_1aa19f444de9b6043e751f40bf9872ec28"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">matxop</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><a class="headerlink" href="#_CPPv4N4matx18randomTensorView_t6matxopE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Type trait to indicate this is an operator. </p>
-</dd></dl>
-
-</div>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T">
-<span id="_CPPv3I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T"></span><span id="_CPPv2I0_NSt11enable_if_tIX!std::is_array_v<typename remove_cvref<ShapeType>::type>EbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ShapeType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><span class="o"><span class="pre">!</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">is_array_v</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="../type_traits.html#_CPPv4I0EN4matx12remove_cvrefE" title="matx::remove_cvref"><span class="n"><span class="pre">remove_cvref</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T" title="matx::randomTensorView_t::randomTensorView_t::ShapeType"><span class="n"><span class="pre">ShapeType</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomTensorView__t_1a5541d6953c80bafc6a61b8d254fe61bf"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">randomTensorView_t</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T" title="matx::randomTensorView_t::randomTensorView_t::ShapeType"><span class="n"><span class="pre">ShapeType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">shape</span></span>, <span class="n"><span class="pre">curandStatePhilox4_32_10_t</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">states</span></span>, <span class="n"><span class="pre">Distribution_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dist</span></span>, <a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span>, <a class="reference internal" href="#_CPPv4I0_iEN4matx18randomTensorView_tE" title="matx::randomTensorView_t::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Construct a new randomTensorView t object. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>shape</strong> – Shape of view </p></li>
-<li><p><strong>states</strong> – States of RNG </p></li>
-<li><p><strong>dist</strong> – RNG distribution </p></li>
-<li><p><strong>alpha</strong> – Alpha value </p></li>
-<li><p><strong>beta</strong> – Beta value </p></li>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>s</strong> – Shape of operator </p></li>
+<li><p><strong>dist</strong> – Distribution (either NORMAL or UNIFORM) </p></li>
+<li><p><strong>seed</strong> – Random number seed </p></li>
+<li><p><strong>alpha</strong> – Value to multiply by each number </p></li>
+<li><p><strong>beta</strong> – Value to add to each number </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Random number operator </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE">
-<span id="_CPPv3I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCEKNSt5tupleIDp2IsEE"></span><span id="_CPPv2I_iDp_NSt11enable_if_tIXI == sizeof...(Is)EbEEENK4matx18randomTensorView_t7GetValCEKNSt5tupleIDp2IsEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">I</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Is</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">enable_if_t</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE" title="matx::randomTensorView_t::GetValC::I"><span class="n"><span class="pre">I</span></span></a><span class="w"> </span><span class="o"><span class="pre">==</span></span><span class="w"> </span><span class="k"><span class="pre">sizeof</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">(</span></span><a class="reference internal" href="#_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE" title="matx::randomTensorView_t::GetValC::Is"><span class="n"><span class="pre">Is</span></span></a><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1randomTensorView__t_1acb2752a00e3041001bd33636c5ee3940"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="pre">__MATX_DEVICE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GetValC</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE" title="matx::randomTensorView_t::GetValC::Is"><span class="n"><span class="pre">Is</span></span></a><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">&gt;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Get the random number at an index</p>
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T">
+<span id="_CPPv3I0_iEN4matx6randomERA4RANK_K7index_t14Distribution_t8uint64_t1T1T"></span><span id="_CPPv2I0_iEN4matx6randomERARANK_K7index_t14Distribution_t8uint64_t1T1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RANK</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ac97223178caa490078c2c4581c717c35"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">random</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">index_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">s</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T" title="matx::random::RANK"><span class="n"><span class="pre">RANK</span></span></a><span class="p"><span class="pre">]</span></span>, <span class="n"><span class="pre">Distribution_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dist</span></span>, <span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <a class="reference internal" href="#_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T" title="matx::random::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span>, <a class="reference internal" href="#_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T" title="matx::random::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Return a random number with a specified shape. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>I</strong> – Unused </p></li>
-<li><p><strong>Is</strong> – Index types </p></li>
+<li><p><strong>RANK</strong> – Rank of operator </p></li>
+<li><p><strong>T</strong> – Type of output </p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Value at index </p>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>s</strong> – Array of dimensions </p></li>
+<li><p><strong>dist</strong> – Distribution (either NORMAL or UNIFORM) </p></li>
+<li><p><strong>seed</strong> – Random number seed </p></li>
+<li><p><strong>alpha</strong> – Value to multiply by each number </p></li>
+<li><p><strong>beta</strong> – Value to add to each number </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Random number operator </p>
 </dd>
 </dl>
-</dd></dl>
-
-</div>
 </dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">index_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
-<span class="n">randomGenerator_t</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="w"> </span><span class="n">rfloat</span><span class="p">(</span><span class="n">count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">t3fu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rfloat</span><span class="p">.</span><span class="n">GetTensorView</span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">({</span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">},</span><span class="w"> </span><span class="n">UNIFORM</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">t3fn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rfloat</span><span class="p">.</span><span class="n">GetTensorView</span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">({</span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">},</span><span class="w"> </span><span class="n">NORMAL</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">index_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span><span class="p">;</span>
 
-<span class="c1">// t3fu and t3fn can now be used as 3D tensors in places where tensors</span>
-<span class="c1">// are taken as input. Each time the tensor is accessed a new random value</span>
-<span class="c1">// is emitted</span>
+<span class="n">tensor_t</span><span class="o">&lt;</span><span class="n">TestType</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="o">&gt;</span><span class="w"> </span><span class="n">t3f</span><span class="p">({</span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">});</span>
+
+<span class="p">(</span><span class="n">t3f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">TestType</span><span class="p">)</span><span class="mi">-1000000</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t3f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">random</span><span class="o">&lt;</span><span class="n">TestType</span><span class="o">&gt;</span><span class="p">({</span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">},</span><span class="w"> </span><span class="n">UNIFORM</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>

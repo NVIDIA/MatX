@@ -129,6 +129,7 @@
 
 <li class="toctree-l1 has-children"><a class="reference internal" href="basics/index.html">Basics</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="basics/broadcast.html">Broadcasting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/datatype.html">Data Types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
@@ -792,6 +793,8 @@ document.write(`
 </li>
       <li><a href="basics/nvtx.html#_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE">matx::matx_nvxtLogLevels::MATX_NVTX_LOG_USER (C++ enumerator)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/math/extrema/max.html#_CPPv4N4matx3maxE2Op2Op">matx::max (C++ function)</a>
 </li>
       <li><a href="api/stats/avgvar/mean.html#_CPPv4I00EN4matx4meanEv7OutTypeRK6InType12cudaExecutor">matx::mean (C++ function)</a>, <a href="api/stats/avgvar/mean.html#_CPPv4I00EN4matx4meanEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/stats/avgvar/mean.html#_CPPv4I00_i0EN4matx4meanEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
@@ -802,8 +805,6 @@ document.write(`
 </li>
       <li><a href="api/math/extrema/min.html#_CPPv4N4matx3minE2Op2Op">matx::min (C++ function)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/math/arithmetic/mul.html#_CPPv4N4matx3mulE2Op2Op">matx::mul (C++ function)</a>
 </li>
       <li><a href="api/math/complex/norm.html#_CPPv4N4matx4normE2Op">matx::norm (C++ function)</a>
@@ -858,25 +859,7 @@ document.write(`
 </li>
       <li><a href="api/dft/fft/r2c.html#_CPPv4I0EN4matx3r2cEDa2T17index_t">matx::r2c (C++ function)</a>
 </li>
-      <li><a href="api/random/random.html#_CPPv4I0EN4matx17randomGenerator_tE">matx::randomGenerator_t (C++ class)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4I_NSt6size_tEEN4matx17randomGenerator_t13GetTensorViewEDaRKNSt5arrayI7index_t4RANKEE14Distribution_t1T1T">matx::randomGenerator_t::GetTensorView (C++ function)</a>, <a href="api/random/random.html#_CPPv4I_iEN4matx17randomGenerator_t13GetTensorViewEDaRA4RANK_K7index_t14Distribution_t1T1T">[1]</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4N4matx17randomGenerator_t17randomGenerator_tE7index_t8uint64_t">matx::randomGenerator_t::randomGenerator_t (C++ function)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4N4matx17randomGenerator_tD0Ev">matx::randomGenerator_t::~randomGenerator_t (C++ function)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4I0_iEN4matx18randomTensorView_tE">matx::randomTensorView_t (C++ class)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4I_iDp_NSt11enable_if_tIXeq1IsZ2IsEbEEENK4matx18randomTensorView_t7GetValCE7index_tKNSt5tupleIDp2IsEE">matx::randomTensorView_t::GetValC (C++ function)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4N4matx18randomTensorView_t6matxopE">matx::randomTensorView_t::matxop (C++ type)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4I0_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx18randomTensorView_t18randomTensorView_tERR9ShapeTypeP26curandStatePhilox4_32_10_t14Distribution_t1T1T">matx::randomTensorView_t::randomTensorView_t (C++ function)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4N4matx18randomTensorView_t11scalar_typeE">matx::randomTensorView_t::scalar_type (C++ type)</a>
-</li>
-      <li><a href="api/random/random.html#_CPPv4N4matx18randomTensorView_t4typeE">matx::randomTensorView_t::type (C++ type)</a>
+      <li><a href="api/random/random.html#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vI14remove_cvref_tI9ShapeTypeEEEEbEEEN4matx6randomEDaRR9ShapeType14Distribution_t8uint64_t1T1T">matx::random (C++ function)</a>, <a href="api/random/random.html#_CPPv4I0_iEN4matx6randomEDaRA4RANK_K7index_t14Distribution_t8uint64_t1T1T">[1]</a>
 </li>
       <li><a href="api/creation/operators/range.html#_CPPv4I_i00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx5rangeEDaRR9ShapeType1T1T">matx::range (C++ function)</a>, <a href="api/creation/operators/range.html#_CPPv4I_i_i0EN4matx5rangeEDaRA4RANK_K7index_t1T1T">[1]</a>
 </li>

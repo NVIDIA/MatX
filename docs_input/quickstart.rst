@@ -410,24 +410,19 @@ is slightly different than other types above:
 
 .. code-block:: cpp
 
-    auto t = make_tensor<float>({100, 50});
-    randomGenerator_t<float> randData(t.TotalSize(), 0);
-    auto randTensor = randData.GetTensorView<2>({100,50}, NORMAL);
+    auto t2 = make_tensor<float>({100, 50});
+    auto randOp = random<float>(t.Shape(), NORMAL);
 
-The code above constructs a random tensor view inside of ``randTensor`` that can be used in expressions as a random-valued tensor. The first line where
-the ``randomGenerator_t`` type is constructed allocates enough memory on the device to provide random numbers for a 100x50 tensor. The second line
-gets a view from the generator. These two steps are important because you typically want to limit how many generators you create due to their memory
-consumption, and instead create views from a small set of generators.
+The code above creates a 100x50 2D tensor, followed by a random operator that produces normally-distributed numbers with the same shape as ``t2``.
 
-Using the random tensor view above in an expression is the same as any other view:
+Using the random operator above uses the same assignment as with any operator, and when the values are fetched on the device a new random number
+will be generated for each element.
 
 .. code-block:: cpp
 
-    auto t2 = make_tensor<float>({100, 50});
-    (t2 = randTensor*5 + randTensor).run(stream);
+    (t2 = randOp*5 + randOp).run(stream);
 
-Unlike normal views, ``randTensor`` will give a new random value every time it is accessed. Not only will every element in the first multiply get A
-different random number, but when it's access again to add to the previous value, a new random number is generated for every element. 
+In the example above ``randOp`` is accessed twice. On each access a new random number is generated.
 
 That's it!
 ----------

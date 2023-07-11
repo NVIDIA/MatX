@@ -96,7 +96,7 @@ struct is_matx_op_impl<T, std::void_t<typename T::matxop>> : std::true_type {
  */
 template <typename T> constexpr bool is_matx_op()
 {
-  return detail::is_matx_op_impl<T>::value;
+  return detail::is_matx_op_impl<typename remove_cvref<T>::type>::value;
 }
 
 namespace detail {
@@ -167,6 +167,19 @@ template<> struct is_device_executor<matx::cudaExecutor> : std::true_type {};
  */
 template <typename T> 
 inline constexpr bool is_device_executor_v = detail::is_device_executor<typename remove_cvref<T>::type>::value;
+
+namespace detail {
+template<typename T> struct is_single_thread_host_executor : std::false_type {};
+template<> struct is_single_thread_host_executor<matx::SingleThreadHostExecutor> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a single-threaded host executor executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+inline constexpr bool is_single_thread_host_executor_v = detail::is_single_thread_host_executor<remove_cvref_t<T>>::value;
 
 
 namespace detail {

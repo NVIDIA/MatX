@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-    <title>Basics &#8212; matx  documentation</title>
+    <title>Concepts &#8212; matx  documentation</title>
   
   
   
@@ -42,11 +42,11 @@
     <script src="../_static/jquery.js"></script>
     <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'basics/index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'basics/concepts';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Broadcasting" href="broadcast.html" />
-    <link rel="prev" title="Build Integration" href="../build.html" />
+    <link rel="next" title="Creating Tensors" href="creation.html" />
+    <link rel="prev" title="Broadcasting" href="broadcast.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -130,9 +130,9 @@
 
 
 
-<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Basics</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Basics</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="broadcast.html">Broadcasting</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html">Concepts</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="datatype.html">Data Types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
@@ -506,7 +506,7 @@
       
       
       
-      <li><a href="../_sources/basics/index.rst" target="_blank"
+      <li><a href="../_sources/basics/concepts.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -575,7 +575,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
 </div></div>
       
     </div>
@@ -586,11 +588,27 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Basics</h1>
+    <h1>Concepts</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operator">Operator</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tensor">Tensor</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#generator">Generator</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#transform">Transform</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#executor">Executor</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#shape">Shape</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stride">Stride</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -600,53 +618,94 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article" role="main">
                   
-  <section id="basics">
-<h1>Basics<a class="headerlink" href="#basics" title="Permalink to this heading">#</a></h1>
-<p>In this section you’ll find detailed guides on building and using of MatX. This is a good place to read through Once
-you’ve read the <a class="reference internal" href="../quickstart.html#quickstart"><span class="std std-ref">Quick Start</span></a> guide.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="broadcast.html">Broadcasting</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#operator">Operator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#transform">Transform</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#executor">Executor</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#shape">Shape</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concepts.html#stride">Stride</a></li>
+  <section id="concepts">
+<span id="id1"></span><h1>Concepts<a class="headerlink" href="#concepts" title="Permalink to this heading">#</a></h1>
+<p>MatX uses numerous concepts that are given names to help understand how the library works. This document
+compiles a list of the terms and definitions that will be useful when reading other documents and code.</p>
+<section id="operator">
+<h2>Operator<a class="headerlink" href="#operator" title="Permalink to this heading">#</a></h2>
+<p>The most important concept in MatX is the <cite>Operator</cite>. An <cite>Operator</cite> is any type that adheres to the <cite>Operator interface</cite>.
+Specifically, any operator must implement the following functions:</p>
+<ul class="simple">
+<li><p>Size</p></li>
+<li><p>Shape</p></li>
+<li><p>Stride</p></li>
+<li><p>Rank</p></li>
+<li><p>operator() (For rvalues at a minimum, and optionally lvalues)</p></li>
 </ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="creation.html">Creating Tensors</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#a-quick-primer-on-matx-types">A Quick Primer On MatX Types</a></li>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#matx-storage">MatX Storage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#tensor-descriptors">Tensor Descriptors</a></li>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#id1">Creating Tensors</a></li>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#storage">Storage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="creation.html#descriptors">Descriptors</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="datatype.html">Data Types</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="datatype.html#user-defined-types">User-defined types</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="matlabpython.html">MatX For MATLAB/NumPy Users</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="matlabpython.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="matlabpython.html#conversion-table">Conversion Table</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="nvtx.html">NVTX Profiling</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#enabling-nvtx-api-and-setting-log-level">Enabling NVTX API and Setting Log Level</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#using-the-nvtx-api">Using the NVTX API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#nvtx-examples">NVTX Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#matx-nvtx-api">MatX NVTX API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#matx-nvtx-logging-levels">MatX NVTX Logging Levels</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nvtx.html#matx-nvtx-auto-range-colors">MatX NVTX Auto Range Colors</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="print.html">Printing</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tensor.html">Tensor Type</a></li>
-</ul>
+<p>These functions provide a minimum set of functionality that can be used on both the host and device.</p>
+<p>The API definition above is simple, but very powerful. Any class/type that implements these functions
+can be used anywhere an operator is accepted. This includes: arithmetic expressions, transforms,
+assignments, etc. <cite>Operators</cite> are a superset containing other types, including generators and tensors.</p>
+<p>As an example:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a tensor. &quot;t&quot; is an operator</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">t</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">10</span><span class="p">);</span>
+
+<span class="c1">// Create a sin operator that operates on &quot;t&quot; and name it &quot;op&quot;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">op</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">);</span>
+
+<span class="c1">// Create a Hamming window generator and assign it to the variable &quot;win&quot;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">win</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">hamming</span><span class="p">({</span><span class="mi">10</span><span class="p">});</span>
+
+<span class="c1">// Launch a kernel where &quot;win&quot; is copied into &quot;t&quot;</span>
+<span class="p">(</span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">win</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
 </div>
+<p>The first three lines have a single operator created. In order, they create a tensor, operator, and generator, respectively.
+As mentioned above, <code class="docutils literal notranslate"><span class="pre">t</span></code>, <code class="docutils literal notranslate"><span class="pre">sin(t)</span></code>, and <code class="docutils literal notranslate"><span class="pre">hamming({10})</span></code> all have the operator interface above implemented.</p>
+<p>The last line more nuanced in where the operator is used. In <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">=</span> <span class="pre">win</span></code> the operator is the assignment operator (<code class="docutils literal notranslate"><span class="pre">=</span></code>),
+which in this case produces a lazily-evaluated assignment  of <code class="docutils literal notranslate"><span class="pre">win</span></code> into <code class="docutils literal notranslate"><span class="pre">t</span></code>. <code class="docutils literal notranslate"><span class="pre">=</span></code> implements the entire operator
+interface above and is used as an operator in the assignment expression.</p>
+<section id="tensor">
+<h3>Tensor<a class="headerlink" href="#tensor" title="Permalink to this heading">#</a></h3>
+<p>Tensors are memory-backed operators providing several initialization methods for different use cases. Tensors implement the
+entire operator interface above, plus many more helper functions specific to a tensor type. Tensors can be used as both lvalues
+and rvalues in every place an operator is expected.</p>
+<p>For more information on creating tensors, see <a class="reference internal" href="creation.html#creating"><span class="std std-ref">Creating Tensors</span></a>.</p>
+</section>
+<section id="generator">
+<h3>Generator<a class="headerlink" href="#generator" title="Permalink to this heading">#</a></h3>
+<p>Generators are a type of operator that can generate values without another tensor or operator as input. For example, windowing
+functions, such as a Hamming window, can generate values by only taking a length as input. Generators are efficient since they
+require no memory.</p>
+</section>
+</section>
+<section id="transform">
+<h2>Transform<a class="headerlink" href="#transform" title="Permalink to this heading">#</a></h2>
+<p>Some functions in MatX can only be executed on a single line without any other operators. For example, an fft is executed by:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">fft</span><span class="p">(</span><span class="n">A</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>It is currently not valid to do something like the following:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">C</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">fft</span><span class="p">(</span><span class="n">A</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>The reason this is invalid is because functions that are classified as transforms launch CUDA kernels to perform a single function,
+and many times they call a CUDA library. Transforms are not operators and cannot be used in operator expressions as shown above.
+Since <code class="docutils literal notranslate"><span class="pre">fft</span></code> is not an operator the compiler will give an error.</p>
+<p>This behavior may change in the future or be relaxed for certain transforms.</p>
+<p>Since some transforms rely on CUDA math library backends not all of them are available with different executors. Please see the
+documentation for the individual function to check compatibility.</p>
+</section>
+<section id="executor">
+<h2>Executor<a class="headerlink" href="#executor" title="Permalink to this heading">#</a></h2>
+<p>Executors are types that describe how to execute an operator expression or transform. They are similar to C++’s execution policy, and
+may even use C++ execution policies behind the scenes. Executors are designed so that the code can remain unchanged while executing
+on a variety of different targets. Currently the following executors are defined:</p>
+<ul class="simple">
+<li><p>cudaExecutor - Execute on a CUDA-supported device</p></li>
+<li><p>SingleThreadHostExecutor - Execute on a single host thread</p></li>
+</ul>
+<p>More executor types will be added in future releases.</p>
+</section>
+<section id="shape">
+<h2>Shape<a class="headerlink" href="#shape" title="Permalink to this heading">#</a></h2>
+<p>Shape is used to describe the size of each dimension of an operator.</p>
+</section>
+<section id="stride">
+<h2>Stride<a class="headerlink" href="#stride" title="Permalink to this heading">#</a></h2>
+<p>Stride is used to describe the spacing between elements in each dimension of an operator</p>
+</section>
 </section>
 
 
@@ -662,20 +721,20 @@ you’ve read the <a class="reference internal" href="../quickstart.html#quickst
     <div class="footer-article-item"><!-- Previous / next buttons -->
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../build.html"
+       href="broadcast.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Build Integration</p>
+        <p class="prev-next-title">Broadcasting</p>
       </div>
     </a>
     <a class="right-next"
-       href="broadcast.html"
+       href="creation.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Broadcasting</p>
+        <p class="prev-next-title">Creating Tensors</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -688,6 +747,28 @@ you’ve read the <a class="reference internal" href="../quickstart.html#quickst
             </div>
             
             
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operator">Operator</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tensor">Tensor</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#generator">Generator</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#transform">Transform</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#executor">Executor</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#shape">Shape</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stride">Stride</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

@@ -138,11 +138,7 @@ void reduce_4d(
   t1.PrefetchDevice(0);
   t4.PrefetchDevice(0);
 
-  randomGenerator_t < ValueType > randData(size0*size1*size2*size3, 0);
-
-  auto r4 = randData.template GetTensorView<t4.Rank()>(t4.Shape(), UNIFORM);
-
-  (t4 = r4).run();
+  (t4 = random<float>(t4.Shape(), UNIFORM)).run();
   cudaDeviceSynchronize();
 
   state.exec([&t4, &t1](nvbench::launch &launch) { matx::sum(t1, t4, (cudaStream_t)launch.get_stream()); });

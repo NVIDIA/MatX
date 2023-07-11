@@ -833,6 +833,16 @@ class tensor_impl_t {
       ldata_ = data;
     }
 
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+    {
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept  
+    {
+    }
+
 
   protected:
     T *ldata_;

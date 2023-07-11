@@ -37,7 +37,8 @@
 namespace matx
 {
   namespace detail {
-    template <typename T> class Alternating {
+    template <typename T> 
+      class Alternating : public BaseOp<Alternating<T>>{
       private:
         index_t size_;
 

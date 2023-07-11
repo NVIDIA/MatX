@@ -89,9 +89,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       {(N - noverlap) / nstep, nfft / 2 + 1});
   tensor_t<float, 1> s_time({(N - noverlap) / nstep});
 
-  randomGenerator_t<float> randData({N}, 0);
-  auto randDataView = randData.GetTensorView<1>(num_samps, NORMAL);
-
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
   (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
@@ -101,7 +98,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
   (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(stream);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * randDataView).run(stream);
+  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(stream);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(stream);
   // x = carrier + noise
@@ -149,9 +146,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   auto f = make_tensor<float>({2000,2000});
   auto f2 = make_tensor<float>({2000,2000});
-  randomGenerator_t<float> randData2({2000*2000}, 0);
-  auto randDataView2 = randData2.GetTensorView<2>({2000,2000}, NORMAL);  
-  (f = randDataView2).run(stream);
+
+  (f = random<float>({2000,2000}, NORMAL)).run(stream);
   inv(f2, f, stream);
 
   // Time graph execution of same kernels
