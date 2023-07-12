@@ -3116,7 +3116,7 @@ void __MATX_INLINE__ trace(OutType dest, const InType &in, Executor &&exec)
  *   CUDA stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ trace(OutType dest, const InType &in, int stream)
+void __MATX_INLINE__ trace(OutType dest, const InType &in, int stream = 0)
 {
   return trace(dest, in, cudaExecutor{stream});
 }

@@ -246,6 +246,29 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
   }
 }
 
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
+{
+  MATX_ENTER_HANDLER();
+
+  // example-begin einsum-trace-1
+  auto a2 = make_tensor<TypeParam>({10,10});
+  auto c0_0 = make_tensor<TypeParam>();
+  auto c0_1 = make_tensor<TypeParam>();
+  (a2 = ones(a2.Shape())).run();
+
+  // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
+  cutensor::einsum(c0_0, "ii->", 0, a2);
+  trace(c0_1, a2);
+
+  // example-end einsum-trace-1
+  cudaStreamSynchronize(0);
+
+  MATX_ASSERT_EQ(c0_0(), c0_1());
+  MATX_ASSERT_EQ(c0_0(), 10);
+
+  MATX_EXIT_HANDLER();
+}
+
 
 
 #endif

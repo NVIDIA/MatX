@@ -79,7 +79,6 @@ else()
 endif()
 
 if(NOT cuTENSOR_FOUND)
-  set(CUTENSOR_VERSION 1.5.0.3)
   set(CUTENSOR_FILENAME libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive)
 
   message(STATUS "cuTENSOR not found. Downloading library. By continuing this download you accept to the license terms of cuTENSOR")
@@ -92,7 +91,7 @@ if(NOT cuTENSOR_FOUND)
     DOWNLOAD_ONLY YES 
   )
       
-  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/11/libcutensor.so)
+  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/${CUDAToolkit_VERSION_MAJOR}/libcutensor.so)
   set(cuTENSOR_INCLUDE_DIR ${cutensor_SOURCE_DIR}/include) 
 
 
