@@ -148,6 +148,9 @@ endif()
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
+    set(CUTENSORNET_VERSION 23.03.0.20)
+    set(CUTENSOR_VERSION 1.7.0.1)
+
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=1)

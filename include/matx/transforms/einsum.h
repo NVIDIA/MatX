@@ -86,7 +86,9 @@ public:
     
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
-    //cutensornetLoggerSetLevel(5);
+
+    // cutensornetLoggerSetLevel(5); // Turn on to see debug from cuTENSOR/cuTensorNet
+
     // Convert all parameter structures
     int32_t *modes[sizeof...(InT) + 1];
     int64_t *extents[sizeof...(InT) + 1];
@@ -112,12 +114,11 @@ public:
                                                 extents, 
                                                 strides, 
                                                 modes, 
-                                                params_.alignments_in_,
+                                                nullptr,
                                                 out.Rank(), 
                                                 extents[sizeof...(InT)], 
                                                 strides[sizeof...(InT)], 
                                                 modes[sizeof...(InT)], 
-                                                params_.alignment_out_,
                                                 MatXTypeToCudaType<typename OutputTensor::scalar_type>(), 
                                                 CUTENSORNET_COMPUTE_32F,
                                                 &descNet_);
@@ -173,33 +174,37 @@ public:
     status = cutensornetCreateWorkspaceDescriptor(handle_, &workDesc_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to create cuTENSOR workspace descriptor");  
 
-    uint64_t requiredWorkspaceSize = 0;
-    status = cutensornetWorkspaceComputeSizes(handle_,
-                                          descNet_,
-                                          optimizerInfo,
-                                          workDesc_);
+    int64_t requiredWorkspaceSize = 0;
+    status = cutensornetWorkspaceComputeContractionSizes(handle_,
+                                                         descNet_,
+                                                         optimizerInfo,
+                                                         workDesc_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
         "Failed to compute cuTENSOR workspace size");  
 
-    status = cutensornetWorkspaceGetSize(handle_,
-                                         workDesc_,
-                                         CUTENSORNET_WORKSIZE_PREF_MIN,
-                                         CUTENSORNET_MEMSPACE_DEVICE,
-                                         &requiredWorkspaceSize);
+    status = cutensornetWorkspaceGetMemorySize(handle_,
+                                                   workDesc_,
+                                                   CUTENSORNET_WORKSIZE_PREF_MIN,
+                                                   CUTENSORNET_MEMSPACE_DEVICE,
+                                                   CUTENSORNET_WORKSPACE_SCRATCH,
+                                                   &requiredWorkspaceSize);
+
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-      "Failed to get cuTENSOR workspace size");  
+      "Failed to get cuTENSOR memory size");  
 
     MATX_ASSERT_STR(workSize_ > requiredWorkspaceSize, matxOutOfMemory, "Not enough workspace memory is available.");
 
     matxAlloc(&workspace_, requiredWorkspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-    status = cutensornetWorkspaceSet(handle_,
-                                          workDesc_,
-                                          CUTENSORNET_MEMSPACE_DEVICE,
-                                          workspace_,
-                                          requiredWorkspaceSize);
+    status = cutensornetWorkspaceSetMemory(handle_,
+                                               workDesc_,
+                                               CUTENSORNET_MEMSPACE_DEVICE,
+                                               CUTENSORNET_WORKSPACE_SCRATCH,
+                                               workspace_,
+                                               requiredWorkspaceSize);
+
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-      "Failed to set cuTENSOR workspace");     
+      "Failed to set cuTENSOR memory");     
 
     /*******************************
      * Initialize all pair-wise contraction plans (for cuTENSOR)
@@ -372,24 +377,31 @@ public:
   inline void Exec(OutputTensor &out, cudaStream_t stream, const InT... tensors)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    [[maybe_unused]] cutensornetStatus_t status;
+
+    cutensornetSliceGroup_t sliceGroup{};
+    status = cutensornetCreateSliceGroupFromIDRange(handle_, 0, params_.num_slices_, 1, &sliceGroup);
+    MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "cutensornetCreateSliceGroupFromIDRange failed");
     
     void *data_in[sizeof...(InT)];
     size_t i = 0;
     ((data_in[i++] = tensors.Data()), ...);
 
-    for (int64_t slice = 0; slice < params_.num_slices_; slice++)
-    {
-      auto status = cutensornetContraction(handle_,
-                                plan_,
-                                data_in,
-                                out.Data(),
-                                workDesc_, 
-                                slice, 
-                                stream);
-      MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-        matxcuTensorError, "cutensornetContraction failed");
-    }
-  }    
+    int32_t accumulateOutput = 0;
+    status = cutensornetContractSlices(handle_,
+                              plan_,
+                              data_in,
+                              out.Data(),
+                              accumulateOutput,
+                              workDesc_, 
+                              sliceGroup, 
+                              stream);
+
+    MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "cutensornetContraction failed");
+
+  }
 
   private:
     static void StringToIntArray(const std::string_view &str, int32_t modes[]) {
@@ -400,7 +412,7 @@ public:
     }
 
     cutensornetContractionPlan_t plan_;
-    uint64_t workSize_;
+    int64_t workSize_;
     void *workspace_;
     cutensornetWorkspaceDescriptor_t workDesc_;
     cutensornetHandle_t handle_;
