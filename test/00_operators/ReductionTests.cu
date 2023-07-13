@@ -627,6 +627,36 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, AllClose)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  // example-begin allclose-test-1
+  auto A = make_tensor<TestType>({5, 5, 5});
+  auto B = make_tensor<TestType>({5, 5, 5});
+  auto C = make_tensor<int>();
+
+  (A = ones<TestType>(A.Shape())).run();
+  (B = ones<TestType>(B.Shape())).run();
+  allclose(C, A, B, 1e-5, 1e-8, exec);
+  // example-end allclose-test-1
+  cudaStreamSynchronize(0);
+
+  ASSERT_EQ(C(), 1);
+
+  B(1,1,1) = 2;
+  allclose(C, A, B, 1e-5, 1e-8, exec);
+  cudaStreamSynchronize(0);
+
+  ASSERT_EQ(C(), 0);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
 {
   MATX_ENTER_HANDLER();

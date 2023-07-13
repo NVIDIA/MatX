@@ -385,6 +385,7 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
   }
 };
 
+
 __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(unsigned int *addr, unsigned int val)
 {
   unsigned int assumed;
@@ -2836,6 +2837,76 @@ void __MATX_INLINE__ all(OutType dest, const InType &in, const int (&dims)[D], E
   all(dest, permute(in, perm), etype);
 #endif  
 }
+
+/**
+ * Find if all values are != 0
+ *
+ * Returns a boolean value indicating whether all values in the set of inputs
+ * are non-zero. The same aggregation rules apply for input vs output tensor
+ * size and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   CUDA executor or stream ID
+ */
+template <typename OutType, typename InType1, typename InType2>
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
+{
+#ifdef __CUDACC__ 
+  MATX_NVTX_START("allclose(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
+
+  cudaStream_t stream = exec.getStream();
+  reduce(dest, isclose(in1, in2, rtol, atol), detail::reduceOpAll<int>(), stream, true);
+#endif  
+}
+
+/**
+ * Find if all values are != 0
+ *
+ * Returns a boolean value indicating whether all values in the set of inputs
+ * are non-zero. The same aggregation rules apply for input vs output tensor
+ * size and what type of reduction is done.
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam InType
+ *   Input data type
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single threaded host executor
+ */
+template <typename OutType, typename InType1, typename InType2>
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, [[maybe_unused]] SingleThreadHostExecutor exec)
+{
+  MATX_NVTX_START("allclose(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
+
+  auto isc = isclose(in1, in2, rtol, atol);
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+    *lout = std::all_of(lin, lin + TotalSize(in1), [](int vin) {
+        return vin != 0;
+      }); 
+  };
+  
+
+  ReduceInput(ft, dest, isc);
+}
+
+
 
 /**
  * Compute a variance reduction
