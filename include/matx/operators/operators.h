@@ -51,6 +51,7 @@
 #include "matx/operators/ifelse.h"
 #include "matx/operators/index.h"
 #include "matx/operators/interleaved.h"
+#include "matx/operators/isclose.h"
 #include "matx/operators/kronecker.h"
 #include "matx/operators/legendre.h"
 #include "matx/operators/permute.h"
