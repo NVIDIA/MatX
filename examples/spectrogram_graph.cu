@@ -144,17 +144,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-  auto f = make_tensor<float>({2000,2000});
-  auto f2 = make_tensor<float>({2000,2000});
-
-  (f = random<float>({2000,2000}, NORMAL)).run(stream);
-  inv(f2, f, stream);
-
   // Time graph execution of same kernels
   cudaEventRecord(start, stream);
    for (uint32_t i = 0; i < num_iterations; i++) {
-  //   cudaGraphLaunch(instance, stream);
-  inv(f2, f, stream);
+     cudaGraphLaunch(instance, stream);
    }
   cudaEventRecord(stop, stream);
   cudaStreamSynchronize(stream);
