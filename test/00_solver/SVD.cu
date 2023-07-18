@@ -87,7 +87,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   transpose(Atv, Av, 0);
 
   auto Atv2 = Atv.View({m, n});
-  svd(Uv, Sv, Vv, Atv2);
+  (mtie(Uv, Sv, Vv) = svd(Atv2)).run();
   // example-end svd-test-1
 
   cudaStreamSynchronize(0);
@@ -167,7 +167,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   transpose(Atv, Av, 0);
 
   auto Atv2 = Atv.View({batches, m, n});
-  svd(Uv, Sv, Vv, Atv2);
+  svd_impl(Uv, Sv, Vv, Atv2);
 
   cudaStreamSynchronize(0);
 

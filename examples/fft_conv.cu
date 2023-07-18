@@ -105,17 +105,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Prefetch the data we just created
   sig_time.PrefetchDevice(0);
   filt_time.PrefetchDevice(0);
-
+printf("pn\n");
   // Perform the FFT in-place on both signal and filter
-  fft(sig_freq, sig_time);
-  fft(filt_freq, filt_time);
-
+  fft_impl(sig_freq, sig_time);
+  fft_impl(filt_freq, filt_time);
+printf("pn\n");
   // Perform the pointwise multiply. Overwrite signal buffer with result
-  (sig_freq = sig_freq * filt_freq).run();
-
+  (sig_freq = fft(sig_time, filtered_size) * fft(filt_time, filtered_size)).run();
+printf("pn\n");
   // IFFT in-place
-  ifft(sig_freq, sig_freq);
-
+  (sig_freq = ifft(sig_freq)).run();
+printf("pn\n");
   // Now the sig_freq view contains the full convolution result. Verify against
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.

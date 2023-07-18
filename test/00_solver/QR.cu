@@ -76,7 +76,7 @@ TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
   // example-begin cusolver_qr-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  cusolver_qr(this->Av, this->TauV, this->Av);
+  (mtie(this->Av, this->TauV) = cusolver_qr(this->Av)).run();
   // example-end cusolver_qr-test-1
   cudaStreamSynchronize(0);
 

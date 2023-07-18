@@ -75,7 +75,7 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
   // example-begin eig-test-1
   // Note that eigenvalue/vector solutions are not necessarily ordered in the same way other libraries
   // may order them. When comparing against other libraries it's best to check A*v = lambda * v
-  eig(this->Evv, this->Wov, this->Bv);
+  (mtie(this->Evv, this->Wov) = eig(this->Bv)).run();
   // example-end eig-test-1
 
   // Now we need to go through all the eigenvectors and eigenvalues and make

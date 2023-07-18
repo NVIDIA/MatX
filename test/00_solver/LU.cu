@@ -72,7 +72,7 @@ TYPED_TEST(LUSolverTestNonComplexFloatTypes, LUBasic)
 {
   MATX_ENTER_HANDLER();
   // example-begin lu-test-1
-  lu(this->Av, this->PivV, this->Av);
+  (mtie(this->Av, this->PivV) =  lu(this->Av)).run();
   // example-end lu-test-1
   cudaStreamSynchronize(0);
 

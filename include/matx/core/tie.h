@@ -30,47 +30,50 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+
 #pragma once
 
-
-#include "matx/core/nvtx.h"
+#include <tuple>
+#include "matx/operators/set.h"
 #include "matx/core/type_utils.h"
 
-namespace matx
-{
-  namespace detail {
-    // inv()
-    template <typename T, typename = void> struct is_inv_xform_op : std::false_type {};
-    template <typename T> struct is_inv_xform_op<T, std::void_t<typename T::inv_xform_op>> : std::true_type {};
-    template <typename T> inline constexpr bool is_inv_xform_op_v = is_inv_xform_op<typename remove_cvref<T>::type>::value;
-  
-  template <typename Op, typename Ex>
-  __MATX_INLINE__ constexpr void CheckExecutor() {
-    if constexpr (is_inv_xform_op_v<Op>) {
-      static_assert(is_device_executor_v<Ex>, "Inverse only supports the CUDA executor currently");
-    }
+namespace matx {
+
+/* mtie exists because we can't overload std::tuple's operator= for operator assignments in
+   a multiple return set statement. */
+template <typename... Ts>
+struct mtie {
+  using mtie_type = bool;
+  using scalar_type = void; // Doesn't matter since it's not used
+  using value_type  = void; // Doesn't matter since it's not used
+  using shape_type  = index_t;
+  using matxoplvalue = bool;
+
+  mtie(Ts... ts) : ts_(ts...) {}
+
+  // operator= to cover multiple return types using mtie in a run statement
+  template <typename RHS, std::enable_if_t<is_matx_transform_op<RHS>(), bool> = true>
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(RHS &&rhs)
+  {
+    return detail::set(*this, rhs);
   }
 
-
-  /**
-   * @brief Dispatch a simple transform to the proper transform function
-   * 
-   * @tparam TensorType Type of output tensor
-   * @tparam Op Input (transform) operator type
-   * @tparam Ex Executor type
-   * @param t Output tensor
-   * @param op Input operator
-   */
-  template <typename TensorType, typename Op, typename Ex>
-  __MATX_INLINE__ void transform_dispatch(TensorType &t, const Op &op, Ex &&ex) {
-    CheckExecutor<Op, Ex>();
-
-    if constexpr (is_inv_xform_op_v<Op>) {
-      inv_impl(t, op.GetOp(), ex.getStream());
-    }
-    else {
-      static_assert("Unknown transform operator when dispatching");
-    }
+  template <int n>
+  auto get() {
+    return std::get<n>(ts_);
   }
+
+  static __MATX_INLINE__ constexpr int32_t Rank()
+  {
+    return 1;
   }
-} // end namespace matx
+
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
+  {
+    return 0;
+  }  
+
+  std::tuple<Ts...> ts_;
+};
+
+}; // namespace matx

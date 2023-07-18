@@ -116,14 +116,14 @@ public:
     (covMatView = (covMatView * (1.0f / static_cast<float>(snap_len_))) +
                    eye<complex>() * load_coeff_)
         .run(stream);
-    inv(invCovMatView, covMatView, stream);
+    inv_impl(invCovMatView, covMatView, stream);
 
     // Find A and B to solve xA=B. Matlab uses A/B to solve for x, which is the
     // same as x = BA^-1
     matmul(abfBView, invCovMatView, vView, stream);
     matmul(abfAView, vhView, abfBView, stream);
 
-    inv(abfAInvView, abfAView, stream);
+    inv_impl(abfAInvView, abfAView, stream);
     matmul(abfWeightsView, abfBView, abfAInvView, stream);
   }
 

@@ -172,9 +172,10 @@ struct DnCholParams_t {
 
 template <typename OutputTensor, typename ATensor>
 class matxDnCholSolverPlan_t : public matxDnSolver_t {
-  static_assert(OutputTensor::Rank() == ATensor::Rank(), "Cholesky input/output tensor ranks must match");
-  using T1 = typename OutputTensor::scalar_type;
-  static constexpr int RANK = OutputTensor::Rank();
+  using OutTensor_t = remove_cvref_t<OutputTensor>;
+  static_assert(OutTensor_t::Rank() == remove_cvref_t<ATensor>::Rank(), "Cholesky input/output tensor ranks must match");
+  using T1 = typename OutTensor_t::scalar_type;
+  static constexpr int RANK = OutTensor_t::Rank();
 
 public:
   /**
@@ -327,8 +328,9 @@ struct DnLUParams_t {
 
 template <typename OutputTensor, typename PivotTensor, typename ATensor>
 class matxDnLUSolverPlan_t : public matxDnSolver_t {
-  static constexpr int RANK = OutputTensor::Rank();
-  using T1 = typename OutputTensor::scalar_type;
+  using OutTensor_t = remove_cvref_t<OutputTensor>;
+  static constexpr int RANK = OutTensor_t::Rank();
+  using T1 = typename OutTensor_t::scalar_type;
   static_assert(RANK-1 == PivotTensor::Rank(), "Pivot tensor rank must be one less than output");
   static_assert(std::is_same_v<typename PivotTensor::scalar_type, int64_t>, "Pivot tensor type must be int64_t");  
 
@@ -1102,13 +1104,14 @@ static matxCache_t<DnEigParams_t, DnEigParamsKeyHash, DnEigParamsKeyEq>
  *   Part of matrix to fill
  */
 template <typename OutputTensor, typename ATensor>
-void chol(OutputTensor &out, const ATensor &a,
+void chol_impl(OutputTensor &&out, const ATensor &a,
           cudaStream_t stream = 0,
           cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  using T1 = typename OutputTensor::scalar_type;
+  using OutputTensor_t = remove_cvref_t<OutputTensor>;
+  using T1 = typename OutputTensor_t::scalar_type;
 
   auto a_new = OpToTensor(a, stream);
 
@@ -1128,25 +1131,92 @@ void chol(OutputTensor &out, const ATensor &a,
   auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a_new, stream);
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnCholSolverPlan_t<OutputTensor, decltype(a_new)>::GetCholParams(tv, uplo);
+  auto params = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>::GetCholParams(tv, uplo);
   params.uplo = uplo;
 
   // Get cache or new inverse plan if it doesn't exist
   auto ret = detail::dnchol_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnCholSolverPlan_t<OutputTensor, decltype(a_new)>{tv, uplo};
+    auto tmp = new detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>{tv, uplo};
     detail::dnchol_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(tv, tv, stream, uplo);
   }
   else {
     auto chol_type =
-        static_cast<detail::matxDnCholSolverPlan_t<OutputTensor, decltype(a_new)> *>(ret.value());
+        static_cast<detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)> *>(ret.value());
     chol_type->Exec(tv, tv, stream, uplo);
   }
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
   matx::copy(out, tv.PermuteMatrix(), stream);
+}
+
+
+namespace detail {
+  template<typename OpA>
+  class CholOp : public BaseOp<CholOp<OpA>>
+  {
+    private:
+      OpA a_;
+      cublasFillMode_t uplo_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using chol_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "chol()"; }
+      __MATX_INLINE__ CholOp(OpA a, cublasFillMode_t uplo) : a_(a), uplo_(uplo) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "chol() only supports the CUDA executor currently");
+
+        chol_impl(std::forward<Out>(out), a_, ex.getStream(), uplo_);
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_device_executor_v<Executor>) {
+          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        }
+        else {
+          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
+        }
+
+        Exec(tmp_out_, std::forward<Executor>(ex));
+      }
+
+      // Size is not relevant in eig() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto chol(const OpA &a, cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER) {
+  return detail::CholOp(a, uplo);
 }
 
 
@@ -1174,12 +1244,12 @@ void chol(OutputTensor &out, const ATensor &a,
  *   CUDA stream
  */
 template <typename OutputTensor, typename PivotTensor, typename ATensor>
-void lu(OutputTensor &out, PivotTensor &piv,
+void lu_impl(OutputTensor &&out, PivotTensor &&piv,
         const ATensor &a, const cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  using T1 = typename OutputTensor::scalar_type;
+  using T1 = typename remove_cvref_t<OutputTensor>::scalar_type;
 
   auto piv_new = OpToTensor(piv, stream);
   auto a_new = OpToTensor(a, stream);
@@ -1225,6 +1295,63 @@ void lu(OutputTensor &out, PivotTensor &piv,
 }
 
 
+
+namespace detail {
+  template<typename OpA>
+  class LUOp : public BaseOp<LUOp<OpA>>
+  {
+    private:
+      OpA a_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using lu_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "lu()"; }
+      __MATX_INLINE__ LUOp(OpA a) : a_(a) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "lu() only supports the CUDA executor currently");
+        static_assert(is_mtie<Out>(), "Must use mtie with lu() to capture multiple outputs. ie: (mtie(O, piv) = lu(A))");
+
+        lu_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream());
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        MATX_ASSERT_STR(false, matxNotSupported, "lu() must only be called with a single assignment since it has multiple return types");
+      }
+
+      // Size is not relevant in eig() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto lu(const OpA &a) {
+  return detail::LUOp(a);
+}
+
+
 /**
  * Compute the determinant of a matrix
  *
@@ -1246,7 +1373,7 @@ void lu(OutputTensor &out, PivotTensor &piv,
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputTensor>
-void det(OutputTensor &out, const InputTensor &a,
+void det_impl(OutputTensor &out, const InputTensor &a,
          const cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1270,11 +1397,76 @@ void det(OutputTensor &out, const InputTensor &a,
 
   s[RANK - 2] = std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
 
-  auto piv = make_tensor<int64_t>(s);
-  auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape());
+  auto piv = make_tensor<int64_t>(s, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
-  lu(ac, piv, a_new, stream);
+  lu_impl(ac, piv, a_new, stream);
   prod(out, diag(ac), stream);
+}
+
+namespace detail {
+  template<typename OpA>
+  class DetOp : public BaseOp<DetOp<OpA>>
+  {
+    private:
+      OpA a_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using det_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "det()"; }
+      __MATX_INLINE__ DetOp(OpA a) : a_(a) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "det() only supports the CUDA executor currently");
+
+        det_impl(out, a_, ex.getStream());
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_device_executor_v<Executor>) {
+          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        }
+        else {
+          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
+        }
+
+        Exec(tmp_out_, std::forward<Executor>(ex));
+      }
+
+      // Size is not relevant in det() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto det(const OpA &a) {
+  return detail::DetOp(a);
 }
 
 
@@ -1302,7 +1494,7 @@ void det(OutputTensor &out, const InputTensor &a,
  *   CUDA stream
  */
 template <typename OutTensor, typename TauTensor, typename ATensor>
-void cusolver_qr(OutTensor &out, TauTensor &tau,
+void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
         const ATensor &a, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1353,6 +1545,63 @@ void cusolver_qr(OutTensor &out, TauTensor &tau,
 }
 
 
+
+namespace detail {
+  template<typename OpA>
+  class CuSolverQROp : public BaseOp<CuSolverQROp<OpA>>
+  {
+    private:
+      OpA a_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using cusolver_qr_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "cusolver_qr()"; }
+      __MATX_INLINE__ CuSolverQROp(OpA a) : a_(a) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
+        static_assert(is_mtie<Out>(), "Must use mtie with cusolver_qr() to capture multiple outputs. ie: (mtie(O, w) = cusolver_qr(A, tau))");
+
+        cusolver_qr_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream());
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        MATX_ASSERT_STR(false, matxNotSupported, "cusolver_qr() must only be called with a single assignment since it has multiple return types");
+      }
+
+      // Size is not relevant in cusolver_qr() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto cusolver_qr(const OpA &a) {
+  return detail::CuSolverQROp(a);
+}
+
+
 /**
  * Perform a SVD decomposition using a cached plan
  *
@@ -1385,8 +1634,8 @@ void cusolver_qr(OutTensor &out, TauTensor &tau,
  *
  */
 template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
-void svd(UTensor &u, STensor &s,
-         VTensor &v, const ATensor &a,
+void svd_impl(UTensor &&u, STensor &&s,
+         VTensor &&v, const ATensor &a,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1441,6 +1690,63 @@ void svd(UTensor &u, STensor &s,
   }
 }
 
+namespace detail {
+  template<typename OpA>
+  class SVDOp : public BaseOp<SVDOp<OpA>>
+  {
+    private:
+      OpA a_;
+      char jobu_;
+      char jobv_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using svd_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "svd()"; }
+      __MATX_INLINE__ SVDOp(OpA a, const char jobu, const char jobvt) : a_(a), jobu_(jobu), jobv_(jobvt) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "svd() only supports the CUDA executor currently");
+        static_assert(is_mtie<Out>(), "Must use mtie with SVD to capture multiple outputs. ie: (mtie(U, S, V) = svd(A))");
+
+        svd_impl(out.template get<0>(), out.template get<1>(), out.template get<2>(), a_, ex.getStream(), jobu_, jobv_);
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        MATX_ASSERT_STR(false, matxNotSupported, "svd() must only be called with a single assignment");
+      }
+
+      // Size is not relevant in svd() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto svd(const OpA &a, const char jobu = 'A', const char jobvt = 'A') {
+  return detail::SVDOp(a, jobu, jobvt);
+}
+
 /**
  * Perform a Eig decomposition using a cached plan
  *
@@ -1471,7 +1777,7 @@ void svd(UTensor &u, STensor &s,
  *   Where to store data in A
  */
 template <typename OutputTensor, typename WTensor, typename ATensor>
-void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
+void eig_impl(OutputTensor &&out, WTensor &&w,
          const ATensor &a, cudaStream_t stream = 0,
          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
@@ -1520,7 +1826,67 @@ void eig([[maybe_unused]] OutputTensor &out, WTensor &w,
   }
 
   /* Copy and free async buffer for transpose */
-  matx::copy(out, tv.PermuteMatrix(), stream);  
+  matx::copy(out, tv.PermuteMatrix(), stream);
+}
+
+
+namespace detail {
+  template<typename OpA>
+  class EigOp : public BaseOp<EigOp<OpA>>
+  {
+    private:
+      OpA a_;
+      cusolverEigMode_t jobz_;
+      cublasFillMode_t uplo_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using eig_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "eig()"; }
+      __MATX_INLINE__ EigOp(OpA a, cusolverEigMode_t jobz, cublasFillMode_t uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "eig () only supports the CUDA executor currently");
+        static_assert(is_mtie<Out>(), "Must use mtie with eig() to capture multiple outputs. ie: (mtie(O, w) = eig(A))");
+
+        eig_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream(), jobz_, uplo_);
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        MATX_ASSERT_STR(false, matxNotSupported, "eig() must only be called with a single assignment since it has multiple return types");
+      }
+
+      // Size is not relevant in eig() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+template<typename OpA>
+__MATX_INLINE__ auto eig(const OpA &a,
+                          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR, 
+                          cublasFillMode_t uplo  = CUBLAS_FILL_MODE_UPPER) {
+  return detail::EigOp(a, jobz, uplo);
 }
 
 } // end namespace matx
