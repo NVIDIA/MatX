@@ -500,10 +500,11 @@ struct DnQRParams_t {
 
 template <typename OutTensor, typename TauTensor, typename ATensor>
 class matxDnQRSolverPlan_t : public matxDnSolver_t {
-  using T1 = typename OutTensor::scalar_type;
-  static constexpr int RANK = OutTensor::Rank();
-  static_assert(OutTensor::Rank()-1 == TauTensor::Rank(), "Tau tensor must be one rank less than output tensor");
-  static_assert(OutTensor::Rank() == ATensor::Rank(), "Output tensor must match A tensor rank in SVD");
+  using out_type_t = remove_cvref_t<OutTensor>;
+  using T1 = typename out_type_t::scalar_type;
+  static constexpr int RANK = out_type_t::Rank();
+  static_assert(out_type_t::Rank()-1 == TauTensor::Rank(), "Tau tensor must be one rank less than output tensor");
+  static_assert(out_type_t::Rank() == ATensor::Rank(), "Output tensor must match A tensor rank in SVD");
 
 public:
   /**
@@ -905,7 +906,7 @@ class matxDnEigSolverPlan_t : public matxDnSolver_t {
 public:
   using T2 = typename WTensor::scalar_type;
   using T1 = typename ATensor::scalar_type;
-  static constexpr int RANK = OutputTensor::Rank();
+  static constexpr int RANK = remove_cvref_t<OutputTensor>::Rank();
   static_assert(RANK == ATensor::Rank(), "Output and A tensor ranks must match for eigen solver");
   static_assert(RANK-1 == WTensor::Rank(), "W tensor must be one rank lower than output for eigen solver");
 
@@ -1499,7 +1500,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  using T1 = typename OutTensor::scalar_type;
+  using T1 = typename remove_cvref_t<OutTensor>::scalar_type;
 
   auto tau_new = OpToTensor(tau, stream);
   auto a_new = OpToTensor(a, stream);
@@ -1706,7 +1707,7 @@ namespace detail {
       using matx_transform_op = bool;
       using svd_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "svd()"; }
+      __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")";; }
       __MATX_INLINE__ SVDOp(OpA a, const char jobu, const char jobvt) : a_(a), jobu_(jobu), jobv_(jobvt) { };
 
       // This should never be called
@@ -1790,7 +1791,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
   */
-  using T1 = typename OutputTensor::scalar_type;
+  using T1 = typename remove_cvref_t<OutputTensor>::scalar_type;
 
   auto w_new = OpToTensor(w, stream);
   auto a_new = OpToTensor(a, stream);
@@ -1856,7 +1857,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "eig () only supports the CUDA executor currently");
-        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
         eig_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
       }

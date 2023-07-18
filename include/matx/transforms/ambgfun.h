@@ -208,7 +208,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     (fullfft = 0).run(stream);
     matx::copy(partfft, new_ynorm_v, stream);
 
-    ifft(fullfft, fullfft, 0, stream);
+    ifft_impl(fullfft, fullfft, 0, stream);
 
     // We need to temporarily allocate a complex output version of AMF since we
     // have no way to convert complex to real in an operator currently
@@ -223,9 +223,9 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     (fullfft_x = 0).run(stream);
     matx::copy(partfft_x, x_normdiv_v, stream);
 
-    fft(fullfft_x, fullfft_x, 0, stream);
+    fft_impl(fullfft_x, fullfft_x, 0, stream);
     AmbgFftXOp(fullfft_x, fullfft_x, fs, cut_val, (float)nfreq).run(stream);
-    ifft(fullfft_x, fullfft_x, 0, stream);
+    ifft_impl(fullfft_x, fullfft_x, 0, stream);
 
     auto fullfft_y = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = 0).run(stream);
@@ -233,7 +233,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto partfft_y = fullfft_y.Slice({0}, {xlen});
     matx::copy(partfft_y, y_normdiv_v, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
-    ifft(fullfft_y, fullfft_y, 0, stream);
+    ifft_impl(fullfft_y, fullfft_y, 0, stream);
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
@@ -251,7 +251,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 
     (fullfft_y = 0).run(stream);
     matx::copy(partfft_y, y_normdiv_v, stream);
-    fft(fullfft_y, fullfft_y, 0, stream);
+    fft_impl(fullfft_y, fullfft_y, 0, stream);
 
     auto fullfft_x = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_x = 0).run(stream);
@@ -260,13 +260,13 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto partfft_x = make_tensor(fullfft_x.GetStorage(), xnd_size);
 
     AmbgDoppX(partfft_x, x_normdiv_v, fs, cut_val).run(stream);
-    fft(fullfft_x, fullfft_x, 0, stream);
+    fft_impl(fullfft_x, fullfft_x, 0, stream);
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
     auto amf_tmp_v = make_tensor<T1>({fullfft_x.Size(0)}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
-    ifft(fullfft_y, fullfft_y, 0, stream);
+    ifft_impl(fullfft_y, fullfft_y, 0, stream);
 
     (amf_tmp_v = abs(fftshift1D(fullfft_y))).run(stream);
 

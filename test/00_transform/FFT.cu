@@ -84,7 +84,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
   // example-begin fft-1
   // Perform a 1D FFT from input av into output avo. Input and output sizes will be deduced by the
   // type of the tensors and output size.
-  fft(avo, av);
+  (avo = fft(av)).run();
   // example-end fft-1
   cudaStreamSynchronize(0);
 
@@ -114,8 +114,9 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
 
   // Perform a batched 1D FFT on a 3D tensor across axis 2. Since axis 2 is the last dimension,
   // this is equivalent to not specifying the axis
-  fft(out1, in);
-  fft(out2, in, {2});
+  (out1 = fft(in)).run();
+  (out2 = fft(in, {2})).run();
+
   // example-end fft-2
   cudaStreamSynchronize(0);
 
@@ -130,8 +131,9 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
   // example-begin fft-3
   // Perform a batched 1D FFT on a 3D tensor across axis 1. This is equivalent to permuting the last
   // two axes before input and after the output
-  fft(out1.Permute({0,2,1}), in.Permute({0,2,1}));
-  fft(out2, in, {1});
+  (out1.Permute({0,2,1}) = fft(in.Permute({0,2,1}))).run();
+  (out2 = fft(in, {1})).run();  
+
   // example-end fft-3
   cudaStreamSynchronize(0);
   
@@ -146,8 +148,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
   // example-begin ifft-1
   // Perform a batched 1D IFFT on a 3D tensor across axis 2. Since axis 2 is the last dimension,
   // this is equivalent to not specifying the axis
-  ifft(out1, in);
-  ifft(out2, in, {2});
+  (out1 = ifft(in)).run();
+  (out2 = ifft(in, {2})).run();    
   // example-end ifft-1
   cudaStreamSynchronize(0);
 
@@ -162,8 +164,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
   // example-begin ifft-2
   // Perform a batched 1D IFFT on a 3D tensor across axis 1. This is equivalent to permuting the last
   // two axes before input and after the output
-  ifft(out1.Permute({0,2,1}), in.Permute({0,2,1}));
-  ifft(out2, in, {1});
+  (out1.Permute({0,2,1}) = ifft(in.Permute({0,2,1}))).run();
+  (out2 = ifft(in, {1})).run();    
   // example-end ifft-2
   cudaStreamSynchronize(0);
   
@@ -177,8 +179,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
   
   {
     auto in1 =  ones<TypeParam>(in.Shape());
-    fft(out1.Permute({0,2,1}), permute(in1, {0,2,1}));
-    fft(out2, in1, {1});
+    (out1.Permute({0,2,1}) = fft(permute(in1, {0,2,1}))).run();
+    (out2 = fft(in1, {1})).run();
 
     cudaStreamSynchronize(0);
 
@@ -190,8 +192,9 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
       }
     }
 
-    ifft(out1.Permute({1,2,0}), permute(in1, {1,2,0}));
-    ifft(out2, in1, {0});
+
+    (out1.Permute({1,2,0}) = ifft(permute(in1, {1,2,0}))).run();
+    (out2 = ifft(in1, {0})).run();
     cudaStreamSynchronize(0);
 
     for(int i = 0; i < d1; i++) {
@@ -228,8 +231,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   // example-begin fft2-1
   // Perform a 2D FFT from 3D tensor "in" into "out1". This is equivalent to performing the FFT
   // on the last two dimension unpermuted.
-  fft2(out1, in);
-  fft2(out2, in, {1,2});
+  (out1 = fft2(in)).run();
+  (out2 = fft2(in, {1,2})).run();
   // example-end fft2-1
   cudaStreamSynchronize(0);
 
@@ -244,8 +247,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   // example-begin fft2-2
   // Perform a 2D FFT from 3D tensor "in" into "out2" across dimensions 2, 0. This is equivalent
   // to permuting the tensor before input and after output
-  fft2(out1.Permute({1,2,0}), in.Permute({1,2,0}));
-  fft2(out2, in, {2,0});
+  (out1.Permute({1,2,0}) = fft2(in.Permute({1,2,0}))).run();
+  (out2 = fft2(in, {2,0})).run();
   // example-end fft2-2
   cudaStreamSynchronize(0);
   
@@ -257,8 +260,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
     }
   }
 
-  fft2(out1.Permute({1,0,2}), in.Permute({1,0,2}));
-  fft2(out2, in, {0,2});
+  (out1.Permute({1,0,2}) = fft2(in.Permute({1,0,2}))).run();
+  (out2 = fft2(in, {0,2})).run();
   cudaStreamSynchronize(0);
   
   for(int i = 0; i < d1; i++) {
@@ -272,8 +275,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   // example-begin ifft2-1
   // Perform a 2D FFT from 3D tensor "in" into "out1". This is equivalent to performing the FFT
   // on the last two dimension unpermuted.
-  ifft2(out1, in);
-  ifft2(out2, in, {1,2});
+  (out1 = ifft2(in)).run();
+  (out2 = ifft2(in, {1,2})).run();
   // example-end ifft2-1
   cudaStreamSynchronize(0);
 
@@ -288,8 +291,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   // example-begin ifft2-2
   // Perform a 2D FFT from 3D tensor "in" into "out2" across dimensions 2, 0. This is equivalent
   // to permuting the tensor before input and after output
-  ifft2(out1.Permute({1,2,0}), in.Permute({1,2,0}));
-  ifft2(out2, in, {2,0});
+  (out1.Permute({1,2,0}) = ifft2(in.Permute({1,2,0}))).run();
+  (out2 = ifft2(in, {2,0})).run();
   // example-end ifft2-2
   cudaStreamSynchronize(0);
   
@@ -301,8 +304,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
     }
   }
 
-  ifft2(out1.Permute({1,0,2}), in.Permute({1,0,2}));
-  ifft2(out2, in, {0,2});
+  (out1.Permute({1,0,2}) = ifft2(in.Permute({1,0,2}))).run();
+  (out2 = ifft2(in, {0,2})).run();
   cudaStreamSynchronize(0);
   
   for(int i = 0; i < d1; i++) {
@@ -316,8 +319,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   {
     auto in1 =  ones<TypeParam>(in.Shape());
 
-    fft2(out1.Permute({1,0,2}), permute(in1, {1,0,2}));
-    fft2(out2, in1, {0,2});
+    (out1.Permute({1,0,2}) = fft2(permute(in1, {1,0,2}))).run();
+    (out2 = fft2(in1, {0,2})).run();
     cudaStreamSynchronize(0);
 
     for(int i = 0; i < d1; i++) {
@@ -329,8 +332,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
     }
     
 
-    ifft2(out1.Permute({1,0,2}), permute(in1, {1,0,2}));
-    ifft2(out2, in1, {0,2});
+    (out1.Permute({1,0,2}) = ifft2(permute(in1, {1,0,2}))).run();
+    (out2 = ifft2(in1, {0,2})).run();
     cudaStreamSynchronize(0);
 
     for(int i = 0; i < d1; i++) {
@@ -356,7 +359,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
   tensor_t<TypeParam, 1> avo{{fft_dim}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  ifft(avo, av);
+  (avo = ifft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -376,7 +379,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
 
   // Perform an FFT on input av into output avo. Since avo is bigger than av, av will be zero-padded
   // to the appropriate size
-  fft(avo, av);
+  (avo = fft(av)).run();
   // example-end fft-4
   cudaStreamSynchronize(0);
 
@@ -394,14 +397,14 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
   tensor_t<TypeParam, 2> avo{{fft_dim + 1, fft_dim * 2}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft(avo, av);
+  (avo = fft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
 
   // example-begin fft-5
   // Perform an FFT but force the size to be fft_dim * 2 instead of the output size
-  fft(avo, av, fft_dim * 2); // Force the FFT size
+  (avo = fft(av, fft_dim * 2)).run(); // Force the FFT size
   // example-end fft-5
   cudaStreamSynchronize(0);
 
@@ -419,7 +422,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
   tensor_t<TypeParam, 1> avo{{fft_dim * 2}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  ifft(avo, av);
+  (avo = ifft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -438,7 +441,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024R2C)
   tensor_t<TypeParam, 1> avo{{fft_dim / 2 + 1}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft(avo, av);
+  (avo = fft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -457,7 +460,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024PadR2C)
   tensor_t<TypeParam, 1> avo{{fft_dim + 1}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft(avo, av);
+  (avo = fft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -476,7 +479,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024PadBatchedR2C)
   tensor_t<TypeParam, 2> avo{{fft_dim, fft_dim + 1}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft(avo, av);
+  (avo = fft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -494,7 +497,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16C2C)
   tensor_t<TypeParam, 2> avo{{fft_dim, fft_dim}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft2(avo, av);
+  (avo = fft2(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -512,7 +515,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16C2C)
   tensor_t<TypeParam, 2> avo{{fft_dim, fft_dim}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  ifft2(avo, av);
+  (avo = ifft2(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -531,7 +534,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024C2CShort)
   tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  fft(avo, av);
+  (avo = fft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -548,7 +551,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT1D1024C2CShort)
   tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  ifft(avo, av);
+  (avo = ifft(av)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);

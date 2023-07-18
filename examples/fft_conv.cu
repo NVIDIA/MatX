@@ -139,6 +139,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
     (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(stream);
   }
+  
   cudaEventRecord(stop, stream);
   cudaStreamSynchronize(stream);
   cudaEventElapsedTime(&fused_ms, start, stop);  

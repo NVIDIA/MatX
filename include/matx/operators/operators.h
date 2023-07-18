@@ -44,6 +44,7 @@
 #include "matx/operators/comma.h"
 #include "matx/operators/diag.h"
 #include "matx/operators/dct.h"
+#include "matx/operators/fft.h"
 #include "matx/operators/fftshift.h"
 #include "matx/operators/flatten.h"
 #include "matx/operators/hermitian.h"

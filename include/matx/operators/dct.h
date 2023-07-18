@@ -102,7 +102,7 @@ void dct(OutputTensor &out, const InputTensor &in,
 
   tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
 
-  fft(tmp, in, 0, stream);
+  fft_impl(tmp, in, 0, stream);
   auto s = tmp.Slice({0}, {N});
   detail::dctOp(out, s, N).run(stream);
 }
