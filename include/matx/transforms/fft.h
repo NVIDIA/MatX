@@ -999,12 +999,19 @@ namespace detail {
       using matx_transform_op = bool;
       using fft_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return std::is_same_v<FFTType, detail::fft_t> ? "fft()" : "ifft()"; }
+      __MATX_INLINE__ std::string str() const { 
+        if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
+          return "fft(" + get_type_str(a_) + ")";
+        }
+        else {
+          return "ifft(" + get_type_str(a_) + ")";
+        }
+      }
       __MATX_INLINE__ FFTOp(OpA a, uint64_t size, PermDims perm, FFTType t) : a_(a), fft_size_(size),  perm_(perm), type_(t) {
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }
-printf("here\n");
+
         if (fft_size_ != 0) {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             out_dims_[Rank() - 1] = fft_size_;
@@ -1042,21 +1049,21 @@ printf("here\n");
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "fft() only supports the CUDA executor currently");
+        static_assert(is_device_executor_v<Executor>, "fft()/ifft() only supports the CUDA executor currently");
         if constexpr (std::is_same_v<PermDims, no_permute_t>) {
           if constexpr (std::is_same_v<FFTType, fft_t>) { 
-            fft_impl(out, a_, fft_size_, ex.getStream());
+            fft_impl(std::get<0>(out), a_, fft_size_, ex.getStream());
           }
           else {
-            ifft_impl(out, a_, fft_size_, ex.getStream());
+            ifft_impl(std::get<0>(out), a_, fft_size_, ex.getStream());
           }
         }
         else {
           if constexpr (std::is_same_v<FFTType, fft_t>) { 
-            fft_impl(permute(out, perm_), permute(a_, perm_), fft_size_, ex.getStream());
+            fft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, ex.getStream());
           }
           else {
-            ifft_impl(permute(out, perm_), permute(a_, perm_), fft_size_, ex.getStream());
+            ifft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, ex.getStream());
           }
         }
       }
@@ -1072,7 +1079,7 @@ printf("here\n");
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 
-        Exec(tmp_out_, std::forward<Executor>(ex));
+        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
   };
 }

@@ -414,7 +414,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "inv() only supports the CUDA executor currently");
-        inv_impl(out, a_, ex.getStream());
+        inv_impl(std::get<0>(out), a_, ex.getStream());
       }
 
       template <typename ShapeType, typename Executor>
@@ -431,7 +431,7 @@ namespace detail {
           make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
         }
 
-        Exec(tmp_out_, std::forward<Executor>(ex));
+        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>

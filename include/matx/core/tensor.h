@@ -46,6 +46,7 @@
 #include "matx/core/tensor_impl.h"
 #include "matx/core/tensor_utils.h"
 #include "matx/core/dlpack.h"
+#include "matx/core/tie.h"
 #include "matx/kernels/utility.cuh"
 
 static constexpr int MAX_TENSOR_DIM = 4;
@@ -282,8 +283,15 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
-    return detail::set(*this, op_base);
+    // In the case where we have a tensor on the LHS and a pure transform
+    // on the RHS we skip set() entirely since it's not used
+    if constexpr (is_matx_transform_op<T2>()) {
+      return mtie(*this, op);
+    }
+    else {
+      const typename detail::base_type<T2>::type &op_base = op;
+      return detail::set(*this, op_base);
+    }
   }
 
   /**

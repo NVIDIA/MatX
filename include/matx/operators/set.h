@@ -100,7 +100,6 @@ public:
 
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
-    if constexpr (is_matx_op<T>() && is_matx_op<Op>()) printf("%lld %lld\n", out.Size(1), op.Size(1));
     if constexpr (!is_mtie<T>()) {
       ASSERT_COMPATIBLE_OP_SIZES(op);
     }
