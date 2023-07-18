@@ -69,9 +69,20 @@ public:
   // Type specifier for reflection on class
   using scalar_type = typename T::scalar_type;
   using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>;
+  using tensor_type = T;
+  using op_type = Op;
+  using matx_setop = bool;
 
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
+  }
+
+  auto &get_lhs() {
+    return out_;
+  }
+
+  auto &get_rhs() {
+    return op_;
   }
 
   /**
@@ -87,7 +98,12 @@ public:
   {
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
 
-    ASSERT_COMPATIBLE_OP_SIZES(op);
+    // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
+    // sizes
+    if constexpr (is_matx_op<T>() && is_matx_op<Op>()) printf("%lld %lld\n", out.Size(1), op.Size(1));
+    if constexpr (!is_mtie<T>()) {
+      ASSERT_COMPATIBLE_OP_SIZES(op);
+    }
   }
 
   set &operator=(const set &) = delete;

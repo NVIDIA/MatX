@@ -68,7 +68,7 @@ TYPED_TEST(CholSolverTestNonComplexFloatTypes, CholeskyBasic)
   MATX_ENTER_HANDLER();
 
   // example-begin chol-test-1
-  chol(this->Bv, this->Bv, 0, CUBLAS_FILL_MODE_LOWER);
+  (this->Bv = chol(this->Bv, CUBLAS_FILL_MODE_LOWER)).run();
   // example-end chol-test-1
   cudaStreamSynchronize(0);
 

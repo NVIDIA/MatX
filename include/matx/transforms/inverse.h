@@ -49,6 +49,8 @@ typedef enum {
   MAT_INVERSE_ALGO_LU,
 } MatInverseAlgo_t;
 
+
+
 namespace detail {
 /**
  * Parameters needed to execute a matrix inverse. Since the matrix inverse
@@ -353,11 +355,10 @@ static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
  * @param stream CUDA stream
  */
 template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
-void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
+void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
@@ -375,6 +376,74 @@ void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
         static_cast<detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
     inv_type->Exec(stream);
   }
+}
+
+
+namespace detail {
+  template<typename OpA>
+  class InvOp : public BaseOp<InvOp<OpA>>
+  {
+    private:
+      OpA a_;
+      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+
+    public:
+      using matxop = bool;
+      using scalar_type = typename OpA::scalar_type;
+      using matx_transform_op = bool;
+      using inv_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "inv()"; }
+      __MATX_INLINE__ InvOp(OpA a) : a_(a) {};
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+      {
+        return tmp_out_(indices...);
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(is_device_executor_v<Executor>, "inv() only supports the CUDA executor currently");
+        inv_impl(out, a_, ex.getStream());
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_device_executor_v<Executor>) {
+          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        }
+        else {
+          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
+        }
+
+        Exec(tmp_out_, std::forward<Executor>(ex));
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+      {
+      }
+  };
+}
+
+template<typename OpA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
+__MATX_INLINE__ auto inv(const OpA &a) {
+  return detail::InvOp(a);
 }
 
 } // end namespace matx

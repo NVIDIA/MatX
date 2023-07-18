@@ -71,7 +71,7 @@ TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
   // solve, then transpose again to compare to Python
   transpose(this->Atv, this->Av, 0);
 
-  det(this->detv, this->Atv);
+  (this->detv = det(this->Atv)).run();
   transpose(this->Av, this->Atv, 0); // Transpose back to row-major
   cudaStreamSynchronize(0);
 

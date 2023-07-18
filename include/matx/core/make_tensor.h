@@ -158,15 +158,15 @@ auto make_tensor( ShapeType &&shape,
  * @returns New tensor
  *
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType,typename ShapeType,
+  std::enable_if_t<is_tensor_view_v<TensorType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor( TensorType &tensor, 
-                  typename TensorType::shape_container &&shape, 
+                  ShapeType &&shape, 
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  auto tmp = make_tensor<typename TensorType::scalar_type, typename TensorType::shape_container>(std::forward<typename TensorType::shape_container>(shape), space, stream);
+  auto tmp = make_tensor<typename TensorType::scalar_type, ShapeType>(std::forward<ShapeType>(shape), space, stream);
   tensor.Shallow(tmp);
 }
 

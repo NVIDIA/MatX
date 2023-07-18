@@ -76,6 +76,7 @@ class tensor_impl_t {
     using desc_type = Desc;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
+    using matxoplvalue = bool;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;

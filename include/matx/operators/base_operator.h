@@ -39,6 +39,7 @@
 
 namespace matx
 {
+
   /**
    * @brief Provides a base class with functions common to all operators
    * 
@@ -51,7 +52,7 @@ namespace matx
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
 
-	__MATX_INLINE__ std::string str() const { return "BaseOp"; }
+	      __MATX_INLINE__ std::string str() const { return "BaseOp"; }
         /**
          * @brief Launch kernel in a GPU stream
          * 
@@ -62,14 +63,22 @@ namespace matx
           MATX_NVTX_START(get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
           auto tp = static_cast<T *>(this);
           auto ex = cudaExecutor(stream);
-          if constexpr (is_matx_op<T>()) {
-            tp->PreRun(tp->Shape(), ex);
+
+          // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+          // async allocation we'd normally have to do
+          if constexpr (is_settable_xform_v<T>) {
+            tp->get_rhs().Exec(tp->get_lhs(), ex);
           }
+          else {
+            if constexpr (is_matx_op<T>()) {
+              tp->PreRun(tp->Shape(), ex);
+            }
 
-          ex.Exec(*tp);
+            ex.Exec(*tp);
 
-          if constexpr (is_matx_op<T>()) {
-            tp->PostRun(tp->Shape(), ex);
+            if constexpr (is_matx_op<T>()) {
+              tp->PostRun(tp->Shape(), ex);
+            }
           }
         }
 
@@ -85,17 +94,24 @@ namespace matx
           auto ex = cudaExecutor(stream);
           auto tp = static_cast<T *>(this);
 
-          if constexpr (is_matx_op<T>()) {
-            tp->PreRun(tp->Shape(), ex);
+          // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+          // async allocation we'd normally have to do
+          if constexpr (is_settable_xform_v<T>) {
+            tp->get_rhs().Exec(tp->get_lhs(), ex);
           }
+          else {
+            if constexpr (is_matx_op<T>()) {
+              tp->PreRun(tp->Shape(), ex);
+            }
 
-          ex.Exec(*tp);
+            ex.Exec(*tp);
 
-          if constexpr (is_matx_op<T>()) {
-            tp->PostRun(tp->Shape(), ex);
+            if constexpr (is_matx_op<T>()) {
+              tp->PostRun(tp->Shape(), ex);
+            }
+
+            cudaEventRecord(ev, stream);
           }
-
-          cudaEventRecord(ev, stream);
         }
 
         /**
@@ -136,14 +152,23 @@ namespace matx
             static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
 
             auto tp = static_cast<T *>(this);
-            if constexpr (is_matx_op<T>()) {
-              tp->PreRun(tp->Shape(), ex);
+
+            // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+            // async allocation we'd normally have to do
+            if constexpr (is_settable_xform_v<T>) {
+              tp->get_rhs().Exec(tp->get_lhs(), ex);
+              //transform_dispatch(tp->get_lhs(), tp->get_rhs(), std::forward<Ex>(ex));
             }
+            else {            
+              if constexpr (is_matx_op<T>()) {
+                tp->PreRun(tp->Shape(), ex);
+              }
 
-            ex.Exec(*tp);
+              ex.Exec(*tp);
 
-            if constexpr (is_matx_op<T>()) {
-              tp->PostRun(tp->Shape(), ex);
+              if constexpr (is_matx_op<T>()) {
+                tp->PostRun(tp->Shape(), ex);
+              }
             }
           }
 
