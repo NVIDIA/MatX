@@ -718,7 +718,6 @@ void PrintData(const Op &op, Args... dims) {
   
 #ifdef __CUDACC__
   cudaDeviceSynchronize();
-  printf("in print\n");
   if constexpr (is_tensor_view_v<Op>) {
     auto kind = GetPointerKind(op.Data());
 

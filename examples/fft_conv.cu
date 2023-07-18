@@ -75,6 +75,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t filter_size = 16;
   index_t batches = 8;
   index_t filtered_size = signal_size + filter_size - 1;
+  float separate_ms;
+  float fused_ms;
+  constexpr int iterations = 100;
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);  
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);  
 
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});
@@ -104,18 +112,39 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // Prefetch the data we just created
   sig_time.PrefetchDevice(0);
-  filt_time.PrefetchDevice(0);
-printf("pn\n");
+  filt_time.PrefetchDevice(0);  
+
+
   // Perform the FFT in-place on both signal and filter
-  fft_impl(sig_freq, sig_time);
-  fft_impl(filt_freq, filt_time);
-printf("pn\n");
-  // Perform the pointwise multiply. Overwrite signal buffer with result
-  (sig_freq = fft(sig_time, filtered_size) * fft(filt_time, filtered_size)).run();
-printf("pn\n");
-  // IFFT in-place
-  (sig_freq = ifft(sig_freq)).run();
-printf("pn\n");
+  for (int i = 0; i < iterations; i++) {
+    if (i == 1) {
+      cudaEventRecord(start, stream);
+    }    
+    fft_impl(sig_freq, sig_time, 0, stream);
+    fft_impl(filt_freq, filt_time, 0, stream);
+
+    (sig_freq = sig_freq * filt_freq).run(stream);
+
+    // IFFT in-place
+    (sig_freq = ifft(sig_freq)).run(stream);
+  }
+
+  cudaEventRecord(stop, stream);
+  cudaStreamSynchronize(stream);
+  cudaEventElapsedTime(&separate_ms, start, stop);   
+
+  for (int i = 0; i < iterations; i++) {
+    if (i == 1) {
+      cudaEventRecord(start, stream);
+    }
+    (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(stream);
+  }
+  cudaEventRecord(stop, stream);
+  cudaStreamSynchronize(stream);
+  cudaEventElapsedTime(&fused_ms, start, stop);  
+
+  printf("FFT runtimes for separate = %.2f ms, fused = %.2f ms\n", separate_ms/(iterations-1), fused_ms/(iterations-1));
+
   // Now the sig_freq view contains the full convolution result. Verify against
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.

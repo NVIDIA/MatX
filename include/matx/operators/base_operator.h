@@ -66,8 +66,8 @@ namespace matx
 
           // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
           // async allocation we'd normally have to do
-          if constexpr (is_settable_xform_v<T>) {
-            tp->get_rhs().Exec(tp->get_lhs(), ex);
+          if constexpr (is_mtie<T>() ) {
+            tp->Exec(ex);
           }
           else {
             if constexpr (is_matx_op<T>()) {
@@ -96,8 +96,8 @@ namespace matx
 
           // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
           // async allocation we'd normally have to do
-          if constexpr (is_settable_xform_v<T>) {
-            tp->get_rhs().Exec(tp->get_lhs(), ex);
+          if constexpr (is_mtie<T>() ) {
+            tp->Exec(ex);
           }
           else {
             if constexpr (is_matx_op<T>()) {
@@ -155,9 +155,8 @@ namespace matx
 
             // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
             // async allocation we'd normally have to do
-            if constexpr (is_settable_xform_v<T>) {
-              tp->get_rhs().Exec(tp->get_lhs(), ex);
-              //transform_dispatch(tp->get_lhs(), tp->get_rhs(), std::forward<Ex>(ex));
+            if constexpr (is_mtie<T>() ) {
+              tp->Exec(ex);
             }
             else {            
               if constexpr (is_matx_op<T>()) {

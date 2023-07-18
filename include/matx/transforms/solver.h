@@ -1179,7 +1179,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "chol() only supports the CUDA executor currently");
 
-        chol_impl(std::forward<Out>(out), a_, ex.getStream(), uplo_);
+        chol_impl(std::get<0>(out),  a_, ex.getStream(), uplo_);  
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1201,7 +1201,7 @@ namespace detail {
           make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
         }
 
-        Exec(tmp_out_, std::forward<Executor>(ex));
+        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       // Size is not relevant in eig() since there are multiple return values and it
@@ -1320,9 +1320,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "lu() only supports the CUDA executor currently");
-        static_assert(is_mtie<Out>(), "Must use mtie with lu() to capture multiple outputs. ie: (mtie(O, piv) = lu(A))");
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(O, piv) = lu(A))");     
 
-        lu_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream());
+        lu_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream());        
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1429,7 +1429,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "det() only supports the CUDA executor currently");
 
-        det_impl(out, a_, ex.getStream());
+        det_impl(std::get<0>(out), a_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1451,7 +1451,7 @@ namespace detail {
           make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
         }
 
-        Exec(tmp_out_, std::forward<Executor>(ex));
+        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       // Size is not relevant in det() since there are multiple return values and it
@@ -1570,9 +1570,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
-        static_assert(is_mtie<Out>(), "Must use mtie with cusolver_qr() to capture multiple outputs. ie: (mtie(O, w) = cusolver_qr(A, tau))");
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(A, tau) = eig(A))");     
 
-        cusolver_qr_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream());
+        cusolver_qr_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1716,9 +1716,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "svd() only supports the CUDA executor currently");
-        static_assert(is_mtie<Out>(), "Must use mtie with SVD to capture multiple outputs. ie: (mtie(U, S, V) = svd(A))");
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, V) = svd(A))");
 
-        svd_impl(out.template get<0>(), out.template get<1>(), out.template get<2>(), a_, ex.getStream(), jobu_, jobv_);
+        svd_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, ex.getStream(), jobu_, jobv_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1856,9 +1856,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_device_executor_v<Executor>, "eig () only supports the CUDA executor currently");
-        static_assert(is_mtie<Out>(), "Must use mtie with eig() to capture multiple outputs. ie: (mtie(O, w) = eig(A))");
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
-        eig_impl(out.template get<0>(), out.template get<1>(), a_, ex.getStream(), jobz_, uplo_);
+        eig_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
