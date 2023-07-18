@@ -249,12 +249,12 @@ public:
     (norms = sqrt(norms)).run(stream);
 
     (waveformPart = waveformPart / norms).run(stream);
-    fft(waveformFull, waveformPart, 0, stream);
+    (waveformFull = fft(waveformPart)).run(stream);
     (waveformFull = conj(waveformFull)).run(stream);
 
-    fft(x, x, 0, stream);
+    (x = fft(x)).run(stream);
     (x = x * waveformT).run(stream);
-    ifft(x, x, 0, stream);
+    (x = ifft(x)).run(stream);
   }
 
 
@@ -310,7 +310,7 @@ public:
     (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask.Size(0) - 1),
                           numCompressedSamples}))
         .run(stream);
-    fft(xf, xf, 0, stream);
+    (xf = fft(xf)).run(stream);
   }
 
   /**
