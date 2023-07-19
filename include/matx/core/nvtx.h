@@ -30,11 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include<functional>
-#include<map>
+#include <functional>
+#include <map>
 #include <mutex>
-#include<string>
-#include<utility>
+#include <string>
+#include <utility>
 #include <nvToolsExt.h>
 
 namespace matx
