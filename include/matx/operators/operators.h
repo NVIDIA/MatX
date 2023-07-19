@@ -35,6 +35,7 @@
 #include "matx/operators/unary_operators.h"
 #include "matx/operators/binary_operators.h"
 
+#include "matx/operators/ambgfun.h"
 #include "matx/operators/cart2sph.h"
 #include "matx/operators/collapse.h"
 #include "matx/operators/concat.h"
@@ -53,6 +54,7 @@
 #include "matx/operators/index.h"
 #include "matx/operators/interleaved.h"
 #include "matx/operators/isclose.h"
+#include "matx/operators/inverse.h"
 #include "matx/operators/kronecker.h"
 #include "matx/operators/legendre.h"
 #include "matx/operators/matmul.h"

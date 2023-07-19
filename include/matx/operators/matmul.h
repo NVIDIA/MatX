@@ -40,15 +40,14 @@
 namespace matx
 {
   namespace detail {
-    template <typename OpA, typename OpB, typename PermDims>
-    class MatMulOp : public BaseOp<MatMulOp<OpA, OpB, PermDims>>
+    template <typename OpA, typename OpB>
+    class MatMulOp : public BaseOp<MatMulOp<OpA, OpB>>
     {
       private:
         OpA a_;
         OpB b_;
-        PermDims perm_;
         float alpha_;
-        float beta_;
+        float beta_;   
         std::array<index_t, OpA::Rank()> out_dims_;
         matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
@@ -62,29 +61,14 @@ namespace matx
             return "matmul(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ MatMulOp(OpA a, OpB b, PermDims perm, float alpha, float beta) : 
-              a_(a), b_(b), perm_(perm), alpha_(alpha), beta_(beta) {
+        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta) : 
+              a_(a), b_(b), alpha_(alpha), beta_(beta) {
           for (int r = 0; r < Rank() - 2; r++) {
             out_dims_[r] = a_.Size(r);
           }
 
-          if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            out_dims_[OpA::Rank() - 2] = a_.Size(OpA::Rank() - 2);
-            out_dims_[OpB::Rank() - 1] = b_.Size(OpB::Rank() - 1);
-          }
-          else {
-            out_dims_[OpA::Rank() - 2] = a_.Size(OpA::Rank() - 2);
-            out_dims_[OpB::Rank() - 1] = b_.Size(OpB::Rank() - 1);
-          }          
-
-          // if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-          //   out_dims_[OpA::Rank() - 2] = a_.Size(perm_[0]);
-          //   out_dims_[OpB::Rank() - 1] = b_.Size(perm_[1]);            
-          // }
-          // else {
-
-            printf("%lld %lld %lld\n", out_dims_[0], out_dims_[1], out_dims_[2]);
-          // }
+          out_dims_[OpA::Rank() - 2] = a_.Size(OpA::Rank() - 2);
+          out_dims_[OpB::Rank() - 1] = b_.Size(OpB::Rank() - 1);
         }
 
         template <typename... Is>
@@ -105,18 +89,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) {
           static_assert(is_device_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
-          //if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            printf("exec %lld %lld %lld\n", std::get<0>(out).Size(0), std::get<0>(out).Size(1), std::get<0>(out).Size(2));
-            matmul_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
-          //}
-          // else {
-          //   if constexpr (std::is_same_v<FFTType, fft_t>) { 
-          //     fft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, ex.getStream());
-          //   }
-          //   else {
-          //     ifft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, ex.getStream());
-          //   }
-          // }
+          matmul_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
         }
 
         template <typename ShapeType, typename Executor>
