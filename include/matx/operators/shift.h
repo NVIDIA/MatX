@@ -67,6 +67,8 @@ namespace matx
         __MATX_INLINE__ ShiftOp(T1 op, T2 shift) : op_(op), shift_(shift)
       {
         static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
+        ASSERT_COMPATIBLE_OP_SIZES(shift_); 
+        ASSERT_COMPATIBLE_OP_SIZES(op_); 
       }
 
         template <typename... Is>
@@ -103,12 +105,14 @@ namespace matx
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return detail::get_rank<T1>();
+          return detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>());
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          return op_.Size(dim);
+          index_t size1 = detail::get_expanded_size<Rank()>(op_, dim);
+          index_t size2 = detail::get_expanded_size<Rank()>(shift_, dim);
+          return detail::matx_max(size1,size2);
         }
 
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
