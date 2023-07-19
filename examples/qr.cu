@@ -73,8 +73,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   qr(Q, R, A, stream);
 
-  matmul(QR, Q, R, stream);
-  matmul(QTQ, conj(transpose(Q)), Q, stream);
+  (QR = matmul(Q, R)).run(stream);
+  (QTQ = matmul(conj(transpose(Q)), Q)).run(stream);
   cudaDeviceSynchronize();
   
   printf("Q:\n"); print(Q);

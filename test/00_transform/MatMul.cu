@@ -113,7 +113,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 
   // example-begin matmul-test-1
   // Perform the GEMM C = A*B
-  matmul(c, a, b);
+  (c = matmul(a, b)).run();
   // example-end matmul-test-1
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -139,7 +139,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectATranspose)
   // example-begin matmul-test-2
   // Perform the GEMM C = A^T * B
   auto at = a.PermuteMatrix();
-  matmul(c, at, b);
+  (c = matmul(at, b)).run();
   // example-end matmul-test-2
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -165,7 +165,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
   // example-begin matmul-test-3
   // Perform the GEMM C = A * B^T
   auto bt = b.PermuteMatrix();
-  matmul(c, a, bt);
+  (c = matmul(a, bt)).run();
   // example-end matmul-test-3
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -190,7 +190,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
 
   auto ct = transpose(c);
 
-  matmul(ct, a, b);
+  (ct = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", this->thresh);
 
   MATX_EXIT_HANDLER();
@@ -217,7 +217,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  (c = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   cudaFree(ap);
@@ -248,7 +248,7 @@ TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(ct), decltype(bt), decltype(at), PROVIDER_TYPE_CUBLASLT>(ct, bt, at);
+  (ct = matmul(bt, at)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", 0.01);
   MATX_EXIT_HANDLER();
@@ -270,7 +270,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  (c = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
@@ -295,7 +295,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRect)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  (c = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
@@ -325,7 +325,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
   this->pb->NumpyToTensorView(b, "b");
 
   // Perform a batched gemm with "batches" GEMMs
-  matmul(c, a, b);
+  (c = matmul(a, b)).run();
 
   // example-end matmul-test-4
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
@@ -358,7 +358,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
   this->pb->NumpyToTensorView(b, "b");
 
   // Perform a strided and batched GEMM where "as" and "bs" have a stride of 2 in their inner-most dimension
-  matmul(cs, as, bs);
+  (cs = matmul(as, bs)).run();
   // example-end matmul-test-5
 
   MATX_TEST_ASSERT_COMPARE(this->pb, cs, "cs", this->thresh);
@@ -387,7 +387,7 @@ TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul(c, a, b);
+  (c = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   MATX_EXIT_HANDLER();
@@ -411,7 +411,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul(c, a, b);
+  (c = matmul(a, b)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -452,7 +452,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     (ap = a3).run();
     (bp = b3).run();
 
-    matmul(ci, ai, bi, axis);
+    (ci = matmul(ai, bi, axis)).run();
     
     (c3 = cp).run();
 
@@ -479,7 +479,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     (bp = b3).run();
 
     // Perform a GEMM with the last two dimensions permuted
-    matmul(ci, ai, bi, axis);
+    (ci = matmul(ai, bi, axis)).run();
     // example-end matmul-test-6    
     
     // copy result from permuted output
@@ -506,7 +506,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     (ap = a3).run();
     (bp = b3).run();
 
-    matmul(ci, ai, bi, axis);
+    (ci = matmul(ai, bi, axis)).run();
     
     // copy result from permuted output
     (c3 = cp).run();
@@ -532,7 +532,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     (ap = a3).run();
     (bp = b3).run();
 
-    matmul(ci, ai, bi, axis);
+    (ci = matmul(ai, bi, axis)).run();
     
     // copy result from permuted output
     (c3 = cp).run();
@@ -572,7 +572,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
     auto br = remap<0>(b3, rb);
     auto cr = remap<0>(c3, rb);
 
-    matmul(cr, ar, br);
+    (cr = matmul(ar, br)).run();
     
     MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
   }

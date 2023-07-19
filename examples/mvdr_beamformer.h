@@ -105,13 +105,13 @@ public:
   {
     (vhView = hermitianT(vView)).run(stream);
 
-    matmul(cbfView, vhView, inVecView, stream);
+    (cbfView = matmul(vhView, inVecView)).run(stream);
 
     matx::copy(ivsView, inVecView.Slice({0, 0}, {matxEnd, snap_len_}), stream);
 
     (ivshView = hermitianT(ivsView)).run(stream);
 
-    matmul(covMatView, ivsView, ivshView, stream);
+    (covMatView = matmul(ivsView, ivshView)).run(stream);
 
     (covMatView = (covMatView * (1.0f / static_cast<float>(snap_len_))) +
                    eye<complex>() * load_coeff_)
@@ -120,11 +120,11 @@ public:
 
     // Find A and B to solve xA=B. Matlab uses A/B to solve for x, which is the
     // same as x = BA^-1
-    matmul(abfBView, invCovMatView, vView, stream);
-    matmul(abfAView, vhView, abfBView, stream);
+    (abfBView = matmul(invCovMatView, vView)).run(stream);
+    (abfAView = matmul(vhView, abfBView)).run(stream);
 
     inv_impl(abfAInvView, abfAView, stream);
-    matmul(abfWeightsView, abfBView, abfAInvView, stream);
+    (abfWeightsView = matmul(abfBView, abfAInvView)).run(stream);
   }
 
   /**

@@ -103,29 +103,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      matmul(UUT, U, conj(transpose(U)), stream);
+      (UUT = matmul(U, conj(transpose(U)))).run(stream);
       print(UUT);
     }
 
     printf("UTU:\n");
-    matmul(UTU, conj(transpose(U)) , U, stream);
+    (UTU = matmul(conj(transpose(U)), U)).run(stream);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      matmul(VVT, conj(transpose(VT)), VT, stream);
+      (VVT = matmul(conj(transpose(VT)), VT)).run(stream);
       print(VVT);
     }
 
     printf("VTV:\n");
-    matmul(VTV, VT, conj(transpose(VT)), stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose(VT)))).run(stream); // works on r x r
 
     print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
     (UD = U * D).run(stream);
 
-    matmul(UDVT, UD, VT, stream);
+    (UDVT = matmul(UD, VT)).run(stream);
 
     printf("A\n");
     print(A);
@@ -159,29 +159,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      matmul(UUT, U, conj(transpose(U)), stream);
+      (UUT = matmul(U, conj(transpose(U)))).run(stream);
       print(UUT);
     }
 
     printf("UTU:\n");
-    matmul(UTU, conj(transpose(U)) , U, stream);
+    (UTU = matmul(conj(transpose(U)), U)).run(stream);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      matmul(VVT, conj(transpose(VT)), VT, stream);
+      (VVT = matmul(conj(transpose(VT)), VT)).run(stream);
       print(VVT);
     }
 
     printf("VTV:\n");
-    matmul(VTV, VT, conj(transpose(VT)), stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose(VT)))).run(stream); // works on r x r
 
     print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
     (UD = U * D).run(stream);
 
-    matmul(UDVT, UD, VT, stream);
+    (UDVT = matmul(UD, VT)).run(stream);
 
     printf("A\n");
     print(A);

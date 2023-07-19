@@ -1022,10 +1022,10 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
     if(
     
       // either RANK-1 or RANK-2 stride must equal one in cublasLt
-      (in.Stride(RANK-1) != 1 && in.Stride(RANK-2) != 1) || 
+      (in.Stride(RANK-1) != (index_t)1 && in.Stride(RANK-2) != (index_t)1) || 
       // cublas allows 0 strides, but verify that the corresponding size is 1
-      (in.Stride(RANK-1) == 0 && in.Size(RANK-1) != 1) ||
-      (in.Stride(RANK-2) == 0 && in.Size(RANK-2) != 1)
+      (in.Stride(RANK-1) == (index_t)0 && in.Size(RANK-1) != (index_t)1) ||
+      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1)
       ) {
       supported = false;
     }
@@ -1071,7 +1071,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-void matmul(TensorTypeC C, const TensorTypeA A,
+void matmul_impl(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
 {
@@ -1113,7 +1113,7 @@ void matmul(TensorTypeC C, const TensorTypeA A,
   // the rightmost stride is !=1 or this function will be an infinite recursion.
   if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) > 1 ) {  // column major check
     // Column major
-    matmul(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
+    matmul_impl(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
   } else 
 #endif
   {
@@ -1179,7 +1179,7 @@ void matmul(TensorTypeC C, const TensorTypeA A,
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
           MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-__MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
+__MATX_INLINE__ void matmul_impl(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B, const int32_t (&axis)[2],
             cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
@@ -1193,7 +1193,7 @@ __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
   auto in1 = permute(A, perm);
   auto in2 = permute(B, perm);
 
-  matmul<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
+  matmul_impl<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
 }
 
 /**
@@ -1252,7 +1252,7 @@ __MATX_INLINE__ void matvec(TensorTypeC C, const TensorTypeA A,
   auto c = clone<TensorTypeC::Rank()+1>(C, shape);
   auto b = clone<TensorTypeB::Rank()+1>(B, shape);
 
-  matmul<decltype(c), decltype(A), decltype(b), PROV>(c, A, b, stream, alpha, beta);
+  matmul_impl<decltype(c), decltype(A), decltype(b), PROV>(c, A, b, stream, alpha, beta);
 }
 
 } // end namespace matx

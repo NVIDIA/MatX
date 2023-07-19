@@ -171,16 +171,16 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       if ( ufirst ) {
         // compute A*AT
         // use conj transpose for complex
-        matmul(AT, Ap, conj(transpose(Ap)), stream);
+        matmul_impl(AT, Ap, conj(transpose(Ap)), stream);
       } else { // !ufirst
         // use conj transpose for complex
-        matmul(AT, conj(transpose(Ap)), Ap, stream);
+        matmul_impl(AT, conj(transpose(Ap)), Ap, stream);
       } // end ufirst
 
       // for each fixed point iteration
       for(int it = 0; it < iterations; it++) {
 
-        matmul(xm, AT, xm, stream);
+        matmul_impl(xm, AT, xm, stream);
 
         // normalize x at each iteration to avoid instability
         // first compute sum of squares, norm will work for complex and real
@@ -219,8 +219,8 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
     vmShapeB[RANK-2] = i;
     vmShapeE[RANK-2] = i+1;
 
-    auto um = slice<RANK>(U, umShapeB, umShapeE);         // as matrix for matmul
-    auto vm = slice<RANK>(VT, vmShapeB, vmShapeE);         // as matrix for matmul
+    auto um = slice<RANK>(U, umShapeB, umShapeE);         // as matrix for matmul_impl
+    auto vm = slice<RANK>(VT, vmShapeB, vmShapeE);         // as matrix for matmul_impl
 
     // u/v will drop the dim that is one element a vector
     umShapeE[RANK-1] = matxDropDim;
@@ -235,7 +235,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
 
       // compute v
       // for complex we need the conj transpose of Ap
-      matmul(transpose(vm), conj(transpose(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      matmul_impl(transpose(vm), conj(transpose(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
 
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
@@ -263,7 +263,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       (v = conj(x)).run(stream);
 
       // compute u, undo conj
-      matmul(um, Ap, conj(transpose(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
+      matmul_impl(um, Ap, conj(transpose(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
@@ -287,7 +287,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
     if(i < k - 1) {
 
       // vm is already conj for complex so no need to conj here
-      matmul(uv, um, vm, stream);
+      matmul_impl(uv, um, vm, stream);
 
       const int CRANK = s.Rank()+ 2;  // adding one more dim to s
       std::array<index_t, CRANK> sCloneShape;
@@ -404,9 +404,9 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
 
   // create spd matrix
   if ( m >= n ) {
-    matmul(AT, conj(transpose(A)), A, stream);
+    matmul_impl(AT, conj(transpose(A)), A, stream);
   } else {
-    matmul(AT, A, conj(transpose(A)), stream);
+    matmul_impl(AT, A, conj(transpose(A)), stream);
   }
    
   auto e2 = eye({d,d});
@@ -417,7 +417,7 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
   (Q = clone<RANK>(e2, cShape)).run(stream);
 
   for(int i = 0; i < iterations; i++) {
-    matmul(Z, AT, Q, stream);
+    matmul_impl(Z, AT, Q, stream);
     qr_internal(Q,R,Z,N,VM,H,QN,RN,stream);
   }
 
@@ -425,7 +425,7 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
   
   if( m >= n ) {
     (VT = conj(transpose(Q))).run(stream);
-    matmul(U, A, Q, stream);
+    matmul_impl(U, A, Q, stream);
     
     auto DShape = U.Shape();
     DShape.fill(matxKeepDim);
@@ -436,7 +436,7 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
     (U = U * STypeS(1) / D).run(stream);
   } else {
     (U = Q).run(stream);
-    matmul(VT, conj(transpose(Q)), A, stream);
+    matmul_impl(VT, conj(transpose(Q)), A, stream);
     
     auto DShape = VT.Shape();
     DShape.fill(matxKeepDim);

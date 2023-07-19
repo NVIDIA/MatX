@@ -156,7 +156,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
     // Calculate a matrix of means
-    matmul(*means, *onesM, a, stream,
+    matmul_impl(*means, *onesM, a, stream,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
 
     // Subtract the means from the observations to get the deviations
@@ -177,7 +177,7 @@ public:
     }
 
     // Multiply by itself and scale by N-1 for the final covariance
-    matmul(c, *devsT, *devs, stream,
+    matmul_impl(c, *devsT, *devs, stream,
                 1.0f / static_cast<float>(a.Size(RANK - 2) - 1));
   }    
 
