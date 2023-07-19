@@ -33,9 +33,11 @@
 #pragma once
 
 #include <cstdio>
-#include <cuda.h>
 #include <exception>
 #include <sstream>
+#ifdef __CUDACC__
+#include <cuda.h>
+#endif
 
 #include "matx/core/stacktrace.h"
 

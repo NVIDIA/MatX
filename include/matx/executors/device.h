@@ -131,7 +131,7 @@ namespace matx
             } 
           }
 #else
-          #error "Cannot execute device function from host compiler"
+          MATX_ASSERT(false, "Cannot call device executor using host compiler");
 #endif    
         }
 

@@ -675,7 +675,8 @@ namespace detail {
           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
-  void DevicePrint(const Op &op, Args... dims) {
+  void DevicePrint([[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
+#ifdef __CUDACC__    
     if constexpr (PRINT_ON_DEVICE) {
       PrintKernel<<<1, 1>>>(op, dims...);
     }
@@ -684,6 +685,7 @@ namespace detail {
       (tmpv = op).run();
       PrintData(tmpv, dims...);
     }
+#endif    
   }
 } // end namespace detail
 
