@@ -159,15 +159,15 @@ namespace detail {
 
           (ci = NTypeS(2) / ci).run(stream);
 
-          matmul(hi, vm, conj(transpose(vm)), stream);
+          matmul_impl(hi, vm, conj(transpose(vm)), stream);
 
           (hi = Ii - cic * hi).run(stream);
 
           // update panel of r
-          matmul(rn, hi, ri, stream);
+          matmul_impl(rn, hi, ri, stream);
 
           // update panel of q
-          matmul(qn, qi, hi, stream); 
+          matmul_impl(qn, qi, hi, stream); 
 
           // deep copy required (can't swap)
           // copy current panels into output matrix

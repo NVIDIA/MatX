@@ -85,7 +85,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   {
     // QTQ == Identity
     auto QTQ = make_tensor<AType>(Qshape);
-    matmul(QTQ, conj(transpose(Q)), Q, stream);
+    (QTQ = matmul(conj(transpose(Q)), Q)).run(stream);
     auto e = eye<SType>({m, m});
 
     auto eShape = Qshape;
@@ -100,7 +100,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   {
     // Q*R == A
     auto QR = make_tensor<AType>(Ashape);
-    matmul(QR, Q, R, stream);
+    (QR = matmul(Q, R)).run(stream);
     
     rmax(mdiffQR, abs(A-QR), stream);
   }

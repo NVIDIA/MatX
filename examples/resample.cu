@@ -65,28 +65,25 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   (sigView = random<float>({num_samp}, NORMAL)).run(stream);
 
-  fft(sigViewComplex, sigView, 0, stream);
+  (sigViewComplex = fft(sigView)).run(stream);
 
   // Slice
   auto sliceView = sigViewComplex.Slice({0}, {nyq});
 
   // Inverse Transform - FFT size based on output
-  ifft(resampView, sliceView, 0, stream);
-  (resampView = resampView * 1.0f / static_cast<float>(N)).run(stream);
+  (resampView = ifft(sliceView)).run(stream);
 
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     // Launch 1D FFT
-    fft(sigViewComplex, sigView, 0, stream);
+    (sigViewComplex = fft(sigView)).run(stream);
 
     // Slice
     auto sv = sigViewComplex.Slice({0}, {nyq});
 
     // Inverse Transform - FFT size based on output
-    ifft(resampView, sv, 0, stream);
-
-    (resampView = resampView * 1.0f / static_cast<float>(N)).run(stream);
+    (resampView = ifft(sv)).run(stream);
   }
 
   cudaEventRecord(stop, stream);

@@ -194,6 +194,24 @@ printf("data %p %p\n", f2.Data(), f.Data());
   print(Vv);
   //svd_impl(Uv, Sv, Vv, Atv2);  
 
+   m = 16;
+  constexpr index_t k = 32;
+  n = 64;
+  constexpr index_t b = 8;
+      const int axis[2] = {1, 2};
+    std::array<int, 3> perm({0, 1, 2});
+
+    auto ai = make_tensor<TypeParam>({b, m, k});
+    auto bi = make_tensor<TypeParam>({b, k, n});
+    auto ci = make_tensor<TypeParam>({b, m, n});
+
+    auto ap = permute(ai, perm);
+    auto bp = permute(bi, perm);
+    auto cp = permute(ci, perm);
+
+
+    (ci = matmul(ai, bi, axis)).run();
+
   // Time graph execution of same kernels
   //cudaEventRecord(start, stream);
   //  for (uint32_t i = 0; i < 10; i++) {

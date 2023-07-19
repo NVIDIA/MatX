@@ -157,7 +157,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   cutensor::einsum(c2, "mk,kn->mn", 0, a2, b2);
-  matmul(c22, a2, b2);
+  (c22 = matmul(a2, b2)).run();
   // example-end einsum-gemm-1
   cudaStreamSynchronize(0);
 
@@ -183,7 +183,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
     // Perform a GEMM of a2 * b2 and store the results transposed
     cutensor::einsum(c2, "mk,kn->nm", 0, a2, b2);
     // example-end einsum-gemm-2
-    matmul(c22, a2, b2);
+    (c22 = matmul(a2, b2)).run();
     cudaStreamSynchronize(0);
 
     auto c22t = c22.Permute({1,0}); // Permute to match cutensor

@@ -118,8 +118,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
     (SSolav = Sav).run();
   }
 
-  matmul(tmpV, Uav, SSolav); // U * S
-  matmul(SSolav, tmpV, Vav); // (U * S) * V'
+  (tmpV = matmul(Uav, SSolav)).run(); // U * S
+  (SSolav = matmul(tmpV, Vav)).run(); // (U * S) * V'
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < Av.Size(0); i++) {
@@ -199,8 +199,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
     (SSolav = Sav).run();
   }
 
-  matmul(tmpV, Uav, SSolav); // U * S
-  matmul(SSolav, tmpV, Vav); // (U * S) * V'
+  (tmpV = matmul(Uav, SSolav)).run(); // U * S
+  (SSolav = matmul(tmpV, Vav)).run(); // (U * S) * V'
   cudaStreamSynchronize(0);
 
   for (index_t b = 0; b < batches; b++) {
@@ -276,8 +276,8 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  matmul(UTU, conj(transpose(U)) , U, stream);
-  matmul(VTV, VT, conj(transpose(VT)), stream); 
+  (UTU = matmul(conj(transpose(U)) , U)).run(stream);
+  (VTV = matmul(VT, conj(transpose(VT)))).run(stream); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
@@ -288,7 +288,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
   (UD = U * D).run(stream);
 
-  matmul(UDVT, UD, VT, stream);
+  (UDVT = matmul(UD, VT)).run(stream);
 
   auto e = eye<SType>({r,r});
   auto eShape = Rshape;
@@ -408,8 +408,8 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  matmul(UTU, conj(transpose(U)) , U, stream);
-  matmul(VTV, VT, conj(transpose(VT)), stream); 
+  (UTU = matmul(conj(transpose(U)), U)).run(stream);
+  (VTV = matmul(VT, conj(transpose(VT)))).run(stream); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
@@ -420,7 +420,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
   (UD = U * D).run(stream);
 
-  matmul(UDVT, UD, VT, stream);
+  (UDVT = matmul(UD, VT)).run(stream);
 
   auto e = eye<SType>({r,r});
   auto eShape = Rshape;

@@ -31,7 +31,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#ifdef __CUDACC__
 #include <cuda_runtime_api.h>
+#endif
 #include <cuda/std/ccomplex>
 
 #include "matx/core/defines.h"

@@ -55,6 +55,7 @@
 #include "matx/operators/isclose.h"
 #include "matx/operators/kronecker.h"
 #include "matx/operators/legendre.h"
+#include "matx/operators/matmul.h"
 #include "matx/operators/permute.h"
 #include "matx/operators/planar.h"
 #include "matx/operators/r2c.h"
