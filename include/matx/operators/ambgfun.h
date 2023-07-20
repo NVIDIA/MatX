@@ -56,7 +56,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename OpX::scalar_type;
         using matx_transform_op = bool;
-        using matmul_xform_op = bool;
+        using ambgfun_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
           if (y_) {

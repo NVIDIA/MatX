@@ -3653,16 +3653,16 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   (D = rcop).run();
 
   // two operators as input
-  matx::conv1d(o1op, lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  (o1op = conv1d(lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
 
   // one tensor and one operators as input
-  matx::conv1d(o2op, B, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  (o2op = conv1d(B, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
   
   // one tensor and one operators as input
-  matx::conv1d(o3op, lop, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  (o3op = conv1d(lop, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
   
   //two tensors as input
-  matx::conv1d(o4op, B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL, 0);
+  (o4op = conv1d(B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
 
   cudaDeviceSynchronize();
 

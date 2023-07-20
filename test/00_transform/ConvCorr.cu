@@ -171,7 +171,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
   this->pb->NumpyToTensorView(this->bv, "b_op");
   // example-begin conv1d-test-1
   // 1D convolution in FULL mode where every output is stored
-  conv1d(this->cv, this->av, this->bv, MATX_C_MODE_FULL, 0);
+  (this->cv = conv1d(this->av, this->bv, MATX_C_MODE_FULL)).run();
   // example-end conv1d-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
@@ -186,7 +186,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv1d(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, 0);
+  (this->cv_full_even = conv1d(this->av, this->bv_even, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -200,44 +200,13 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv2d(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, 0);
+  (this->cv_full_even = conv2d(this->av, this->bv_even, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionRemap)
-{
-  MATX_ENTER_HANDLER();
 
-  int N = 256;
-  int B = 5;
-  int F = 3;
-  int R = 3;
-
-  // This is a does it compile and run test
-  // TODO add correctness checking
-  auto in = make_tensor<int>({B, N});
-  auto out = make_tensor<int>({B, N});
-  auto filt = make_tensor<int>({B, F});
-  auto idx = make_tensor<int>({R});
-  for(int i = 0; i < idx.Size(0); i++) {
-    idx(i) = i;
-  }
-
-  (in = 1).run();
-  (filt = 1).run();
-
-  // example-begin conv1d-test-2
-  // 1D convolution in SAME mode where the output size matches the input
-  conv1d(out, in, filt, MATX_C_MODE_SAME, 0);
-  // example-end conv1d-test-2
-  
-  conv1d(remap<0>(out,idx), remap<0>(in,idx), filt, MATX_C_MODE_SAME, 0);
-
-  cudaDeviceSynchronize();
-  MATX_EXIT_HANDLER();
-}
 
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
 {
@@ -246,7 +215,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv1d(this->cv_same, this->av, this->bv_even, MATX_C_MODE_SAME, 0);
+  (this->cv_same = conv1d(this->av, this->bv_even, MATX_C_MODE_SAME)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
   MATX_EXIT_HANDLER();
@@ -260,7 +229,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
   // example-begin conv2d-test-1
-  conv2d(this->cv_same, this->av, this->bv_even, MATX_C_MODE_SAME, 0);
+  (this->cv_same = conv2d(this->av, this->bv_even, MATX_C_MODE_SAME)).run();
   // example-end conv2d-test-1
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
@@ -274,7 +243,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv1d(this->cv_valid_even, this->av, this->bv_even, MATX_C_MODE_VALID, 0);
+  (this->cv_valid_even = conv1d(this->av, this->bv_even, MATX_C_MODE_VALID)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_even, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -287,7 +256,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidEven)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv2d(this->cv_valid_even, this->av, this->bv_even, MATX_C_MODE_VALID, 0);
+  (this->cv_valid_even = conv2d(this->av, this->bv_even, MATX_C_MODE_VALID)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_even, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -300,7 +269,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv1d(this->cv_full_odd, this->av, this->bv_odd, MATX_C_MODE_FULL, 0);
+  (this->cv_full_odd = conv1d(this->av, this->bv_odd, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_odd, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -313,7 +282,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullOdd)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv2d(this->cv_full_odd, this->av, this->bv_odd, MATX_C_MODE_FULL, 0);
+  (this->cv_full_odd = conv2d(this->av, this->bv_odd, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_odd, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -326,7 +295,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv1d(this->cv_same, this->av, this->bv_odd, MATX_C_MODE_SAME, 0);
+  (this->cv_same = conv1d(this->av, this->bv_odd, MATX_C_MODE_SAME)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
   MATX_EXIT_HANDLER();
@@ -339,7 +308,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameOdd)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv2d(this->cv_same, this->av, this->bv_odd, MATX_C_MODE_SAME, 0);
+  (this->cv_same = conv2d(this->av, this->bv_odd, MATX_C_MODE_SAME)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_same, "conv_same", this->thresh);
   MATX_EXIT_HANDLER();
@@ -352,7 +321,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv1d(this->cv_valid_odd, this->av, this->bv_odd, MATX_C_MODE_VALID, 0);
+  (this->cv_valid_odd = conv1d(this->av, this->bv_odd, MATX_C_MODE_VALID)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_odd, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -365,7 +334,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidOdd)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_odd, "b_op");
-  conv2d(this->cv_valid_odd, this->av, this->bv_odd, MATX_C_MODE_VALID, 0);
+  (this->cv_valid_odd = conv2d(this->av, this->bv_odd, MATX_C_MODE_VALID)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_valid_odd, "conv_valid", this->thresh);
   MATX_EXIT_HANDLER();
@@ -378,7 +347,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv1d(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, 0);
+  (this->cv_full_even = conv1d(this->bv_even, this->av, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -391,7 +360,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSwap)
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  conv2d(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, 0);
+  (this->cv_full_even = conv2d(this->bv_even, this->av, MATX_C_MODE_FULL)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "conv_full", this->thresh);
   MATX_EXIT_HANDLER();
@@ -406,7 +375,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
   // example-begin corr-test-1
   // Full correlation mode with direct correlation
-  corr(this->cv_full_even, this->av, this->bv_even, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
+  (this->cv_full_even = corr(this->av, this->bv_even, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT)).run();
   // example-end corr-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "corr", this->thresh);
@@ -420,7 +389,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
   this->pb->RunTVGenerator("corr_swap");
   this->pb->NumpyToTensorView(this->av, "a_op");
   this->pb->NumpyToTensorView(this->bv_even, "b_op");
-  corr(this->cv_full_even, this->bv_even, this->av, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT, 0);
+  (this->cv_full_even = corr(this->bv_even, this->av, MATX_C_MODE_FULL, MATX_C_METHOD_DIRECT)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv_full_even, "corr_swap", this->thresh);
   MATX_EXIT_HANDLER();
@@ -447,9 +416,9 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  conv1d(out1, in1, in2, MATX_C_MODE_SAME);
+  (out1 = conv1d(in1, in2, MATX_C_MODE_SAME)).run();
   // example-begin conv1d-test-1
-  conv1d(out2, in1, in2, {2}, MATX_C_MODE_SAME);
+  (out2 = conv1d(in1, in2, {2}, MATX_C_MODE_SAME)).run();
   // example-end conv1d-test-1
 
   cudaStreamSynchronize(0);
@@ -462,9 +431,9 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  conv1d(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME);
+  (out1.Permute({0,2,1}) = conv1d(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME)).run();
   // example-begin conv1d-test-3
-  conv1d(out2, in1, in2, {1}, MATX_C_MODE_SAME);
+  (out2 = conv1d(in1, in2, {1}, MATX_C_MODE_SAME)).run();
   // example-end conv1d-test-3
 
   cudaStreamSynchronize(0);
@@ -477,8 +446,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  conv1d(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME);
-  conv1d(out2, in1, in2, {0}, MATX_C_MODE_SAME);
+  (out1.Permute({1,2,0}) = conv1d(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME)).run();
+  (out2 = conv1d(in1, in2, {0}, MATX_C_MODE_SAME)).run();
 
   cudaStreamSynchronize(0);
 
@@ -490,8 +459,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  corr(out1, in1, in2, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
-  corr(out2, in1, in2, {2}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  (out1 = corr(in1, in2, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
+  (out2 = corr(in1, in2, {2}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
 
   cudaStreamSynchronize(0);
 
@@ -503,8 +472,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  corr(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
-  corr(out2, in1, in2, {1}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  (out1.Permute({0,2,1}) = corr(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
+  (out2 = corr(in1, in2, {1}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
 
   cudaStreamSynchronize(0);
 
@@ -516,8 +485,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
     }
   }
 
-  corr(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
-  corr(out2, in1, in2, {0}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT);
+  (out1.Permute({1,2,0}) = corr(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
+  (out2 = corr(in1, in2, {0}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run();
 
   cudaStreamSynchronize(0);
 
@@ -554,8 +523,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
     }
   }
 
-  conv2d(out1, in1, in2, MATX_C_MODE_SAME);
-  conv2d(out2, in1, in2, {1, 2}, MATX_C_MODE_SAME);
+  (out1 = conv2d(in1, in2, MATX_C_MODE_SAME)).run();
+  (out2 = conv2d(in1, in2, {1, 2}, MATX_C_MODE_SAME)).run();
 
   cudaStreamSynchronize(0);
 
@@ -567,8 +536,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
     }
   }
  
-  conv2d(out1.Permute({0,2,1}), in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME);
-  conv2d(out2, in1, in2, {2, 1}, MATX_C_MODE_SAME);
+  (out1.Permute({0,2,1}) = conv2d(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME)).run();
+  (out2 = conv2d(in1, in2, {2, 1}, MATX_C_MODE_SAME)).run();
 
   cudaStreamSynchronize(0);
 
@@ -580,8 +549,8 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
     }
   }
   
-  conv2d(out1.Permute({1,2,0}), in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME);
-  conv2d(out2, in1, in2, {2, 0}, MATX_C_MODE_SAME);
+  (out1.Permute({1,2,0}) = conv2d(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME)).run();
+  (out2 = conv2d(in1, in2, {2, 0}, MATX_C_MODE_SAME)).run();
 
   cudaStreamSynchronize(0);
 

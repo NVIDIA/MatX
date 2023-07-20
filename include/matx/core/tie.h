@@ -102,7 +102,6 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {
-    printf("tie exec %lld %lld\n", std::get<0>(ts_).Size(1), std::get<0>(ts_).Size(2));
     std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
   }
 

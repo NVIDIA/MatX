@@ -240,7 +240,7 @@ static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
  *   CUDA stream
  */
 template <typename TensorTypeC, typename TensorTypeA>
-void cov(TensorTypeC &c, const TensorTypeA &a,
+void cov_impl(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)    
