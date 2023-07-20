@@ -76,7 +76,7 @@ TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
   this->pb->RunTVGenerator("cov");
   this->pb->NumpyToTensorView(this->av, "a");
   // example-begin cov-test-1
-  cov(this->cv, this->av, 0);
+  (this->cv = cov(this->av)).run();
   // example-end cov-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "c_cov", this->thresh);

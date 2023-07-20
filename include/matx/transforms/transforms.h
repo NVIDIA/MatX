@@ -32,17 +32,10 @@
 
 #pragma once
 
-#include "matx/transforms/ambgfun.h"
-#include "matx/transforms/cgsolve.h"
-#include "matx/transforms/conv.h"
 #include "matx/transforms/copy.h"
-#include "matx/transforms/corr.h"
-#include "matx/transforms/cov.h"
 #include "matx/transforms/cub.h"
 #include "matx/transforms/einsum.h"
-#include "matx/transforms/fft.h"
 #include "matx/transforms/filter.h"
-#include "matx/transforms/inverse.h"
 #include "matx/transforms/matmul.h"
 #include "matx/transforms/permute.h"
 #include "matx/transforms/qr.h"

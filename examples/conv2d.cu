@@ -76,7 +76,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   
   auto out = make_tensor<int>({oN,oM});
   
-  conv2d(out, in, filter, mode, 0);
+  (out = conv2d(in, filter, mode)).run();
 
   printf("in:\n");
   print(in);
@@ -84,6 +84,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(filter);
   printf("out:\n");
   print(out);
+
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();

@@ -35,6 +35,8 @@
 #include "matx/transforms/reduce.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
+#include "matx/operators/if.h"
+#include "matx/operators/clone.h"
 
 namespace matx
 {
@@ -56,7 +58,7 @@ namespace matx
    *
    */
   template <typename XType, typename AType, typename BType>
-    __MATX_INLINE__ void cgsolve(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
+    __MATX_INLINE__ void cgsolve_impl(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
     {
       using scalar_type = typename XType::scalar_type;
       const int VRANK = XType::Rank();

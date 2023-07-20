@@ -150,8 +150,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.
   auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
-  conv1d(time_out, sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL,
-          0);
+  (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
 
   cudaStreamSynchronize(0);
  
@@ -168,6 +167,30 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       }
     }
   }
+
+{
+  const int d1 = 8;
+  const int d2 = 512;
+  const int d3 = 1024;
+
+  auto in1 = make_tensor<float>({d1, d2, d3});
+  auto in2 = make_tensor<float>({d1, d2, d3});
+  auto out1 = make_tensor<float>({d1, d2, d3});
+  auto out2 = make_tensor<float>({d1, d2, d3});
+
+  for(int i = 0; i < d1; i++) {
+    for(int j = 0; j < d2; j++) {
+      for(int k = 0; k < d3; k++) {
+        in1(i,j,k) = static_cast<float>((float)(i+j+k));
+        in2(i,j,k) = static_cast<float>((float)(1));
+      }
+    }
+  }
+
+  (out1.Permute({0,2,1}) = conv1d(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME)).run();
+  // example-begin conv1d-test-3
+  (out2 = conv1d(in1, in2, {1}, MATX_C_MODE_SAME)).run();  
+}
 
   std::cout << "Verification successful" << std::endl;
 

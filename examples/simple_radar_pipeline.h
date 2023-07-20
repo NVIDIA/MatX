@@ -201,8 +201,8 @@ public:
                            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}});
 
     // Pre-process CFAR convolution
-    conv2d(normT, ones({numChannels, numPulsesRnd, numCompressedSamples}),
-           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL, stream);
+    (normT = conv2d(ones({numChannels, numPulsesRnd, numCompressedSamples}),
+           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
 
     cancelMask.PrefetchDevice(stream);
     ba.PrefetchDevice(stream);
@@ -281,7 +281,7 @@ public:
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
     auto xo = tpcView.Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    conv1d(xo, x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
+    (xo = conv1d(x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME)).run(stream);
   }
 
   /**
@@ -354,8 +354,7 @@ public:
 
     // Estimate the background average power in each cell
     // background_averages = conv2(Xpow, mask, 'same') ./ norm;
-    conv2d(ba, xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL,
-           stream);
+    (ba = conv2d(xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
 
     // Computing number of cells contributing to each cell.
     // This can be done with a convolution of the cfarMask with

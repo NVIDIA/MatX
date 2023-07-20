@@ -78,7 +78,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   (X = TypeParam(1)).run();
 
-  cgsolve(X, A, B, .0001, max_iters);
+  (X = cgsolve(A, B, .0001, max_iters)).run();
 
   matvec(Bout, A, X);
   sum(norm, (Bout-B)*(Bout-B));

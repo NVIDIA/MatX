@@ -93,8 +93,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < iterations; i++) {
-    conv1d(outView, inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL,
-           stream);
+    (outView = conv1d(inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
   }
   
 

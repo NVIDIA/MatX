@@ -35,37 +35,34 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/cgsolve.h"
+#include "matx/transforms/cov.h"
 
 namespace matx
 {
   namespace detail {
-    template <typename OpA, typename OpB>
-    class CGSolveOp : public BaseOp<CGSolveOp<OpA, OpB>>
+    template <typename OpA>
+    class CovOp : public BaseOp<CovOp<OpA>>
     {
       private:
         OpA a_;
-        OpB b_;
-        double tol_;
-        int max_iters_;
         std::array<index_t, 2> out_dims_;
-        matx::tensor_t<typename OpA::scalar_type, 2> tmp_out_;
+        matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
       public:
         using matxop = bool;
         using scalar_type = typename OpA::scalar_type;
         using matx_transform_op = bool;
-        using cgsolve_xform_op = bool;
+        using cov_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          return "cgsolve(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
+          return "cov(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ CGSolveOp(const OpA &A, const OpB &B, double tol, int max_iters) : 
-              a_(A), b_(B), tol_(tol), max_iters_(max_iters) {
+        __MATX_INLINE__ CovOp(const OpA &A) : 
+              a_(A) {
           
           for (int r = 0; r < Rank(); r++) {
-            out_dims_[r] = b_.Size(r);
+            out_dims_[r] = a_.Size(r);
           }
         }
 
@@ -77,7 +74,7 @@ namespace matx
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return remove_cvref_t<OpB>::Rank();
+          return OpA::Rank();
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
@@ -86,8 +83,8 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) {
-          static_assert(is_device_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
-          cgsolve_impl(std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
+          static_assert(is_device_executor_v<Executor>, "cov() only supports the CUDA executor currently");
+          cov_impl(std::get<0>(out), a_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
@@ -96,10 +93,6 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }     
-
-          if constexpr (is_matx_op<OpB>()) {
-            b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }          
 
           if constexpr (is_device_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -111,25 +104,27 @@ namespace matx
   }
 
 
-  /**
-   * Performs a complex gradient solve on a square matrix.  
-   *
-   * @param A
-   *   Tensor A
-   * @param B
-   *   Tensor B 
-   * @param tol
-   *   tolerance to solve to  
-   * @param max_iters
-   *   max iterations for solve
-   *
-   */
-  template <typename AType, typename BType>
-    __MATX_INLINE__ auto cgsolve(AType A, BType B, double tol=1e-6, int max_iters=4)
+/**
+ * Compute a covariance matrix without a plan
+ *
+ * Creates a new cov plan in the cache if none exists, and uses that to execute
+ * the covariance calculation. This function is preferred over creating a plan
+ * directly for both efficiency and simpler code. Since it only uses the
+ * signature of the covariance to decide if a plan is cached, it may be able to
+ * reused plans for different A matrices
+ *
+ * @tparam AType
+ *    Data type of A operator
+ *
+ * @param a
+ *   Covariance operator input view
+ */
+  template <typename AType>
+    __MATX_INLINE__ auto cov(AType a)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     
-    return detail::CGSolveOp(A, B, tol, max_iters);
+    return detail::CovOp(a);
   }
 
 }
