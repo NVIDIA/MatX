@@ -299,7 +299,7 @@ public:
 
     ParseEinsum(subscripts, tokens);
 
-    MATX_ASSERT_STR(tokens.size() - 1 == sizeof...(InT), matxInvalidDim, "Number of subscript groups in Einstein notation must match the number of tensors (input and output)");
+    MATX_ASSERT_STR(tokens.size() - 1 == sizeof...(InT), matxInvalidDim, "Number of subscript groups in Einstein notation must match the number of operators (input and output)");
 
     // Set all the token characters
     for (i = 0; i < tokens.size(); i++) {
@@ -485,7 +485,7 @@ namespace cutensor {
    * @param tensors List of input tensors
    */
   template <typename OutputType, typename... InT>
-  void einsum(OutputType &out, const std::string &subscripts, cudaStream_t stream, InT... tensors)
+  void einsum_impl(OutputType &out, const std::string &subscripts, cudaStream_t stream, InT... tensors)
   {
 #if MATX_ENABLE_CUTENSOR    
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
