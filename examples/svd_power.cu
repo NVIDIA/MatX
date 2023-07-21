@@ -89,7 +89,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (S = 0).run(stream);
     (VT = 0).run(stream);
 
-    svdpi(U, S, VT, A, x0, iterations, stream, k);
+    (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(stream);
 
     cudaDeviceSynchronize();
     printf("svdpi:\n");
@@ -103,22 +103,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose(U)))).run(stream);
+      (UUT = matmul(U, conj(transpose_matrix(U)))).run(stream);
       print(UUT);
     }
 
     printf("UTU:\n");
-    (UTU = matmul(conj(transpose(U)), U)).run(stream);
+    (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      (VVT = matmul(conj(transpose(VT)), VT)).run(stream);
+      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(stream);
       print(VVT);
     }
 
     printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose(VT)))).run(stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); // works on r x r
 
     print(VTV);
 
@@ -145,7 +145,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (S = 0).run(stream);
     (VT = 0).run(stream);
     // TODO add k
-    svdbpi(U, S, VT, A, iterations, stream);
+    (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
 
     cudaDeviceSynchronize();
     printf("svdbpi:\n");
@@ -159,22 +159,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose(U)))).run(stream);
+      (UUT = matmul(U, conj(transpose_matrix(U)))).run(stream);
       print(UUT);
     }
 
     printf("UTU:\n");
-    (UTU = matmul(conj(transpose(U)), U)).run(stream);
+    (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      (VVT = matmul(conj(transpose(VT)), VT)).run(stream);
+      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(stream);
       print(VVT);
     }
 
     printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose(VT)))).run(stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); // works on r x r
 
     print(VTV);
 

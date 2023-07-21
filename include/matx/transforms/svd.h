@@ -75,7 +75,7 @@ namespace matx {
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
 template<typename UType, typename SType, typename VTType, typename AType, typename X0Type>
-void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
+void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(U.Rank() == A.Rank());
@@ -171,10 +171,10 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       if ( ufirst ) {
         // compute A*AT
         // use conj transpose for complex
-        matmul_impl(AT, Ap, conj(transpose(Ap)), stream);
+        matmul_impl(AT, Ap, conj(transpose_matrix(Ap)), stream);
       } else { // !ufirst
         // use conj transpose for complex
-        matmul_impl(AT, conj(transpose(Ap)), Ap, stream);
+        matmul_impl(AT, conj(transpose_matrix(Ap)), Ap, stream);
       } // end ufirst
 
       // for each fixed point iteration
@@ -235,7 +235,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
 
       // compute v
       // for complex we need the conj transpose of Ap
-      matmul_impl(transpose(vm), conj(transpose(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      matmul_impl(transpose_matrix(vm), conj(transpose_matrix(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
 
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
@@ -263,7 +263,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       (v = conj(x)).run(stream);
 
       // compute u, undo conj
-      matmul_impl(um, Ap, conj(transpose(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
+      matmul_impl(um, Ap, conj(transpose_matrix(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
@@ -330,7 +330,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
  *   CUDA stream
  */
 template<typename UType, typename SType, typename VTType, typename AType>
-void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStream_t stream) {
+void svdbpi_impl(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(U.Rank() == A.Rank());
@@ -404,9 +404,9 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
 
   // create spd matrix
   if ( m >= n ) {
-    matmul_impl(AT, conj(transpose(A)), A, stream);
+    matmul_impl(AT, conj(transpose_matrix(A)), A, stream);
   } else {
-    matmul_impl(AT, A, conj(transpose(A)), stream);
+    matmul_impl(AT, A, conj(transpose_matrix(A)), stream);
   }
    
   auto e2 = eye({d,d});
@@ -424,7 +424,7 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
   (S = real(sqrt(diag(R)))).run(stream);
   
   if( m >= n ) {
-    (VT = conj(transpose(Q))).run(stream);
+    (VT = conj(transpose_matrix(Q))).run(stream);
     matmul_impl(U, A, Q, stream);
     
     auto DShape = U.Shape();
@@ -436,7 +436,7 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
     (U = U * STypeS(1) / D).run(stream);
   } else {
     (U = Q).run(stream);
-    matmul_impl(VT, conj(transpose(Q)), A, stream);
+    matmul_impl(VT, conj(transpose_matrix(Q)), A, stream);
     
     auto DShape = VT.Shape();
     DShape.fill(matxKeepDim);

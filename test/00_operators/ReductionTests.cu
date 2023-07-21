@@ -1054,7 +1054,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Find)
     // example-begin find-test-1
     // Find values greater than 0.5
     TestType thresh = (TestType)0.5;
-    find(t1o, num_found, t1, GT{thresh}, ExecType{});
+    (mtie(t1o, num_found) = find(t1, GT{thresh})).run(ExecType{});
     // example-end find-test-1
     cudaStreamSynchronize(0);
     
@@ -1093,7 +1093,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdx)
     // example-begin find_idx-test-1
     // Find indices with values greater than 0.5
     TestType thresh = (TestType)0.5;
-    find_idx(t1o, num_found, t1, GT{thresh}, ExecType{});
+    (mtie(t1o, num_found) = find_idx(t1, GT{thresh})).run(ExecType{});
     // example-end find_idx-test-1
     cudaStreamSynchronize(0);
     
@@ -1134,7 +1134,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
 
     // Find indices with values greater than 0.5
     // example-begin select-test-1
-    find_idx(t1o_idx, num_found, t1, GT{thresh}, executor);
+    (mtie(t1o_idx, num_found) = find_idx(t1, GT{thresh})).run(executor);
 
     // Since we use the output on the host in select() we need to synchronize first
     cudaStreamSynchronize(0);
@@ -1144,7 +1144,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
     (t1o_slice = select(t1o_slice, t1o_idx_slice)).run(executor);
 
     // Compare to simply finding the values
-    find(t1o_2, num_found2, t1, GT{thresh}, executor);
+    (mtie(t1o_2, num_found2) = find(t1, GT{thresh})).run(executor);
     // example-end select-test-1
     cudaStreamSynchronize(0);
 
@@ -1174,7 +1174,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
     }
 
     // example-begin unique-test-1
-    unique(t1o, num_found, t1, ExecType{});
+    (mtie(t1o, num_found) = unique(t1)).run(ExecType{});
     // example-end unique-test-1
     cudaStreamSynchronize(0);
 

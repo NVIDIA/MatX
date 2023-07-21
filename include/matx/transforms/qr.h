@@ -35,6 +35,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/operators/slice.h"
 #include <cstdio>
 #include <numeric>
 
@@ -159,7 +160,7 @@ namespace detail {
 
           (ci = NTypeS(2) / ci).run(stream);
 
-          matmul_impl(hi, vm, conj(transpose(vm)), stream);
+          matmul_impl(hi, vm, conj(transpose_matrix(vm)), stream);
 
           (hi = Ii - cic * hi).run(stream);
 
@@ -203,7 +204,7 @@ namespace detail {
  *   CUDA stream
  */
 template<typename QType, typename RType, typename AType>
-void qr(QType Q, RType R, AType A, cudaStream_t stream) {
+void qr_impl(QType Q, RType R, AType A, cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(A.Rank() >= 2);

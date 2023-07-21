@@ -76,7 +76,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   R.PrefetchDevice(stream);
   
   // example-begin qr-test-1
-  qr(Q, R, A, stream);
+  (mtie(Q, R) = qr(A)).run(stream);
   // example-end qr-test-1
 
   auto mdiffQTQ = make_tensor<SType>();
@@ -85,7 +85,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   {
     // QTQ == Identity
     auto QTQ = make_tensor<AType>(Qshape);
-    (QTQ = matmul(conj(transpose(Q)), Q)).run(stream);
+    (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(stream);
     auto e = eye<SType>({m, m});
 
     auto eShape = Qshape;

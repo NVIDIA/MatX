@@ -59,7 +59,7 @@ namespace matx
    *
    */
   template <typename OutputTensor, typename InputTensor>
-    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
+    __MATX_INLINE__ void transpose_impl([[maybe_unused]] OutputTensor &out,
         const InputTensor &in, cudaExecutor exec)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -103,7 +103,7 @@ namespace matx
     };
   
   template <typename OutputTensor, typename InputTensor>
-    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
+    __MATX_INLINE__ void transpose_impl([[maybe_unused]] OutputTensor &out,
         const InputTensor &in, SingleThreadHostExecutor exec)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

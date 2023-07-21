@@ -40,6 +40,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/transforms/matmul.h"
+#include "matx/transforms/transpose.h"
 
 namespace matx {
 namespace detail {
@@ -172,7 +173,7 @@ public:
     }
     else {
       // example-begin transpose-test-1
-      transpose(*devsT, *devs, stream);
+      (*devsT = transpose(*devsT)).run(stream);
       // example-end transpose-test-1
     }
 

@@ -31,6 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "matx/transforms/transpose.h"
 #include <cassert>
 #include <cstdio>
 #include <math.h>
@@ -185,7 +186,7 @@ printf("data %p %p\n", f2.Data(), f.Data());
   // example-begin svd-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  transpose(Atv, Av, 0);
+  (Atv = transpose(Av)).run();
 
   auto Atv2 = Atv.View({m, n});
   (mtie(Uv, Sv, Vv) = svd(Atv2)).run();

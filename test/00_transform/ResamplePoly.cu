@@ -121,7 +121,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     this->pb->NumpyToTensorView(f, "filter_random");
     // example-begin resample_poly-test-1
     // Resample "a" using input signal "f" by rate up/down
-    resample_poly(b, a, f, up, down);
+    (b = resample_poly(a, f, up, down)).run();
     // example-end resample_poly-test-1
 
     cudaStreamSynchronize(0);
@@ -130,7 +130,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    resample_poly(b, static_cast<TypeParam>(4.0) * a, f, up, down);
+    (b = resample_poly(static_cast<TypeParam>(4.0) * a, f, up, down)).run();
     (b = b * static_cast<TypeParam>(0.25)).run();
     cudaStreamSynchronize(0);
 
@@ -183,7 +183,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
     auto b = make_tensor<TypeParam>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
-    resample_poly(b, a, f, up, down);
+    (b = resample_poly(a, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -191,7 +191,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    resample_poly(b, static_cast<TypeParam>(4.0) * a, f, up, down);
+    (b = resample_poly(static_cast<TypeParam>(4.0) * a, f, up, down)).run();
     (b = b * static_cast<TypeParam>(0.25)).run();
     cudaStreamSynchronize(0);
 
@@ -240,7 +240,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
 
     cudaStreamSynchronize(0);
 
-    resample_poly(b, a, f, up, down);
+    (b = resample_poly(a, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -288,7 +288,7 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
 
     cudaStreamSynchronize(0);
 
-    resample_poly(b, a, f, up, down);
+    (b = resample_poly(a, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -331,7 +331,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     auto b = make_tensor<TypeParam>({nA, nB, nC, b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
-    resample_poly(b, ac, f, up, down);
+    (b = resample_poly(ac, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -352,7 +352,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
 
     cudaStreamSynchronize(0);
 
-    resample_poly(b, ac, f, up, down);
+    (b = resample_poly(ac, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -399,7 +399,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
     auto a = make_tensor<TypeParam>({a_len});
     auto b = make_tensor<TypeParam>({a_len});
     this->pb->NumpyToTensorView(a, "a");
-    resample_poly(b, a, zero, up, down);
+    (b = resample_poly(a, zero, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -442,7 +442,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
     const index_t b_len = a_len / down;
     auto b = make_tensor<TypeParam>({b_len});
     this->pb->NumpyToTensorView(a, "a");
-    resample_poly(b, a, seven, up, down);
+    (b = resample_poly(a, seven, up, down)).run();
 
     cudaStreamSynchronize(0);
 
@@ -493,7 +493,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
     const index_t b_len = a_len * up;
     auto b = make_tensor<TypeParam>({b_len});
     this->pb->NumpyToTensorView(a, "a");
-    resample_poly(b, a, f, up, down);
+    (b = resample_poly(a, f, up, down)).run();
 
     cudaStreamSynchronize(0);
 

@@ -108,7 +108,7 @@ static index_t gcd(index_t a, index_t b) {
  * @param stream CUDA stream on which to run the kernel(s)
  */
 template <typename OutType, typename InType, typename FilterType>
-inline void resample_poly(OutType &out, const InType &in, const FilterType &f,
+inline void resample_poly_impl(OutType &out, const InType &in, const FilterType &f,
                    index_t up, index_t down, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 

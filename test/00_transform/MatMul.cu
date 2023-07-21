@@ -188,7 +188,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  auto ct = transpose(c);
+  auto ct = transpose_matrix(c);
 
   (ct = matmul(a, b)).run();
   MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", this->thresh);

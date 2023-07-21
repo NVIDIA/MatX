@@ -71,10 +71,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   Q.PrefetchDevice(stream);
   R.PrefetchDevice(stream);
 
-  qr(Q, R, A, stream);
+  (mtie(Q, R) = qr(A)).run(stream);
 
   (QR = matmul(Q, R)).run(stream);
-  (QTQ = matmul(conj(transpose(Q)), Q)).run(stream);
+  (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(stream);
   cudaDeviceSynchronize();
   
   printf("Q:\n"); print(Q);

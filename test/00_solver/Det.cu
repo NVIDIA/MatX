@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include "matx/transforms/transpose.h"
 
 using namespace matx;
 constexpr int m = 15;
@@ -69,10 +70,10 @@ TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
 
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  transpose(this->Atv, this->Av, 0);
+  (this->Atv = transpose(this->Av)).run();
 
   (this->detv = det(this->Atv)).run();
-  transpose(this->Av, this->Atv, 0); // Transpose back to row-major
+  (this->Av = transpose(this->Atv)).run(); // Transpose back to row-major
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->detv, "det", 0.1);

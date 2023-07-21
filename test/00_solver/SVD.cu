@@ -84,7 +84,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   // example-begin svd-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  transpose(Atv, Av, 0);
+  (Atv = transpose(Av)).run();
 
   auto Atv2 = Atv.View({m, n});
   (mtie(Uv, Sv, Vv) = svd(Atv2)).run();
@@ -96,8 +96,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
   // However, U and V are in column-major format, so we have to transpose them
   // back to verify the identity.
-  transpose(Uav, Uv, 0);
-  transpose(Vav, Vv, 0);
+  (Uav = transpose(Uv)).run();
+  (Vav = transpose(Vv)).run();
 
   // Zero out s
   (Sav = zeros<typename inner_op_type_t<TypeParam>::type>({m, n})).run();
@@ -164,7 +164,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  transpose(Atv, Av, 0);
+  (Atv = transpose(Av)).run();
 
   auto Atv2 = Atv.View({batches, m, n});
   svd_impl(Uv, Sv, Vv, Atv2);
@@ -175,8 +175,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
   // However, U and V are in column-major format, so we have to transpose them
   // back to verify the identity.
-  transpose(Uav, Uv, 0);
-  transpose(Vav, Vv, 0);
+  (Uav = transpose(Uv)).run();
+  (Vav = transpose(Vv)).run();
 
   // Zero out s
   (Sav = zeros<typename inner_op_type_t<TypeParam>::type>({batches, m, n})).run();
@@ -260,7 +260,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   (S = 0).run(stream);
   (VT = 0).run(stream);
 
-  svdpi(U, S, VT, A, x0, iterations, stream, r);
+  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(stream);
   // example-end svdpi-test-1
 
   auto Rshape = Ushape;
@@ -276,8 +276,8 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose(U)) , U)).run(stream);
-  (VTV = matmul(VT, conj(transpose(VT)))).run(stream); 
+  (UTU = matmul(conj(transpose_matrix(U)) , U)).run(stream);
+  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
@@ -392,7 +392,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   (S = 0).run(stream);
   (VT = 0).run(stream);
 
-  svdbpi(U, S, VT, A, iterations, stream);
+  (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
   // example-end svdbpi-test-1
 
   auto Rshape = Ushape;
@@ -408,8 +408,8 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose(U)), U)).run(stream);
-  (VTV = matmul(VT, conj(transpose(VT)))).run(stream); 
+  (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
+  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
