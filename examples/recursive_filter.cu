@@ -120,7 +120,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     // example-begin filter-example-1
     // Perform an IIR filter on "inView" with rCoeffs and nrCoeffs recursive/non-recursive
     // coefficients, respectively
-    filter(outView, inView, rCoeffs, nrCoeffs, stream);
+    (outView = filter(inView, rCoeffs, nrCoeffs)).run(stream);
     // example-end filter-example-1
   }
 

@@ -501,7 +501,7 @@ static auto matxMakeFilter(OutType &o, const InType &i,
 // TODO: Update later once we support compile-time shapes
 template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-void filter(OutType &o, const InType &i,
+void filter_impl(OutType &o, const InType &i,
             const std::array<FilterType, NR> h_rec,
             const std::array<FilterType, NNR> h_nonrec, cudaStream_t stream = 0)
 {

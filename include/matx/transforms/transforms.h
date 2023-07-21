@@ -34,9 +34,6 @@
 
 #include "matx/transforms/copy.h"
 #include "matx/transforms/cub.h"
-#include "matx/transforms/einsum.h"
-#include "matx/transforms/filter.h"
-#include "matx/transforms/matmul.h"
 #include "matx/transforms/permute.h"
 #include "matx/transforms/qr.h"
 #include "matx/transforms/reduce.h"

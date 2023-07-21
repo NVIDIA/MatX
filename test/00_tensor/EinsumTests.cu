@@ -115,7 +115,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   auto b = b1.View({4,3,2});
 
   // Perform a 3D tensor contraction
-  cutensor::einsum(c2, "ijk,jil->kl", 0, a, b);
+  (c2 = cutensor::einsum("ijk,jil->kl", a, b)).run();
   // example-end einsum-contraction-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
@@ -135,7 +135,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
   (b1 = ones(b1.Shape()) * 2).run(); 
 
   // Perform a dot product of b1 with itself and store in a1
-  cutensor::einsum(c0, "i,i->", 0, a1, b1);
+  (c0 = cutensor::einsum("i,i->", a1, b1)).run();
   // example-end einsum-dot-1
   cudaStreamSynchronize(0);
   MATX_ASSERT_EQ(c0(), 4 * a1.Size(0));
@@ -156,7 +156,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
   (b2 = ones(b2.Shape())).run(); 
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
-  cutensor::einsum(c2, "mk,kn->mn", 0, a2, b2);
+  (c2 = cutensor::einsum("mk,kn->mn", a2, b2)).run();
   (c22 = matmul(a2, b2)).run();
   // example-end einsum-gemm-1
   cudaStreamSynchronize(0);
@@ -181,7 +181,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
     (b2 = ones(b2.Shape())).run(); 
 
     // Perform a GEMM of a2 * b2 and store the results transposed
-    cutensor::einsum(c2, "mk,kn->nm", 0, a2, b2);
+    (c2 = cutensor::einsum("mk,kn->nm", a2, b2)).run();
     // example-end einsum-gemm-2
     (c22 = matmul(a2, b2)).run();
     cudaStreamSynchronize(0);
@@ -205,7 +205,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
   (b = ones(b.Shape())).run();
 
   // Permute a 4D tensor. This gives the same output as Permute, but is much faster
-  cutensor::einsum(b, "ijkl->jlki", 0, a);
+  (b = cutensor::einsum("ijkl->jlki", a)).run();
   (b2 = a.Permute({1,3,2,0})).run();
   // example-end einsum-permute-1
   cudaStreamSynchronize(0);
@@ -232,7 +232,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
 
   auto b = matx::make_tensor<TypeParam>({3});
   // Sum the columns of "a"
-  matx::cutensor::einsum(b, "ij->j", 0, a);
+  (b = matx::cutensor::einsum("ij->j", a)).run();
   // example-end einsum-sum-1
     
   cudaStreamSynchronize(0);
@@ -257,7 +257,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
   (a2 = ones(a2.Shape())).run();
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
-  cutensor::einsum(c0_0, "ii->", 0, a2);
+  (c0_0 = cutensor::einsum("ii->", a2)).run();
   trace(c0_1, a2);
 
   // example-end einsum-trace-1
