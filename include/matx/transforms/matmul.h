@@ -1113,7 +1113,7 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   // the rightmost stride is !=1 or this function will be an infinite recursion.
   if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) > 1 ) {  // column major check
     // Column major
-    matmul_impl(transpose(c), transpose(b), transpose(a), stream, alpha, beta);
+    matmul_impl(transpose_matrix(c), transpose_matrix(b), transpose_matrix(a), stream, alpha, beta);
   } else 
 #endif
   {

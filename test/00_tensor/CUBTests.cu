@@ -118,7 +118,7 @@ TEST(TensorStats, Hist)
   inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
 
   // example-begin hist-test-1
-  hist(outv, inv, 0.0f, 12.0f);
+  (outv = hist(inv, 0.0f, 12.0f)).run();;
   // example-end hist-test-1
   cudaStreamSynchronize(0);
 
@@ -145,7 +145,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
   // Ascending
   // example-begin cumsum-test-1
   // Compute the cumulative sum/exclusive scan across "t1"
-  cumsum(tmpv, this->t1, this->exec);
+  (tmpv = cumsum(this->t1)).run(this->exec);
   // example-end cumsum-test-1
   cudaStreamSynchronize(0);
 
@@ -164,7 +164,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
     }
   }
 
-  cumsum(tmpv2, this->t2, this->exec);
+  (tmpv2 = cumsum(this->t2)).run(this->exec);
   cudaStreamSynchronize(0);
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
     ttl = 0;

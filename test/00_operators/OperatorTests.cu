@@ -32,6 +32,7 @@
 
 #include "assert.h"
 #include "matx.h"
+#include "matx/transforms/transpose.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -2126,7 +2127,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
   }
 
   t2t.PrefetchDevice(0);
-  transpose(t2t, t2, exec);
+  (t2t = transpose(t2)).run(exec);
 
   t2t.PrefetchHost(0);
   cudaStreamSynchronize(0);
@@ -2161,7 +2162,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, NonSquareTranspose)
     }
   }
 
-  transpose(t2t, t2, exec);
+  (t2t = transpose(t2)).run(exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count1; i++) {
@@ -2196,7 +2197,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
     }
   }
 
-  transpose(t3t, t3, exec);
+  (t3t = transpose(t3t)).run(exec);
   cudaError_t error = cudaStreamSynchronize(0);
   ASSERT_EQ(error, cudaSuccess);
 
