@@ -10,7 +10,7 @@ When writing a simple arithmetic expression like the following:
     (A = B * (cos(C) / D)).run();
 
 Using the typical order of operations rules, we evaluate the expression in parentheses first (``(cos(C) / D)``),
-followed by the multiple, then the assignment. Written using standard C++ operator overloading, we would have a 
+followed by the multiply, then the assignment. Written using standard C++ operator overloading, we would have a 
 cosine, division, multiplication, and assignment overload. Each operator performs their respective task, then returns
 the value computed. That returned value is stored somewhere (either out to memory or possible in a register), then
 the next operator uses that output as input into its own computation. Finally, the assignment writes the value, 

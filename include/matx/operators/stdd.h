@@ -35,34 +35,34 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/cub.h"
+#include "matx/transforms/reduce.h"
 
 namespace matx {
 
 
 
 namespace detail {
-  template<typename OpA>
-  class HistOp : public BaseOp<HistOp<OpA>>
+  template<typename OpA, typename PermDims>
+  class StddOp : public BaseOp<StddOp<OpA, PermDims>>
   {
     private:
+      // static constexpr int o_rank = std::is_same_v<PermDims, no_permute_t> ? 0 : 
+      //           OpA::Rank() - std::tuple_size_v<PermDims>;
+      static constexpr int o_rank = detail::permute_rank<OpA, PermDims>::rank;
+
       OpA a_;
-      typename OpA::scalar_type lower_;
-      typename OpA::scalar_type upper_;
-      std::array<index_t, OpA::Rank()> out_dims_;
-      matx::tensor_t<int, OpA::Rank()> tmp_out_;      
+      PermDims perm_;
+      std::array<index_t, o_rank> out_dims_;
+      matx::tensor_t<typename OpA::scalar_type, o_rank> tmp_out_;      
 
     public:
       using matxop = bool;
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
-      using hist_xform_op = bool;
+      using stdd_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "hist()"; }
-      __MATX_INLINE__ HistOp(OpA a, typename OpA::scalar_type lower, typename OpA::scalar_type upper) : a_(a), lower_(lower), upper_(upper) { 
-        for (int r = 0; r < Rank(); r++) {
-          out_dims_[r] = a_.Size(r);
-        }
+      __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ StddOp(OpA a, PermDims perm) : a_(a), perm_(perm) { 
       };
 
       template <typename... Is>
@@ -72,14 +72,18 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
-
-        hist_impl(std::get<0>(out), a_, lower_, upper_, ex.getStream());
+        if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+          stdd_impl(std::get<0>(out), a_, ex);
+        }
+        else {
+          auto perm = detail::getPermuteDims<OpA::Rank()>(perm_);
+          stdd_impl(std::get<0>(out), permute(a_, perm), ex);
+        }
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return OpA::Rank();
+        return o_rank;
       }
 
       template <typename ShapeType, typename Executor>
@@ -91,6 +95,9 @@ namespace detail {
 
         if constexpr (is_device_executor_v<Executor>) {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        }
+        else {
+          make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);          
         }
 
         Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
@@ -105,29 +112,46 @@ namespace detail {
 }
 
 /**
- * Compute a histogram of rows in a tensor
+ * Compute a standard deviation reduction
  *
- * Computes a histogram with the given number of levels and upper/lower limits.
- * The number of levels is one greater than the number of bins generated, and is
- * determined by the size of the last dimension of the output tensor. Each bin
- * contains elements falling within idx*(upper-lower)/a.out.Lsize(). In other
- * words, each bin is as large as the difference between the upper and lower
- * bounds and the number of bins
+ * Computes the standard deviation of the input according to the output tensor
+ * rank and size along an axis
  *
- * @tparam InputOperator
- *   Type of histogram input
- * @param a
- *   Input operator
- * @param lower
- *   Lower limit
- * @param upper
- *   Upper limit
+ * @tparam InType
+ *   Input data type
+ * @tparam D
+ *   Num of dimensions to reduce over
+ *
+ * @param in
+ *   Input data to reduce
+ * @param dims
+ *   Array containing dimensions to reduce over
  */
-template <typename InputOperator>
-__MATX_INLINE__ auto hist(const InputOperator &a,
-          const typename InputOperator::scalar_type lower,
-          const typename InputOperator::scalar_type upper) {
-  return detail::HistOp(a, lower, upper);
+template <typename InType, int D>
+__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+{
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  auto perm = detail::to_array(dims);
+
+  return detail::StddOp(in, perm);
+}
+
+/**
+ * Compute a standard deviation reduction
+ *
+ * Computes the standard deviation of the input according to the output tensor
+ * rank and size
+ *
+ * @tparam InType
+ *   Input data type
+ *
+ * @param in
+ *   Input data to reduce
+ */
+template <typename InType>
+__MATX_INLINE__ auto stdd(const InType &in)
+{
+  return detail::StddOp(in, detail::no_permute_t{});
 }
 
 }

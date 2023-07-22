@@ -3068,76 +3068,13 @@ template <typename OutType, typename InType, typename Executor, std::enable_if_t
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
-void __MATX_INLINE__ stdd(OutType dest, const InType &in, Executor &&exec)
+void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec)
 {
   MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   var(dest, in, exec, 1);
   (dest = sqrt(dest)).run(exec);
 }
 
-/**
- * Compute a standard deviation reduction
- *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
- *
- * @tparam OutType
- *   Output data type
- * @tparam InType
- *   Input data type
- *
- * @param dest
- *   Destination view of reduction
- * @param in
- *   Input data to reduce
- * @param stream
- *   CUDA stream
- */
-template <typename OutType, typename InType>
-void __MATX_INLINE__ stdd(OutType dest, const InType &in, int stream = 0)
-{
-  stdd(dest, in, cudaExecutor{stream});
-}
-
-/**
- * Compute a standard deviation reduction
- *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
- *
- * @tparam OutType
- *   Output data type
- * @tparam InType
- *   Input data type
- * @tparam D
- *   Num of dimensions to reduce over
- * @tparam Executor
- *   Executor type
- *
- * @param dest
- *   Destination view of reduction
- * @param in
- *   Input data to reduce
- * @param dims
- *   Array containing dimensions to reduce over
- * @param exec
- *   Executor to use for reduction
- */
-template <typename OutType, typename InType, int D, typename Executor>
-void __MATX_INLINE__ stdd(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
-{
-#ifdef __CUDACC__
-  MATX_NVTX_START("stdd(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
-  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
-  static_assert(OutType::Rank() + D == InType::Rank(), "reduction output rank must equal input rank minus reduction dims");
-
-  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
-
-  stdd(dest, permute(in, perm), std::forward<Executor>(exec));
-
-#endif  
-}
 
 /**
  * Computes the trace of a tensor
@@ -3161,7 +3098,7 @@ template <typename OutType, typename InType, typename Executor, std::enable_if_t
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
-void __MATX_INLINE__ trace(OutType dest, const InType &in, Executor &&exec)
+void __MATX_INLINE__ trace_impl(OutType dest, const InType &in, Executor &&exec)
 {
   MATX_NVTX_START("trace(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -3187,7 +3124,7 @@ void __MATX_INLINE__ trace(OutType dest, const InType &in, Executor &&exec)
  *   CUDA stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ trace(OutType dest, const InType &in, int stream = 0)
+void __MATX_INLINE__ trace_impl(OutType dest, const InType &in, int stream = 0)
 {
   return trace(dest, in, cudaExecutor{stream});
 }

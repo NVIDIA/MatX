@@ -215,6 +215,8 @@ struct is_matx_op_lvalue_impl<T, std::void_t<typename T::matxoplvalue>> : std::t
 };
 }
 
+
+
 /**
  * @brief Determine if a type is a left hand side operator
  * 
@@ -852,6 +854,16 @@ struct no_permute_t{};
 
 struct fft_t{};
 struct ifft_t{};
+
+template <typename T1, typename T2>
+struct permute_rank {
+  static const int rank = T1::Rank() - std::tuple_size_v<T2>;
+};
+
+template <typename T1>
+struct permute_rank<T1, no_permute_t> {
+  static const int rank = 0;
+};  
 
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes
