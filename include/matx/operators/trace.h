@@ -43,26 +43,20 @@ namespace matx {
 
 namespace detail {
   template<typename OpA>
-  class HistOp : public BaseOp<HistOp<OpA>>
+  class TraceOp : public BaseOp<TraceOp<OpA>>
   {
     private:
       OpA a_;
-      typename OpA::scalar_type lower_;
-      typename OpA::scalar_type upper_;
-      std::array<index_t, OpA::Rank()> out_dims_;
-      matx::tensor_t<int, OpA::Rank()> tmp_out_;      
+      matx::tensor_t<typename OpA::scalar_type, 0> tmp_out_;      
 
     public:
       using matxop = bool;
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
-      using hist_xform_op = bool;
+      using trace_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "hist()"; }
-      __MATX_INLINE__ HistOp(OpA a, typename OpA::scalar_type lower, typename OpA::scalar_type upper) : a_(a), lower_(lower), upper_(upper) { 
-        for (int r = 0; r < Rank(); r++) {
-          out_dims_[r] = a_.Size(r);
-        }
+      __MATX_INLINE__ std::string str() const { return "trace()"; }
+      __MATX_INLINE__ TraceOp(OpA a) : a_(a) { 
       };
 
       template <typename... Is>
@@ -72,14 +66,12 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
-
-        hist_impl(std::get<0>(out), a_, lower_, upper_, ex.getStream());
+        trace_impl(std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return OpA::Rank();
+        return 0;
       }
 
       template <typename ShapeType, typename Executor>
@@ -90,7 +82,10 @@ namespace detail {
         }     
 
         if constexpr (is_device_executor_v<Executor>) {
-          make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+          make_tensor(tmp_out_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        }
+        else {
+          make_tensor(tmp_out_, MATX_HOST_MEMORY);          
         }
 
         Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
@@ -98,36 +93,26 @@ namespace detail {
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return out_dims_[dim];
+        return 1;
       }
 
   };
 }
 
 /**
- * Compute a histogram of rows in a tensor
+ * Computes the trace of a tensor
  *
- * Computes a histogram with the given number of levels and upper/lower limits.
- * The number of levels is one greater than the number of bins generated, and is
- * determined by the size of the last dimension of the output tensor. Each bin
- * contains elements falling within idx*(upper-lower)/a.out.Lsize(). In other
- * words, each bin is as large as the difference between the upper and lower
- * bounds and the number of bins
+ * Computes the trace of a square matrix by summing the diagonal
  *
  * @tparam InputOperator
- *   Type of histogram input
+ *   Input data type
+ *
  * @param a
- *   Input operator
- * @param lower
- *   Lower limit
- * @param upper
- *   Upper limit
+ *   Input data to reduce
  */
 template <typename InputOperator>
-__MATX_INLINE__ auto hist(const InputOperator &a,
-          const typename InputOperator::scalar_type lower,
-          const typename InputOperator::scalar_type upper) {
-  return detail::HistOp(a, lower, upper);
+__MATX_INLINE__ auto trace(const InputOperator &a) {
+  return detail::TraceOp(a);
 }
 
 }

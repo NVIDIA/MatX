@@ -161,8 +161,11 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
   }
 }
 
-template <int RANK, int D>
-auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+
+
+template <int RANK, typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type>, bool> = true>
+auto __MATX_INLINE__ getPermuteDims(T dims) {
+  constexpr auto D = dims.size();
   std::array<int, RANK> perm;
   std::array<bool, RANK> visited;
 
@@ -190,6 +193,11 @@ auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
   }
 
   return perm;
+}
+
+template <int RANK, int D>
+auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+  return getPermuteDims<RANK>(detail::to_array(dims));
 }
 
 };

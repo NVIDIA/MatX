@@ -144,7 +144,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, VarianceStd)
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);  
 
   // example-begin stdd-test-1
-  stdd(t0, t1, exec);
+  (t0 = stdd(t1)).run(exec);
   // example-end stdd-test-1
   MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
 
@@ -174,7 +174,7 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
   var(t0, t1, exec, 0);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);    
 
-  stdd(t0, t1, exec);
+  (t0 = stdd(t1)).run(exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
 
   MATX_EXIT_HANDLER();
@@ -563,8 +563,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   if constexpr (!is_complex_v<TestType>)
   {
-    stdd(t2a, permute(t4,{2,3,0,1}), exec);
-    stdd(t2b, t4, {0,1}, exec);
+    (t2a = stdd(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = stdd(t4, {0,1})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -1205,7 +1205,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
   auto t0 = make_tensor<TestType>();
 
   (t2 = ones<TestType>(t2.Shape())).run(exec);
-  trace(t0, t2, exec);
+  (t0 = trace(t2)).run(exec);
   // example-end trace-test-1
 
   cudaDeviceSynchronize();

@@ -258,7 +258,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   (c0_0 = cutensor::einsum("ii->", a2)).run();
-  trace(c0_1, a2);
+  (c0_1 = trace(a2)).run();
 
   // example-end einsum-trace-1
   cudaStreamSynchronize(0);
