@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
 
 namespace matx {
@@ -42,27 +43,22 @@ namespace matx {
 
 
 namespace detail {
-  template<typename OpA, typename PermDims>
-  class StddOp : public BaseOp<StddOp<OpA, PermDims>>
+  template<typename OpA, int ORank>
+  class StddOp : public BaseOp<StddOp<OpA, ORank>>
   {
     private:
-      // static constexpr int o_rank = std::is_same_v<PermDims, no_permute_t> ? 0 : 
-      //           OpA::Rank() - std::tuple_size_v<PermDims>;
-      static constexpr int o_rank = detail::permute_rank<OpA, PermDims>::rank;
-
       OpA a_;
-      PermDims perm_;
-      std::array<index_t, o_rank> out_dims_;
-      matx::tensor_t<typename OpA::scalar_type, o_rank> tmp_out_;      
+      std::array<index_t, ORank> out_dims_;
+      matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;      
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
       using stdd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(OpA a, PermDims perm) : a_(a), perm_(perm) { 
+      __MATX_INLINE__ StddOp(OpA a) : a_(a) { 
       };
 
       template <typename... Is>
@@ -72,18 +68,12 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-          stdd_impl(std::get<0>(out), a_, ex);
-        }
-        else {
-          auto perm = detail::getPermuteDims<OpA::Rank()>(perm_);
-          stdd_impl(std::get<0>(out), permute(a_, perm), ex);
-        }
+        stdd_impl(std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return o_rank;
+        return ORank;
       }
 
       template <typename ShapeType, typename Executor>
@@ -131,9 +121,9 @@ template <typename InType, int D>
 __MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
-  auto perm = detail::to_array(dims);
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
-  return detail::StddOp(in, perm);
+  return detail::StddOp<decltype(in), InType::Rank() - D>(permute(in, perm));
 }
 
 /**
@@ -151,7 +141,7 @@ __MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
 template <typename InType>
 __MATX_INLINE__ auto stdd(const InType &in)
 {
-  return detail::StddOp(in, detail::no_permute_t{});
+  return detail::StddOp<decltype(in), 0>(in);
 }
 
 }

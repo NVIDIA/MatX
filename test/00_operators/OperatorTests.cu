@@ -2197,7 +2197,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
     }
   }
 
-  (t3t = transpose(t3t)).run(exec);
+  (t3t = transpose_matrix(t3t)).run(exec);
   cudaError_t error = cudaStreamSynchronize(0);
   ASSERT_EQ(error, cudaSuccess);
 
