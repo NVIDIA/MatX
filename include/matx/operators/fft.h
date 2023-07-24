@@ -161,10 +161,12 @@ namespace matx
    *   input tensor or operator
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto fft(OpA &&a, uint64_t fft_size = 0) {
-    return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::fft_t{});
+  __MATX_INLINE__ auto fft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = BACKWARD) {
+    return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::fft_t{}, norm);
   }
 
   /**
@@ -184,12 +186,14 @@ namespace matx
    *   axis to perform FFT along
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0) {
+  __MATX_INLINE__ auto fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = BACKWARD) {
 
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFTOp(a, fft_size, perm, detail::fft_t{});
+    return detail::FFTOp(a, fft_size, perm, detail::fft_t{}, norm);
   }
 
   /**
@@ -208,10 +212,12 @@ namespace matx
    *   input tensor or operator
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft(OpA &&a, uint64_t fft_size = 0) {
-    return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::ifft_t{});
+  __MATX_INLINE__ auto ifft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = BACKWARD) {
+    return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::ifft_t{}, norm);
   }
 
   /**
@@ -231,11 +237,13 @@ namespace matx
    *   axis to perform FFT along
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0) {
+  __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFTOp(a, fft_size, perm, detail::ifft_t{});
+    return detail::FFTOp(a, fft_size, perm, detail::ifft_t{}, norm);
   }  
 
 
