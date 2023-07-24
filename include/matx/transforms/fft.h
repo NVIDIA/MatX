@@ -802,10 +802,43 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
 
 } // end namespace detail
 
+enum class FFTNorm {
+  BACKWARD, /// fft is unscaled, ifft is 1/N
+  FORWARD, /// fft is scaled 1/N, ifft is not scaled
+  ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
+};
 
+/**
+ * Run a 1D FFT with a cached plan
+ *
+ * Creates a new FFT plan in the cache if none exists, and uses that to execute
+ * the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions
+ * match
+ *
+ * @tparam OutputTensor
+ *   Output tensor or operator type
+ * @tparam InputTensor
+ *   Input tensor or operator type
+ * @param o
+ *   Output tensor or operator. The length of the fastest-changing dimension dictates the
+ * size of FFT. If this size is longer than the length of the input tensor, the
+ * tensor will potentially be copied and zero-padded to a new block of memory.
+ * Future releases may remove this restriction to where there is no copy.
+ * 
+ * Note: fft_size must be unsigned so that the axis overload does not match both 
+ * prototypes with index_t. 
+ * @param i
+ *   input tensor or operator
+ * @param fft_size
+ *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+ * @param norm
+ *   Normalization to apply to IFFT
+ * @param stream
+ *   CUDA stream
+ */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-         uint64_t fft_size = 0, cudaStream_t stream = 0)
+         uint64_t fft_size = 0, FFTNorm norm = BACKWARD, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
@@ -824,6 +857,15 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   // currently will result in an extra allocation/transfer when using fft_size to grow
   // adjusts size of tensor based on fft_size
   auto in = detail::GetFFTInputView(out, in_t, fft_size, stream);
+
+  // Normalize input if necessary
+  using input_type = decltype(in_t);
+  using scalar_type = typename inner_op_type_t<typename input_type::scalar_type>;
+  if (norm == ORTHO) {
+    (in *= std::sqrt(scalar_type(fft_size))).run(stream);
+  } else if (norm == FORWARD) {
+    (in /= scalar_type(fft_size)).run(stream);
+  }
 
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
@@ -847,11 +889,9 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 }
 
 
-
-
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size = 0, cudaStream_t stream = 0)
+          uint64_t fft_size = 0, FFTNorm norm = BACKWARD, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
@@ -869,6 +909,15 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   // TODO should combine into function above
   // adjusts size of tensor based on fft_size
   auto in = detail::GetFFTInputView(out, in_t, fft_size, stream);
+
+  // Normalize input if necessary
+  using input_type = decltype(in_t);
+  using scalar_type = typename inner_op_type_t<typename input_type::scalar_type>;
+  if (norm == ORTHO) {
+    (in *= std::sqrt(scalar_type(fft_size))).run(stream);
+  } else if (norm == FORWARD) {
+    (in *= scalar_type(fft_size)).run(stream);
+  }
 
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
@@ -890,7 +939,6 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
     (o = out).run(stream);
   }
 }
-
 
 
 /**
