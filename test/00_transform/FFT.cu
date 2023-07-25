@@ -103,8 +103,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1DFWD1024C2C)
   tensor_t<TypeParam, 1> avo{{fft_dim}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  // example-begin fft-1
-  // Perform a 1D FFT from input av into output avo. Input and output sizes will be deduced by the
+  // example-begin fft-1-fwd
+  // Perform a 1D FFT from input av into output avo with FORWARD scaling (1/N). Input and output sizes will be deduced by the
   // type of the tensors and output size.
   fft(avo, av, fft_dim, 0, FORWARD);
   // example-end fft-1
@@ -126,7 +126,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1DORTHO1024C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   // example-begin fft-1
-  // Perform a 1D FFT from input av into output avo. Input and output sizes will be deduced by the
+  // Perform a 1D FFT from input av into output avo with ORTHO scaling (1/sqrt(N)). Input and output sizes will be deduced by the
   // type of the tensors and output size.
   fft(avo, av, fft_dim, 0, ORTHO);
   // example-end fft-1
