@@ -12,7 +12,7 @@ getri/getrf functions for LU decomposition.
 .. note::
    This function is currently is not supported with host-based executors (CPU)
 
-.. doxygenfunction:: inv(TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream = 0)
+.. doxygenfunction:: inv(const OpA &a)
 
 Examples
 ~~~~~~~~

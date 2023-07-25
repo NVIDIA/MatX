@@ -5,9 +5,8 @@ stdd
 
 Compute the standard deviation of a tensor. The name `stdd` is used to avoid confliction with the use of the C++ standard library
 
-.. doxygenfunction:: matx::stdd(OutType dest, const InType &in, Executor &&exec)
-.. doxygenfunction:: matx::stdd(OutType dest, const InType &in, int stream = 0)
-.. doxygenfunction:: matx::stdd(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
+.. doxygenfunction:: stdd(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: stdd(const InType &in)
 
 Examples
 ~~~~~~~~

@@ -5,8 +5,7 @@ sort
 
 Sort elements of a tensor in either ascending or descending order
 
-.. doxygenfunction:: sort(OutputTensor &a_out, const InputOperator &a, const SortDirection_t dir, cudaExecutor exec = 0)
-.. doxygenfunction:: sort(OutputTensor &a_out, const InputOperator &a, const SortDirection_t dir, SingleThreadHostExecutor exec)
+.. doxygenfunction:: sort(const InputOperator &a, const SortDirection_t dir)
 
 Examples
 ~~~~~~~~

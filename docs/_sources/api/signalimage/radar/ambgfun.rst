@@ -5,8 +5,8 @@ ambgfun
 
 Ambiguity function
 
-.. doxygenfunction:: ambgfun(AMFTensor &amf, XTensor &x, YTensor &y, double fs, AMBGFunCutType_t cut, float cut_val = 0.0, cudaStream_t stream = 0)
-.. doxygenfunction:: ambgfun(AMFTensor &amf, XTensor &x, double fs, AMBGFunCutType_t cut, float cut_val = 0.0, cudaStream_t stream = 0)
+.. doxygenfunction:: ambgfun(XTensor &x, YTensor &y, double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
+.. doxygenfunction:: ambgfun(XTensor &x, double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
 
 Examples
 ~~~~~~~~

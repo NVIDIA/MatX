@@ -132,6 +132,7 @@
 <li class="toctree-l2"><a class="reference internal" href="basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/print.html">Printing</a></li>
@@ -163,7 +164,6 @@
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -180,10 +180,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="api/manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="api/manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -565,19 +567,19 @@ document.write(`
 </li>
       <li><a href="api/math/trig/acosh.html#_CPPv4N4matx5acoshE2Op">matx::acosh (C++ function)</a>
 </li>
-      <li><a href="api/logic/truth/all.html#_CPPv4I00EN4matx3allEv7OutTypeRK6InType12cudaExecutor">matx::all (C++ function)</a>, <a href="api/logic/truth/all.html#_CPPv4I00EN4matx3allEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/logic/truth/all.html#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/logic/truth/all.html#_CPPv4I0EN4matx3allEDaRK6InType">matx::all (C++ function)</a>, <a href="api/logic/truth/all.html#_CPPv4I0_iEN4matx3allEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
       <li><a href="api/creation/operators/alternate.html#_CPPv4I0EN4matx9alternateEDaK7index_t">matx::alternate (C++ function)</a>
 </li>
-      <li><a href="api/signalimage/radar/ambgfun.html#_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t">matx::ambgfun (C++ function)</a>, <a href="api/signalimage/radar/ambgfun.html#_CPPv4I00EN4matx7ambgfunEvR9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t">[1]</a>
+      <li><a href="api/signalimage/radar/ambgfun.html#_CPPv4I00EN4matx7ambgfunEDaR7XTensorR7YTensord16AMBGFunCutType_tf">matx::ambgfun (C++ function)</a>, <a href="api/signalimage/radar/ambgfun.html#_CPPv4I0EN4matx7ambgfunEDaR7XTensord16AMBGFunCutType_tf">[1]</a>
 </li>
       <li><a href="api/math/complex/angle.html#_CPPv4N4matx5angleE2Op">matx::angle (C++ function)</a>
 </li>
-      <li><a href="api/logic/truth/any.html#_CPPv4I00EN4matx3anyEv7OutTypeRK6InType12cudaExecutor">matx::any (C++ function)</a>, <a href="api/logic/truth/any.html#_CPPv4I00EN4matx3anyEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/logic/truth/any.html#_CPPv4I00_i0EN4matx3anyEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/logic/truth/any.html#_CPPv4I0EN4matx3anyEDaRK6InType">matx::any (C++ function)</a>, <a href="api/logic/truth/any.html#_CPPv4I0_iEN4matx3anyEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/searchsort/argmax.html#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor">matx::argmax (C++ function)</a>, <a href="api/searchsort/argmax.html#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/searchsort/argmax.html#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/searchsort/argmax.html#_CPPv4I0EN4matx6argmaxEDaRK6InType">matx::argmax (C++ function)</a>, <a href="api/searchsort/argmax.html#_CPPv4I0_iEN4matx6argmaxEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/searchsort/argmin.html#_CPPv4I000EN4matx6argminEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor">matx::argmin (C++ function)</a>, <a href="api/searchsort/argmin.html#_CPPv4I000EN4matx6argminEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/searchsort/argmin.html#_CPPv4I000_i0EN4matx6argminEv7OutTypeR15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/searchsort/argmin.html#_CPPv4I0EN4matx6argminEDaRK6InType">matx::argmin (C++ function)</a>, <a href="api/searchsort/argmin.html#_CPPv4I0_iEN4matx6argminEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
       <li><a href="api/casting/as_double.html#_CPPv4I0EN4matx9as_doubleEDa1T">matx::as_double (C++ function)</a>
 </li>
@@ -615,11 +617,11 @@ document.write(`
 </li>
       <li><a href="api/math/round/ceil.html#_CPPv4N4matx4ceilE2Op">matx::ceil (C++ function)</a>
 </li>
-      <li><a href="api/linalg/other/cgsolve.html#_CPPv4I000EN4matx7cgsolveEv5XType5AType5BTypedi12cudaStream_t">matx::cgsolve (C++ function)</a>
+      <li><a href="api/linalg/other/cgsolve.html#_CPPv4I00EN4matx7cgsolveEDa5AType5BTypedi">matx::cgsolve (C++ function)</a>
 </li>
       <li><a href="api/signalimage/general/chirp.html#_CPPv4I00EN4matx5chirpEDa7SpaceOp8FreqTypeN7SpaceOp11scalar_typeE8FreqType11ChirpMethod">matx::chirp (C++ function)</a>, <a href="api/signalimage/general/chirp.html#_CPPv4I00EN4matx5chirpEDa7index_t8TimeType8FreqType8TimeType8FreqType11ChirpMethod">[1]</a>
 </li>
-      <li><a href="api/linalg/decomp/chol.html#_CPPv4I00EN4matx4cholEvR12OutputTensorRK7ATensor12cudaStream_t16cublasFillMode_t">matx::chol (C++ function)</a>
+      <li><a href="api/linalg/decomp/chol.html#_CPPv4I0EN4matx4cholEDaRK3OpA16cublasFillMode_t">matx::chol (C++ function)</a>
 </li>
       <li><a href="api/manipulation/joinrepeat/clone.html#_CPPv4I_NSt6size_tE0EN4matx5cloneEDa2OpRKNSt5arrayI7index_t4RankEE">matx::clone (C++ function)</a>, <a href="api/manipulation/joinrepeat/clone.html#_CPPv4I_i0EN4matx5cloneEDa2OpRA4Rank_K7index_t">[1]</a>
 </li>
@@ -627,25 +629,25 @@ document.write(`
 </li>
       <li><a href="api/math/complex/conj.html#_CPPv4N4matx4conjE2Op">matx::conj (C++ function)</a>
 </li>
-      <li><a href="api/signalimage/convolution/conv1d.html#_CPPv4I000EN4matx6conv1dEv10OutputTypeRK7In1TypeRK7In2Type18matxConvCorrMode_t12cudaStream_t">matx::conv1d (C++ function)</a>, <a href="api/signalimage/convolution/conv1d.html#_CPPv4I000EN4matx6conv1dEv10OutputTypeRK7In1TypeRK7In2TypeRAL1E_K7int32_t18matxConvCorrMode_t12cudaStream_t">[1]</a>
+      <li><a href="api/signalimage/convolution/conv1d.html#_CPPv4I00EN4matx6conv1dEDaRK7In1TypeRK7In2Type18matxConvCorrMode_t">matx::conv1d (C++ function)</a>, <a href="api/signalimage/convolution/conv1d.html#_CPPv4I00EN4matx6conv1dEDaRK7In1TypeRK7In2TypeRAL1E_K7int32_t18matxConvCorrMode_t">[1]</a>
 </li>
-      <li><a href="api/signalimage/convolution/conv2d.html#_CPPv4I000EN4matx6conv2dEv10OutputTypeK7In1TypeK7In2Type18matxConvCorrMode_t12cudaStream_t">matx::conv2d (C++ function)</a>, <a href="api/signalimage/convolution/conv2d.html#_CPPv4I000EN4matx6conv2dEvR10OutputTypeRK7In1TypeRK7In2TypeRAL2E_K7int32_t18matxConvCorrMode_t12cudaStream_t">[1]</a>
+      <li><a href="api/signalimage/convolution/conv2d.html#_CPPv4I00EN4matx6conv2dEDaRK7In1TypeRK7In2Type18matxConvCorrMode_t">matx::conv2d (C++ function)</a>, <a href="api/signalimage/convolution/conv2d.html#_CPPv4I00EN4matx6conv2dEDaRK7In1TypeRK7In2TypeRAL2E_K7int32_t18matxConvCorrMode_t">[1]</a>
 </li>
       <li><a href="api/manipulation/basic/copy.html#_CPPv4I000EN4matx4copyEvR12OutputTensorRK11InputTensor8Executor">matx::copy (C++ function)</a>, <a href="api/manipulation/basic/copy.html#_CPPv4I00EN4matx4copyE6TensorRK6Tensor8Executor">[1]</a>, <a href="api/manipulation/basic/copy.html#_CPPv4I00EN4matx4copyEvR12OutputTensorRK11InputTensor12cudaStream_t">[2]</a>, <a href="api/manipulation/basic/copy.html#_CPPv4I0EN4matx4copyE6TensorRK6Tensor12cudaStream_t">[3]</a>
 </li>
-      <li><a href="api/stats/corr/corr.html#_CPPv4I000EN4matx4corrEv12OutputTensorK7In1TypeK7In2Type18matxConvCorrMode_t20matxConvCorrMethod_t12cudaStream_t">matx::corr (C++ function)</a>, <a href="api/stats/corr/corr.html#_CPPv4I000EN4matx4corrEv12OutputTensorK7In1TypeK7In2TypeRAL1E_K7int32_t18matxConvCorrMode_t20matxConvCorrMethod_t12cudaStream_t">[1]</a>
+      <li><a href="api/stats/corr/corr.html#_CPPv4I00EN4matx4corrEDaRK7In1TypeRK7In2Type18matxConvCorrMode_t20matxConvCorrMethod_t">matx::corr (C++ function)</a>, <a href="api/stats/corr/corr.html#_CPPv4I00EN4matx4corrEDaRK7In1TypeRK7In2TypeRAL1E_K7int32_t18matxConvCorrMode_t20matxConvCorrMethod_t">[1]</a>
 </li>
       <li><a href="api/math/trig/cos.html#_CPPv4N4matx3cosE2Op">matx::cos (C++ function)</a>
 </li>
       <li><a href="api/math/trig/cosh.html#_CPPv4N4matx4coshE2Op">matx::cosh (C++ function)</a>
 </li>
-      <li><a href="api/stats/corr/cov.html#_CPPv4I00EN4matx3covEvR11TensorTypeCRK11TensorTypeA12cudaStream_t">matx::cov (C++ function)</a>
+      <li><a href="api/stats/corr/cov.html#_CPPv4I0EN4matx3covEDa5AType">matx::cov (C++ function)</a>
 </li>
-      <li><a href="api/math/sumprod/cumsum.html#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK13InputOperator12cudaExecutor">matx::cumsum (C++ function)</a>, <a href="api/math/sumprod/cumsum.html#_CPPv4I00EN4matx6cumsumEvR12OutputTensorRK13InputOperator24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/math/sumprod/cumsum.html#_CPPv4I0EN4matx6cumsumEDaRK13InputOperator">matx::cumsum (C++ function)</a>
 </li>
-      <li><a href="api/linalg/decomp/qr.html#_CPPv4I000EN4matx11cusolver_qrEvR9OutTensorR9TauTensorRK7ATensor12cudaStream_t">matx::cusolver_qr (C++ function)</a>
+      <li><a href="api/linalg/decomp/qr.html#_CPPv4I0EN4matx11cusolver_qrEDaRK3OpA">matx::cusolver_qr (C++ function)</a>
 </li>
-      <li><a href="api/linalg/matvec/einsum.html#_CPPv4I0DpEN4matx8cutensor6einsumEvR10OutputTypeRKNSt6stringE12cudaStream_tDp3InT">matx::cutensor::einsum (C++ function)</a>
+      <li><a href="api/linalg/matvec/einsum.html#_CPPv4IDpEN4matx8cutensor6einsumEDaRKNSt6stringEDp3InT">matx::cutensor::einsum (C++ function)</a>
 </li>
       <li><a href="api/dft/dct/dct.html#_CPPv4I00EN4matx3dctEvR12OutputTensorRK11InputTensorK12cudaStream_t">matx::dct (C++ function)</a>
 </li>
@@ -653,7 +655,7 @@ document.write(`
 </li>
       <li><a href="api/signalimage/general/downsample.html#_CPPv4I0EN4matx10downsampleEDaRK1T7int32_t7index_t">matx::downsample (C++ function)</a>
 </li>
-      <li><a href="api/linalg/eigenvalues/eig.html#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t">matx::eig (C++ function)</a>
+      <li><a href="api/linalg/eigenvalues/eig.html#_CPPv4I0EN4matx3eigEDaRK3OpA17cusolverEigMode_t16cublasFillMode_t">matx::eig (C++ function)</a>
 </li>
       <li><a href="basics/nvtx.html#_CPPv4N4matx8endEventEi">matx::endEvent (C++ function)</a>
 </li>
@@ -663,9 +665,9 @@ document.write(`
 </li>
       <li><a href="api/creation/operators/eye.html#_CPPv4I00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx3eyeEDaRR9ShapeType">matx::eye (C++ function)</a>, <a href="api/creation/operators/eye.html#_CPPv4I0_iEN4matx3eyeEDaRA4RANK_K7index_t">[1]</a>
 </li>
-      <li><a href="api/dft/fft/fft.html#_CPPv4I00EN4matx3fftEv12OutputTensorK11InputTensor8uint64_t12cudaStream_t">matx::fft (C++ function)</a>, <a href="api/dft/fft/fft.html#_CPPv4I00EN4matx3fftEv12OutputTensorK11InputTensorRAL1E_K7int32_t8uint64_t12cudaStream_t">[1]</a>
+      <li><a href="api/dft/fft/fft.html#_CPPv4I0EN4matx3fftEDaRR3OpA8uint64_t">matx::fft (C++ function)</a>, <a href="api/dft/fft/fft.html#_CPPv4I0EN4matx3fftEDaRR3OpARAL1E_K7int32_t8uint64_t">[1]</a>
 </li>
-      <li><a href="api/dft/fft/fft2d.html#_CPPv4I00EN4matx4fft2Ev12OutputTensorK11InputTensor12cudaStream_t">matx::fft2 (C++ function)</a>, <a href="api/dft/fft/fft2d.html#_CPPv4I00EN4matx4fft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t">[1]</a>
+      <li><a href="api/dft/fft/fft2d.html#_CPPv4I0EN4matx4fft2EDaRR3OpA">matx::fft2 (C++ function)</a>, <a href="api/dft/fft/fft2d.html#_CPPv4I0EN4matx4fft2EDaRR3OpARAL2E_K7int32_t">[1]</a>
 </li>
       <li><a href="api/dft/utility/fftfreq.html#_CPPv4I0EN4matx7fftfreqEDa7index_tf">matx::fftfreq (C++ function)</a>
 </li>
@@ -673,11 +675,11 @@ document.write(`
 </li>
       <li><a href="api/dft/utility/fftshift2d.html#_CPPv4I0EN4matx10fftshift2DEDa2T1">matx::fftshift2D (C++ function)</a>
 </li>
-      <li><a href="api/signalimage/filtering/filter.html#_CPPv4I_6size_t_6size_t000EN4matx6filterEvR7OutTypeRK6InTypeKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE12cudaStream_t">matx::filter (C++ function)</a>
+      <li><a href="api/signalimage/filtering/filter.html#_CPPv4I0_6size_t_6size_t0EN4matx6filterEDaRK3OpAKNSt5arrayI10FilterType2NREEKNSt5arrayI10FilterType3NNREE">matx::filter (C++ function)</a>
 </li>
-      <li><a href="api/searchsort/find.html#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor">matx::find (C++ function)</a>, <a href="api/searchsort/find.html#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/searchsort/find.html#_CPPv4I00EN4matx4findEDaRK3OpA10SelectType">matx::find (C++ function)</a>
 </li>
-      <li><a href="api/searchsort/findidx.html#_CPPv4I0000EN4matx8find_idxEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor">matx::find_idx (C++ function)</a>, <a href="api/searchsort/findidx.html#_CPPv4I0000EN4matx8find_idxEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/searchsort/findidx.html#_CPPv4I00EN4matx8find_idxEDaRK3OpA10SelectType">matx::find_idx (C++ function)</a>
 </li>
       <li><a href="api/manipulation/joinrepeat/flatten.html#_CPPv4I0EN4matx7flattenEDaRK2T1">matx::flatten (C++ function)</a>
 </li>
@@ -697,15 +699,15 @@ document.write(`
 </li>
       <li><a href="api/math/complex/hermitiant.html#_CPPv4I0EN4matx10hermitianTEDa2T1">matx::hermitianT (C++ function)</a>
 </li>
-      <li><a href="api/stats/hist/hist.html#_CPPv4I00EN4matx4histEvR12OutputTensorRK13InputOperatorKN13InputOperator11scalar_typeEKN13InputOperator11scalar_typeEK12cudaStream_t">matx::hist (C++ function)</a>
+      <li><a href="api/stats/hist/hist.html#_CPPv4I0EN4matx4histEDaRK13InputOperatorKN13InputOperator11scalar_typeEKN13InputOperator11scalar_typeE">matx::hist (C++ function)</a>
 </li>
       <li><a href="api/manipulation/basic/if.html#_CPPv4I00EN4matx2IFEDa2T12T2">matx::IF (C++ function)</a>
 </li>
       <li><a href="api/manipulation/basic/ifelse.html#_CPPv4I000EN4matx6IFELSEE">matx::IFELSE (C++ class)</a>
 </li>
-      <li><a href="api/dft/fft/ifft.html#_CPPv4I00EN4matx4ifftEv12OutputTensorK11InputTensor8uint64_t12cudaStream_t">matx::ifft (C++ function)</a>, <a href="api/dft/fft/ifft.html#_CPPv4I00EN4matx4ifftEv12OutputTensorK11InputTensorRAL1E_Ki8uint64_t12cudaStream_t">[1]</a>
+      <li><a href="api/dft/fft/ifft.html#_CPPv4I0EN4matx4ifftEDaRR3OpA8uint64_t">matx::ifft (C++ function)</a>, <a href="api/dft/fft/ifft.html#_CPPv4I0EN4matx4ifftEDaRR3OpARAL1E_K7int32_t8uint64_t">[1]</a>
 </li>
-      <li><a href="api/dft/fft/ifft2.html#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensor12cudaStream_t">matx::ifft2 (C++ function)</a>, <a href="api/dft/fft/ifft2.html#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t">[1]</a>
+      <li><a href="api/dft/fft/ifft2.html#_CPPv4I0EN4matx5ifft2EDaRR3OpA">matx::ifft2 (C++ function)</a>, <a href="api/dft/fft/ifft2.html#_CPPv4I0EN4matx5ifft2EDaRR3OpARAL2E_K7int32_t">[1]</a>
 </li>
       <li><a href="api/dft/utility/ifftshift1d.html#_CPPv4I0EN4matx11ifftshift1DEDa2T1">matx::ifftshift1D (C++ function)</a>
 </li>
@@ -713,7 +715,7 @@ document.write(`
 </li>
       <li><a href="api/math/complex/imag.html#_CPPv4N4matx4imagE2Op">matx::imag (C++ function)</a>
 </li>
-      <li><a href="api/linalg/decomp/inverse.html#_CPPv4I00_16MatInverseAlgo_tEN4matx3invEvR14TensorTypeAInvRK11TensorTypeA12cudaStream_t">matx::inv (C++ function)</a>
+      <li><a href="api/linalg/decomp/inverse.html#_CPPv4I0_16MatInverseAlgo_tEN4matx3invEDaRK3OpA">matx::inv (C++ function)</a>
 </li>
       <li><a href="api/io/read_csv.html#_CPPv4I0EN4matx2io8read_csvEvR10TensorTypeKNSt6stringEKNSt6stringEb">matx::io::read_csv (C++ function)</a>
 </li>
@@ -771,13 +773,13 @@ document.write(`
 </li>
       <li><a href="api/creation/operators/logspace.html#_CPPv4I_i00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx8logspaceEDaRR9ShapeType1T1T">matx::logspace (C++ function)</a>, <a href="api/creation/operators/logspace.html#_CPPv4I_i_i0EN4matx8logspaceEDaRA4RANK_K7index_t1T1T">[1]</a>
 </li>
-      <li><a href="api/linalg/decomp/lu.html#_CPPv4I000EN4matx2luEvR12OutputTensorR11PivotTensorRK7ATensorK12cudaStream_t">matx::lu (C++ function)</a>
+      <li><a href="api/linalg/decomp/lu.html#_CPPv4I0EN4matx2luEDaRK3OpA">matx::lu (C++ function)</a>
 </li>
-      <li><a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tI20is_matx_descriptor_vIN12remove_cvrefI1DE4typeEEbEEEN4matx11make_tensorEDaPC1TRR1Db">matx::make_tensor (C++ function)</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tI20is_matx_descriptor_vIN12remove_cvrefI1DE4typeEEbEEEN4matx11make_tensorEDaRR1D17matxMemorySpace_t12cudaStream_t">[1]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaa17is_matx_storage_vI7StorageEaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaRR7StorageRR9ShapeType">[2]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant15is_matx_shape_vI9ShapeTypeEaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaRR9ShapeType17matxMemorySpace_t12cudaStream_t">[3]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaP1TRR9ShapeTypeb">[4]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0EN4matx11make_tensorEDa17matxMemorySpace_t12cudaStream_t">[5]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0EN4matx11make_tensorEDaP1Tb">[6]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorType17matxMemorySpace_t12cudaStream_t">[7]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePCN10TensorType11scalar_typeERAclN10TensorType4RankEE_K7index_tRAclN10TensorType4RankEE_K7index_tb">[8]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePCN10TensorType11scalar_typeERRN10TensorType9desc_typeEb">[9]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeERAclN10TensorType4RankEE_K7index_tb">[10]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeERRN10TensorType15shape_containerEb">[11]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeEb">[12]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypeRRN10TensorType12storage_typeERRN10TensorType15shape_containerE">[13]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypeRRN10TensorType15shape_containerE17matxMemorySpace_t12cudaStream_t">[14]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaRR10TensorTypeRRN10TensorType9desc_typeE17matxMemorySpace_t12cudaStream_t">[15]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEvR10TensorTypeRAclN10TensorType4RankEE_K7index_t17matxMemorySpace_t12cudaStream_t">[16]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaP1TRA4RANK_K7index_tb">[17]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaPC1TRA4RANK_K7index_tRA4RANK_K7index_tb">[18]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaRA4RANK_K7index_t17matxMemorySpace_t12cudaStream_t">[19]</a>
+      <li><a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tI20is_matx_descriptor_vIN12remove_cvrefI1DE4typeEEbEEEN4matx11make_tensorEDaPC1TRR1Db">matx::make_tensor (C++ function)</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tI20is_matx_descriptor_vIN12remove_cvrefI1DE4typeEEbEEEN4matx11make_tensorEDaRR1D17matxMemorySpace_t12cudaStream_t">[1]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaa16is_tensor_view_vI10TensorTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaR10TensorTypeRR9ShapeType17matxMemorySpace_t12cudaStream_t">[2]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaa17is_matx_storage_vI7StorageEaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaRR7StorageRR9ShapeType">[3]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant15is_matx_shape_vI9ShapeTypeEaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaRR9ShapeType17matxMemorySpace_t12cudaStream_t">[4]</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx11make_tensorEDaP1TRR9ShapeTypeb">[5]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0EN4matx11make_tensorEDa17matxMemorySpace_t12cudaStream_t">[6]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0EN4matx11make_tensorEDaP1Tb">[7]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorType17matxMemorySpace_t12cudaStream_t">[8]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePCN10TensorType11scalar_typeERAclN10TensorType4RankEE_K7index_tRAclN10TensorType4RankEE_K7index_tb">[9]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePCN10TensorType11scalar_typeERRN10TensorType9desc_typeEb">[10]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeERAclN10TensorType4RankEE_K7index_tb">[11]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeERRN10TensorType15shape_containerEb">[12]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypePN10TensorType11scalar_typeEb">[13]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaR10TensorTypeRRN10TensorType12storage_typeERRN10TensorType15shape_containerE">[14]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEDaRR10TensorTypeRRN10TensorType9desc_typeE17matxMemorySpace_t12cudaStream_t">[15]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx11make_tensorEvR10TensorTypeRAclN10TensorType4RankEE_K7index_t17matxMemorySpace_t12cudaStream_t">[16]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaP1TRA4RANK_K7index_tb">[17]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaPC1TRA4RANK_K7index_tRA4RANK_K7index_tb">[18]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx11make_tensorEDaRA4RANK_K7index_t17matxMemorySpace_t12cudaStream_t">[19]</a>
 </li>
       <li><a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant15is_matx_shape_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx13make_tensor_pEDaRR9ShapeType17matxMemorySpace_t12cudaStream_t">matx::make_tensor_p (C++ function)</a>, <a href="api/creation/tensors/make.html#_CPPv4I00_NSt11enable_if_tIXaant20is_matx_descriptor_vI9ShapeTypeEntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx13make_tensor_pEDaPC1TRR9ShapeTypeb">[1]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0EN4matx13make_tensor_pEDa17matxMemorySpace_t12cudaStream_t">[2]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_NSt11enable_if_tI16is_tensor_view_vI10TensorTypeEbEEEN4matx13make_tensor_pEDaR10TensorTypeRRN10TensorType15shape_containerE17matxMemorySpace_t12cudaStream_t">[3]</a>, <a href="api/creation/tensors/make.html#_CPPv4I0_iEN4matx13make_tensor_pEDaRA4RANK_K7index_t17matxMemorySpace_t12cudaStream_t">[4]</a>
 </li>
-      <li><a href="api/linalg/matvec/matmul.html#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff">matx::matmul (C++ function)</a>, <a href="api/linalg/matvec/matmul.html#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff">[1]</a>
+      <li><a href="api/linalg/matvec/matmul.html#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBRAL2E_K7int32_tff">matx::matmul (C++ function)</a>, <a href="api/linalg/matvec/matmul.html#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBff">[1]</a>
 </li>
       <li><a href="api/linalg/matvec/matvec.html#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matvecEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff">matx::matvec (C++ function)</a>
 </li>
@@ -793,13 +795,13 @@ document.write(`
 </li>
       <li><a href="basics/nvtx.html#_CPPv4N4matx18matx_nvxtLogLevels18MATX_NVTX_LOG_USERE">matx::matx_nvxtLogLevels::MATX_NVTX_LOG_USER (C++ enumerator)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/math/extrema/max.html#_CPPv4N4matx3maxE2Op2Op">matx::max (C++ function)</a>
 </li>
-      <li><a href="api/stats/avgvar/mean.html#_CPPv4I00EN4matx4meanEv7OutTypeRK6InType12cudaExecutor">matx::mean (C++ function)</a>, <a href="api/stats/avgvar/mean.html#_CPPv4I00EN4matx4meanEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/stats/avgvar/mean.html#_CPPv4I00_i0EN4matx4meanEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/stats/avgvar/mean.html#_CPPv4I0EN4matx4meanEDaRK6InType">matx::mean (C++ function)</a>, <a href="api/stats/avgvar/mean.html#_CPPv4I0_iEN4matx4meanEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/stats/avgvar/median.html#_CPPv4I00EN4matx6medianEv7OutTypeRK6InType12cudaExecutor">matx::median (C++ function)</a>, <a href="api/stats/avgvar/median.html#_CPPv4I00EN4matx6medianEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/stats/avgvar/median.html#_CPPv4I00_i0EN4matx6medianEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/stats/avgvar/median.html#_CPPv4I0EN4matx6medianEDaRK6InType">matx::median (C++ function)</a>, <a href="api/stats/avgvar/median.html#_CPPv4I0_iEN4matx6medianEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
       <li><a href="api/creation/operators/meshgrid.html#_CPPv4IDpEN4matx8meshgridEDaDpRR2Ts">matx::meshgrid (C++ function)</a>
 </li>
@@ -847,15 +849,15 @@ document.write(`
 </li>
       <li><a href="api/logic/logical/or.html#_CPPv4N4matxooE2Op2Op">matx::operator|| (C++ function)</a>
 </li>
-      <li><a href="api/manipulation/basic/permute.html#_CPPv4I0EN4matx7permuteEDaRK1TRAclN1T4RankEE_K7int32_t">matx::permute (C++ function)</a>, <a href="api/manipulation/basic/permute.html#_CPPv4I0EN4matx7permuteEDaRK1TRKNSt5arrayI7int32_tFN1T4RankEvEEE">[1]</a>, <a href="api/manipulation/basic/permute.html#_CPPv4I0_iEN4matx7permuteEvRN6detail13tensor_impl_tI1T4RankEERKN6detail13tensor_impl_tI1T4RankEERKNSt16initializer_listI8uint32_tEEK12cudaStream_t">[2]</a>
+      <li><a href="api/manipulation/rearranging/permute.html#_CPPv4I0EN4matx7permuteEDaRK1TRAclN1T4RankEE_K7int32_t">matx::permute (C++ function)</a>, <a href="api/manipulation/rearranging/permute.html#_CPPv4I0EN4matx7permuteEDaRK1TRKNSt5arrayI7int32_tFN1T4RankEvEEE">[1]</a>
 </li>
       <li><a href="api/math/arithmetic/pow.html#_CPPv4N4matx3powE2Op2Op">matx::pow (C++ function)</a>
 </li>
-      <li><a href="api/math/sumprod/prod.html#_CPPv4I00EN4matx4prodEv7OutTypeRK6InType12cudaExecutor">matx::prod (C++ function)</a>, <a href="api/math/sumprod/prod.html#_CPPv4I00EN4matx4prodEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/math/sumprod/prod.html#_CPPv4I00_i0EN4matx4prodEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/math/sumprod/prod.html#_CPPv4I0EN4matx4prodEDaRK6InType">matx::prod (C++ function)</a>, <a href="api/math/sumprod/prod.html#_CPPv4I0_iEN4matx4prodEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
       <li><a href="api/type_traits.html#_CPPv4I0EN4matx14promote_half_tE">matx::promote_half_t (C++ type)</a>
 </li>
-      <li><a href="api/linalg/decomp/qr.html#_CPPv4I000EN4matx2qrEv5QType5RType5AType12cudaStream_t">matx::qr (C++ function)</a>
+      <li><a href="api/linalg/decomp/qr.html#_CPPv4I0EN4matx2qrEDa5AType">matx::qr (C++ function)</a>
 </li>
       <li><a href="api/dft/fft/r2c.html#_CPPv4I0EN4matx3r2cEDa2T17index_t">matx::r2c (C++ function)</a>
 </li>
@@ -877,15 +879,15 @@ document.write(`
 </li>
       <li><a href="api/manipulation/joinrepeat/repmat.html#_CPPv4I0EN4matx6repmatEDa2T17index_t">matx::repmat (C++ function)</a>, <a href="api/manipulation/joinrepeat/repmat.html#_CPPv4I0EN4matx6repmatEDa2T1PK7index_t">[1]</a>, <a href="api/manipulation/joinrepeat/repmat.html#_CPPv4I0EN4matx6repmatEDa2T1RA_K7index_t">[2]</a>
 </li>
-      <li><a href="api/signalimage/filtering/resample_poly.html#_CPPv4I000EN4matx13resample_polyEvR7OutTypeRK6InTypeRK10FilterType7index_t7index_t12cudaStream_t">matx::resample_poly (C++ function)</a>
+      <li><a href="api/signalimage/filtering/resample_poly.html#_CPPv4I00EN4matx13resample_polyEDaRK6InTypeRK10FilterType7index_t7index_t">matx::resample_poly (C++ function)</a>
 </li>
       <li><a href="api/manipulation/rearranging/reshape.html#_CPPv4I_i00_NSt11enable_if_tIXntNSt10is_array_vIN12remove_cvrefI9ShapeTypeE4typeEEEEbEEEN4matx7reshapeEDaRK1TRR9ShapeType">matx::reshape (C++ function)</a>, <a href="api/manipulation/rearranging/reshape.html#_CPPv4I_i0EN4matx7reshapeEDaRK1TRA4RANK_K7int32_t">[1]</a>
 </li>
       <li><a href="api/manipulation/rearranging/reverse.html#_CPPv4I_i0EN4matx7reverseEDa2Op">matx::reverse (C++ function)</a>, <a href="api/manipulation/rearranging/reverse.html#_CPPv4I_i_i_Dpi0EN4matx7reverseEDa7Op_type">[1]</a>
 </li>
-      <li><a href="api/math/extrema/rmax.html#_CPPv4I00EN4matx4rmaxEv7OutTypeRK6InType12cudaExecutor">matx::rmax (C++ function)</a>, <a href="api/math/extrema/rmax.html#_CPPv4I00EN4matx4rmaxEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/math/extrema/rmax.html#_CPPv4I00_i0EN4matx4rmaxEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/math/extrema/rmax.html#_CPPv4I0EN4matx4rmaxEDaRK6InType">matx::rmax (C++ function)</a>, <a href="api/math/extrema/rmax.html#_CPPv4I0_iEN4matx4rmaxEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/math/extrema/rmin.html#_CPPv4I00EN4matx4rminEv7OutTypeRK6InType12cudaExecutor">matx::rmin (C++ function)</a>, <a href="api/math/extrema/rmin.html#_CPPv4I00EN4matx4rminEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/math/extrema/rmin.html#_CPPv4I00_i0EN4matx4rminEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/math/extrema/rmin.html#_CPPv4I0EN4matx4rminEDaRK6InType">matx::rmin (C++ function)</a>, <a href="api/math/extrema/rmin.html#_CPPv4I0_iEN4matx4rminEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
       <li><a href="api/math/round/round.html#_CPPv4N4matx5roundE2Op">matx::round (C++ function)</a>
 </li>
@@ -901,9 +903,9 @@ document.write(`
 </li>
       <li><a href="api/manipulation/basic/slice.html#_CPPv4I_i0EN4matx5sliceEDaK6OpTypeRAclN6OpType4RankEE_K7index_tRAclN6OpType4RankEE_K7index_t">matx::slice (C++ function)</a>, <a href="api/manipulation/basic/slice.html#_CPPv4I_i0EN4matx5sliceEDaK6OpTypeRAclN6OpType4RankEE_K7index_tRAclN6OpType4RankEE_K7index_tRAclN6OpType4RankEE_K7index_t">[1]</a>
 </li>
-      <li><a href="api/math/misc/softmax.html#_CPPv4I00EN4matx7softmaxEv7OutTypeRK6InType12cudaStream_t">matx::softmax (C++ function)</a>, <a href="api/math/misc/softmax.html#_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t">[1]</a>
+      <li><a href="api/math/misc/softmax.html#_CPPv4I0EN4matx7softmaxEDaRK6InType">matx::softmax (C++ function)</a>, <a href="api/math/misc/softmax.html#_CPPv4I0_iEN4matx7softmaxEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/searchsort/sort.html#_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_t12cudaExecutor">matx::sort (C++ function)</a>, <a href="api/searchsort/sort.html#_CPPv4I00EN4matx4sortEvR12OutputTensorRK13InputOperatorK15SortDirection_t24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/searchsort/sort.html#_CPPv4I0EN4matx4sortEDaRK13InputOperatorK15SortDirection_t">matx::sort (C++ function)</a>
 </li>
       <li><a href="api/math/trig/sph2cart.html#_CPPv4I000EN4matx8sph2cartEDa2T12T22T3">matx::sph2cart (C++ function)</a>
 </li>
@@ -911,15 +913,15 @@ document.write(`
 </li>
       <li><a href="api/manipulation/joinrepeat/stack.html#_CPPv4IDpEN4matx5stackEDaiDp2Ts">matx::stack (C++ function)</a>
 </li>
-      <li><a href="api/stats/avgvar/stdd.html#_CPPv4I000EN4matx4stddEv7OutTypeRK6InTypeRR8Executor">matx::stdd (C++ function)</a>, <a href="api/stats/avgvar/stdd.html#_CPPv4I00EN4matx4stddEv7OutTypeRK6InTypei">[1]</a>, <a href="api/stats/avgvar/stdd.html#_CPPv4I00_i0EN4matx4stddEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/stats/avgvar/stdd.html#_CPPv4I0EN4matx4stddEDaRK6InType">matx::stdd (C++ function)</a>, <a href="api/stats/avgvar/stdd.html#_CPPv4I0_iEN4matx4stddEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/math/sumprod/sum.html#_CPPv4I00EN4matx3sumEv7OutTypeRK6InType12cudaExecutor">matx::sum (C++ function)</a>, <a href="api/math/sumprod/sum.html#_CPPv4I00EN4matx3sumEv7OutTypeRK6InType24SingleThreadHostExecutor">[1]</a>, <a href="api/math/sumprod/sum.html#_CPPv4I00_i0EN4matx3sumEv7OutTypeRK6InTypeRA1D_KiRR8Executor">[2]</a>
+      <li><a href="api/math/sumprod/sum.html#_CPPv4I0EN4matx3sumEDaRK6InType">matx::sum (C++ function)</a>, <a href="api/math/sumprod/sum.html#_CPPv4I0_iEN4matx3sumEDaRK6InTypeRA1D_Ki">[1]</a>
 </li>
-      <li><a href="api/linalg/decomp/svd.html#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc">matx::svd (C++ function)</a>
+      <li><a href="api/linalg/decomp/svd.html#_CPPv4I0EN4matx3svdEDaRK3OpAKcKc">matx::svd (C++ function)</a>
 </li>
-      <li><a href="api/linalg/decomp/svdbpi.html#_CPPv4I0000EN4matx6svdbpiEvR5UTypeR5STypeR6VTTypeR5ATypei12cudaStream_t">matx::svdbpi (C++ function)</a>
+      <li><a href="api/linalg/decomp/svdbpi.html#_CPPv4I0EN4matx6svdbpiEDaR5ATypei">matx::svdbpi (C++ function)</a>
 </li>
-      <li><a href="api/linalg/decomp/svdpi.html#_CPPv4I00000EN4matx5svdpiEvR5UTypeR5STypeR6VTTypeR5ATypeR6X0Typei12cudaStream_t7index_t">matx::svdpi (C++ function)</a>
+      <li><a href="api/linalg/decomp/svdpi.html#_CPPv4I00EN4matx5svdpiEDaR5ATypeR6X0Typei7index_t">matx::svdpi (C++ function)</a>
 </li>
       <li><a href="api/math/trig/tan.html#_CPPv4N4matx3tanE2Op">matx::tan (C++ function)</a>
 </li>
@@ -1009,15 +1011,17 @@ document.write(`
 </li>
       <li><a href="basics/tensor.html#_CPPv4I0_i0EN4matx8tensor_t4ViewEDaRR5Shape">matx::tensor_t::View (C++ function)</a>, <a href="basics/tensor.html#_CPPv4I0_iEN4matx8tensor_t4ViewEDaRA5NRANK_K12ShapeIntType">[1]</a>, <a href="basics/tensor.html#_CPPv4N4matx8tensor_t4ViewEv">[2]</a>
 </li>
-      <li><a href="api/linalg/other/trace.html#_CPPv4I000EN4matx5traceEv7OutTypeRK6InTypeRR8Executor">matx::trace (C++ function)</a>, <a href="api/linalg/other/trace.html#_CPPv4I00EN4matx5traceEv7OutTypeRK6InTypei">[1]</a>
+      <li><a href="api/linalg/other/trace.html#_CPPv4I0EN4matx5traceEDaRK13InputOperator">matx::trace (C++ function)</a>
 </li>
-      <li><a href="api/manipulation/rearranging/transpose.html#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor12cudaExecutor">matx::transpose (C++ function)</a>, <a href="api/manipulation/rearranging/transpose.html#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/manipulation/rearranging/transpose.html#_CPPv4I0EN4matx9transposeEDaK1T">matx::transpose (C++ function)</a>
 </li>
-      <li><a href="api/searchsort/unique.html#_CPPv4I000EN4matx6uniqueEvR12OutputTensorR11CountTensorRK13InputOperator12cudaExecutor">matx::unique (C++ function)</a>, <a href="api/searchsort/unique.html#_CPPv4I000EN4matx6uniqueEvR12OutputTensorR11CountTensorRK13InputOperator24SingleThreadHostExecutor">[1]</a>
+      <li><a href="api/manipulation/rearranging/transpose_matrix.html#_CPPv4I0EN4matx16transpose_matrixEDaK1T">matx::transpose_matrix (C++ function)</a>
+</li>
+      <li><a href="api/searchsort/unique.html#_CPPv4I0EN4matx6uniqueEDaRK3OpA">matx::unique (C++ function)</a>
 </li>
       <li><a href="api/signalimage/general/upsample.html#_CPPv4I0EN4matx8upsampleEDaRK1T7int32_t7index_t">matx::upsample (C++ function)</a>
 </li>
-      <li><a href="api/stats/avgvar/var.html#_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori">matx::var (C++ function)</a>, <a href="api/stats/avgvar/var.html#_CPPv4I00EN4matx3varEv7OutTypeRK6InTypeii">[1]</a>, <a href="api/stats/avgvar/var.html#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori">[2]</a>
+      <li><a href="api/stats/avgvar/var.html#_CPPv4I0EN4matx3varEDaRK6InTypei">matx::var (C++ function)</a>, <a href="api/stats/avgvar/var.html#_CPPv4I0_iEN4matx3varEDaRK6InTypeRA1D_Kii">[1]</a>
 </li>
       <li><a href="api/viz/bar.html#_CPPv4I0EN4matx3viz3barEvRK10TensorTypeRK10TensorTypeRKNSt6stringERKNSt6stringERKNSt6stringERKNSt6stringE">matx::viz::bar (C++ function)</a>, <a href="api/viz/bar.html#_CPPv4I0EN4matx3viz3barEvRK10TensorTypeRKNSt6stringERKNSt6stringERKNSt6stringE">[1]</a>
 </li>

@@ -18,11 +18,11 @@ void einsum_permute(nvbench::state &state, nvbench::type_list<ValueType>)
 
   x.PrefetchDevice(0);
 
-  cutensor::einsum(y, "ijkl->likj", 0, x);
+  (y = cutensor::einsum("ijkl->likj", x)).run();
 
   state.exec( 
     [&x, &y](nvbench::launch &launch) {
-        cutensor::einsum(y, "ijkl->likj", (cudaStream_t)launch.get_stream(), x);
+        (y = cutensor::einsum("ijkl->likj", x)).run(cudaExecutor(launch.get_stream()));
     });
 }
 

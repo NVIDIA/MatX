@@ -35,7 +35,9 @@ void sort1d(
 
   (randomData = random<float>(sortedData.Shape(), NORMAL)).run();
 
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { 
+    (sortedData = matx::sort(randomData, SORT_DIR_ASC)).run(cudaExecutor(launch.get_stream())); 
+  });
 
 }
 
@@ -69,7 +71,9 @@ void sort2d(
 
   (randomData = random<float>(sortedData.Shape(), NORMAL)).run();
 
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { 
+    (sortedData = matx::sort(randomData, SORT_DIR_ASC)).run(cudaExecutor(launch.get_stream())); 
+  });
 
 }
 

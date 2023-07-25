@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,70 +616,43 @@ document.write(`
 <span id="all-func"></span><h1>all<a class="headerlink" href="#all" title="Permalink to this heading">#</a></h1>
 <p>Returns a truth value if all values in the reduction converts to a boolean “true”</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor">
-<span id="_CPPv3I00_i0EN4matx3allE7OutTypeRK6InTypeRA1D_KiRR8Executor"></span><span id="_CPPv2I00_i0EN4matx3allE7OutTypeRK6InTypeRAD_KiRR8Executor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Executor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a5f2db14e8a0ae04c8e04d285914a70b3"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor" title="matx::all::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor" title="matx::all::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span>, <a class="reference internal" href="#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor" title="matx::all::Executor"><span class="n"><span class="pre">Executor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00_i0EN4matx3allEv7OutTypeRK6InTypeRA1D_KiRR8Executor" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx3allEDaRK6InTypeRA1D_Ki">
+<span id="_CPPv3I0_iEN4matx3allERK6InTypeRA1D_Ki"></span><span id="_CPPv2I0_iEN4matx3allERK6InTypeRAD_Ki"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1af4c433555e83f85b1975a808541f6cf2"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx3allEDaRK6InTypeRA1D_Ki" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx3allEDaRK6InTypeRA1D_Ki" title="matx::all::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx3allEDaRK6InTypeRA1D_Ki" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Find if all values are != 0</p>
 <p>Returns a boolean value indicating whether all values in the set of inputs are non-zero. The same aggregation rules apply for input vs output tensor size and what type of reduction is done.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
 <li><p><strong>InType</strong> – Input data type </p></li>
-<li><p><strong>D</strong> – Num of dimensions to reduce over </p></li>
-<li><p><strong>Executor</strong> – Executor type</p></li>
+<li><p><strong>D</strong> – Num of dimensions to reduce over</p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
 <li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>dims</strong> – Array containing dimensions to reduce over </p></li>
-<li><p><strong>exec</strong> – Executor to use for reduction </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of all-reduce computed </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3allEv7OutTypeRK6InType12cudaExecutor">
-<span id="_CPPv3I00EN4matx3allE7OutTypeRK6InType12cudaExecutor"></span><span id="_CPPv2I00EN4matx3allE7OutTypeRK6InType12cudaExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a71bf2eaef4ec856ab303225f1f32582e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType12cudaExecutor" title="matx::all::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType12cudaExecutor" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType12cudaExecutor" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx3allEDaRK6InType">
+<span id="_CPPv3I0EN4matx3allERK6InType"></span><span id="_CPPv2I0EN4matx3allERK6InType"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a85f74985d9ddbdf20ce8cd578b0b2717"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx3allEDaRK6InType" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx3allEDaRK6InType" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Find if all values are != 0</p>
 <p>Returns a boolean value indicating whether all values in the set of inputs are non-zero. The same aggregation rules apply for input vs output tensor size and what type of reduction is done.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>InType</strong> – Input data type</p></li>
-</ul>
+<dd class="field-odd"><p><strong>InType</strong> – Input data type</p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>exec</strong> – CUDA executor or stream ID </p></li>
-</ul>
+<dd class="field-even"><p><strong>in</strong> – Input data to reduce </p>
 </dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3allEv7OutTypeRK6InType24SingleThreadHostExecutor">
-<span id="_CPPv3I00EN4matx3allE7OutTypeRK6InType24SingleThreadHostExecutor"></span><span id="_CPPv2I00EN4matx3allE7OutTypeRK6InType24SingleThreadHostExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ac0bef721b7d206a63bb957c223ee4c95"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">all</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType24SingleThreadHostExecutor" title="matx::all::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType24SingleThreadHostExecutor" title="matx::all::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">SingleThreadHostExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3allEv7OutTypeRK6InType24SingleThreadHostExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Find if all values are != 0</p>
-<p>Returns a boolean value indicating whether all values in the set of inputs are non-zero. The same aggregation rules apply for input vs output tensor size and what type of reduction is done.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>InType</strong> – Input data type</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>exec</strong> – Single threaded host executor </p></li>
-</ul>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of all-reduce computed </p>
 </dd>
 </dl>
 </dd></dl>
@@ -686,13 +661,13 @@ document.write(`
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Reduce a 4D tensor into a 0D tensor where the 0D is &quot;true&quot; if all values in &quot;t4&quot;</span>
 <span class="c1">// convert to &quot;true&quot;, or &quot;false&quot; otherwise</span>
-<span class="n">all</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span><span class="w"> </span><span class="n">t4</span><span class="p">,</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">all</span><span class="p">(</span><span class="n">t4</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both</span>
 <span class="c1">// examples permute the dimensions before the reduction    </span>
-<span class="n">all</span><span class="p">(</span><span class="n">t2a</span><span class="p">,</span><span class="w"> </span><span class="n">permute</span><span class="p">(</span><span class="n">t4</span><span class="p">,{</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}),</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
-<span class="n">all</span><span class="p">(</span><span class="n">t2b</span><span class="p">,</span><span class="w"> </span><span class="n">t4</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t2a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">all</span><span class="p">(</span><span class="n">permute</span><span class="p">(</span><span class="n">t4</span><span class="p">,{</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}))).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t2b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">all</span><span class="p">(</span><span class="n">t4</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">})).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>

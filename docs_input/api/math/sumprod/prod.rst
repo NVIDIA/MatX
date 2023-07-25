@@ -5,9 +5,8 @@ prod
 
 Reduce an input by the product of all elements in the reduction set
 
-.. doxygenfunction:: prod(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: prod(OutType dest, const InType &in, SingleThreadHostExecutor exec)
-.. doxygenfunction:: prod(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
+.. doxygenfunction:: prod(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: prod(const InType &in)
 
 Examples
 ~~~~~~~~

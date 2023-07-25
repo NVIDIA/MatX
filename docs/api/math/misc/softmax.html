@@ -136,6 +136,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -167,7 +168,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -184,10 +184,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -618,61 +620,50 @@ document.write(`
 <div class="math notranslate nohighlight">
 \[\sigma(z_i) = \frac{e^{z_{i}}}{\sum_{j=1}^K e^{z_{j}}} \ \ \ for\ i=1,2,\dots,K\]</div>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx7softmaxEv7OutTypeRK6InType12cudaStream_t">
-<span id="_CPPv3I00EN4matx7softmaxE7OutTypeRK6InType12cudaStream_t"></span><span id="_CPPv2I00EN4matx7softmaxE7OutTypeRK6InType12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a7c0f30c475b8a1da1a9236e9804d8f1e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">softmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx7softmaxEv7OutTypeRK6InType12cudaStream_t" title="matx::softmax::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx7softmaxEv7OutTypeRK6InType12cudaStream_t" title="matx::softmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx7softmaxEv7OutTypeRK6InType12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Calculate the softmax of values in a tensor treated as a flat vector</p>
-<p>softmax computes the exponential of each value divided by the sum of the exponentials of items in the reduced set. By default the sum is performed over all dimensions. Note that traditional definitions of softmax are simply exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x is biased by a correction factor of max(x).</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>InType</strong> – Input data type </p></li>
-<li><p><strong>RANK</strong> – Rank of output tensor</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination for softmax output </p></li>
-<li><p><strong>in</strong> – Input data to compute the softmax </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<section id="examples">
-<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">softmax</span><span class="p">(</span><span class="n">t1_out</span><span class="p">,</span><span class="w"> </span><span class="n">t1</span><span class="p">);</span>
-</pre></div>
-</div>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t">
-<span id="_CPPv3I00_iEN4matx7softmaxE7OutTypeRK6InTypeRA1D_Ki12cudaStream_t"></span><span id="_CPPv2I00_iEN4matx7softmaxE7OutTypeRK6InTypeRAD_Ki12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a90a4d12b6d5bf20100ab1d3464511189"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">softmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t" title="matx::softmax::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t" title="matx::softmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t" title="matx::softmax::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00_iEN4matx7softmaxEv7OutTypeRK6InTypeRA1D_Ki12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx7softmaxEDaRK6InTypeRA1D_Ki">
+<span id="_CPPv3I0_iEN4matx7softmaxERK6InTypeRA1D_Ki"></span><span id="_CPPv2I0_iEN4matx7softmaxERK6InTypeRAD_Ki"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aa884ce8b690f7aeb192f8ca635ee25f5"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">softmax</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx7softmaxEDaRK6InTypeRA1D_Ki" title="matx::softmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx7softmaxEDaRK6InTypeRA1D_Ki" title="matx::softmax::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx7softmaxEDaRK6InTypeRA1D_Ki" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Calculate the softmax of values in a tensor treated as a flat vector</p>
 <p>softmax computes the exponential of each value divided by the sum of the exponentials of items in the reduced set. The axes in which to perform the softmax over determine which axes the sum will be computed over, but the input tensor rank and sizes match between input and output. Note that traditional definitions of softmax are simply exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x is biased by a correction factor of max(x).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
 <li><p><strong>InType</strong> – Input data type </p></li>
 <li><p><strong>D</strong> – Rank of dimension array</p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination for softmax output </p></li>
 <li><p><strong>in</strong> – Input data to compute the softmax </p></li>
 <li><p><strong>dims</strong> – C-style array containing the dimensions to sum over </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx7softmaxEDaRK6InType">
+<span id="_CPPv3I0EN4matx7softmaxERK6InType"></span><span id="_CPPv2I0EN4matx7softmaxERK6InType"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a32ef12b89d9df543d21043ed1331b078"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">softmax</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx7softmaxEDaRK6InType" title="matx::softmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx7softmaxEDaRK6InType" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Calculate the softmax of values in a tensor treated as a flat vector</p>
+<p>softmax computes the exponential of each value divided by the sum of the exponentials of items in the reduced set. The axes in which to perform the softmax over determine which axes the sum will be computed over, but the input tensor rank and sizes match between input and output. Note that traditional definitions of softmax are simply exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x is biased by a correction factor of max(x).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>InType</strong> – Input data type</p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>in</strong> – Input data to compute the softmax </p>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">t1_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">softmax</span><span class="p">(</span><span class="n">t1</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
+</pre></div>
+</div>
 </section>
 <section id="id1">
 <h2>Examples<a class="headerlink" href="#id1" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">softmax</span><span class="p">(</span><span class="n">t3_out</span><span class="p">,</span><span class="w"> </span><span class="n">t3</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">});</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">t3_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">softmax</span><span class="p">(</span><span class="n">t3</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">})).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>

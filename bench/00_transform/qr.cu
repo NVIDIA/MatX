@@ -34,7 +34,7 @@ void qr_batch(nvbench::state &state,
 
   // warm up
   nvtxRangePushA("Warmup");
-  qr(Q, R, A, stream);
+  (mtie(Q, R) = qr(A)).run(stream);
 
   cudaDeviceSynchronize();
   nvtxRangePop();
@@ -42,7 +42,7 @@ void qr_batch(nvbench::state &state,
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
    [&Q, &R, &A](nvbench::launch &launch) {
-      qr(Q, R, A, launch.get_stream()); });
+      (mtie(Q, R) = qr(A)).run(cudaExecutor{launch.get_stream()}); });
   MATX_NVTX_END_RANGE( 1 )
 
 }

@@ -5,9 +5,8 @@ argmin
 
 Returns both the minimum values and the indices of the minimum values across the input operator
 
-.. doxygenfunction:: argmin(OutType dest, TensorIndexType &idest, const InType &in, const int (&dims)[D], Executor &&exec)
-.. doxygenfunction:: argmin(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: argmin(OutType dest, TensorIndexType &idest, const InType &in, SingleThreadHostExecutor exec)
+.. doxygenfunction:: argmin(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: argmin(const InType &in)
 
 Examples
 ~~~~~~~~

@@ -15,11 +15,11 @@ void softmax(nvbench::state &state, nvbench::type_list<ValueType>)
   t4.PrefetchDevice(0);
   t4out.PrefetchDevice(0);
 
-  softmax(t4out, t4, {3});
+  (t4out = softmax(t4, {3})).run();
 
   state.exec( 
     [&t4, &t4out](nvbench::launch &launch) {
-      matx::softmax(t4out, t4, (cudaStream_t)launch.get_stream());
+      (t4out = softmax(t4)).run((cudaStream_t)launch.get_stream());
     });
 }
 NVBENCH_BENCH_TYPES(softmax, NVBENCH_TYPE_AXES(softmax_types));
@@ -40,11 +40,11 @@ void reduce_0d_matx(nvbench::state &state, nvbench::type_list<ValueType>)
   auto xv2 = make_tensor<ValueType>();
   xv.PrefetchDevice(0);
 
-  matx::sum(xv2, xv);
+  (xv2 = matx::sum(xv)).run();
 
   state.exec( 
     [&xv, &xv2](nvbench::launch &launch) {
-      matx::sum(xv2, xv, (cudaStream_t)launch.get_stream());
+      (xv2 = matx::sum(xv)).run((cudaStream_t)launch.get_stream());
     });
 
 }
@@ -74,11 +74,11 @@ void reduce_0d_cub(nvbench::state &state, nvbench::type_list<ValueType>)
   auto xv2 = make_tensor<ValueType>();
   xv.PrefetchDevice(0);
 
-  sum(xv2, xv, 0);
+  (xv2 = matx::sum(xv)).run();
 
   state.exec( 
     [&xv, &xv2](nvbench::launch &launch) {
-      sum(xv2, xv, (cudaStream_t)launch.get_stream());
+      (xv2 = matx::sum(xv)).run((cudaStream_t)launch.get_stream());
     });
 
 }
@@ -141,7 +141,8 @@ void reduce_4d(
   (t4 = random<float>(t4.Shape(), UNIFORM)).run();
   cudaDeviceSynchronize();
 
-  state.exec([&t4, &t1](nvbench::launch &launch) { matx::sum(t1, t4, (cudaStream_t)launch.get_stream()); });
+  state.exec([&t4, &t1](nvbench::launch &launch) { 
+    (t1 = matx::sum(t4, {1, 2, 3})).run((cudaStream_t)launch.get_stream()); });
 
 }
 

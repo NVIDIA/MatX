@@ -9,7 +9,8 @@ Perform a 1D FFT
    These functions are currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: fft(OutputTensor o, const InputTensor i, uint64_t fft_size = 0, cudaStream_t stream = 0)
+.. doxygenfunction:: fft(OpA &&a, uint64_t fft_size = 0)
+.. doxygenfunction:: fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0)
 
 Examples
 ~~~~~~~~
@@ -19,7 +20,6 @@ Examples
   :end-before: example-end fft-1
   :dedent:
 
-.. doxygenfunction:: fft(OutputTensor out, const InputTensor in, const int32_t (&axis)[1], uint64_t fft_size = 0, cudaStream_t stream = 0)
 
 .. literalinclude:: ../../../../test/00_transform/FFT.cu
   :language: cpp

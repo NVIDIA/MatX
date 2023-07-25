@@ -235,7 +235,9 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
 
       // compute v
       // for complex we need the conj transpose of Ap
+      // example-begin transpose_matrix-test-1
       matmul_impl(transpose_matrix(vm), conj(transpose_matrix(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      // example-end transpose_matrix-test-1
 
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real

@@ -121,9 +121,15 @@ namespace matx
  *
  * @tparam InType
  *   Input data type
+ * @tparam ReduceOp
+ *   Reduction operator type
  *
  * @param in
  *   Input data to compute the reduce 
+ * @param op
+ *   Reduction operator
+ * @param init
+ *   Initialize the data
  */
 template <typename InType, typename ReduceOp>
 __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
@@ -150,11 +156,17 @@ __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
  *   Input data type
  * @tparam D
  *   Rank of dimension array
+ * @tparam ReduceOp
+ *   Reduction operator type
  *
  * @param in
  *   Input data to compute the reduce 
  * @param dims
  *   C-style array containing the dimensions to sum over
+ * @param op
+ *   Reduction operator
+ * @param init
+ *   Initialize the data
  */
 template <typename InType, int D, typename ReduceOp>
 __MATX_INLINE__ auto reduce(const InType &in, const int (&dims)[D], ReduceOp op, bool init = true)

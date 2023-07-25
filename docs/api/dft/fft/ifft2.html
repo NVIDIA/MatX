@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -618,22 +620,33 @@ document.write(`
 <p>These functions are currently not supported with host-based executors (CPU)</p>
 </div>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensor12cudaStream_t">
-<span id="_CPPv3I00EN4matx5ifft2E12OutputTensorK11InputTensor12cudaStream_t"></span><span id="_CPPv2I00EN4matx5ifft2E12OutputTensorK11InputTensor12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3381f931f70e5b5a0c7eb5b4ec8d6ebe"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensor12cudaStream_t" title="matx::ifft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">o</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensor12cudaStream_t" title="matx::ifft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensor12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx5ifft2EDaRR3OpA">
+<span id="_CPPv3I0EN4matx5ifft2ERR3OpA"></span><span id="_CPPv2I0EN4matx5ifft2ERR3OpA"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3883c0b7ac093be96f957a3a783773be"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx5ifft2EDaRR3OpA" title="matx::ifft2::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx5ifft2EDaRR3OpA" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Run a 2D IFFT with a cached plan</p>
 <p>Creates a new FFT plan in the cache if none exists, and uses that to execute the 2D IFFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutputTensor</strong> – Output operator or tensor type </p></li>
-<li><p><strong>InputTensor</strong> – Input operator or tensor type </p></li>
-</ul>
+<dd class="field-odd"><p><strong>OpA</strong> – Input operator or tensor type </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>a</strong> – Input operator </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx5ifft2EDaRR3OpARAL2E_K7int32_t">
+<span id="_CPPv3I0EN4matx5ifft2ERR3OpARAL2E_K7int32_t"></span><span id="_CPPv2I0EN4matx5ifft2ERR3OpARA2_K7int32_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a2dbfc235921bca6181347a5314735899"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx5ifft2EDaRR3OpARAL2E_K7int32_t" title="matx::ifft2::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">2</span></span><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx5ifft2EDaRR3OpARAL2E_K7int32_t" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Run a 2D IFFT with a cached plan</p>
+<p>Creates a new IFFT plan in the cache if none exists, and uses that to execute the 2D FFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>OpA</strong> – Input operator or tensor data type </p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>o</strong> – Output tensor </p></li>
-<li><p><strong>i</strong> – input tensor </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>a</strong> – Input operator or tensor </p></li>
+<li><p><strong>axis</strong> – axes to perform ifft on </p></li>
 </ul>
 </dd>
 </dl>
@@ -643,37 +656,14 @@ document.write(`
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Perform a 2D FFT from 3D tensor &quot;in&quot; into &quot;out1&quot;. This is equivalent to performing the FFT</span>
 <span class="c1">// on the last two dimension unpermuted.</span>
-<span class="n">ifft2</span><span class="p">(</span><span class="n">out1</span><span class="p">,</span><span class="w"> </span><span class="n">in</span><span class="p">);</span>
-<span class="n">ifft2</span><span class="p">(</span><span class="n">out2</span><span class="p">,</span><span class="w"> </span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">});</span>
+<span class="p">(</span><span class="n">out1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ifft2</span><span class="p">(</span><span class="n">in</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
+<span class="p">(</span><span class="n">out2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ifft2</span><span class="p">(</span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">})).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t">
-<span id="_CPPv3I00EN4matx5ifft2E12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t"></span><span id="_CPPv2I00EN4matx5ifft2E12OutputTensorK11InputTensorRA2_Ki12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a4c68d918c624601e01a7f9daa5c774da"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ifft2</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t" title="matx::ifft2::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t" title="matx::ifft2::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">2</span></span><span class="p"><span class="pre">]</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx5ifft2Ev12OutputTensorK11InputTensorRAL2E_Ki12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Run a 2D IFFT with a cached plan</p>
-<p>Creates a new IFFT plan in the cache if none exists, and uses that to execute the 2D FFT. Note that FFTs and IFFTs share the same plans if all dimensions match</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutputTensor</strong> – Output operator or tensor data type </p></li>
-<li><p><strong>InputTensor</strong> – Input operator or tensor data type </p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>out</strong> – Output operator or tensor </p></li>
-<li><p><strong>in</strong> – input operator or tensor </p></li>
-<li><p><strong>axis</strong> – axis to perform ifft on </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Perform a 2D FFT from 3D tensor &quot;in&quot; into &quot;out2&quot; across dimensions 2, 0. This is equivalent</span>
 <span class="c1">// to permuting the tensor before input and after output</span>
-<span class="n">ifft2</span><span class="p">(</span><span class="n">out1</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">}),</span><span class="w"> </span><span class="n">in</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">}));</span>
-<span class="n">ifft2</span><span class="p">(</span><span class="n">out2</span><span class="p">,</span><span class="w"> </span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">});</span>
+<span class="p">(</span><span class="n">out1</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">})</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ifft2</span><span class="p">(</span><span class="n">in</span><span class="p">.</span><span class="n">Permute</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">}))).</span><span class="n">run</span><span class="p">();</span>
+<span class="p">(</span><span class="n">out2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ifft2</span><span class="p">(</span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">})).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>

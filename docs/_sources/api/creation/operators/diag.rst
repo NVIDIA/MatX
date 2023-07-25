@@ -19,27 +19,6 @@ Examples
    :end-before: example-end diag-op-test-1
    :dedent:
 
-The generator form of ``diag()`` has both a shaped and a shape-less form. The shaped form takes a single argument specifying
-the shape of the operator. This is useful when the operator is used in contexts where it must have a shape.
-For example:
-
-.. code-block:: cpp
-
-    auto krondiag  = kron(diag({4, 4}, 5));
-
-Without a shape, the ``kron`` operator would not be able to generate a Kronecker product, and will result
-in a compiler error.
-
-Shapeless is useful when the size is already known by another operator:
-
-.. code-block:: cpp
-
-    auto t2 = make_tensor<float>({5, 5});
-    (t2 = diag(5)).run();
-
-In the case above the lazy assignment of ``t2`` is done at runtime and will only request elements 0:5,0:5
-since the number of elements fetched is dictated by the size of ``t2``.
-
 Generator
 _________
 

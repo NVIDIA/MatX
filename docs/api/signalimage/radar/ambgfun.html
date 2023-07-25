@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,64 +616,61 @@ document.write(`
 <span id="ambgfun-func"></span><h1>ambgfun<a class="headerlink" href="#ambgfun" title="Permalink to this heading">#</a></h1>
 <p>Ambiguity function</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t">
-<span id="_CPPv3I000EN4matx7ambgfunER9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t"></span><span id="_CPPv2I000EN4matx7ambgfunER9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AMFTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">XTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">YTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a318a015e33b58574aaa440504d99d1ea"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ambgfun</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t" title="matx::ambgfun::AMFTensor"><span class="n"><span class="pre">AMFTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">amf</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t" title="matx::ambgfun::XTensor"><span class="n"><span class="pre">XTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t" title="matx::ambgfun::YTensor"><span class="n"><span class="pre">YTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fs</span></span>, <span class="n"><span class="pre">AMBGFunCutType_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut_val</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx7ambgfunEvR9AMFTensorR7XTensorR7YTensord16AMBGFunCutType_tf12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx7ambgfunEDaR7XTensorR7YTensord16AMBGFunCutType_tf">
+<span id="_CPPv3I00EN4matx7ambgfunER7XTensorR7YTensord16AMBGFunCutType_tf"></span><span id="_CPPv2I00EN4matx7ambgfunER7XTensorR7YTensord16AMBGFunCutType_tf"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">XTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">YTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3d763516acf1ce55c7395569881eec65"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ambgfun</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx7ambgfunEDaR7XTensorR7YTensord16AMBGFunCutType_tf" title="matx::ambgfun::XTensor"><span class="n"><span class="pre">XTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx7ambgfunEDaR7XTensorR7YTensord16AMBGFunCutType_tf" title="matx::ambgfun::YTensor"><span class="n"><span class="pre">YTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fs</span></span>, <span class="n"><span class="pre">AMBGFunCutType_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut_val</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx7ambgfunEDaR7XTensorR7YTensord16AMBGFunCutType_tf" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Cross-ambiguity function</p>
 <p>Generates a cross-ambiguity magnitude function from inputs x and y. The ambiguity function generates a 2D delay vs doppler matrix of the cross ambiguity of x and y.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>T1</strong> – x/y vector types </p></li>
-<li><p><strong>T2</strong> – Type of output </p></li>
-<li><p><strong>RANK</strong> – Rank of input matrix. Must be 1 currently</p></li>
+<li><p><strong>XTensor</strong> – x vector type </p></li>
+<li><p><strong>YTensor</strong> – Y vector type </p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>amf</strong> – 2D output matrix where rows are the Doppler (Hz) shift and columns are the delay in seconds. </p></li>
 <li><p><strong>x</strong> – First input signal </p></li>
 <li><p><strong>y</strong> – Second input signal </p></li>
 <li><p><strong>fs</strong> – Sampling frequency </p></li>
 <li><p><strong>cut</strong> – Type of cut. 2D is effectively no cut. Delay cut returns a cut with zero time delay. Doppler generates a cut with zero Doppler shift. Note that in both Delay and Doppler mode, the output matrix must be a 2D tensor where the first dimension is 1 to match the type of 2D mode. </p></li>
 <li><p><strong>cut_val</strong> – Value to perform the cut at </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>2D output matrix where rows are the Doppler (Hz) shift and columns are the delay in seconds. </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx7ambgfunEvR9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t">
-<span id="_CPPv3I00EN4matx7ambgfunER9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t"></span><span id="_CPPv2I00EN4matx7ambgfunER9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AMFTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">XTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0047720a86a4881d1f452b7bdb5907c9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ambgfun</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx7ambgfunEvR9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t" title="matx::ambgfun::AMFTensor"><span class="n"><span class="pre">AMFTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">amf</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx7ambgfunEvR9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t" title="matx::ambgfun::XTensor"><span class="n"><span class="pre">XTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fs</span></span>, <span class="n"><span class="pre">AMBGFunCutType_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut_val</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx7ambgfunEvR9AMFTensorR7XTensord16AMBGFunCutType_tf12cudaStream_t" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx7ambgfunEDaR7XTensord16AMBGFunCutType_tf">
+<span id="_CPPv3I0EN4matx7ambgfunER7XTensord16AMBGFunCutType_tf"></span><span id="_CPPv2I0EN4matx7ambgfunER7XTensord16AMBGFunCutType_tf"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">XTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a54fcc01eb4c0c3611607645a5baa5456"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">ambgfun</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0EN4matx7ambgfunEDaR7XTensord16AMBGFunCutType_tf" title="matx::ambgfun::XTensor"><span class="n"><span class="pre">XTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">fs</span></span>, <span class="n"><span class="pre">AMBGFunCutType_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">cut_val</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx7ambgfunEDaR7XTensord16AMBGFunCutType_tf" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Ambiguity function</p>
 <p>Generates an ambiguity magnitude function from input signal x. The ambiguity function generates a 2D delay vs doppler matrix of the input signal.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>T1</strong> – x vector type </p></li>
-<li><p><strong>T2</strong> – Type of output </p></li>
-<li><p><strong>RANK</strong> – Rank of input matrix. Must be 1 currently</p></li>
-</ul>
+<dd class="field-odd"><p><strong>XTensor</strong> – x vector type </p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>amf</strong> – 2D output matrix where rows are the Doppler (Hz) shift and columns are the delay in seconds. </p></li>
 <li><p><strong>x</strong> – First input signal </p></li>
 <li><p><strong>fs</strong> – Sampling frequency </p></li>
 <li><p><strong>cut</strong> – Type of cut. 2D is effectively no cut. Delay cut returns a cut with zero time delay. Doppler generates a cut with zero Doppler shift. Note that in both Delay and Doppler mode, the output matrix must be a 2D tensor where the first dimension is 1 to match the type of 2D mode. </p></li>
 <li><p><strong>cut_val</strong> – Value to perform the cut at </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>2D output matrix where rows are the Doppler (Hz) shift and columns are the delay in seconds. </p>
 </dd>
 </dl>
 </dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ambgfun</span><span class="p">(</span><span class="n">amf_delay_v</span><span class="p">,</span><span class="w"> </span><span class="n">xv</span><span class="p">,</span><span class="w"> </span><span class="mf">1e3</span><span class="p">,</span><span class="w"> </span><span class="n">AMGBFUN_CUT_TYPE_DELAY</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">amf_delay_v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ambgfun</span><span class="p">(</span><span class="n">xv</span><span class="p">,</span><span class="w"> </span><span class="mf">1e3</span><span class="p">,</span><span class="w"> </span><span class="n">AMBGFUN_CUT_TYPE_DELAY</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ambgfun</span><span class="p">(</span><span class="n">amf_doppler_v</span><span class="p">,</span><span class="w"> </span><span class="n">xv</span><span class="p">,</span><span class="w"> </span><span class="mf">1e3</span><span class="p">,</span><span class="w"> </span><span class="n">AMGBFUN_CUT_TYPE_DOPPLER</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">amf_doppler_v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ambgfun</span><span class="p">(</span><span class="n">xv</span><span class="p">,</span><span class="w"> </span><span class="mf">1e3</span><span class="p">,</span><span class="w"> </span><span class="n">AMBGFUN_CUT_TYPE_DOPPLER</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>

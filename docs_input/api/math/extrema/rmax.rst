@@ -6,9 +6,8 @@ rmax
 Reduces the input by the maximum values across the specified axes. Note the name `rmax` is used as to note
 collide with the C++ standard library or other libraries with `max` defined.
 
-.. doxygenfunction:: rmax(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
-.. doxygenfunction:: rmax(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: rmax(OutType dest, const InType &in, SingleThreadHostExecutor exec)
+.. doxygenfunction:: rmax(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: rmax(const InType &in)
 
 Examples
 ~~~~~~~~

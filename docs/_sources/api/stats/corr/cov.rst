@@ -5,7 +5,7 @@ cov
 
 Compute a covariance matrix
 
-.. doxygenfunction:: cov(TensorTypeC &c, const TensorTypeA &a, cudaStream_t stream = 0)
+.. doxygenfunction:: cov(AType a)
 
 Examples
 ~~~~~~~~

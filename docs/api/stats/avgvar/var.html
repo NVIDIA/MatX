@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,81 +616,54 @@ document.write(`
 <span id="var-func"></span><h1>var<a class="headerlink" href="#var" title="Permalink to this heading">#</a></h1>
 <p>Compute the variance of a tensor. <cite>ddof</cite> can be used optionally to control the bias term in the denominator</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx3varEv7OutTypeRK6InTypeii">
-<span id="_CPPv3I00EN4matx3varE7OutTypeRK6InTypeii"></span><span id="_CPPv2I00EN4matx3varE7OutTypeRK6InTypeii"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a795ffa59bd1a26a671f9436ad6fa6050"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx3varEv7OutTypeRK6InTypeii" title="matx::var::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx3varEv7OutTypeRK6InTypeii" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ddof</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx3varEv7OutTypeRK6InTypeii" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx3varEDaRK6InTypeRA1D_Kii">
+<span id="_CPPv3I0_iEN4matx3varERK6InTypeRA1D_Kii"></span><span id="_CPPv2I0_iEN4matx3varERK6InTypeRAD_Kii"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae6f3b8c9c6b6b8d80b437dd559288fd7"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx3varEDaRK6InTypeRA1D_Kii" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx3varEDaRK6InTypeRA1D_Kii" title="matx::var::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ddof</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx3varEDaRK6InTypeRA1D_Kii" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Compute a variance reduction</p>
 <p>Computes the variance of the input according to the output tensor rank and size</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>InType</strong> – Input data type</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>ddof</strong> – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate </p></li>
-<li><p><strong>stream</strong> – CUDA stream ID </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori">
-<span id="_CPPv3I000EN4matx3varE7OutTypeRK6InTypeRR8Executori"></span><span id="_CPPv2I000EN4matx3varE7OutTypeRK6InTypeRR8Executori"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Executor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a669653d22abee7a2462ffcfc5ab65a5d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori" title="matx::var::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori" title="matx::var::Executor"><span class="n"><span class="pre">Executor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">exec</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ddof</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx3varEv7OutTypeRK6InTypeRR8Executori" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Compute a variance reduction</p>
-<p>Computes the variance of the input according to the output tensor rank and size</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
 <li><p><strong>InType</strong> – Input data type </p></li>
-<li><p><strong>Executor</strong> – Executor type</p></li>
+<li><p><strong>D</strong> – Num of dimensions to reduce over</p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>exec</strong> – Executor type </p></li>
-<li><p><strong>ddof</strong> – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori">
-<span id="_CPPv3I00_i0EN4matx3varE7OutTypeRK6InTypeRA1D_KiRR8Executori"></span><span id="_CPPv2I00_i0EN4matx3varE7OutTypeRK6InTypeRAD_KiRR8Executori"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Executor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae338d2327f182a3b58ce292ae29f6af9"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori" title="matx::var::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori" title="matx::var::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span>, <a class="reference internal" href="#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori" title="matx::var::Executor"><span class="n"><span class="pre">Executor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">exec</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ddof</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00_i0EN4matx3varEv7OutTypeRK6InTypeRA1D_KiRR8Executori" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Compute a variance reduction</p>
-<p>Computes the variance of the input according to the output tensor rank and size</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>InType</strong> – Input data type </p></li>
-<li><p><strong>D</strong> – Num of dimensions to reduce over </p></li>
-<li><p><strong>Executor</strong> – Executor type</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
 <li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>dims</strong> – Array containing dimensions to reduce over </p></li>
-<li><p><strong>exec</strong> – Executor to use for reduction </p></li>
 <li><p><strong>ddof</strong> – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of variance computed </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx3varEDaRK6InTypei">
+<span id="_CPPv3I0EN4matx3varERK6InTypei"></span><span id="_CPPv2I0EN4matx3varERK6InTypei"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3b599003b6e36e7d3f80593b61a27987"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">var</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx3varEDaRK6InTypei" title="matx::var::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ddof</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx3varEDaRK6InTypei" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Compute a variance reduction</p>
+<p>Computes the variance of the input according to the output tensor rank and size</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>InType</strong> – Input data type</p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>in</strong> – Input data to reduce </p></li>
+<li><p><strong>ddof</strong> – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of variance computed </p>
 </dd>
 </dl>
 </dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">var</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span><span class="w"> </span><span class="n">t1</span><span class="p">,</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">var</span><span class="p">(</span><span class="n">t1</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>

@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,35 +616,15 @@ document.write(`
 <span id="eig-func"></span><h1>eig<a class="headerlink" href="#eig" title="Permalink to this heading">#</a></h1>
 <p>Perform an eigenvalue decomposition saving the eigenvalues, and optionally saving eigenvectors</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t">
-<span id="_CPPv3I000EN4matx3eigER12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t"></span><span id="_CPPv2I000EN4matx3eigER12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae9bc3fb2745ee0969022522d428e0204"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">eig</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::WTensor"><span class="n"><span class="pre">WTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">w</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="n"><span class="pre">cusolverEigMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobz</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUSOLVER_EIG_MODE_VECTOR</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx3eigEvR12OutputTensorR7WTensorRK7ATensor12cudaStream_t17cusolverEigMode_t16cublasFillMode_t" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Perform a Eig decomposition using a cached plan</p>
-<p>See documentation of matxDnEigSolverPlan_t for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a eigen decomposition from only the matrix A. The input and output parameters may be the same tensor. In that case, the input is destroyed and the output is stored in-place.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>T1</strong> – Data type of matrix A </p></li>
-<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>out</strong> – Output tensor view </p></li>
-<li><p><strong>w</strong> – Eigenvalues output </p></li>
-<li><p><strong>a</strong> – Input matrix A </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-<li><p><strong>jobz</strong> – CUSOLVER_EIG_MODE_VECTOR to compute eigenvectors or CUSOLVER_EIG_MODE_NOVECTOR to not compute </p></li>
-<li><p><strong>uplo</strong> – Where to store data in A </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx3eigEDaRK3OpA17cusolverEigMode_t16cublasFillMode_t">
+<span id="_CPPv3I0EN4matx3eigERK3OpA17cusolverEigMode_t16cublasFillMode_t"></span><span id="_CPPv2I0EN4matx3eigERK3OpA17cusolverEigMode_t16cublasFillMode_t"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a9f8dbc093c579bfd7113fbb1d5eec5a1"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">eig</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx3eigEDaRK3OpA17cusolverEigMode_t16cublasFillMode_t" title="matx::eig::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cusolverEigMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobz</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUSOLVER_EIG_MODE_VECTOR</span></span>, <span class="n"><span class="pre">cublasFillMode_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">uplo</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">CUBLAS_FILL_MODE_UPPER</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx3eigEDaRK3OpA17cusolverEigMode_t16cublasFillMode_t" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Note that eigenvalue/vector solutions are not necessarily ordered in the same way other libraries</span>
 <span class="c1">// may order them. When comparing against other libraries it&#39;s best to check A*v = lambda * v</span>
-<span class="n">eig</span><span class="p">(</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Evv</span><span class="p">,</span><span class="w"> </span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Wov</span><span class="p">,</span><span class="w"> </span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Bv</span><span class="p">);</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Evv</span><span class="p">,</span><span class="w"> </span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Wov</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eig</span><span class="p">(</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">Bv</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>

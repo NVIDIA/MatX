@@ -13,7 +13,8 @@ is supported for any tensor with a rank higher than 2.
    This function is currently is not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: matmul(TensorTypeC C, const TensorTypeA A, const TensorTypeB B, cudaStream_t stream = 0, float alpha = 1.0, float beta = 0.0)
+.. doxygenfunction:: matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0)
+.. doxygenfunction:: matmul(const OpA A, const OpB B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)
 
 Examples
 ~~~~~~~~
@@ -56,8 +57,6 @@ Strided Batched
    :end-before: example-end matmul-test-5
    :dedent:
 
-
-.. doxygenfunction:: matmul(TensorTypeC C, const TensorTypeA A, const TensorTypeB B, const int32_t (&axis)[2], cudaStream_t stream = 0, float alpha = 1.0, float beta = 0.0)
 
 .. literalinclude:: ../../../../test/00_transform/MatMul.cu
    :language: cpp

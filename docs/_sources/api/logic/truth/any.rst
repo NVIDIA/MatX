@@ -5,9 +5,8 @@ any
 
 Returns a truth value if any value in the reduction converts to a boolean "true"
 
-.. doxygenfunction:: any(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
-.. doxygenfunction:: any(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: any(OutType dest, const InType &in, SingleThreadHostExecutor exec)
+.. doxygenfunction:: any(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: any(const InType &in)
 
 Examples
 ~~~~~~~~

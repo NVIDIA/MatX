@@ -24,7 +24,7 @@ void conv1d_4d_batch(nvbench::state &state,
   cudaDeviceSynchronize();
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
-      [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
   MATX_NVTX_END_RANGE( 1 )
   
 }
@@ -48,7 +48,7 @@ void conv1d_2d_batch(nvbench::state &state,
   cudaDeviceSynchronize();
 
   state.exec(
-      [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
 }
 NVBENCH_BENCH_TYPES(conv1d_2d_batch, NVBENCH_TYPE_AXES(conv_types));
 
@@ -67,7 +67,7 @@ void conv1d_large(nvbench::state &state,
   cudaDeviceSynchronize();
 
   state.exec(
-      [&out, &at, &bt](nvbench::launch &launch) { conv1d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
 }
 NVBENCH_BENCH_TYPES(conv1d_large, NVBENCH_TYPE_AXES(conv_types));
 
@@ -88,7 +88,7 @@ void conv2d_batch(nvbench::state &state,
   cudaDeviceSynchronize();
 
   state.exec(
-      [&out, &at, &bt](nvbench::launch &launch) { conv2d(out, at, bt, MATX_C_MODE_FULL, launch.get_stream()); });
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv2d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
 
   auto seconds = state.get_summary("Batch GPU").get_float64("value");
   auto &flops = state.add_summary("TFLOPS");

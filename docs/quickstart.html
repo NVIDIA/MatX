@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="api/manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="api/manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -611,7 +613,7 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#initialization-of-operators-and-generators">Initialization of operators and generators</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#executors">Executors</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#transforms">Transforms</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#random-numbers">Random numbers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#that-s-it">That’s it!</a></li>
 </ul>
@@ -909,27 +911,28 @@ expression and are not limited to simply assigning to a tensor. Expanding on our
 intermediate storage, we combined two generators, a multiply, and an add operator into a single kernel.</p>
 </section>
 </section>
-<section id="executors">
-<h2>Executors<a class="headerlink" href="#executors" title="Permalink to this heading">#</a></h2>
-<p>As mentioned above, the <code class="docutils literal notranslate"><span class="pre">exec</span></code> function is an executor for launching operators onto the device. <code class="docutils literal notranslate"><span class="pre">exec</span></code> is a special type of executor since it can take
-either views or operators as inputs and transform them in an element-wise kernel. Often the type of operation we are trying to do cannot be expressed as
-an MatX element-wise operator, so <code class="docutils literal notranslate"><span class="pre">exec</span></code> cannot be used. Other types of executors exist for this purpose. These executors typically do more complex
-transformations on the data compared to an element-wise kernel, and often use optimized libraries on the back-end to execute. Some examples are fft (Fast
-Fourier Transform), matmul (Matrix Multiply), and sort.</p>
-<p>MatX provides an easy-to-use API for executing complex functions, like those mentioned above. These executors currently cannot be part of an operator
-expression and must be executed as their own statement:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">fft</span><span class="p">(</span><span class="n">B</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">,</span><span class="w"> </span><span class="n">stream</span><span class="p">);</span>
+<section id="transforms">
+<h2>Transforms<a class="headerlink" href="#transforms" title="Permalink to this heading">#</a></h2>
+<p>As mentioned above, the <code class="docutils literal notranslate"><span class="pre">run</span></code> function takes an executor describing where to launch the work. In the examples above <code class="docutils literal notranslate"><span class="pre">run</span></code> the operator
+expressions created a single fused element-wise operation. Often the type of operation we are trying to do cannot be expressed as
+an element-wise operator and therefor can’t be fused with other operations without synchronization. These classes of operators are called <em>transforms</em>.
+Transforms can be used anywhere operators are used:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">B</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fft</span><span class="p">(</span><span class="n">A</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">C</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
 </pre></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">fft</span></code> executor above performs a 1D FFT on the tensor <code class="docutils literal notranslate"><span class="pre">A</span></code>, and stores it in <code class="docutils literal notranslate"><span class="pre">B</span></code>. All executors use the same calling convention where the outputs
-are listed first, followed by inputs, and finally an optional stream. Except for <code class="docutils literal notranslate"><span class="pre">exec</span></code>, executors can only operate on tensor views, and not
-on generators or operators. For instance, you cannot take an fft of <code class="docutils literal notranslate"><span class="pre">ones()</span></code>.</p>
-<p>Unless documented otherwise, executors work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
+<p>The <code class="docutils literal notranslate"><span class="pre">fft</span></code> transform above performs a 1D FFT on the tensor <code class="docutils literal notranslate"><span class="pre">A</span></code>, multiplies the output by <code class="docutils literal notranslate"><span class="pre">C</span></code>, and stores it in <code class="docutils literal notranslate"><span class="pre">B</span></code>. Since the FFT
+may require synchronizing before performing the multiply, MatX can internally create a temporary buffer for the FFT output and free it when
+the expression goes out of scope.</p>
+<p>Unless documented otherwise, transforms work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
 a 1D tensor (vector), etc. If the dimension of the tensor is higher than the expected dimension, all higher dimensions will be batched. In the FFT
 call above, if <code class="docutils literal notranslate"><span class="pre">A</span></code> and <code class="docutils literal notranslate"><span class="pre">B</span></code> are 4D tensors, the inner 3 dimensions will launch a batched 1D FFT with no change in syntax.</p>
-<p>As mentioned above, the same tensor views can be used in operator expressions before or after executors:</p>
+<p>As mentioned above, the same tensor views can be used in operator expressions before or after transforms:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="p">).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">stream</span><span class="p">);</span>
+<span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Or fused in a single line:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>The code above executes a kernel to store the result of <code class="docutils literal notranslate"><span class="pre">b</span> <span class="pre">+</span> <span class="pre">2</span></code> into <code class="docutils literal notranslate"><span class="pre">a</span></code>, then subsequently performs the matrix multiply <code class="docutils literal notranslate"><span class="pre">C</span> <span class="pre">=</span> <span class="pre">A</span> <span class="pre">*</span> <span class="pre">B</span></code>. Since
@@ -937,11 +940,12 @@ the operator and matrix multiply are launched in the same CUDA stream, they will
 <p>Common reduction executors are also available, such as <code class="docutils literal notranslate"><span class="pre">sum()</span></code>, <code class="docutils literal notranslate"><span class="pre">mean()</span></code>, <code class="docutils literal notranslate"><span class="pre">max()</span></code>, etc:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">t4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">({</span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">});</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_tensor</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">();</span>
-<span class="n">sum</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span><span class="w"> </span><span class="n">t4</span><span class="p">);</span>
+<span class="p">(</span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sum</span><span class="p">(</span><span class="n">t4</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>The above code performs an optimized sum reduction of <code class="docutils literal notranslate"><span class="pre">t4</span></code> into <code class="docutils literal notranslate"><span class="pre">t0</span></code>. Currently reduction type exectors <em>can</em> take operators as an input. Please
 see the documentation for a list of which ones are compatible.</p>
+<p>For more information about operation fusion, see <a class="reference internal" href="basics/fusion.html#fusion"><span class="std std-ref">Operator Fusion</span></a>.</p>
 </section>
 <section id="random-numbers">
 <h2>Random numbers<a class="headerlink" href="#random-numbers" title="Permalink to this heading">#</a></h2>
@@ -1028,7 +1032,7 @@ real tasks using MatX, and the API guide to see an exhaustive list of functions 
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#initialization-of-operators-and-generators">Initialization of operators and generators</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#executors">Executors</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#transforms">Transforms</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#random-numbers">Random numbers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#that-s-it">That’s it!</a></li>
 </ul>

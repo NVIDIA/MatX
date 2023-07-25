@@ -5,8 +5,8 @@ conv2d
 
 2D convolution
 
-.. doxygenfunction:: conv2d(OutputType o, const In1Type in1, const In2Type in2, matxConvCorrMode_t mode, cudaStream_t stream = 0)
-.. doxygenfunction:: conv2d(OutputType &o, const In1Type &i1, const In2Type &i2, const int32_t (&axis)[2],  matxConvCorrMode_t mode, cudaStream_t stream = 0)
+.. doxygenfunction:: conv2d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode)
+.. doxygenfunction:: conv2d(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[2], matxConvCorrMode_t mode)   
 
 Examples
 ~~~~~~~~
