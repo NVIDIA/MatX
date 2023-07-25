@@ -92,6 +92,50 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1DFWD1024C2C)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "fft_1d_fwd", {fft_dim, fft_dim});
+
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  // example-begin fft-1
+  // Perform a 1D FFT from input av into output avo. Input and output sizes will be deduced by the
+  // type of the tensors and output size.
+  fft(avo, av, fft_dim, 0, FORWARD);
+  // example-end fft-1
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1DORTHO1024C2C)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "fft_1d_ortho", {fft_dim, fft_dim});
+
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  // example-begin fft-1
+  // Perform a 1D FFT from input av into output avo. Input and output sizes will be deduced by the
+  // type of the tensors and output size.
+  fft(avo, av, fft_dim, 0, ORTHO);
+  // example-end fft-1
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1Axis)
 {
   MATX_ENTER_HANDLER();
@@ -348,7 +392,6 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2Axis)
   MATX_EXIT_HANDLER();
 }
 
-
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
 {
   MATX_ENTER_HANDLER();
@@ -360,6 +403,40 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft(av)).run();
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT1DORTHO1024C2C)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "ifft_1d_ortho", {fft_dim, fft_dim});
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  ifft(avo, av, fft_dim, 0, ORTHO);
+  cudaStreamSynchronize(0);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT1DFWD1024C2C)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 1024;
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "fft_operators", "ifft_1d_fwd", {fft_dim, fft_dim});
+  tensor_t<TypeParam, 1> av{{fft_dim}};
+  tensor_t<TypeParam, 1> avo{{fft_dim}};
+  this->pb->NumpyToTensorView(av, "a_in");
+
+  ifft(avo, av, fft_dim, 0, FORWARD);
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
