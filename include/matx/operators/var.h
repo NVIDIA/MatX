@@ -44,10 +44,11 @@ namespace matx {
 
 namespace detail {
   template<typename OpA, int ORank>
-  class StddOp : public BaseOp<StddOp<OpA, ORank>>
+  class VarOp : public BaseOp<VarOp<OpA, ORank>>
   {
     private:
       OpA a_;
+      int ddof_;
       std::array<index_t, ORank> out_dims_;
       matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;      
 
@@ -55,10 +56,10 @@ namespace detail {
       using matxop = bool;
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
-      using stdd_xform_op = bool;
+      using var_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ std::string str() const { return "var(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ VarOp(OpA a, int ddof) : a_(a), ddof_(ddof) { 
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }        
@@ -71,7 +72,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        stdd_impl(std::get<0>(out), a_, ex);
+        var_impl(std::get<0>(out), a_, ex, ddof_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -105,10 +106,10 @@ namespace detail {
 }
 
 /**
- * Compute a standard deviation reduction
+ * Compute a variance reduction
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size along an axis
+ * Computes the variance of the input according to the output tensor rank and
+ * size
  *
  * @tparam InType
  *   Input data type
@@ -119,33 +120,41 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of variance computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto var(const InType &in, const int (&dims)[D], int ddof = 1)
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::VarOp<decltype(permop), InType::Rank() - D>(permop, ddof);
 }
 
 /**
- * Compute a standard deviation reduction
+ * Compute a variance reduction
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
+ * Computes the variance of the input according to the output tensor rank and
+ * size
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
  *   Input data to reduce
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of variance computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto var(const InType &in, int ddof = 1)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::VarOp<decltype(in), 0>(in, ddof);
 }
 
 }

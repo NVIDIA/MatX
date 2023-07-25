@@ -97,6 +97,7 @@ public:
   inline set(T &out, const Op op) : out_(out), op_(op)
   {
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
+    static_assert(!is_matx_transform_op<T>(), "Cannot use transform operator on LHS of assignment");
 
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
@@ -162,6 +163,9 @@ public:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) noexcept
   {
+    if constexpr (is_matx_op<T>()) {
+      out_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }    
     if constexpr (is_matx_op<Op>()) {
       op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -170,6 +174,9 @@ public:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept  
   {
+    if constexpr (is_matx_op<T>()) {
+      out_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }     
     if constexpr (is_matx_op<Op>()) {
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }

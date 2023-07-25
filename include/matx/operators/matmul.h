@@ -40,14 +40,15 @@
 namespace matx
 {
   namespace detail {
-    template <typename OpA, typename OpB>
-    class MatMulOp : public BaseOp<MatMulOp<OpA, OpB>>
+    template <typename OpA, typename OpB, typename PermDims>
+    class MatMulOp : public BaseOp<MatMulOp<OpA, OpB, PermDims>>
     {
       private:
         OpA a_;
         OpB b_;
         float alpha_;
-        float beta_;   
+        float beta_;
+        PermDims perm_; 
         std::array<index_t, OpA::Rank()> out_dims_;
         matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
@@ -61,14 +62,30 @@ namespace matx
             return "matmul(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta) : 
-              a_(a), b_(b), alpha_(alpha), beta_(beta) {
-          for (int r = 0; r < Rank() - 2; r++) {
-            out_dims_[r] = a_.Size(r);
+        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta, PermDims perm) : 
+              a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
+          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            for (int r = 0; r < Rank(); r++) {
+              if (perm_[r] == Rank() - 2) {
+                out_dims_[r] = a_.Size(perm_[r]);
+              }
+              else if (perm_[r] == Rank() - 1) {
+                out_dims_[r] = b_.Size(perm_[r]);
+              }
+              else {
+                out_dims_[r] = a_.Size(r);
+              }
+            }
+            printf("%lld %lld %lld\n", out_dims_[0], out_dims_[1], out_dims_[2]);
           }
+          else {
+            for (int r = 0; r < Rank() - 2; r++) {
+              out_dims_[r] = a_.Size(r);
+            }
 
-          out_dims_[OpA::Rank() - 2] = a_.Size(OpA::Rank() - 2);
-          out_dims_[OpB::Rank() - 1] = b_.Size(OpB::Rank() - 1);
+            out_dims_[OpA::Rank() - 2] = a_.Size(OpA::Rank() - 2);
+            out_dims_[OpB::Rank() - 1] = b_.Size(OpB::Rank() - 1);
+          }
         }
 
         template <typename... Is>
@@ -76,6 +93,7 @@ namespace matx
         {
           return tmp_out_(indices...);
         }
+   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -89,7 +107,12 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) {
           static_assert(is_device_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
-          matmul_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            matmul_impl(permute(std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
+          }
+          else {
+            matmul_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -98,6 +121,10 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          if constexpr (is_matx_op<OpB>()) {
+            b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }          
 
           if constexpr (is_device_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -134,7 +161,7 @@ namespace matx
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0) {
-    return detail::MatMulOp(A, B, alpha, beta);
+    return detail::MatMulOp(A, B, alpha, beta, detail::no_permute_t{});
   }
 
   /**
@@ -171,6 +198,6 @@ namespace matx
     auto in1 = permute(A, perm);
     auto in2 = permute(B, perm);
 
-    return detail::MatMulOp(in1, in2, alpha, beta);
+    return detail::MatMulOp(in1, in2, alpha, beta, perm);
   }  
 }

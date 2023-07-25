@@ -2,7 +2,7 @@
 // BSD 3-Clause License
 //
 // COpBright (c) 2021, NVIDIA Corporation
-// All rights reserved.
+// prod rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -21,7 +21,7 @@
 // THIS SOFTWARE IS PROVIDED BY THE COpBRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COpBRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// DISCLAIMED. IN NO EVENT SHprod THE COpBRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
 // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
@@ -44,7 +44,7 @@ namespace matx {
 
 namespace detail {
   template<typename OpA, int ORank>
-  class StddOp : public BaseOp<StddOp<OpA, ORank>>
+  class ProdOp : public BaseOp<ProdOp<OpA, ORank>>
   {
     private:
       OpA a_;
@@ -55,13 +55,13 @@ namespace detail {
       using matxop = bool;
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
-      using stdd_xform_op = bool;
+      using prod_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ std::string str() const { return "prod(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ ProdOp(OpA a) : a_(a) { 
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
-        }        
+        }                    
       };
 
       template <typename... Is>
@@ -71,13 +71,13 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        stdd_impl(std::get<0>(out), a_, ex);
+        prod_impl(std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return ORank;
-      }
+    }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
@@ -105,10 +105,9 @@ namespace detail {
 }
 
 /**
- * Compute a standard deviation reduction
+ * Compute product of numbers along axes
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size along an axis
+ * Returns a tensor representing the product of all items in the reduction
  *
  * @tparam InType
  *   Input data type
@@ -119,33 +118,34 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @returns Operator with reduced values of prod-reduce computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto prod(const InType &in, const int (&dims)[D])
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::ProdOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
 /**
- * Compute a standard deviation reduction
+ * Compute product of numbers
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
+ * Returns a tensor representing the product of all items in the reduction
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
  *   Input data to reduce
+ * @returns Operator with reduced values of prod-reduce computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto prod(const InType &in)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::ProdOp<decltype(in), 0>(in);
 }
 
 }
