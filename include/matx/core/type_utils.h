@@ -669,7 +669,7 @@ using extract_scalar_type_t = typename detail::extract_scalar_type_impl<T>::scal
  * @tparam T Type to convert
  */
 template <typename T>
-using promote_half_t = typename std::conditional_t<is_half_v<T>, float, T>;
+using promote_half_t = typename std::conditional_t<is_half_v<T> || is_matx_half_v<T>, float, T>;
 
 
 

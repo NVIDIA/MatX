@@ -860,11 +860,11 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 
   // Normalize input if necessary
   using input_type = decltype(in_t);
-  using scalar_type = typename inner_op_type_t<typename input_type::scalar_type>;
+  using s_type = typename detail::value_promote_t<typename input_type::scalar_type>;
   if (norm == ORTHO) {
-    (in *= std::sqrt(scalar_type(fft_size))).run(stream);
+    (in /= std::sqrt(static_cast<s_type>(fft_size))).run(stream);
   } else if (norm == FORWARD) {
-    (in /= scalar_type(fft_size)).run(stream);
+    (in /= s_type(fft_size)).run(stream);
   }
 
   // Get parameters required by these tensors
@@ -912,11 +912,11 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
 
   // Normalize input if necessary
   using input_type = decltype(in_t);
-  using scalar_type = typename inner_op_type_t<typename input_type::scalar_type>;
+  using s_type = typename detail::value_promote_t<typename input_type::scalar_type>;
   if (norm == ORTHO) {
-    (in *= std::sqrt(scalar_type(fft_size))).run(stream);
+    (in *= std::sqrt(static_cast<s_type>(fft_size))).run(stream);
   } else if (norm == FORWARD) {
-    (in *= scalar_type(fft_size)).run(stream);
+    (in *= s_type(fft_size)).run(stream);
   }
 
   // Get parameters required by these tensors

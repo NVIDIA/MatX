@@ -169,6 +169,20 @@ class fft_operators:
             'a_out': np.fft.fft(seq, self.size[1])
         }
 
+    def fft_1d_ortho(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft(seq, self.size[1], norm="ortho")
+        }
+
+    def fft_1d_fwd(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft(seq, self.size[1], norm="forward")
+        }
+
     def fft_1d_batched(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
         return {
@@ -181,6 +195,20 @@ class fft_operators:
         return {
             'a_in': seq,
             'a_out': np.fft.ifft(seq, self.size[1])
+        }
+
+    def ifft_1d_ortho(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.ifft(seq, self.size[1], norm="ortho")
+        }
+
+    def ifft_1d_fwd(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.ifft(seq, self.size[1], norm="forward")
         }
 
     def rfft_1d(self) -> Dict[str, np.ndarray]:
