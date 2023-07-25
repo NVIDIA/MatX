@@ -192,7 +192,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 
   // example-begin sort-test-1
   // Ascending sort of 1D input
-  matx::sort(tmpv, this->t1, SORT_DIR_ASC, this->exec);
+  (tmpv = matx::sort(this->t1, SORT_DIR_ASC)).run(this->exec);
   // example-end sort-test-1
   cudaStreamSynchronize(0);
 
@@ -202,7 +202,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 
   // example-begin sort-test-2
   // Descending sort of 1D input
-  matx::sort(tmpv, this->t1, SORT_DIR_DESC, this->exec);
+  (tmpv = matx::sort(this->t1, SORT_DIR_DESC)).run(this->exec);
   // example-end sort-test-2
   cudaStreamSynchronize(0);
 
@@ -219,7 +219,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
     }
   }
 
-  matx::sort(tmpv2, this->t2, SORT_DIR_ASC, this->exec);
+  (tmpv2 = matx::sort(this->t2, SORT_DIR_ASC)).run(this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
@@ -229,7 +229,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
   }
 
   // Descending
-  matx::sort(tmpv2, this->t2, SORT_DIR_DESC, this->exec);
+  (tmpv2 = matx::sort(this->t2, SORT_DIR_DESC)).run(this->exec);
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {

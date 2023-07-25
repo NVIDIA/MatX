@@ -245,7 +245,7 @@ public:
     (waveformPart = waveformPart * hamming<0>({waveformLength})).run(stream);
 
     // compute L2 norm
-    sum(norms, norm(waveformPart), stream);
+    (norms = sum(norm(waveformPart))).run(stream);
     (norms = sqrt(norms)).run(stream);
 
     (waveformPart = waveformPart / norms).run(stream);

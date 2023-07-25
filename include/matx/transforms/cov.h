@@ -173,7 +173,7 @@ public:
     }
     else {
       // example-begin transpose-test-1
-      (*devsT = transpose(*devsT)).run(stream);
+      (*devsT = transpose(*devs)).run(stream);
       // example-end transpose-test-1
     }
 

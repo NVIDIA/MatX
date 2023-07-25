@@ -148,7 +148,7 @@ namespace detail {
           auto Ei = eye<ATypeS>({m-i,m-i});
           auto Ii = clone<RANK>(Ei, ECShape);
 
-          sum(N, norm(x), stream);
+          (N = sum(norm(x))).run(stream);
           (N = sqrt(N)).run(stream);
 
           // copy x into v and apply signed addition of nc
@@ -156,7 +156,7 @@ namespace detail {
                    v = x + sign(x, ATypeS(1) ) * nc,
                    v = x)).run(stream);
 
-          sum(ci, norm(v), stream);
+          (ci = sum(norm(v))).run(stream);
 
           (ci = NTypeS(2) / ci).run(stream);
 

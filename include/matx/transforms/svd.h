@@ -188,8 +188,8 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
         sum(s, norm(x), stream);
 #else
         //WAR cub not supporting strided output
-        sum(sums, norm(x), stream);
-        (s = sums).run(stream);;
+        (sums = sum(norm(x))).run(stream);
+        (s = sums).run(stream);
 #endif
 
         const int CRANK = s.Rank()+1;  // adding one more dim to s
@@ -243,7 +243,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       sum(s, norm(v), stream);
 #else
       //WAR cub not supporting strided output
-      sum(sums, norm(v), stream);
+      (sums = sum(norm(v))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);
@@ -270,7 +270,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       sum(s, norm(u), stream);
 #else
       //WAR cub not supporting strided output
-      sum(sums, norm(u), stream);
+      (sums = sum(norm(u))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);

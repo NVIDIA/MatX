@@ -195,21 +195,29 @@ printf("data %p %p\n", f2.Data(), f.Data());
   print(Vv);
   //svd_impl(Uv, Sv, Vv, Atv2);  
 
-   m = 16;
-  constexpr index_t k = 32;
-  n = 64;
-  constexpr index_t b = 8;
-    // example-begin matmul-test-6  
-    const int axis[2] = {2, 1};
+{
+    tensor_t<TypeParam, 0> t0;
 
-    auto ai = make_tensor<TypeParam>({b, k, m});
-    auto bi = make_tensor<TypeParam>({b, n, k});
-    auto ci = make_tensor<TypeParam>({b, m, n});
+    tensor_t<TypeParam, 1> t1({30});
+    tensor_t<TypeParam, 2> t2({30, 40});
+    tensor_t<TypeParam, 3> t3({30, 40, 50});
+    tensor_t<TypeParam, 4> t4({30, 40, 50, 60});
 
-    // Perform a GEMM with the last two dimensions permuted
-    (ci = matmul(ai, bi, axis)).run();
-    // example-end matmul-test-6    
-print(ci);
+    (t1 = ones<TypeParam>(t1.Shape())).run();
+    (t2 = ones<TypeParam>(t2.Shape())).run();
+    (t3 = ones<TypeParam>(t3.Shape())).run();
+    (t4 = ones<TypeParam>(t4.Shape())).run();
+    cudaStreamSynchronize(0);
+
+    t1(5) = 0;
+    t3(1, 1, 1) = 0;
+
+    // example-begin all-test-1
+    // Reduce a 4D tensor into a 0D tensor where the 0D is "true" if all values in "t4"
+    // convert to "true", or "false" otherwise
+    (t0 = all(t4)).run();  
+    print(t0);
+}
 
     cudaStreamSynchronize(0);
   // Time graph execution of same kernels

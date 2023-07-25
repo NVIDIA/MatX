@@ -164,10 +164,10 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  (Atv = transpose(Av)).run();
+  (Atv = transpose_matrix(Av)).run();
 
   auto Atv2 = Atv.View({batches, m, n});
-  svd_impl(Uv, Sv, Vv, Atv2);
+  (mtie(Uv, Sv, Vv) = svd(Atv2)).run();
 
   cudaStreamSynchronize(0);
 
@@ -175,8 +175,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
   // However, U and V are in column-major format, so we have to transpose them
   // back to verify the identity.
-  (Uav = transpose(Uv)).run();
-  (Vav = transpose(Vv)).run();
+  (Uav = transpose_matrix(Uv)).run();
+  (Vav = transpose_matrix(Vv)).run();
 
   // Zero out s
   (Sav = zeros<typename inner_op_type_t<TypeParam>::type>({batches, m, n})).run();
@@ -305,9 +305,9 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   (VTVd = abs(VTV - I)).run(stream);
   (Ad = abs(A - UDVT)).run(stream);
 
-  rmax(mdiffU, UTUd, stream);
-  rmax(mdiffV, VTVd, stream);
-  rmax(mdiffA, Ad, stream);
+  (mdiffU = rmax(UTUd)).run(stream);
+  (mdiffV = rmax(VTVd)).run(stream);
+  (mdiffA = rmax(Ad)).run(stream);
 
   cudaDeviceSynchronize();
 
@@ -437,9 +437,9 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   (VTVd = abs(VTV - I)).run(stream);
   (Ad = abs(A - UDVT)).run(stream);
 
-  rmax(mdiffU, UTUd, stream);
-  rmax(mdiffV, VTVd, stream);
-  rmax(mdiffA, Ad, stream);
+  (mdiffU = rmax(UTUd)).run(stream);
+  (mdiffV = rmax(VTVd)).run(stream);
+  (mdiffA = rmax(Ad)).run(stream);
 
   cudaDeviceSynchronize();
 

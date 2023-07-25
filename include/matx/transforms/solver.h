@@ -1281,7 +1281,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   lu_impl(ac, piv, a_new, stream);
-  prod(out, diag(ac), stream);
+  (out = prod(diag(ac))).run(stream);
 }
 
 
