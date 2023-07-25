@@ -47,7 +47,7 @@ namespace detail {
   {
     private:
       OpA a_;
-      const SortDirection_t dir dir_;
+      SortDirection_t dir_;
       std::array<index_t, OpA::Rank()> out_dims_;
       matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;      
 
@@ -58,7 +58,7 @@ namespace detail {
       using sort_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "sort()"; }
-      __MATX_INLINE__ SortOp(OpA a) : a_(a), dir_(dir) { 
+      __MATX_INLINE__ SortOp(OpA a, SortDirection_t dir) : a_(a), dir_(dir) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }

@@ -19,14 +19,14 @@
 //    this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COpBRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// AND argmin EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
 // DISCLAIMED. IN NO EVENT SHALL THE COpBRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// FOR argmin DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// CAUSED AND ON argmin THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN argmin WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -44,71 +44,52 @@ namespace matx {
 
 namespace detail {
   template<typename OpA, int ORank>
-  class StddOp : public BaseOp<StddOp<OpA, ORank>>
+  class ArgMinOp : public BaseOp<ArgMinOp<OpA, ORank>>
   {
     private:
       OpA a_;
-      std::array<index_t, ORank> out_dims_;
-      matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;      
 
     public:
       using matxop = bool;
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
-      using stdd_xform_op = bool;
+      using argmin_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(OpA a) : a_(a) { 
-        for (int r = 0; r < ORank; r++) {
-          out_dims_[r] = a_.Size(r);
-        }        
+      __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ ArgMinOp(OpA a) : a_(a) {
+     
       };
 
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-        return tmp_out_(indices...);
-      };
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        stdd_impl(std::get<0>(out), a_, ex);
+        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmin(). ie: (mtie(O, I) = argmin(A))");   
+        argmin_impl(std::get<0>(out), std::get<1>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return ORank;
+        return matxNoRank;
       }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
       {
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
-
-        if constexpr (is_device_executor_v<Executor>) {
-          make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);          
-        }
-
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        MATX_ASSERT_STR(false, matxNotSupported, "argmin() must only be called with a single assignment since it has multiple return types");
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return out_dims_[dim];
+        return 0;
       }
 
   };
 }
 
 /**
- * Compute a standard deviation reduction
- *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size along an axis
+ * Compute min reduction of a tensor and returns value + index along specified axes
  *
  * @tparam InType
  *   Input data type
@@ -119,33 +100,32 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @returns Operator with reduced values of argmin-reduce computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto argmin(const InType &in, const int (&dims)[D])
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::ArgMinOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
 /**
- * Compute a standard deviation reduction
- *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
+ * Compute min reduction of a tensor and returns value + index
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
  *   Input data to reduce
+ * @returns Operator with reduced values of argmin-reduce computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto argmin(const InType &in)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::ArgMinOp<decltype(in), 0>(in);
 }
 
 }

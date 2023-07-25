@@ -44,7 +44,7 @@ namespace matx {
 
 namespace detail {
   template<typename OpA, int ORank>
-  class StddOp : public BaseOp<StddOp<OpA, ORank>>
+  class AnyOp : public BaseOp<AnyOp<OpA, ORank>>
   {
     private:
       OpA a_;
@@ -55,10 +55,10 @@ namespace detail {
       using matxop = bool;
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
-      using stdd_xform_op = bool;
+      using any_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ std::string str() const { return "any(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ AnyOp(OpA a) : a_(a) { 
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }        
@@ -71,7 +71,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        stdd_impl(std::get<0>(out), a_, ex);
+        any_impl(std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -105,10 +105,11 @@ namespace detail {
 }
 
 /**
- * Compute a standard deviation reduction
+ * Find if any value is != 0
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size along an axis
+ * Returns a boolean value indicating whether any value in the set of inputs are
+ * non-zero. The same aggregation rules apply for input vs output tensor size
+ * and what type of reduction is done.
  *
  * @tparam InType
  *   Input data type
@@ -119,33 +120,36 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @returns Operator with reduced values of any-reduce computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto any(const InType &in, const int (&dims)[D])
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::AnyOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
 /**
- * Compute a standard deviation reduction
+ * Find if any value is != 0
  *
- * Computes the standard deviation of the input according to the output tensor
- * rank and size
+ * Returns a boolean value indicating whether any value in the set of inputs are
+ * non-zero. The same aggregation rules apply for input vs output tensor size
+ * and what type of reduction is done.
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
  *   Input data to reduce
+ * @returns Operator with reduced values of any-reduce computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto any(const InType &in)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::AnyOp<decltype(in), 0>(in);
 }
 
 }

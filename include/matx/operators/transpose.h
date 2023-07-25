@@ -43,35 +43,46 @@ namespace matx {
 
 namespace detail {
   template<typename OpA>
-  class TransposeOp : public BaseOp<TransposeOp<OpA>>
+  class TransposeMatrixOp : public BaseOp<TransposeMatrixOp<OpA>>
   {
     private:
       OpA a_;
-      std::array<index_t, 2> out_dims_;
+      std::array<index_t, OpA::Rank()> out_dims_;
       matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
     public:
       using matxop = bool;
       using scalar_type = typename OpA::scalar_type;
+      using shape_type = std::conditional_t<has_shape_type_v<OpA>, typename OpA::shape_type, index_t>; 
       using matx_transform_op = bool;
+      using matxoplvalue = bool;
       using transpose_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "transpose(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ TransposeOp(OpA a) : a_(a) {
+      __MATX_INLINE__ std::string str() const { return "transpose_matrix(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ TransposeMatrixOp(OpA a) : a_(a) {
         for (int r = 0; r < Rank(); r++) {
-          out_dims_[Rank() - r - 1] = a_.Size(r);
+          if (r >= Rank() - 2) {
+            out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);
+          }
+          else {
+            out_dims_[r] = a_.Size(r);
+          }
         }        
       }
 
-      // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
         return tmp_out_(indices...);
       }
 
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)  {
+        return tmp_out_(indices...);
+      }      
+
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        transpose_impl(std::get<0>(out), a_, ex);
+        transpose_matrix_impl(std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -102,6 +113,9 @@ namespace detail {
         return out_dims_[dim];
       }
 
+      template<typename R> 
+      __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+
   };
 }
 
@@ -117,17 +131,21 @@ namespace detail {
   * @param op Input operator
   * @return transposed operator
   */
-template <typename T>
+  template <typename T>
   __MATX_INLINE__ auto transpose(const T op) {
   
     static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
+    int32_t dims[T::Rank()];
+    for (int r = 0; r < T::Rank(); r++) {
+      dims[r] = T::Rank() - r - 1;
+    }
 
-    return detail::TransposeOp(op);
+    return permute(op, dims);
   }
 
 
   /**
-   * @brief Operator to transpose the dimensions of a tensor or operator.
+   * @brief Operator to transpose the last two dimensions of a tensor or operator.
    *
    * The each dimension must appear in the dims array once.
 
@@ -138,18 +156,17 @@ template <typename T>
    * @return permuted operator
    */
   template <typename T>
-    __MATX_INLINE__ auto transpose_matrix( const T op) {
-    
-      static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
+  __MATX_INLINE__ auto transpose_matrix(const T op) {
+    static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
 
-      int32_t dims[T::Rank()];
-      for(int i = 0; i < T::Rank(); i++) 
-        dims[i] = i;
-      int32_t dim1 = T::Rank() - 1;
-      int32_t dim2 = T::Rank() - 2;
+    int32_t dims[T::Rank()];
+    for(int i = 0; i < T::Rank(); i++) 
+      dims[i] = i;
+    int32_t dim1 = T::Rank() - 1;
+    int32_t dim2 = T::Rank() - 2;
 
-      std::swap(dims[dim1],dims[dim2]);
-      return permute(op, detail::to_array(dims));
-    }  
+    std::swap(dims[dim1],dims[dim2]);
+    return permute(op, detail::to_array(dims));
+  }  
 
 }
