@@ -47,6 +47,13 @@
 #include <optional>
 
 namespace matx {
+
+enum FFTNorm {
+  BACKWARD, /// fft is unscaled, ifft is 1/N
+  FORWARD, /// fft is scaled 1/N, ifft is not scaled
+  ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
+};
+
 namespace detail {
 
 static constexpr int MAX_FFT_RANK = 2;
@@ -96,11 +103,28 @@ public:
    *   CUDA stream
    **/
   void inline Forward(OutTensorType &o,
-                      const InTensorType &i, cudaStream_t stream)
+                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
+
+    // Normalize input if necessary
+    using s_type = typename detail::value_promote_t<typename InTensorType::scalar_type>;
+    s_type factor;
+    if (params_.fft_rank == 1) {
+      factor = static_cast<s_type>(params_.n[0]);
+    } else {
+      factor = static_cast<s_type>(params_.n[0] * params_.n[1]);
+    }
+
     Exec(o, i, CUFFT_FORWARD);
+
+    if (norm == ORTHO) {
+      (o *= 1.0 / std::sqrt(factor)).run(stream);
+    } else if (norm == FORWARD) {
+      (o *= 1.0 / factor).run(stream);
+    }
+
   }
 
   /**
@@ -118,7 +142,7 @@ public:
    *   CUDA stream
    **/
   void inline Inverse(OutTensorType &o,
-                      const InTensorType &i, cudaStream_t stream)
+                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
@@ -126,13 +150,20 @@ public:
 
     // cuFFT doesn't scale IFFT the same as MATLAB/Python. Scale it here to
     // match
+    using s_type = typename detail::value_promote_t<typename OutTensorType::scalar_type>;
+    s_type factor;
     if (params_.fft_rank == 1) {
-      (o = o * 1.0 / static_cast<double>(params_.n[0])).run(stream);
+      factor = static_cast<s_type>(params_.n[0]);
+    } else {
+      factor = static_cast<s_type>(params_.n[0] * params_.n[1]);
     }
-    else {
-      (o = o * 1.0 / static_cast<double>(params_.n[0] * params_.n[1]))
-          .run(stream);
+
+    if (norm == ORTHO) {
+      (o *= 1.0 / std::sqrt(factor)).run(stream);
+    } else if (norm == BACKWARD) {
+      (o *= 1.0 / factor).run(stream);
     }
+
   }
 
   static FftParams_t GetFFTParams(OutTensorType &o,
@@ -858,15 +889,6 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   // adjusts size of tensor based on fft_size
   auto in = detail::GetFFTInputView(out, in_t, fft_size, stream);
 
-  // Normalize input if necessary
-  using input_type = decltype(in_t);
-  using s_type = typename detail::value_promote_t<typename input_type::scalar_type>;
-  if (norm == ORTHO) {
-    (in /= std::sqrt(static_cast<s_type>(fft_size))).run(stream);
-  } else if (norm == FORWARD) {
-    (in /= s_type(fft_size)).run(stream);
-  }
-
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
   params.stream = stream;
@@ -876,11 +898,11 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   if (ret == std::nullopt) {
     auto tmp = new detail::matxFFTPlan1D_t<decltype(out), decltype(in)>{out, in};
     detail::cache_1d.Insert(params, static_cast<void *>(tmp));
-    tmp->Forward(out, in, stream);
+    tmp->Forward(out, in, stream, norm);
   }
   else {
     auto fft_type = static_cast<detail::matxFFTPlan1D_t<decltype(out), decltype(in)> *>(ret.value());
-    fft_type->Forward(out, in, stream);
+    fft_type->Forward(out, in, stream, norm);
   }
 
   if(!out.isSameView(o)) {
@@ -910,15 +932,6 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   // adjusts size of tensor based on fft_size
   auto in = detail::GetFFTInputView(out, in_t, fft_size, stream);
 
-  // Normalize input if necessary
-  using input_type = decltype(in_t);
-  using s_type = typename detail::value_promote_t<typename input_type::scalar_type>;
-  if (norm == ORTHO) {
-    (in *= std::sqrt(static_cast<s_type>(fft_size))).run(stream);
-  } else if (norm == FORWARD) {
-    (in *= s_type(fft_size)).run(stream);
-  }
-
   // Get parameters required by these tensors
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
   params.stream = stream;
@@ -928,11 +941,11 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   if (ret == std::nullopt) {
     auto tmp = new detail::matxFFTPlan1D_t<decltype(out), decltype(in)>{out, in};
     detail::cache_1d.Insert(params, static_cast<void *>(tmp));
-    tmp->Inverse(out, in, stream);
+    tmp->Inverse(out, in, stream, norm);
   }
   else {
     auto fft_type = static_cast<detail::matxFFTPlan1D_t<decltype(out), decltype(in)> *>(ret.value());
-    fft_type->Inverse(out, in, stream);
+    fft_type->Inverse(out, in, stream, norm);
   }
 
   if(!out.isSameView(o)) {
