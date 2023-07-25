@@ -14,9 +14,14 @@ of ``einsum`` operations are:
 * Inner products
 * Transposes
 * Reductions
+* Trace
 
 While many of these operations are possible using other methods in MatX, ``einsum`` typically has a 
 shorter syntax, and is sometimes more optimized than a direct version of the operation. 
+
+.. note::
+   Using einsum() requires a minimum of cuTENSOR 1.7.0 and cuTensorNet 23.03.0.20. These are downloaded
+   automatically as part of CMake, but for offline environments these versions are needed.
 
 As of now, MatX only supports a limited set of ``einsum`` operations that would be supported in
 the NumPy version. Specifically only tensor contractions, inner products, and GEMMs are supported 
@@ -120,3 +125,11 @@ Sum
    :start-after: example-begin einsum-sum-1
    :end-before: example-end einsum-sum-1
    :dedent:   
+
+Trace
+~~~~~
+.. literalinclude:: ../../../../test/00_tensor/EinsumTests.cu
+   :language: cpp
+   :start-after: example-begin einsum-trace-1
+   :end-before: example-end einsum-trace-1
+   :dedent:      

@@ -5,9 +5,8 @@ sum
 
 Reduces the input by the sum of values across the specified axes.
 
-.. doxygenfunction:: sum(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
-.. doxygenfunction:: sum(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: sum(OutType dest, const InType &in,  SingleThreadHostExecutor exec)
+.. doxygenfunction:: sum(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: sum(const InType &in)
 
 Examples
 ~~~~~~~~

@@ -5,9 +5,8 @@ all
 
 Returns a truth value if all values in the reduction converts to a boolean "true"
 
-.. doxygenfunction:: all(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
-.. doxygenfunction:: all(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: all(OutType dest, const InType &in, SingleThreadHostExecutor exec)
+.. doxygenfunction:: all(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: all(const InType &in)
 
 Examples
 ~~~~~~~~

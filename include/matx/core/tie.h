@@ -84,21 +84,13 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   static __MATX_INLINE__ constexpr int32_t Rank()
   {
-    return 1;
+    return matxNoRank;
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
   {
     return 0;
   }  
-
-  constexpr __MATX_INLINE__ auto Elements() const noexcept {
-    return std::tuple_size(ts_);
-  }
-
-  constexpr __MATX_INLINE__ auto IsSingleAssign() const noexcept { 
-    return sizeof...(Ts) == 2;
-  }
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {

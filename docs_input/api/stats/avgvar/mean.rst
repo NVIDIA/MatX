@@ -5,9 +5,8 @@ mean
 
 Compute the mean of the reduction dimensions
 
-.. doxygenfunction:: mean(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: mean(OutType dest, const InType &in, SingleThreadHostExecutor exec)
-.. doxygenfunction:: mean(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
+.. doxygenfunction:: mean(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: mean(const InType &in)
 
 Examples
 ~~~~~~~~

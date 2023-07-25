@@ -417,9 +417,9 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   }
 
   (out1 = conv1d(in1, in2, MATX_C_MODE_SAME)).run();
-  // example-begin conv1d-test-1
+  // example-begin conv1d-test-2
   (out2 = conv1d(in1, in2, {2}, MATX_C_MODE_SAME)).run();
-  // example-end conv1d-test-1
+  // example-end conv1d-test-2
 
   cudaStreamSynchronize(0);
 

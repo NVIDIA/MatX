@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,76 +616,41 @@ document.write(`
 <span id="argmax-func"></span><h1>argmax<a class="headerlink" href="#argmax" title="Permalink to this heading">#</a></h1>
 <p>Returns both the maximum values and the indices of the maximum values across the input operator</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor">
-<span id="_CPPv3I000_i0EN4matx6argmaxE7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor"></span><span id="_CPPv2I000_i0EN4matx6argmaxE7OutTypeRK15TensorIndexTypeRK6InTypeRAD_KiRR8Executor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Executor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1acc853f7f41c73c205bcec72408a7b846"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="matx::argmax::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="matx::argmax::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">idest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="matx::argmax::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span>, <a class="reference internal" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="matx::argmax::Executor"><span class="n"><span class="pre">Executor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000_i0EN4matx6argmaxEv7OutTypeRK15TensorIndexTypeRK6InTypeRA1D_KiRR8Executor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Compute maxn reduction of a tensor and returns value + index</p>
-<p>Returns a tensor with maximums and indices</p>
+<dt class="sig sig-object cpp" id="_CPPv4I0_iEN4matx6argmaxEDaRK6InTypeRA1D_Ki">
+<span id="_CPPv3I0_iEN4matx6argmaxERK6InTypeRA1D_Ki"></span><span id="_CPPv2I0_iEN4matx6argmaxERK6InTypeRAD_Ki"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">D</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ae438e4da2408cd0cd236bfde551f1196"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_iEN4matx6argmaxEDaRK6InTypeRA1D_Ki" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dims</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4I0_iEN4matx6argmaxEDaRK6InTypeRA1D_Ki" title="matx::argmax::D"><span class="n"><span class="pre">D</span></span></a><span class="p"><span class="pre">]</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0_iEN4matx6argmaxEDaRK6InTypeRA1D_Ki" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Compute min reduction of a tensor and returns value + index along specified axes</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>TensorIndexType</strong> – Output type stpring indices </p></li>
 <li><p><strong>InType</strong> – Input data type </p></li>
-<li><p><strong>D</strong> – Num of dimensions to reduce over </p></li>
-<li><p><strong>Executor</strong> – Executor type</p></li>
+<li><p><strong>D</strong> – Num of dimensions to reduce over</p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>idest</strong> – Destination for indices </p></li>
 <li><p><strong>in</strong> – Input data to reduce </p></li>
 <li><p><strong>dims</strong> – Array containing dimensions to reduce over </p></li>
-<li><p><strong>exec</strong> – Executor to use for reduction </p></li>
 </ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of argmax-reduce computed </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor">
-<span id="_CPPv3I000EN4matx6argmaxE7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor"></span><span id="_CPPv2I000EN4matx6argmaxE7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a51fd4bda0f6ccf92fc6e76e0e7398fdd"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor" title="matx::argmax::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor" title="matx::argmax::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">idest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType12cudaExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Compute maxn reduction of a tensor and returns value + index</p>
-<p>Returns a tensor with maximums and indices</p>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx6argmaxEDaRK6InType">
+<span id="_CPPv3I0EN4matx6argmaxERK6InType"></span><span id="_CPPv2I0EN4matx6argmaxERK6InType"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ac7a4d06d7a8a754ddc952417ec27104e"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx6argmaxEDaRK6InType" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx6argmaxEDaRK6InType" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Compute min reduction of a tensor and returns value + index</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>TensorIndexType</strong> – Output type stpring indices </p></li>
-<li><p><strong>InType</strong> – Input data type</p></li>
-</ul>
+<dd class="field-odd"><p><strong>InType</strong> – Input data type</p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>idest</strong> – Destination for indices </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>exec</strong> – CUDA executor or stream ID </p></li>
-</ul>
+<dd class="field-even"><p><strong>in</strong> – Input data to reduce </p>
 </dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor">
-<span id="_CPPv3I000EN4matx6argmaxE7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor"></span><span id="_CPPv2I000EN4matx6argmaxE7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorIndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a6268d1ffa7e87265f36470de6ba24d81"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">argmax</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor" title="matx::argmax::OutType"><span class="n"><span class="pre">OutType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dest</span></span>, <a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor" title="matx::argmax::TensorIndexType"><span class="n"><span class="pre">TensorIndexType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">idest</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor" title="matx::argmax::InType"><span class="n"><span class="pre">InType</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">SingleThreadHostExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000EN4matx6argmaxEv7OutTypeR15TensorIndexTypeRK6InType24SingleThreadHostExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Compute maxn reduction of a tensor and returns value + index</p>
-<p>Returns a tensor with maximums and indices</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>OutType</strong> – Output data type </p></li>
-<li><p><strong>TensorIndexType</strong> – Output type stpring indices </p></li>
-<li><p><strong>InType</strong> – Input data type</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>dest</strong> – Destination view of reduction </p></li>
-<li><p><strong>idest</strong> – Destination for indices </p></li>
-<li><p><strong>in</strong> – Input data to reduce </p></li>
-<li><p><strong>exec</strong> – Single threaded host executor </p></li>
-</ul>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Operator with reduced values of argmax-reduce computed </p>
 </dd>
 </dl>
 </dd></dl>
@@ -696,13 +663,13 @@ document.write(`
 
 <span class="n">t1o</span><span class="p">.</span><span class="n">SetVals</span><span class="p">({(</span><span class="n">T</span><span class="p">)</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="mi">11</span><span class="p">});</span>
 
-<span class="n">argmax</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span><span class="w"> </span><span class="n">t0i</span><span class="p">,</span><span class="w"> </span><span class="n">t1o</span><span class="p">,</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span><span class="w"> </span><span class="n">t0i</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argmax</span><span class="p">(</span><span class="n">t1o</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both</span>
 <span class="c1">// examples permute the dimensions before the reduction    </span>
-<span class="n">argmax</span><span class="p">(</span><span class="n">t2a</span><span class="p">,</span><span class="w"> </span><span class="n">t2ai</span><span class="p">,</span><span class="w"> </span><span class="n">permute</span><span class="p">(</span><span class="n">t4</span><span class="p">,{</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}),</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
-<span class="n">argmax</span><span class="p">(</span><span class="n">t2b</span><span class="p">,</span><span class="w"> </span><span class="n">t2bi</span><span class="p">,</span><span class="w"> </span><span class="n">t4</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="n">t2a</span><span class="p">,</span><span class="w"> </span><span class="n">t2ai</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argmax</span><span class="p">(</span><span class="n">permute</span><span class="p">(</span><span class="n">t4</span><span class="p">,{</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}))).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="n">t2b</span><span class="p">,</span><span class="w"> </span><span class="n">t2bi</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argmax</span><span class="p">(</span><span class="n">t4</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">})).</span><span class="n">run</span><span class="p">(</span><span class="n">exec</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>

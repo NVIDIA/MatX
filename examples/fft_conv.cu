@@ -71,133 +71,103 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
 
-  // index_t signal_size = 1ULL << 16;
-  // index_t filter_size = 16;
-  // index_t batches = 8;
-  // index_t filtered_size = signal_size + filter_size - 1;
-  // float separate_ms;
-  // float fused_ms;
-  // constexpr int iterations = 100;
-  // cudaStream_t stream;
-  // cudaStreamCreate(&stream);  
-  // cudaEvent_t start, stop;
-  // cudaEventCreate(&start);
-  // cudaEventCreate(&stop);  
+  index_t signal_size = 1ULL << 16;
+  index_t filter_size = 16;
+  index_t batches = 8;
+  index_t filtered_size = signal_size + filter_size - 1;
+  float separate_ms;
+  float fused_ms;
+  constexpr int iterations = 100;
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);  
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);  
 
-  // // Create time domain buffers
-  // auto sig_time  = make_tensor<complex>({batches, signal_size});
-  // auto filt_time = make_tensor<complex>({batches, filter_size});
-  // auto time_out  = make_tensor<complex>({batches, filtered_size});
+  // Create time domain buffers
+  auto sig_time  = make_tensor<complex>({batches, signal_size});
+  auto filt_time = make_tensor<complex>({batches, filter_size});
+  auto time_out  = make_tensor<complex>({batches, filtered_size});
 
-  // // Frequency domain buffers
-  // auto sig_freq  = make_tensor<complex>({batches, filtered_size});
-  // auto filt_freq = make_tensor<complex>({batches, filtered_size});
+  // Frequency domain buffers
+  auto sig_freq  = make_tensor<complex>({batches, filtered_size});
+  auto filt_freq = make_tensor<complex>({batches, filtered_size});
 
-  // for (index_t b = 0; b < batches; b++) {
-  //   // Fill the time domain signals with data
-  //   for (index_t i = 0; i < signal_size; i++) {
-  //     sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
-  //                           (static_cast<float>(i % 10) / 10.0f) +
-  //                       0.1f,
-  //                   -1.0f * (static_cast<float>(i % 2) == 0.0f) *
-  //                           (static_cast<float>(i % 10) / 5.0f) -
-  //                       0.1f};
-  //   }
-  //   for (index_t i = 0; i < filter_size; i++) {
-  //     filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
-  //                     static_cast<float>(-i) / static_cast<float>(filter_size) +
-  //                         0.5f};
-  //   }
-  // }
+  for (index_t b = 0; b < batches; b++) {
+    // Fill the time domain signals with data
+    for (index_t i = 0; i < signal_size; i++) {
+      sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
+                            (static_cast<float>(i % 10) / 10.0f) +
+                        0.1f,
+                    -1.0f * (static_cast<float>(i % 2) == 0.0f) *
+                            (static_cast<float>(i % 10) / 5.0f) -
+                        0.1f};
+    }
+    for (index_t i = 0; i < filter_size; i++) {
+      filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
+                      static_cast<float>(-i) / static_cast<float>(filter_size) +
+                          0.5f};
+    }
+  }
 
-  // // Prefetch the data we just created
-  // sig_time.PrefetchDevice(0);
-  // filt_time.PrefetchDevice(0);  
+  // Prefetch the data we just created
+  sig_time.PrefetchDevice(0);
+  filt_time.PrefetchDevice(0);  
 
 
-  // // Perform the FFT in-place on both signal and filter
-  // for (int i = 0; i < iterations; i++) {
-  //   if (i == 1) {
-  //     cudaEventRecord(start, stream);
-  //   }    
-  //   fft_impl(sig_freq, sig_time, 0, stream);
-  //   fft_impl(filt_freq, filt_time, 0, stream);
+  // Perform the FFT in-place on both signal and filter
+  for (int i = 0; i < iterations; i++) {
+    if (i == 1) {
+      cudaEventRecord(start, stream);
+    }    
+    fft_impl(sig_freq, sig_time, 0, stream);
+    fft_impl(filt_freq, filt_time, 0, stream);
 
-  //   (sig_freq = sig_freq * filt_freq).run(stream);
+    (sig_freq = sig_freq * filt_freq).run(stream);
 
-  //   // IFFT in-place
-  //   (sig_freq = ifft(sig_freq)).run(stream);
-  // }
+    // IFFT in-place
+    (sig_freq = ifft(sig_freq)).run(stream);
+  }
 
-  // cudaEventRecord(stop, stream);
-  // cudaStreamSynchronize(stream);
-  // cudaEventElapsedTime(&separate_ms, start, stop);   
+  cudaEventRecord(stop, stream);
+  cudaStreamSynchronize(stream);
+  cudaEventElapsedTime(&separate_ms, start, stop);   
 
-  // for (int i = 0; i < iterations; i++) {
-  //   if (i == 1) {
-  //     cudaEventRecord(start, stream);
-  //   }
-  //   (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(stream);
-  // }
+  for (int i = 0; i < iterations; i++) {
+    if (i == 1) {
+      cudaEventRecord(start, stream);
+    }
+    (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(stream);
+  }
   
-  // cudaEventRecord(stop, stream);
-  // cudaStreamSynchronize(stream);
-  // cudaEventElapsedTime(&fused_ms, start, stop);  
+  cudaEventRecord(stop, stream);
+  cudaStreamSynchronize(stream);
+  cudaEventElapsedTime(&fused_ms, start, stop);  
 
-  // printf("FFT runtimes for separate = %.2f ms, fused = %.2f ms\n", separate_ms/(iterations-1), fused_ms/(iterations-1));
+  printf("FFT runtimes for separate = %.2f ms, fused = %.2f ms\n", separate_ms/(iterations-1), fused_ms/(iterations-1));
 
-  // // Now the sig_freq view contains the full convolution result. Verify against
-  // // a direct convolution. The conv1d function only accepts a 1D filter, so we
-  // // create a sliced view here.
-  // auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
-  // (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  // Now the sig_freq view contains the full convolution result. Verify against
+  // a direct convolution. The conv1d function only accepts a 1D filter, so we
+  // create a sliced view here.
+  auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
+  (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
 
-  // cudaStreamSynchronize(0);
+  cudaStreamSynchronize(0);
  
-  // // Compare signals
-  // for (index_t b = 0; b < batches; b++) {
-  //   for (index_t i = 0; i < filtered_size; i++) {
-  //     if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
-  //         fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
-  //       std::cout <<
-  //           "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
-  //           sig_freq(b,i).real() << " " <<
-  //           sig_freq(b,i).imag() << "\n";
-  //       return -1;
-  //     }
-  //   }
-  // }
+  // Compare signals
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < filtered_size; i++) {
+      if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
+          fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
+        std::cout <<
+            "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
+            sig_freq(b,i).real() << " " <<
+            sig_freq(b,i).imag() << "\n";
+        return -1;
+      }
+    }
+  }
 
-{
-  constexpr index_t m = 16;
-  constexpr index_t k = 32;
-  constexpr index_t n = 64;
-  constexpr index_t b = 8;
-  tensor_t<float, 3> a3{{b, m, k}};
-  tensor_t<float, 3> b3{{b, k, n}};
-  tensor_t<float, 3> c3{{b, m, n}};    
-    const int axis[2] = {2, 1};
-    std::array<int, 3> perm({0, 2, 1});
-
-    auto ai = make_tensor<float>({b, k, m});
-    auto bi = make_tensor<float>({b, n, k});
-    auto ci = make_tensor<float>({b, n, m});
-
-    auto ap = permute(ai, perm);
-    auto bp = permute(bi, perm);
-    auto cp = permute(ci, perm);
-
-    // copy data into permuted inputs
-    (ap = a3).run();
-    (bp = b3).run();
-
-    // Perform a GEMM with the last two dimensions permuted
-    (ci = matmul(ai, bi, axis)).run();
-    // example-end matmul-test-6    
-    
-    // copy result from permuted output
-    (c3 = cp).run();
-}
 
   std::cout << "Verification successful" << std::endl;
 

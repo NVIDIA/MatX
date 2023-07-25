@@ -15,7 +15,7 @@ Return by Value
 .. doxygenfunction:: make_tensor( const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( TensorType &tensor, const index_t (&shape)[TensorType::Rank()], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
-.. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::shape_container &&shape,  matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
+.. doxygenfunction:: make_tensor( TensorType &tensor, ShapeType &&shape,  matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( TensorType &tensor, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( T *data, const index_t (&shape)[RANK], bool owning = false)

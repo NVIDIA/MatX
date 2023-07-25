@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -624,25 +626,45 @@ is supported for any tensor with a rank higher than 2.</p>
 <p>This function is currently is not supported with host-based executors (CPU)</p>
 </div>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff">
-<span id="_CPPv3I000_20MatXMatMulProvider_tEN4matx6matmulE11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff"></span><span id="_CPPv2I000_20MatXMatMulProvider_tEN4matx6matmulE11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeC</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeA</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeB</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">MatXMatMulProvider_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PROV</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">PROVIDER_TYPE_CUBLASLT</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1af0041ee32bc8d7534761e485ff8b2381"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matmul</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff" title="matx::matmul::TensorTypeC"><span class="n"><span class="pre">TensorTypeC</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">C</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff" title="matx::matmul::TensorTypeA"><span class="n"><span class="pre">TensorTypeA</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">A</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff" title="matx::matmul::TensorTypeB"><span class="n"><span class="pre">TensorTypeB</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">B</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeB12cudaStream_tff" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Run a GEMM without a plan</p>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBff">
+<span id="_CPPv3I00EN4matx6matmulEK3OpAK3OpBff"></span><span id="_CPPv2I00EN4matx6matmulEK3OpAK3OpBff"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpB</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a0e3a8b80e3d06e2e8cf8b2779478d2ed"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matmul</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBff" title="matx::matmul::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">A</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBff" title="matx::matmul::OpB"><span class="n"><span class="pre">OpB</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">B</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBff" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Run a GEMM (generic matrix multiply))</p>
 <p>Creates a new GEMM plan in the cache if none exists, and uses that to execute the GEMM. This function is preferred over creating a plan directly for both efficiency and simpler code. Since it only uses the signature of the GEMM to decide if a plan is cached, it may be able to reused plans for different A/B/C matrices as long as they were configured with the same dimensions.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>TensorTypeC</strong> – Data type of C tensor or operator </p></li>
-<li><p><strong>TensorTypeA</strong> – Data type of A tensor or operator </p></li>
-<li><p><strong>TensorTypeB</strong> – Data type of B tensor or operator </p></li>
-<li><p><strong>PROV</strong> – Provider type chosen from MatXMatMulProvider_t type</p></li>
+<li><p><strong>OpA</strong> – Data type of A tensor or operator </p></li>
+<li><p><strong>OpB</strong> – Data type of B tensor or operator</p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>C</strong> – C A Tensor or Operator </p></li>
 <li><p><strong>A</strong> – A A Tensor or Operator </p></li>
-<li><p><strong>B</strong> – B A Tensor or Operator </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
+<li><p><strong>B</strong> – B B Tensor or Operator </p></li>
+<li><p><strong>alpha</strong> – Scalar multiplier to apply to operator A </p></li>
+<li><p><strong>beta</strong> – Scalar multiplier to apply to operator C on input </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBRAL2E_K7int32_tff">
+<span id="_CPPv3I00EN4matx6matmulEK3OpAK3OpBRAL2E_K7int32_tff"></span><span id="_CPPv2I00EN4matx6matmulEK3OpAK3OpBRA2_K7int32_tff"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpB</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3cca4701a8696d6ced24dd61d8e69407"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matmul</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBRAL2E_K7int32_tff" title="matx::matmul::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">A</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBRAL2E_K7int32_tff" title="matx::matmul::OpB"><span class="n"><span class="pre">OpB</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">B</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">2</span></span><span class="p"><span class="pre">]</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx6matmulEDaK3OpAK3OpBRAL2E_K7int32_tff" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Run a GEMM (generic matrix multiply))</p>
+<p>Creates a new GEMM plan in the cache if none exists, and uses that to execute the GEMM. This function is preferred over creating a plan directly for both efficiency and simpler code. Since it only uses the signature of the GEMM to decide if a plan is cached, it may be able to reused plans for different A/B/C matrices as long as they were configured with the same dimensions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>OpA</strong> – Data type of A tensor or operator </p></li>
+<li><p><strong>OpB</strong> – Data type of B tensor or operator</p></li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>A</strong> – A A Tensor or Operator </p></li>
+<li><p><strong>B</strong> – B B Tensor or Operator </p></li>
+<li><p><strong>axis</strong> – the axis of the tensor or operator to perform the gemm along </p></li>
 <li><p><strong>alpha</strong> – Scalar multiplier to apply to operator A </p></li>
 <li><p><strong>beta</strong> – Scalar multiplier to apply to operator C on input </p></li>
 </ul>
@@ -653,19 +675,19 @@ is supported for any tensor with a rank higher than 2.</p>
 <section id="examples">
 <h3>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h3>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Perform the GEMM C = A*B</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">);</span>
+<span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>Permuted A</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Perform the GEMM C = A^T * B</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">PermuteMatrix</span><span class="p">();</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">at</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">);</span>
+<span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">at</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>Permuted B</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Perform the GEMM C = A * B^T</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">bt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">PermuteMatrix</span><span class="p">();</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">bt</span><span class="p">);</span>
+<span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">bt</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>Batched</p>
@@ -685,7 +707,7 @@ is supported for any tensor with a rank higher than 2.</p>
 <span class="k">this</span><span class="o">-&gt;</span><span class="n">pb</span><span class="o">-&gt;</span><span class="n">NumpyToTensorView</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;b&quot;</span><span class="p">);</span>
 
 <span class="c1">// Perform a batched gemm with &quot;batches&quot; GEMMs</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">);</span>
+<span class="p">(</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 <p>Strided Batched</p>
@@ -710,37 +732,9 @@ is supported for any tensor with a rank higher than 2.</p>
 <span class="k">this</span><span class="o">-&gt;</span><span class="n">pb</span><span class="o">-&gt;</span><span class="n">NumpyToTensorView</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;b&quot;</span><span class="p">);</span>
 
 <span class="c1">// Perform a strided and batched GEMM where &quot;as&quot; and &quot;bs&quot; have a stride of 2 in their inner-most dimension</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">cs</span><span class="p">,</span><span class="w"> </span><span class="n">as</span><span class="p">,</span><span class="w"> </span><span class="n">bs</span><span class="p">);</span>
+<span class="p">(</span><span class="n">cs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">as</span><span class="p">,</span><span class="w"> </span><span class="n">bs</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff">
-<span id="_CPPv3I000_20MatXMatMulProvider_tEN4matx6matmulE11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff"></span><span id="_CPPv2I000_20MatXMatMulProvider_tEN4matx6matmulE11TensorTypeCK11TensorTypeAK11TensorTypeBRA2_K7int32_t12cudaStream_tff"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeC</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeA</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorTypeB</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">MatXMatMulProvider_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PROV</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">PROVIDER_TYPE_CUBLASLT</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ab087a5ac5ff59a34c989bd514883485d"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">matmul</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff" title="matx::matmul::TensorTypeC"><span class="n"><span class="pre">TensorTypeC</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">C</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff" title="matx::matmul::TensorTypeA"><span class="n"><span class="pre">TensorTypeA</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">A</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff" title="matx::matmul::TensorTypeB"><span class="n"><span class="pre">TensorTypeB</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">B</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">int32_t</span></span><span class="w"> </span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">2</span></span><span class="p"><span class="pre">]</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">alpha</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">beta</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I000_20MatXMatMulProvider_tEN4matx6matmulEv11TensorTypeCK11TensorTypeAK11TensorTypeBRAL2E_K7int32_t12cudaStream_tff" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Run a GEMM without a plan</p>
-<p>Creates a new GEMM plan in the cache if none exists, and uses that to execute the GEMM. This function is preferred over creating a plan directly for both efficiency and simpler code. Since it only uses the signature of the GEMM to decide if a plan is cached, it may be able to reused plans for different A/B/C matrices as long as they were configured with the same dimensions.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>TensorTypeC</strong> – Data type of C tensor or operator </p></li>
-<li><p><strong>TensorTypeA</strong> – Data type of A tensor or operator </p></li>
-<li><p><strong>TensorTypeB</strong> – Data type of B tensor or operator </p></li>
-<li><p><strong>PROV</strong> – Provider type chosen from MatXMatMulProvider_t type</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>C</strong> – C output tensor or operator </p></li>
-<li><p><strong>A</strong> – A input tensor or operator </p></li>
-<li><p><strong>B</strong> – B input tensor or operator </p></li>
-<li><p><strong>axis</strong> – the axis of the tensor or operator to perform the gemm along </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-<li><p><strong>alpha</strong> – Scalar multiplier to apply to operator A </p></li>
-<li><p><strong>beta</strong> – Scalar multiplier to apply to operator C on input </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">axis</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">};</span>
 <span class="n">std</span><span class="o">::</span><span class="n">array</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="o">&gt;</span><span class="w"> </span><span class="n">perm</span><span class="p">({</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">});</span>
 
@@ -757,7 +751,7 @@ is supported for any tensor with a rank higher than 2.</p>
 <span class="p">(</span><span class="n">bp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b3</span><span class="p">).</span><span class="n">run</span><span class="p">();</span>
 
 <span class="c1">// Perform a GEMM with the last two dimensions permuted</span>
-<span class="n">matmul</span><span class="p">(</span><span class="n">ci</span><span class="p">,</span><span class="w"> </span><span class="n">ai</span><span class="p">,</span><span class="w"> </span><span class="n">bi</span><span class="p">,</span><span class="w"> </span><span class="n">axis</span><span class="p">);</span>
+<span class="p">(</span><span class="n">ci</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">matmul</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span><span class="w"> </span><span class="n">bi</span><span class="p">,</span><span class="w"> </span><span class="n">axis</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>

@@ -383,8 +383,6 @@ namespace matx
  *   Input operator or tensor type
  * @param a
  *   Input operator
- * @param stream
- *   CUDA stream
  */
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(OpA &&a) {

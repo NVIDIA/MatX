@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -617,52 +619,21 @@ function or choose from a built-in set of common comparators. The values meeting
 are returned in <cite>a_out</cite>, while the number of elements found are in <cite>num_found</cite>. It’s important that <cite>a_out</cite>
 is sized large enough to store all elements found or the behavior is undefined.</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor">
-<span id="_CPPv3I0000EN4matx4findER12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor"></span><span id="_CPPv2I0000EN4matx4findER12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SelectType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CountTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputOperator</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a3d7f1ea5f6c45788bbaa360846e83232"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">find</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor" title="matx::find::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor" title="matx::find::CountTensor"><span class="n"><span class="pre">CountTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">num_found</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor" title="matx::find::InputOperator"><span class="n"><span class="pre">InputOperator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor" title="matx::find::SelectType"><span class="n"><span class="pre">SelectType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">sel</span></span>, <span class="n"><span class="pre">cudaExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType12cudaExecutor" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx4findEDaRK3OpA10SelectType">
+<span id="_CPPv3I00EN4matx4findERK3OpA10SelectType"></span><span id="_CPPv2I00EN4matx4findERK3OpA10SelectType"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SelectType</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ab267b32ad28415fbd26810077054a9f0"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">find</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx4findEDaRK3OpA10SelectType" title="matx::find::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <a class="reference internal" href="#_CPPv4I00EN4matx4findEDaRK3OpA10SelectType" title="matx::find::SelectType"><span class="n"><span class="pre">SelectType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">sel</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx4findEDaRK3OpA10SelectType" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Reduce values that meet a certain criteria</p>
 <p>Finds all values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, this can be the same size as the input, but if something is known about the data to indicate not as many entries are needed, the output can be smaller.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>SelectType</strong> – Type of select functor </p></li>
-<li><p><strong>CountTensor</strong> – Output items type </p></li>
-<li><p><strong>OutputTensor</strong> – Output type </p></li>
 <li><p><strong>InputOperator</strong> – Input type </p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>num_found</strong> – Number of items found meeting criteria </p></li>
-<li><p><strong>a_out</strong> – Sorted tensor </p></li>
 <li><p><strong>a</strong> – Input tensor </p></li>
 <li><p><strong>sel</strong> – Select functor </p></li>
-<li><p><strong>exec</strong> – CUDA executor or stream </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor">
-<span id="_CPPv3I0000EN4matx4findER12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor"></span><span id="_CPPv2I0000EN4matx4findER12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SelectType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CountTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputOperator</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a74e825bede79390852b6f0d720bdda52"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">find</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor" title="matx::find::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a_out</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor" title="matx::find::CountTensor"><span class="n"><span class="pre">CountTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">num_found</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor" title="matx::find::InputOperator"><span class="n"><span class="pre">InputOperator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor" title="matx::find::SelectType"><span class="n"><span class="pre">SelectType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">sel</span></span>, <span class="n"><span class="pre">SingleThreadHostExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0000EN4matx4findEvR12OutputTensorR11CountTensorRK13InputOperator10SelectType24SingleThreadHostExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Reduce values that meet a certain criteria</p>
-<p>Finds all values meeting the criteria specified in SelectOp, and saves them out to an output tensor. This function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe, this can be the same size as the input, but if something is known about the data to indicate not as many entries are needed, the output can be smaller.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>SelectType</strong> – Type of select functor </p></li>
-<li><p><strong>CountTensor</strong> – Output items type </p></li>
-<li><p><strong>OutputTensor</strong> – Output type </p></li>
-<li><p><strong>InputOperator</strong> – Input type </p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>num_found</strong> – Number of items found meeting criteria </p></li>
-<li><p><strong>a_out</strong> – Sorted tensor </p></li>
-<li><p><strong>a</strong> – Input tensor </p></li>
-<li><p><strong>sel</strong> – Select functor </p></li>
-<li><p><strong>exec</strong> – Single-threaded host executor </p></li>
 </ul>
 </dd>
 </dl>
@@ -672,7 +643,7 @@ is sized large enough to store all elements found or the behavior is undefined.<
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Find values greater than 0.5</span>
 <span class="n">TestType</span><span class="w"> </span><span class="n">thresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">TestType</span><span class="p">)</span><span class="mf">0.5</span><span class="p">;</span>
-<span class="n">find</span><span class="p">(</span><span class="n">t1o</span><span class="p">,</span><span class="w"> </span><span class="n">num_found</span><span class="p">,</span><span class="w"> </span><span class="n">t1</span><span class="p">,</span><span class="w"> </span><span class="n">GT</span><span class="p">{</span><span class="n">thresh</span><span class="p">},</span><span class="w"> </span><span class="n">ExecType</span><span class="p">{});</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="n">t1o</span><span class="p">,</span><span class="w"> </span><span class="n">num_found</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">find</span><span class="p">(</span><span class="n">t1</span><span class="p">,</span><span class="w"> </span><span class="n">GT</span><span class="p">{</span><span class="n">thresh</span><span class="p">})).</span><span class="n">run</span><span class="p">(</span><span class="n">ExecType</span><span class="p">{});</span>
 </pre></div>
 </div>
 </section>

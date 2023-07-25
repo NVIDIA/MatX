@@ -9,7 +9,8 @@ Perform a 1D inverse FFT
    These functions are currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: ifft(OutputTensor o, const InputTensor i, uint64_t fft_size = 0, cudaStream_t stream = 0)
+.. doxygenfunction:: ifft(OpA &&a, uint64_t fft_size = 0)
+.. doxygenfunction:: ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0)
 
 Examples
 ~~~~~~~~
@@ -19,7 +20,6 @@ Examples
   :end-before: example-end ifft-1
   :dedent:
 
-.. doxygenfunction:: ifft(OutputTensor out, const InputTensor in, const int (&axis)[1], uint64_t fft_size = 0, cudaStream_t stream = 0)
 
 .. literalinclude:: ../../../../test/00_transform/FFT.cu
   :language: cpp

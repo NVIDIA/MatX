@@ -9,7 +9,8 @@ Reduce to softmax values in input. Softmax is defined as:
 
    \sigma(z_i) = \frac{e^{z_{i}}}{\sum_{j=1}^K e^{z_{j}}} \ \ \ for\ i=1,2,\dots,K
 
-.. doxygenfunction:: softmax(OutType dest, const InType &in, cudaStream_t stream = 0)
+.. doxygenfunction:: softmax(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: softmax(const InType &in)
 
 Examples
 ~~~~~~~~
@@ -20,7 +21,6 @@ Examples
    :end-before: example-end softmax-test-1
    :dedent:
 
-.. doxygenfunction:: softmax(OutType dest, const InType &in, const int (&dims)[D], cudaStream_t stream = 0)
 
 Examples
 ~~~~~~~~

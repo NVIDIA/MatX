@@ -5,9 +5,8 @@ median
 
 Compute the median of the reduction dimensions
 
-.. doxygenfunction:: median(OutType dest, const InType &in, cudaExecutor exec = 0)
-.. doxygenfunction:: median(OutType dest, const InType &in, SingleThreadHostExecutor exec)
-.. doxygenfunction:: median(OutType dest, const InType &in, const int (&dims)[D], Executor &&exec)
+.. doxygenfunction:: median(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: median(const InType &in)
 
 Examples
 ~~~~~~~~

@@ -5,7 +5,7 @@ conv1d
 
 1D convolution
 
-.. doxygenfunction:: conv1d(OutputType o, const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode, cudaStream_t stream = 0)
+.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode)
 
 Examples
 ~~~~~~~~
@@ -22,7 +22,7 @@ Examples
    :end-before: example-end conv1d-test-2
    :dedent:
 
-.. doxygenfunction:: conv1d(OutputType o, const In1Type &i1, const In2Type &i2, const int32_t (&axis)[1], matxConvCorrMode_t mode, cudaStream_t stream = 0)   
+.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[1], matxConvCorrMode_t mode)   
 
 Examples
 ~~~~~~~~

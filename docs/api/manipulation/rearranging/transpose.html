@@ -45,7 +45,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/manipulation/rearranging/transpose';</script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Selecting" href="../selecting/index.html" />
+    <link rel="next" title="transpose_matrix" href="transpose_matrix.html" />
     <link rel="prev" title="shift" href="shift.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 current active has-children"><a class="reference internal" href="index.html">Rearranging</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="shift.html">shift</a></li>
 <li class="toctree-l4 current active"><a class="current reference internal" href="#">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -616,30 +618,27 @@ document.write(`
 an operator in reverse order. Using <cite>transpose()</cite> potentially allows for higher performance
 than calling <cite>permute()</cite> since it’s not lazily evaluated and can use an optimized implementation.</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor24SingleThreadHostExecutor">
-<span id="_CPPv3I00EN4matx9transposeER12OutputTensorRK11InputTensor24SingleThreadHostExecutor"></span><span id="_CPPv2I00EN4matx9transposeER12OutputTensorRK11InputTensor24SingleThreadHostExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a095c33b66b4d655f648c20a26aa2358b"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">transpose</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor24SingleThreadHostExecutor" title="matx::transpose::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor24SingleThreadHostExecutor" title="matx::transpose::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">SingleThreadHostExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor24SingleThreadHostExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor12cudaExecutor">
-<span id="_CPPv3I00EN4matx9transposeER12OutputTensorRK11InputTensor12cudaExecutor"></span><span id="_CPPv2I00EN4matx9transposeER12OutputTensorRK11InputTensor12cudaExecutor"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OutputTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InputTensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1aaae590ca011e9597987546585bc0d0f2"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">transpose</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor12cudaExecutor" title="matx::transpose::OutputTensor"><span class="n"><span class="pre">OutputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor12cudaExecutor" title="matx::transpose::InputTensor"><span class="n"><span class="pre">InputTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">in</span></span>, <span class="n"><span class="pre">cudaExecutor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">exec</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I00EN4matx9transposeEvR12OutputTensorRK11InputTensor12cudaExecutor" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Transpose the outer dimensions of a tensor view out-of-place</p>
-<p>Transposes the two fastest-changing dimensions of a tensor. Any higher dimension is untouched. This has the same effect as permute with {1,0} as the last two dims, but it is much faster for tensors that are already contiguous. For tensors that are not a contiguous view, this function is not allowed.</p>
-<p>Both tensor views must be the same rank, and the dimensions that moved must match their original size</p>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx9transposeEDaK1T">
+<span id="_CPPv3I0EN4matx9transposeEK1T"></span><span id="_CPPv2I0EN4matx9transposeEK1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1ad28d89ac26c68bc1532d9a0e201069e4"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">transpose</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx9transposeEDaK1T" title="matx::transpose::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">op</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx9transposeEDaK1T" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Operator to transpose the dimensions of a tensor or operator. </p>
+<p>The each dimension must appear in the dims array once.</p>
+<p>This operator can appear as an rvalue or lvalue.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>out</strong> – Tensor to copy into </p></li>
-<li><p><strong>in</strong> – Tensor to copy from </p></li>
-<li><p><strong>exec</strong> – CUDA executor to run operation </p></li>
-</ul>
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T</strong> – Input operator/tensor type </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>op</strong> – Input operator </p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>transposed operator </p>
 </dd>
 </dl>
 </dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">transpose</span><span class="p">(</span><span class="o">*</span><span class="n">devsT</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">devs</span><span class="p">,</span><span class="w"> </span><span class="n">stream</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="o">*</span><span class="n">devsT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transpose</span><span class="p">(</span><span class="o">*</span><span class="n">devs</span><span class="p">)).</span><span class="n">run</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>
@@ -667,11 +666,11 @@ than calling <cite>permute()</cite> since it’s not lazily evaluated and can us
       </div>
     </a>
     <a class="right-next"
-       href="../selecting/index.html"
+       href="transpose_matrix.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Selecting</p>
+        <p class="prev-next-title">transpose_matrix</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

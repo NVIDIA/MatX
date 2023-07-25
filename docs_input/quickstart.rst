@@ -359,35 +359,37 @@ expression and are not limited to simply assigning to a tensor. Expanding on our
 Instead of setting ``t1`` to a range, we multiply the range by 5.0, and add that range to a vector of ones using the ``ones`` generator. Without any
 intermediate storage, we combined two generators, a multiply, and an add operator into a single kernel.
 
-Executors
----------
-As mentioned above, the ``exec`` function is an executor for launching operators onto the device. ``exec`` is a special type of executor since it can take
-either views or operators as inputs and transform them in an element-wise kernel. Often the type of operation we are trying to do cannot be expressed as 
-an MatX element-wise operator, so ``exec`` cannot be used. Other types of executors exist for this purpose. These executors typically do more complex 
-transformations on the data compared to an element-wise kernel, and often use optimized libraries on the back-end to execute. Some examples are fft (Fast 
-Fourier Transform), matmul (Matrix Multiply), and sort. 
-
-MatX provides an easy-to-use API for executing complex functions, like those mentioned above. These executors currently cannot be part of an operator
-expression and must be executed as their own statement:
+Transforms
+----------
+As mentioned above, the ``run`` function takes an executor describing where to launch the work. In the examples above ``run`` the operator
+expressions created a single fused element-wise operation. Often the type of operation we are trying to do cannot be expressed as 
+an element-wise operator and therefor can't be fused with other operations without synchronization. These classes of operators are called *transforms*. 
+Transforms can be used anywhere operators are used:
 
 .. code-block:: cpp
 
-    fft(B, A, stream);
+    (B = fft(A) * C).run(stream);
 
-The ``fft`` executor above performs a 1D FFT on the tensor ``A``, and stores it in ``B``. All executors use the same calling convention where the outputs
-are listed first, followed by inputs, and finally an optional stream. Except for ``exec``, executors can only operate on tensor views, and not
-on generators or operators. For instance, you cannot take an fft of ``ones()``. 
+The ``fft`` transform above performs a 1D FFT on the tensor ``A``, multiplies the output by ``C``, and stores it in ``B``. Since the FFT
+may require synchronizing before performing the multiply, MatX can internally create a temporary buffer for the FFT output and free it when
+the expression goes out of scope.
 
-Unless documented otherwise, executors work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
+Unless documented otherwise, transforms work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
 a 1D tensor (vector), etc. If the dimension of the tensor is higher than the expected dimension, all higher dimensions will be batched. In the FFT 
 call above, if ``A`` and ``B`` are 4D tensors, the inner 3 dimensions will launch a batched 1D FFT with no change in syntax.
 
-As mentioned above, the same tensor views can be used in operator expressions before or after executors:
+As mentioned above, the same tensor views can be used in operator expressions before or after transforms:
 
 .. code-block:: cpp
 
     (a = b + 2).run(stream);
-    matmul(c, a, b, stream);
+    (c = matmul(a, d)).run(stream);
+
+Or fused in a single line:
+
+.. code-block:: cpp
+
+    (c = matmul(b + 2, d)).run(stream);
 
 The code above executes a kernel to store the result of ``b + 2`` into ``a``, then subsequently performs the matrix multiply ``C = A * B``. Since
 the operator and matrix multiply are launched in the same CUDA stream, they will be executed serially.
@@ -398,10 +400,12 @@ Common reduction executors are also available, such as ``sum()``, ``mean()``, ``
 
     auto t4 = make_tensor<float>({100, 100, 100, 100});
     auto t0 = make_tensor<float>();
-    sum(t0, t4);
+    (t0 = sum(t4)).run();
 
 The above code performs an optimized sum reduction of ``t4`` into ``t0``. Currently reduction type exectors *can* take operators as an input. Please
 see the documentation for a list of which ones are compatible.
+
+For more information about operation fusion, see :ref:`fusion`.
 
 Random numbers
 --------------

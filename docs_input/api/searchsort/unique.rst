@@ -6,8 +6,7 @@ unique
 Reduce to unique values in input. On completion `a_out` contains all unique values in `a`, and `num_found`
 contains the number of unique elements.
 
-.. doxygenfunction:: unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, cudaExecutor exec = 0)
-.. doxygenfunction:: unique(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SingleThreadHostExecutor exec)
+.. doxygenfunction:: unique(const OpA &a)
 
 Examples
 ~~~~~~~~

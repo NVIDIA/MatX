@@ -7,8 +7,7 @@ Transpose an operator into a tensor. This is equivalent to permuting the dimensi
 an operator in reverse order. Using `transpose()` potentially allows for higher performance
 than calling `permute()` since it's not lazily evaluated and can use an optimized implementation.
 
-.. doxygenfunction:: transpose(OutputTensor &out, const InputTensor &in, SingleThreadHostExecutor exec)
-.. doxygenfunction:: transpose(OutputTensor &out, const InputTensor &in, cudaExecutor exec)
+.. doxygenfunction:: transpose(const T op)
 
 Examples
 ~~~~~~~~

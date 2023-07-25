@@ -135,6 +135,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/concepts.html">Concepts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/creation.html">Creating Tensors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/datatype.html">Data Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../basics/fusion.html">Operator Fusion</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/matlabpython.html">MatX For MATLAB/NumPy Users</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/nvtx.html">NVTX Profiling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../basics/print.html">Printing</a></li>
@@ -166,7 +167,6 @@
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/copy.html">copy</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/if.html">IF</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/ifelse.html">IFELSE</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/basic/slice.html">slice</a></li>
 </ul>
 </li>
@@ -183,10 +183,12 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/shift.html">shift</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose.html">transpose</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/transpose_matrix.html">transpose_matrix</a></li>
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -614,39 +616,18 @@ document.write(`
 <span id="svd-func"></span><h1>svd<a class="headerlink" href="#svd" title="Permalink to this heading">#</a></h1>
 <p>Perform a singular value decomposition (SVD) using the power iteration method.</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc">
-<span id="_CPPv3I0000EN4matx3svdER7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc"></span><span id="_CPPv2I0000EN4matx3svdER7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">UTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">STensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VTensor</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ATensor</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a34b34776863370d0b29dbb632306eb1e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">svd</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::UTensor"><span class="n"><span class="pre">UTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::STensor"><span class="n"><span class="pre">STensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">s</span></span>, <a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::VTensor"><span class="n"><span class="pre">VTensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">v</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="matx::svd::ATensor"><span class="n"><span class="pre">ATensor</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="n"><span class="pre">cudaStream_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">stream</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobu</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobvt</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0000EN4matx3svdEvR7UTensorR7STensorR7VTensorRK7ATensor12cudaStream_tKcKc" title="Permalink to this definition">#</a><br /></dt>
-<dd><p>Perform a SVD decomposition using a cached plan</p>
-<p>See documentation of matxDnSVDSolverPlan_t for a description of how the algorithm works. This function provides a simple interface to the cuSolver library by deducing all parameters needed to perform a SVD decomposition from only the matrix A.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>T1</strong> – Data type of matrix A </p></li>
-<li><p><strong>RANK</strong> – Rank of matrix A</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>u</strong> – U matrix output </p></li>
-<li><p><strong>s</strong> – Sigma matrix output </p></li>
-<li><p><strong>v</strong> – V matrix output </p></li>
-<li><p><strong>a</strong> – Input matrix A </p></li>
-<li><p><strong>stream</strong> – CUDA stream </p></li>
-<li><p><strong>jobu</strong> – Specifies options for computing all or part of the matrix U: = ‘A’. See cuSolver documentation for more info </p></li>
-<li><p><strong>jobvt</strong> – specifies options for computing all or part of the matrix V**T. See cuSolver documentation for more info </p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
+<dt class="sig sig-object cpp" id="_CPPv4I0EN4matx3svdEDaRK3OpAKcKc">
+<span id="_CPPv3I0EN4matx3svdERK3OpAKcKc"></span><span id="_CPPv2I0EN4matx3svdERK3OpAKcKc"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpA</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespacematx_1a6973f66f683077751924aba5cbf2a564"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">matx</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">svd</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN4matx3svdEDaRK3OpAKcKc" title="matx::svd::OpA"><span class="n"><span class="pre">OpA</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobu</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">jobvt</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="sc"><span class="pre">'A'</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN4matx3svdEDaRK3OpAKcKc" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 <section id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">#</a></h2>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// cuSolver only supports col-major solving today, so we need to transpose,</span>
 <span class="c1">// solve, then transpose again to compare to Python</span>
-<span class="n">transpose</span><span class="p">(</span><span class="n">Atv</span><span class="p">,</span><span class="w"> </span><span class="n">Av</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="p">(</span><span class="n">Atv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transpose</span><span class="p">(</span><span class="n">Av</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 
 <span class="k">auto</span><span class="w"> </span><span class="n">Atv2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Atv</span><span class="p">.</span><span class="n">View</span><span class="p">({</span><span class="n">m</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">});</span>
-<span class="n">svd</span><span class="p">(</span><span class="n">Uv</span><span class="p">,</span><span class="w"> </span><span class="n">Sv</span><span class="p">,</span><span class="w"> </span><span class="n">Vv</span><span class="p">,</span><span class="w"> </span><span class="n">Atv2</span><span class="p">);</span>
+<span class="p">(</span><span class="n">mtie</span><span class="p">(</span><span class="n">Uv</span><span class="p">,</span><span class="w"> </span><span class="n">Sv</span><span class="p">,</span><span class="w"> </span><span class="n">Vv</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svd</span><span class="p">(</span><span class="n">Atv2</span><span class="p">)).</span><span class="n">run</span><span class="p">();</span>
 </pre></div>
 </div>
 </section>
