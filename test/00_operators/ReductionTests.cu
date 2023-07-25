@@ -136,11 +136,11 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, VarianceStd)
   pb->NumpyToTensorView(t1, "x");
 
   // example-begin var-test-1
-  var(t0, t1, exec);
+  (t0 = var(t1)).run(exec);
   // example-end var-test-1
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ub", 0.01);
 
-  var(t0, t1, exec, 0);
+  (t0 = var(t1, 0)).run(exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);  
 
   // example-begin stdd-test-1
@@ -168,10 +168,10 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
   tensor_t<TestType, 1> t1({size});
   pb->NumpyToTensorView(t1, "x");
 
-  var(t0, t1, exec);
+  (t0 = var(t1)).run(exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ub", 0.01);
 
-  var(t0, t1, exec, 0);
+  (t0 = var(t1, 0)).run(exec);
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);    
 
   (t0 = stdd(t1)).run(exec);
@@ -201,7 +201,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 
     // example-begin sum-test-2
     // Reduce a 3D tensor into a 2D by taking the sum of the last dimension
-    sum(b, a, {2}, exec);
+    (b = sum(a, {2})).run(exec);
     // example-end sum-test-2
     cudaStreamSynchronize(0);
     for(int i = 0 ; i < x ; i++) {
@@ -221,23 +221,23 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 
     // example-begin sum-test-1
     // Reduce a 4D tensor into a 0D by taking the sum of all elements
-    sum(t0, t4, exec);
+    (t0 = sum(t4)).run(exec);
     // example-end sum-test-1
     cudaStreamSynchronize(0);
     ASSERT_TRUE(MatXUtils::MatXTypeCompare(
         t0(), (TestType)(t4.Size(0) * t4.Size(1) * t4.Size(2) * t4.Size(3))));
 
-     sum(t0, t3, exec);
+     (t0 = sum(t3)).run(exec);
      cudaStreamSynchronize(0);
      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
          t0(), (TestType)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
 
-     sum(t0, t2, exec);
+     (t0 = sum(t2)).run(exec);
      cudaStreamSynchronize(0);
      ASSERT_TRUE(
          MatXUtils::MatXTypeCompare(t0(), (TestType)(t2.Size(0) * t2.Size(1))));
 
-     sum(t0, t1, exec);
+     (t0 = sum(t1)).run(exec);
      cudaStreamSynchronize(0);
      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(t1.Size(0))));
   }
@@ -248,7 +248,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     auto t3 = ones<TestType>({3, 4, 5});
     auto t2 = ones<TestType>({3, 4});
 
-    sum(t1, t4, exec);
+    (t1 = sum(t4, {1, 2, 3})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
@@ -256,14 +256,14 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
           t1(i), (TestType)(t4.Size(1) * t4.Size(2) * t4.Size(3))));
     }
 
-    sum(t1, t3, exec);
+    (t1 = sum(t3, {1, 2})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i), (TestType)(t3.Size(1) * t3.Size(2))));
     }
 
-    sum(t1, t2, exec);
+    (t1 = sum(t2, {1})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(t2.Size(1))));
@@ -271,8 +271,9 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 
     // Test tensor input too
     auto t2t = make_tensor<TestType>({3, 4});
-    (t2t = ones<TestType>({3, 4})).run();
-    sum(t1, t2t);
+    (t2t = ones<TestType>({3, 4})).run(exec);
+    (t1 = sum(t2t, {1})).run(exec);
+
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(t2t.Size(1))));
     }    
@@ -283,7 +284,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     auto t4 = ones<TestType>({3, 4, 5, 6});
     auto t3 = ones<TestType>({3, 4, 5});
 
-    sum(t2, t4, exec);
+    (t2 = sum(t4, {2, 3})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
@@ -292,7 +293,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
       }
     }
 
-    sum(t2, t3, exec);
+    (t2 = sum(t3, {2})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
@@ -301,25 +302,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
       }
     }
   }
-  
-  {
-    tensor_t<TestType, 2> t2a({3, 4});
-    tensor_t<TestType, 2> t2b({3, 4});
-    
-    auto t4 = ones<TestType>({3, 4, 5, 6});
 
-    sum(t2a, t4, exec);
-    sum(t2b, t4, {2,3}, exec);
-
-    cudaStreamSynchronize(0);
-    for (index_t i = 0; i < t2a.Size(0); i++) {
-      for (index_t j = 0; j < t2a.Size(1); j++) {
-        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
-            t2a(i, j), t2b(i,j)));
-      }
-    }
-  }
-  
   MATX_EXIT_HANDLER();
 }
 
@@ -339,7 +322,7 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   pb->NumpyToTensorView(t1, "t1");
 
   // example-begin softmax-test-1
-  softmax(t1_out, t1);
+  (t1_out = softmax(t1)).run();
   // example-end softmax-test-1
 
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
@@ -348,7 +331,7 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   auto t3_out = make_tensor<TypeParam>({80,size,size});
   pb->NumpyToTensorView(t3, "t3");
   // example-begin softmax-test-2
-  softmax(t3_out, t3, {2});
+  (t3_out = softmax(t3, {2})).run();
   // example-end softmax-test-2
   
   MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);
@@ -381,8 +364,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   (t4 = as_type<TestType>(t4r)).run(exec);
   {
-    sum(t2a, permute(t4,{2,3,0,1}), exec);
-    sum(t2b, t4, {0,1}, exec);
+    (t2a = sum(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = sum(t4, {0,1})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -394,8 +377,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
   }
 
   {
-    mean(t2a, permute(t4,{2,3,0,1}), exec);
-    mean(t2b, t4, {0,1}, exec);
+    (t2a = mean(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = mean(t4, {0,1})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -423,8 +406,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   if constexpr (!is_complex_v<TestType>)
   {
-    prod(t2a, permute(t4,{2,3,0,1}), exec);
-    prod(t2b, t4, {0,1}, exec);
+    (t2a = prod(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = prod(t4, {0,1})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -440,8 +423,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin rmax-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction        
-    rmax(t2a, permute(t4,{2,3,0,1}), exec);
-    rmax(t2b, t4, {0,1}, exec);
+    (t2a = rmax(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = rmax(t4, {0,1})).run(exec);
     // example-end rmax-test-2
 
     cudaStreamSynchronize(0);
@@ -458,8 +441,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin rmin-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction
-    rmin(t2a, permute(t4,{2,3,0,1}), exec);
-    rmin(t2b, t4, {0,1}, exec);
+    (t2a = rmin(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = rmin(t4, {0,1})).run(exec);
     // example-end rmin-test-2
 
     cudaStreamSynchronize(0);
@@ -476,8 +459,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin argmax-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction    
-    argmax(t2a, t2ai, permute(t4,{2,3,0,1}), exec);
-    argmax(t2b, t2bi, t4, {0,1}, exec);
+    (mtie(t2a, t2ai) = argmax(permute(t4,{2,3,0,1}))).run(exec);
+    (mtie(t2b, t2bi) = argmax(t4, {0,1})).run(exec);
     // example-end argmax-test-2
 
     cudaStreamSynchronize(0);
@@ -496,8 +479,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin argmin-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction
-    argmin(t2a, t2ai, permute(t4,{2,3,0,1}), exec);
-    argmin(t2b, t2bi, t4, {0,1}, exec);
+    (mtie(t2a, t2ai) = argmin(permute(t4,{2,3,0,1}))).run(exec);
+    (mtie(t2b, t2bi) = argmin(t4, {0,1})).run(exec);
     // example-end argmin-test-2
 
     cudaStreamSynchronize(0);
@@ -516,8 +499,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin any-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction
-    any(t2a, permute(t4,{2,3,0,1}), exec);
-    any(t2b, t4, {0,1}, exec);
+    (t2a = any(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = any(t4, {0,1})).run(exec);
     // example-end any-test-2
 
     cudaStreamSynchronize(0);
@@ -534,8 +517,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin all-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction    
-    all(t2a, permute(t4,{2,3,0,1}), exec);
-    all(t2b, t4, {0,1}, exec);
+    (t2a = all(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = all(t4, {0,1})).run(exec);
     // example-end all-test-2
 
     cudaStreamSynchronize(0);
@@ -549,8 +532,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   if constexpr (!is_complex_v<TestType>)
   {
-    var(t2a, permute(t4,{2,3,0,1}), exec);
-    var(t2b, t4, {0,1}, exec);
+    (t2a = var(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = var(t4, {0,1})).run(exec);
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -606,20 +589,20 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
     // example-begin any-test-1
     // Reduce a 4D tensor into a single output (0D) tensor indicating whether any values were 
     // convertible to "true"
-    any(t0, t4, exec);
+    (t0 = any(t4)).run(exec);
     // example-end any-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
-    any(t0, t3, exec);
+    (t0 = any(t3)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    any(t0, t2, exec);
+    (t0 = any(t2)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
-    any(t0, t1, exec);
+    (t0 = any(t1)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
   }
@@ -686,20 +669,20 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
     // example-begin all-test-1
     // Reduce a 4D tensor into a 0D tensor where the 0D is "true" if all values in "t4"
     // convert to "true", or "false" otherwise
-    all(t0, t4, exec);
+    (t0 = all(t4)).run(exec);
     // example-end all-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    all(t0, t3, exec);
+    (t0 = all(t3)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
-    all(t0, t2, exec);
+    (t0 = all(t2)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    all(t0, t1, exec);
+    (t0 = all(t1)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
   }
@@ -730,21 +713,21 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
 
     // example-begin median-test-1
     // Compute media over all elements in "t1e" and store result in "t0"
-    median(t0, t1e, exec);
+    (t0 = median(t1e)).run(exec);
     // example-end median-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(4.5f)));
 
-    median(t0, t1o, exec);
+    (t0 = median(t1o)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(5)));
 
-    median(t1out, t2e, exec);
+    (t1out = median(t2e, {1})).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(2.5f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(2.5f)));
 
-    median(t1out, t2o, exec);
+    (t1out = median(t2o, {1})).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(3.0f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(3.0f)));
@@ -764,7 +747,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, MinMaxNegative)
 
     matx::tensor_t<TestType, 0> max_val{};
     matx::tensor_t<matx::index_t, 0> max_idx{};
-    matx::argmax(max_val, max_idx, t, ExecType{});
+    (mtie(max_val, max_idx) = matx::argmax(t)).run(ExecType{});
     cudaStreamSynchronize(0);
     ASSERT_EQ(max_val(), -1);
     ASSERT_EQ(max_idx(), 1);
@@ -789,7 +772,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
     // Reduce all inputs in "t1o" into "t0" by the maximum of all elements
-    rmax(t0, t1o, exec);
+    (t0 = rmax(t1o)).run(exec);
     // example-end rmax-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));    
@@ -814,7 +797,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
     // Reduce all inputs in "t1o" into "t0" by the minimum of all elements
-    rmin(t0, t1o, exec);
+    (t0 = rmin(t1o)).run(exec);
     // example-end rmin-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1))); 
@@ -839,7 +822,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
-    argmax(t0, t0i, t1o, exec);
+    (mtie(t0, t0i) = argmax(t1o)).run(exec);
     // example-end argmax-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));
@@ -850,7 +833,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     tensor_t<index_t, 1> t1i_small{{2}};
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});    
         
-    argmax(t1o_small, t1i_small, t2o, exec);
+    (mtie(t1o_small, t1i_small) = argmax(t2o, {1})).run(exec);
     cudaStreamSynchronize(0);
 
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));
@@ -878,7 +861,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
-    argmin(t0, t0i, t1o, exec);
+    (mtie(t0, t0i) = argmin(t1o)).run(exec);
     // example-end argmin-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
@@ -889,7 +872,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     tensor_t<index_t, 1> t1i_small{{2}};    
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});
 
-    argmin(t1o_small, t1i_small, t2o, exec);
+    (mtie(t1o_small, t1i_small) = argmin(t2o, {1})).run(exec);
     cudaStreamSynchronize(0);
     
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));
@@ -918,20 +901,20 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t0 = make_tensor<TestType>();
     auto t4 = ones<TestType>({30, 40, 50, 60});    
     // Compute the mean over all dimensions in "t4" and store the result in "t0"
-    mean(t0, t4, exec);
+    (t0 = mean(t4)).run(exec);
     // example-end mean-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    mean(t0, t3, exec);
+    (t0 = mean(t3)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    mean(t0, t2, exec);
+    (t0 = mean(t2)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
-    mean(t0, t1, exec);
+    (t0 = mean(t1)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
   }
@@ -942,19 +925,19 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t3 = ones<TestType>({30, 40, 50});
     auto t2 = ones<TestType>({30, 40});
 
-    mean(t1, t4, exec);
+    (t1 = mean(t4, {1, 2, 3})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
     }
 
-    mean(t1, t3, exec);
+    (t1 = mean(t3, {1, 2})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
     }
 
-    mean(t1, t2, exec);
+    (t1 = mean(t2, {1})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
@@ -967,7 +950,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t4 = ones<TestType>({30, 40, 50, 60});
     auto t3 = ones<TestType>({30, 40, 50});
 
-    mean(t2, t4, exec);
+    (t2 = mean(t4, {2, 3})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
@@ -975,7 +958,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
       }
     }
 
-    mean(t2, t3, exec);
+    (t2 = mean(t3, {2})).run(exec);
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
@@ -1021,12 +1004,12 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Prod)
 
     // example-begin prod-test-1
     // Compute the product of all elements in "t2" and store into "t0"
-    prod(t0, t2, exec);
+    (t0 = prod(t2)).run(exec);
     // example-end prod-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t2p));
 
-    prod(t0, t1, exec);
+    (t0 = prod(t1)).run(exec);
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t1p));
   }

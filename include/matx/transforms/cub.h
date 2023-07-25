@@ -1370,7 +1370,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
  *   CUDA executor
  */
 template <typename OutputTensor, typename InputOperator>
-void sort(OutputTensor &a_out, const InputOperator &a,
+void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
           cudaExecutor exec = 0)
 {
@@ -1409,7 +1409,7 @@ void sort(OutputTensor &a_out, const InputOperator &a,
 }
 
 template <typename OutputTensor, typename InputOperator>
-void sort(OutputTensor &a_out, const InputOperator &a,
+void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
           [[maybe_unused]] SingleThreadHostExecutor exec)
 {
@@ -1960,7 +1960,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
   matxAlloc((void **)&sort_ptr, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
   auto sort_tensor = make_tensor<typename InputOperator::scalar_type>(sort_ptr, a.Shape());
 
-  matx::sort(sort_tensor, a, SORT_DIR_ASC, stream);
+  matx::sort_impl(sort_tensor, a, SORT_DIR_ASC, stream);
 
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
 

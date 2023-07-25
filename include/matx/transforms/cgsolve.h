@@ -35,6 +35,7 @@
 #include "matx/transforms/reduce.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
+#include "matx/operators/all.h"
 #include "matx/operators/if.h"
 #include "matx/operators/clone.h"
 
@@ -124,10 +125,10 @@ namespace matx
       // p = r0 
       (p = r0 = B - Ap).run(stream);  
       
-      sum(r0r0, r0*r0, stream);
+      (r0r0 = sum(r0*r0)).run(stream);
       
       if(tol>0.0f) {
-        all(converged, as_int(sqrt(r0r0) < tol), stream);
+        (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
       
         cudaEventRecord(event, stream);
         cudaStreamWaitEvent(d2h, event);
@@ -139,7 +140,7 @@ namespace matx
         matvec(Ap, A, p, stream);
 
         // pAp = dot(p,Ap)  
-        sum(pAp, p*Ap, stream);
+        (pAp = sum(p*Ap)).run(stream);
         
         // if pAp is zero then we have exactly numerically converged.
         // However, this is batched so we may iterate more.  Iterating
@@ -154,7 +155,7 @@ namespace matx
         (IF( pApc != scalar_type(0), updateOp)).run(stream);
         
         // r1r1 = dot(r1, r1)
-        sum(r1r1, r1*r1, stream);
+        (r1r1 = sum(r1*r1)).run(stream);
         
         if(tol>0.0f) {
           // copy convergence criteria to host.  
@@ -167,7 +168,7 @@ namespace matx
             break;
           }
 
-          all(converged, as_int(sqrt(r1r1) < tol), stream);
+          (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
         
           cudaEventRecord(event, stream);
           cudaStreamWaitEvent(d2h, event);

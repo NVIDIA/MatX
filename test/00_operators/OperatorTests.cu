@@ -1528,7 +1528,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
   (a = a + b).run(exec);
 
   auto t0 = make_tensor<TestType>();
-  sum(t0, a, exec);
+  (t0 = sum(a)).run(exec);
   cudaStreamSynchronize(0);
   ASSERT_EQ(t0(), static_cast<TestType>(2 * a.TotalSize()));
   MATX_EXIT_HANDLER();
@@ -2197,7 +2197,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
     }
   }
 
-  (t3t = transpose_matrix(t3t)).run(exec);
+  (t3t = transpose_matrix(t3)).run(exec);
   cudaError_t error = cudaStreamSynchronize(0);
   ASSERT_EQ(error, cudaSuccess);
 

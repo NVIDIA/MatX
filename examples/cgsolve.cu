@@ -81,8 +81,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (X = cgsolve(A, B, .0001, max_iters)).run();
 
   matvec(Bout, A, X);
-  sum(norm, (Bout-B)*(Bout-B));
-  matx::rmax(maxn, sqrt(norm), 0);
+  (norm = sum((Bout-B)*(Bout-B))).run();
+  (maxn = matx::rmax(sqrt(norm))).run();
 
   cudaDeviceSynchronize();
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));

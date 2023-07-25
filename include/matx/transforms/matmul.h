@@ -1144,57 +1144,6 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   }
 }
 
-/**
- * Run a GEMM without a plan
- *
- * Creates a new GEMM plan in the cache if none exists, and uses that to execute
- * the GEMM. This function is preferred over creating a plan directly for both
- * efficiency and simpler code. Since it only uses the signature of the GEMM to
- * decide if a plan is cached, it may be able to reused plans for different
- * A/B/C matrices as long as they were configured with the same dimensions.
- *
- * @tparam TensorTypeC
- *    Data type of C tensor or operator
- * @tparam TensorTypeA
- *    Data type of A tensor or operator
- * @tparam TensorTypeB
- *    Data type of B tensor or operator
- * @tparam PROV
- *    Provider type chosen from MatXMatMulProvider_t type
- *
- * @param C
- *   C output tensor or operator
- * @param A
- *   A input tensor or operator
- * @param B
- *   B input tensor or operator
- * @param axis
- *   the axis of the tensor or operator to perform the gemm along
- * @param stream
- *   CUDA stream
- * @param alpha
- *   Scalar multiplier to apply to operator A
- * @param beta
- *   Scalar multiplier to apply to operator C on input
- */
-template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-__MATX_INLINE__ void matmul_impl(TensorTypeC C, const TensorTypeA A,
-            const TensorTypeB B, const int32_t (&axis)[2],
-            cudaStream_t stream = 0,
-            float alpha = 1.0, float beta = 0.0)
-{
-  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
-  MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeC::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
-
-  auto perm = detail::getPermuteDims<TensorTypeC::Rank()>(axis);
-  auto out = permute(C, perm);
-
-  auto in1 = permute(A, perm);
-  auto in2 = permute(B, perm);
-
-  matmul_impl<TensorTypeC, TensorTypeA, TensorTypeB, PROV>(out, in1, in2, stream, alpha, beta);
-}
 
 /**
  * Run a GEMV without a plan
