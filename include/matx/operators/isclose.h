@@ -55,10 +55,8 @@ namespace matx
           op1_(op1), op2_(op2), rtol_(static_cast<inner_type>(rtol)), atol_(static_cast<inner_type>(atol)) 
         {
           static_assert(op1.Rank() == op2.Rank(), "Operator ranks must match in isclose()");
-          for (int32_t i = 0; i < op2.Rank(); i++) {
-            MATX_ASSERT_STR(op1.Size(i) == op2.Size(i), matxInvalidDim, 
-                "Size of each dimension must match in isclose()");
-          }
+          ASSERT_COMPATIBLE_OP_SIZES(op1); 
+          ASSERT_COMPATIBLE_OP_SIZES(op2);
         }
 
         template <typename... Is>
@@ -71,12 +69,14 @@ namespace matx
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return remove_cvref_t<Op1>::Rank();
+          return detail::matx_max(detail::get_rank<Op1>(), detail::get_rank<Op2>());
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
-          return op1_.Size(dim);
+          index_t size1 = detail::get_expanded_size<Rank()>(op1_, dim);
+          index_t size2 = detail::get_expanded_size<Rank()>(op2_, dim);
+          return detail::matx_max(size1,size2);
         }
 
       private:
