@@ -136,9 +136,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       viz::contour(time, freqs, Sxx);
 #else
       printf("Not outputting plot since visualizations disabled\n");
-#endif    
+#endif
     }
-    
+
   }
 
   cudaEventRecord(stop, stream);
