@@ -120,13 +120,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     if (i == 1) {
       cudaEventRecord(start, stream);
     }    
-    fft_impl(sig_freq, sig_time, 0, stream);
-    fft_impl(filt_freq, filt_time, 0, stream);
+    (sig_freq = fft(sig_time)).run(stream);
+    (filt_freq = fft(filt_time)).run(stream);
 
     (sig_freq = sig_freq * filt_freq).run(stream);
 
     // IFFT in-place
     (sig_freq = ifft(sig_freq)).run(stream);
+    
   }
 
   cudaEventRecord(stop, stream);
