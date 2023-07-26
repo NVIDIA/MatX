@@ -48,7 +48,7 @@
 
 namespace matx {
 
-enum FFTNorm {
+enum class FFTNorm {
   BACKWARD, /// fft is unscaled, ifft is 1/N
   FORWARD, /// fft is scaled 1/N, ifft is not scaled
   ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
@@ -103,7 +103,7 @@ public:
    *   CUDA stream
    **/
   void inline Forward(OutTensorType &o,
-                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = BACKWARD)
+                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = FFTNorm::BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
@@ -119,9 +119,9 @@ public:
 
     Exec(o, i, CUFFT_FORWARD);
 
-    if (norm == ORTHO) {
+    if (norm == FFTNorm::ORTHO) {
       (o *= 1.0 / std::sqrt(factor)).run(stream);
-    } else if (norm == FORWARD) {
+    } else if (norm == FFTNorm::FORWARD) {
       (o *= 1.0 / factor).run(stream);
     }
 
@@ -142,7 +142,7 @@ public:
    *   CUDA stream
    **/
   void inline Inverse(OutTensorType &o,
-                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = BACKWARD)
+                      const InTensorType &i, cudaStream_t stream, FFTNorm norm = FFTNorm::BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     cufftSetStream(this->plan_, stream);
@@ -158,9 +158,9 @@ public:
       factor = static_cast<s_type>(params_.n[0] * params_.n[1]);
     }
 
-    if (norm == ORTHO) {
+    if (norm == FFTNorm::ORTHO) {
       (o *= 1.0 / std::sqrt(factor)).run(stream);
-    } else if (norm == BACKWARD) {
+    } else if (norm == FFTNorm::BACKWARD) {
       (o *= 1.0 / factor).run(stream);
     }
 
@@ -833,11 +833,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
 
 } // end namespace detail
 
-enum class FFTNorm {
-  BACKWARD, /// fft is unscaled, ifft is 1/N
-  FORWARD, /// fft is scaled 1/N, ifft is not scaled
-  ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
-};
+
 
 /**
  * Run a 1D FFT with a cached plan
@@ -869,7 +865,7 @@ enum class FFTNorm {
  */
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-         uint64_t fft_size = 0, FFTNorm norm = BACKWARD, cudaStream_t stream = 0)
+         uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");  
@@ -913,7 +909,7 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size = 0, FFTNorm norm = BACKWARD, cudaStream_t stream = 0)
+          uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD, cudaStream_t stream = 0)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
