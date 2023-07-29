@@ -102,7 +102,7 @@ namespace matx
       auto pAp = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
       auto norm = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-      auto converged = make_tensor<int>(MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       // create aliases to reuse memory
       //auto b = a;

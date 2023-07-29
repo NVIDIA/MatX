@@ -1584,8 +1584,8 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
 #ifdef __CUDACC__  
   MATX_NVTX_START("softmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto tmp_sum = make_tensor<typename InType::scalar_type>(MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tmp_max = make_tensor<typename InType::scalar_type>(MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_sum = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_max = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
   rmax_impl(tmp_max, in, cudaExecutor{stream});
   sum_impl(tmp_sum, exp(in - tmp_max), stream);
   (dest = exp(in - tmp_max) / tmp_sum).run(stream);
@@ -2453,7 +2453,7 @@ template <typename OutType, typename InType1, typename InType2>
 void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__ 
-  MATX_NVTX_START("allclose(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
 
   cudaStream_t stream = exec.getStream();
@@ -2483,7 +2483,7 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
 template <typename OutType, typename InType1, typename InType2>
 void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
-  MATX_NVTX_START("allclose(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
 
   auto isc = isclose(in1, in2, rtol, atol);

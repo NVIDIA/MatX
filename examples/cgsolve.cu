@@ -52,7 +52,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto B = make_tensor<TypeParam, 2> ({BATCH, N});
   auto Bout = make_tensor<TypeParam, 2> ({BATCH, N});
   auto norm = make_tensor<TypeParam, 1>({BATCH});
-  auto maxn = make_tensor<TypeParam>();
+  auto maxn = make_tensor<TypeParam>({});
 
 
   // Simple Poisson matrix

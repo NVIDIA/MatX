@@ -855,6 +855,8 @@ struct no_permute_t{};
 struct fft_t{};
 struct ifft_t{};
 
+struct no_size_t{}; // Used to create 0D tensors
+
 template <typename T1, typename T2>
 struct permute_rank {
   static const int rank = T1::Rank() - std::tuple_size_v<T2>;

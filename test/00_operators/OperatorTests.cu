@@ -345,9 +345,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, FMod)
   ExecType exec{}; 
 
   // example-begin fmod-test-1
-  auto tiv0 = make_tensor<TestType>();
-  auto tiv1 = make_tensor<TestType>();
-  auto tov0 = make_tensor<TestType>();
+  auto tiv0 = make_tensor<TestType>({});
+  auto tiv1 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   tiv0() = (TestType)5.0;
   tiv1() = (TestType)3.1;
@@ -367,8 +367,8 @@ TYPED_TEST(OperatorTestsFloatAllExecs, TrigFuncs)
 
   ExecType exec{}; 
 
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -455,8 +455,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, AngleOp)
 
   ExecType exec{}; 
 
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<typename TestType::value_type, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<typename TestType::value_type>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -483,7 +483,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
   MATX_ENTER_HANDLER();
   { // clone from 0D
     // example-begin clone-test-1
-    auto tiv = make_tensor<TestType>();
+    auto tiv = make_tensor<TestType>({});
     auto tov = make_tensor<TestType>({N,M,K});
 
     tiv() = 3;
@@ -1301,7 +1301,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
     auto from = make_tensor<int>({N});
     (from = range<0>({N}, 0, 1)).run(exec);
     sync();
-    auto ind = make_tensor<int>();
+    auto ind = make_tensor<int>({});
     auto r = remap<0>(from, ind);
     auto to = make_tensor<int>({1});
 
@@ -1324,8 +1324,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
     (from = ones(from.Shape())).run(exec);
     sync();
 
-    auto i0 = make_tensor<int>();
-    auto i1 = make_tensor<int>();
+    auto i0 = make_tensor<int>({});
+    auto i1 = make_tensor<int>({});
     auto r0 = remap<0>(from, i0);
     auto r1 = remap<1>(from, i0);
 
@@ -1367,8 +1367,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, RealImagOp)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<typename TestType::value_type, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<typename TestType::value_type>({});  
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1394,16 +1394,16 @@ TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
   using ExecType = std::tuple_element_t<1, TypeParam>;
   using inner_type = typename inner_op_type_t<TestType>::type;
 
-  ExecType exec{};   
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  ExecType exec{};
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   TestType d = c;
   TestType z = 0;
   tiv0() = c;
 
-  tensor_t<TestType, 0> tov00;
+  auto tov00 = make_tensor<TestType>({});
 
   // example-begin IFELSE-test-1
   IFELSE(tiv0 == d, tov0 = z, tov0 = d).run(exec);
@@ -1435,8 +1435,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncsR2C)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<typename detail::complex_from_scalar_t<TestType>, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<typename detail::complex_from_scalar_t<TestType>>({});
   TestType c = GenerateData<TestType>();
   tiv0() = c;
 
@@ -1459,8 +1459,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1527,7 +1527,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
   cudaDeviceSynchronize();
   (a = a + b).run(exec);
 
-  auto t0 = make_tensor<TestType>();
+  auto t0 = make_tensor<TestType>({});
   (t0 = sum(a)).run(exec);
   cudaStreamSynchronize(0);
   ASSERT_EQ(t0(), static_cast<TestType>(2 * a.TotalSize()));
@@ -1542,8 +1542,8 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};     
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1562,7 +1562,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), min(c, d)));
 
   // These operators convert type T into bool
-  tensor_t<bool, 0> tob;
+  auto tob = make_tensor<bool>({});
 
   // example-begin lt-test-1
   (tob = tiv0 < d).run(exec);
@@ -1611,8 +1611,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncDivComplex)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};  
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0; 
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
   typename TestType::value_type s = 5.0;
 
   TestType c = GenerateData<TestType>();  
@@ -1633,8 +1633,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1702,8 +1702,8 @@ TYPED_TEST(OperatorTestsIntegralAllExecs, OperatorFuncs)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1726,8 +1726,8 @@ TYPED_TEST(OperatorTestsBooleanAllExecs, OperatorFuncs)
   using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   TestType d = false;
@@ -1781,8 +1781,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
 
   ExecType exec{};   
 
-  tensor_t<TestType, 0> tiv0;
-  tensor_t<TestType, 0> tov0;
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
 
   TestType c = GenerateData<TestType>();
   tiv0() = c;
@@ -1800,7 +1800,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
   // abs and norm take a complex and output a floating point value
-  tensor_t<typename TestType::value_type, 0> tdd0;
+  auto tdd0 = make_tensor<typename TestType::value_type>({});
   // example-begin norm-test-1
   (tdd0 = norm(tiv0)).run(exec);
   // example-end norm-test-1
@@ -2357,7 +2357,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   ExecType exec{}; 
 
   {
-    tensor_t<TestType, 0> t0;
+    auto t0 = make_tensor<TestType>({});
     tensor_t<TestType, 4> t4i({10, 20, 30, 40});
     tensor_t<TestType, 4> t4o({10, 20, 30, 40});
 
@@ -3118,7 +3118,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
   tensor_t<TestType, 2> t2({count0, count1});
   tensor_t<TestType, 2> t2s({count0, count1});
   tensor_t<TestType, 2> t2s2({count0, count1});
-  tensor_t<int, 0> t0;
+  auto t0 = make_tensor<int>({});
   t0() = -5;
 
   for (index_t i = 0; i < count0; i++) {
@@ -3502,7 +3502,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
   
   { // taking a rank0 tensor for m and constant for n
     auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
-    auto m = make_tensor<int>();
+    auto m = make_tensor<int>({});
     auto out = make_tensor<TestType>({size});
     m() = order;
 

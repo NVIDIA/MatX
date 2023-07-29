@@ -39,7 +39,7 @@
 using namespace matx;
 
 template <typename TensorType> struct TensorCreationTestsData {
-  tensor_t<TensorType, 0> t0{};
+  tensor_t<TensorType, 0> t0{{}};
   tensor_t<TensorType, 1> t1{{10}};
   tensor_t<TensorType, 2> t2{{20, 10}};
   tensor_t<TensorType, 3> t3{{30, 20, 10}};
@@ -100,7 +100,7 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
   ASSERT_EQ(mt2.Size(0), 2);
   ASSERT_EQ(mt2.Size(1), 2);
 
-  auto mt0 = make_tensor<TypeParam>();
+  auto mt0 = make_tensor<TypeParam>({});
   auto mt1 = make_tensor<TypeParam>({10});
   auto mt3 = make_tensor<TypeParam>({10, 5, 4});
   auto mt4 = make_tensor<TypeParam>({10, 5, 4, 3});

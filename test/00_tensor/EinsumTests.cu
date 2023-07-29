@@ -130,7 +130,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
   // example-begin einsum-dot-1
   auto a1 = make_tensor<TypeParam>({60});
   auto b1 = make_tensor<TypeParam>({60});
-  auto c0 = make_tensor<TypeParam>();
+  auto c0 = make_tensor<TypeParam>({});
   (a1 = ones(a1.Shape()) * 2).run();
   (b1 = ones(b1.Shape()) * 2).run(); 
 
@@ -252,8 +252,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
 
   // example-begin einsum-trace-1
   auto a2 = make_tensor<TypeParam>({10,10});
-  auto c0_0 = make_tensor<TypeParam>();
-  auto c0_1 = make_tensor<TypeParam>();
+  auto c0_0 = make_tensor<TypeParam>({});
+  auto c0_1 = make_tensor<TypeParam>({});
   (a2 = ones(a2.Shape())).run();
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call

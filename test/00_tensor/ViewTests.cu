@@ -39,7 +39,7 @@
 using namespace matx;
 
 template <typename TensorType> struct ViewTestsData {
-  tensor_t<TensorType, 0> t0{};
+  tensor_t<TensorType, 0> t0{{}};
   tensor_t<TensorType, 1> t1{{10}};
   tensor_t<TensorType, 2> t2{{20, 10}};
   tensor_t<TensorType, 3> t3{{30, 20, 10}};
@@ -358,7 +358,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
 
 TEST(BasicTensorTest, Clone)
 {
-  tensor_t<float, 0> t0{};
+  tensor_t<float, 0> t0{{}};
   tensor_t<float, 1> t1{{10}};
   tensor_t<float, 2> t2{{20, 10}};
   tensor_t<float, 3> t3{{30, 20, 10}};

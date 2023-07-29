@@ -114,13 +114,7 @@ public:
    */
   tensor_t() : detail::tensor_impl_t<T, RANK, Desc>{}
   {
-    if constexpr (RANK == 0) {
-      storage_ = typename Storage::container{sizeof(T)};
-      this->SetLocalData(storage_.data());
-    }
-    else {
-      this->SetLocalData(nullptr);
-    }
+    this->SetLocalData(nullptr);
   }
 
   /**
@@ -239,6 +233,19 @@ public:
   {
     this->SetLocalData(storage_.data());
   }
+
+  /**
+   * Constructor for a rank-0 tensor.
+   *
+   * @param shape
+   *   Tensor shape (empty braces)
+   */
+  __MATX_INLINE__ tensor_t([[maybe_unused]] const std::initializer_list<detail::no_size_t> shape) :
+    detail::tensor_impl_t<T, RANK, Desc>(std::array<index_t, 0>{}),
+    storage_{typename Storage::container{sizeof(T)}}
+  {    
+    this->SetLocalData(storage_.data());
+  }  
   
 
   /**

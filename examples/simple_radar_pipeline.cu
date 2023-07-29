@@ -39,7 +39,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t numPulses = 128;
   index_t numSamples = 9000;
   index_t waveformLength = 1000;
+  constexpr bool ENABLE_GRAPHS = false;
   uint32_t iterations = 100;
+  constexpr int num_streams = 1;
+  cudaGraph_t graphs[num_streams];
+  cudaGraphExec_t instances[num_streams];  
+  using complex = cuda::std::complex<float>;
+  RadarPipeline<complex> *pipelines[num_streams];
 
   std::cout << "Iterations: " << iterations << std::endl;
   std::cout << "numChannels: " << numChannels << std::endl;
@@ -48,62 +54,101 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "waveformLength: " << waveformLength << std::endl;
 
   // cuda stream to place work in
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
+  cudaStream_t streams[num_streams];
   
   // manually set to log all NVTX levels
   MATX_NVTX_SET_LOG_LEVEL( matx_nvxtLogLevels::MATX_NVTX_LOG_ALL );
   
   // create some events for timing
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-  
-  MATX_NVTX_START_RANGE("Pipeline Initialize", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1)
-  printf("Initializing data structures...\n");
-  auto radar =
-      RadarPipeline(numPulses, numSamples, waveformLength, numChannels, stream);
-  radar.GetInputView().PrefetchDevice(stream);
-  MATX_NVTX_END_RANGE(1)
-  
+  cudaEvent_t starts[num_streams];
+  cudaEvent_t stops[num_streams];
+
+  for (int s = 0; s < num_streams; s++) {
+    cudaEventCreate(&starts[s]);
+    cudaEventCreate(&stops[s]);
+    cudaStreamCreate(&streams[s]);
+    
+    MATX_NVTX_START_RANGE("Pipeline Initialize", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1)
+    printf("Initializing data structures for stream %d...\n", s);
+    pipelines[s] = new RadarPipeline(numPulses, numSamples, waveformLength, numChannels, streams[s]);
+    pipelines[s]->GetInputView().PrefetchDevice(streams[s]);
+    MATX_NVTX_END_RANGE(1)
+
+    cudaStreamSynchronize(streams[s]);    
+  }
+
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   printf("Running test...\n");
-  cudaStreamSynchronize(stream);
-  cudaEventRecord(start, stream);
-  
-  for (uint32_t i = 0; i < iterations; i++) {
+
+  auto run_pipeline = [&](int s) {
     MATX_NVTX_START_RANGE("PulseCompression", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 21)
-    radar.PulseCompression();
+    pipelines[s]->PulseCompression();
     MATX_NVTX_END_RANGE(21)  
     
     MATX_NVTX_START_RANGE("ThreePulseCanceller", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 22)
-    radar.ThreePulseCanceller();
+    pipelines[s]->ThreePulseCanceller();
     MATX_NVTX_END_RANGE(22)
     
     MATX_NVTX_START_RANGE("DopplerProcessing", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 23)
-    radar.DopplerProcessing();
+    pipelines[s]->DopplerProcessing();
     MATX_NVTX_END_RANGE(23)
     
     MATX_NVTX_START_RANGE("CFARDetections", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 24)
-    radar.CFARDetections();
+    pipelines[s]->CFARDetections();
     MATX_NVTX_END_RANGE(24)
+  }; 
+
+  // Warmup
+  for (int s = 0; s < num_streams; s++) {
+    run_pipeline(s);
   }
 
-  cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  if (ENABLE_GRAPHS) {
+    for (int s = 0; s < num_streams; s++) {
+      cudaStreamBeginCapture(streams[s], cudaStreamCaptureModeGlobal);
+      run_pipeline(s);
+      cudaStreamEndCapture(streams[s], &graphs[s]);
+      cudaGraphInstantiate(&instances[s], graphs[s], NULL, NULL, 0);     
+    }
+  }
+  
+  for (uint32_t i = 0; i < iterations; i++) {
+    for (int s = 0; s < num_streams; s++) {
+      if (i == 1) {
+        cudaEventRecord(starts[s], streams[s]);
+      }
+
+      if (ENABLE_GRAPHS) {
+        cudaGraphLaunch(instances[s], streams[s]);
+      }
+      else {
+        run_pipeline(s);
+      }
+    }
+  }
+
+  for (int s = 0; s < num_streams; s++) {
+    cudaEventRecord(stops[s], streams[s]);
+    cudaStreamSynchronize(streams[s]);
+  }
   MATX_NVTX_END_RANGE(2)
   
   MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 3)
   float time_ms;
-  cudaEventElapsedTime(&time_ms, start, stop);
+  cudaEventElapsedTime(&time_ms, starts[num_streams-1], stops[num_streams-1]);
   float time_s = time_ms * .001f;
 
-  printf("Pipeline rate: %f pulses/channel/sec\n",
-         static_cast<float>(iterations * numChannels * numPulses) / time_s);
+  auto mult = iterations * numChannels * numPulses * num_streams;
+  printf("Pipeline finished in %.2fms, rate: %.2f pulses/channel/sec (%.2f Gbps)\n",
+        time_ms,
+         static_cast<float>(mult) / time_s,
+         static_cast<float>(mult*sizeof(complex)*numSamples*8)/time_s/1e9);
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
-  cudaStreamDestroy(stream);
+for (int s = 0; s < num_streams; s++) {
+    cudaEventDestroy(starts[s]);
+    cudaEventDestroy(stops[s]);
+    cudaStreamDestroy(streams[s]);
+}
 
   cudaDeviceSynchronize();
   CUDA_CHECK_LAST_ERROR();

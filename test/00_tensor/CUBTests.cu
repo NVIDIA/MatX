@@ -44,7 +44,7 @@ template <typename TensorType> struct CUBTestsData {
   using ExecType = std::tuple_element_t<1, TensorType>;
   ExecType exec{};   
 
-  tensor_t<TypeParam, 0> t0{};
+  tensor_t<TypeParam, 0> t0{{}};
   tensor_t<TypeParam, 1> t1{{10}};
   tensor_t<TypeParam, 2> t2{{20, 10}};
   tensor_t<TypeParam, 3> t3{{30, 20, 10}};

@@ -295,9 +295,9 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   eShape[RANK-1] = matxKeepDim;
   eShape[RANK-2] = matxKeepDim;
 
-  auto mdiffU = make_tensor<SType>();
-  auto mdiffV = make_tensor<SType>();
-  auto mdiffA = make_tensor<SType>();
+  auto mdiffU = make_tensor<SType>({});
+  auto mdiffV = make_tensor<SType>({});
+  auto mdiffA = make_tensor<SType>({});
 
   auto I = clone<RANK>(e, eShape);
 
@@ -427,9 +427,9 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   eShape[RANK-1] = matxKeepDim;
   eShape[RANK-2] = matxKeepDim;
 
-  auto mdiffU = make_tensor<SType>();
-  auto mdiffV = make_tensor<SType>();
-  auto mdiffA = make_tensor<SType>();
+  auto mdiffU = make_tensor<SType>({});
+  auto mdiffV = make_tensor<SType>({});
+  auto mdiffA = make_tensor<SType>({});
 
   auto I = clone<RANK>(e, eShape);
 

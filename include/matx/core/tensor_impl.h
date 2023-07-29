@@ -681,6 +681,9 @@ class tensor_impl_t {
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(Is... indices) const noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif
       return *(ldata_ + GetValC<0, Is...>(std::make_tuple(indices...)));
     }
 
@@ -698,6 +701,9 @@ class tensor_impl_t {
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(Is... indices) noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif      
       return *(ldata_ + GetVal<0, Is...>(std::make_tuple(indices...)));
     }    
 

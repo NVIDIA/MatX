@@ -1078,6 +1078,7 @@ private:
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   CubParams_t params;
+  cudaStream_t stream_;
   CParams cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
   int *d_histogram = nullptr; // Used for hist()
