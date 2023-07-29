@@ -79,8 +79,8 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   (mtie(Q, R) = qr(A)).run(stream);
   // example-end qr-test-1
 
-  auto mdiffQTQ = make_tensor<SType>();
-  auto mdiffQR = make_tensor<SType>();
+  auto mdiffQTQ = make_tensor<SType>({});
+  auto mdiffQR = make_tensor<SType>({});
 
   {
     // QTQ == Identity

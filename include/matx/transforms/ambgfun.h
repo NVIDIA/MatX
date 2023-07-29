@@ -175,7 +175,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   //tensor_t<T1, RANK> ry(x);
 
   auto x_normdiv_v = make_tensor<T1>(x.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto x_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto x_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
   (x_norm_v = sum(norm(x))).run(stream);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
@@ -186,7 +186,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   if (y) {
     ry.Reset(y.value().Data(), y.value().Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
-    auto y_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
+    auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     (y_norm_v = sum(norm(ry))).run(stream);
     (y_normdiv_v = ry / y_norm_v).run(stream);

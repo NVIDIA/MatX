@@ -238,7 +238,8 @@ auto make_tensor_p( TensorType &tensor,
  *
  **/
 template <typename T>
-auto make_tensor( matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
+auto make_tensor( [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
+                  matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
                   cudaStream_t stream = 0) {  
   std::array<index_t, 0> shape;
 
@@ -259,7 +260,7 @@ template <typename TensorType,
 auto make_tensor( TensorType &tensor, 
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
                   cudaStream_t stream = 0) {  
-  auto tmp = make_tensor<typename TensorType::scalar_type>(space, stream);
+  auto tmp = make_tensor<typename TensorType::scalar_type>({}, space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -272,7 +273,8 @@ auto make_tensor( TensorType &tensor,
  *
  **/
 template <typename T>
-auto make_tensor_p( matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
+auto make_tensor_p( [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
+                    matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
                     cudaStream_t stream = 0) {
   
   std::array<index_t, 0> shape;
@@ -389,6 +391,7 @@ auto make_tensor( TensorType &tensor,
  **/
 template <typename T>
 auto make_tensor( T *ptr, 
+                  [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
                   bool owning = false) {
   std::array<index_t, 0> shape;
   return make_tensor<T, decltype(shape)>(ptr, std::move(shape), owning);

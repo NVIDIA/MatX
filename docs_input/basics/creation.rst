@@ -33,6 +33,13 @@ To convert between a ``tensor_t`` and ``tensor_impl_t`` a type trait called ``ba
 
 where ``in`` is the ``tensor_t`` object and ``in1_`` will be a ``tensor_impl_t``.
 
+Tensor Constructor
+------------------
+Where possible, tensors should always be created using ``make_tensor``. This abstracts the type away from the user should any template types
+change in the future. The one exception to this is when tensors are used as class members (see below). When a tensor is created with the default
+constructor it is in an uninitialized state. Any type of accesses to the tensor will result in undefined behavior, so it must be initialized
+using ``make_tensor`` before using it. 
+
 MatX Storage
 ------------
 Within the ``tensor_t`` class is an abstract template parameter called ``Storage``. ``Storage`` objects are always created from a ``basic_storage``
@@ -152,8 +159,14 @@ and
 
     auto t = make_tensor<float>({10, 20, 30});
 
-In the former case the array is an lvalue that can be modified in memory before calling, whereas the latter case uses rvalues. When the sizes are known
-at compile time the static version of ``make_`` should be used:
+In the former case the array is an lvalue that can be modified in memory before calling, whereas the latter case uses rvalues. For 0D tensors an empty 
+braced list is required:
+
+.. code-block:: cpp
+
+    auto t0 = make_tensor<float>({});
+
+When the sizes are known at compile time the static version of ``make_`` should be used:
 
 .. code-block:: cpp
 

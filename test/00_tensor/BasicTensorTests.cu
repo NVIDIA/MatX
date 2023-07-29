@@ -39,7 +39,7 @@
 using namespace matx;
 
 template <typename TensorType> struct BasicTensorTestsData {
-  tensor_t<TensorType, 0> t0{};
+  tensor_t<TensorType, 0> t0{{}};
   tensor_t<TensorType, 1> t1{{10}};
   tensor_t<TensorType, 2> t2{{20, 10}};
   tensor_t<TensorType, 3> t3{{30, 20, 10}};

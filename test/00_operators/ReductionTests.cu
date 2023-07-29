@@ -131,7 +131,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, VarianceStd)
   constexpr index_t size = 100;
   pb->InitAndRunTVGenerator<TestType>("00_operators", "stats", "run", {size});
 
-  tensor_t<TestType, 0> t0;
+  auto t0 = make_tensor<TestType>({});
   tensor_t<TestType, 1> t1({size});
   pb->NumpyToTensorView(t1, "x");
 
@@ -164,7 +164,7 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
   constexpr index_t size = 100;
   pb->InitAndRunTVGenerator<TestType>("00_operators", "stats", "run", {size});
 
-  tensor_t<typename TestType::value_type, 0> t0;
+  auto t0 = make_tensor<typename TestType::value_type>({});
   tensor_t<TestType, 1> t1({size});
   pb->NumpyToTensorView(t1, "x");
 
@@ -212,7 +212,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
   }
 
   {
-    tensor_t<TestType, 0> t0;
+    auto t0 = make_tensor<TestType>({});
 
     auto t4 = ones<TestType>({3, 4, 5, 6});
     auto t3 = ones<TestType>({3, 4, 5});
@@ -570,7 +570,7 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
 
   MATX_ENTER_HANDLER();
   {
-    tensor_t<TestType, 0> t0;
+    auto t0 = make_tensor<TestType>({});
 
     tensor_t<TestType, 1> t1({30});
     tensor_t<TestType, 2> t2({30, 40});
@@ -621,7 +621,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, AllClose)
   // example-begin allclose-test-1
   auto A = make_tensor<TestType>({5, 5, 5});
   auto B = make_tensor<TestType>({5, 5, 5});
-  auto C = make_tensor<int>();
+  auto C = make_tensor<int>({});
 
   (A = ones<TestType>(A.Shape())).run();
   (B = ones<TestType>(B.Shape())).run();
@@ -650,7 +650,7 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
   ExecType exec{};
 
   {
-    tensor_t<TestType, 0> t0;
+    auto t0 = make_tensor<TestType>({});
 
     tensor_t<TestType, 1> t1({30});
     tensor_t<TestType, 2> t2({30, 40});
@@ -699,7 +699,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
   ExecType exec{};
 
   {
-    tensor_t<TestType, 0> t0{};
+    tensor_t<TestType, 0> t0{{}};
     tensor_t<TestType, 1> t1e{{10}};
     tensor_t<TestType, 1> t1o{{11}};
     tensor_t<TestType, 2> t2e{{2, 4}};
@@ -745,8 +745,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, MinMaxNegative)
     auto t = matx::make_tensor<TestType, 1>({3});
     t.SetVals({-3, -1, -7});
 
-    matx::tensor_t<TestType, 0> max_val{};
-    matx::tensor_t<matx::index_t, 0> max_idx{};
+    matx::tensor_t<TestType, 0> max_val{{}};
+    matx::tensor_t<matx::index_t, 0> max_idx{{}};
     (mtie(max_val, max_idx) = matx::argmax(t)).run(ExecType{});
     cudaStreamSynchronize(0);
     ASSERT_EQ(max_val(), -1);
@@ -766,7 +766,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
     ExecType exec{};
     using T = TestType;
     // example-begin rmax-test-1
-    auto t0 = make_tensor<TestType>();
+    auto t0 = make_tensor<TestType>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
@@ -791,7 +791,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
     ExecType exec{};
     using T = TestType;
     // example-begin rmin-test-1
-    auto t0 = make_tensor<TestType>();
+    auto t0 = make_tensor<TestType>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
@@ -816,8 +816,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     ExecType exec{};
     using T = TestType;
     // example-begin argmax-test-1
-    auto t0 = make_tensor<TestType>();
-    auto t0i = make_tensor<index_t>();
+    auto t0 = make_tensor<TestType>({});
+    auto t0i = make_tensor<index_t>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
@@ -855,8 +855,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     ExecType exec{};
     using T = TestType;
     // example-begin argmin-test-1
-    auto t0 = make_tensor<TestType>();
-    auto t0i = make_tensor<index_t>();
+    auto t0 = make_tensor<TestType>({});
+    auto t0i = make_tensor<index_t>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
@@ -898,7 +898,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t1 = ones<TestType>({30});
 
     // example-begin mean-test-1
-    auto t0 = make_tensor<TestType>();
+    auto t0 = make_tensor<TestType>({});
     auto t4 = ones<TestType>({30, 40, 50, 60});    
     // Compute the mean over all dimensions in "t4" and store the result in "t0"
     (t0 = mean(t4)).run(exec);
@@ -979,7 +979,7 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Prod)
 
   MATX_ENTER_HANDLER();
   {
-    tensor_t<TestType, 0> t0;
+    auto t0 = make_tensor<TestType>({});
 
     std::array<index_t, 2> s2{3, 4};
     std::array<index_t, 1> s1{3};
@@ -1025,7 +1025,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Find)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
-    tensor_t<int, 0> num_found{};
+    tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<TestType, 1> t1o{{100}};
 
@@ -1064,7 +1064,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdx)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
-    tensor_t<int, 0> num_found{};
+    tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<int, 1> t1o{{100}};
 
@@ -1101,7 +1101,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
-    tensor_t<int, 0> num_found{}, num_found2{};
+    tensor_t<int, 0> num_found{{}}, num_found2{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<int, 1> t1o_idx{{100}};
     tensor_t<TestType, 1> t1o{{100}};
@@ -1148,7 +1148,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
-    tensor_t<int, 0> num_found{};
+    tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<TestType, 1> t1o{{100}};
 
@@ -1185,7 +1185,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
 
   // example-begin trace-test-1
   auto t2 = make_tensor<TestType>({count, count});
-  auto t0 = make_tensor<TestType>();
+  auto t0 = make_tensor<TestType>({});
 
   (t2 = ones<TestType>(t2.Shape())).run(exec);
   (t0 = trace(t2)).run(exec);

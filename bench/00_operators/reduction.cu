@@ -11,7 +11,7 @@ void softmax(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
   auto t4    = make_tensor<ValueType>({1,10845,8,16});
-  auto t4out    = make_tensor<ValueType>({1,10845,8,16});
+  auto t4out = make_tensor<ValueType>({1,10845,8,16});
   t4.PrefetchDevice(0);
   t4out.PrefetchDevice(0);
 
@@ -37,7 +37,7 @@ void reduce_0d_matx(nvbench::state &state, nvbench::type_list<ValueType>)
 
   auto xvc = make_tensor<ValueType>({x_len, x_len, x_len, x_len});
   auto xv = xvc.Permute({0,1,3,2});
-  auto xv2 = make_tensor<ValueType>();
+  auto xv2 = make_tensor<ValueType>({});
   xv.PrefetchDevice(0);
 
   (xv2 = matx::sum(xv)).run();
@@ -71,7 +71,7 @@ void reduce_0d_cub(nvbench::state &state, nvbench::type_list<ValueType>)
   state.add_global_memory_writes<ValueType>(1);  
 
   auto xv = make_tensor<ValueType>({x_len, x_len, x_len, x_len});
-  auto xv2 = make_tensor<ValueType>();
+  auto xv2 = make_tensor<ValueType>({});
   xv.PrefetchDevice(0);
 
   (xv2 = matx::sum(xv)).run();
@@ -98,7 +98,7 @@ void reduce_0d_cub_permute(nvbench::state &state, nvbench::type_list<ValueType>)
   auto xvc = make_tensor<ValueType>({x_len, x_len, x_len, x_len});
   auto xv = xvc.Permute({0,1,3,2});
 
-  auto xv2 = make_tensor<ValueType>();
+  auto xv2 = make_tensor<ValueType>({});
   xv.PrefetchDevice(0);
 
   cub_reduce<decltype(xv2), decltype(xv), CustomSum>(xv2, xv, 0.0f, 0);

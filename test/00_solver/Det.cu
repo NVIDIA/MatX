@@ -54,7 +54,7 @@ protected:
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Av{{m, m}};
   tensor_t<T, 2> Atv{{m, m}};
-  tensor_t<T, 0> detv{};
+  tensor_t<T, 0> detv{{}};
 };
 
 template <typename TensorType>
