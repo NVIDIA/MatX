@@ -43,8 +43,7 @@ namespace detail {
   class ChannelizePolyOp : public BaseOp<ChannelizePolyOp<OpA, FilterType>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-            typename OpA::scalar_type, typename cuda::std::complex<typename OpA::scalar_type>>;
+      using out_t = complex_from_scalar_t<typename OpA::scalar_type>;
       OpA a_;
       FilterType f_;
       index_t num_channels_;

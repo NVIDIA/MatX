@@ -101,18 +101,6 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = channel;
 
-    // For C2C transforms, we use ifft() to get the correct sign on the imaginary
-    // components and thus avoid a post-fft conjugation. However, ifft scales by
-    // 1/N, so we pre-scale here by N to compensate. For R2C transforms, we must
-    // use fft() and we handle conjugation in the subsequent unpacking.
-    const auto scale = [num_channels]() -> auto {
-        if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t>) {
-            return static_cast<input_t>(1.0);
-        } else {
-            return static_cast<input_t>(num_channels);
-        }
-    }();
-
     if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
             const index_t first_ind = std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
@@ -140,7 +128,6 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 h++;
             }
             outdims[OutElemRank] = t;
-            accum *= scale;
             detail::mapply([accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, outdims);
@@ -180,7 +167,6 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 indims[InRank-1] -= num_channels;
             }
             outdims[OutElemRank] = t;
-            accum *= scale;
             detail::mapply([accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, outdims);

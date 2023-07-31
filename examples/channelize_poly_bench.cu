@@ -85,11 +85,6 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       auto filter = matx::make_tensor<InType, 1>({filter_len});
       auto output = matx::make_tensor<OutType, 3>({num_batches, output_len_per_channel, num_channels});
 
-      input.PrefetchDevice(stream);
-      filter.PrefetchDevice(stream);
-      output.PrefetchDevice(stream);
-      cudaStreamSynchronize(stream);
-
       const matx::index_t decimation_factor = num_channels;
 
       for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
@@ -98,21 +93,20 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
 
       cudaStreamSynchronize(stream);
 
-      double total_elapsed_ms = 0.0;
-      float iter_elapsed_ms = 0.0f;
+      float elapsed_ms = 0.0f;
+      cudaEventRecord(start);
       for (int k = 0; k < NUM_ITERATIONS; k++) {
-        cudaEventRecord(start);
         (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(stream);
-        cudaEventRecord(stop);
-        cudaStreamSynchronize(stream);
-        CUDA_CHECK_LAST_ERROR();
-        cudaEventElapsedTime(&iter_elapsed_ms, start, stop);
-        total_elapsed_ms += iter_elapsed_ms;
       }
+      cudaEventRecord(stop);
+      cudaStreamSynchronize(stream);
+      CUDA_CHECK_LAST_ERROR();
+      cudaEventElapsedTime(&elapsed_ms, start, stop);
 
-      const double avg_elapsed_us = (total_elapsed_ms/NUM_ITERATIONS)*1.0e3;
+      const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
       printf("Batches: %5lld Channels: %5lld FilterLen: %5lld InputLen: %7lld Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
-        num_batches, num_channels, filter_len, input_len, avg_elapsed_us, static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
+        num_batches, num_channels, filter_len, input_len, avg_elapsed_us,
+        static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
     }
     printf("\n");
   }
@@ -130,14 +124,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   const matx::index_t channel_start = 3;
   const matx::index_t channel_stop = 10;
-  printf("Benchmarking float -> complex<float>\n");
-  ChannelizePolyBench<float,cuda::std::complex<float>>(channel_start, channel_stop);
 
-  printf("Benchmarking double -> complex<double>\n");
-  ChannelizePolyBench<double,cuda::std::complex<double>>(channel_start, channel_stop);
+  // printf("Benchmarking float -> complex<float>\n");
+  // ChannelizePolyBench<float,cuda::std::complex<float>>(channel_start, channel_stop);
 
-  printf("Benchmarking complex<double> -> complex<double>\n");
-  ChannelizePolyBench<double,cuda::std::complex<double>>(channel_start, channel_stop);
+  printf("Benchmarking complex<float> -> complex<float>\n");
+  ChannelizePolyBench<cuda::std::complex<float>,cuda::std::complex<float>>(channel_start, channel_stop);
+
+  // printf("Benchmarking double -> complex<double>\n");
+  // ChannelizePolyBench<double,cuda::std::complex<double>>(channel_start, channel_stop);
+
+  // printf("Benchmarking complex<double> -> complex<double>\n");
+  // ChannelizePolyBench<cuda::std::complex<double>,cuda::std::complex<double>>(channel_start, channel_stop);
 
   MATX_EXIT_HANDLER();
 }

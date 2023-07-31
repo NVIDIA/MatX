@@ -248,7 +248,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       matxChannelizePoly1DInternal_FusedChan(out, in, f, stream);
     } else {
       matxChannelizePoly1DInternal(out, in, f, stream);
-      (out = ifft(out, num_channels)).run(stream);
+      // Specify FORWARD here to prevent any normalization after the ifft. We do not
+      // want any extra scaling on the output values.
+      (out = ifft(out, num_channels, FFTNorm::FORWARD)).run(stream);
     }
   }
 }
