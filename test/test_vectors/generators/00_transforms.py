@@ -6,6 +6,7 @@ import sys
 from scipy import io
 from scipy import signal
 from scipy.constants import c, pi
+from scipy.fft import ifft
 import matx_common
 from typing import Dict, List
 
@@ -154,6 +155,87 @@ class resample_poly_operators:
         self.res['b_random'] = signal.resample_poly(self.res['a'], self.res['up'], self.res['down'], window=self.res['filter_random'])
         if 'filter_default' in self.res:
             self.res['b_default'] = signal.resample_poly(self.res['a'], self.res['up'], self.res['down'])
+        return self.res
+
+class channelize_poly_operators:
+    np_random_state = None
+    def __init__(self, dtype: str, size: List[int]):
+        if not channelize_poly_operators.np_random_state:
+            # We want reproducible results, but do not want to create random vectors that
+            # are too similar between test cases. If we seed every time with the same value
+            # and then create test cases with e.g. 1000 and 2000 samples, the first 1000
+            # samples will be identical in both case. Thus, we seed only once and store the
+            # state from one call to the next thereafter.
+            np.random.seed(1234)
+        else:
+            np.random.set_state(channelize_poly_operators.np_random_state)
+
+        self.size = size
+        self.dtype = dtype
+        signal_len = size[0]
+        filter_len = size[1]
+        num_channels = size[2]
+        # Remaining dimensions are batch dimensions
+        if len(size) > 3:
+            a_dims = size[3:]
+            a_dims = np.append(a_dims, signal_len)
+        else:
+            a_dims = [signal_len]
+        self.res = {
+            'a': matx_common.randn_ndarray(a_dims, dtype=dtype),
+            'filter_random': matx_common.randn_ndarray((filter_len,), dtype=dtype),
+            'num_channels': num_channels,
+        }
+
+        channelize_poly_operators.np_random_state = np.random.get_state()
+
+    def channelize(self) -> Dict[str, np.ndarray]:
+        def idivup(a, b) -> int: return (a+b-1)//b
+
+        h = self.res['filter_random']
+        num_channels = self.res['num_channels']
+        x = self.res['a']
+        num_taps_per_channel = idivup(h.size, num_channels)
+        if num_channels * num_taps_per_channel > h.size:
+            h = np.pad(h, (0,num_channels*num_taps_per_channel-h.size))
+        h = np.reshape(h, (num_channels, num_taps_per_channel), order='F')
+        x_len_per_channel = idivup(x.shape[-1], num_channels)
+        x_pad_len = x_len_per_channel * num_channels
+        num_batches = x.size // x.shape[-1]
+        out = np.zeros((num_batches, num_channels, x_len_per_channel), dtype=np.complex128)
+        xr = np.reshape(x, (num_batches, x.shape[-1]))
+        for batch_ind in range(num_batches):
+            xpad = xr[batch_ind, :]
+            if x_pad_len > x.shape[-1]:
+                xpad = np.pad(xpad, (0,x_pad_len-x.shape[-1]))
+            # flipud because samples are inserted into the filter banks in order
+            # M-1, M-2, ..., 0
+            xf = np.flipud(np.reshape(xpad, (num_channels,x_len_per_channel), order='F'))
+            buf = np.zeros((num_channels, num_taps_per_channel), dtype=self.dtype)
+
+            # We scale the outputs by num_channels because we use the ifft
+            # and it scales by 1/N for an N-point FFT. We use ifft instead
+            # of fft because the complex exponentials in the Harris paper
+            # (c.f. Equation 17) are exp(j * ...) instead of exp(-j * ...)
+            # whereas scipy uses the negative version for DFTs.
+            scale = num_channels
+            for i in range(x_len_per_channel):
+                buf[:, 1:] = buf[:, 0:num_taps_per_channel-1]
+                buf[:, 0] = xf[:, i]
+                for j in range(num_channels):
+                    out[batch_ind, j, i] = scale * np.dot(np.squeeze(buf[j,:]), np.squeeze(h[j,:]))
+            out[batch_ind,:,:] = ifft(out[batch_ind,:,:], axis=0)
+        if num_batches > 1:
+            s = list(x.shape)
+            s[-1] = num_channels
+            s = np.append(s, x_len_per_channel)
+            perm = np.arange(len(x.shape)+1)
+            perm[-2] = len(x.shape)
+            perm[-1] = len(x.shape)-1
+            out = np.transpose(np.reshape(out, s), axes=perm)
+        else:
+            out = np.transpose(np.reshape(out, out.shape[1:]), axes=[1,0])
+        self.res['b_random'] = out
         return self.res
 
 class fft_operators:

@@ -41,6 +41,7 @@
 #include "matx/operators/concat.h"
 #include "matx/operators/constval.h"
 #include "matx/operators/cast.h"
+#include "matx/operators/channelize_poly.h"
 #include "matx/operators/chol.h"
 #include "matx/operators/clone.h"
 #include "matx/operators/conv.h"

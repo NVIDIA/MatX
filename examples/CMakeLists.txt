@@ -1,6 +1,7 @@
 set(examples 
     simple_radar_pipeline 
     recursive_filter 
+    channelize_poly_bench
     convolution 
     conv2d
     cgsolve 
