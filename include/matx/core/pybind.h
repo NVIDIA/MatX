@@ -242,29 +242,29 @@ public:
     if constexpr (is_complex_v<T1> || is_complex_v<T2>) {
       if (debug) {
         printf("FileName=%s Vector=%f%+f File=%f%+f\n", name.c_str(),
-               static_cast<float>(ut_data.real()),
-               static_cast<float>(ut_data.imag()),
-               static_cast<float>(file_data.real()),
-               static_cast<float>(file_data.imag()));
+               static_cast<double>(ut_data.real()),
+               static_cast<double>(ut_data.imag()),
+               static_cast<double>(file_data.real()),
+               static_cast<double>(file_data.imag()));
       }
 
-      if (fabs(static_cast<float>(ut_data.real()) -
-               static_cast<float>(file_data.real())) > thresh) {
+      if (fabs(static_cast<double>(ut_data.real()) -
+               static_cast<double>(file_data.real())) > thresh) {
         return false;
       }
-      if (fabs(static_cast<float>(ut_data.imag()) -
-               static_cast<float>(file_data.imag())) > thresh) {
+      if (fabs(static_cast<double>(ut_data.imag()) -
+               static_cast<double>(file_data.imag())) > thresh) {
         return false;
       }
     }
     else {
       if (debug) {
         std::cout << "FileName=" << name.c_str()
-                  << " Vector=" << static_cast<float>(ut_data)
-                  << " File=" << static_cast<float>(file_data) << "\n";
+                  << " Vector=" << static_cast<double>(ut_data)
+                  << " File=" << static_cast<double>(file_data) << "\n";
       }
-      else if (fabs(static_cast<float>(ut_data) -
-                    static_cast<float>(file_data)) > thresh) {
+      else if (fabs(static_cast<double>(ut_data) -
+                    static_cast<double>(file_data)) > thresh) {
         return false;
       }
     }

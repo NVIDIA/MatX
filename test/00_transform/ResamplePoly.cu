@@ -49,7 +49,7 @@ protected:
     if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
       thresh = 1.0e-1;
     } else if constexpr (std::is_same_v<T, double>) {
-      thresh = 1.0e-12;
+      thresh = 1.0e-10;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
       // rather than absolute for larger values.
