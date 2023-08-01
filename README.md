@@ -193,6 +193,10 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+*v0.5.0*:
+* Polyphase resampler
+* Documentation overhaul with examples for each function
+  
 *v0.4.0*:
 * SVD power iteration function
 * `sign`, and `index` operators
@@ -209,14 +213,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
 * NVTX support
 * Many, many bug fixes
 
-*v0.2.3*:
-* Several new functions: `find`, `find_idx`, `unique`, and `chirp`
-* cuTENSOR and cuTensorNet integration for new `einsum` function
-   * Tensor contraction support
-* Better error reporting
-   
-*v0.2.2*:
-* Arbitrary tensor ranks
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
