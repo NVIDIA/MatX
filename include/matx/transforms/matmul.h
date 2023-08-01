@@ -997,7 +997,9 @@ struct MatMulParamsKeyEq {
     return l.m == t.m && l.n == t.n && l.k == t.k && l.a_rows == t.a_rows &&
            l.b_rows == t.b_rows && l.c_rows == t.c_rows &&
            l.a_cols == t.a_cols && l.b_cols == t.b_cols &&
-           l.c_cols == t.c_cols && l.stream == t.stream && l.lda == t.lda &&
+           l.c_cols == t.c_cols && 
+           l.astride == t.astride && l.bstride == t.bstride && l.cstride == t.cstride &&
+           l.stream == t.stream && l.lda == t.lda &&
            l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
            l.opB == t.opB;
