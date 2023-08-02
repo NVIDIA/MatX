@@ -97,11 +97,13 @@ public:
    *   Inverse of A (if it exists)
    *
    */
-  matxInversePlan_t(TensorTypeAInv &a_inv, const TensorTypeA &a)
+  matxInversePlan_t(TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream)
   {
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    stream_ = stream;
     
     // Ok to remove since we're just passing a list of RO pointers
     //using a_nc = typename std::remove_const<decltype(a)>(a); 
@@ -123,26 +125,29 @@ public:
       // here as our batch dims
       std::vector<const T1 *> in_pointers;
       std::vector<T1 *> out_pointers;
+      make_tensor(tmp_a_, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      (tmp_a_ = a).run(stream);
+
       if constexpr (RANK == 2) {
-        in_pointers.push_back(&a(0, 0));
+        in_pointers.push_back(&tmp_a_(0, 0));
         out_pointers.push_back(&a_inv(0, 0));
       }
       else {
         using shape_type = typename TensorTypeA::desc_type::shape_type;
         int batch_offset = 2;
         std::array<shape_type, TensorTypeA::Rank()> idx{0};
-        auto a_shape = a.Shape();
+        auto a_shape = tmp_a_.Shape();
         // Get total number of batches
         size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - batch_offset, 1, std::multiplies<shape_type>());
         for (size_t iter = 0; iter < total_iter; iter++) {
-          auto ip = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto ip = std::apply([&](auto... param) { return tmp_a_.GetPointer(param...); }, idx);
           auto op = std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
           
           in_pointers.push_back(ip);
           out_pointers.push_back(op);
 
           // Update all but the last 2 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, idx, batch_offset);
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(tmp_a_, idx, batch_offset);
         }        
       }
 
@@ -307,6 +312,8 @@ private:
   int *d_info;
   T1 **d_A_array;
   T1 **d_A_inv_array;
+  cudaStream_t stream_;
+  matx::tensor_t<typename TensorTypeA::scalar_type, TensorTypeA::Rank()> tmp_a_;
 };
 
 /**
@@ -367,7 +374,7 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
   // Get cache or new inverse plan if it doesn't exist
   auto ret = detail::inv_cache.Lookup(params);
   if (ret == std::nullopt) {
-    auto tmp = new detail::matxInversePlan_t{a_inv, a};
+    auto tmp = new detail::matxInversePlan_t{a_inv, a, stream};
     detail::inv_cache.Insert(params, static_cast<void *>(tmp));
     tmp->Exec(stream);
   }
