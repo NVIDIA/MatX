@@ -126,7 +126,7 @@ inline void resample_poly_impl(OutType &out, const InType &in, const FilterType 
   }
 
   const index_t up_size = in.Size(RANK-1) * up;
-  const index_t outlen = up_size / down + ((up_size % down) ? 1 : 0);
+  [[maybe_unused]] const index_t outlen = up_size / down + ((up_size % down) ? 1 : 0);
 
   MATX_ASSERT_STR(out.Size(RANK-1) == outlen, matxInvalidDim, "resample_poly: output size mismatch");
 
