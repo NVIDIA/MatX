@@ -46,7 +46,7 @@ namespace detail {
   {
     private:
       OpA a_;
-      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
     public:
       using matxop = bool;
@@ -73,13 +73,13 @@ namespace detail {
       }
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_device_executor_v<Executor>, "inv() only supports the CUDA executor currently");
         inv_impl(std::get<0>(out), a_, ex.getStream());
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

@@ -94,8 +94,8 @@ namespace matx
       class matxBinaryOp : public BaseOp<matxBinaryOp<I1,I2,Op>>
     {
       private:
-        typename base_type<I1>::type in1_;
-        typename base_type<I2>::type in2_;
+        mutable typename base_type<I1>::type in1_;
+        mutable typename base_type<I2>::type in2_;
         typename base_type<Op>::type op_;
 
       public:
@@ -147,7 +147,7 @@ namespace matx
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<I1>()) {
           in1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -159,7 +159,7 @@ namespace matx
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept  
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
       {
         if constexpr (is_matx_op<I1>()) {
           in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

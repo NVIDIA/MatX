@@ -49,7 +49,7 @@ namespace detail {
       index_t num_channels_;
       index_t decimation_factor_;
       std::array<index_t, OpA::Rank() + 1> out_dims_;
-      matx::tensor_t<out_t, OpA::Rank() + 1> tmp_out_;
+      mutable matx::tensor_t<out_t, OpA::Rank() + 1> tmp_out_;
 
     public:
       using matxop = bool;
@@ -77,7 +77,7 @@ namespace detail {
       }
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_device_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
 
         channelize_poly_impl(std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
@@ -89,7 +89,7 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

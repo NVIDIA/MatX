@@ -74,7 +74,32 @@ namespace matx
           constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
           {
             return op2_.Size(dim);
-          }        
+          }      
+
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+          {
+            if constexpr (is_matx_op<Op1>()) {
+              op1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+
+            if constexpr (is_matx_op<Op2>()) {
+              op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+          }
+
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+          {
+            if constexpr (is_matx_op<Op1>()) {
+              op1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+
+            if constexpr (is_matx_op<Op2>()) {
+              op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+          }       
+                 
         private:
           typename base_type<Op1>::type op1_;
           typename base_type<Op2>::type op2_;

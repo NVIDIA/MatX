@@ -104,13 +104,13 @@ namespace matx
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
       in1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept  
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept  
     {
       in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }

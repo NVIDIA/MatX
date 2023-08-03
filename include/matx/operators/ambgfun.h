@@ -44,13 +44,13 @@ namespace matx
     class AmbgFunOp : public BaseOp<AmbgFunOp<OpX, OpY>>
     {
       private:
-        OpX x_;
-        OpY y_;
+        mutable OpX x_;
+        mutable OpY y_;
         double fs_;
         AMBGFunCutType_t cut_;
         float cut_val_;
         std::array<index_t, 2> out_dims_;
-        matx::tensor_t<typename OpX::scalar_type, 2> tmp_out_;
+        mutable matx::tensor_t<typename OpX::scalar_type, 2> tmp_out_;
 
       public:
         using matxop = bool;
@@ -104,14 +104,14 @@ namespace matx
         }
 
         template <typename Out, typename Executor>
-        void Exec(Out &&out, Executor &&ex) {
+        void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_device_executor_v<Executor>, "ambgfun() only supports the CUDA executor currently");
           static_assert(std::tuple_element_t<0, remove_cvref_t<Out>>::Rank() == 2, "Output tensor of ambgfun must be 2D");
           ambgfun_impl(std::get<0>(out), x_, y_, fs_, cut_, cut_val_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpX>()) {
             x_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

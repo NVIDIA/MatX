@@ -65,7 +65,7 @@ namespace detail {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_device_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
 
         std::apply([&](auto... args) {
@@ -79,7 +79,7 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         MATX_ASSERT_STR(false, matxNotSupported, "einsum() must only be called with a single assignment since it has multiple return types");
       }

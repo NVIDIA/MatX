@@ -50,7 +50,7 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         std::array<index_t, OpA::Rank()> out_dims_;
-        matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
+        mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
                                           typename OpA::scalar_type, 
                                           typename scalar_to_complex<OpA>::ctype>, OpA::Rank()> tmp_out_;
 
@@ -111,7 +111,7 @@ namespace matx
         }
 
         template <typename Out, typename Executor>
-        void Exec(Out &&out, Executor &&ex) {
+        void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_device_executor_v<Executor>, "fft()/ifft() only supports the CUDA executor currently");
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
@@ -132,7 +132,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
