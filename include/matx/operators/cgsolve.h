@@ -49,7 +49,7 @@ namespace matx
         double tol_;
         int max_iters_;
         std::array<index_t, 2> out_dims_;
-        matx::tensor_t<typename OpA::scalar_type, 2> tmp_out_;
+        mutable matx::tensor_t<typename OpA::scalar_type, 2> tmp_out_;
 
       public:
         using matxop = bool;
@@ -79,19 +79,20 @@ namespace matx
         {
           return remove_cvref_t<OpB>::Rank();
         }
+
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
           return out_dims_[dim];
         }
 
         template <typename Out, typename Executor>
-        void Exec(Out &&out, Executor &&ex) {
+        void Exec(Out &&out, Executor &&ex)  const{
           static_assert(is_device_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
           cgsolve_impl(std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

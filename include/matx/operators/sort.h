@@ -49,7 +49,7 @@ namespace detail {
       OpA a_;
       SortDirection_t dir_;
       std::array<index_t, OpA::Rank()> out_dims_;
-      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;      
+      mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;      
 
     public:
       using matxop = bool;
@@ -70,7 +70,7 @@ namespace detail {
       };
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         sort_impl(std::get<0>(out), a_, dir_, ex);
       }
 
@@ -80,7 +80,7 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

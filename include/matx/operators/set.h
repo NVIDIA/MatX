@@ -63,7 +63,7 @@ template <typename T, typename Op>
 class set : public BaseOp<set<T, Op>> {
 private:
   mutable typename base_type<T>::type out_;
-  typename base_type<Op>::type op_;
+  mutable typename base_type<Op>::type op_;
 
 public:
   // Type specifier for reflection on class
@@ -161,7 +161,7 @@ public:
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) noexcept
+  __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
   {
     if constexpr (is_matx_op<T>()) {
       out_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -172,7 +172,7 @@ public:
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept  
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
   {
     if constexpr (is_matx_op<T>()) {
       out_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

@@ -50,7 +50,7 @@ namespace matx
         float beta_;
         PermDims perm_; 
         std::array<index_t, OpA::Rank()> out_dims_;
-        matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+        mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
       public:
         using matxop = bool;
@@ -105,7 +105,7 @@ namespace matx
         }
 
         template <typename Out, typename Executor>
-        void Exec(Out &&out, Executor &&ex) {
+        void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_device_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             matmul_impl(permute(std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
@@ -116,7 +116,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

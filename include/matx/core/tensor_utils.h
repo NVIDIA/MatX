@@ -315,7 +315,7 @@ namespace detail {
    * @return Value after broadcasting
    */
   template <class T, typename... Is>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(T &i, Is... indices)
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(const T &i, Is... indices)
   {
     if constexpr (T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank) {
       return i(indices...);
@@ -348,7 +348,7 @@ namespace detail {
 
 
   template <class T, typename... Is>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(T &i, Is... indices)
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(const T &i, Is... indices)
   {
     if constexpr (is_matx_op<T>())
     {

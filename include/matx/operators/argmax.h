@@ -64,7 +64,7 @@ namespace detail {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmax(). ie: (mtie(O, I) = argmax(A))");   
         argmax_impl(std::get<0>(out), std::get<1>(out), a_, ex);
       }
@@ -75,7 +75,7 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         MATX_ASSERT_STR(false, matxNotSupported, "argmax() must only be called with a single assignment since it has multiple return types");
       }
