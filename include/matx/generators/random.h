@@ -448,7 +448,7 @@ public:
         }
         else if constexpr (is_single_thread_host_executor_v<Executor>) {
           if (!init_) {
-            curandStatus_t ret;
+            [[maybe_unused]] curandStatus_t ret;
 
             ret = curandCreateGeneratorHost(&gen_, CURAND_RNG_PSEUDO_MT19937);
             MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to create random number generator");
