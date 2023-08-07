@@ -51,7 +51,7 @@ namespace matx {
 template <int THREADS, typename OutType, typename InType, typename FilterType>
 __launch_bounds__(THREADS)
 __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
-                    index_t up, index_t down)
+                    index_t up, index_t down, index_t elems_per_thread)
 {
     using output_t = typename OutType::scalar_type;
     using input_t = typename InType::scalar_type;
@@ -73,6 +73,7 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
     }
 
     const int phase_ind = blockIdx.y;
+    const int elem_block = blockIdx.z;
     const int tid = threadIdx.x;
     const index_t filter_len_half = filter_len/2;
 
@@ -130,7 +131,9 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
     if (last_filter_ind < 0) {
         for (index_t out_ind = phase_ind + tid * up; out_ind < output_len; out_ind += THREADS * up) {
             bdims[Rank - 1] = out_ind;
-            output.operator()(bdims) = 0;
+            detail::mapply([&output](auto &&...args) {
+                output.operator()(args...) = 0;
+            }, bdims);
         }
         return;
     }
@@ -170,7 +173,9 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
     const index_t max_h_epilogue = this_phase_len - left_h_ind - 1;
     const index_t max_input_ind = static_cast<int>(input_len) - 1;
 
-    for (index_t out_ind = phase_ind + tid * up; out_ind < output_len; out_ind += THREADS * up) {
+    const index_t start_ind = phase_ind + up * (tid  + elem_block * elems_per_thread * THREADS);
+    const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
+    for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS * up) {
         // out_ind is the index in the output array and up_ind is the corresponding
         // index in the upsampled array
         const index_t up_ind = out_ind * down;
@@ -196,13 +201,19 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
         index_t x_ind = input_ind - prologue;
         index_t h_ind = left_h_ind - prologue;
         output_t accum {};
+        input_t in_val;
         for (index_t j = 0; j < n; j++) {
             bdims[Rank - 1] = x_ind++;
-            accum += s_filter[h_ind++] * input.operator()(bdims);
+            detail::mapply([&in_val, &input](auto &&...args) {
+                in_val = input.operator()(args...);
+            }, bdims);
+            accum += s_filter[h_ind++] * in_val;
         }
 
         bdims[Rank - 1] = out_ind;
-        output.operator()(bdims) = accum;
+        detail::mapply([&accum, &output](auto &&...args) {
+            output.operator()(args...) = accum;
+        }, bdims);
     }
 }
 

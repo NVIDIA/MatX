@@ -64,15 +64,27 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     static_cast<int>((filter_len + 1 + up - 1) / up) :
     static_cast<int>((filter_len + up - 1) / up);
   const size_t filter_shm = sizeof(filter_t) * max_phase_len;
-
+  const index_t output_len = o.Size(OutType::Rank()-1);
+  const index_t max_output_len_per_phase = (output_len + up - 1) / up;
   const int num_phases = static_cast<int>(up);
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
   dim3 grid(num_batches, num_phases);
-
   constexpr int THREADS = 128;
+  constexpr index_t DESIRED_MIN_GRID_SIZE = 512;
+  // If we do not have enough batches and phases to create a large grid, then
+  // we try to reduce the number of output elements generated per thread to
+  // yield a large-enough grid to saturate the GPU. However, since the filter
+  // taps are stored in shared memory, we do not want to process fewer elements
+  // per thread than is necessary to saturate the GPU.
+  if (num_batches * num_phases < DESIRED_MIN_GRID_SIZE) {
+    const index_t desired_elem_blocks = (DESIRED_MIN_GRID_SIZE + num_batches * num_phases - 1) /
+      (num_batches * num_phases);
+    const index_t max_output_len_per_thread = (max_output_len_per_phase + THREADS - 1) / THREADS;
+    grid.z = static_cast<uint32_t>(std::min(desired_elem_blocks, max_output_len_per_thread));
+  }
+  const index_t elems_per_thread = (max_output_len_per_phase + THREADS * grid.z - 1) / (THREADS * grid.z);
   ResamplePoly1D<THREADS, OutType, InType, FilterType><<<grid, THREADS, filter_shm, stream>>>(
-      o, i, filter, up, down);
-
+      o, i, filter, up, down, elems_per_thread);
 #endif
 }
 

@@ -8,6 +8,7 @@ set(examples
     fft_conv 
     resample 
     mvdr_beamformer 
+    resample_poly_bench
     spectrogram 
     spectrogram_graph
     spherical_harmonics 
