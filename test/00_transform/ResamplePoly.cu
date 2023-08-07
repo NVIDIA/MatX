@@ -515,3 +515,49 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 
   MATX_EXIT_HANDLER();
 }
+
+// Use non-trivial operators for input and filter tensors to ensure
+// that the kernel supports such operators.
+TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
+{
+  MATX_ENTER_HANDLER();
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t up;
+    index_t down;
+  } test_cases[] = {
+    { 3500, 62501, 384, 3125 },
+    { 3501, 62501, 384, 3125 },
+    { 3500, 62500, 384, 3125 },
+    { 3501, 62500, 384, 3125 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t up = test_cases[i].up;
+    const index_t down = test_cases[i].down;
+    const index_t up_len = a_len * up;
+    [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
+    this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
+
+    auto a = make_tensor<TypeParam>({a_len});
+    auto f = make_tensor<TypeParam>({f_len});
+    auto b = make_tensor<TypeParam>({b_len});
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+
+    cudaStreamSynchronize(0);
+
+    (b = resample_poly(shift<0>(shift<0>(a, 8), -8), shift<0>(shift<0>(f, 3), -3), up, down)).run();
+
+    cudaStreamSynchronize(0);
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
