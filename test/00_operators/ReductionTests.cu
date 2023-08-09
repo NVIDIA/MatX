@@ -623,8 +623,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, AllClose)
   auto B = make_tensor<TestType>({5, 5, 5});
   auto C = make_tensor<int>({});
 
-  (A = ones<TestType>(A.Shape())).run();
-  (B = ones<TestType>(B.Shape())).run();
+  (A = ones<TestType>(A.Shape())).run(exec);
+  (B = ones<TestType>(B.Shape())).run(exec);
   allclose(C, A, B, 1e-5, 1e-8, exec);
   // example-end allclose-test-1
   cudaStreamSynchronize(0);
