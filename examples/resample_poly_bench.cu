@@ -115,11 +115,11 @@ void ResamplePolyBench()
       cudaStreamSynchronize(stream);
 
       float elapsed_ms = 0.0f;
-      cudaEventRecord(start);
+      cudaEventRecord(start, stream);
       for (int k = 0; k < NUM_ITERATIONS; k++) {
         (output = matx::resample_poly(input, filter, up, down)).run(stream);
       }
-      cudaEventRecord(stop);
+      cudaEventRecord(stop, stream);
       cudaStreamSynchronize(stream);
       CUDA_CHECK_LAST_ERROR();
       cudaEventElapsedTime(&elapsed_ms, start, stop);
