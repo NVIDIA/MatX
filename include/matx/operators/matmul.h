@@ -76,7 +76,6 @@ namespace matx
                 out_dims_[r] = a_.Size(r);
               }
             }
-            printf("%lld %lld %lld\n", out_dims_[0], out_dims_[1], out_dims_[2]);
           }
           else {
             for (int r = 0; r < Rank() - 2; r++) {
