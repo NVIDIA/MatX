@@ -1071,9 +1071,10 @@ public:
    * @returns Overlapping view of data
    *
    */
+  template <int N>  
   __MATX_INLINE__ auto
-  OverlapView(std::initializer_list<typename Desc::shape_type> const &windows,
-              std::initializer_list<typename Desc::stride_type> const &strides) const
+  OverlapView(const std::array<typename Desc::shape_type, N> &windows,
+              const std::array<typename Desc::stride_type, N> &strides) const
   {
     static_assert(RANK == 1, "Overlapped views only supported on 1D tensors.");
     
