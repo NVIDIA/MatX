@@ -36,6 +36,7 @@
 #include "matx/operators/binary_operators.h"
 
 #include "matx/operators/ambgfun.h"
+#include "matx/operators/at.h"
 #include "matx/operators/cart2sph.h"
 #include "matx/operators/collapse.h"
 #include "matx/operators/concat.h"
@@ -73,6 +74,7 @@
 #include "matx/operators/legendre.h"
 #include "matx/operators/lu.h"
 #include "matx/operators/matmul.h"
+#include "matx/operators/percentile.h"
 #include "matx/operators/permute.h"
 #include "matx/operators/planar.h"
 #include "matx/operators/qr.h"
