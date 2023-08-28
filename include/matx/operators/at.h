@@ -32,83 +32,50 @@
 
 #pragma once
 
-
-#include "matx/core/type_utils.h"
-#include "matx/core/iterator.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
 {
+
+  /**
+   * Returns the current tensor index for the given dimension.
+   */
   namespace detail {
-    template <typename T1>
-      class FlattenOp : public BaseOp<FlattenOp<T1>>
+    template <typename Op, typename... Is>
+    class AtOp : public BaseOp<AtOp<Op, Is...>>
     {
       private:
-        typename base_type<T1>::type op1_;
+        Op op_;
+        std::array<index_t, sizeof...(Is)> idx_;
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using scalar_type = typename Op::scalar_type;
 
-        __MATX_INLINE__ std::string str() const { return "flatten(" + op1_.str() + ")"; }
- 
-        __MATX_INLINE__ FlattenOp(const T1 &op1) : op1_(op1)
+        __MATX_INLINE__ std::string str() const { return "at()"; } 
+        __MATX_INLINE__ AtOp(Op op, Is... is) : op_(op), idx_{is...} {};  
+
+        template <typename... Is2>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()([[maybe_unused]] Is2... indices) const 
         {
-          static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
+          return mapply(op_, idx_);
         }
-
-        template <typename Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
-        {
-          return *RandomOperatorIterator{op1_, id0};
-        }
-
-        template <typename Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is id0) 
-        {
-          return *RandomOperatorOutputIterator{op1_, id0};
-        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return 1;
+          return 0;
         }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
         {
-          index_t size = 1;
-          if (dim == 0) {
-            for (int r = 0; r < op1_.Rank(); r++) {
-              size *= op1_.Size(r);
-            }
-          }
-
-          return size;
+          return index_t(0);
         }
     };
+  }   
+
+
+  template <typename Op, typename... Is, std::enable_if_t<((std::is_integral_v<Is>) && ...), bool> = true>
+  __MATX_INLINE__ auto at(const Op op, Is... indices) {
+    return detail::AtOp(op, indices...);
   }
-
-  /**
-   * Flatten operator
-   *
-   * The flatten operator takes an operator of rank 2 or higher and flattens every dimension
-   * into a single 1D tensor. 
-   *
-   * @tparam T1
-   *   Operator type
-   *
-   * @returns
-   *   Operator of flattened input
-   */
-  template <typename T1>
-    auto __MATX_INLINE__ flatten(const T1 &a)
-    {
-      if constexpr (T1::Rank() <= 1) {
-        return a;
-      }
-      else {
-        return detail::FlattenOp<T1>(a);
-      }
-    };
-
 } // end namespace matx

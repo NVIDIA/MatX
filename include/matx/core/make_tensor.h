@@ -72,9 +72,9 @@ auto make_tensor( const index_t (&shape)[RANK],
  * @param stream cuda stream to allocate in (only applicable to async allocations)
  **/
 template <typename TensorType, std::enable_if_t< is_tensor_view_v<TensorType>, bool> = true>
-void make_tensor( TensorType &tensor, 
-                  const index_t (&shape)[TensorType::Rank()], 
-                  matxMemorySpace_t space = MATX_MANAGED_MEMORY, 
+void make_tensor( TensorType &tensor,
+                  const index_t (&shape)[TensorType::Rank()],
+                  matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 

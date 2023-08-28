@@ -690,6 +690,81 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
   MATX_EXIT_HANDLER();
 }
 
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Percentile)
+{
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  const index_t dsize = 6;
+  pb->InitAndRunTVGenerator<TestType>("00_reductions", "percentile", "run", {dsize});
+
+  ExecType exec{};
+
+  MATX_ENTER_HANDLER();
+  {
+    auto t1e = make_tensor<TestType>({dsize});
+    auto t1o = make_tensor<TestType>({dsize+1});
+    auto t0 = make_tensor<TestType>({});
+    pb->NumpyToTensorView(t1e, "t1e");
+    pb->NumpyToTensorView(t1o, "t1o");
+
+    // example-begin percentile-test-1
+    // Find the 50th percentile value in `t1e` using linear interpolation between midpoints
+    (t0 = percentile(t1e, 50, PercentileMethod::LINEAR)).run(exec);
+    // example-end percentile-test-1
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_linear50", 0.01);
+
+    (t0 = percentile(t1e, 80, PercentileMethod::LINEAR)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_linear80", 0.01);
+
+    (t0 = percentile(t1e, 50, PercentileMethod::LOWER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_lower50", 0.01);
+
+    (t0 = percentile(t1e, 80, PercentileMethod::LOWER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_lower80", 0.01);
+
+    (t0 = percentile(t1e, 50, PercentileMethod::HIGHER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_higher50", 0.01);
+
+    (t0 = percentile(t1e, 80, PercentileMethod::HIGHER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_higher80", 0.01);
+
+    (t0 = percentile(t1o, 50, PercentileMethod::LINEAR)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_linear50", 0.01);
+
+    (t0 = percentile(t1o, 80, PercentileMethod::LINEAR)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_linear80", 0.01);
+
+    (t0 = percentile(t1o, 50, PercentileMethod::LOWER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_lower50", 0.01);
+
+    (t0 = percentile(t1o, 80, PercentileMethod::LOWER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_lower80", 0.01);
+
+    (t0 = percentile(t1o, 50, PercentileMethod::HIGHER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_higher50", 0.01);
+
+    (t0 = percentile(t1o, 80, PercentileMethod::HIGHER)).run(exec);
+    cudaStreamSynchronize(0);
+    MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_higher80", 0.01);    
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
 {
   MATX_ENTER_HANDLER();
