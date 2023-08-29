@@ -113,8 +113,10 @@ public:
   using T2 = typename TensorTypeA::scalar_type;
   using T3 = typename TensorTypeB::scalar_type;
   static constexpr int RANK = TensorTypeC::Rank();
-  static_assert(TensorTypeC::Rank() == TensorTypeB::Rank());
-  static_assert(TensorTypeC::Rank() == TensorTypeA::Rank());
+
+  // We allow a batch stride of 0 on one of the tensors, so only make sure C's rank matches one of them
+  static_assert(TensorTypeC::Rank() == TensorTypeB::Rank() || TensorTypeB::Rank() == 2);
+  static_assert(TensorTypeC::Rank() == TensorTypeA::Rank() || TensorTypeA::Rank() == 2);
 
   /**
    * Construct a GEMM handle
@@ -152,17 +154,20 @@ public:
     
     MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
                   "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
-    static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
-    static_assert(TensorTypeA::Rank() == TensorTypeC::Rank());
+
     static_assert(RANK >= 2);
-    MATX_ASSERT(a.Size(RANK - 1) == b.Size(RANK - 2), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 1) == b.Size(RANK - 1), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 2) == a.Size(RANK - 2), matxInvalidSize);
+    MATX_ASSERT(a.Size(TensorTypeA::Rank() - 1) == b.Size(TensorTypeB::Rank() - 2), matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 1) == b.Size(TensorTypeB::Rank() - 1), matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 2) == a.Size(TensorTypeA::Rank() - 2), matxInvalidSize);
 
     // Ensure batch dimensions are equal
     for (int i = 0; i < RANK - 2; i++) {
-      MATX_ASSERT(a.Size(i) == b.Size(i), matxInvalidSize);
-      MATX_ASSERT(a.Size(i) == c.Size(i), matxInvalidSize);
+      if constexpr (RANK == TensorTypeA::Rank()) {
+        MATX_ASSERT(a.Size(i) == c.Size(i), matxInvalidSize);
+      }
+      if constexpr (RANK == TensorTypeB::Rank()) {
+        MATX_ASSERT(b.Size(i) == c.Size(i), matxInvalidSize);
+      }
     }
 
     // This must come before the things below to properly set class parameters
@@ -238,9 +243,21 @@ public:
     // If we have a 3D or above tensor, the upper dims are batch dimensions. We
     // only batch on the third dimension and loop anything else above;
     if constexpr (RANK >= 3) {
-      params.batch = static_cast<int32_t>(a.Size(RANK - 3));
-      params.astride = a.Stride(RANK-3);
-      params.bstride = b.Stride(RANK-3);
+      params.batch = static_cast<int32_t>(c.Size(RANK - 3));
+      if constexpr (TensorTypeA::Rank() == RANK) {
+        params.astride = a.Stride(TensorTypeA::Rank()-3);
+      }
+      else {
+        params.astride = 0;
+      }
+
+      if constexpr (TensorTypeB::Rank() == RANK) {
+        params.bstride = b.Stride(TensorTypeB::Rank()-3);
+      }
+      else {
+        params.bstride = 0;
+      }
+
       params.cstride = c.Stride(RANK-3);
     } 
 
@@ -254,30 +271,30 @@ public:
       // If it does not we should delete this code.
       MATX_ASSERT_STR(false, matxInvalidDim, "Internal Matmul error.  This should not be hit\n");
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (b.Stride(RANK - 2) == 1) {
+        if (b.Stride(TensorTypeB::Rank() - 2) == 1) {
           params.opA = CUBLAS_OP_N;
-          params.a_rows = b.Size(RANK - 1);
-          params.a_cols = b.Size(RANK - 2);
-          params.lda = b.Stride(RANK - 1);
+          params.a_rows = b.Size(TensorTypeB::Rank() - 1);
+          params.a_cols = b.Size(TensorTypeB::Rank() - 2);
+          params.lda = b.Stride(TensorTypeB::Rank() - 1);
         }
-        else if (b.Stride(RANK - 1) == 1) {
+        else if (b.Stride(TensorTypeB::Rank() - 1) == 1) {
           params.opA = CUBLAS_OP_T;
-          params.a_rows = b.Size(RANK - 2);
-          params.a_cols = b.Size(RANK - 1);
-          params.lda = b.Stride(RANK - 2);
+          params.a_rows = b.Size(TensorTypeB::Rank() - 2);
+          params.a_cols = b.Size(TensorTypeB::Rank() - 1);
+          params.lda = b.Stride(TensorTypeB::Rank() - 2);
         }
 
-        if (a.Stride(RANK - 2) == 1) {
+        if (a.Stride(TensorTypeA::Rank() - 2) == 1) {
           params.opB = CUBLAS_OP_N;
-          params.b_rows = a.Size(RANK - 1);
-          params.b_cols = a.Size(RANK - 2);
-          params.ldb = a.Stride(RANK - 1);
+          params.b_rows = a.Size(TensorTypeA::Rank() - 1);
+          params.b_cols = a.Size(TensorTypeA::Rank() - 2);
+          params.ldb = a.Stride(TensorTypeA::Rank() - 1);
         }
-        else if (a.Stride(RANK - 1) == 1) {
+        else if (a.Stride(TensorTypeA::Rank() - 1) == 1) {
           params.opB = CUBLAS_OP_T;
-          params.b_rows = a.Size(RANK - 2);
-          params.b_cols = a.Size(RANK - 1);
-          params.ldb = a.Stride(RANK - 2);
+          params.b_rows = a.Size(TensorTypeA::Rank() - 2);
+          params.b_cols = a.Size(TensorTypeA::Rank() - 1);
+          params.ldb = a.Stride(TensorTypeA::Rank() - 2);
         }
           
         params.c_rows = params.a_rows;
@@ -287,12 +304,12 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(b.Size(RANK - 1));
-        params.n = static_cast<int>(a.Size(RANK - 2));
+        params.m = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
+        params.n = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
         params.k =
-            static_cast<int>(a.Size(RANK - 2)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(b.Stride(RANK - 1));
-        params.ldb = static_cast<int>(a.Stride(RANK - 1));
+            static_cast<int>(a.Size(TensorTypeA::Rank() - 2)); // Gemm Problem dimensions
+        params.lda = static_cast<int>(b.Stride(TensorTypeB::Rank() - 1));
+        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1));
         params.ldc = static_cast<int>(c.Stride(RANK - 1));
       }      
     }
@@ -301,8 +318,8 @@ public:
         if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opA = CUBLAS_OP_N;
-        } else if ( a.Stride(RANK-1) > 1 // last stride > 1
-                  || (a.Stride(RANK-1) == 1 && a.Stride(RANK-2) == 1 && a.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+        } else if ( a.Stride(TensorTypeA::Rank()-1) > 1 // last stride > 1
+                  || (a.Stride(TensorTypeA::Rank()-1) == 1 && a.Stride(TensorTypeA::Rank()-2) == 1 && a.Size(TensorTypeA::Rank()-1) != 1)) { // last strides both equal 1 and size > 1 
           params.opA = CUBLAS_OP_T;
         } else { // otherwise row major
           params.opA = CUBLAS_OP_N;
@@ -311,30 +328,30 @@ public:
         if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opB = CUBLAS_OP_N;
-        } else if ( b.Stride(RANK-1) > 1 // last stride > 1
-                  || (b.Stride(RANK-1) == 1 && b.Stride(RANK-2) == 1 && b.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+        } else if ( b.Stride(TensorTypeB::Rank()-1) > 1 // last stride > 1
+                  || (b.Stride(TensorTypeB::Rank()-1) == 1 && b.Stride(TensorTypeB::Rank()-2) == 1 && b.Size(TensorTypeB::Rank()-1) != 1)) { // last strides both equal 1 and size > 1 
           params.opB = CUBLAS_OP_T;
         } else { // otherwise row major
           params.opB = CUBLAS_OP_N;
         }
         
-        params.a_rows = a.Size(RANK - 2);
-        params.a_cols = a.Size(RANK - 1);
-        params.b_rows = b.Size(RANK - 2);
-        params.b_cols = b.Size(RANK - 1);
+        params.a_rows = a.Size(TensorTypeA::Rank() - 2);
+        params.a_cols = a.Size(TensorTypeA::Rank() - 1);
+        params.b_rows = b.Size(TensorTypeB::Rank() - 2);
+        params.b_cols = b.Size(TensorTypeB::Rank() - 1);
        
         // set lda/ldb according to transpose modes
-        params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(RANK - 1) : b.Stride(RANK - 2); 
-        params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(RANK - 1) : a.Stride(RANK - 2);
+        params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(TensorTypeB::Rank() - 1) : b.Stride(TensorTypeB::Rank() - 2); 
+        params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(TensorTypeA::Rank() - 1) : a.Stride(TensorTypeA::Rank() - 2);
 
         // for complex half we have copied to planar row-major
         if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
-          params.ldb = b.Size(RANK-1);
+          params.ldb = b.Size(TensorTypeB::Rank()-1);
         }
 
         // for complex half we have copied to planar row-major
         if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
-          params.lda = a.Size(RANK-1);
+          params.lda = a.Size(TensorTypeA::Rank()-1);
         }
 
         params.c_rows = params.a_rows;
@@ -345,12 +362,12 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(a.Size(RANK - 2));
-        params.n = static_cast<int>(b.Size(RANK - 1));
+        params.m = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
+        params.n = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
         params.k =
-            static_cast<int>(a.Size(RANK - 1)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(a.Stride(RANK - 2));
-        params.ldb = static_cast<int>(b.Stride(RANK - 2));
+            static_cast<int>(a.Size(TensorTypeA::Rank() - 1)); // Gemm Problem dimensions
+        params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
+        params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 2));
       }
     }
@@ -579,7 +596,12 @@ private:
     if constexpr (is_complex_half_v<T2>) {
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
-      stride = params_.a_rows * params_.a_cols * 2;
+      if constexpr (TensorTypeA::Rank() == RANK) {
+        stride = params_.a_rows * params_.a_cols * 2;
+      }
+      else {
+        stride = 0;
+      }      
     }
     else {
       stride = params_.astride;
@@ -593,7 +615,12 @@ private:
     if constexpr (is_complex_half_v<T3>) {
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
-      stride = params_.b_rows * params_.b_cols * 2;
+      if constexpr (TensorTypeB::Rank() == RANK) {
+        stride = params_.b_rows * params_.b_cols * 2;
+      }
+      else {
+        stride = 0;
+      }
     }
     else {
       stride = params_.bstride;
