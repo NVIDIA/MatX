@@ -333,6 +333,85 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideA)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t batches = 2;
+  constexpr index_t m = 3;
+  constexpr index_t k = 4;
+  constexpr index_t n = 5;
+  
+  tensor_t<TypeParam, 2> a0{{m, k}};
+  tensor_t<TypeParam, 3> b{{batches, k, n}};
+  tensor_t<TypeParam, 2> b0{{k, n}};
+  tensor_t<TypeParam, 3> c{{batches, m, n}};  
+  tensor_t<TypeParam, 2> c0{{m, n}};  
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n});
+
+  this->pb->NumpyToTensorView(a0, "a");
+  this->pb->NumpyToTensorView(b0, "b");
+  this->pb->NumpyToTensorView(c0, "c");
+  (b = b0).run();
+
+  // Perform a batched gemm with "batches" GEMMs
+  (c = matmul(a0, b)).run();
+
+  cudaStreamSynchronize(0);
+
+  for (int i = 0; i < c.Size(0); i++) {
+    for (int j = 0; j < c.Size(1); j++) {
+      for (int p = 0; p < c.Size(2); p++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c0(j, p), c(i, j, p), this->thresh));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideB)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t batches = 2;
+  constexpr index_t m = 3;
+  constexpr index_t k = 4;
+  constexpr index_t n = 5;
+  
+  tensor_t<TypeParam, 3> a{{batches, m, k}};
+  tensor_t<TypeParam, 2> a0{{m, k}};
+  tensor_t<TypeParam, 2> b0{{k, n}};
+  tensor_t<TypeParam, 3> c{{batches, m, n}};  
+  tensor_t<TypeParam, 2> c0{{m, n}};  
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run", {m, k, n});
+
+  this->pb->NumpyToTensorView(a0, "a");
+  this->pb->NumpyToTensorView(b0, "b");
+  this->pb->NumpyToTensorView(c0, "c");
+  (a = a0).run();
+
+  // Perform a batched gemm with "batches" GEMMs
+  (c = matmul(a, b0)).run();
+
+  cudaStreamSynchronize(0);
+
+  for (int i = 0; i < c.Size(0); i++) {
+    for (int j = 0; j < c.Size(1); j++) {
+      for (int p = 0; p < c.Size(2); p++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c0(j, p), c(i, j, p), this->thresh));
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
 {
   MATX_ENTER_HANDLER();
