@@ -176,7 +176,7 @@ public:
       // Just call the convolution kernel directly if they
       // don't require recursive coefficients. Default to SAME. Do we want to
       // use SAME here or give them an option? IIR doesn't have the same concept
-      conv1d_impl(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
+      conv1d_impl(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, matxConvCorrMethod_t::MATX_C_METHOD_DIRECT, stream);
     }
 #endif
   }

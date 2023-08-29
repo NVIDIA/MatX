@@ -64,7 +64,7 @@ namespace matx
           // If we're on the upper part of the spectrum, return the conjugate of the first half
           if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
             cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
-            return cuda::std::conj(mapply(op_, tup));
+            return conj(mapply(op_, tup));
           }
 
           return mapply(op_, tup);
@@ -78,7 +78,7 @@ namespace matx
           // If we're on the upper part of the spectrum, return the conjugate of the first half
           if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
             cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
-            return cuda::std::conj(mapply(op_, tup));
+            return conj(mapply(op_, tup));
           }
 
           return mapply(op_, tup);

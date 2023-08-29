@@ -105,4 +105,14 @@ namespace matx {
   constexpr bool RankGT(int32_t rank1, int32_t rank2) {
     return rank1 > rank2 || rank1 == matxNoRank;
   }
+
+  template <typename Op>
+  constexpr std::array<index_t, Op::Rank()> Shape(const Op &op) {
+    std::array<index_t, Op::Rank()> shape;
+    for (int r = 0; r < Op::Rank(); r++) {
+      shape[r] = op.Size(r);
+    }
+
+    return shape;
+  }
 }; 
