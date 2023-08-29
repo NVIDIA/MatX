@@ -50,6 +50,7 @@ namespace matx
         OpA a_;
         OpB b_;
         matxConvCorrMode_t mode_;
+        matxConvCorrMethod_t method_;
         PermDims perm_;
         std::array<index_t, max_rank> out_dims_;
         mutable matx::tensor_t<out_t, max_rank> tmp_out_;
@@ -64,8 +65,12 @@ namespace matx
           return "conv1d(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
         }
 
-        __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, PermDims perm) : 
-              a_(A), b_(B), mode_(mode), perm_(perm) {
+        __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, matxConvCorrMethod_t method, PermDims perm) : 
+              a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
+
+          MATX_ASSERT_STR((!is_matx_type_v<typename OpA::scalar_type> && !is_matx_type_v<typename OpB::scalar_type>) || 
+                          method == MATX_C_METHOD_DIRECT, 
+            matxInvalidType, "FFT convolutions do not support half precision float currently");
 
           // Currently when using the axis parameter the rank of inputs must be equal
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
@@ -74,7 +79,7 @@ namespace matx
               if (axis == Rank() - 1) {
                 const auto max_axis = std::max(a_.Size(r), b_.Size(r));
                 const auto min_axis = std::min(a_.Size(r), b_.Size(r));
-              
+
                 if (mode_ == MATX_C_MODE_FULL) {
                   out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
                 }
@@ -83,12 +88,12 @@ namespace matx
                 }
                 else if (mode_ == MATX_C_MODE_VALID) {
                   out_dims_[axis] = max_axis - min_axis + 1;
-                }                  
+                }
               }
               else {
                 out_dims_[axis] = b_.Size(r);
               }
-            }                      
+            }
           }
           else {
             if constexpr (OpA::Rank() > OpB::Rank()) {
@@ -112,7 +117,7 @@ namespace matx
             }
             else if (mode_ == MATX_C_MODE_VALID) {
               out_dims_[max_rank-1] = max_axis - min_axis + 1;
-            }                
+            }
           }
         }
 
@@ -137,10 +142,10 @@ namespace matx
           MATX_STATIC_ASSERT_STR((Rank() == std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            conv1d_impl(permute(std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
+            conv1d_impl(permute(std::get<0>(out), perm_), a_, b_, mode_, method_, ex.getStream());
           }
           else {
-            conv1d_impl(std::get<0>(out), a_, b_, mode_, ex.getStream());
+            conv1d_impl(std::get<0>(out), a_, b_, mode_, method_, ex.getStream());
           }
         }
 
@@ -149,11 +154,11 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }     
+          }
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }          
+          }
 
           if constexpr (is_device_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -171,12 +176,14 @@ namespace matx
  * @tparam In2Type Type of second input
  * @param i1 First input operator
  * @param i2 Second input operator
- * @param mode Convolution mode
+ * @param mode Convolution mode (FULL, SAME, or VALID)
+ * @param method Convolution method (direct or FFT). Only complex inputs are supported for FFT currently
  */
 template <typename In1Type, typename In2Type>
 __MATX_INLINE__ auto conv1d(const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode) {
-  return detail::Conv1DOp(i1, i2, mode, detail::no_permute_t{});     
+                   matxConvCorrMode_t mode = MATX_C_MODE_FULL,
+                   matxConvCorrMethod_t method = MATX_C_METHOD_DIRECT) {
+  return detail::Conv1DOp(i1, i2, mode, method, detail::no_permute_t{});     
 }  
 
 
@@ -188,19 +195,21 @@ __MATX_INLINE__ auto conv1d(const In1Type &i1, const In2Type &i2,
  * @param i1 First input operator
  * @param i2 Second input operator
  * @param axis the axis to perform convolution
- * @param mode Convolution mode
+ * @param mode Convolution mode (FULL, SAME, or VALID)
+ * @param method Convolution method (direct or FFT). Only complex inputs are supported for FFT currently
  */
 template <typename In1Type, typename In2Type>
 __MATX_INLINE__ auto conv1d(const In1Type &i1, const In2Type &i2,
                    const int32_t (&axis)[1],
-                   matxConvCorrMode_t mode) {
+                   matxConvCorrMode_t mode = MATX_C_MODE_FULL,
+                   matxConvCorrMethod_t method = MATX_C_METHOD_DIRECT) {
   MATX_STATIC_ASSERT(In1Type::Rank() == In2Type::Rank(), "conv1d: inputs must have same rank to use conv1d with axis parameter");
 
   auto perm = detail::getPermuteDims<std::max(In1Type::Rank(), In2Type::Rank())>(axis);
 
   auto in1 = permute(i1, perm);
   auto in2 = permute(i2, perm);                    
-  return detail::Conv1DOp(in1, in2, mode, perm);
+  return detail::Conv1DOp(in1, in2, mode, method, perm);
 }
 
 

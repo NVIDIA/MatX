@@ -60,16 +60,13 @@ namespace matx {
  */
 template <typename OutputTensor, typename In1Type, typename In2Type>
 __MATX_INLINE__ void corr_impl(OutputTensor o, const In1Type i1, const In2Type i2,
-          matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method,
+          matxConvCorrMode_t mode, matxConvCorrMethod_t method,
           cudaStream_t stream = 0)
 {
-  MATX_ASSERT_STR(method == MATX_C_METHOD_DIRECT, matxNotSupported,
-               "Only direct correlation method supported at this time");
-  
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
   auto i2r = reverse<In2Type::Rank()-1>(conj(i2));
-  conv1d_impl(o, i1, i2r, mode, stream);
+  conv1d_impl(o, i1, i2r, mode, method, stream);
 }
 
 

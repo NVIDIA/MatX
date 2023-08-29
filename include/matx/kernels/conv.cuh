@@ -25,8 +25,7 @@ typedef enum {
 
 typedef enum {
   MATX_C_METHOD_DIRECT,
-  MATX_C_METHOD_FFT,
-  MATX_C_METHOD_AUTO,
+  MATX_C_METHOD_FFT
 } matxConvCorrMethod_t;
 
 #ifdef __CUDACC__ 

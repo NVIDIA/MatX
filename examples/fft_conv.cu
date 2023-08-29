@@ -64,6 +64,9 @@ using namespace matx;
  * For smaller signal sizes, the FFT convolution typically performs worse since
  * there is some buffer and 3 FFT operations (2 for FFT of signal and filter,
  * and 1 IFFT after the multiply) that causes the setup time to dominate.
+ * 
+ * Note that the conv1d() operator has a mode to perform FFT-based convolution
+ * automatically.
  *
  */
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
