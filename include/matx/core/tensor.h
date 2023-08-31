@@ -87,10 +87,10 @@ enum {
  * using multiple views on the same data. Failure to do so can result in race
  * conditions on the device or host.
  */
-template <typename T, 
-          int RANK, 
-          typename Storage = DefaultStorage<T>, 
-          typename Desc = DefaultDescriptor<RANK>> 
+template <typename T,
+          int RANK,
+          typename Storage = DefaultStorage<T>,
+          typename Desc = DefaultDescriptor<RANK>>
 class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
 public:
   // Type specifier for reflection on class
@@ -110,7 +110,7 @@ public:
 
   /**
    * @brief Construct a new 0-D tensor t object
-   * 
+   *
    */
   tensor_t() : detail::tensor_impl_t<T, RANK, Desc>{}
   {
@@ -119,7 +119,7 @@ public:
 
   /**
    * @brief Copy constructor
-   * 
+   *
    * @param rhs Object to copy from
    */
   __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
@@ -128,7 +128,7 @@ public:
 
   /**
    * @brief Move constructor
-   * 
+   *
    * @param rhs Object to move from
    */
   __MATX_HOST__ tensor_t(tensor_t &&rhs) noexcept
@@ -178,7 +178,7 @@ public:
     std::swap(lhs.ldata_, rhs.ldata_);
     swap(lhs.storage_, rhs.storage_);
     swap(lhs.desc_, rhs.desc_);
-  }  
+  }
 
   __MATX_INLINE__  ~tensor_t() = default;
 
@@ -188,27 +188,27 @@ public:
 
   /**
    * @brief Construct a new tensor t object from an arbitrary shape and descriptor
-   * 
+   *
    * @tparam S2 Shape type
    * @tparam D2 Descriptor type
    * @param s Shape object
    * @param desc Descriptor object
    */
-  template <typename S2 = Storage, typename D2 = Desc, 
+  template <typename S2 = Storage, typename D2 = Desc,
             std::enable_if_t<is_matx_storage_v<typename remove_cvref<S2>::type> && is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
   tensor_t(S2 &&s, D2 &&desc) :
     detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
     storage_{std::forward<S2>(s)}
   {
     this->SetLocalData(storage_.data());
-  } 
+  }
 
   /**
    * @brief Construct a new tensor t object. Used to copy an existing storage object for proper reference counting
-   * 
-   * @param s 
-   * @param desc 
-   * @param ldata 
+   *
+   * @param s
+   * @param desc
+   * @param ldata
    */
   template <typename D2 = Desc>
   tensor_t(Storage s, D2 &&desc, T* ldata) :
@@ -216,7 +216,7 @@ public:
     storage_{std::move(s)}
   {
     this->SetLocalData(ldata);
-  }  
+  }
 
 
   /**
@@ -225,7 +225,7 @@ public:
    * @param desc
    *   Tensor descriptor
    */
-  template <typename D2 = Desc, typename = 
+  template <typename D2 = Desc, typename =
     typename std::enable_if_t<is_matx_descriptor_v<D2>>>
   __MATX_INLINE__ tensor_t(D2 &&desc) :
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
@@ -243,10 +243,10 @@ public:
   __MATX_INLINE__ tensor_t([[maybe_unused]] const std::initializer_list<detail::no_size_t> shape) :
     detail::tensor_impl_t<T, RANK, Desc>(std::array<index_t, 0>{}),
     storage_{typename Storage::container{sizeof(T)}}
-  {    
+  {
     this->SetLocalData(storage_.data());
-  }  
-  
+  }
+
 
   /**
    * Constructor for a rank-1 and above tensor.
@@ -257,10 +257,10 @@ public:
   __MATX_INLINE__ tensor_t(const typename Desc::shape_type (&shape)[RANK]) :
     detail::tensor_impl_t<T, RANK, Desc>(shape),
     storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
-  {    
+  {
     this->SetLocalData(storage_.data());
   }
-   
+
 
   // Lazy operators
   /**
@@ -663,19 +663,19 @@ public:
   __MATX_INLINE__ auto View(Shape &&shape)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
         sizeof(M) * shape.TotalSize() <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
-    
-    // This could be loosened up to make sure only the fastest changing dims 
+
+    // This could be loosened up to make sure only the fastest changing dims
     // are compact
-    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize, 
+    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize,
        "To get a reshaped view the tensor must be compact");
 
     // Copy descriptor and call ctor with shape
-    Desc new_desc{std::forward<Shape>(shape)};  
+    Desc new_desc{std::forward<Shape>(shape)};
     return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
   }
 
@@ -719,28 +719,28 @@ public:
   __MATX_INLINE__ auto View(const ShapeIntType (&shape)[NRANK])
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     // Change this to not rely on index_t
     std::array<index_t, NRANK> tshape;
-    std::move(std::begin(shape), std::end(shape), tshape.begin()); 
+    std::move(std::begin(shape), std::end(shape), tshape.begin());
 
     [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
     MATX_ASSERT_STR(
         sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
-        "Total size of new tensor must not be larger than the original");    
-    
-    // This could be loosened up to make sure only the fastest changing dims 
+        "Total size of new tensor must not be larger than the original");
+
+    // This could be loosened up to make sure only the fastest changing dims
     // are compact
-    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize, 
+    MATX_ASSERT_STR(this->desc_.IsContiguous(), matxInvalidSize,
        "To get a reshaped view the tensor must be compact");
 
-    DefaultDescriptor<tshape.size()> desc{std::move(tshape)};   
+    DefaultDescriptor<tshape.size()> desc{std::move(tshape)};
     return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_};
-  }  
+  }
 
   /**
    * @brief Make a copy of a tensor and maintain all refcounts
-   * 
+   *
    * @return Copy of view
    */
   __MATX_INLINE__ auto View()
@@ -761,7 +761,7 @@ public:
   __MATX_INLINE__ void PrefetchDevice(cudaStream_t const stream) const noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     int dev;
     cudaGetDevice(&dev);
     cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), dev, stream);
@@ -780,7 +780,7 @@ public:
   __MATX_INLINE__ void PrefetchHost(cudaStream_t const stream) const noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
@@ -797,13 +797,13 @@ public:
   __MATX_INLINE__ auto RealView() const noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
     Type *data = reinterpret_cast<Type *>(this->ldata_);
     std::array<typename Desc::stride_type, RANK> strides;
-    
+
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->desc_.Stride(i);
@@ -817,14 +817,14 @@ public:
     }
 
     // Copy descriptor and call ctor with shape
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};  
+    Desc new_desc{this->desc_.Shape(), std::move(strides)};
     return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
   }
 
   /**
    * @brief Return the storage container from the tensor
-   * 
-   * @return storage container 
+   *
+   * @return storage container
    */
   __MATX_INLINE__ auto GetStorage() noexcept {
     return storage_;
@@ -842,7 +842,7 @@ public:
   __MATX_INLINE__ auto ImagView() const noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
@@ -860,10 +860,10 @@ public:
       }
     }
 
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};  
+    Desc new_desc{this->desc_.Shape(), std::move(strides)};
     return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
   }
-  
+
   /**
    * Permute the dimensions of a tensor
    *
@@ -882,7 +882,7 @@ public:
   __MATX_INLINE__ auto Permute(const std::array<int32_t, RANK> &dims) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     std::array<shape_type, RANK> n;
     std::array<stride_type, RANK> s;
@@ -900,7 +900,7 @@ public:
       s[i] = this->Stride(d);
     }
 
-    Desc new_desc{std::move(n), std::move(s)};  
+    Desc new_desc{std::move(n), std::move(s)};
     return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
   }
 
@@ -938,7 +938,7 @@ public:
   __MATX_INLINE__ auto PermuteMatrix() const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     int32_t tdims[RANK];
     std::iota(std::begin(tdims), std::end(tdims), 0);
@@ -968,15 +968,15 @@ public:
    * @param shape
    *   Shape of tensor
    */
-  template <typename ShapeType, 
-      std::enable_if_t<!std::is_pointer_v<typename remove_cvref<ShapeType>::type>, bool> = true>  
+  template <typename ShapeType,
+      std::enable_if_t<!std::is_pointer_v<typename remove_cvref<ShapeType>::type>, bool> = true>
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, ShapeType &&shape) noexcept
   {
     this->desc_.InitFromShape(std::forward<ShapeType>(shape));
     storage_.SetData(data);
     this->ldata_ = data;
-  }  
+  }
 
   /**
    * Set the underlying data pointer from the view
@@ -993,7 +993,7 @@ public:
   Reset(T *const data) noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     storage_.SetData(data);
     this->ldata_ = data;
   }
@@ -1043,21 +1043,22 @@ public:
   __MATX_INLINE__ __MATX_HOST__ auto GetRefCount() const noexcept
   {
     return storage_.use_count();
-  }  
+  }
 
   /**
    * Create an overlapping tensor view
    *
-   * Creates and overlapping tensor view where an existing tensor can be
+   * Creates an overlapping tensor view where an existing tensor can be
    * repeated into a higher rank with overlapping elements. For example, the
-   * following 1D tensor [1 2 3 4 5] could be cloned into a 2d tensor with a
+   * following 1D tensor [1 2 3 4 5] could be cloned into a 2D tensor with a
    * window size of 2 and overlap of 1, resulting in:
    *
-   * [1 2
-   *  2 3
-   *  3 4
-   *  4 5]
-   *
+   \verbatim
+     [1 2
+      2 3
+      3 4
+      4 5]
+   \endverbatim
    * Currently this only works on 1D tensors going to 2D, but may be expanded
    * for higher dimensions in the future. Note that if the window size does not
    * divide evenly into the existing column dimension, the view may chop off the
@@ -1077,9 +1078,9 @@ public:
               const std::array<typename Desc::stride_type, N> &strides) const
   {
     static_assert(RANK == 1, "Overlapped views only supported on 1D tensors.");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     std::array<typename Desc::shape_type, RANK+1> n;
     std::array<typename Desc::stride_type, RANK+1> s;
 
@@ -1104,8 +1105,8 @@ public:
     n[0] = adj_el / stride_size + 1;
     s[0] = stride_size;
 
-    tensor_desc_t<decltype(n), decltype(s), RANK+1> new_desc{std::move(n), std::move(s)}; 
-    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};    
+    tensor_desc_t<decltype(n), decltype(s), RANK+1> new_desc{std::move(n), std::move(s)};
+    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
   }
 
   /**
@@ -1137,9 +1138,9 @@ public:
   __MATX_INLINE__ auto Clone(const std::array<index_t, N> &clones) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     std::array<index_t, N> n;
-    std::array<typename Desc::stride_type, N> s;    
+    std::array<typename Desc::stride_type, N> s;
 
     int d = 0;
 
@@ -1164,10 +1165,10 @@ public:
     }
     MATX_ASSERT_STR(d == RANK, matxInvalidDim,
                     "Must keep as many dimension as the original tensor has");
-    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};  
+    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
   }
-  
+
   template <int N>
   __MATX_INLINE__ auto Clone(const index_t (&clones)[N]) const
   {
@@ -1194,9 +1195,9 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
     static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
     this->operator()() = val;
   }
@@ -1216,9 +1217,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
       "Single initializer list on SetVals only for non-complex rank 1 tensor or complex rank 0 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     for (size_t i = 0; i < vals.size(); i++) {
       if constexpr (is_cuda_complex_v<T>) {
         typename T::value_type real = (vals.begin() + i)->real();
@@ -1235,7 +1236,7 @@ public:
    * Rank-2 non-complex or rank-1 initializer list setting
    *
    * Note that for performance reasons only CUDA managed pointers are supported with SetVals
-   * at the moment.   
+   * at the moment.
    *
    * @param vals
    *   1D/2D initializer list of values
@@ -1246,11 +1247,11 @@ public:
               &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 2) || (is_cuda_complex_v<T> && RANK == 1)),
-      "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");    
+      "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         if constexpr (is_cuda_complex_v<T>) {
@@ -1272,7 +1273,7 @@ public:
    * Rank-3 non-complex or rank-2 complex initializer list setting
    *
    * Note that for performance reasons only CUDA managed pointers are supported with SetVals
-   * at the moment.   
+   * at the moment.
    *
    * @param vals
    *   3D/2D initializer list of values
@@ -1284,11 +1285,11 @@ public:
               vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 3) || (is_cuda_complex_v<T> && RANK == 2)),
-      "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");  
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");     
-    
+      "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");
+    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1313,7 +1314,7 @@ public:
    * Rank-4 non-complex or rank-3 complex initializer list setting
    *
    * Note that for performance reasons only CUDA managed pointers are supported with SetVals
-   * at the moment.   
+   * at the moment.
    *
    * @param vals
    *   3D/4D initializer list of values
@@ -1327,9 +1328,9 @@ public:
     static_assert(((!is_cuda_complex_v<T> && RANK == 4) || (is_cuda_complex_v<T> && RANK == 3)),
       "Quad initializer list on SetVals only for non-complex rank 4 tensor or complex rank 3 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1363,7 +1364,7 @@ public:
    * Rank-4 complex initializer list setting
    *
    * Note that for performance reasons only CUDA managed pointers are supported with SetVals
-   * at the moment.   
+   * at the moment.
    *
    * @param vals
    *   4D initializer list of values
@@ -1376,11 +1377,11 @@ public:
               &vals)
   {
     static_assert((is_cuda_complex_v<T> && RANK == 4),
-          "Quintuple initializer list on SetVals only for complex rank 3 tensors");    
+          "Quintuple initializer list on SetVals only for complex rank 3 tensors");
     MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     for (size_t i = 0; i < vals.size(); i++) {
       for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
         for (size_t k = 0; k < ((vals.begin() + i)->begin() + j)->size(); k++) {
@@ -1447,9 +1448,9 @@ public:
                              [[maybe_unused]] const std::array<typename Desc::stride_type, RANK> &strides) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     std::array<typename Desc::shape_type, N> n = {};
     std::array<typename Desc::stride_type, N> s = {};
 
@@ -1496,10 +1497,10 @@ public:
     MATX_ASSERT_STR(d == N, matxInvalidDim,
                     "Number of indices must match the target rank to slice to");
 
-    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};  
+    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
-  
+
   template <int N = RANK>
   __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
                              const typename Desc::shape_type (&ends)[RANK],
@@ -1537,11 +1538,11 @@ public:
                              const std::array<typename Desc::shape_type, RANK> &ends) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-   
+
     const std::array<typename Desc::stride_type, RANK> strides = {-1};
-    
+
     return Slice<N>(firsts, ends, strides);
   }
 
@@ -1563,7 +1564,7 @@ public:
   __MATX_INLINE__ __MATX_HOST__ void PrintVal(const T &val) const noexcept
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     if constexpr (is_complex_v<T>) {
       printf("%.4e%+.4ej ", static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
@@ -1603,7 +1604,7 @@ public:
     }
     else if constexpr (std::is_same_v<T, bool>) {
       printf("%d ", val);
-    }    
+    }
   }
 
   /**
@@ -1614,7 +1615,7 @@ public:
    */
   template <typename ... Args>
   __MATX_HOST__ void InternalPrint(Args ...dims) const noexcept
-  {   
+  {
     MATX_STATIC_ASSERT(RANK == sizeof...(Args), "Number of dimensions to print must match tensor rank");
     MATX_STATIC_ASSERT(RANK <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
     if constexpr (sizeof...(Args) == 0) {
@@ -1658,13 +1659,13 @@ public:
           printf("\n");
         }
         printf("\n");
-      }      
+      }
     }
     else if constexpr (sizeof...(Args) == 4) {
       auto& i = detail::pp_get<0>(dims...);
       auto& j = detail::pp_get<1>(dims...);
       auto& k = detail::pp_get<2>(dims...);
-      auto& l = detail::pp_get<3>(dims...); 
+      auto& l = detail::pp_get<3>(dims...);
       for (typename Desc::shape_type _i = 0; _i < ((i == 0) ? this->Size(0) : i); _i++) {
         for (typename Desc::shape_type _j = 0; _j < ((j == 0) ? this->Size(1) : j); _j++) {
           printf("[%06lld,%06lld,:,:]\n", _i, _j);
@@ -1681,22 +1682,22 @@ public:
         }
       }
     }
-  } 
+  }
 
 
 
   /**
    * @brief Print a tensor's values to stdout using start/end parameters
-   * 
+   *
    * This form of `Print()` takes two array-like lists for the start and end indices, respectively. For
    * example:
-   * 
+   *
    * `a.Print({2, 3}, {matxEnd, 5});`
-   * 
+   *
    * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end, and
    * the second index starting at 3 and ending at 5 (exlusive). The format is identical to calling
    * `Slice()` to get a sliced view, followed by `Print()` with the indices.
-   * 
+   *
    * @tparam NRANK Automatically-deduced rank of tensor
    * @param start Start indices to print from
    * @param end End indices to stop
@@ -1717,16 +1718,16 @@ public:
 
   /**
    * @brief Print a tensor's values to stdout using start/end/stride
-   * 
+   *
    * This form of `Print()` takes three array-like lists for the start, end, and stride indices, respectively. For
    * example:
-   * 
+   *
    * `a.Print({2, 3}, {matxEnd, 5}, {1, 2});`
-   * 
-   * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end with a 
-   * stride of 1, and the second index starting at 3 and ending at 5 (exlusive) with a stride of 2. The format is 
+   *
+   * Will print the 2D tensor `a` with the first dimension starting at index 2 and going to the end with a
+   * stride of 1, and the second index starting at 3 and ending at 5 (exlusive) with a stride of 2. The format is
    * identical to calling `Slice()` to get a sliced view, followed by `Print()` with the indices.
-   * 
+   *
    * @tparam NRANK Automatically-deduced rank of tensor
    * @param start Start indices to print from
    * @param end End indices to stop
@@ -1734,11 +1735,11 @@ public:
    */
 
   template <int NRANK>
-  [[deprecated("Using the free-standing print() function instead")]] 
+  [[deprecated("Using the free-standing print() function instead")]]
   void Print(const index_t (&start)[NRANK], const index_t (&end)[NRANK], const index_t (&strides)[NRANK]) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     auto s = this->Slice(start, end, strides);
     std::array<index_t, NRANK> arr = {0};
     auto tup = std::tuple_cat(arr);
@@ -1762,15 +1763,15 @@ public:
 
   /**
    * @brief Get a DLPack v0.8 structure representing the tensor
-   * 
+   *
    * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
    * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
    * by calling ->deleter(self).
-   * 
+   *
    * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
    * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
    * will occur.
-   * 
+   *
    * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
    */
   DLManagedTensor *GetDLPackTensor() const {
@@ -1790,7 +1791,7 @@ public:
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {
-        t->device.device_type = kDLCUDA; 
+        t->device.device_type = kDLCUDA;
         t->device.device_id = dev_ord;
       }
       else {
@@ -1800,10 +1801,10 @@ public:
     else {
       // We have a record of this pointer and can map it from the record
       switch (kind) {
-        case MATX_MANAGED_MEMORY: 
+        case MATX_MANAGED_MEMORY:
         case MATX_DEVICE_MEMORY:
         case MATX_ASYNC_DEVICE_MEMORY:
-          t->device.device_type = kDLCUDA; 
+          t->device.device_type = kDLCUDA;
           t->device.device_id = dev_ord;
           break;
         case MATX_HOST_MEMORY:
@@ -1813,7 +1814,7 @@ public:
         case MATX_HOST_MALLOC_MEMORY:
           t->device.device_type = kDLCPU;
           break;
-        default: 
+        default:
           MATX_ASSERT_STR(false, matxCudaError, "Cannot determine kind of memory");
           break;
       }
@@ -1840,7 +1841,7 @@ public:
 
     return mt;
   }
-  
+
 
 private:
   Storage storage_;
