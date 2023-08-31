@@ -10,7 +10,7 @@ using conv_types =
 
 /* FFT benchmarks */
 template <typename ValueType>
-void conv1d_4d_batch(nvbench::state &state,
+void conv1d_direct_4d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
   auto out = make_tensor<ValueType>({4, 2, 14, 288 + 4096 + 133 - 1});
@@ -28,11 +28,11 @@ void conv1d_4d_batch(nvbench::state &state,
   MATX_NVTX_END_RANGE( 1 )
   
 }
-NVBENCH_BENCH_TYPES(conv1d_4d_batch, NVBENCH_TYPE_AXES(conv_types));
+NVBENCH_BENCH_TYPES(conv1d_direct_4d_batch, NVBENCH_TYPE_AXES(conv_types));
 
 
 template <typename ValueType>
-void conv1d_2d_batch(nvbench::state &state,
+void conv1d_direct_2d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
 
@@ -50,15 +50,40 @@ void conv1d_2d_batch(nvbench::state &state,
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
 }
-NVBENCH_BENCH_TYPES(conv1d_2d_batch, NVBENCH_TYPE_AXES(conv_types));
+NVBENCH_BENCH_TYPES(conv1d_direct_2d_batch, NVBENCH_TYPE_AXES(conv_types));
 
 template <typename ValueType>
-void conv1d_large(nvbench::state &state,
+void conv1d_direct_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
-  auto at = make_tensor<ValueType>({100000000});
-  auto bt = make_tensor<ValueType>({1000});
+  auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
+  auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
   auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
+
+  out.PrefetchDevice(0);
+  at.PrefetchDevice(0);
+  bt.PrefetchDevice(0);
+
+  (out = conv1d(at, bt, MATX_C_MODE_FULL)).run();
+
+  cudaDeviceSynchronize();
+
+  state.exec(
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
+}
+NVBENCH_BENCH_TYPES(conv1d_direct_large, NVBENCH_TYPE_AXES(conv_types))
+  .add_int64_power_of_two_axis("Filter Size", nvbench::range(3, 11, 1))
+  .add_int64_power_of_two_axis("Signal Size", nvbench::range(12, 24, 1));
+
+template <typename ValueType>
+void conv1d_fft_large(nvbench::state &state,
+                            nvbench::type_list<ValueType>)
+{
+  auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
+  auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
+  auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
+
+  (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run();
 
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
@@ -67,12 +92,15 @@ void conv1d_large(nvbench::state &state,
   cudaDeviceSynchronize();
 
   state.exec(
-      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
+      [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run(cudaExecutor(launch.get_stream())); });
 }
-NVBENCH_BENCH_TYPES(conv1d_large, NVBENCH_TYPE_AXES(conv_types));
+NVBENCH_BENCH_TYPES(conv1d_fft_large, NVBENCH_TYPE_AXES(conv_types))
+  .add_int64_power_of_two_axis("Filter Size", nvbench::range(3, 11, 1))
+  .add_int64_power_of_two_axis("Signal Size", nvbench::range(12, 24, 1));  
+
 
 template <typename ValueType>
-void conv2d_batch(nvbench::state &state,
+void conv2d_direct_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
   auto at = make_tensor<ValueType>({256, 1024, 1024});
@@ -103,4 +131,4 @@ void conv2d_batch(nvbench::state &state,
     flops.set_float64("value", (double)2 * out.Size(2) * out.Size(1) * out.Size(0) * bt.Size(2) * bt.Size(1) / seconds / 1e12);
   }
 }
-NVBENCH_BENCH_TYPES(conv2d_batch, NVBENCH_TYPE_AXES(conv_types));
+NVBENCH_BENCH_TYPES(conv2d_direct_batch, NVBENCH_TYPE_AXES(conv_types));
