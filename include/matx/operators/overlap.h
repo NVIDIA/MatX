@@ -45,9 +45,9 @@ namespace matx
     template <int DIM, typename T>
       class OverlapOp : public BaseOp<OverlapOp<DIM, T>>
     {
-      public: 
+      public:
         using scalar_type = typename T::scalar_type;
-        using shape_type = index_t; 
+        using shape_type = index_t;
 
       private:
         typename base_type<T>::type op_;
@@ -70,7 +70,7 @@ namespace matx
           index_t window_size = windows[0];
           index_t stride_size = strides[0];
 
-          MATX_ASSERT(stride_size < window_size, matxInvalidSize);
+          MATX_ASSERT(stride_size <= window_size, matxInvalidSize);
           MATX_ASSERT(stride_size > 0, matxInvalidSize);
 
           // Figure out the actual length of the sequence we can use. It might be
@@ -85,7 +85,7 @@ namespace matx
           s_[0] = stride_size;
         };
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i0, index_t i1) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i0, index_t i1) const
         {
           return op_(i0*s_[0] + i1);
         }
@@ -119,16 +119,17 @@ namespace matx
   /**
    * @brief Create an overlapping tensor view
    *
-   * Creates and overlapping tensor view where an existing tensor can be
+   * Creates an overlapping tensor view where an existing tensor can be
    * repeated into a higher rank with overlapping elements. For example, the
    * following 1D tensor [1 2 3 4 5] could be cloned into a 2d tensor with a
    * window size of 2 and overlap of 1, resulting in:
    *
-   * [1 2
-   *  2 3
-   *  3 4
-   *  4 5]
-   *
+   \verbatim
+    [1 2
+     2 3
+     3 4
+     4 5]
+   \endverbatim
    * Currently this only works on 1D tensors going to 2D, but may be expanded
    * for higher dimensions in the future. Note that if the window size does not
    * divide evenly into the existing column dimension, the view may chop off the
@@ -147,7 +148,7 @@ namespace matx
    *
    */
   template <typename OpType, int N>
-  __MATX_INLINE__ auto overlap( const OpType &op, 
+  __MATX_INLINE__ auto overlap( const OpType &op,
       const std::array<index_t, N> &windows,
       const std::array<index_t, N> &strides)
   {
@@ -159,12 +160,12 @@ namespace matx
   }
 
   template <typename OpType, int N>
-  __MATX_INLINE__ auto overlap( const OpType &op, 
+  __MATX_INLINE__ auto overlap( const OpType &op,
       const index_t (&windows)[N],
-      const index_t (&strides)[N]) 
+      const index_t (&strides)[N])
   {
-    return overlap<OpType, N>(op, 
-        detail::to_array(windows), 
+    return overlap<OpType, N>(op,
+        detail::to_array(windows),
         detail::to_array(strides));
   }
 

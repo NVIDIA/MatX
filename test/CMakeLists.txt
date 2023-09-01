@@ -16,6 +16,7 @@ set (test_sources
     00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
+    00_transform/PWelch.cu
     00_transform/ResamplePoly.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
@@ -35,11 +36,11 @@ set (test_sources
     main.cu
 )
 
-# Some of <00_io> tests need csv files and the binary 'test.mat' which all 
+# Some of <00_io> tests need csv files and the binary 'test.mat' which all
 # are located under 'CMAKE_SOURCE_DIR/test/00_io'. When calling the test
 # executable <matx_test> from its location in 'CMAKE_BINARY_DIR/test' the
-# search paths according <FileIOTests.cu> are 
-# '../test/00_io/small_csv_comma_nh.csv' and 
+# search paths according <FileIOTests.cu> are
+# '../test/00_io/small_csv_comma_nh.csv' and
 # '../test/00_io/small_csv_complex_comma_nh.csv' respectively. Therefore
 # they must be copied to the correct location:
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/00_io)
