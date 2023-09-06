@@ -6,11 +6,12 @@ overlap
 Create an overlapping view an of input operator giving a higher-rank view of the input
 
 For example, the following 1D tensor [1 2 3 4 5] could be cloned into a 2d tensor with a
-window size of 2 and overlap of 1, resulting in:
- [1 2
-  2 3
-  3 4
-  4 5]
+window size of 2 and overlap of 1, resulting in::
+
+  [1 2
+   2 3
+   3 4
+   4 5]
 
 Currently this only works on 1D tensors going to 2D, but may be expanded
 for higher dimensions in the future. Note that if the window size does not

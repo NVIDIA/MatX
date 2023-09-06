@@ -11,6 +11,7 @@ set(DOXYGEN_INDEX_FILE ${DOXYGEN_OUTPUT_DIR}/html/index.html)
 set(DOXYGEN_EXAMPLE_DIR ${PROJECT_SOURCE_DIR}/examples)
 set(DOXYGEN_EXCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/*)
 set(DOXYGEN_EXCLUDE_DIR2 ${PROJECT_BINARY_DIR}/*)
+set(DOXYGEN_EXCLUDE_DIR3 ${PROJECT_SOURCE_DIR}/build*)
 set(DOXYXML_DIR ${PROJECT_BINARY_DIR}/doxygen/xml/)
 set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
 set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
@@ -45,8 +46,8 @@ set(SPHINX_INDEX_FILE ${SPHINX_BUILD}/index.html)
 # - Our doc files have been updated
 # - The Sphinx config has been updated
 add_custom_command(OUTPUT ${SPHINX_INDEX_FILE}
-                   COMMAND 
-                     ${SPHINX_EXECUTABLE} -b html
+                   COMMAND
+                     ${SPHINX_EXECUTABLE} -b html -W
                      -c ${CMAKE_CURRENT_BINARY_DIR}
                      # Tell Breathe where to find the Doxygen output
                      -Dbreathe_projects.MatX=${DOXYGEN_OUTPUT_DIR}/xml

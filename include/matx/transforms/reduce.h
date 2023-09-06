@@ -61,7 +61,7 @@ union PascalHalfBits {
   __nv_bfloat16 b[2];
 };
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
 /**
  * Warp shuffle down with a complex float
  *
@@ -168,7 +168,7 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicMax(float *addr, float val)
  */
 __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __nv_bfloat16 val)
 {
-#if __CUDA_ARCH__ > 600      
+#if __CUDA_ARCH__ > 600
   HalfBits tmpval;
   HalfBits old;
   unsigned short *address_as_other = (unsigned short *)addr;
@@ -183,14 +183,14 @@ __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __n
     old.b = static_cast<float>(atomicCAS(address_as_other, assumed, tmpval.i));
   }
 
-  return old.b;  
+  return old.b;
 #else // Pascal doesn't support short atomicCAS
   PascalHalfBits tmpval;
   PascalHalfBits old;
   unsigned int *address_as_other;
   int offset;
 
-  // We need to move our pointer back 
+  // We need to move our pointer back
   if ((uintptr_t)addr & 0x10) {
     address_as_other = (unsigned int *)(reinterpret_cast<uint8_t*>(addr) - 2);
     offset = 1;
@@ -211,7 +211,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __n
   }
 
   return old.b[offset];
-#endif  
+#endif
 };
 
 
@@ -227,7 +227,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __n
  */
 __MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
 {
-#if __CUDA_ARCH__ > 600      
+#if __CUDA_ARCH__ > 600
   HalfBits tmpval;
   HalfBits old;
   unsigned short *address_as_other = (unsigned short *)addr;
@@ -242,7 +242,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
     old.h = atomicCAS(address_as_other, assumed, tmpval.i);
   }
 
-  return old.h;  
+  return old.h;
 #else // Pascal doesn't support short atomicCAS
   PascalHalfBits tmpval;
   PascalHalfBits old;
@@ -270,7 +270,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
   }
 
   return old.h[offset];
-#endif    
+#endif
 };
 
 /**
@@ -694,8 +694,8 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(cuda::std::complex<double> *addr,
 namespace matx {
 namespace detail {
 
-#ifdef __CUDACC__  
-template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() { 
+#ifdef __CUDACC__
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() {
   if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
     constexpr HalfBits tmp{0x7BFF};
     return tmp.h;
@@ -703,13 +703,13 @@ template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T 
   if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
     constexpr HalfBits tmp{0x7F7F};
     return tmp.b;
-  }  
+  }
   else {
-    return cuda::std::numeric_limits<T>::max(); 
+    return cuda::std::numeric_limits<T>::max();
   }
 }
 
-template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() { 
+template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() {
   if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
     constexpr HalfBits tmp{0x0400};
     return tmp.h;
@@ -717,9 +717,9 @@ template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T 
   if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
     constexpr HalfBits tmp{0x0080};
     return tmp.b;
-  }  
-  else {  
-    return cuda::std::numeric_limits<T>::lowest(); 
+  }
+  else {
+    return cuda::std::numeric_limits<T>::lowest();
   }
 }
 
@@ -734,25 +734,25 @@ template <typename T> class reduceOpSum {
 public:
   using matx_reduce = bool;
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 + v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) {
     if constexpr (is_complex_v<T>) {
       if constexpr (is_matx_half_v<typename T::value_type>) {
-        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[0], static_cast<typename T::value_type::value_type>(val.real())); 
-        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[1], static_cast<typename T::value_type::value_type>(val.imag())); 
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[0], static_cast<typename T::value_type::value_type>(val.real()));
+        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[1], static_cast<typename T::value_type::value_type>(val.imag()));
       }
       else {
-        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[0], val.real()); 
-        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[1], val.imag()); 
-      }      
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[0], val.real());
+        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[1], val.imag());
+      }
     }
-    else {    
+    else {
       if constexpr (is_matx_half_v<T>) {
-        atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val)); 
+        atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val));
       }
       else {
-        atomicAdd(addr, val); 
+        atomicAdd(addr, val);
       }
     }
   }
@@ -768,7 +768,7 @@ template <typename T> class reduceOpProd {
 public:
   using matx_reduce = bool;
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 * v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(1); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
 };
@@ -785,10 +785,10 @@ public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 > v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return minVal<T>(); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { 
-    atomicMax(reinterpret_cast<convert_matx_type_t<T> *>(addr), static_cast<convert_matx_type_t<T>>(val)); 
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) {
+    atomicMax(reinterpret_cast<convert_matx_type_t<T> *>(addr), static_cast<convert_matx_type_t<T>>(val));
   }
 };
 
@@ -806,7 +806,7 @@ public:
   {
     return (v1 != 0) || (v2 != 0);
   }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) || (v2 != 0)); return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) || (v2 != 0)); return v1; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(0); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
@@ -826,7 +826,7 @@ public:
     return (v1 != 0) && (v2 != 0);
   }
 
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) && (v2 != 0)); return v1; }  
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) && (v2 != 0)); return v1; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
@@ -843,7 +843,7 @@ public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 < v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); } 
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return maxVal<T>(); }
   __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
 };
@@ -862,54 +862,54 @@ __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
         val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 8);
         im = __shfl_down_sync(0xffffffff, val.imag(), 8);
-        val = op.Reduce(val, {re, im});        
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 4);
         im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 2);
         im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 1);
         im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});                                       
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 8) {
         re = __shfl_down_sync(0xffffffff, val.real(), 8);
         im = __shfl_down_sync(0xffffffff, val.imag(), 8);
-        val = op.Reduce(val, {re, im});        
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 4);
         im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 2);
         im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 1);
         im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});    
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 4) {
         re = __shfl_down_sync(0xffffffff, val.real(), 4);
         im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 2);
         im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 1);
         im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});   
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 2) {
         re = __shfl_down_sync(0xffffffff, val.real(), 2);
         im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, val.real(), 1);
         im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im}); 
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 1) {
         re = __shfl_down_sync(0xffffffff, val.real(), 1);
         im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im}); 
+        val = op.Reduce(val, {re, im});
       }
       return val;
     }
@@ -920,59 +920,59 @@ __MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
         val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
-        val = op.Reduce(val, {re, im});        
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});                                       
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 8) {
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
-        val = op.Reduce(val, {re, im});        
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});    
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 4) {
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});   
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 2) {
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});  
+        val = op.Reduce(val, {re, im});
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im}); 
+        val = op.Reduce(val, {re, im});
       }
       else if (size > 1) {
         re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
         im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im}); 
+        val = op.Reduce(val, {re, im});
       }
-      return val;      
+      return val;
     }
   }
-  else {  
+  else {
     // breaking this out so common case is faster without branches
     if constexpr (!is_matx_half_v<T>) {
       if (size > 16) {
@@ -1045,7 +1045,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
   using scalar_type = typename InType::scalar_type;
   using T = typename OutType::scalar_type;
   [[maybe_unused]] bool valid;
-  
+
   // This is for 2 stage reduction
 
   // nvcc limitation here.  we have to declare shared memory with the same type
@@ -1101,7 +1101,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
 
     if (indices[InType::Rank()-4] < in.Size(0) && indices[InType::Rank()-3] < in.Size(1) && indices[InType::Rank()-2] < in.Size(2) &&
         indices[InType::Rank()-1] < in.Size(3)) {
-      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);   
+      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
     }
   }
   else {
@@ -1114,14 +1114,14 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
     #pragma unroll
     for (int r = 0; r < InType::Rank(); r++) {
       indices[r] = x_abs / mult;
-      x_abs -= indices[r] * mult;      
-      mult /= in.Size(r+1); 
+      x_abs -= indices[r] * mult;
+      mult /= in.Size(r+1);
     }
-    
+
     if (valid) {
-      in_val = in(indices);  
-    }     
-  }  
+      in_val = in(indices);
+    }
+  }
 
   // Compute offset index based on rank difference
   #pragma unroll
@@ -1158,9 +1158,9 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
     }
 
     if (valid) {
-      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
-    }   
-  }  
+      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
+    }
+  }
 
   // reduce along x dim (warp)
   in_val = warpReduceOp(in_val, red, blockDim.x);
@@ -1198,11 +1198,11 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
   using T = typename OutType::scalar_type;
   T in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
-  constexpr uint32_t DRANK = InType::Rank() - RANK;  
+  constexpr uint32_t DRANK = InType::Rank() - RANK;
   std::array<index_t, InType::Rank()> indices;
   index_t abs_idx = -1;
   bool valid = false;
-  
+
   if constexpr (InType::Rank() == 1) {
     indices[0] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (indices[InType::Rank()-1] < in.Size(0)) {
@@ -1250,12 +1250,12 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
     #pragma unroll
     for (int r = 0; r < InType::Rank(); r++) {
       indices[r] = x_abs / mult;
-      x_abs -= indices[r] * mult;      
-      mult /= in.Size(r+1); 
-    }    
+      x_abs -= indices[r] * mult;
+      mult /= in.Size(r+1);
+    }
 
     if (valid) {
-      in_val = in(indices);  
+      in_val = in(indices);
     }
   }
 
@@ -1300,19 +1300,19 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
       }
       if (valid) {
         iout = mapply([&](auto... param) { return idest.GetPointer(param...); }, indices);
-        out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices); 
-      }   
+        out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
+      }
     }
   }
 
-  if (valid) {  
+  if (valid) {
     __threadfence();
 
     // Value matches
-    if (*out == in_val) {    
+    if (*out == in_val) {
       atomicMin(iout, abs_idx);
     }
-  }  
+  }
 }
 #endif
 
@@ -1363,14 +1363,14 @@ template <typename OutType, typename TensorIndexType, typename InType, typename 
 void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, bool init = true)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using scalar_type = typename InType::scalar_type;
   using T = typename OutType::scalar_type;
 
   static_assert(OutType::Rank() < InType::Rank());
-  static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");    
+  static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");
 
   if constexpr (OutType::Rank() > 0) {
     for (int i = 0; i < OutType::Rank(); i++) {
@@ -1381,14 +1381,14 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
   std::array<index_t, in.Rank()> sizes;
   for (int i = 0; i < in.Rank(); i++) {
     sizes[i] = in.Size(i);
-  }   
+  }
 
   detail::get_grid_dims<in.Rank()>(blocks, threads, sizes);
-  
+
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
   }
-  
+
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
 
   detail::matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
@@ -1398,9 +1398,9 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
   if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
     (idest = std::numeric_limits<index_t>::max()).run(stream);
     detail::matxIndexKernel<<<blocks, threads, 0, stream>>>(
-        dest, idest, in, mult);     
+        dest, idest, in, mult);
   }
-#endif  
+#endif
 }
 
 
@@ -1446,7 +1446,7 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
   if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
@@ -1484,16 +1484,16 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
                  cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
-  
+
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
   inner_type scale = 1;
 
   cudaStream_t stream = exec.getStream();
 
-  
+
   sum_impl(dest, in, stream);
 
   // The reduction is performed over the difference in ranks between input and
@@ -1503,7 +1503,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
   }
 
   (dest = dest * static_cast<inner_type>(1) / scale).run(stream);
-#endif  
+#endif
 }
 
 /**
@@ -1533,23 +1533,23 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
   inner_type scale = 1;
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto ts = TotalSize(in);
-      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(ts); 
+      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(ts);
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(lin.Size(1)); 
+        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(lin.Size(1));
       }
     }
   };
-  
+
   ReduceInput(ft, dest, in);
 }
 
@@ -1573,7 +1573,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] 
  * @param dest
  *   Destination for softmax output
  * @param in
- *   Input data to compute the softmax 
+ *   Input data to compute the softmax
  * @param stream
  *   CUDA stream
  */
@@ -1581,7 +1581,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
                  cudaStream_t stream = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("softmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -1589,7 +1589,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
   rmax_impl(tmp_max, in, cudaExecutor{stream});
   sum_impl(tmp_sum, exp(in - tmp_max), stream);
   (dest = exp(in - tmp_max) / tmp_sum).run(stream);
-#endif  
+#endif
 }
 
 /**
@@ -1598,8 +1598,8 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
  * softmax computes the exponential of each value divided by the sum of the exponentials
  * of items in the reduced set. The axes in which to perform the softmax over determine
  * which axes the sum will be computed over, but the input tensor rank and sizes match
- * between input and output. Note that traditional definitions of softmax are simply 
- * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x 
+ * between input and output. Note that traditional definitions of softmax are simply
+ * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x
  * is biased by a correction factor of max(x).
  *
  * @tparam OutType
@@ -1612,7 +1612,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
  * @param dest
  *   Destination for softmax output
  * @param in
- *   Input data to compute the softmax 
+ *   Input data to compute the softmax
  * @param dims
  *   C-style array containing the dimensions to sum over
  * @param stream
@@ -1623,7 +1623,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("softmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   static_assert(dims.size() < InType::Rank(), "softmax dimensions must be <= Rank of input");
   static_assert(OutType::Rank() == InType::Rank(), "softmax output rank must equal input rank");
 
@@ -1651,7 +1651,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
     else {
       clone_dims[r] = matxKeepDim;
     }
-  }  
+  }
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto tmp_max = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -1659,7 +1659,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   sum_impl(tmp_sum, exp(permute(in, perm) - clone<InType::Rank()>(tmp_max, clone_dims)), stream);
 
   (dest = exp(in - clone<InType::Rank()>(tmp_max, clone_dims)) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);
-#endif  
+#endif
 }
 
 /**
@@ -1690,7 +1690,7 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ median_impl(OutType dest,
                    const InType &in, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
     MATX_NVTX_START("median_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
     using T = typename OutType::scalar_type;
@@ -1743,11 +1743,11 @@ void __MATX_INLINE__ median_impl(OutType dest,
 
 #if 1  // sort doesn't currently work on non-tensor input
     static_assert(InType::Rank() <= 2 && OutType::Rank() <= 1, "median only supported with output rank <= 1 and input rank <= 2");
-#else 
+#else
     constexpr int out_dims = OutType::Rank();
     constexpr int red_dims = InType::Rank() - OutType::Rank();
 
-    if constexpr ( out_dims > 1) {  
+    if constexpr ( out_dims > 1) {
       // collapse batch dimensions to a single dimension
       auto oop = lcollapse<out_dims>(dest);
       auto iop = lcollapse<out_dims>(in);
@@ -1755,7 +1755,7 @@ void __MATX_INLINE__ median_impl(OutType dest,
       static_assert(oop.Rank() == 1);
       median_impl(oop, iop, stream);
 
-    } else if constexpr ( red_dims > 1) { 
+    } else if constexpr ( red_dims > 1) {
 
       // collapse reduction dim to a single dim
       auto iop = rcollapse<red_dims>(in);
@@ -1768,7 +1768,7 @@ void __MATX_INLINE__ median_impl(OutType dest,
     }
 #endif
   }
-#endif  
+#endif
 }
 
 /**
@@ -1799,13 +1799,13 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("median_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto insize = TotalSize(in);
-      auto tin = new typename InType::scalar_type[insize];      
-      std::partial_sort_copy( lin, 
-                              lin + insize, 
-                              tin, 
+      auto tin = new typename InType::scalar_type[insize];
+      std::partial_sort_copy( lin,
+                              lin + insize,
+                              tin,
                               tin + insize);
       if ((insize % 2) == 0) {
         *lout = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
@@ -1814,30 +1814,30 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
         *lout = tin[insize / 2];
       }
 
-      delete [] tin;          
+      delete [] tin;
     }
     else {
       auto insize = lin.Size(1);
-      auto tin = new typename InType::scalar_type[insize];      
+      auto tin = new typename InType::scalar_type[insize];
       for (index_t b = 0; b < lin.Size(0); b++) {
-        std::partial_sort_copy( lin + lbegin[b], 
-                                lin + lend[b], 
-                                tin, 
+        std::partial_sort_copy( lin + lbegin[b],
+                                lin + lend[b],
+                                tin,
                                 tin + insize);
 
-        if ((insize % 2) == 0) {        
+        if ((insize % 2) == 0) {
           *(lout + b) = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
         }
         else {
           *(lout + b) = tin[insize / 2];
-        }     
+        }
       }
 
-      delete [] tin;            
+      delete [] tin;
     }
   };
-  
-  ReduceInput(ft, dest, in);  
+
+  ReduceInput(ft, dest, in);
 }
 
 
@@ -1867,7 +1867,7 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, cudaExecutor exec 
 
   cudaStream_t stream = exec.getStream();
   cub_sum<OutType, InType>(dest, in, stream);
-#endif  
+#endif
 }
 
 /**
@@ -1891,18 +1891,18 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0)); 
+      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0));
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)); 
+        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0));
       }
     }
   };
-  
-  ReduceInputNoConvert(ft, dest, in);  
+
+  ReduceInputNoConvert(ft, dest, in);
 }
 
 
@@ -1935,7 +1935,7 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec
   // Reduce "in" into "dest" using a product operation as the reduction type
   reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
   // example-end reduce-1
-#endif  
+#endif
 }
 
 /**
@@ -1959,24 +1959,24 @@ template <typename OutType, typename InType>
 void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::accumulate(lin, 
-                              lin + TotalSize(in), 
-                              static_cast<typename InType::scalar_type>(1), 
-                              std::multiplies<typename InType::scalar_type>()); 
+      *lout = std::accumulate(lin,
+                              lin + TotalSize(in),
+                              static_cast<typename InType::scalar_type>(1),
+                              std::multiplies<typename InType::scalar_type>());
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], 
-                                      lin + lend[b], 
-                                      static_cast<typename InType::scalar_type>(1), 
-                                      std::multiplies<typename InType::scalar_type>()); 
+        *(lout + b) = std::accumulate(lin + lbegin[b],
+                                      lin + lend[b],
+                                      static_cast<typename InType::scalar_type>(1),
+                                      std::multiplies<typename InType::scalar_type>());
       }
     }
   };
-  
-  ReduceInput(ft, dest, in);  
+
+  ReduceInput(ft, dest, in);
 }
 
 
@@ -2009,7 +2009,7 @@ void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, cudaExecutor exec
 
   cudaStream_t stream = exec.getStream();
   cub_max<OutType, InType>(dest, in, stream);
-#endif  
+#endif
 }
 
 /**
@@ -2037,19 +2037,19 @@ void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, [[maybe_unused]] 
 {
   MATX_NVTX_START("rmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = *std::max_element(lin, lin + TotalSize(in)); 
+      *lout = *std::max_element(lin, lin + TotalSize(in));
     }
     else {
       auto els = lend[1] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]); 
+        lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]);
       }
     }
   };
-  
-  ReduceInput(ft, dest, in);    
+
+  ReduceInput(ft, dest, in);
 }
 
 
@@ -2077,7 +2077,7 @@ void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, [[maybe_unused]] 
 template <typename OutType, typename TensorIndexType, typename InType>
 void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
@@ -2086,7 +2086,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
   // the reduced values while "idest" will include the indices of the reduced values
   reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
   // example-end reduce-2
-#endif  
+#endif
 }
 
 /**
@@ -2114,19 +2114,19 @@ template <typename OutType, typename TensorIndexType, typename InType>
 void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::max_element(lin, lin + TotalSize(in)) - lin; 
+      *lout = std::max_element(lin, lin + TotalSize(in)) - lin;
     }
     else {
       auto els = lend[0] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = std::max_element(lin + lbegin[b], lin + lend[b]) - lin; 
+        lout[b] = std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
     }
   };
-  
+
   // This could be more efficient by not running two reductions to find the same values, but
   // for brevity this is faster
   ReduceInput(ft, idest, in);
@@ -2158,12 +2158,12 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 template <typename OutType, typename InType>
 void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("rmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
   cub_min<OutType, InType>(dest, in, stream);
-#endif  
+#endif
 }
 
 /**
@@ -2188,21 +2188,21 @@ void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, cudaExecutor exec
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
-{ 
+{
   MATX_NVTX_START("rmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = *std::min_element(lin, lin + TotalSize(in)); 
+      *lout = *std::min_element(lin, lin + TotalSize(in));
     }
     else {
       auto els = lend[1] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]); 
+        lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]);
       }
     }
   };
-  
-  ReduceInput(ft, dest, in);   
+
+  ReduceInput(ft, dest, in);
 }
 
 
@@ -2231,12 +2231,12 @@ template <typename OutType, typename TensorIndexType, typename InType>
 void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
   reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
-#endif  
+#endif
 }
 
 /**
@@ -2264,19 +2264,19 @@ template <typename OutType, typename TensorIndexType, typename InType>
 void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
 {
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::min_element(lin, lin + TotalSize(in)) - lin; 
+      *lout = std::min_element(lin, lin + TotalSize(in)) - lin;
     }
     else {
       auto els = lend[1] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = std::min_element(lin + lbegin[b], lin + lend[b]) - lin; 
+        lout[b] = std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
     }
   };
-  
+
   // This could be more efficient by not running two reductions to find the same values, but
   // for brevity this is faster
   ReduceInput(ft, idest, in);
@@ -2307,11 +2307,11 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 template <typename OutType, typename InType>
 void __MATX_INLINE__ any_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   cudaStream_t stream = exec.getStream();
   reduce(dest, in, detail::reduceOpAny<typename OutType::scalar_type>(), stream, true);
-#endif  
+#endif
 }
 
 /**
@@ -2338,21 +2338,21 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] S
 {
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
           return vin != 0;
-        }); 
+        });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
         lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
           return vin != 0;
-        }); 
+        });
       }
     }
   };
-  
+
   ReduceInput(ft, dest, in);
 }
 
@@ -2380,11 +2380,11 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] S
 template <typename OutType, typename InType>
 void __MATX_INLINE__ all_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__ 
+#ifdef __CUDACC__
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   cudaStream_t stream = exec.getStream();
   reduce(dest, in, detail::reduceOpAll<typename OutType::scalar_type>(), stream, true);
-#endif  
+#endif
 }
 
 /**
@@ -2411,21 +2411,21 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] S
 {
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
           return vin != 0;
-        }); 
+        });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
         lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
           return vin != 0;
-        }); 
+        });
       }
     }
   };
-  
+
   ReduceInput(ft, dest, in);
 }
 
@@ -2443,22 +2443,28 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] S
  *   Input data type
  *
  * @param dest
- *   Destination view of reduction
- * @param in
- *   Input data to reduce
+ *   Destination view of output boolean
+ * @param in1
+ *   First input data to compare
+ * @param in2
+ *   Second input data to compare
+ * @param rtol
+ *   Relative tolerance for comparison
+ * @param atol
+ *   Absolute tolerance for comparison
  * @param exec
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType1, typename InType2>
 void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
 {
-#ifdef __CUDACC__ 
+#ifdef __CUDACC__
   MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
 
   cudaStream_t stream = exec.getStream();
   reduce(dest, isclose(in1, in2, rtol, atol), detail::reduceOpAll<int>(), stream, true);
-#endif  
+#endif
 }
 
 /**
@@ -2474,9 +2480,15 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
  *   Input data type
  *
  * @param dest
- *   Destination view of reduction
- * @param in
- *   Input data to reduce
+ *   Destination view of output boolean
+ * @param in1
+ *   First input data to compare
+ * @param in2
+ *   Second input data to compare
+ * @param rtol
+ *   Relative tolerance for comparison
+ * @param atol
+ *   Absolute tolerance for comparison
  * @param exec
  *   Single threaded host executor
  */
@@ -2488,12 +2500,12 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
 
   auto isc = isclose(in1, in2, rtol, atol);
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) { 
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     *lout = std::all_of(lin, lin + TotalSize(in1), [](int vin) {
         return vin != 0;
-      }); 
+      });
   };
-  
+
 
   ReduceInput(ft, dest, isc);
 }
