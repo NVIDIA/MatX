@@ -139,6 +139,7 @@ namespace matx
    *   Type of operator input
    * @tparam N
    *   Rank of overlapped window
+   * @param op input operator
    * @param windows
    *   Window size (columns in output)
    * @param strides

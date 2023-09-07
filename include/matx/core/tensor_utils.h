@@ -53,7 +53,7 @@ namespace matx
   template <typename Op>
   index_t TotalSize(const Op &op) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     if constexpr (is_tensor_view_v<Op>) {
       return static_cast<size_t>(op.TotalSize());
     }
@@ -163,7 +163,7 @@ namespace detail {
   // Work around cuda::std::apply not working
   template <typename Func, typename Tuple, size_t... S>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
-    
+
     if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
     }
@@ -234,7 +234,7 @@ namespace detail {
   template <typename T0, typename T1, typename... Tn>
   constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
   {
-    
+
     if constexpr (sizeof...(tn) == 0) {
         return t0 > t1 ? t0 : t1;
     }
@@ -247,7 +247,7 @@ namespace detail {
 
   template <class T, class M = T>
   __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t get_rank()
-  {   
+  {
     if constexpr (is_matx_op<M>())
       return T::Rank();
     else
@@ -414,10 +414,10 @@ namespace detail {
     }
   }
 
-  template <class T> 
+  template <class T>
   __MATX_INLINE__ __MATX_HOST__  auto get_type_str( [[maybe_unused]] T op) {
      if constexpr (is_matx_op<T>()) {
-       return op.str(); 
+       return op.str();
      } else {
        // This should be a scalar value
        return "S_" + to_short_str<T>();
@@ -485,16 +485,16 @@ namespace detail {
     if constexpr (std::is_same_v<T, uint32_t>)
       return {kDLUInt, 32, 1};
     if constexpr (std::is_same_v<T, uint64_t>)
-      return {kDLUInt, 64, 1};    
+      return {kDLUInt, 64, 1};
     if constexpr (std::is_same_v<T, bool>)
-#if DLPACK_VERSION >= 80      
+#if DLPACK_VERSION >= 80
       return {kDLBool, 8, 1};
 #else
       return {kDLUInt, 8, 1};
-#endif      
+#endif
 
     return {kDLOpaqueHandle, 1, 1};
-  }  
+  }
 
 
   /**
@@ -560,7 +560,7 @@ namespace detail {
   template <typename T> static std::string GetTensorType()
   {
     if constexpr (std::is_same_v<T, bool>)
-      return "bool";    
+      return "bool";
     if constexpr (std::is_same_v<T, int32_t>)
       return "int32_t";
     if constexpr (std::is_same_v<T, uint32_t>)
@@ -577,15 +577,15 @@ namespace detail {
       return "bfloat16";
     if constexpr (std::is_same_v<T, double>)
       return "double";
-    if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>) 
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>)
       return "complex<double>";
-    if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>) 
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>)
       return "complex<float>";
     if constexpr (std::is_same_v<T, matxFp16Complex>)
       return "complex<float16>";
     if constexpr (std::is_same_v<T, matxBf16Complex>)
       return "complex<bfloat16>";
-          
+
     return "unknown";
   }
 
@@ -670,13 +670,13 @@ namespace detail {
     }
   }
 
-  template <typename Op, 
+  template <typename Op,
    typename... Args,
           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
   void DevicePrint([[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
-#ifdef __CUDACC__    
+#ifdef __CUDACC__
     if constexpr (PRINT_ON_DEVICE) {
       PrintKernel<<<1, 1>>>(op, dims...);
     }
@@ -685,7 +685,7 @@ namespace detail {
       (tmpv = op).run();
       PrintData(tmpv, dims...);
     }
-#endif    
+#endif
   }
 } // end namespace detail
 
@@ -715,20 +715,20 @@ template <typename Op, typename... Args,
                             bool> = true>
 void PrintData(const Op &op, Args... dims) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
 #ifdef __CUDACC__
   cudaDeviceSynchronize();
   if constexpr (is_tensor_view_v<Op>) {
     auto kind = GetPointerKind(op.Data());
 
-    // Try to get pointer from cuda 
+    // Try to get pointer from cuda
     if (kind == MATX_INVALID_MEMORY) {
       CUmemorytype mtype;
       void *data[] = {&mtype};
       CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-      auto ret = cuPointerGetAttributes(1, 
-                                        &attrs[0], 
-                                        data, 
+      auto ret = cuPointerGetAttributes(1,
+                                        &attrs[0],
+                                        data,
                                         reinterpret_cast<CUdeviceptr>(op.Data()));
       MATX_ASSERT_STR_EXP(ret, CUDA_SUCCESS, matxCudaError, "Failed to get memory type");
       MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0 || mtype == CU_MEMORYTYPE_DEVICE,
@@ -756,6 +756,7 @@ void PrintData(const Op &op, Args... dims) {
 #endif
 }
 
+#if 0
 /**
  * @brief Print a tensor's values to stdout
  *
@@ -783,7 +784,7 @@ void PrintData(const Op &op, Args... dims) {
 //                             bool> = true>
 // void PrintData(const Op &op, Args... dims) {
 //   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
 // #ifdef __CUDACC__
 //   cudaDeviceSynchronize();
 //   if constexpr (is_tensor_view_v<Op>) {
@@ -809,6 +810,7 @@ void PrintData(const Op &op, Args... dims) {
 //   InternalPrint(op, dims...);
 // #endif
 // }
+#endif
 
 
 /**
@@ -829,44 +831,48 @@ template <typename Op, typename... Args,
 #else
 template <typename Op, typename... Args>
 #endif
-void print(const Op &op, Args... dims) 
+void print(const Op &op, Args... dims)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   // print tensor size info first
   std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
 
   printf("%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), op.Rank());
-  
+
   for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
   {
     printf("%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
     if( dimIdx < (op.Rank() - 1) )
       printf(", ");
   }
-  
-  if constexpr (is_tensor_view_v<Op>) 
+
+  if constexpr (is_tensor_view_v<Op>)
   {
     printf("], Strides:[");
-    if constexpr (Op::Rank() > 0) 
+    if constexpr (Op::Rank() > 0)
     {
-      for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ ) 
+      for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
       {
         printf("%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
         {
           printf(",");
         }
-      }   
+      }
     }
   }
 
   printf("]\n");
   PrintData(op, dims...);
-  
+
 }
 
 
+#ifndef DOXYGEN_ONLY
+// Complete hide this version from doxygen, otherwise we get
+// "error: argument 'op' from the argument list of matx::print has multiple @param documentation sections"
+// due to the Rank==0 definition above
 /**
  * @brief Print a tensor's all values to stdout
  *
@@ -876,28 +882,25 @@ void print(const Op &op, Args... dims)
  * automatically according to the rank of this tensor. The user only have to
  * invoke `print(op)` to print the whole tensor, instead of passing zeros
  * manually.
- * 
+ *
  * @tparam Op Operator input type
  * @tparam Args Bounds type
- * @param oper Operator input
+ * @param op Operator input
  * @param dims Bounds for printing
  */
-#ifndef DOXYGEN_ONLY
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-#else
-template <typename Op, typename... Args>
-#endif
-void print(const Op &oper, Args... dims) {
+void print(const Op &op, Args... dims) {
   std::array<int, Op::Rank()> arr = {0};
   auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { print(oper, args...); }, tp);
+  std::apply([&](auto &&...args) { print(op, args...); }, tp);
 }
+#endif
 
 template <typename Op>
 auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
   if constexpr (!is_tensor_view_v<Op>) {
-    return make_tensor<typename remove_cvref<Op>::scalar_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream); 
+    return make_tensor<typename remove_cvref<Op>::scalar_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
     return op;
   }

@@ -9,8 +9,8 @@ Perform a 1D FFT
    These functions are currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: fft(OpA &&a, uint64_t fft_size = 0)
-.. doxygenfunction:: fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0)
+.. doxygenfunction:: fft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 
 Examples
 ~~~~~~~~
@@ -25,7 +25,7 @@ Examples
   :language: cpp
   :start-after: example-begin fft-2
   :end-before: example-end fft-2
-  :dedent:  
+  :dedent:
 
 .. literalinclude:: ../../../../test/00_transform/FFT.cu
   :language: cpp
@@ -43,4 +43,4 @@ Examples
   :language: cpp
   :start-after: example-begin fft-5
   :end-before: example-end fft-5
-  :dedent:  
+  :dedent:

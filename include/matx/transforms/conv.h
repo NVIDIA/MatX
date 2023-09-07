@@ -49,7 +49,7 @@ namespace detail {
 template <typename OutputType, typename InType, typename FilterType>
 inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
                                      const FilterType &filter, matxConvCorrMode_t mode,
-                                     cudaStream_t stream) 
+                                     cudaStream_t stream)
 {
   const index_t padded_size = i.Size(InType::Rank() - 1) + filter.Size(InType::Rank() - 1) - 1;
   auto in_shape_padded = Shape(i);
@@ -60,7 +60,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   index_t slice_end[InType::Rank()];
 
   std::fill(std::begin(slice_start), std::end(slice_start), 0);
-  std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);  
+  std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);
 
   auto s1 = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto s2 = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -138,23 +138,23 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
 template <typename OutputType, typename InType, typename FilterType>
 inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
-                                     const FilterType &filter, matxConvCorrMode_t mode, 
+                                     const FilterType &filter, matxConvCorrMode_t mode,
                                      cudaStream_t stream)
 {
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
 
   MATX_ASSERT_STR(mode != MATX_C_MODE_FULL || o.Size(o.Rank()-1) == i.Size(i.Rank()-1) + filter.Size(filter.Rank()-1) - 1,
       matxInvalidSize, "Output size for FULL convolution incorrect");
-  MATX_ASSERT_STR(mode != MATX_C_MODE_SAME || o.Size(o.Rank()-1) == i.Size(i.Rank()-1), 
+  MATX_ASSERT_STR(mode != MATX_C_MODE_SAME || o.Size(o.Rank()-1) == i.Size(i.Rank()-1),
       matxInvalidSize, "Output size for SAME convolution incorrect");
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
-  using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>; 
-  
+  using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>;
+
   size_t filter_len = filter.Size(filter.Rank()-1);
   size_t signal_len = i.Size(i.Rank()-1);
 
@@ -184,22 +184,22 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   Conv1D<THREADS, EPT><<<gsize, THREADS, shmsize, stream>>>(
       o, i, filter, sig_len, mode);
 
-#endif  
+#endif
 }
 
 
 template <typename OutputType, typename In1Type, typename In2Type>
 void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
-                              In2Type &in2, matxConvCorrMode_t mode, 
+                              In2Type &in2, matxConvCorrMode_t mode,
                               cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   MATX_STATIC_ASSERT(OutputType::Rank() == In1Type::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(OutputType::Rank() == In2Type::Rank(), matxInvalidDim);
   MATX_STATIC_ASSERT(OutputType::Rank() >= 2, matxInvalidDim);
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   constexpr int Rank = OutputType::Rank();
 
   // TODO dispatch different sizes based on filter size?
@@ -216,9 +216,9 @@ void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
   dim3 blocks( int( (o.Size(Rank-1) + threads.x - 1 ) / threads.x),
                int((o.Size(Rank-2) + (threads.y * ILPY) - 1 ) / (threads.y * ILPY)),
                num_batch);
-  
+
   Conv2D<OutputType, In1Type, In2Type, BLOCK_X, BLOCK_Y, FILTER_SHARED_X, FILTER_SHARED_Y, FILTER_REG_X, FILTER_REG_Y, ILPY><<<blocks, threads, 0, stream>>>(o, in1, in2, mode, num_batch);
-#endif  
+#endif
 }
 } // end namespace detail
 
@@ -227,19 +227,19 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
                    matxConvCorrMode_t mode, matxConvCorrMethod_t method, cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   static_assert(In1Type::Rank() == In2Type::Rank());
 
   if (mode == MATX_C_MODE_SAME) {
-    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) == std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)), matxInvalidSize, 
+    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) == std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)), matxInvalidSize,
       "Output size for SAME mode convolution must match largest input size");
   }
 
   if (mode == MATX_C_MODE_VALID) {
-    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) == 
-      std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) - std::min(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) + 1, matxInvalidSize, 
+    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) ==
+      std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) - std::min(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) + 1, matxInvalidSize,
       "Output size for VALID mode convolution must be N - L + 1");
-  }  
+  }
 
   const int Rank = In1Type::Rank();
   //detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
@@ -268,7 +268,7 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
 
 /**
  * @brief 1D convolution
- * 
+ *
  * @tparam OutputType Type of output
  * @tparam In1Type Type of first input
  * @tparam In2Type Type of second input
@@ -276,28 +276,29 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
  * @param i1 First input operator
  * @param i2 Second input operator
  * @param mode Convolution mode
+ * @param method Convolution method
  * @param stream CUDA stream
  */
 template <typename OutputType, typename In1Type, typename In2Type>
 inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, matxConvCorrMethod_t method, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   if constexpr ( In1Type::Rank() >  In2Type::Rank() ) {
     // broadcast i2 path.  clone i2 across batches
-    
+
     constexpr int LRank = In1Type::Rank();
     constexpr int SRank = In2Type::Rank();
     constexpr int DRank = LRank - SRank;
 
     index_t shape[LRank];
-    
+
     // copy left-most dimensions from i1
     #pragma unroll
     for(int i = 0; i < DRank; i++) {
       shape[i] = i1.Size(i);
     }
-    
+
     // set right most dimensions as matxKeepDim
     #pragma unroll
     for(int i = 0; i < SRank; i++) {
@@ -310,10 +311,10 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     static_assert(i1.Rank() == ci2.Rank());
 
     conv1d_impl_internal(o, i1, ci2, mode, method, stream);
-    	  
+
   }  else if constexpr ( In2Type::Rank() >  In1Type::Rank()) {
     // broadcast i1 path.  clone i1 across batches
-    
+
     constexpr int LRank = In2Type::Rank();
     constexpr int SRank = In1Type::Rank();
     constexpr int DRank = LRank - SRank;
@@ -324,7 +325,7 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     for(int i = 0; i < DRank; i++) {
       shape[i] = i2.Size(i);
     }
-    
+
     // set right most dimensions as matxKeepDim
     #pragma unroll
     for(int i = 0; i < SRank; i++) {
@@ -337,7 +338,7 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     static_assert(ci1.Rank() == i2.Rank());
 
     conv1d_impl_internal(o, ci1, i2, mode, method, stream);
-  
+
   } else {
     static_assert(In1Type::Rank() == In2Type::Rank());
     // batched pass outer dims must match
@@ -345,10 +346,10 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
   }
 }
 
-    
+
 /**
  * @brief 2D convolution
- * 
+ *
  * @tparam OutputType Type of output
  * @tparam In1Type Type of first input
  * @tparam In2Type Type of second input

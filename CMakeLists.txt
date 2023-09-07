@@ -12,7 +12,7 @@ option(MATX_BUILD_EXAMPLES "Build examples" OFF)
 option(MATX_BUILD_TESTS "Build unit tests" OFF)
 option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
 option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
-option(MATX_BUILD_DOCS "Build documentation. Mutually exclusive with all other options" OFF)
+option(MATX_BUILD_DOCS "Build documentation" OFF)
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
@@ -29,11 +29,9 @@ set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 # Enable compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Building documentation is mutually exclusive with everything else, and doesn't require CUDA
 if (MATX_BUILD_DOCS)
     project(MATX_DOCS)
     add_subdirectory(docs_input)
-    return()
 endif()
 
 # CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
@@ -53,7 +51,7 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     rapids_cuda_init_architectures(MATX)
 endif()
 
-# This needs to go after MATX_BUILD_DOCS check so it doesn't look for CUDA if we're just building docs
+# This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
 project(MATX
         LANGUAGES CUDA CXX
         DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
@@ -61,9 +59,9 @@ project(MATX
         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
 
 if (NOT CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES "70;80") 
-endif()        
-message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")        
+    set(CMAKE_CUDA_ARCHITECTURES "70;80")
+endif()
+message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 
 rapids_cmake_write_version_file(include/version_config.h)
 
@@ -89,7 +87,7 @@ add_library(matx::matx ALIAS matx)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
-"$<INSTALL_INTERFACE:include/matx/kernels>")                                         
+"$<INSTALL_INTERFACE:include/matx/kernels>")
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
@@ -102,7 +100,7 @@ endif()
 message(STATUS "Need libcuda++. Finding...")
 set(LIBCUDACXX_VERSION "2.1.0" CACHE STRING "Version of libcudacxx to use")
 include(cmake/FindLibcudacxx.cmake)
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
+target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
@@ -111,17 +109,17 @@ if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 endif()
 
 # Set preferred compiler warning flags
-set(WARN_FLAGS  -Wall 
-                -Wextra 
+set(WARN_FLAGS  -Wall
+                -Wextra
                 -Wcast-align
                 -Wunused
                 -Wconversion
-                -Wno-unknown-pragmas 
-                -Wnon-virtual-dtor 
+                -Wno-unknown-pragmas
+                -Wnon-virtual-dtor
                 -Wshadow)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(WARN_FLAGS ${WARN_FLAGS} 
+    set(WARN_FLAGS ${WARN_FLAGS}
         -Wmisleading-indentation
         -Wduplicated-cond
         -Wduplicated-branches
@@ -154,7 +152,7 @@ if (MATX_EN_CUTENSOR)
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR=1)
-    
+
     target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
     target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)
 
@@ -198,12 +196,12 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries
-    if (MATX_EN_VISUALIZATION) 
+    if (MATX_EN_VISUALIZATION)
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=1)
         check_python_libs("plotly.express")
     else()
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ=0)
-    endif()    
+    endif()
 else()
     message(WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
     target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11=0)
@@ -212,10 +210,10 @@ endif()
 
 # Add in all CUDA linker dependencies
 target_link_libraries(matx INTERFACE    CUDA::cudart
-                                        CUDA::nvToolsExt 
-                                        CUDA::cublas 
-                                        CUDA::cublasLt 
-                                        CUDA::cufft 
+                                        CUDA::nvToolsExt
+                                        CUDA::cublas
+                                        CUDA::cublasLt
+                                        CUDA::cufft
                                         CUDA::cusolver
                                         CUDA::cuda_driver
                                         CUDA::curand)
@@ -244,7 +242,7 @@ if (NOT_SUBPROJECT)
         GLOBAL_TARGETS matx
         NAMESPACE matx::
         DOCUMENTATION doc_string)
-      
+
       # build export targets
       rapids_export(
         BUILD matx

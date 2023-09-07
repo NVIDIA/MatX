@@ -107,15 +107,19 @@ INSTANTIATE_TEST_CASE_P(PWelchComplexExponentialTests, PWelchComplexExponentialT
 TEST(PWelchOpTest, xin_complex_float)
 {
   float thresh = 0.01f;
-  auto x = ones<cuda::std::complex<float>>({16});
-  auto Pxx  = make_tensor<float>({8});
-  (Pxx = pwelch(x, 8, 0, 8)).run();
+  index_t signal_size = 16;
+  index_t nperseg = 8;
+  index_t noverlap = 0;
+  index_t nfft = 8;
+  auto x = ones<cuda::std::complex<float>>({signal_size});
+  auto Pxx  = make_tensor<float>({nfft});
+  (Pxx = pwelch(x, nperseg, noverlap, nfft)).run();
 
   cudaStreamSynchronize(0);
 
   EXPECT_NEAR(Pxx(0), 64, thresh);
-  for (index_t k=1; k<16; k++)
+  for (index_t k=1; k<nfft; k++)
   {
-    EXPECT_NEAR(Pxx(k), 0, thresh);
+    EXPECT_NEAR(Pxx(k), 0, thresh) << "failure at index k=" << k;
   }
 }
