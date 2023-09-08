@@ -485,7 +485,7 @@ namespace cutensor {
    * @param tensors List of input tensors
    */
   template <typename OutputType, typename... InT>
-  void einsum_impl(OutputType &out, const std::string &subscripts, cudaStream_t stream, InT... tensors)
+  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors)
   {
 #if MATX_ENABLE_CUTENSOR    
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
