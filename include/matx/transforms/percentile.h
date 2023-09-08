@@ -58,8 +58,8 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
 {
   MATX_NVTX_START("percentile_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  double alpha;
-  double beta;
+  double alpha = 0.;
+  double beta = 0.;
   double subidx;
 
   // Compute alpha and beta if used
