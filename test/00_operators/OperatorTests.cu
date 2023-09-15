@@ -3100,7 +3100,8 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   // Now a rectangular repmat
   tensor_t<TestType, 2> t2r({count0 * same_reps, count1 * same_reps * 2});
 
-  auto rrepop = repmat(t2, {same_reps, same_reps * 2});
+  index_t rreps[] = {same_reps, same_reps * 2};
+  auto rrepop = repmat(t2, static_cast<const index_t*>(rreps));
   ASSERT_TRUE(rrepop.Size(0) == same_reps * t2.Size(0));
   ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
 

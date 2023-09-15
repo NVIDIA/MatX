@@ -65,7 +65,7 @@ namespace matx
         __MATX_INLINE__ PWelchOp(const OpX &x, index_t nperseg, index_t noverlap, index_t nfft) :
               x_(x), nperseg_(nperseg), noverlap_(noverlap), nfft_(nfft) {
 
-          MATX_STATIC_ASSERT_STR(x.Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
+          MATX_STATIC_ASSERT_STR(OpX::Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
           for (int r = 0; r < x.Rank(); r++) {
             out_dims_[r] = x_.Size(r);
           }

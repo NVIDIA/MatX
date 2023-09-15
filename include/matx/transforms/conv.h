@@ -308,7 +308,7 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     // clone i2
     auto ci2 = clone<LRank>(i2, shape);
 
-    static_assert(i1.Rank() == ci2.Rank());
+    static_assert(In1Type::Rank() == decltype(ci2)::Rank());
 
     conv1d_impl_internal(o, i1, ci2, mode, method, stream);
 

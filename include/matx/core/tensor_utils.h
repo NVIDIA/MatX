@@ -59,7 +59,7 @@ namespace matx
     }
     else {
       index_t total = 1;
-      for (int i = 0; i < op.Rank(); i++) {
+      for (int i = 0; i < Op::Rank(); i++) {
         total *= op.Size(i);
       }
 
@@ -81,7 +81,7 @@ namespace matx
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     index_t maxSize = op.Size(0);
 
-    for (int i = 1; i < op.Rank(); i++)
+    for (int i = 1; i < Op::Rank(); i++)
     {
       maxSize = std::max(op.Size(i), maxSize);
     }
@@ -102,7 +102,7 @@ namespace detail {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
     using l_stride_type = index_t;
     using l_shape_type = index_t;
-    constexpr int RANK = op.Rank();
+    constexpr int RANK = Op::Rank();
 
     std::array<l_shape_type, RANK> indices;
 
@@ -138,7 +138,7 @@ namespace detail {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
     using l_stride_type = index_t;
     using l_shape_type = index_t;
-    constexpr int RANK = op.Rank();
+    constexpr int RANK = Op::Rank();
     std::array<l_shape_type, RANK> indices{0};
 
     for (int idx = 0; idx < RANK - nb_dims; idx++) {
@@ -601,8 +601,8 @@ namespace detail {
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
-    MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
+    MATX_STATIC_ASSERT(Op::Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
+    MATX_STATIC_ASSERT(Op::Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
 
     if constexpr (sizeof...(Args) == 0) {
       PrintVal(op.operator()());
@@ -838,12 +838,12 @@ void print(const Op &op, Args... dims)
   // print tensor size info first
   std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
 
-  printf("%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), op.Rank());
+  printf("%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), Op::Rank());
 
-  for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
+  for (index_t dimIdx = 0; dimIdx < (Op::Rank() ); dimIdx++ )
   {
     printf("%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
-    if( dimIdx < (op.Rank() - 1) )
+    if( dimIdx < (Op::Rank() - 1) )
       printf(", ");
   }
 
@@ -852,10 +852,10 @@ void print(const Op &op, Args... dims)
     printf("], Strides:[");
     if constexpr (Op::Rank() > 0)
     {
-      for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
+      for (index_t dimIdx = 0; dimIdx < (Op::Rank() ); dimIdx++ )
       {
         printf("%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
-        if( dimIdx < (op.Rank() - 1) )
+        if( dimIdx < (Op::Rank() - 1) )
         {
           printf(",");
         }

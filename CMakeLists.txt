@@ -91,6 +91,13 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if (CMAKE_COMPILER_VERSION VERSION_LESS 14)
+        target_compile_options(matx INTERFACE -fPIE)
+    endif()
+    target_compile_options(matx INTERFACE -std=c++17 $<$<COMPILE_LANGUAGE:CUDA>:-ccbin=${CMAKE_CXX_COMPILER}>)
+endif()
+
 # 11.2 and above required for async allocation
 if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.4)
     message(FATAL_ERROR "MatX requires CUDA 11.4 or higher. Please update before using.")
@@ -109,22 +116,30 @@ if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 endif()
 
 # Set preferred compiler warning flags
-set(WARN_FLAGS  -Wall
-                -Wextra
-                -Wcast-align
-                -Wunused
-                -Wconversion
-                -Wno-unknown-pragmas
-                -Wnon-virtual-dtor
-                -Wshadow)
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(WARN_FLAGS ${WARN_FLAGS}
-        -Wmisleading-indentation
-        -Wduplicated-cond
-        -Wduplicated-branches
-        -Wlogical-op
-        -Wnull-dereference)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(WARN_FLAGS
+        -Wno-unknown-warning-option
+        -Wno-inconsistent-missing-override
+        -Wno-c++20-extensions
+        -Wno-deprecated-declarations)
+else ()
+    set(WARN_FLAGS
+        -Wall
+        -Wextra
+        -Wcast-align
+        -Wunused
+        -Wconversion
+        -Wno-unknown-pragmas
+        -Wnon-virtual-dtor
+        -Wshadow)
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(WARN_FLAGS ${WARN_FLAGS}
+            -Wmisleading-indentation
+            -Wduplicated-cond
+            -Wduplicated-branches
+            -Wlogical-op
+            -Wnull-dereference)
+    endif()
 endif()
 
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)

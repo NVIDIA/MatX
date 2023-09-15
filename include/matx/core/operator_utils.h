@@ -40,7 +40,8 @@ namespace matx {
 
   template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
-    if constexpr (out.Rank() <= 1 && is_tensor_view_v<OutputOp>) {
+    constexpr auto OUTRANK = std::remove_reference<OutputOp>::type::Rank();
+    if constexpr (OUTRANK <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
         if constexpr(ConvertType) {
           return func(  in, 
@@ -85,8 +86,10 @@ namespace matx {
     }
 
     // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
-    // then collapse the left size by the output rank to get the batch dimensions  
-    auto collapsed = matx::lcollapse<out.Rank()>(rcollapse<in.Rank() - out.Rank()>(in_base));
+    // then collapse the left size by the output rank to get the batch dimensions
+    constexpr auto INRANK = std::remove_reference<InputOp>::type::Rank();
+    constexpr auto OUTRANK = std::remove_reference<OutputOp>::type::Rank();
+    auto collapsed = matx::lcollapse<OUTRANK>(rcollapse<INRANK-OUTRANK>(in_base));
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
 
   
