@@ -1389,9 +1389,9 @@ public:
                l < (((vals.begin() + i)->begin() + j)->begin() + k)->size();
                l++) {
             for (size_t m = 0;
-                 m < ((((vals.begin() + i)->begin() + j)->begin() + k)->begin() + l)
+                 (m+1) < ((((vals.begin() + i)->begin() + j)->begin() + k)->begin() + l)
                          ->size();
-                 m++) {
+                 m+=2) {
               typename T::value_type real =
                   (((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
                     l)
@@ -1405,7 +1405,6 @@ public:
                    m + 1)
                       ->real();
               this->operator()(i, j, k, l) = {real, imag};
-              m++;
             }
           }
         }

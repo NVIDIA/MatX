@@ -545,6 +545,10 @@ public:
             curandGenerateNormalDouble(gen_, &val[1], 1, beta_, alpha_);
           }
         }
+        else {
+          val = 0;
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Unsupported distribution");
+        }
 #endif
 
         return val;

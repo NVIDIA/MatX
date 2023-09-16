@@ -58,7 +58,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   double thresh;;

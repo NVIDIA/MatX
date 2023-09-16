@@ -75,7 +75,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 1> av{{a_len0}};
@@ -104,7 +104,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> av{{a_len0,a_len1}};
@@ -133,7 +133,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 1> av{{a_len}};

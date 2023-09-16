@@ -49,7 +49,7 @@ protected:
     pb->NumpyToTensorView(Lv, "L");
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<T, 2> Bv{{dim_size, dim_size}};

@@ -48,7 +48,7 @@ protected:
     pb->InitAndRunTVGenerator<T>("00_solver", "svd", "run", {m, n});
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
 };

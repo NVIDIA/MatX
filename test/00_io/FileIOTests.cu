@@ -46,7 +46,7 @@ protected:
     pb->InitAndRunTVGenerator<T>("00_file_io", "csv", "run", {});
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   const std::string small_csv = "../test/00_io/small_csv_comma_nh.csv";

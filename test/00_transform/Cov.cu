@@ -55,7 +55,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   tensor_t<T, 2> av{{cov_dim, cov_dim}};
   tensor_t<T, 2> cv{{cov_dim, cov_dim}};

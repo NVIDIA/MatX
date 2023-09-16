@@ -116,30 +116,33 @@ if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 endif()
 
 # Set preferred compiler warning flags
+set(WARN_FLAGS
+    -Wall
+    -Wcast-align
+    -Wunused
+    -Wno-unknown-pragmas
+    -Wnon-virtual-dtor
+    -Wshadow)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(WARN_FLAGS ${WARN_FLAGS}
+        -Wmisleading-indentation
+        -Wduplicated-cond
+        -Wduplicated-branches
+        -Wlogical-op
+        -Wnull-dereference)
+endif()
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(WARN_FLAGS
-        -Wno-unknown-warning-option
-        -Wno-inconsistent-missing-override
+    set(WARN_FLAGS ${WARN_FLAGS}
+        -Wmisleading-indentation
+        -Wnull-dereference
         -Wno-c++20-extensions
-        -Wno-deprecated-declarations)
-else ()
-    set(WARN_FLAGS
-        -Wall
+        -Wno-unused-lambda-capture)
+else()
+    set(WARN_FLAGS ${WARN_FLAGS}
         -Wextra
-        -Wcast-align
-        -Wunused
-        -Wconversion
-        -Wno-unknown-pragmas
-        -Wnon-virtual-dtor
-        -Wshadow)
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        set(WARN_FLAGS ${WARN_FLAGS}
-            -Wmisleading-indentation
-            -Wduplicated-cond
-            -Wduplicated-branches
-            -Wlogical-op
-            -Wnull-dereference)
-    endif()
+        -Wconversion)
 endif()
 
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
