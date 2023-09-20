@@ -49,12 +49,12 @@ namespace matx
         index_t nperseg_;
         index_t noverlap_;
         index_t nfft_;
-        std::array<index_t, 2> out_dims_;
-        mutable matx::tensor_t<typename OpX::scalar_type, 2> tmp_out_;
+        std::array<index_t, 1> out_dims_;
+        mutable matx::tensor_t<typename OpX::scalar_type::value_type, 1> tmp_out_;
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpX::scalar_type;
+        using scalar_type = typename OpX::scalar_type::value_type;
         using matx_transform_op = bool;
         using pwelch_xform_op = bool;
 
