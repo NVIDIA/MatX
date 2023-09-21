@@ -134,7 +134,7 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
           auto int_val = at(sort_out, static_cast<index_t>(subidx));
           (dest = at(sort_out,  static_cast<index_t>(subidx)) + 
                                 as_type<typename InType::scalar_type>(
-                                  static_cast<double>(subidx - static_cast<index_t>(subidx)) * 
+                                  (subidx - std::floor(subidx)) * 
                                   as_type<double>(at(sort_out, static_cast<index_t>(subidx + 1)) - int_val)
                                 )
           ).run(exec);
