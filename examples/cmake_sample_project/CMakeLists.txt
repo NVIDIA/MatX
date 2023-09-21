@@ -10,11 +10,13 @@ set(CMAKE_CUDA_ARCHITECTURES 70)
 #set(MATX_EN_VISUALIZATION ON)  # Uncomment to enable visualizations
 #set(MATX_EN_FILEIO ON)         # Uncomment to file IO 
 
-# Uncomment this line and point it to the correct path if you added MatX as a subdirectory
-# inside your project
+# The expected use pattern is to copy the "cmake_sample_project directory" to
+# a new development location and then checkout MatX within the copied folder 
+# 
+# alternatively you can update "MatX" below with the path to your MatX checkout
 add_subdirectory(MatX)
 
-# Use this section is you installed MatX using "make install"
+# Use this section if you installed MatX using "make install"
 #find_package(matx CONFIG REQUIRED)
 
 add_executable(sample_matx main.cu)
