@@ -60,7 +60,7 @@ namespace matx
          */
         __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
         {
-          MATX_NVTX_START(get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
+          MATX_NVTX_START(detail::get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
           auto tp = static_cast<T *>(this);
           auto ex = cudaExecutor(stream);
 
