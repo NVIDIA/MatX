@@ -37,7 +37,7 @@
 #if MATX_ENABLE_PYBIND11
 
 #include <pybind11/embed.h>
-#include <pybind11/numpy.h> 
+#include <pybind11/numpy.h>
 #include <optional>
 
 namespace matx {
@@ -84,7 +84,7 @@ class MatXPybind {
 public:
   MatXPybind() { Init(); }
 
-  void Init() {  
+  void Init() {
     if (gil == nullptr) {
       try {
         gil = new pybind11::scoped_interpreter{};
@@ -93,7 +93,7 @@ public:
         // Interpreter already running
       }
     }
-    AddPath(std::string(MATX_ROOT) + GENERATORS_PATH); 
+    AddPath(std::string(MATX_ROOT) + GENERATORS_PATH);
   }
 
   void AddPath(const std::string &path)
@@ -129,10 +129,21 @@ public:
     RunTVGenerator(func);
   }
 
+  template <typename T>
+  void InitAndRunTVGeneratorWithCfg(const std::string &mname, const std::string &cname,
+                             const std::string &func,
+                             const pybind11::dict &cfg)
+  {
+    mod = pybind11::module_::import(mname.c_str());
+
+    sx_obj = mod.attr(cname.c_str())(GetNumpyDtype<T>(), cfg);
+    RunTVGenerator(func);
+  }
+
   auto GetMethod(const std::string meth) { return sx_obj.attr(meth.c_str()); }
 
   ~MatXPybind() {
-    
+
   }
 
   template <typename T> static auto GetNumpyDtype()
@@ -304,7 +315,7 @@ public:
   inline matxBf16Complex ConvertComplex(const matxBf16Complex in)
   {
     return {in.real(), in.imag()};
-  }  
+  }
 
   template <typename TensorType>
   void NumpyToTensorView(TensorType &ten,
@@ -425,7 +436,7 @@ public:
     return ften;
   }
 
-  template <typename TensorType, 
+  template <typename TensorType,
             typename CT = matx_convert_complex_type<typename TensorType::scalar_type>>
   std::optional<TestFailResult<CT>>
   CompareOutput(const TensorType &ten,

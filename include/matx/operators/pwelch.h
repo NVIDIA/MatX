@@ -40,11 +40,12 @@
 namespace matx
 {
   namespace detail {
-    template <typename OpX>
-    class PWelchOp : public BaseOp<PWelchOp<OpX>>
+    template <typename OpX, typename OpW>
+    class PWelchOp : public BaseOp<PWelchOp<OpX,OpW>>
     {
       private:
         OpX x_;
+        OpW w_;
 
         index_t nperseg_;
         index_t noverlap_;
@@ -59,11 +60,11 @@ namespace matx
         using pwelch_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const {
-          return "pwelch(" + get_type_str(x_) + ")";
+          return "pwelch(" + get_type_str(x_) + "," + get_type_str(w_) + ")";
         }
 
-        __MATX_INLINE__ PWelchOp(const OpX &x, index_t nperseg, index_t noverlap, index_t nfft) :
-              x_(x), nperseg_(nperseg), noverlap_(noverlap), nfft_(nfft) {
+        __MATX_INLINE__ PWelchOp(const OpX &x, const OpW &w, index_t nperseg, index_t noverlap, index_t nfft) :
+              x_(x), w_(w), nperseg_(nperseg), noverlap_(noverlap), nfft_(nfft) {
 
           MATX_STATIC_ASSERT_STR(x.Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
           for (int r = 0; r < x.Rank(); r++) {
@@ -90,14 +91,18 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           static_assert(is_device_executor_v<Executor>, "pwelch() only supports the CUDA executor currently");
-          pwelch_impl(std::get<0>(out), x_, nperseg_, noverlap_, nfft_, ex.getStream());
+          pwelch_impl(std::get<0>(out), x_, w_, nperseg_, noverlap_, nfft_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpX>()) {
-            x_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            x_.PreRun(Shape(x_), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<OpW>()) {
+            w_.PreRun(Shape(w_), std::forward<Executor>(ex));
           }
 
           if constexpr (is_device_executor_v<Executor>) {
@@ -114,8 +119,12 @@ namespace matx
    *
    * @tparam xType
    *   Input time domain data type
+   * @tparam wType
+   *   Input window type
    * @param x
-   *   Input time domain tensor x
+   *   Input time domain tensor
+   * @param w
+   *   Input window operator
    * @param nperseg
    *   Length of each segment
    * @param noverlap
@@ -127,11 +136,17 @@ namespace matx
    *
    */
 
-  template <typename xType>
-    __MATX_INLINE__ auto pwelch(const xType& x, index_t nperseg, index_t noverlap, index_t nfft)
+  template <typename xType, typename wType>
+    __MATX_INLINE__ auto pwelch(const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    return detail::PWelchOp(x, nperseg, noverlap, nfft);
+    return detail::PWelchOp(x, w, nperseg, noverlap, nfft);
+  }
+
+  template <typename xType>
+    __MATX_INLINE__ auto pwelch(const xType& x, index_t nperseg, index_t noverlap, index_t nfft)
+  {
+    return detail::PWelchOp(x, std::nullopt, nperseg, noverlap, nfft);
   }
 }
