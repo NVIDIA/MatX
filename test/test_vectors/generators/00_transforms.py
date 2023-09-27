@@ -329,33 +329,3 @@ class fft_operators:
             'a_in': seq,
             'a_out': np.fft.ifft2(seq, (self.size[1], self.size[1]))
         }
-
-class pwelch_operators:
-    def __init__(self, dtype: str, params: List[int]):
-        self.dtype = dtype
-        self.signal_size = params[0]
-        self.nperseg = params[1]
-        self.noverlap = params[2]
-        self.nfft = params[3]
-        self.ftone = params[4]
-        self.sigma = params[5]
-
-        np.random.seed(1234)
-
-    def pwelch_complex_exponential(self) -> Dict[str, np.ndarray]:
-        s = np.exp(2j*np.pi*self.ftone*np.linspace(0,self.signal_size-1,self.signal_size)/self.nfft)
-        n = np.random.normal(loc=0,scale=self.sigma,size=self.signal_size) + 1j*np.random.normal(loc=0,scale=self.sigma,size=self.signal_size)
-        x = s + n
-        f, Pxx = signal.welch(x,
-                              fs=1./self.nfft,
-                              window=np.ones(self.nperseg),
-                              nperseg=self.nperseg,
-                              noverlap=self.noverlap,
-                              nfft=self.nfft,
-                              return_onesided=False,
-                              scaling = 'density',
-                              detrend=False)
-        return {
-            'x_in': x,
-            'Pxx_out': Pxx
-        }

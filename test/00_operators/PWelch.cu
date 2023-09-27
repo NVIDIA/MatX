@@ -36,21 +36,29 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <pybind11/pybind11.h>
+using namespace pybind11::literals; // to bring in the '_a' literal
+
 using namespace matx;
 
 struct TestParams {
+    std::string window_name;
     index_t signal_size;
     index_t nperseg;
     index_t noverlap;
     index_t nfft;
-    int ftone;
-    int sigma;
+    float ftone;
+    float sigma;
 };
+
 const std::vector<TestParams> CONFIGS = {
-  {16, 8, 2, 8, 0, 0},
-  {16, 8, 4, 8, 1, 0},
-  {16, 8, 4, 8, 2, 1},
-  {16384, 256, 64, 256, 63, 0}
+  {"none", 8, 8, 2, 8, 0., 0.},
+  {"none", 16, 8, 4, 8, 1., 0.},
+  {"none", 16, 8, 4, 8, 2., 1.},
+  {"none", 16384, 256, 64, 256, 63., 0.},
+  {"boxcar", 8, 8, 2, 8, 0., 0.},
+  {"hann", 16, 8, 4, 8, 1., 0.},
+  {"flattop", 1024, 64, 32, 128, 2., 1.},
 };
 
 class PWelchComplexExponentialTest : public ::testing::TestWithParam<TestParams>
@@ -74,16 +82,49 @@ template <typename TypeParam>
 void helper(PWelchComplexExponentialTest& test)
 {
   MATX_ENTER_HANDLER();
-  test.pb->template InitAndRunTVGenerator<TypeParam>(
-      "00_transforms", "pwelch_operators", "pwelch_complex_exponential", {test.params.signal_size, test.params.nperseg, test.params.noverlap, test.params.nfft, test.params.ftone, test.params.sigma});
+  pybind11::dict cfg(
+    "signal_size"_a=test.params.signal_size,
+    "nperseg"_a=test.params.nperseg,
+    "noverlap"_a=test.params.noverlap,
+    "nfft"_a=test.params.nfft,
+    "ftone"_a=test.params.ftone,
+    "sigma"_a=test.params.sigma,
+    "window_name"_a=test.params.window_name
+  );
+
+  test.pb->template InitAndRunTVGeneratorWithCfg<TypeParam>(
+      "00_operators", "pwelch_operators", "pwelch_complex_exponential", cfg);
 
   tensor_t<TypeParam, 1> x{{test.params.signal_size}};
   test.pb->NumpyToTensorView(x, "x_in");
 
-  // example-begin pwelch-test-1
   auto Pxx  = make_tensor<typename TypeParam::value_type>({test.params.nfft});
-  (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft)).run();
-  // example-end pwelch-test-1
+
+  if (test.params.window_name == "none")
+  {
+    (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft)).run();
+  }
+  else
+  {
+    auto w = make_tensor<typename TypeParam::value_type>({test.params.nperseg});
+    if (test.params.window_name == "boxcar")
+    {
+      (w = ones<typename TypeParam::value_type>({test.params.nperseg})).run();
+    }
+    else if (test.params.window_name == "hann")
+    {
+      (w = hanning<0,1,typename TypeParam::value_type>({test.params.nperseg})).run();
+    }
+    else if (test.params.window_name == "flattop")
+    {
+      (w = flattop<0,1,typename TypeParam::value_type>({test.params.nperseg})).run();
+    }
+    else
+    {
+      ASSERT_TRUE(false) << "Unknown window parameter name " + test.params.window_name;
+    }
+    (Pxx = pwelch(x, w, test.params.nperseg, test.params.noverlap, test.params.nfft)).run();
+  }
 
   cudaStreamSynchronize(0);
 
@@ -104,6 +145,7 @@ TEST_P(PWelchComplexExponentialTest, xin_complex_double)
 
 INSTANTIATE_TEST_CASE_P(PWelchComplexExponentialTests, PWelchComplexExponentialTest,::testing::ValuesIn(CONFIGS));
 
+
 TEST(PWelchOpTest, xin_complex_float)
 {
   float thresh = 0.01f;
@@ -112,8 +154,11 @@ TEST(PWelchOpTest, xin_complex_float)
   index_t noverlap = 0;
   index_t nfft = 8;
   auto x = ones<cuda::std::complex<float>>({signal_size});
+  // example-begin pwelch-test-1
   auto Pxx  = make_tensor<float>({nfft});
-  (Pxx = pwelch(x, nperseg, noverlap, nfft)).run();
+  auto w = ones<float>({nperseg});
+  (Pxx = pwelch(x, w, nperseg, noverlap, nfft)).run();
+  // example-end pwelch-test-1
 
   cudaStreamSynchronize(0);
 

@@ -5,12 +5,13 @@ pwelch
 
 Estimate the power spectral density of a signal using Welch's method [1]_
 
+.. doxygenfunction:: pwelch(const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft)
 .. doxygenfunction:: pwelch(const xType& x, index_t nperseg, index_t noverlap, index_t nfft)
 
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_transform/PWelch.cu
+.. literalinclude:: ../../../../test/00_operators/PWelch.cu
    :language: cpp
    :start-after: example-begin pwelch-test-1
    :end-before: example-end pwelch-test-1

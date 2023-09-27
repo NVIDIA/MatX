@@ -9,6 +9,7 @@ set (test_sources
     00_tensor/EinsumTests.cu
     00_operators/OperatorTests.cu
     00_operators/GeneratorTests.cu
+    00_operators/PWelch.cu
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
     00_transform/MatMul.cu
@@ -16,7 +17,6 @@ set (test_sources
     00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
-    00_transform/PWelch.cu
     00_transform/ResamplePoly.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
@@ -97,7 +97,3 @@ target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} gtest)
 add_custom_target(test
     DEPENDS matx_test
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/matx_test)
-
-
-
-

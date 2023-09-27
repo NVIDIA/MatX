@@ -34,29 +34,8 @@
 
 namespace matx
 {
-  /**
-   *  Transform to estimate the power spectral density of signal using Welch's method.
-   *
-   * @tparam PxxType
-   *   Output data type
-   * @tparam xType
-   *   Input data type
-   * @param Pxx
-   *   Output power spectral density of time domain signal x
-   * @param x
-   *   Input time domain signal x
-   * @param nperseg
-   *   Length of each segment
-   * @param noverlap
-   *   Number of points to overlap between segments.  Defaults to 0
-   * @param nfft
-   *   Length of FFT used per segment.  nfft >= nperseg.  Defaults to nfft = nperseg
-   * @param stream
-   *   cuda Stream to execute on
-   *
-   */
-  template <typename PxxType, typename xType>
-    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, index_t nperseg, index_t noverlap, index_t nfft, cudaStream_t stream=0)
+  template <typename PxxType, typename xType, typename wType>
+    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, cudaStream_t stream=0)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -65,13 +44,20 @@ namespace matx
       MATX_ASSERT_STR((noverlap >= 0) && (noverlap < nperseg), matxInvalidDim, "pwelch:  Must have 0 <= noverlap < nperseg");
 
       // Create overlapping view
-      auto x_with_overlaps = overlap(x,{nfft}, {nperseg - noverlap});
+      auto x_with_overlaps = overlap(x,{nperseg}, {nperseg - noverlap});
 
       // Create temporary space for fft outputs
       index_t batches = x_with_overlaps.Shape()[0];
       auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::scalar_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
 
-      (X_with_overlaps = fft(x_with_overlaps,nfft)).run(stream);
+      if constexpr (std::is_same_v<wType, std::nullopt_t>)
+      {
+        (X_with_overlaps = fft(x_with_overlaps,nfft)).run(stream);
+      }
+      else
+      {
+        (X_with_overlaps = fft(x_with_overlaps * w,nfft)).run(stream);
+      }
 
       // Compute magnitude squared in-place
       (X_with_overlaps = conj(X_with_overlaps) * X_with_overlaps).run(stream);
