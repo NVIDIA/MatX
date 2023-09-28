@@ -52,11 +52,13 @@ namespace matx
         std::array<index_t, OpA::Rank()> out_dims_;
         mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
                                           typename OpA::scalar_type, 
-                                          typename scalar_to_complex<OpA>::ctype>, OpA::Rank()> tmp_out_;
+                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>, OpA::Rank()> tmp_out_;
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using scalar_type = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
+          typename OpA::scalar_type,
+          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
         using matx_transform_op = bool;
         using fft_xform_op = bool;
 
@@ -76,11 +78,21 @@ namespace matx
           }
 
           if (fft_size_ != 0) {
-            if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-              out_dims_[Rank() - 1] = fft_size_;
-            }
-            else {
-              out_dims_[perm_[0]] = fft_size_;
+            if constexpr (is_complex_v<typename OpA::scalar_type>) {
+              if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+                out_dims_[Rank() - 1] = fft_size_;
+              }
+              else {
+                out_dims_[perm_[0]] = fft_size_;
+              }
+            } else {
+              // R2C transforms pack the results in fft_size_/2 + 1 complex elements
+              if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+                out_dims_[Rank() - 1] = fft_size_ / 2 + 1;
+              }
+              else {
+                out_dims_[perm_[0]] = fft_size_ / 2 + 1;
+              }
             }
           }
           else {
@@ -91,8 +103,12 @@ namespace matx
               else {
                 out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
               }
+              // The output dimension could correspond to an input dimension of either
+              // (out_dim-1)*2 or (out_dim-1)*2+1. The FFT transform will be unable to
+              // deduce which is correct, so explicitly set the transform size here.
+              fft_size_ = a.Size(a.Rank()-1);
             }
-          }     
+          }
         }
 
         template <typename... Is>
