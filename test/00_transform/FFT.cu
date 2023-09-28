@@ -537,7 +537,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024PadR2C)
   tensor_t<TypeParam, 1> avo{{fft_dim + 1}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av)).run();
+  (avo = fft(av, fft_dim*2)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -556,7 +556,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024PadBatchedR2C)
   tensor_t<TypeParam, 2> avo{{fft_dim, fft_dim + 1}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av)).run();
+  (avo = fft(av, fft_dim*2)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
