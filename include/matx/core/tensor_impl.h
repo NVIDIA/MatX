@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <type_traits>
 #include <cuda/std/functional>
 #include "matx/core/error.h"

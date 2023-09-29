@@ -50,7 +50,7 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type; 
 
-	 __MATX_INLINE__ std::string str() const { return "r2c(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "r2c(" + op_.str() + ")"; }
 
         __MATX_INLINE__ R2COp(T1 op, index_t orig) : op_(op), orig_size_(orig) {
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
@@ -95,6 +95,22 @@ namespace matx
           }
           else {
             return op_.Size(dim);
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
         }
     };
