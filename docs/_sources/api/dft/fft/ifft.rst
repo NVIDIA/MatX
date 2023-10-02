@@ -9,8 +9,8 @@ Perform a 1D inverse FFT
    These functions are currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: ifft(OpA &&a, uint64_t fft_size = 0)
-.. doxygenfunction:: ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0)
+.. doxygenfunction:: ifft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 
 Examples
 ~~~~~~~~

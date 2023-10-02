@@ -5,7 +5,13 @@ conv1d
 
 1D convolution
 
-.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode)
+Performs a convolution operation of two inputs. Three convolution modes are available: full, same, and valid. The
+mode controls how much (if any) of the output is truncated to remove filter ramps. The method parameter allows
+either direct or FFT-based convolution. Direct performs the typical sliding-window dot product approach, whereas
+FFT uses the convolution theorem. The FFT method may be faster for large inputs, but both methods should be tested
+for the target input sizes.
+
+.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode, matxConvCorrMethod_t method)
 
 Examples
 ~~~~~~~~
@@ -22,7 +28,7 @@ Examples
    :end-before: example-end conv1d-test-2
    :dedent:
 
-.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[1], matxConvCorrMode_t mode)   
+.. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[1], matxConvCorrMode_t mode = MATX_C_MODE_FULL, matxConvCorrMethod_t method = MATX_C_METHOD_DIRECT)
 
 Examples
 ~~~~~~~~

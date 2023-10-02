@@ -46,7 +46,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Radar" href="../radar/index.html" />
-    <link rel="prev" title="downsample" href="downsample.html" />
+    <link rel="prev" title="pwelch" href="pwelch.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -183,6 +183,7 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/overlap.html">overlap</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/rearranging/reverse.html">reverse</a></li>
@@ -192,6 +193,7 @@
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../../manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../manipulation/selecting/at.html">at</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/selecting/reduce.html">reduce</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/selecting/remap.html">remap</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../manipulation/selecting/select.html">select</a></li>
@@ -325,9 +327,13 @@
 <li class="toctree-l4"><a class="reference internal" href="../../stats/hist/hist.html">hist</a></li>
 </ul>
 </li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../stats/misc/index.html">Misc</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-30"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../stats/misc/percentile.html">percentile</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../searchsort/index.html">Searching and Sorting</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-30"><i class="fa-solid fa-chevron-down"></i></label><ul>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../searchsort/index.html">Searching and Sorting</a><input class="toctree-checkbox" id="toctree-checkbox-31" name="toctree-checkbox-31" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-31"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../searchsort/argmax.html">argmax</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../searchsort/argmin.html">argmin</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../searchsort/find.html">find</a></li>
@@ -336,36 +342,38 @@
 <li class="toctree-l3"><a class="reference internal" href="../../searchsort/unique.html">unique</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../logic/index.html">Logic Functions</a><input class="toctree-checkbox" id="toctree-checkbox-31" name="toctree-checkbox-31" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-31"><i class="fa-solid fa-chevron-down"></i></label><ul>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/bitwise/index.html">Bitwise Operations</a><input class="toctree-checkbox" id="toctree-checkbox-32" name="toctree-checkbox-32" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-32"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../logic/index.html">Logic Functions</a><input class="toctree-checkbox" id="toctree-checkbox-32" name="toctree-checkbox-32" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-32"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/bitwise/index.html">Bitwise Operations</a><input class="toctree-checkbox" id="toctree-checkbox-33" name="toctree-checkbox-33" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-33"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/bitwise/and.html">Bitwise AND (&amp;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/bitwise/or.html">Bitwise OR (|)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/bitwise/xor.html">Bitwise XOR (^)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/comparison/index.html">Comparison Operations</a><input class="toctree-checkbox" id="toctree-checkbox-33" name="toctree-checkbox-33" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-33"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/comparison/index.html">Comparison Operations</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-34"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/equal.html">Equal (==)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/gt.html">Greater than (&gt;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/gte.html">Greater than or equal (&gt;=)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/isclose.html">isclose</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/lt.html">Less than (&lt;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/lte.html">Less than or equal (&lt;=)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/comparison/neq.html">Not-equal (!=)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/logical/index.html">Logical Operations</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-34"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/logical/index.html">Logical Operations</a><input class="toctree-checkbox" id="toctree-checkbox-35" name="toctree-checkbox-35" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-35"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/logical/and.html">&amp;&amp; (AND)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/logical/not.html">! (NOT)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/logical/or.html">|| (OR)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/truth/index.html">Truth Value Testing</a><input class="toctree-checkbox" id="toctree-checkbox-35" name="toctree-checkbox-35" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-35"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../logic/truth/index.html">Truth Value Testing</a><input class="toctree-checkbox" id="toctree-checkbox-36" name="toctree-checkbox-36" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-36"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/truth/all.html">all</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../logic/truth/allclose.html">allclose</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../logic/truth/any.html">any</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../casting/index.html">Casting Operators</a><input class="toctree-checkbox" id="toctree-checkbox-36" name="toctree-checkbox-36" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-36"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../casting/index.html">Casting Operators</a><input class="toctree-checkbox" id="toctree-checkbox-37" name="toctree-checkbox-37" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-37"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../casting/as_double.html">as_double</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../casting/as_float.html">as_float</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../casting/as_int16.html">as_int16</a></li>
@@ -377,7 +385,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../casting/as_uint8.html">as_uint8</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../window/index.html">Windowing</a><input class="toctree-checkbox" id="toctree-checkbox-37" name="toctree-checkbox-37" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-37"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../window/index.html">Windowing</a><input class="toctree-checkbox" id="toctree-checkbox-38" name="toctree-checkbox-38" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-38"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../window/bartlett.html">bartlett</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../window/blackman.html">blackman</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../window/flattop.html">flattop</a></li>
@@ -385,42 +393,44 @@
 <li class="toctree-l3"><a class="reference internal" href="../../window/hanning.html">hanning</a></li>
 </ul>
 </li>
-<li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">Signal and Image Processing</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-38" name="toctree-checkbox-38" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-38"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
-<li class="toctree-l3 has-children"><a class="reference internal" href="../convolution/index.html">Convolution</a><input class="toctree-checkbox" id="toctree-checkbox-39" name="toctree-checkbox-39" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-39"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">Signal and Image Processing</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-39" name="toctree-checkbox-39" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-39"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../convolution/index.html">Convolution</a><input class="toctree-checkbox" id="toctree-checkbox-40" name="toctree-checkbox-40" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-40"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../convolution/conv1d.html">conv1d</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../convolution/conv2d.html">conv2d</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../filtering/index.html">Filtering</a><input class="toctree-checkbox" id="toctree-checkbox-40" name="toctree-checkbox-40" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-40"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../filtering/index.html">Filtering</a><input class="toctree-checkbox" id="toctree-checkbox-41" name="toctree-checkbox-41" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-41"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../filtering/channelize_poly.html">channelize_poly</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../filtering/filter.html">filter</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../filtering/resample_poly.html">resample_poly</a></li>
 </ul>
 </li>
-<li class="toctree-l3 current active has-children"><a class="reference internal" href="index.html">General</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-41" name="toctree-checkbox-41" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-41"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="index.html">General</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-42" name="toctree-checkbox-42" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-42"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="chirp.html">chirp</a></li>
 
 <li class="toctree-l4"><a class="reference internal" href="downsample.html">downsample</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pwelch.html">pwelch</a></li>
 <li class="toctree-l4 current active"><a class="current reference internal" href="#">upsample</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../radar/index.html">Radar</a><input class="toctree-checkbox" id="toctree-checkbox-42" name="toctree-checkbox-42" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-42"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../radar/index.html">Radar</a><input class="toctree-checkbox" id="toctree-checkbox-43" name="toctree-checkbox-43" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-43"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../radar/ambgfun.html">ambgfun</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../radar/mvdr.html">MVDR</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../polynomials/index.html">Polynomials</a><input class="toctree-checkbox" id="toctree-checkbox-43" name="toctree-checkbox-43" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-43"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../polynomials/index.html">Polynomials</a><input class="toctree-checkbox" id="toctree-checkbox-44" name="toctree-checkbox-44" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-44"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../polynomials/legendre.html">legendre</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../random/random.html">Random Number Generation</a></li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../dft/index.html">Discrete Fourier Transform</a><input class="toctree-checkbox" id="toctree-checkbox-44" name="toctree-checkbox-44" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-44"><i class="fa-solid fa-chevron-down"></i></label><ul>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/dct/index.html">DCT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-45" name="toctree-checkbox-45" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-45"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../dft/index.html">Discrete Fourier Transform</a><input class="toctree-checkbox" id="toctree-checkbox-45" name="toctree-checkbox-45" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-45"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/dct/index.html">DCT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-46" name="toctree-checkbox-46" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-46"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/dct/dct.html">dct</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/fft/index.html">FFT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-46" name="toctree-checkbox-46" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-46"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/fft/index.html">FFT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-47" name="toctree-checkbox-47" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-47"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/fft/fft.html">fft</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/fft/fft2d.html">fft2</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/fft/ifft.html">ifft</a></li>
@@ -428,7 +438,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../../dft/fft/r2c.html">r2c</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/utility/index.html">Utility Functions</a><input class="toctree-checkbox" id="toctree-checkbox-47" name="toctree-checkbox-47" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-47"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../dft/utility/index.html">Utility Functions</a><input class="toctree-checkbox" id="toctree-checkbox-48" name="toctree-checkbox-48" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-48"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/utility/fftfreq.html">fftfreq</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/utility/fftshift1d.html">fftshift1D</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../dft/utility/fftshift2d.html">fftshift2D</a></li>
@@ -438,7 +448,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../../viz/index.html">Visualization</a><input class="toctree-checkbox" id="toctree-checkbox-48" name="toctree-checkbox-48" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-48"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../viz/index.html">Visualization</a><input class="toctree-checkbox" id="toctree-checkbox-49" name="toctree-checkbox-49" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-49"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../viz/bar.html">bar</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../viz/contour.html">contour</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../viz/line.html">line</a></li>
@@ -449,7 +459,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../type_traits.html">Type Traits</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/index.html">Example Applications</a><input class="toctree-checkbox" id="toctree-checkbox-49" name="toctree-checkbox-49" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-49"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/index.html">Example Applications</a><input class="toctree-checkbox" id="toctree-checkbox-50" name="toctree-checkbox-50" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-50"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../examples/fftconv.html">FFT Convolution</a></li>
 </ul>
 </li>
@@ -662,12 +672,12 @@ document.write(`
     <div class="footer-article-item"><!-- Previous / next buttons -->
 <div class="prev-next-area">
     <a class="left-prev"
-       href="downsample.html"
+       href="pwelch.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">downsample</p>
+        <p class="prev-next-title">pwelch</p>
       </div>
     </a>
     <a class="right-next"

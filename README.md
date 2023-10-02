@@ -193,6 +193,17 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+*v0.6.0*:
+- Breaking changes
+    * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`. 
+- Features
+    * Polyphase channelizer
+    * Many new operators, including upsample, downsample, pwelch, overlap, at, etc
+    * Added more lvalue semantics for operators based on view manipulation
+- Bug fixes
+    * Fixed cache issues
+    * Fixed stride = 0 in matmul
+
 *v0.5.0*:
 * Polyphase resampler
 * Documentation overhaul with examples for each function
@@ -204,15 +215,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
 * dlpack export support
 * 16-bit float reductions
 * Output iterator support in CUB
-
-*v0.3.0*:
-* Many new operators, including `flatten`, `remap`, `lcollapse`. `rcollapse`, `fmod`, `clone`, `slice`
-* Extended N-D tensor support to more functions
-* Allow operators on reduction inputs
-* g++11 support
-* NVTX support
-* Many, many bug fixes
-
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
