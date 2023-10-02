@@ -249,7 +249,7 @@ public:
     (norms = sqrt(norms)).run(stream);
 
     (waveformPart = waveformPart / norms).run(stream);
-    (waveformFull = fft(waveformPart)).run(stream);
+    (waveformFull = fft(waveformPart, numSamplesRnd)).run(stream);
     (waveformFull = conj(waveformFull)).run(stream);
 
     (x = fft(x)).run(stream);
