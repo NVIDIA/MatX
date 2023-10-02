@@ -66,23 +66,25 @@ require no memory.
 Transform
 ---------
 
-Some functions in MatX can only be executed on a single line without any other operators. For example, an fft is executed by:
+Transforms are operators that take one or more inputs and call a backend library or kernel. Transforms usually changes one or
+more properties of the input, but that is not always the case. An fft may change the input type or shape, but a sort transform
+does not. Depending on the context used, a transform may asynchronously allocate temporary memory if the expression requires it. 
+
+For example:
 
 .. code-block:: cpp
 
-    fft(A, A);
+    (b = fft(A)).run();
 
-It is currently not valid to do something like the following:
+The expression above performs an out-of-place FFT by taking the input ``A`` and storing in output ``B``. Transforms may also be used
+in larger expressions:
 
 .. code-block:: cpp
 
-    (C = B * fft(A, A)).run();
+    (C = B * fft(A)).run();
 
-The reason this is invalid is because functions that are classified as transforms launch CUDA kernels to perform a single function,
-and many times they call a CUDA library. Transforms are not operators and cannot be used in operator expressions as shown above.
-Since ``fft`` is not an operator the compiler will give an error.
-
-This behavior may change in the future or be relaxed for certain transforms.
+In this case ``fft(A)`` may need somewhere to store the output of the FFT, and could asynchronously allocate memory to do so. However,
+MatX may also perform fusion on the expression if possible.
 
 Since some transforms rely on CUDA math library backends not all of them are available with different executors. Please see the
 documentation for the individual function to check compatibility.

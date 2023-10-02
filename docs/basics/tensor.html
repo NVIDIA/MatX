@@ -183,6 +183,7 @@
 <li class="toctree-l3 has-children"><a class="reference internal" href="../api/manipulation/rearranging/index.html">Rearranging</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-9"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/fliplr.html">fliplr</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/flipud.html">flipud</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/overlap.html">overlap</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/permute.html">permute</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/reshape.html">reshape</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/rearranging/reverse.html">reverse</a></li>
@@ -192,6 +193,7 @@
 </ul>
 </li>
 <li class="toctree-l3 has-children"><a class="reference internal" href="../api/manipulation/selecting/index.html">Selecting</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-10"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/manipulation/selecting/at.html">at</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/selecting/reduce.html">reduce</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/selecting/remap.html">remap</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/manipulation/selecting/select.html">select</a></li>
@@ -325,9 +327,13 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/stats/hist/hist.html">hist</a></li>
 </ul>
 </li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/stats/misc/index.html">Misc</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-30"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/stats/misc/percentile.html">percentile</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/searchsort/index.html">Searching and Sorting</a><input class="toctree-checkbox" id="toctree-checkbox-30" name="toctree-checkbox-30" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-30"><i class="fa-solid fa-chevron-down"></i></label><ul>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/searchsort/index.html">Searching and Sorting</a><input class="toctree-checkbox" id="toctree-checkbox-31" name="toctree-checkbox-31" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-31"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/searchsort/argmax.html">argmax</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/searchsort/argmin.html">argmin</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/searchsort/find.html">find</a></li>
@@ -336,36 +342,38 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/searchsort/unique.html">unique</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/logic/index.html">Logic Functions</a><input class="toctree-checkbox" id="toctree-checkbox-31" name="toctree-checkbox-31" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-31"><i class="fa-solid fa-chevron-down"></i></label><ul>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/bitwise/index.html">Bitwise Operations</a><input class="toctree-checkbox" id="toctree-checkbox-32" name="toctree-checkbox-32" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-32"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/logic/index.html">Logic Functions</a><input class="toctree-checkbox" id="toctree-checkbox-32" name="toctree-checkbox-32" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-32"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/bitwise/index.html">Bitwise Operations</a><input class="toctree-checkbox" id="toctree-checkbox-33" name="toctree-checkbox-33" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-33"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/bitwise/and.html">Bitwise AND (&amp;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/bitwise/or.html">Bitwise OR (|)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/bitwise/xor.html">Bitwise XOR (^)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/comparison/index.html">Comparison Operations</a><input class="toctree-checkbox" id="toctree-checkbox-33" name="toctree-checkbox-33" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-33"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/comparison/index.html">Comparison Operations</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-34"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/equal.html">Equal (==)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/gt.html">Greater than (&gt;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/gte.html">Greater than or equal (&gt;=)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/isclose.html">isclose</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/lt.html">Less than (&lt;)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/lte.html">Less than or equal (&lt;=)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/comparison/neq.html">Not-equal (!=)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/logical/index.html">Logical Operations</a><input class="toctree-checkbox" id="toctree-checkbox-34" name="toctree-checkbox-34" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-34"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/logical/index.html">Logical Operations</a><input class="toctree-checkbox" id="toctree-checkbox-35" name="toctree-checkbox-35" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-35"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/logical/and.html">&amp;&amp; (AND)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/logical/not.html">! (NOT)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/logical/or.html">|| (OR)</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/truth/index.html">Truth Value Testing</a><input class="toctree-checkbox" id="toctree-checkbox-35" name="toctree-checkbox-35" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-35"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/logic/truth/index.html">Truth Value Testing</a><input class="toctree-checkbox" id="toctree-checkbox-36" name="toctree-checkbox-36" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-36"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/truth/all.html">all</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/logic/truth/allclose.html">allclose</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/logic/truth/any.html">any</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/casting/index.html">Casting Operators</a><input class="toctree-checkbox" id="toctree-checkbox-36" name="toctree-checkbox-36" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-36"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/casting/index.html">Casting Operators</a><input class="toctree-checkbox" id="toctree-checkbox-37" name="toctree-checkbox-37" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-37"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/casting/as_double.html">as_double</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/casting/as_float.html">as_float</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/casting/as_int16.html">as_int16</a></li>
@@ -377,7 +385,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/casting/as_uint8.html">as_uint8</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/window/index.html">Windowing</a><input class="toctree-checkbox" id="toctree-checkbox-37" name="toctree-checkbox-37" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-37"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/window/index.html">Windowing</a><input class="toctree-checkbox" id="toctree-checkbox-38" name="toctree-checkbox-38" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-38"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/window/bartlett.html">bartlett</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/window/blackman.html">blackman</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/window/flattop.html">flattop</a></li>
@@ -385,42 +393,44 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/window/hanning.html">hanning</a></li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/signalimage/index.html">Signal and Image Processing</a><input class="toctree-checkbox" id="toctree-checkbox-38" name="toctree-checkbox-38" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-38"><i class="fa-solid fa-chevron-down"></i></label><ul>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/convolution/index.html">Convolution</a><input class="toctree-checkbox" id="toctree-checkbox-39" name="toctree-checkbox-39" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-39"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/signalimage/index.html">Signal and Image Processing</a><input class="toctree-checkbox" id="toctree-checkbox-39" name="toctree-checkbox-39" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-39"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/convolution/index.html">Convolution</a><input class="toctree-checkbox" id="toctree-checkbox-40" name="toctree-checkbox-40" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-40"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/convolution/conv1d.html">conv1d</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/convolution/conv2d.html">conv2d</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/filtering/index.html">Filtering</a><input class="toctree-checkbox" id="toctree-checkbox-40" name="toctree-checkbox-40" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-40"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/filtering/index.html">Filtering</a><input class="toctree-checkbox" id="toctree-checkbox-41" name="toctree-checkbox-41" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-41"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/signalimage/filtering/channelize_poly.html">channelize_poly</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/filtering/filter.html">filter</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/filtering/resample_poly.html">resample_poly</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/general/index.html">General</a><input class="toctree-checkbox" id="toctree-checkbox-41" name="toctree-checkbox-41" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-41"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/general/index.html">General</a><input class="toctree-checkbox" id="toctree-checkbox-42" name="toctree-checkbox-42" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-42"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/general/chirp.html">chirp</a></li>
 
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/general/downsample.html">downsample</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/signalimage/general/pwelch.html">pwelch</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/general/upsample.html">upsample</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/radar/index.html">Radar</a><input class="toctree-checkbox" id="toctree-checkbox-42" name="toctree-checkbox-42" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-42"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/signalimage/radar/index.html">Radar</a><input class="toctree-checkbox" id="toctree-checkbox-43" name="toctree-checkbox-43" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-43"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/radar/ambgfun.html">ambgfun</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/signalimage/radar/mvdr.html">MVDR</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/polynomials/index.html">Polynomials</a><input class="toctree-checkbox" id="toctree-checkbox-43" name="toctree-checkbox-43" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-43"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/polynomials/index.html">Polynomials</a><input class="toctree-checkbox" id="toctree-checkbox-44" name="toctree-checkbox-44" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-44"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/polynomials/legendre.html">legendre</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/random/random.html">Random Number Generation</a></li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/dft/index.html">Discrete Fourier Transform</a><input class="toctree-checkbox" id="toctree-checkbox-44" name="toctree-checkbox-44" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-44"><i class="fa-solid fa-chevron-down"></i></label><ul>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/dct/index.html">DCT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-45" name="toctree-checkbox-45" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-45"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/dft/index.html">Discrete Fourier Transform</a><input class="toctree-checkbox" id="toctree-checkbox-45" name="toctree-checkbox-45" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-45"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/dct/index.html">DCT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-46" name="toctree-checkbox-46" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-46"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/dct/dct.html">dct</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/fft/index.html">FFT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-46" name="toctree-checkbox-46" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-46"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/fft/index.html">FFT Functions</a><input class="toctree-checkbox" id="toctree-checkbox-47" name="toctree-checkbox-47" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-47"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/fft/fft.html">fft</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/fft/fft2d.html">fft2</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/fft/ifft.html">ifft</a></li>
@@ -428,7 +438,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/fft/r2c.html">r2c</a></li>
 </ul>
 </li>
-<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/utility/index.html">Utility Functions</a><input class="toctree-checkbox" id="toctree-checkbox-47" name="toctree-checkbox-47" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-47"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api/dft/utility/index.html">Utility Functions</a><input class="toctree-checkbox" id="toctree-checkbox-48" name="toctree-checkbox-48" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-48"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/utility/fftfreq.html">fftfreq</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/utility/fftshift1d.html">fftshift1D</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/dft/utility/fftshift2d.html">fftshift2D</a></li>
@@ -438,7 +448,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="../api/viz/index.html">Visualization</a><input class="toctree-checkbox" id="toctree-checkbox-48" name="toctree-checkbox-48" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-48"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/viz/index.html">Visualization</a><input class="toctree-checkbox" id="toctree-checkbox-49" name="toctree-checkbox-49" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-49"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/viz/bar.html">bar</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/viz/contour.html">contour</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/viz/line.html">line</a></li>
@@ -449,7 +459,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/type_traits.html">Type Traits</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Example Applications</a><input class="toctree-checkbox" id="toctree-checkbox-49" name="toctree-checkbox-49" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-49"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Example Applications</a><input class="toctree-checkbox" id="toctree-checkbox-50" name="toctree-checkbox-50" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-50"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../examples/fftconv.html">FFT Convolution</a></li>
 </ul>
 </li>
@@ -754,6 +764,17 @@ needed for device code.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>desc</strong> – Tensor descriptor </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N4matx8tensor_t8tensor_tEKNSt16initializer_listIN6detail9no_size_tEEE">
+<span id="_CPPv3N4matx8tensor_t8tensor_tEKNSt16initializer_listIN6detail9no_size_tEEE"></span><span id="_CPPv2N4matx8tensor_t8tensor_tEKNSt16initializer_listIN6detail9no_size_tEEE"></span><span id="matx::tensor_t::tensor_t__std::initializer_list:detail::no_size_t:C"></span><span class="target" id="classmatx_1_1tensor__t_1a873bdea3019d9b22c68cd422891a7f39"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">tensor_t</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">detail</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">no_size_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8tensor_t8tensor_tEKNSt16initializer_listIN6detail9no_size_tEEE" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Constructor for a rank-0 tensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shape</strong> – Tensor shape (empty braces) </p>
 </dd>
 </dl>
 </dd></dl>
@@ -1328,12 +1349,17 @@ needed for device code.</p>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK4matx8tensor_t11OverlapViewERKNSt16initializer_listIN4Desc10shape_typeEEERKNSt16initializer_listIN4Desc11stride_typeEEE">
-<span id="_CPPv3NK4matx8tensor_t11OverlapViewERKNSt16initializer_listIN4Desc10shape_typeEEERKNSt16initializer_listIN4Desc11stride_typeEEE"></span><span id="_CPPv2NK4matx8tensor_t11OverlapViewERKNSt16initializer_listIN4Desc10shape_typeEEERKNSt16initializer_listIN4Desc11stride_typeEEE"></span><span id="matx::tensor_t::OverlapView__std::initializer_list:Desc::shape_type:CR.std::initializer_list:Desc::stride_type:CRC"></span><span class="target" id="classmatx_1_1tensor__t_1a988fc9c1c7b7a193b23b560ca646df3b"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OverlapView</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::Desc"><span class="n"><span class="pre">Desc</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">windows</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::Desc"><span class="n"><span class="pre">Desc</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">stride_type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">strides</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK4matx8tensor_t11OverlapViewERKNSt16initializer_listIN4Desc10shape_typeEEERKNSt16initializer_listIN4Desc11stride_typeEEE" title="Permalink to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4I_iENK4matx8tensor_t11OverlapViewEDaRKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE">
+<span id="_CPPv3I_iENK4matx8tensor_t11OverlapViewERKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE"></span><span id="_CPPv2I_iENK4matx8tensor_t11OverlapViewERKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">N</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmatx_1_1tensor__t_1a55435a7547a1b64dc8d990f4197ef347"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OverlapView</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::Desc"><span class="n"><span class="pre">Desc</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shape_type</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_iENK4matx8tensor_t11OverlapViewEDaRKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE" title="matx::tensor_t::OverlapView::N"><span class="n"><span class="pre">N</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">windows</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::Desc"><span class="n"><span class="pre">Desc</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">stride_type</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_iENK4matx8tensor_t11OverlapViewEDaRKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE" title="matx::tensor_t::OverlapView::N"><span class="n"><span class="pre">N</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">strides</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4I_iENK4matx8tensor_t11OverlapViewEDaRKNSt5arrayIN4Desc10shape_typeE1NEERKNSt5arrayIN4Desc11stride_typeE1NEE" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Create an overlapping tensor view</p>
-<p>Creates and overlapping tensor view where an existing tensor can be repeated into a higher rank with overlapping elements. For example, the following 1D tensor [1 2 3 4 5] could be cloned into a 2d tensor with a window size of 2 and overlap of 1, resulting in:</p>
-<p>[1 2 2 3 3 4 4 5]</p>
-<p>Currently this only works on 1D tensors going to 2D, but may be expanded for higher dimensions in the future. Note that if the window size does not divide evenly into the existing column dimension, the view may chop off the end of the data to make the tensor rectangular.</p>
+<p>Creates an overlapping tensor view where an existing tensor can be repeated into a higher rank with overlapping elements. For example, the following 1D tensor [1 2 3 4 5] could be cloned into a 2D tensor with a window size of 2 and overlap of 1, resulting in:</p>
+<p><div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">[</span><span class="mi">1</span> <span class="mi">2</span>
+   <span class="mi">2</span> <span class="mi">3</span>
+   <span class="mi">3</span> <span class="mi">4</span>
+   <span class="mi">4</span> <span class="mi">5</span><span class="p">]</span>
+</pre></div>
+</div>
+ Currently this only works on 1D tensors going to 2D, but may be expanded for higher dimensions in the future. Note that if the window size does not divide evenly into the existing column dimension, the view may chop off the end of the data to make the tensor rectangular.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -1391,7 +1417,7 @@ needed for device code.</p>
 <dt class="sig sig-object cpp" id="_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listI1TEEEE">
 <span id="_CPPv3N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listI1TEEEE"></span><span id="_CPPv2N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listI1TEEEE"></span><span id="matx::tensor_t::SetVals__std::initializer_list:std::initializer_list:T:C:CR"></span><span class="target" id="classmatx_1_1tensor__t_1aff50f55a7d055f11e773f95f18297398"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SetVals</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">vals</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listI1TEEEE" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Rank-2 non-complex or rank-1 initializer list setting</p>
-<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment. </p>
+<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>vals</strong> – 1D/2D initializer list of values </p>
@@ -1403,7 +1429,7 @@ needed for device code.</p>
 <dt class="sig sig-object cpp" id="_CPPv4N4matx8tensor_t7SetValsEKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE">
 <span id="_CPPv3N4matx8tensor_t7SetValsEKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE"></span><span id="_CPPv2N4matx8tensor_t7SetValsEKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE"></span><span id="matx::tensor_t::SetVals__std::initializer_list:std::initializer_list:std::initializer_list:T:C:C:C"></span><span class="target" id="classmatx_1_1tensor__t_1ad1ca021c5defe3542dc28ab450633031"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SetVals</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">vals</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8tensor_t7SetValsEKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEE" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Rank-3 non-complex or rank-2 complex initializer list setting</p>
-<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment. </p>
+<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>vals</strong> – 3D/2D initializer list of values </p>
@@ -1415,7 +1441,7 @@ needed for device code.</p>
 <dt class="sig sig-object cpp" id="_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE">
 <span id="_CPPv3N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE"></span><span id="_CPPv2N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE"></span><span id="matx::tensor_t::SetVals__std::initializer_list:std::initializer_list:std::initializer_list:std::initializer_list:T:C:C:C:CR"></span><span class="target" id="classmatx_1_1tensor__t_1a7c3017abd34a9788e3b1c81e93f650f7"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SetVals</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">vals</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEE" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Rank-4 non-complex or rank-3 complex initializer list setting</p>
-<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment. </p>
+<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>vals</strong> – 3D/4D initializer list of values </p>
@@ -1427,7 +1453,7 @@ needed for device code.</p>
 <dt class="sig sig-object cpp" id="_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE">
 <span id="_CPPv3N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE"></span><span id="_CPPv2N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE"></span><span id="matx::tensor_t::SetVals__std::initializer_list:std::initializer_list:std::initializer_list:std::initializer_list:std::initializer_list:T:C:C:C:C:CR"></span><span class="target" id="classmatx_1_1tensor__t_1a917b3c68e8dc8415404b33469d26f0f4"></span><span class="pre">__MATX_INLINE__</span><span class="w"> </span><span class="pre">__MATX_HOST__</span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SetVals</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">initializer_list</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_i00EN4matx8tensor_tE" title="matx::tensor_t::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">vals</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4matx8tensor_t7SetValsERKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listIKNSt16initializer_listI1TEEEEEEEEEE" title="Permalink to this definition">#</a><br /></dt>
 <dd><p>Rank-4 complex initializer list setting</p>
-<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment. </p>
+<p>Note that for performance reasons only CUDA managed pointers are supported with SetVals at the moment.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>vals</strong> – 4D initializer list of values </p>
