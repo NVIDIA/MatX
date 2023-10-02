@@ -83,7 +83,7 @@ namespace matx
                 out_dims_[Rank() - 1] = fft_size_;
               }
               else {
-                out_dims_[perm_[0]] = fft_size_;
+                out_dims_[perm_[Rank()-1]] = fft_size_;
               }
             } else {
               // R2C transforms pack the results in fft_size_/2 + 1 complex elements
@@ -91,21 +91,32 @@ namespace matx
                 out_dims_[Rank() - 1] = fft_size_ / 2 + 1;
               }
               else {
-                out_dims_[perm_[0]] = fft_size_ / 2 + 1;
+                out_dims_[perm_[Rank()-1]] = fft_size_ / 2 + 1;
               }
             }
           }
           else {
             if constexpr (!is_complex_v<typename OpA::scalar_type>) { // C2C uses the same input/output size. R2C is N/2+1
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[perm_[0]] = out_dims_[perm_[0]] / 2 + 1;
+                out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
               }
               else {
                 out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
               }
-              // The output dimension could correspond to an input dimension of either
-              // (out_dim-1)*2 or (out_dim-1)*2+1. The FFT transform will be unable to
-              // deduce which is correct, so explicitly set the transform size here.
+            }
+            // For R2C transforms, the output length could correspond to an input length of
+            // either (out_dim-1)*2 or (out_dim-1)*2+1. The FFT transform will be unable to
+            // deduce which is correct, so explicitly set the transform size here. For C2C
+            // transforms, we do not want to implicitly zero-pad. Users can opt-in to
+            // zero-padding by providing the desired padded fft_size_ as a parameter.
+            // For R2C transforms, we do not know the fft size -- it could be either
+            // (N-1)*2 or (N-1)*2+1. If the operator is used such that the output is a
+            // real tensor, then the size will be set to the output tensor length. If we
+            // create a temporary, then this will be a C2C transform and the output length
+            // will match the input length.
+            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              fft_size_ = a.Size(perm_[Rank()-1]);
+            } else {
               fft_size_ = a.Size(a.Rank()-1);
             }
           }
@@ -130,7 +141,7 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_device_executor_v<Executor>, "fft()/ifft() only supports the CUDA executor currently");
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (std::is_same_v<FFTType, fft_t>) {
               fft_impl(std::get<0>(out), a_, fft_size_, norm_, ex.getStream());
             }
             else {

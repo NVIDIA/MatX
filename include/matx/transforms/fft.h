@@ -448,17 +448,32 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream = 0
 
   if (this->params_.transform_type == CUFFT_C2R ||
       this->params_.transform_type == CUFFT_Z2D) {
-    MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                matxInvalidType);
+    if (is_cuda_complex_v<T1> || !is_cuda_complex_v<T2>) {
+      MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R/Z2D transform");
+    }
+    if (this->params_.n[0] != o.Size(OutTensorType::Rank()-1) ||
+       (this->params_.n[0]/2)+1 != i.Size(InTensorType::Rank()-1)) {
+      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R/Z2D transform");
+    }
   }
   else if (this->params_.transform_type == CUFFT_R2C ||
            this->params_.transform_type == CUFFT_D2Z) {
-    MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                matxInvalidType);
+    if (is_cuda_complex_v<T2> || !is_cuda_complex_v<T1>) {
+      MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C/D2Z transform");
+    }
+    if (this->params_.n[0] != i.Size(InTensorType::Rank()-1) ||
+       (this->params_.n[0]/2)+1 != o.Size(OutTensorType::Rank()-1)) {
+      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C/D2Z transform");
+    }
   }
   else {
-    MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-    MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
+    if (!is_complex_v<T2> || !is_complex_v<T1> || !std::is_same_v<T1, T2>) {
+      MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
+    }
+    if (this->params_.n[0] != o.Size(InTensorType::Rank()-1) ||
+        this->params_.n[0] != i.Size(InTensorType::Rank()-1)) {
+      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
+    }
   }
 
   size_t workspaceSize;

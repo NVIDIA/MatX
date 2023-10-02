@@ -66,8 +66,16 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   auto s2 = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto sifft = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-  (s1 = fft(i, padded_size)).run(stream);
-  (s2 = fft(filter, padded_size)).run(stream);
+  if constexpr (! is_complex_v<typename InType::scalar_type>) {
+    slice_end[InType::Rank() - 1] = padded_size/2 + 1;
+  }
+  auto s1s = slice(s1, slice_start, slice_end);
+  if constexpr (! is_complex_v<typename FilterType::scalar_type>) {
+    slice_end[FilterType::Rank() - 1] = padded_size/2 + 1;
+  }
+  auto s2s = slice(s2, slice_start, slice_end);
+  (s1s = fft(i, padded_size)).run(stream);
+  (s2s = fft(filter, padded_size)).run(stream);
 
   // If this is real-valued input we need to accomodate cuFFT's output of N/2+1 complex
   // samples and use r2c to convert back to N.

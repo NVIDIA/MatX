@@ -58,7 +58,7 @@ namespace matx
          * 
          * @param stream CUDA stream
          */
-        __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
+        __MATX_INLINE__ void run(cudaStream_t stream = 0)
         {
           MATX_NVTX_START(detail::get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
           auto tp = static_cast<T *>(this);
@@ -88,7 +88,7 @@ namespace matx
          * @param ev CUDA event
          * @param stream CUDA stream
          */
-        __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
+        __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0)
         {
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
           auto ex = cudaExecutor(stream);

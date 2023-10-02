@@ -454,9 +454,8 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
   auto avo = make_tensor<TypeParam>({fft_dim * 2});
   this->pb->NumpyToTensorView(av, "a_in");
 
-  // Perform an FFT on input av into output avo. Since avo is bigger than av, av will be zero-padded
-  // to the appropriate size
-  (avo = fft(av)).run();
+  // Specify the FFT size as bigger than av. Thus, av will be zero-padded to the appropriate size
+  (avo = fft(av, fft_dim * 2)).run();
   // example-end fft-4
   cudaStreamSynchronize(0);
 
@@ -474,7 +473,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
   tensor_t<TypeParam, 2> avo{{fft_dim + 1, fft_dim * 2}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av)).run();
+  (avo = fft(av, fft_dim*2)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -499,7 +498,8 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
   tensor_t<TypeParam, 1> avo{{fft_dim * 2}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = ifft(av)).run();
+  // Specify the IFFT size as bigger than av. Thus, av will be zero-padded to the appropriate size
+  (avo = ifft(av, fft_dim * 2)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -541,6 +541,65 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024PadR2C)
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1DSizeChecks)
+{
+  MATX_ENTER_HANDLER();
+
+  using ComplexType = TypeParam;
+  using RealType = typename TypeParam::value_type;
+
+  const index_t N = 16;
+  auto tc = make_tensor<ComplexType>({N});
+  auto tr = make_tensor<ComplexType>({N});
+
+  // C2C, output size larger than input size
+  ASSERT_THROW({
+    auto t2 = make_tensor<ComplexType>({2*N});
+    // We do not implicitly zero-pad to a larger transform size
+    (t2 = fft(tc)).run();
+    cudaDeviceSynchronize();
+  }, matx::detail::matxException);
+
+  // C2C, output size smaller than input size
+  ASSERT_THROW({
+    auto t2 = make_tensor<ComplexType>({(N/2)+1});
+    (t2 = fft(tc)).run();
+    cudaDeviceSynchronize();
+  }, matx::detail::matxException);
+
+  // R2C, output size smaller than N/2 + 1
+  ASSERT_THROW({
+    auto t2 = make_tensor<ComplexType>({N/2});
+    (t2 = fft(tr)).run();
+    cudaDeviceSynchronize();
+  }, matx::detail::matxException);
+
+  // R2C, output size larger than N/2 + 1
+  ASSERT_THROW({
+    auto t2 = make_tensor<ComplexType>({N/2+2});
+    (t2 = fft(tr)).run();
+    cudaDeviceSynchronize();
+  }, matx::detail::matxException);
+
+  // C2R, output size smaller than N
+  ASSERT_THROW({
+    auto tcs = slice(tc, {0}, {N/2+1});
+    auto t2 = make_tensor<RealType>({N-1});
+    (t2 = fft(tcs)).run();
+    cudaDeviceSynchronize();
+  }, matx::detail::matxException);
+
+  // C2R, output size too large
+ ASSERT_THROW({
+    auto tcs = slice(tc, {0}, {N/2+1});
+    auto t2 = make_tensor<RealType>({N+2});
+    (t2 = fft(tcs)).run();
+    cudaDeviceSynchronize();
+ }, matx::detail::matxException);
+
   MATX_EXIT_HANDLER();
 }
 
@@ -611,7 +670,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT1D1024C2CShort)
   tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av)).run();
+  (avo = fft(av, fft_dim - 16)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
@@ -628,7 +687,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT1D1024C2CShort)
   tensor_t<TypeParam, 1> avo{{fft_dim - 16}};
   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = ifft(av)).run();
+  (avo = ifft(av, fft_dim - 16)).run();
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
