@@ -96,11 +96,15 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.4)
     message(FATAL_ERROR "MatX requires CUDA 11.4 or higher. Please update before using.")
 endif()
 
-# We typically need newer versions libcudacxx than availabled in the toolkit.  pull down specific version here
-message(STATUS "Need libcuda++. Finding...")
-set(LIBCUDACXX_VERSION "2.1.0" CACHE STRING "Version of libcudacxx to use")
-include(cmake/FindLibcudacxx.cmake)
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")
+# libcudacxx is now part of CCCL, so grab that repo if needed
+message(STATUS "Need CCCL. Finding...")
+set(CCCL_VERSION "v2.2.0" CACHE STRING "Version of CCCL to use")
+include(cmake/FindCCCL.cmake)
+
+target_include_directories(matx SYSTEM INTERFACE
+                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/libcudacxx>
+                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/cub>
+                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/thrust>)
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)

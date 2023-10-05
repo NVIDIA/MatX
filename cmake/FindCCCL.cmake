@@ -30,31 +30,20 @@
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # /////////////////////////////////////////////////////////////////////////////////
 
-function(find_and_configure_libcudacxx version)
+function(find_and_configure_cccl version)
 
-  list(APPEND CMAKE_MESSAGE_CONTEXT "libcudacxx")
+  list(APPEND CMAKE_MESSAGE_CONTEXT "cccl")
 
-  rapids_cpm_find(libcudacxx ${version}
-    GLOBAL_TARGETS
-      libcudacxx libcudacxx::libcudacxx cxx_static
-    BUILD_EXPORT_SET
-      ${PROJECT_NAME}-exports
-    INSTALL_EXPORT_SET
-      ${PROJECT_NAME}-exports
-    CPM_ARGS
-      GIT_REPOSITORY  https://github.com/NVIDIA/libcudacxx.git
-      GIT_TAG         ${version}
-      GIT_SHALLOW     TRUE
-      DOWNLOAD_ONLY   TRUE
-      OPTIONS         "LIBCXX_INCLUDE_BENCHMARKS OFF"
-                      "LIBCXX_INCLUDE_TESTS OFF"
-                      "LIBCXX_ENABLE_SHARED OFF"
-                      "LIBCXX_ENABLE_STATIC OFF"
-  )
+  CPMAddPackage(
+    NAME CCCL
+    GITHUB_REPOSITORY nvidia/cccl
+    GIT_TAG ${version} 
+)
 
-  set(LIBCUDACXX_INCLUDE_DIR "${libcudacxx_SOURCE_DIR}/include" PARENT_SCOPE)
-  set(LIBCXX_INCLUDE_DIR "${libcudacxx_SOURCE_DIR}/libcxx/include" PARENT_SCOPE)
+
+  set(CCCL_INCLUDE_DIR "${cccl_SOURCE_DIR}/include" PARENT_SCOPE)
+  set(LIBCXX_INCLUDE_DIR "${cccl_SOURCE_DIR}/libcxx/include" PARENT_SCOPE)
 
 endfunction()
 
-find_and_configure_libcudacxx(${LIBCUDACXX_VERSION})
+find_and_configure_cccl(${CCCL_VERSION})
