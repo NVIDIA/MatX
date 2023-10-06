@@ -162,6 +162,27 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
         }
       }
     }
+
+    // Test with a nested transform. Restrict to floating point types for
+    // the convolution
+    if constexpr (std::is_same_v<TypeParam,float> || std::is_same_v<TypeParam,double>)
+    {
+      auto delta = make_tensor<TypeParam>({1});
+      delta(0) = static_cast<TypeParam>(1.0);
+      cudaStreamSynchronize(0);
+
+      (td = 0).run();
+      (td = diag(conv1d(tc, delta, MATX_C_MODE_SAME))).run();
+      cudaStreamSynchronize(0);
+
+      for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 10; j++) {
+          if (i == j) {
+            MATX_ASSERT_EQ(td(i), tc(i, j));
+          }
+        }
+      }
+    }
   }
   MATX_EXIT_HANDLER();
 }
