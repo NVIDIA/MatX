@@ -123,8 +123,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     if (i == 1) {
       cudaEventRecord(start, stream);
     }    
-    (sig_freq = fft(sig_time)).run(stream);
-    (filt_freq = fft(filt_time)).run(stream);
+    (sig_freq = fft(sig_time, filtered_size)).run(stream);
+    (filt_freq = fft(filt_time, filtered_size)).run(stream);
 
     (sig_freq = sig_freq * filt_freq).run(stream);
 
