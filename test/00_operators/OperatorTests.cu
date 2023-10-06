@@ -482,7 +482,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
   using TestType = std::tuple_element_t<0, TypeParam>;
   using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{};   
+  ExecType exec{};
 
   MATX_ENTER_HANDLER();
   { // clone from 0D
@@ -664,6 +664,35 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
   }    
 
+  if constexpr (is_device_executor_v<ExecType>)
+  { // clone of a nested transform; conv2d currently only has a device executor
+    auto tiv = make_tensor<TestType>({M,K});
+    auto tov = make_tensor<TestType>({N,M,K});
+    auto delta = make_tensor<TestType>({1,1});
+
+    for(int m = 0; m < M; m++) {
+      for(int k = 0; k < K; k++) {
+        tiv(m,k) = static_cast<typename inner_op_type_t<TestType>::type>(m*K)+static_cast<typename inner_op_type_t<TestType>::type>(k);
+      }
+    }
+
+    delta(0,0) = static_cast<typename inner_op_type_t<TestType>::type>(1.0);
+
+    cudaDeviceSynchronize();
+
+    (tov = clone<3>(conv2d(tiv, delta, MATX_C_MODE_SAME), {N, matxKeepDim, matxKeepDim})).run(exec);
+
+    cudaDeviceSynchronize();
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_EQ(tov(n,m,k) , tiv(m,k));
+        }
+      }
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
 
@@ -695,6 +724,18 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
   cudaStreamSynchronize(0);
 
   ASSERT_EQ(t0(), t2(1, 4));  
+
+  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+    using ComplexType = detail::complex_from_scalar_t<TestType>;
+    auto c0 = make_tensor<ComplexType>({});
+    (c0 = at(fft(t1), 0)).run(exec);
+    cudaStreamSynchronize(0);
+
+    // The first component of the FFT output (DC) is the sum of all elements, so
+    // 10+20+...+100 = 550. The imaginary component should be 0.
+    ASSERT_NEAR(c0().real(), static_cast<TestType>(550.0), static_cast<TestType>(1.0e-6));
+    ASSERT_NEAR(c0().imag(), static_cast<TestType>(0.0), static_cast<TestType>(1.0e-6));
+  }
 
   MATX_EXIT_HANDLER();
 }
