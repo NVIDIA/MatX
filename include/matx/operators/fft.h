@@ -109,7 +109,7 @@ namespace matx
             // deduce which is correct, so explicitly set the transform size here. For C2C
             // transforms, we do not want to implicitly zero-pad. Users can opt-in to
             // zero-padding by providing the desired padded fft_size_ as a parameter.
-            // For R2C transforms, we do not know the fft size -- it could be either
+            // For C2R transforms, we do not know the fft size -- it could be either
             // (N-1)*2 or (N-1)*2+1. If the operator is used such that the output is a
             // real tensor, then the size will be set to the output tensor length. If we
             // create a temporary, then this will be a C2C transform and the output length
