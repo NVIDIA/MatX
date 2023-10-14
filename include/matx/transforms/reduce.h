@@ -1644,7 +1644,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   for (int r = 0; r < InType::Rank(); r++) {
     if (axis_ptr >= 0 && dims[axis_ptr] == r) {
       clone_dims[r] = in.Size(r);
-      if (++axis_ptr == dims.size()) {
+      if (static_cast<decltype(dims.size())>(++axis_ptr) == dims.size()) {
         axis_ptr = -1;
       }
     }

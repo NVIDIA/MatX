@@ -90,7 +90,7 @@ namespace matx
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          if (dim == (uint32_t)(Rank() - 1)) {
+          if (dim == Rank() - 1) {
             return orig_size_;
           }
           else {

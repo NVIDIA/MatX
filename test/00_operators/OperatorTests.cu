@@ -3367,7 +3367,7 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
   using inner_type = typename inner_op_type_t<TestType>::type;
   using complex_type = detail::complex_from_scalar_t<typename inner_op_type_t<TestType>::type>;
 
-  const inner_type thresh = static_cast<inner_type>(1.0e-6);
+  [[maybe_unused]] const inner_type thresh = static_cast<inner_type>(1.0e-6);
 
   // Verify that fftshift1D/ifftshift1D work with nested transforms.
   // These tests are limited to complex-to-complex transforms where we have matched
