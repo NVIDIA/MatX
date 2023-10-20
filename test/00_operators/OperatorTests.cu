@@ -1057,6 +1057,55 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
+  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  { // rcollapse with nested transform operator
+    auto tov = make_tensor<TestType>({N,M*K});
+    auto delta = make_tensor<TestType>({1,1});
+    delta(0,0) = static_cast<typename inner_op_type_t<TestType>::type>(1.0);
+
+    auto op = rcollapse<2>(conv2d(tiv, delta, MATX_C_MODE_SAME));
+
+    EXPECT_TRUE(op.Rank() == 2);
+    EXPECT_TRUE(op.Size(0) == N);
+    EXPECT_TRUE(op.Size(1) == M*K);
+
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_TRUE(tiv(n,m,k) == tov(n,m*K+k));
+        }
+      }
+    }
+  }
+
+  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  { // lcollapse with nested transform operator
+    auto tov = make_tensor<TestType>({N*M,K});
+    auto delta = make_tensor<TestType>({1,1});
+    delta(0,0) = static_cast<typename inner_op_type_t<TestType>::type>(1.0);
+
+    auto op = lcollapse<2>(conv2d(tiv, delta, MATX_C_MODE_SAME));
+
+    EXPECT_TRUE(op.Rank() == 2);
+    EXPECT_TRUE(op.Size(0) == N*M);
+    EXPECT_TRUE(op.Size(1) == K);
+
+    (tov = (TestType)0).run(exec);
+    (tov = op).run(exec);
+    cudaStreamSynchronize(0);
+
+    for(int n = 0; n < N; n++) {
+      for(int m = 0; m < M; m++) {
+        for(int k = 0; k < K; k++) {
+          ASSERT_TRUE(tiv(n,m,k) == tov(n*M+m,k));
+        }
+      }
+    }
+  }
   MATX_EXIT_HANDLER();
 }
 
@@ -2880,6 +2929,26 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     }
     else {
       ASSERT_EQ(t12(i - t11.Size(0)), t1o(i));
+    }
+  }
+
+  // Test contcat with nested transforms
+  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+    auto delta = make_tensor<TestType>({1});
+    delta.SetVals({1.0});
+
+    (t1o = 0).run(exec);
+    (t1o = concat(0, conv1d(t11, delta, MATX_C_MODE_SAME), conv1d(t12, delta, MATX_C_MODE_SAME))).run(exec);
+
+    cudaStreamSynchronize(0);
+
+    for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
+      if (i < t11.Size(0)) {
+        ASSERT_EQ(t11(i), t1o(i));
+      }
+      else {
+        ASSERT_EQ(t12(i - t11.Size(0)), t1o(i));
+      }
     }
   }
 

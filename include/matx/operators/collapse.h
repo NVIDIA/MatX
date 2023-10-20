@@ -141,6 +141,22 @@ namespace matx
             return set(*this, rhs); 
           }
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
     };
   }
   /**
@@ -272,6 +288,22 @@ namespace matx
           }
           else {          
             return set(*this, rhs); 
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
         }
     };
