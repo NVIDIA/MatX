@@ -175,6 +175,50 @@ namespace matx
         }
       }
 
+      template <int I, typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        if constexpr (I < sizeof...(Ts)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<Ts...>>>()) {
+            cuda::std::get<I>(ops_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            PreRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        } else if constexpr (I == sizeof...(Ts)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<Ts...>>>()) {
+            cuda::std::get<I>(ops_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            // This was the last ops_ element, so stop recursion
+          }
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        PreRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+      }
+
+      template <int I, typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        if constexpr (I < sizeof...(Ts)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<Ts...>>>()) {
+            cuda::std::get<I>(ops_).PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            PostRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        } else if constexpr (I == sizeof...(Ts)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<Ts...>>>()) {
+            cuda::std::get<I>(ops_).PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            // This was the last ops_ element, so stop recursion
+          }
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        PostRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+      }
+
       private:
       cuda::std::tuple<Ts...> ops_;
       index_t size_;    
