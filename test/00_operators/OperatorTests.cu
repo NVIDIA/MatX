@@ -3223,7 +3223,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Upsample)
     auto us_op = upsample(t1, 0, n);
     // example-end upsample-test-1
 
-    ASSERT_TRUE(us_op.Size(0) == (t1.Size(0) - 1) * n + 1);
+    ASSERT_TRUE(us_op.Size(0) == t1.Size(0) * n);
     for (index_t i = 0; i < us_op.Size(0); i++) {
       if ((i % n) == 0) {
         MatXUtils::MatXTypeCompare(us_op(i), t1(i / n));

@@ -46,7 +46,7 @@ namespace matx
       class UpsampleOp : public BaseOp<UpsampleOp<T>>
     {
       private:
-        T op_;
+        typename base_type<T>::type op_;
         int32_t dim_;
         index_t n_;
 
@@ -86,7 +86,7 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           if (dim == dim_) {
-            return (op_.Size(dim) - 1) * n_ + 1;
+            return op_.Size(dim) * n_;
           }
           else {
             return op_.Size(dim);
