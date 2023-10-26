@@ -79,6 +79,14 @@ namespace detail {
         MATX_ASSERT_STR(false, matxNotSupported, "unique() must only be called with a single assignment since it has multiple return types");
       }
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in unique() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

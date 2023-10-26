@@ -93,11 +93,14 @@ namespace detail {
         }
 
         Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
-      }
+      }      
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }        
       }
   };
 }

@@ -79,6 +79,30 @@ namespace matx
           return detail::matx_max(size1,size2);
         }
 
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<Op1>()) {
+            op1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<Op2>()) {
+            op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }          
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<Op1>()) {
+            op1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<Op2>()) {
+            op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }          
+
       private:
         Op1 op1_;
         Op2 op2_;
