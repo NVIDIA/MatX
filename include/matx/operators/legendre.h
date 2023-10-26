@@ -144,6 +144,38 @@ namespace matx
             return ret;
           }    
 
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            n_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T2>()) {
+            m_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T3>()) {
+            in_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }                    
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            n_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T2>()) {
+            m_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T3>()) {
+            in_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }            
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return detail::get_rank<T3>() + 2;

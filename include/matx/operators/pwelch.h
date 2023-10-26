@@ -111,6 +111,18 @@ namespace matx
 
           Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<OpX>()) {
+            x_.PostRun(Shape(x_), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<OpW>()) {
+            w_.PostRun(Shape(w_), std::forward<Executor>(ex));
+          }
+        }               
     };
   }
 
