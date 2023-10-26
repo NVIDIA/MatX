@@ -78,6 +78,7 @@
 #include "matx/operators/percentile.h"
 #include "matx/operators/permute.h"
 #include "matx/operators/planar.h"
+#include "matx/operators/polyval.h"
 #include "matx/operators/pwelch.h"
 #include "matx/operators/qr.h"
 #include "matx/operators/r2c.h"

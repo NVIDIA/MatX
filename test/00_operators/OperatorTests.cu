@@ -3274,6 +3274,33 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Sphere2Cart)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, PolyVal)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  pb->InitAndRunTVGenerator<TestType>("00_operators", "polyval_operator", "run", {4, 100});
+
+  ExecType exec{};
+  auto x = make_tensor<TestType>({100});
+  auto c = make_tensor<TestType>({4});
+  auto out = make_tensor<TestType>({100});
+
+  pb->NumpyToTensorView(x, "x");
+  pb->NumpyToTensorView(c, "c");
+
+  // example-begin polyval-test-1
+  (out = polyval(x, c)).run();
+  // example-end polyval-test-1
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(pb, out, "out", 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(OperatorTestsNumericAllExecs, Upsample)
 {
   MATX_ENTER_HANDLER();
