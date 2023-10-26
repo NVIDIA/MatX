@@ -4,6 +4,21 @@ import numpy as np
 import scipy.signal as ss
 from typing import Dict, List
 
+class polyval_operator:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        pass
+
+    def run(self) -> Dict[str, np.array]:
+        c = np.random.rand(self.size[0])
+        x = np.random.rand(self.size[1])
+
+        return {
+            'c': c,
+            'x': x,
+            'out': np.polyval(c, x),
+        }
+
 
 class kron_operator:
     def __init__(self, dtype: str, size: List[int]):
