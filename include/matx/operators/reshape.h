@@ -136,7 +136,7 @@ namespace matx
         }
 
         template <typename S2, typename Executor>
-        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void PreRun(S2 &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<T>()) {
             op_.PreRun(std::forward<S2>(shape), std::forward<Executor>(ex));
@@ -144,7 +144,7 @@ namespace matx
         }
 
         template <typename S2, typename Executor>
-        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void PostRun(S2 &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<S2>(shape), std::forward<Executor>(ex));
