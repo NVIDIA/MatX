@@ -654,7 +654,7 @@ namespace detail {
       auto& l = detail::pp_get<3>(dims...);
       for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
         for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
-          printf("[%06" INDEX_T_FMT ",%06" INDEX_T_FMT "lld,:,:]\n", _i, _j);
+          printf("[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
               if (_l == 0)
