@@ -173,6 +173,8 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         }
     }
 
+    __syncthreads();
+
     // left_h_ind is the index in s_filter that contains the filter tap that will be applied to the
     // last input signal value not to the right of the output index in the virtual upsampled array.
     // If the filter has odd length and a given output value aligns with an input value, then
@@ -186,19 +188,13 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
 
     const index_t start_ind = phase_ind + up * (tid  + elem_block * elems_per_thread * THREADS);
     const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
-    __syncthreads();
     for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS * up) {
         // out_ind is the index in the output array and up_ind = out_ind * down is the
         // corresponding index in the upsampled array
         const index_t up_ind = out_ind * down;
 
         // input_ind is the largest index in the input array that is not greater than
-        // (to the right of, in the previous figure earlier) up_ind. This is equivalent
-        // to up_ind / up where up_ind = out_ind * down, but we increment rather than
-        // divide to avoid integer divisions. out_ind increments by THREADS * up each
-        // iteration, so adding THREADS * up * down and dividing by up is equivalent
-        // to adding THREADS * down.
-        // input_ind += THREADS * down;
+        // (to the right of, in the previous figure earlier) up_ind.
         const index_t input_ind = up_ind / up;
         // We want x_ind and h_ind to be the first aligned input and filter samples
         // of the convolution and n to be the number of taps. prologue is the number
