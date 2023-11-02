@@ -1530,7 +1530,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
  *   Single thread host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -1796,7 +1796,7 @@ void __MATX_INLINE__ median_impl(OutType dest,
  *   Single thread host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("median_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
@@ -1888,7 +1888,7 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, cudaExecutor exec 
  *   Single thread host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
@@ -1956,7 +1956,7 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec
  *   Single thread host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
@@ -2033,7 +2033,7 @@ void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, cudaExecutor exec
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("rmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2111,7 +2111,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *   Single threaded host executor
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2187,7 +2187,7 @@ void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, cudaExecutor exec
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("rmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
@@ -2261,7 +2261,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
  *   SIngle host executor
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2334,7 +2334,7 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, cudaExecutor exec 
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2407,7 +2407,7 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, cudaExecutor exec 
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2493,7 +2493,7 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
  *   Single threaded host executor
  */
 template <typename OutType, typename InType1, typename InType2>
-void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, [[maybe_unused]] SingleThreadHostExecutor exec)
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() == 0, "allclose output must be rank 0");

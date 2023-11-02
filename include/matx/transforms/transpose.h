@@ -104,7 +104,7 @@ namespace matx
   
   template <typename OutputTensor, typename InputTensor>
     __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in, SingleThreadHostExecutor exec)
+        const InputTensor &in, HostExecutor exec)
     {
       static_assert(InputTensor::Rank() >= 2, "transpose_matrix operator must be on rank 2 or greater");
 

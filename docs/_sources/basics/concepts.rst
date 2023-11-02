@@ -97,7 +97,7 @@ may even use C++ execution policies behind the scenes. Executors are designed so
 on a variety of different targets. Currently the following executors are defined:
 
 * cudaExecutor - Execute on a CUDA-supported device
-* SingleThreadHostExecutor - Execute on a single host thread
+* HostExecutor - Execute on a single host thread
 
 More executor types will be added in future releases.
 

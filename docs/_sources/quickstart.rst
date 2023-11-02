@@ -290,11 +290,11 @@ The example above uses the ``ones`` generator to create a tensor with only the v
 value ``1`` any time an element of it is requested, and no data is ever loaded from memory.
 
 Implicit in the ``run`` call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
-To run the same code on the host, a ``SingleThreadHostExecutor`` can be passed into ``run``:
+To run the same code on the host, a ``HostExecutor`` can be passed into ``run``:
 
 .. code-block:: cpp
 
-    (c = (a*a) + ones(a.Shape())).run(SingleThreadHostExecutor{});
+    (c = (a*a) + ones(a.Shape())).run(HostExecutor{});
 
 Instead of a CUDA stream, we pass an executor to ``run`` that instructs MatX to execute the code on the host instead of the device using a single CPU thread.
 Unlike CUDA calls, host executors are synchronous, and the line above will block until finished executing.

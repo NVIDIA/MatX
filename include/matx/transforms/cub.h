@@ -1412,7 +1412,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator>
 void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
-          [[maybe_unused]] SingleThreadHostExecutor exec)
+          [[maybe_unused]] HostExecutor exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1509,7 +1509,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
 
 template <typename OutputTensor, typename InputOperator>
 void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
-            [[maybe_unused]] SingleThreadHostExecutor exec)
+            [[maybe_unused]] HostExecutor exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1783,7 +1783,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
  *   Single-threaded host executor
  */
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
-void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] SingleThreadHostExecutor exec)
+void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] HostExecutor exec)
 {
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1904,7 +1904,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
  *   Single host executor
  */
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
-void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] SingleThreadHostExecutor exec)
+void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] HostExecutor exec)
 {
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2021,7 +2021,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
  *   Single thread executor
  */
 template <typename CountTensor, typename OutputTensor, typename InputOperator>
-void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, [[maybe_unused]] SingleThreadHostExecutor exec)
+void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, [[maybe_unused]] HostExecutor exec)
 {
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
