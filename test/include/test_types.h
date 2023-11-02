@@ -72,7 +72,7 @@ template <> auto inline GenerateData<cuda::std::complex<double>>()
   return cuda::std::complex<double>(1.5, -2.5);
 }
 
-using ExecutorTypesAll = std::tuple<matx::cudaExecutor, matx::SingleThreadHostExecutor>;
+using ExecutorTypesAll = std::tuple<matx::cudaExecutor, matx::HostExecutor>;
 
 // Define the types to test for each group. If a type is put into a list that
 // isn't compatible with a test type, a compiler error will occur

@@ -256,7 +256,7 @@ inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_s
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};
 template <> struct is_executor<cudaExecutor> : std::true_type {};
-template <> struct is_executor<SingleThreadHostExecutor> : std::true_type {};
+template <> struct is_executor<HostExecutor> : std::true_type {};
 }
 
 /**
@@ -286,7 +286,7 @@ inline constexpr bool is_device_executor_v = detail::is_device_executor<typename
 
 namespace detail {
 template<typename T> struct is_single_thread_host_executor : std::false_type {};
-template<> struct is_single_thread_host_executor<matx::SingleThreadHostExecutor> : std::true_type {};
+template<> struct is_single_thread_host_executor<matx::HostExecutor> : std::true_type {};
 }
 
 /**
