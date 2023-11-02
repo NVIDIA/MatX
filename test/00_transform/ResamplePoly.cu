@@ -268,6 +268,9 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
     { 350, 1, 7 },
     { 351, 7, 1 },
     { 351, 1, 7 },
+    { 1000000, 5, 1 },
+    { 1000000, 1, 5 },
+    { 1000000, 2, 3 },
   };
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -509,7 +512,11 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
         aj = (j % up == 0) ? a(j/up) : 0;
         bj = b(j);
       }
-      ASSERT_NEAR(aj, bj, 1.0e-16);
+      if (j % up == 0) {
+        ASSERT_NEAR(aj, bj, this->thresh);
+      } else {
+        ASSERT_EQ(bj, 0.0);
+      }
     }
   }
 

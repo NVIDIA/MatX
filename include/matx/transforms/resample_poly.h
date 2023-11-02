@@ -55,36 +55,115 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   
   using input_t = typename InType::scalar_type;
   using filter_t = typename FilterType::scalar_type;
+  using output_t = typename OutType::scalar_type;
   using shape_type = typename OutType::shape_type;
-  
-  shape_type filter_len = filter.Size(FilterType::Rank()-1);
 
   // Even-length filters will be prepended with a single 0 to make them odd-length
-  const int max_phase_len = (filter_len % 2 == 0) ?
-    static_cast<int>((filter_len + 1 + up - 1) / up) :
-    static_cast<int>((filter_len + up - 1) / up);
-  const size_t filter_shm = sizeof(filter_t) * max_phase_len;
+  const shape_type filter_len = filter.Size(FilterType::Rank()-1);
+  const index_t max_phase_len = (filter_len % 2 == 0) ?
+    ((filter_len + 1 + up - 1) / up) :
+    ((filter_len + up - 1) / up);
+
+  auto downcast_to_32b_index = [&i, filter_len, up, down]() -> bool {
+      if constexpr (sizeof(index_t) == 4) {
+        // The index is already 32 bits
+        return false;
+      } else {
+        return
+          // + 1 because we may include a zero padded after the last input element
+          (i.Size(i.Rank() - 1)+1) * up <= std::numeric_limits<int32_t>::max() &&
+          (filter_len+1) <= std::numeric_limits<int32_t>::max() &&
+          down <= std::numeric_limits<int32_t>::max();
+      }
+  };
+
   const index_t output_len = o.Size(OutType::Rank()-1);
-  const index_t max_output_len_per_phase = (output_len + up - 1) / up;
-  const int num_phases = static_cast<int>(up);
-  const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
-  dim3 grid(num_batches, num_phases);
-  constexpr int THREADS = 128;
-  constexpr index_t DESIRED_MIN_GRID_SIZE = 512;
-  // If we do not have enough batches and phases to create a large grid, then
-  // we try to reduce the number of output elements generated per thread to
-  // yield a large-enough grid to saturate the GPU. However, since the filter
-  // taps are stored in shared memory, we do not want to process fewer elements
-  // per thread than is necessary to saturate the GPU.
-  if (num_batches * num_phases < DESIRED_MIN_GRID_SIZE) {
-    const index_t desired_elem_blocks = (DESIRED_MIN_GRID_SIZE + num_batches * num_phases - 1) /
-      (num_batches * num_phases);
-    const index_t max_output_len_per_thread = (max_output_len_per_phase + THREADS - 1) / THREADS;
-    grid.z = static_cast<uint32_t>(std::min(desired_elem_blocks, max_output_len_per_thread));
+
+  // We default to the ElemBlock kernel as it tends to work well for general problems.
+  enum class ResampleKernel {
+    PhaseBlock,
+    ElemBlock,
+    WarpCentric,
+  } kernel = ResampleKernel::ElemBlock;
+
+  // The WarpCentric kernel currently uses cg::reduce(), which requires trivially-copyable types.
+  if constexpr (std::is_trivially_copyable_v<output_t>) {
+    // There are a couple cases where a warp-centric resampler tends to be faster:
+    // 1. When we have a small number of output points, handling one or a few points per warp is an effective
+    // way to achieve higher occupancy.
+    // 2. When we have many filter taps per output point, each thread in the warp will be able to read
+    // multiple elements and the warp will tend to achieve coalesced reads. This helps to prevent loop
+    // overhead and barrier stalls from dominating.
+    if (output_len <= 2048 || max_phase_len > 256) {
+      kernel = ResampleKernel::WarpCentric;
+    }
   }
-  const index_t elems_per_thread = (max_output_len_per_phase + THREADS * grid.z - 1) / (THREADS * grid.z);
-  ResamplePoly1D<THREADS, OutType, InType, FilterType><<<grid, THREADS, filter_shm, stream>>>(
-      o, i, filter, up, down, elems_per_thread);
+
+  // Currently, we select only ElemBlock or WarpCentric to keep things simpler. However, there are some
+  // cases where PhaseBlock is the fastest kernel. If there are specific parameter sets of interest, then
+  // we can benchmark the PhaseBlock method and, if it proves fastest, use that method in those cases.
+
+  // Desired number of blocks to reach high occupancy
+  constexpr index_t DESIRED_MIN_GRID_SIZE = 8192;
+  const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
+  dim3 grid(num_batches, 1, 1);
+  // comp_unit is either a thread or a warp, depending on the kernel. It is the size of the computational
+  // unit that collectively computes a single output value.
+  auto compute_elems_per_comp_unit = [&grid, DESIRED_MIN_GRID_SIZE](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
+    const int start_batch_size = grid.x * grid.y;
+    const index_t desired_extra_batches = (DESIRED_MIN_GRID_SIZE + start_batch_size - 1) /
+      start_batch_size;
+    const index_t max_outlen_per_comp_unit = (max_outlen_per_cta + cta_comp_unit_count - 1) /
+      cta_comp_unit_count;
+    grid.z = static_cast<uint32_t>(std::min(desired_extra_batches, max_outlen_per_comp_unit));
+    return (max_outlen_per_cta + cta_comp_unit_count * grid.z - 1) / (cta_comp_unit_count * grid.z);
+  };
+
+  constexpr int THREADS = MATX_RESAMPLE_POLY_MAX_NUM_THREADS;
+  if (kernel == ResampleKernel::PhaseBlock) {
+    const size_t smemBytes = (sizeof(filter_t) * max_phase_len <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
+      sizeof(filter_t) * max_phase_len : 0;
+    const index_t max_output_len_per_phase = (output_len + up - 1) / up;
+    grid.y = static_cast<int>(up);
+    const index_t elems_per_thread = compute_elems_per_comp_unit(max_output_len_per_phase, THREADS);
+    if (downcast_to_32b_index()) {
+      ResamplePoly1D_PhaseBlock<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+        o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
+        static_cast<int32_t>(elems_per_thread));
+    } else {
+      ResamplePoly1D_PhaseBlock<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+        o, i, filter, up, down, elems_per_thread);
+    }
+  } else if (kernel == ResampleKernel::ElemBlock) {
+    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+    const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
+    const index_t elems_per_thread = compute_elems_per_comp_unit(output_len, THREADS);
+    if (downcast_to_32b_index()) {
+      ResamplePoly1D_ElemBlock<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+        o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
+        static_cast<int32_t>(elems_per_thread));
+    } else {
+      ResamplePoly1D_ElemBlock<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+        o, i, filter, up, down, elems_per_thread);
+    }
+  } else {
+    // We only select the WarpCentric kernel for trivially copyable types, but we need this
+    // constexpr if to avoid instantiating the kernel with inappropriate types.
+    if constexpr (std::is_trivially_copyable_v<output_t>) {
+      const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+      const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
+      static_assert(THREADS % WARP_SIZE == 0);
+      const index_t elems_per_warp = compute_elems_per_comp_unit(output_len, THREADS/WARP_SIZE);
+      if (downcast_to_32b_index()) {
+        ResamplePoly1D_WarpCentric<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+          o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
+          static_cast<int32_t>(elems_per_warp));
+      } else {
+        ResamplePoly1D_WarpCentric<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+          o, i, filter, up, down, elems_per_warp);
+      }
+    }
+  }
 #endif
 }
 
