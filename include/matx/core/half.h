@@ -51,20 +51,17 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   using value_type = T; ///< Type of half
 
   /**
-   * @brief Initialize to zero
+   * @brief Default constructor
    * 
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf() : x(0.0f) {}
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf() = default;
 
   /**
-   * @brief Copy constructor
+   * @brief Default copy constructor
    * 
    * @param x_ Parameter to copy
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept
-      : x(x_.x)
-  {
-  }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept = default;
 
   /**
    * @brief Copy constructor from arbitrary type
@@ -79,7 +76,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   /**
-   * @brief Default desctructor
+   * @brief Default destructor
    * 
    */
   __MATX_INLINE__ ~matxHalf() = default;
@@ -115,16 +112,11 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   /**
-   * @brief Copy assignment operator
+   * @brief Default copy assignment operator
    * 
    * @param rhs Value to copy
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> &
-  operator=(const matxHalf<T> &rhs)
-  {
-    x = rhs.x;
-    return *this;
-  }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> &operator=(const matxHalf<T> &rhs) = default;
 
   /**
    * @brief Copy assignment operator
