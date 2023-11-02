@@ -289,6 +289,15 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     const index_t max_input_ind = input_len - 1;
 
     const index_t filter_len_half = filter_len/2;
+    // The loops below assume odd-length filters with a central tap. In the case of storing an
+    // even-length filter to smem, a zero is pre-pended to the filter (prior to flipping for convolution)
+    // so that the stored filter length is always odd-length.
+    // Thus, for a stored filter, both filter_len/2 and (filter_len-1)/2 reference the central tap.
+    // In the case of an originally even-length filter, the index of the central tap in the filter
+    // tensor is filter_len/2 - 1. When not storing the filter to smem, we want the same central
+    // tap, so we compute the index as (filter_len-1)/2. This will return the same result for
+    // natively odd-length filters, but for even-length filters will reference the same coefficient
+    // whether or not the filter has been loaded to shared memory.
     const index_t filter_central_tap = (filter_len-1)/2;
     const index_t start_ind = elem_block * elems_per_thread * THREADS + tid;
     const index_t last_ind = std::min(output_len - 1, start_ind + (elems_per_thread-1) * THREADS);
