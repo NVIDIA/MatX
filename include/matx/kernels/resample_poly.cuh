@@ -40,6 +40,11 @@
 #include <stdio.h>
 #include <vector>
 
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+
+namespace cg = cooperative_groups;
+
 #include "cuComplex.h"
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
@@ -47,17 +52,26 @@
 
 namespace matx {
 
+// Use for __launch_bounds__ to allow the compiler to tune register usage
+static constexpr int MATX_RESAMPLE_POLY_MAX_NUM_THREADS = 256;
+
+// We use a static 11 KiB buffer to potentially store the filter. If it fits, we will load it
+// into smem. If not, then we will load it from global memory at the time of use. We choose
+// 11 KiB so that we can definitely fit four blocks in 48 KiB, leaving 1 KiB per block
+// for the driver.
+static constexpr size_t MATX_RESAMPLE_POLY_MAX_SMEM_BYTES = 11*1024;
+
 #ifdef __CUDACC__ 
-template <int THREADS, typename OutType, typename InType, typename FilterType>
-__launch_bounds__(THREADS)
-__global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
+template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+__launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
+__global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_thread)
 {
     using output_t = typename OutType::scalar_type;
     using input_t = typename InType::scalar_type;
     using filter_t = typename FilterType::scalar_type;
 
-    extern __shared__ __align__(alignof(double4)) uint8_t smem_filter[];
+    extern __shared__ uint8_t smem_filter[];
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
@@ -159,7 +173,6 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
         }
     }
 
-
     __syncthreads();
 
     // left_h_ind is the index in s_filter that contains the filter tap that will be applied to the
@@ -171,19 +184,18 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
     const index_t left_h_ind = (last_filter_ind - left_filter_ind)/up;
 
     const index_t max_h_epilogue = this_phase_len - left_h_ind - 1;
-    const index_t max_input_ind = static_cast<int>(input_len) - 1;
+    const index_t max_input_ind = input_len - 1;
 
     const index_t start_ind = phase_ind + up * (tid  + elem_block * elems_per_thread * THREADS);
     const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
     for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS * up) {
-        // out_ind is the index in the output array and up_ind is the corresponding
-        // index in the upsampled array
+        // out_ind is the index in the output array and up_ind = out_ind * down is the
+        // corresponding index in the upsampled array
         const index_t up_ind = out_ind * down;
 
         // input_ind is the largest index in the input array that is not greater than
         // (to the right of, in the previous figure earlier) up_ind.
         const index_t input_ind = up_ind / up;
-
         // We want x_ind and h_ind to be the first aligned input and filter samples
         // of the convolution and n to be the number of taps. prologue is the number
         // of valid samples before input_ind. In the case that the filter is not
@@ -214,6 +226,263 @@ __global__ void ResamplePoly1D(OutType output, InType input, FilterType filter,
         detail::mapply([&accum, &output](auto &&...args) {
             output.operator()(args...) = accum;
         }, bdims);
+    }
+}
+
+template <int THREADS, typename FilterType>
+__device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::scalar_type *s_filter, const FilterType &filter)
+{
+    const index_t filter_len = filter.Size(0);
+    const int tid = threadIdx.x;
+    if (filter_len % 2 == 0) {
+        for (int t = tid; t < filter_len; t += THREADS) {
+            s_filter[t+1] = filter.operator()(t);
+        }
+        if (tid == 0) {
+            s_filter[0] = static_cast<typename FilterType::scalar_type>(0);
+        }
+    } else {
+        for (int t = tid; t < filter_len; t += THREADS) {
+            s_filter[t] = filter.operator()(t);
+        }
+    }
+    __syncthreads();    
+}
+
+template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+__launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
+__global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterType filter,
+                    index_t up, index_t down, index_t elems_per_thread)
+{
+    using output_t = typename OutType::scalar_type;
+    using input_t = typename InType::scalar_type;
+    using filter_t = typename FilterType::scalar_type;
+
+    extern __shared__ uint8_t smem_filter[];
+    filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
+
+    constexpr int Rank = OutType::Rank();
+    const index_t output_len = output.Size(Rank-1);
+    index_t filter_len = filter.Size(0);
+    const index_t input_len = input.Size(Rank-1);
+
+    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+    const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
+
+    const int elem_block = blockIdx.z;
+    const int tid = threadIdx.x;
+    // const int THREADS = blockDim.x;
+
+    if (load_filter_to_smem) {
+        ResamplePoly1D_LoadFilter<THREADS, FilterType>(s_filter, filter);
+        if (filter_len % 2 == 0) {
+            filter_len++;
+        }
+    }
+
+    // All but the last dim are batch indices
+    const int batch_idx = blockIdx.x;
+    auto bdims = BlockToIdx(output, batch_idx, 1);
+
+    // Scale the filter coefficients by up to match scipy's convention
+    const filter_t scale = static_cast<filter_t>(up);
+    const index_t max_input_ind = input_len - 1;
+
+    const index_t filter_len_half = filter_len/2;
+    // The loops below assume odd-length filters with a central tap. In the case of storing an
+    // even-length filter to smem, a zero is pre-pended to the filter (prior to flipping for convolution)
+    // so that the stored filter length is always odd-length.
+    // Thus, for a stored filter, both filter_len/2 and (filter_len-1)/2 reference the central tap.
+    // In the case of an originally even-length filter, the index of the central tap in the filter
+    // tensor is filter_len/2 - 1. When not storing the filter to smem, we want the same central
+    // tap, so we compute the index as (filter_len-1)/2. This will return the same result for
+    // natively odd-length filters, but for even-length filters will reference the same coefficient
+    // whether or not the filter has been loaded to shared memory.
+    const index_t filter_central_tap = (filter_len-1)/2;
+    const index_t start_ind = elem_block * elems_per_thread * THREADS + tid;
+    const index_t last_ind = std::min(output_len - 1, start_ind + (elems_per_thread-1) * THREADS);
+    if (load_filter_to_smem) {
+        for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
+            const index_t up_ind = out_ind * down;
+            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t x_start = (up_start + up - 1) / up;
+            index_t x_end = up_end / up;
+            // Since the filter is in shared memory, we can narrow the index type to 32 bits
+            int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start));
+
+            output_t accum {};
+            input_t in_val;
+            for (index_t i = x_start; i <= x_end; i++) {
+                bdims[Rank - 1] = i;
+                detail::mapply([&in_val, &input](auto &&...args) {
+                    in_val = input.operator()(args...);
+                }, bdims);
+                accum += in_val * s_filter[h_ind];
+                h_ind -= up;
+            }
+
+            accum *= scale;
+            bdims[Rank - 1] = out_ind;
+            detail::mapply([&accum, &output](auto &&...args) {
+                output.operator()(args...) = accum;
+            }, bdims);
+        }
+    } else {
+        for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
+            const index_t up_ind = out_ind * down;
+            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t x_start = (up_start + up - 1) / up;
+            index_t x_end = up_end / up;
+            index_t h_ind = filter_central_tap + (up_ind - up*x_start);            
+            if (h_ind - up*(x_end-x_start) < 0) {
+                x_end--;
+            }
+
+            output_t accum {};
+            input_t in_val;
+            for (index_t i = x_start; i <= x_end; i++) {
+                bdims[Rank - 1] = i;
+                detail::mapply([&in_val, &input](auto &&...args) {
+                    in_val = input.operator()(args...);
+                }, bdims);
+                accum += in_val * filter.operator()(h_ind);
+                h_ind -= up;
+            }
+
+            accum *= scale;
+            bdims[Rank - 1] = out_ind;
+            detail::mapply([&accum, &output](auto &&...args) {
+                output.operator()(args...) = accum;
+            }, bdims);
+        }
+    }
+
+}
+
+template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+__launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
+__global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterType filter,
+                    index_t up, index_t down, index_t elems_per_warp)
+{
+    using output_t = typename OutType::scalar_type;
+    using input_t = typename InType::scalar_type;
+    using filter_t = typename FilterType::scalar_type;
+
+    auto block = cg::this_thread_block();
+    auto tile = cg::tiled_partition<WARP_SIZE>(block);
+    const int warp_id = tile.meta_group_rank();
+    const int NUM_WARPS = THREADS / WARP_SIZE;
+    const int lane_id = tile.thread_rank();
+
+    extern __shared__ uint8_t smem_filter[];
+    filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
+
+    constexpr int Rank = OutType::Rank();
+    const index_t output_len = output.Size(Rank-1);
+    index_t filter_len = filter.Size(0);
+    const index_t input_len = input.Size(Rank-1);
+
+    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+    const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
+
+    const int elem_block = blockIdx.z;
+
+    if (load_filter_to_smem) {
+        ResamplePoly1D_LoadFilter<THREADS, FilterType>(s_filter, filter);
+        if (filter_len % 2 == 0) {
+            filter_len++;
+        }        
+    }
+
+    // All but the last dim are batch indices
+    const int batch_idx = blockIdx.x;
+    auto bdims = BlockToIdx(output, batch_idx, 1);
+
+    // Scale the filter coefficients by up to match scipy's convention
+    const filter_t scale = static_cast<filter_t>(up);
+    const index_t max_input_ind = input_len - 1;
+
+    const index_t filter_len_half = filter_len/2;
+    const index_t filter_central_tap = (filter_len-1)/2;
+    const index_t start_ind = elem_block * elems_per_warp * NUM_WARPS;
+    const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_warp * NUM_WARPS - 1);
+    if (load_filter_to_smem) {
+        for (index_t out_ind = start_ind+warp_id; out_ind <= last_ind; out_ind += NUM_WARPS) {
+            const index_t up_ind = out_ind * down;
+            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t x_start = (up_start + up - 1) / up;
+            index_t x_end = up_end / up;
+            // Since the filter is in shared memory, we can narrow the index type to 32 bits
+            int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start)) - lane_id*up;
+
+            output_t accum {};
+            input_t in_val;
+            for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
+                bdims[Rank - 1] = i;
+                detail::mapply([&in_val, &input](auto &&...args) {
+                    in_val = input.operator()(args...);
+                }, bdims);
+                accum += in_val * s_filter[h_ind];
+                h_ind -= up * WARP_SIZE;
+            }
+
+            accum *= scale;
+            if constexpr (is_complex_v<output_t>) {
+                using inner_type = typename inner_op_type_t<output_t>::type;
+                accum.real(cg::reduce(tile, accum.real(), cg::plus<inner_type>()));
+                accum.imag(cg::reduce(tile, accum.imag(), cg::plus<inner_type>()));
+            } else {
+                accum = cg::reduce(tile, accum, cg::plus<output_t>());
+            }
+            if (lane_id == 0) {
+                bdims[Rank - 1] = out_ind;
+                detail::mapply([&accum, &output](auto &&...args) {
+                    output.operator()(args...) = accum;
+                }, bdims);
+            }
+        }
+    } else {
+        for (index_t out_ind = start_ind+warp_id; out_ind <= last_ind; out_ind += NUM_WARPS) {
+            const index_t up_ind = out_ind * down;
+            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t x_start = (up_start + up - 1) / up;
+            index_t x_end = up_end / up;
+            index_t h_ind = filter_central_tap + (up_ind - up*x_start);            
+            if (h_ind - up*(x_end-x_start) < 0) {
+                x_end--;
+            }
+            h_ind -= lane_id*up;
+
+            output_t accum {};
+            input_t in_val;
+            for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
+                bdims[Rank - 1] = i;
+                detail::mapply([&in_val, &input](auto &&...args) {
+                    in_val = input.operator()(args...);
+                }, bdims);
+                accum += in_val * filter.operator()(h_ind);
+                h_ind -= up * WARP_SIZE;
+            }
+
+            accum *= scale;
+            if constexpr (is_complex_v<output_t>) {
+                using inner_type = typename inner_op_type_t<output_t>::type;
+                accum.real(cg::reduce(tile, accum.real(), cg::plus<inner_type>()));
+                accum.imag(cg::reduce(tile, accum.imag(), cg::plus<inner_type>()));
+            } else {
+                accum = cg::reduce(tile, accum, cg::plus<output_t>());
+            }
+            if (lane_id == 0) {
+                bdims[Rank - 1] = out_ind;
+                detail::mapply([&accum, &output](auto &&...args) {
+                    output.operator()(args...) = accum;
+                }, bdims);
+            }
+        }
     }
 }
 
