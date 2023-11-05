@@ -679,7 +679,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
   auto bs = slice<1>(b, {0,0}, {matxEnd, matxDropDim});
   // example-begin matvec-test-1
   // "a" is a matrix and "bs" is a vector
-  matvec(cs, a, bs);
+  (cs = matvec(a, bs)).run();
   // example-end matvec-test-1
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
@@ -689,7 +689,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
   tensor_t<TypeParam, 1> cv{{m}};
   (bv = bs).run();
   (cv = cs).run();
-  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+  (cv = matvec(a, bv)).run();;
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -715,7 +715,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
 
   auto cs = slice<2>(c, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
   auto bs = slice<2>(b, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
-  matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
+  (cs = matvec(a, bs)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -723,7 +723,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
   tensor_t<TypeParam, 2> cv{{blocks, m}};
   (bv = bs).run();
   (cv = cs).run();
-  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+  (cv = matvec(a, bv)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -751,7 +751,7 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
 
   auto cs = slice<2>(c, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
   auto bs = slice<2>(b, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
-  matvec<decltype(cs), decltype(a), decltype(bs), PROVIDER_TYPE_CUBLASLT>(cs, a, bs);
+  (cs = matvec(a, bs)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -759,7 +759,7 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
   tensor_t<TypeParam, 2> cv{{blocks, m}};
   (bv = bs).run();
   (cv = cs).run();
-  matvec<decltype(cv), decltype(a), decltype(bv), PROVIDER_TYPE_CUBLASLT>(cv, a, bv);
+  (cv = matvec(a, bv)).run();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 

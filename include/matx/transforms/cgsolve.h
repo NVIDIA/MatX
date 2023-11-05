@@ -120,7 +120,7 @@ namespace matx
       auto pApc = clone<VRANK>(pAp, clone_shape);
     
       // A*X
-      matvec(Ap, A, X, stream);
+      (Ap = matvec(A, X)).run(stream);
       // r0 = B - A*X   
       // p = r0 
       (p = r0 = B - Ap).run(stream);  
@@ -137,7 +137,7 @@ namespace matx
       int i;
       for (i = 0 ; i < max_iters; i++) {
         // Ap = matvec(A, p) 
-        matvec(Ap, A, p, stream);
+        (Ap = matvec(A, p)).run(stream);
 
         // pAp = dot(p,Ap)  
         (pAp = sum(p*Ap)).run(stream);

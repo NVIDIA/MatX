@@ -79,7 +79,7 @@ TYPED_TEST(SolveTestsFloatNonComplexNonHalf, CGSolve)
   // example-begin cgsolve-test-1
   (X = cgsolve(A, B, .00001, 10)).run();
   // example-end cgsolve-test-1
-  matvec(B, A, X);
+  (B = matvec(A, X)).run();
   cudaDeviceSynchronize();
 
   for(int i = 0; i < BATCH; i++) {
