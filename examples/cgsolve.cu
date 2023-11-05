@@ -80,7 +80,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   (X = cgsolve(A, B, .0001, max_iters)).run();
 
-  matvec(Bout, A, X);
+  (Bout = matvec(A, X)).run();
   (norm = sum((Bout-B)*(Bout-B))).run();
   (maxn = matx::rmax(sqrt(norm))).run();
 
