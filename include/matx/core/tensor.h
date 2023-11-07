@@ -49,8 +49,6 @@
 #include "matx/core/tie.h"
 #include "matx/kernels/utility.cuh"
 
-static constexpr int MAX_TENSOR_DIM = 4;
-
 // forward declare
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;

@@ -53,7 +53,7 @@ namespace matx
     {
       private:
         typename base_type<T1>::type op_;
-        index_t reps_[MAX_TENSOR_DIM];
+        index_t reps_[T1::Rank()];
 
       public:
         using matxop = bool;
