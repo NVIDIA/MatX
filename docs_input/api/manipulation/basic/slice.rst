@@ -4,7 +4,8 @@ slice
 #####
 
 Slice an operator with new start and end points, and optionally new strides. Slice can also
-be used to drop ranks, for operations such as selecting a single row. 
+be used to drop ranks, for operations such as selecting a single row. Negative indices can be used 
+to indicate starting at the end and going backward.
 
 .. doxygenfunction:: slice(const OpType opIn, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
 .. doxygenfunction:: slice(const OpType op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()], const index_t (&strides)[OpType::Rank()])
@@ -26,7 +27,13 @@ Examples
 
 .. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
    :language: cpp
-   :start-after: example-begin slice-test-2
-   :end-before: example-end slice-test-2
+   :start-after: example-begin slice-test-3
+   :end-before: example-end slice-test-3
    :dedent:
+
+.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+   :language: cpp
+   :start-after: example-begin slice-test-4
+   :end-before: example-end slice-test-4
+   :dedent:   
 

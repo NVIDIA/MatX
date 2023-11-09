@@ -845,6 +845,21 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
     }
   }
 
+  // Negative indexing. These should give the same results
+  // example-begin slice-test-4
+  auto t2sn = slice(t2, {-4, -5}, {matxEnd, matxEnd});
+  auto t2s = slice(t2, {t2.Size(0) - 4, t2.Size(1) - 5}, {matxEnd, matxEnd});
+
+  // example-end slice-test-4
+  cudaStreamSynchronize(0);
+  ASSERT_EQ(t2sn.Size(0), t2s.Size(0));
+  ASSERT_EQ(t2sn.Size(1), t2s.Size(1));
+  for (index_t i = 0; i < t2sn.Size(0); i++) {
+    for (index_t j = 0; j < t2sn.Size(1); j++) {
+      ASSERT_EQ(t2sn(i, j), t2s(i, j));
+    }
+  }  
+
   MATX_EXIT_HANDLER();
 }
 
