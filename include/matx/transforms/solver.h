@@ -84,6 +84,8 @@ public:
   void SetBatchPointers(TensorType &a)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    batch_a_ptrs.clear();
     
     if constexpr (TensorType::Rank() == 2) {
       batch_a_ptrs.push_back(&a(0, 0));
@@ -1121,19 +1123,30 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     (a_new = a).run(stream);
   }  
 
-  /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
-  */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto tv = detail::matxDnSolver_t::TransposeCopy(tp, a_new, stream);
+  // cuSolver assumes column-major matrices and MatX uses row-major matrices.
+  // One way to address this is to create a transposed copy of the input to
+  // use with the factorization, followed by transposing the output. However,
+  // for matrices with no additional padding, we can also change the value of
+  // uplo to effectively change the matrix to column-major. This allows us to
+  // compute the factorization without additional transposes. If we do not
+  // have contiguous input and output tensors, then we create a temporary
+  // contiguous tensor for use with cuSolver.
+  uplo = (uplo == CUBLAS_FILL_MODE_UPPER) ? CUBLAS_FILL_MODE_LOWER : CUBLAS_FILL_MODE_UPPER;
+
+  const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
+  auto tv = [allContiguous, &a_new, &out, &stream]() -> auto {
+    if (allContiguous) {
+      (out = a_new).run(stream);
+      return out;
+    } else{
+      auto t = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      matx::copy(t, a_new, stream);
+      return t;
+    }
+  }();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>::GetCholParams(tv, uplo);
+  auto params = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(tv)>::GetCholParams(tv, uplo);
   params.uplo = uplo;
 
   // Get cache or new inverse plan if it doesn't exist
@@ -1149,9 +1162,9 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     chol_type->Exec(tv, tv, stream, uplo);
   }
 
-  /* Temporary WAR
-   * Copy and free async buffer for transpose */
-  matx::copy(out, tv.PermuteMatrix(), stream);
+  if (! allContiguous) {
+    matx::copy(out, tv, stream);
+  }
 }
 
 

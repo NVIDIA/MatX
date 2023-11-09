@@ -40,7 +40,10 @@ class cholesky:
     def run(self):
         n = self.size[0]
 
-        A = np.random.randn(n, n)
+        if self.dtype in ('complex64', 'complex128'):
+            A = np.random.randn(n, n) + 1j*np.random.randn(n, n)
+        else:
+            A = np.random.randn(n, n)
         B = np.matmul(A, A.conj().T)
         B = B + n*np.eye(n)
 

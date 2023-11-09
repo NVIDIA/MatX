@@ -37,46 +37,113 @@
 #include "gtest/gtest.h"
 
 using namespace matx;
-constexpr int dim_size = 100;
 
 template <typename T> class CholSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "cholesky", "run", {dim_size});
-    pb->NumpyToTensorView(Bv, "B");
-    pb->NumpyToTensorView(Lv, "L");
   }
 
   void TearDown() { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Bv{{dim_size, dim_size}};
-  tensor_t<T, 2> Lv{{dim_size, dim_size}};
 };
 
 template <typename TensorType>
-class CholSolverTestNonComplexFloatTypes : public CholSolverTest<TensorType> {
+class CholSolverTestNonHalfFloatTypes : public CholSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(CholSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
+                 MatXFloatNonHalfTypes);
 
-TYPED_TEST(CholSolverTestNonComplexFloatTypes, CholeskyBasic)
+TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();
 
-  // example-begin chol-test-1
-  (this->Bv = chol(this->Bv, CUBLAS_FILL_MODE_LOWER)).run();
-  // example-end chol-test-1
-  cudaStreamSynchronize(0);
+  const std::array dims {
+    16,
+    50,
+    100,
+    130,
+    200,
+    1000
+  };
 
-  // Cholesky only saves the upper triangle by default, and the lower triangle
-  // is garbage. Python saves the opposite.
-  for (index_t i = 0; i < this->Bv.Size(0); i++) {
-    for (index_t j = 0; j <= i; j++) {
-      ASSERT_NEAR(this->Bv(i, j), this->Lv(i, j), 0.001);
+  for (size_t k = 0; k < dims.size(); k++) {
+    this->pb->template InitAndRunTVGenerator<TypeParam>("00_solver", "cholesky", "run", {dims[k]});
+    auto Bv = make_tensor<TypeParam>({dims[k], dims[k]});
+    auto Lv = make_tensor<TypeParam>({dims[k], dims[k]});
+    this->pb->NumpyToTensorView(Bv, "B");
+    this->pb->NumpyToTensorView(Lv, "L");
+
+    // example-begin chol-test-1
+    (Bv = chol(Bv, CUBLAS_FILL_MODE_LOWER)).run();
+    // example-end chol-test-1
+    cudaStreamSynchronize(0);
+
+    // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
+    // and destroys the upper triangular portion.
+    if constexpr (is_complex_v<TypeParam>) {
+      for (index_t i = 0; i < dims[k]; i++) {
+        for (index_t j = 0; j <= i; j++) {
+          ASSERT_NEAR(Bv(i, j).real(), Lv(i, j).real(), 0.001);
+          ASSERT_NEAR(Bv(i, j).imag(), Lv(i, j).imag(), 0.001);
+        }
+      }
+    } else {
+      for (index_t i = 0; i < dims[k]; i++) {
+        for (index_t j = 0; j <= i; j++) {
+          ASSERT_NEAR(Bv(i, j), Lv(i, j), 0.001);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
+{
+  MATX_ENTER_HANDLER();
+
+  const std::array dims {
+    50,
+    100,
+    130,
+    200,
+    1000
+  };
+
+  for (size_t k = 0; k < dims.size(); k++) {
+    this->pb->template InitAndRunTVGenerator<TypeParam>("00_solver", "cholesky", "run", {dims[k]});
+    auto Bv = make_tensor<TypeParam>({2*dims[k], 3*dims[k]});
+    auto Bslice = slice<2>(Bv, {11, 50}, {dims[k]+11, dims[k]+50});
+    auto Cv = make_tensor<TypeParam>({dims[k], dims[k]});
+    auto Lv = make_tensor<TypeParam>({dims[k], dims[k]});
+    this->pb->NumpyToTensorView(Cv, "B");
+    this->pb->NumpyToTensorView(Lv, "L");
+    (Bslice = Cv).run();
+    cudaStreamSynchronize(0);
+
+    (Bslice = chol(Bslice, CUBLAS_FILL_MODE_LOWER)).run();
+    cudaStreamSynchronize(0);
+
+    // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
+    // and destroys the upper triangular portion.
+    if constexpr (is_complex_v<TypeParam>) {
+      for (index_t i = 0; i < dims[k]; i++) {
+        for (index_t j = 0; j <= i; j++) {
+          ASSERT_NEAR(Bslice(i, j).real(), Lv(i, j).real(), 0.001);
+          ASSERT_NEAR(Bslice(i, j).imag(), Lv(i, j).imag(), 0.001);
+        }
+      }
+    } else {
+      for (index_t i = 0; i < dims[k]; i++) {
+        for (index_t j = 0; j <= i; j++) {
+          ASSERT_NEAR(Bslice(i, j), Lv(i, j), 0.001);
+        }
+      }
     }
   }
 
