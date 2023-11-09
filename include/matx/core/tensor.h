@@ -56,21 +56,15 @@ template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
 /* Special values used to indicate properties of tensors */
 namespace matx {
-#ifdef INDEX_64_BIT
 enum {
-  matxKeepDim = LLONG_MAX,
-  matxDropDim = LLONG_MAX - 1,
-  matxEnd = LLONG_MAX - 2,
-  matxKeepStride = LLONG_MAX - 3
+  matxKeepDim     = std::numeric_limits<index_t>::max(),
+  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
+  matxEnd         = std::numeric_limits<index_t>::max() - 2,
+  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
+
+  // If adding a new marker adjust this to the last element above
+  matxIdxSentinel = matxKeepStride - 1,
 };
-#else
-enum {
-  matxKeepDim = INT_MAX,
-  matxDropDim = INT_MAX - 1,
-  matxEnd = INT_MAX - 2,
-  matxKeepStride = INT_MAX - 3
-};
-#endif
 
 
 /**
@@ -1458,8 +1452,11 @@ public:
 
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
-      typename Desc::shape_type first = firsts[i];
-      typename Desc::shape_type end = ends[i];
+      typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
+      typename Desc::shape_type end = ends[i]   < 0 ? this->Size(i) + ends[i]   : ends[i];
+
+      MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= this->Size(i)), matxInvalidDim,
+        "Slice end index out of range of operator");
 
       MATX_ASSERT_STR(first < end, matxInvalidSize, "Slice must be at least one element long");
 

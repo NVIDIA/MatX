@@ -70,8 +70,13 @@ namespace matx
                                       const std::array<shape_type, T::Rank()> &strides) : op_(op) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
-            shape_type start = starts[i];
-            shape_type end = ends[i];
+            shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
+            shape_type end   = ends[i]   < 0 ? op.Size(i) + ends[i]   : ends[i];
+
+            MATX_ASSERT_STR((start > matxIdxSentinel) || (start < op.Size(i)), matxInvalidDim,
+              "Slice slice index out of range of operator");
+            MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= op.Size(i)), matxInvalidDim,
+              "Slice end index out of range of operator");
 
             starts_[i] = start;
             strides_[i] = strides[i];
