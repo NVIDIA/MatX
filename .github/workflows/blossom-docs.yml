@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages doctest2
+name: Deploy static content to Pages doctest2 update
 
 on:
   # Runs on pushes targeting the default branch
