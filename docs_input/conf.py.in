@@ -15,18 +15,19 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+import datetime
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'matx'
-copyright = '2021, Nvidia'
+copyright = '2021-2023, Nvidia'
 author = 'Nvidia'
 
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = ''
+release = f'{datetime.datetime.now()}'
 
 
 # -- General configuration ---------------------------------------------------
