@@ -41,6 +41,7 @@
 #include "matx/kernels/utility.cuh"
 
 static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
+static unsigned int PRINT_PRECISION = 4;            ///< control PrintVal()'s precision
 
 namespace matx
 {
@@ -509,15 +510,23 @@ namespace detail {
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    using namespace std::literals::string_literals;
+
     if constexpr (is_complex_v<T>) {
-      printf("%.4e%+.4ej ", static_cast<float>(val.real()),
+      auto prec = std::to_string(PRINT_PRECISION);
+      auto fmt_s = ("%."s + prec + "e%+." + prec + "ej ").c_str();
+      printf(fmt_s, static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
     }
     else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
-      printf("%.4e ", static_cast<float>(val));
+      auto prec = std::to_string(PRINT_PRECISION);
+      auto fmt_s = ("%."s + prec + "e ").c_str();
+      printf(fmt_s, static_cast<float>(val));
     }
     else if constexpr (std::is_floating_point_v<T>) {
-      printf("%.4e ", val);
+      auto prec = std::to_string(PRINT_PRECISION);
+      auto fmt_s = ("%."s + prec + "e ").c_str();
+      printf(fmt_s, val);
     }
     else if constexpr (std::is_same_v<T, long long int>) {
       printf("%lld ", val);
@@ -904,6 +913,24 @@ auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
   } else {
     return op;
   }
+}
+
+/**
+ * @brief Set the print() precision for floating point values
+ * 
+ * @param precision Number of digits of precision for floating point output (default 4).
+ */
+void set_print_precision(unsigned int precision) {
+  PRINT_PRECISION = precision;
+}
+
+/**
+ * @brief Get the print() precision for floating point values
+ * 
+ * @return Number of digits of precision for floating point output (default 4).
+ */
+unsigned int get_print_precision() {
+  return PRINT_PRECISION;
 }
 
 }
