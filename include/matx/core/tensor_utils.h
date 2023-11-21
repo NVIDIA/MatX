@@ -920,7 +920,7 @@ auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
  * 
  * @param precision Number of digits of precision for floating point output (default 4).
  */
-void set_print_precision(unsigned int precision) {
+__MATX_INLINE__ __MATX_HOST__ void set_print_precision(unsigned int precision) {
   PRINT_PRECISION = precision;
 }
 
@@ -929,7 +929,7 @@ void set_print_precision(unsigned int precision) {
  * 
  * @return Number of digits of precision for floating point output (default 4).
  */
-unsigned int get_print_precision() {
+__MATX_INLINE__ __MATX_HOST__ unsigned int get_print_precision() {
   return PRINT_PRECISION;
 }
 
