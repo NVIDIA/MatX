@@ -513,19 +513,19 @@ namespace detail {
     using namespace std::literals::string_literals;
 
     if constexpr (is_complex_v<T>) {
-      auto prec = std::to_string(PRINT_PRECISION);
-      auto fmt_s = ("%."s + prec + "e%+." + prec + "ej ").c_str();
+      const auto prec = std::to_string(PRINT_PRECISION);
+      const auto fmt_s = ("%."s + prec + "e%+." + prec + "ej ").c_str();
       printf(fmt_s, static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
     }
     else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
-      auto prec = std::to_string(PRINT_PRECISION);
-      auto fmt_s = ("%."s + prec + "e ").c_str();
+      const auto prec = std::to_string(PRINT_PRECISION);
+      const auto fmt_s = ("%."s + prec + "e ").c_str();
       printf(fmt_s, static_cast<float>(val));
     }
     else if constexpr (std::is_floating_point_v<T>) {
-      auto prec = std::to_string(PRINT_PRECISION);
-      auto fmt_s = ("%."s + prec + "e ").c_str();
+      const auto prec = std::to_string(PRINT_PRECISION);
+      const auto fmt_s = ("%."s + prec + "e ").c_str();
       printf(fmt_s, val);
     }
     else if constexpr (std::is_same_v<T, long long int>) {
