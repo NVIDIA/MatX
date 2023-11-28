@@ -232,7 +232,9 @@ public:
    * @param shape
    *   Tensor shape (empty braces)
    */
-  __MATX_INLINE__ tensor_t([[maybe_unused]] const std::initializer_list<detail::no_size_t> shape) :
+  __MATX_INLINE__ tensor_t(const std::initializer_list<detail::no_size_t> /* unused */) :
+    // The ctor argument is unused, but matches {} for rank-0 tensors. We do
+    // not use [[maybe_unused]] due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429 in gcc < 9.3
     detail::tensor_impl_t<T, RANK, Desc>(std::array<index_t, 0>{}),
     storage_{typename Storage::container{sizeof(T)}}
   {
