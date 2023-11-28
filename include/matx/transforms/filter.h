@@ -53,13 +53,17 @@ class matxFilter_t {
   using filter_tensor = matx::tensor_t<FilterType, 1>;
 
 public:
-  matxFilter_t([[maybe_unused]] OutType &o, const InType &i,
+  matxFilter_t(OutType &o, const InType &i,
                const filter_tensor &h_rec,
                const filter_tensor &h_nonrec)
       : h_nonr_copy(h_nonrec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
+    // o may be unused. We use the (void) idiom rather than [[maybe_unused]] due to
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429
+    (void) o;
+
     if constexpr (RANK == 1) {
       MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
 

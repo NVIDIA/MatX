@@ -44,20 +44,17 @@ set (test_sources
 # '../test/00_io/small_csv_complex_comma_nh.csv' respectively. Therefore
 # they must be copied to the correct location:
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/00_io)
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_comma_nh.csv
-	${CMAKE_BINARY_DIR}/test/00_io/small_csv_comma_nh.csv
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_complex_comma_nh.csv
-	${CMAKE_BINARY_DIR}/test/00_io/small_csv_complex_comma_nh.csv
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/test.mat
-	${CMAKE_BINARY_DIR}/test/00_io/test.mat
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
 
 # Find proprietary parameters
