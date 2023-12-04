@@ -682,6 +682,12 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
   (cs = matvec(a, bs)).run();
   // example-end matvec-test-1
 
+  // Test the rank/size of the matvec operator
+  auto a_times_bs = matvec(a, bs);
+  ASSERT_EQ(a_times_bs.Rank(), 1);
+  ASSERT_EQ(a_times_bs.Size(0), m);
+  ASSERT_EQ(cs.Size(0), m);
+
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // Test also with rank-1 tensors rather than just slices
@@ -692,6 +698,26 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
   (cv = matvec(a, bv)).run();;
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  // Test with batching
+  constexpr index_t batch1 = 5;
+  constexpr index_t batch2 = 9;
+  auto a_batch = clone<4>(a, {batch1, batch2, matxKeepDim, matxKeepDim});
+  auto b_batch = clone<3>(bs, {batch1, batch2, matxKeepDim});
+  auto batched_matvec = matvec(a_batch, b_batch);
+  ASSERT_EQ(batched_matvec.Rank(), 3);
+  ASSERT_EQ(batched_matvec.Size(0), batch1);
+  ASSERT_EQ(batched_matvec.Size(1), batch2);
+  ASSERT_EQ(batched_matvec.Size(2), m);
+  auto result = make_tensor<TypeParam>(batched_matvec.Shape());
+  (result = batched_matvec).run();
+  for (index_t i = 0; i < batch1; i++) {
+    for (index_t j = 0; j < batch2; j++) {
+      auto rs = slice<1>(result, {i,j,0}, {matxDropDim,matxDropDim,matxEnd});
+      auto rsc = clone<2>(rs, {matxKeepDim,1});
+      MATX_TEST_ASSERT_COMPARE(this->pb, rsc, "c", this->thresh);
+    }
+  }
 
   MATX_EXIT_HANDLER();
 }

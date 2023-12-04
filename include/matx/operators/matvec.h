@@ -48,8 +48,9 @@ namespace matx
         OpB b_;
         float alpha_;
         float beta_;
-        std::array<index_t, 2> out_dims_;
-        mutable matx::tensor_t<typename OpA::scalar_type, 2> tmp_out_;
+        static constexpr int RANK = remove_cvref_t<OpB>::Rank();
+        std::array<index_t, RANK> out_dims_;
+        mutable matx::tensor_t<typename OpA::scalar_type, RANK> tmp_out_;
 
       public:
         using matxop = bool;
@@ -65,7 +66,7 @@ namespace matx
               a_(A), b_(B), alpha_(alpha), beta_(beta) {
           
           for (int r = 0; r < Rank(); r++) {
-            out_dims_[r] = b_.Size(r);
+            out_dims_[r] = a_.Size(r);
           }
         }
 
