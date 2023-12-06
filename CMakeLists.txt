@@ -172,10 +172,6 @@ if (MATX_MULTI_GPU)
     find_package(Nvshmem REQUIRED)
 endif()
 
-# NVHPC has a bug where it doesn't create the CUDA includes as system includes. This causes errors with
-# the warnings we enable. Forcefully add it here.
-target_compile_options(matx INTERFACE -isystem=${CUDAToolkit_INCLUDE_DIRS})
-
 # Find python3 and pybind11 for generating unit tests and benchmarks
 if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EXAMPLES OR MATX_BUILD_TESTS OR MATX_BUILD_BENCHMARKS)
     message(STATUS "Enabling pybind11 support")
