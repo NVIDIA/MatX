@@ -47,5 +47,5 @@ function(find_and_configure_nvbench VERSION)
 endfunction()
 
 # NVBench doesn't tag yet
-set(CUDA_MATX_MIN_VERSION_nvbench "1a13a2e")
+set(CUDA_MATX_MIN_VERSION_nvbench "7521229")
 find_and_configure_nvbench(${CUDA_MATX_MIN_VERSION_nvbench})
