@@ -1,5 +1,5 @@
- /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+/*
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#include <type_traits>
-#include <iostream>
 #include <git_version.hpp>
+#include <iostream>
+#include <type_traits>
 
 constexpr const char* dbranch = "branch=" DEMO_GIT_BRANCH;
-constexpr const char* dsha1 = "sha1=" DEMO_GIT_SHA1;
-constexpr const char* dvers = "version=" DEMO_GIT_VERSION;
+constexpr const char* dsha1   = "sha1=" DEMO_GIT_SHA1;
+constexpr const char* dvers   = "version=" DEMO_GIT_VERSION;
 
 int main()
 {
-  std::cout <<  dbranch << std::endl;
-  std::cout <<  dsha1 << std::endl;
-  std::cout <<  dvers << std::endl;
+  std::cout << dbranch << std::endl;
+  std::cout << dsha1 << std::endl;
+  std::cout << dvers << std::endl;
   return 0;
 }

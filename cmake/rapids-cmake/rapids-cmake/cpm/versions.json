@@ -1,23 +1,80 @@
-
 {
   "packages" : {
+    "benchmark" : {
+      "version" : "1.8.0",
+      "git_url" : "https://github.com/google/benchmark.git",
+      "git_tag" : "v${version}"
+    },
+    "cuco" : {
+      "version" : "0.0.1",
+      "git_shallow" : false,
+      "git_url" : "https://github.com/NVIDIA/cuCollections.git",
+      "git_tag" : "7c76a124df0c2cd3fd66e3e080b9470a3b4707c6"
+    },
+    "fmt" : {
+      "version" : "9.1.0",
+      "git_url" : "https://github.com/fmtlib/fmt.git",
+      "git_tag" : "${version}",
+      "patches" : [
+        {
+          "file" : "fmt/no_debug_warnings.diff",
+          "issue" : "No warnings during debug builds [https://github.com/fmtlib/fmt/issues/3351]",
+          "fixed_in" : "10.0"
+        }
+      ]
+    },
     "GTest" : {
-      "version" : "1.10.0",
+      "version" : "1.13.0",
       "git_url" : "https://github.com/google/googletest.git",
-      "git_tag" : "release-${version}"
+      "git_tag" : "v${version}"
+    },
+    "libcudacxx" : {
+      "version" : "2.1.0",
+      "git_url" : "https://github.com/NVIDIA/libcudacxx.git",
+      "git_tag" : "${version}",
+      "patches" : [
+        {
+          "file" : "libcudacxx/install_rules.diff",
+          "issue" : "libcudacxx installs incorrect files [https://github.com/NVIDIA/libcudacxx/pull/428]",
+          "fixed_in" : "2.2"
+        },
+        {
+          "file" : "libcudacxx/reroot_support.diff",
+          "issue" : "Support conda-forge usage of CMake rerooting [https://github.com/NVIDIA/libcudacxx/pull/490], requires libcudacxx/install_rules.diff.",
+          "fixed_in" : "2.2"
+        },
+        {
+          "file" : "libcudacxx/proclaim_return_type_nv_exec_check_disable.diff",
+          "issue" : "Use pragma to disable execution checks in cuda::proclaim_return_type. [https://github.com/NVIDIA/libcudacxx/pull/448]",
+          "fixed_in" : "2.2"
+        },
+        {
+          "file" : "libcudacxx/memory_resource.diff",
+          "issue" : "Allow {async_}resource_ref to be constructible from a pointer. [https://github.com/NVIDIA/libcudacxx/pull/439]",
+          "fixed_in" : "2.2"
+        }
+      ]
     },
     "nvbench" : {
       "version" : "0.0",
       "git_shallow" : false,
       "git_url" : "https://github.com/NVIDIA/nvbench.git",
-      "git_tag" : "12d13bdc5e74801645eba3e46a64081b9b020dca"
+      "git_tag" : "b8f0f6b5832dd632006492fd2434c81fdef0f2de",
+      "patches" : [
+        {
+          "file" : "nvbench/nvml_with_static_builds.diff",
+          "issue" : "Add support for nvml with static nvbench [https://github.com/NVIDIA/nvbench/pull/148]",
+          "fixed_in" : ""
+        }
+      ]
     },
     "nvcomp" : {
-      "version" : "2.3.2",
+      "version" : "3.0.4",
       "git_url" : "https://github.com/NVIDIA/nvcomp.git",
       "git_tag" : "v2.2.0",
       "proprietary_binary" : {
-        "x86_64-linux" : "https://developer.download.nvidia.com/compute/nvcomp/${version}/local_installers/nvcomp_install_CUDA_11.x.tgz"
+        "x86_64-linux" :  "https://developer.download.nvidia.com/compute/nvcomp/${version}/local_installers/nvcomp_${version}_x86_64_${cuda-toolkit-version-major}.x.tgz",
+        "aarch64-linux" : "https://developer.download.nvidia.com/compute/nvcomp/${version}/local_installers/nvcomp_${version}_SBSA_${cuda-toolkit-version-major}.x.tgz"
       }
     },
     "rmm" : {
@@ -26,25 +83,31 @@
       "git_tag" : "branch-${version}"
     },
     "spdlog" : {
-      "version" : "1.8.5",
+      "version" : "1.11.0",
       "git_url" : "https://github.com/gabime/spdlog.git",
       "git_tag" : "v${version}"
     },
     "Thrust" : {
-      "version" : "1.15.0.0",
+      "version" : "1.17.2",
       "git_url" : "https://github.com/NVIDIA/thrust.git",
-      "git_tag" : "1.15.0"
-    },
-    "libcudacxx" : {
-      "version" : "1.7.0",
-      "git_url" : "https://github.com/NVIDIA/libcudacxx.git",
-      "git_tag" : "${version}"
-    },
-    "cuco" : {
-      "version" : "0.0.1",
-      "git_shallow" : false,
-      "git_url" : "https://github.com/NVIDIA/cuCollections.git",
-      "git_tag" : "3a49fc7143366e33334ce25846fb9854fbdc99f3"
+      "git_tag" : "${version}",
+      "patches" : [
+        {
+          "file" : "Thrust/reroot_support.diff",
+          "issue" : "Support conda-forge usage of CMake rerooting [https://github.com/NVIDIA/thrust/pull/1969]",
+          "fixed_in" : "2.2"
+        },
+        {
+          "file" : "Thrust/transform_iter_with_reduce_by_key.diff",
+          "issue" : "Support transform iterator with reduce by key [https://github.com/NVIDIA/thrust/pull/1805]",
+          "fixed_in" : "2.1"
+        },
+        {
+          "file" : "Thrust/install_rules.diff",
+          "issue" : "Thrust 1.X installs incorrect files [https://github.com/NVIDIA/thrust/issues/1790]",
+          "fixed_in" : "2.0"
+        }
+      ]
     }
   }
 }

@@ -45,6 +45,9 @@ This module will set the following variables in your project:
 #]=======================================================================]
 
 # Prefer using a Config module if it exists for this project
+
+@_RAPIDS_FIND_INITIAL_CODE_BLOCK@
+
 set(@_RAPIDS_PKG_NAME@_NO_CONFIG @_RAPIDS_NO_CONFIG@)
 if(NOT @_RAPIDS_PKG_NAME@_NO_CONFIG)
   find_package(@_RAPIDS_PKG_NAME@ CONFIG QUIET)
@@ -70,10 +73,12 @@ include(${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake)
 
 if(@_RAPIDS_PKG_NAME@_IS_HEADER_ONLY)
   find_package_handle_standard_args(@_RAPIDS_PKG_NAME@
+                                    FOUND_VAR @_RAPIDS_PKG_NAME@_FOUND
                                     REQUIRED_VARS @_RAPIDS_PKG_NAME@_INCLUDE_DIR
                                     VERSION_VAR @_RAPIDS_VERSION@)
 else()
   find_package_handle_standard_args(@_RAPIDS_PKG_NAME@
+                                    FOUND_VAR @_RAPIDS_PKG_NAME@_FOUND
                                     REQUIRED_VARS @_RAPIDS_PKG_NAME@_LIBRARY @_RAPIDS_PKG_NAME@_INCLUDE_DIR
                                     VERSION_VAR @_RAPIDS_VERSION@)
 endif()
@@ -86,7 +91,7 @@ if(@_RAPIDS_PKG_NAME@_FOUND)
   endif()
 
   if(NOT TARGET @_RAPIDS_PKG_NAME@::@_RAPIDS_PKG_NAME@)
-    add_library(@_RAPIDS_PKG_NAME@::@_RAPIDS_PKG_NAME@ UNKNOWN IMPORTED)
+    add_library(@_RAPIDS_PKG_NAME@::@_RAPIDS_PKG_NAME@ UNKNOWN IMPORTED GLOBAL)
     set_target_properties(@_RAPIDS_PKG_NAME@::@_RAPIDS_PKG_NAME@ PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${@_RAPIDS_PKG_NAME@_INCLUDE_DIRS}")
 
@@ -110,6 +115,8 @@ if(@_RAPIDS_PKG_NAME@_FOUND)
     endif()
   endif()
 endif()
+
+@_RAPIDS_FIND_FINAL_CODE_BLOCK@
 
 unset(@_RAPIDS_PKG_NAME@_NO_CONFIG)
 unset(@_RAPIDS_PKG_NAME@_IS_HEADER_ONLY)

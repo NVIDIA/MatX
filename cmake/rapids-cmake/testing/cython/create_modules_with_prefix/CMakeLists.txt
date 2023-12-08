@@ -41,5 +41,5 @@ rapids_cython_create_modules(
     )
 
 if(NOT TARGET test_test)
-  message(FATAL_ERROR "rapids_cython_init didn't create the prefixed library target `test_test`")
+  message(FATAL_ERROR "rapids_cython_create_modules didn't create the prefixed library target `test_test`")
 endif()

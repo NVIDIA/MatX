@@ -22,3 +22,5 @@ add_cmake_config_test(create_modules_errors.cmake SHOULD_FAIL "You must call rap
 add_cmake_config_test(create_modules)
 add_cmake_config_test(create_modules_with_library)
 add_cmake_config_test(create_modules_with_prefix)
+
+add_cmake_config_test(add_rpath_entries)

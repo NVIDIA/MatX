@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,8 @@ needs to be set to the provided path.
   rapids_export_find_package_root( (BUILD|INSTALL)
                                    <PackageName>
                                    <directory_path>
-                                   <ExportSet>
+                                   (<ExportSetName> | EXPORT_SET [ExportSetName])
+                                   [CONDITION <variableName>]
                                    )
 
 When constructing complicated export sets, espically ones that
@@ -47,11 +48,38 @@ will find the packaged dependency.
   before any find_dependency calls for `PackageName` for our install directory
   export set.
 
+``EXPORT_SET``
+  List the export set name that the `directory_path` should be attached too. If
+  no name is given the associated call will be ignored.
+
+``CONDITION``
+  A boolean variable name, that when evaluates to undefined or a false value
+  will cause the associated call to be ignored.
+
 #]=======================================================================]
-function(rapids_export_find_package_root type name dir_path export_set)
+function(rapids_export_find_package_root type name dir_path)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.export.find_package_root_dir")
+  include("${rapids-cmake-dir}/cmake/detail/policy.cmake")
+
+  set(options "")
+  set(one_value EXPORT_SET CONDITION)
+  set(multi_value "")
+  cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
+  # handle when we are given just an export set name and not `EXPORT_SET <name>`
+  if(_RAPIDS_UNPARSED_ARGUMENTS AND NOT _RAPIDS_COMPONENTS_EXPORT_SET)
+    rapids_cmake_policy(DEPRECATED_IN 23.12
+                        REMOVED_IN 24.02
+                        MESSAGE [=[Usage of `rapids_export_find_package_root` without an explicit `EXPORT_SET` key has been deprecated.]=]
+    )
+    set(_RAPIDS_EXPORT_SET ${_RAPIDS_UNPARSED_ARGUMENTS})
+  endif()
+  # Early terminate conditions
+  if(NOT _RAPIDS_EXPORT_SET OR NOT ${_RAPIDS_CONDITION})
+    return()
+  endif()
 
   string(TOLOWER ${type} type)
+  set(export_set ${_RAPIDS_EXPORT_SET})
 
   if(NOT TARGET rapids_export_${type}_${export_set})
     add_library(rapids_export_${type}_${export_set} INTERFACE)

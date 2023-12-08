@@ -1,6 +1,7 @@
 API Reference
 #############
 
+.. _`common`:
 
 Common
 ******
@@ -19,6 +20,8 @@ require.
    /command/rapids_cmake_write_git_revision_file
    /command/rapids_cmake_write_version_file
 
+.. _`cpm`:
+
 CPM
 ***
 
@@ -30,6 +33,7 @@ tracking of these dependencies for correct export support.
 
    /command/rapids_cpm_init
    /command/rapids_cpm_find
+   /command/rapids_cpm_package_override
 
 CPM Pre-Configured Packages
 ***************************
@@ -45,6 +49,8 @@ package uses :ref:`can be found here. <cpm_versions>`
    :titlesonly:
 
    /packages/rapids_cpm_cuco
+   /packages/rapids_cpm_fmt
+   /packages/rapids_cpm_gbench
    /packages/rapids_cpm_gtest
    /packages/rapids_cpm_libcudacxx
    /packages/rapids_cpm_nvbench
@@ -52,7 +58,8 @@ package uses :ref:`can be found here. <cpm_versions>`
    /packages/rapids_cpm_rmm
    /packages/rapids_cpm_spdlog
    /packages/rapids_cpm_thrust
-   /command/rapids_cpm_package_override
+
+.. _`cython`:
 
 Cython
 ******
@@ -69,7 +76,10 @@ The `rapids_cython` functions allow projects to easily build cython modules usin
 
    /command/rapids_cython_init
    /command/rapids_cython_create_modules
+   /command/rapids_cython_add_rpath_entries
 
+
+.. _`find`:
 
 Find
 ****
@@ -83,6 +93,8 @@ tracking of these dependencies for correct export support.
    /command/rapids_find_generate_module
    /command/rapids_find_package
 
+.. _`cuda`:
+
 CUDA
 ****
 
@@ -94,8 +106,12 @@ require.
 
     rapids_cuda_init_architectures </command/rapids_cuda_init_architectures>
     rapids_cuda_init_runtime </command/rapids_cuda_init_runtime>
+    rapids_cuda_patch_toolkit </command/rapids_cuda_patch_toolkit>
+    rapids_cuda_set_runtime </command/rapids_cuda_set_runtime>
     rapids_cuda_set_architectures [Advanced] </command/rapids_cuda_set_architectures>
 
+
+.. _`export`:
 
 Export Set Generation
 *********************
@@ -130,3 +146,19 @@ correct export generation. These should only be used when :cmake:command:`rapids
    rapids_export_find_package_root [Advanced] </command/rapids_export_find_package_root>
    rapids_export_package [Advanced] </command/rapids_export_package>
 
+.. _`testing`:
+
+Testing
+*******
+
+The `rapids_test` functions simplify CTest resource allocation, allowing for tests to run in parallel without over-allocating GPU resources.
+More information on resource allocation can be found in the rapids-cmake :ref:`Hardware Resources and Testing documentation <rapids_resource_allocation>`.
+
+.. toctree::
+   :titlesonly:
+
+   /command/rapids_test_init
+   /command/rapids_test_add
+   /command/rapids_test_generate_resource_spec
+   /command/rapids_test_gpu_requirements
+   /command/rapids_test_install_relocatable

@@ -1,5 +1,5 @@
- /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+/*
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-#include <type_traits>
-#include <iostream>
 #include <git_version.hpp>
+#include <iostream>
+#include <type_traits>
 
 constexpr const char* dbranch = DEMO_GIT_BRANCH;
-constexpr const char* dsha1 = DEMO_GIT_SHA1;
-constexpr const char* dvers = DEMO_GIT_VERSION;
-
+constexpr const char* dsha1   = DEMO_GIT_SHA1;
+constexpr const char* dvers   = DEMO_GIT_VERSION;
 
 int main()
 {
@@ -29,9 +28,9 @@ int main()
   static_assert(dsha1 == "unknown");
   static_assert(dvers == "unknown");
 
-# ifdef DEMO_GIT_IS_DIRTY
-#   error "DEMO_GIT_IS_DIRTY define shouldn't exist as git shouldn't have been found"
-# endif
+#ifdef DEMO_GIT_IS_DIRTY
+#error "DEMO_GIT_IS_DIRTY define shouldn't exist as git shouldn't have been found"
+#endif
 
   return 0;
 }

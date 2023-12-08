@@ -1,0 +1,47 @@
+diff --git a/dependencies/cub/cub/cmake/cub-header-search.cmake b/dependencies/cub/cub/cmake/cub-header-search.cmake
+index 2ff1a8acd8..5e731f2be8 100644
+--- a/dependencies/cub/cub/cmake/cub-header-search.cmake
++++ b/dependencies/cub/cub/cmake/cub-header-search.cmake
+@@ -1,5 +1,6 @@
+ unset(_CUB_VERSION_INCLUDE_DIR CACHE) # Clear old result to force search
+ find_path(_CUB_VERSION_INCLUDE_DIR cub/version.cuh
++  NO_CMAKE_FIND_ROOT_PATH
+   NO_DEFAULT_PATH # Only search explicit paths below:
+   PATHS
+     "${CMAKE_CURRENT_LIST_DIR}/../.."            # Source tree
+diff --git a/dependencies/cub/cub/cmake/cub-header-search.cmake.in b/dependencies/cub/cub/cmake/cub-header-search.cmake.in
+index 271b1b27bd..3bd10e4b70 100644
+--- a/dependencies/cub/cub/cmake/cub-header-search.cmake.in
++++ b/dependencies/cub/cub/cmake/cub-header-search.cmake.in
+@@ -11,6 +11,7 @@ list(TRANSFORM from_install_prefix REPLACE ".+" "../")
+ list(JOIN from_install_prefix "" from_install_prefix)
+ 
+ find_path(_CUB_VERSION_INCLUDE_DIR cub/version.cuh
++  NO_CMAKE_FIND_ROOT_PATH
+   NO_DEFAULT_PATH # Only search explicit paths below:
+   PATHS
+     "${CMAKE_CURRENT_LIST_DIR}/${from_install_prefix}/@CMAKE_INSTALL_INCLUDEDIR@"
+diff --git a/thrust/cmake/thrust-header-search.cmake b/thrust/cmake/thrust-header-search.cmake
+index 643ec90b7..7d27c68f4 100644
+--- a/thrust/cmake/thrust-header-search.cmake
++++ b/thrust/cmake/thrust-header-search.cmake
+@@ -1,6 +1,7 @@
+ # Parse version information from version.h:
+ unset(_THRUST_VERSION_INCLUDE_DIR CACHE) # Clear old result to force search
+ find_path(_THRUST_VERSION_INCLUDE_DIR thrust/version.h
++  NO_CMAKE_FIND_ROOT_PATH
+   NO_DEFAULT_PATH # Only search explicit paths below:
+   PATHS
+     "${CMAKE_CURRENT_LIST_DIR}/../.."            # Source tree
+diff --git a/thrust/cmake/thrust-header-search.cmake.in b/thrust/cmake/thrust-header-search.cmake.in
+index c014c469b..adea07e2d 100644
+--- a/thrust/cmake/thrust-header-search.cmake.in
++++ b/thrust/cmake/thrust-header-search.cmake.in
+@@ -11,6 +11,7 @@ list(TRANSFORM from_install_prefix REPLACE ".+" "../")
+ list(JOIN from_install_prefix "" from_install_prefix)
+ 
+ find_path(_THRUST_VERSION_INCLUDE_DIR thrust/version.h
++  NO_CMAKE_FIND_ROOT_PATH
+   NO_DEFAULT_PATH # Only search explicit paths below:
+   PATHS
+     "${CMAKE_CURRENT_LIST_DIR}/${from_install_prefix}/@CMAKE_INSTALL_INCLUDEDIR@"

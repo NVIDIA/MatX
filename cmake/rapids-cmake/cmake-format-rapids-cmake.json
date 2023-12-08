@@ -23,6 +23,16 @@
           "nargs": 3
         }
       },
+      "rapids_cmake_policy": {
+        "pargs": {
+          "nargs": 0
+        },
+        "kwargs": {
+          "DEPRECATED_IN": 1,
+          "REMOVED_IN": 1,
+          "MESSAGE": 1
+        }
+      },
       "rapids_cmake_support_conda_env": {
         "pargs": {
           "nargs": 1,
@@ -60,7 +70,8 @@
           "GIT_REPOSITORY": "1",
           "GIT_TAG": "1",
           "GIT_SHALLOW": "1",
-          "OPTIONS": "+"
+          "OPTIONS": "+",
+          "PATCH_COMMAND": "1"
         }
       },
       "rapids_cpm_init": {
@@ -77,6 +88,34 @@
         }
       },
 
+      "rapids_cpm_cuco": {
+        "pargs": {
+          "nargs": 0
+        },
+        "kwargs": {
+          "BUILD_EXPORT_SET": 1,
+          "INSTALL_EXPORT_SET": 1
+        }
+      },
+      "rapids_cpm_fmt": {
+        "pargs": {
+          "nargs": 0
+        },
+        "kwargs": {
+          "BUILD_EXPORT_SET": 1,
+          "INSTALL_EXPORT_SET": 1
+        }
+      },
+      "rapids_cpm_gbench": {
+        "pargs": {
+          "nargs": 0,
+          "flags": ["BUILD_STATIC"]
+        },
+        "kwargs": {
+          "BUILD_EXPORT_SET": 1,
+          "INSTALL_EXPORT_SET": 1
+        }
+      },
       "rapids_cpm_gtest": {
         "pargs": {
           "nargs": 0
@@ -97,10 +136,12 @@
       },
       "rapids_cpm_nvbench": {
         "pargs": {
-          "nargs": 0
+          "nargs": 0,
+          "flags": ["BUILD_STATIC"]
         },
         "kwargs": {
-          "BUILD_EXPORT_SET": 1
+          "BUILD_EXPORT_SET": 1,
+          "INSTALL_EXPORT_SET": 1
         }
       },
       "rapids_cpm_nvcomp": {
@@ -128,6 +169,7 @@
         },
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
+          "FMT_OPTION": 1,
           "INSTALL_EXPORT_SET": 1
         }
       },
@@ -156,6 +198,11 @@
           "nargs": 1
         }
       },
+      "rapids_cuda_set_runtime": {
+        "pargs": {
+          "nargs": 3
+        }
+      },
 
       "rapids_export_cpm": {
         "pargs": {
@@ -179,19 +226,29 @@
           "FINAL_CODE_BLOCK": 1,
           "VERSION": 1,
           "GLOBAL_TARGETS": "+",
+          "COMPONENTS": "+",
+          "COMPONENTS_EXPORT_SET": "+",
           "LANGUAGES": "+"
         }
       },
       "rapids_export_find_package_file": {
         "pargs": {
-          "nargs": 3,
+          "nargs": "3+",
           "flags": ["INSTALL", "BUILD"]
+        },
+        "kwargs": {
+          "EXPORT_SET": 1,
+          "CONDITION": 1
         }
       },
       "rapids_export_find_package_root": {
         "pargs": {
-          "nargs": 4,
+          "nargs": "3+",
           "flags": ["INSTALL", "BUILD"]
+        },
+        "kwargs": {
+          "EXPORT_SET": 1,
+          "CONDITION": 1
         }
       },
       "rapids_export_package": {
@@ -261,8 +318,59 @@
           "LINKED_LIBRARIES": "*",
           "INSTALL_DIR": "1"
         }
+      },
+      "rapids_cython_add_rpath_entries": {
+        "pargs": {
+          "nargs": "0"
+        },
+        "kwargs": {
+          "PATHS": "+",
+          "TARGET": "1",
+          "ROOT_DIRECTORY": "1"
+        }
+      },
+      "rapids_test_init": {
+        "pargs": {
+          "nargs": "0"
+        }
+      },
+      "rapids_test_add": {
+        "pargs": {
+          "nargs": "0"
+        },
+        "kwargs": {
+          "NAME": "1",
+          "COMMAND": "*",
+          "INSTALL_COMPONENT_SET": "1",
+          "GPUS": "1",
+          "PERCENT": "1",
+          "WORKING_DIRECTORY": "1"
+        }
+      },
+      "rapids_test_gpu_requirements": {
+        "pargs": {
+          "nargs": "1"
+        },
+        "kwargs": {
+          "GPUS": "1",
+          "PERCENT": "1"
+        }
+      },
+      "rapids_test_generate_resource_spec": {
+        "pargs": {
+          "nargs": "2"
+        }
+      },
+      "rapids_test_install_relocatable": {
+        "pargs": {
+          "nargs": "0",
+          "flags": ["INCLUDE_IN_ALL"]
+        },
+        "kwargs": {
+          "INSTALL_COMPONENT_SET": "1",
+          "DESTINATION": "1"
+        }
       }
-
     }
   }
 }

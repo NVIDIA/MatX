@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,4 +50,3 @@ endif()
 if(NOT CPM_DOWNLOAD_ALL)
   message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be set to true when an override exists")
 endif()
-

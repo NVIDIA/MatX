@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,10 @@
 int static_launch_kernelA(int x, int y);
 int static_launch_kernelB(int x, int y);
 
-int main(int argc, char **) {
-
+int main(int argc, char**)
+{
   auto resultA = static_launch_kernelA(3, argc);
   auto resultB = static_launch_kernelB(3, argc);
-  if (resultA != 6 && resultB != 6) {
-    return 1;
-  }
+  if (resultA != 6 && resultB != 6) { return 1; }
   return 0;
 }

@@ -1,0 +1,9 @@
+{
+  "patches" : [
+    {
+      "file" : "Thrust/cub_odr.diff",
+      "issue" : "cub kernel dispatch ODR [https://github.com/NVIDIA/cub/issues/545]",
+      "fixed_in" : ""
+    }
+  ]
+}

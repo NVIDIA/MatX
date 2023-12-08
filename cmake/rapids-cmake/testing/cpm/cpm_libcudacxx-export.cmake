@@ -21,6 +21,12 @@ rapids_cpm_init()
 rapids_cpm_libcudacxx(BUILD_EXPORT_SET frank INSTALL_EXPORT_SET test)
 rapids_cpm_libcudacxx(INSTALL_EXPORT_SET test2)
 
+add_library(example INTERFACE )
+target_link_libraries(example INTERFACE libcudacxx::libcudacxx)
+
+install(TARGETS example EXPORT example-targets)
+install(EXPORT example-targets FILE ${project_name}-targets.cmake DESTINATION "lib/cmake/")
+
 get_target_property(packages rapids_export_install_test PACKAGE_NAMES)
 if(NOT libcudacxx IN_LIST packages)
   message(FATAL_ERROR "rapids_cpm_libcudacxx failed to record libcudacxx needs to be exported")

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,8 +29,13 @@ rapids_cpm_package_details
                              <exclude_from_all_variable>
                              )
 
+Result Variables
+^^^^^^^^^^^^^^^^
+  :cmake:variable:`rapids_cmake_always_download` will contain the value of the `always_download` entry if it exists.
+  :cmake:variable:`CPM_DOWNLOAD_ALL` will contain the value of the `always_download` entry if it exists.
+
 #]=======================================================================]
-# cmake-lint: disable=R0913
+# cmake-lint: disable=R0913,R0915
 function(rapids_cpm_package_details package_name version_var url_var tag_var shallow_var
          exclude_from_all_var)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.rapids_cpm_package_details")
@@ -59,6 +64,16 @@ function(rapids_cpm_package_details package_name version_var url_var tag_var sha
   rapids_cpm_json_get_value(git_url)
   rapids_cpm_json_get_value(git_tag)
 
+  if(override_json_data)
+    string(JSON value ERROR_VARIABLE no_url_override GET "${override_json_data}" git_url)
+    string(JSON value ERROR_VARIABLE no_tag_override GET "${override_json_data}" git_tag)
+    string(JSON value ERROR_VARIABLE no_patches_override GET "${override_json_data}" patches)
+    set(git_details_overridden TRUE)
+    if(no_url_override AND no_tag_override AND no_patches_override)
+      set(git_details_overridden FALSE)
+    endif()
+  endif()
+
   # Parse optional fields, set the variable to the 'default' value first
   set(git_shallow ON)
   rapids_cpm_json_get_value(git_shallow)
@@ -66,10 +81,10 @@ function(rapids_cpm_package_details package_name version_var url_var tag_var sha
   set(exclude_from_all OFF)
   rapids_cpm_json_get_value(exclude_from_all)
 
-  if(override_json_data)
-    # The default value for always download is defined by having an override for this package. When
-    # we have an override we presume the user doesn't want to use an existing local installed
-    # version
+  set(always_download OFF)
+  if(override_json_data AND json_data AND git_details_overridden)
+    # `always_download` default value requires the package to exist in both the default and override
+    # and that the git url / git tag have been modified.
     set(always_download ON)
   endif()
   rapids_cpm_json_get_value(always_download)
@@ -89,6 +104,7 @@ function(rapids_cpm_package_details package_name version_var url_var tag_var sha
   set(${shallow_var} ${git_shallow} PARENT_SCOPE)
   set(${exclude_from_all_var} ${exclude_from_all} PARENT_SCOPE)
   if(DEFINED always_download)
+    set(rapids_cmake_always_download ${always_download} PARENT_SCOPE)
     set(CPM_DOWNLOAD_ALL ${always_download} PARENT_SCOPE)
   endif()
 

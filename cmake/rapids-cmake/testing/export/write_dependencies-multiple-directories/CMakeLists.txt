@@ -15,7 +15,7 @@
 #=============================================================================
 
 #Needs to before inclusion of `cpm.cmake`
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 include(${rapids-cmake-dir}/export/cpm.cmake)
 include(${rapids-cmake-dir}/export/write_dependencies.cmake)

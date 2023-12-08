@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ tracking of these dependencies for correct export support.
 
   rapids_find_package(<PackageName>
                       [ all normal find_package options ]
+                      [COMPONENTS <components...>]
                       [GLOBAL_TARGETS <targets...>]
                       [BUILD_EXPORT_SET <name>]
                       [INSTALL_EXPORT_SET <name>]
@@ -47,6 +48,12 @@ in `GLOBAL_TARGETS`.
 
 ``PackageName``
   Name of the package to find.
+
+``COMPONENTS``
+  .. versionadded:: v22.10.00
+
+  A list of required components that are required to be found for this
+  package to be considered valid.
 
 ``GLOBAL_TARGETS``
   Which targets from this package should be made global. This information
@@ -101,30 +108,42 @@ The :cmake:command:`rapids_find_package` function supports two call modes.
 macro(rapids_find_package name)
   #
   # rapids_find_package breaks convention and is a macro on purpose. Since `find_package` allows
-  # abitrary variable creation ( `<PROJECT_???>` ) we need to have `rapids_find_package` do the
+  # arbitrary variable creation ( `<PROJECT_???>` ) we need to have `rapids_find_package` do the
   # same. If it doesn't it would make drop in replacements impossible
   #
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.find.package")
   set(_rapids_options FIND_ARGS)
   set(_rapids_one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET)
-  set(_rapids_multi_value GLOBAL_TARGETS)
-  cmake_parse_arguments(_RAPIDS "${_rapids_options}" "${_rapids_one_value}"
+  set(_rapids_multi_value COMPONENTS GLOBAL_TARGETS)
+  cmake_parse_arguments(_RAPIDS_FIND "${_rapids_options}" "${_rapids_one_value}"
                         "${_rapids_multi_value}" ${ARGN})
 
-  find_package(${name} ${_RAPIDS_UNPARSED_ARGUMENTS})
+  if(_RAPIDS_FIND_COMPONENTS)
+    list(APPEND _RAPIDS_FIND_UNPARSED_ARGUMENTS COMPONENTS ${_RAPIDS_FIND_COMPONENTS})
+  endif()
 
-  if(_RAPIDS_GLOBAL_TARGETS)
+  find_package(${name} ${_RAPIDS_FIND_UNPARSED_ARGUMENTS})
+
+  if(_RAPIDS_FIND_GLOBAL_TARGETS)
     include("${rapids-cmake-dir}/cmake/make_global.cmake")
-    rapids_cmake_make_global(_RAPIDS_GLOBAL_TARGETS)
+    rapids_cmake_make_global(_RAPIDS_FIND_GLOBAL_TARGETS)
   endif()
 
   # Only record the export requirements if the package was found This allows us to handle implicit
   # OPTIONAL find packages
   if(${${name}_FOUND})
 
+    if(${name} STREQUAL "CUDAToolkit")
+      include("${rapids-cmake-dir}/cuda/patch_toolkit.cmake")
+      rapids_cuda_patch_toolkit()
+    endif()
+
     set(_rapids_extra_info)
-    if(_RAPIDS_GLOBAL_TARGETS)
-      list(APPEND _rapids_extra_info "GLOBAL_TARGETS" ${_RAPIDS_GLOBAL_TARGETS})
+    if(_RAPIDS_FIND_GLOBAL_TARGETS)
+      list(APPEND _rapids_extra_info "GLOBAL_TARGETS" ${_RAPIDS_FIND_GLOBAL_TARGETS})
+    endif()
+    if(_RAPIDS_FIND_COMPONENTS)
+      list(APPEND _rapids_extra_info "COMPONENTS" ${_RAPIDS_FIND_COMPONENTS})
     endif()
 
     # Record the version we found to be what consumers need to find as well
@@ -133,14 +152,15 @@ macro(rapids_find_package name)
       list(APPEND _rapids_extra_info "VERSION" ${possible_version})
     endif()
 
-    if(_RAPIDS_BUILD_EXPORT_SET)
+    if(_RAPIDS_FIND_BUILD_EXPORT_SET)
       include("${rapids-cmake-dir}/export/package.cmake")
-      rapids_export_package(BUILD ${name} ${_RAPIDS_BUILD_EXPORT_SET} ${_rapids_extra_info})
+      rapids_export_package(BUILD ${name} ${_RAPIDS_FIND_BUILD_EXPORT_SET} ${_rapids_extra_info})
     endif()
 
-    if(_RAPIDS_INSTALL_EXPORT_SET)
+    if(_RAPIDS_FIND_INSTALL_EXPORT_SET)
       include("${rapids-cmake-dir}/export/package.cmake")
-      rapids_export_package(INSTALL ${name} ${_RAPIDS_INSTALL_EXPORT_SET} ${_rapids_extra_info})
+      rapids_export_package(INSTALL ${name} ${_RAPIDS_FIND_INSTALL_EXPORT_SET}
+                                    ${_rapids_extra_info})
     endif()
 
     unset(_rapids_extra_info)
@@ -148,8 +168,8 @@ macro(rapids_find_package name)
 
   # Cleanup all our local variables
   foreach(_rapids_local_var IN LISTS _rapids_options _rapids_one_value _rapids_multi_value)
-    if(DEFINED _RAPIDS_${_rapids_local_var})
-      unset(_RAPIDS_${_rapids_local_var})
+    if(DEFINED _RAPIDS_FIND_${_rapids_local_var})
+      unset(_RAPIDS_FIND_${_rapids_local_var})
     endif()
   endforeach()
   unset(_rapids_local_var)

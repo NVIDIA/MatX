@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,8 @@ function(rapids_cpm_download)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.download")
 
   # When changing version verify no new variables needs to be propagated
-  set(CPM_DOWNLOAD_VERSION 0.35.0)
+  set(CPM_DOWNLOAD_VERSION 0.38.5)
+  set(CPM_DOWNLOAD_MD5_HASH c98d14a13dfd1952e115979c095f6794)
 
   if(CPM_SOURCE_CACHE)
     # Expand relative path. This is important if the provided path contains a tilde (~)
@@ -72,7 +73,13 @@ function(rapids_cpm_download)
     message(VERBOSE "Downloading CPM.cmake to ${CPM_DOWNLOAD_LOCATION}")
     file(DOWNLOAD
          https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
-         ${CPM_DOWNLOAD_LOCATION})
+         ${CPM_DOWNLOAD_LOCATION} LOG download_log)
+
+    file(MD5 ${CPM_DOWNLOAD_LOCATION} cpm_hash)
+    if(NOT cpm_hash STREQUAL CPM_DOWNLOAD_MD5_HASH)
+      message(FATAL_ERROR "CPM.cmake hash mismatch [got=${cpm_hash} expected=${CPM_DOWNLOAD_MD5_HASH}] to download details below\n ${download_log}"
+      )
+    endif()
   endif()
 
   include(${CPM_DOWNLOAD_LOCATION})

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,4 +23,4 @@ endif()
 # Used by rapids_cuda_init_architectures to allow the `project()` call to invoke the
 # rapids_cuda_set_architectures function after compiler detection
 #
-rapids_cuda_set_architectures(ALL)
+rapids_cuda_set_architectures(RAPIDS)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <type_traits>
 #include <demo/version.h>
 #include <nested/version.h>
+#include <type_traits>
 
 constexpr int dmajor = DEMO_VERSION_MAJOR;
 constexpr int dminor = DEMO_VERSION_MINOR;

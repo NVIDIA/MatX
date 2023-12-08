@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/find/generate_module.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(rapids-test-project LANGUAGES CXX)
 
 set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -30,6 +30,13 @@ rapids_find_generate_module( RapidsTest
     )
 
 find_package(RapidsTest REQUIRED)
+
+if(NOT RapidsTest_FOUND)
+  message(FATAL_ERROR "RapidsTest_FOUND should be set to TRUE")
+endif()
+if(NOT RAPIDSTEST_FOUND)
+  message(FATAL_ERROR "RAPIDSTEST_FOUND should be set to TRUE")
+endif()
 
 if(NOT TARGET RapidsTest::RapidsTest)
   message(FATAL_ERROR "RapidsTest target should be generated")

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 include(${rapids-cmake-dir}/cpm/init.cmake)
 include(${rapids-cmake-dir}/cpm/find.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(rapids-test-project LANGUAGES CXX)
 
 rapids_cpm_init()
@@ -47,6 +47,5 @@ set(to_match_string [=["NAME;RapidsTest;VERSION;20.09.00;DOWNLOAD_COMMAND;ls;OPT
 file(READ "${CMAKE_BINARY_DIR}/rapids-test-project-dependencies.cmake" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_cpm_find(BUILD) failed to perserve quotes around CPM arguments")
+  message(FATAL_ERROR "rapids_cpm_find(BUILD) failed to preserve quotes around CPM arguments")
 endif()
-

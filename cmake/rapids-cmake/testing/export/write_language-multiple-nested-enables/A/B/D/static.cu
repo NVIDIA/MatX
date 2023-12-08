@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,7 @@
  * limitations under the License.
  */
 
-
-static __global__ void example_cuda_kernel(int& r, int x, int y)
-{
-
-  r =  x * y + ( x * 4 - (y/2) );
-}
+static __global__ void example_cuda_kernel(int& r, int x, int y) { r = x * y + (x * 4 - (y / 2)); }
 
 int static_launch_kernelD(int x, int y)
 {

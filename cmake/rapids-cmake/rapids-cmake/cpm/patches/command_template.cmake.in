@@ -1,0 +1,89 @@
+#=============================================================================
+# Copyright (c) 2022, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#=============================================================================
+
+set(msg_state)
+function(rapids_cpm_run_git_patch file issue)
+  set(git_command @GIT_EXECUTABLE@)
+  cmake_path(GET file FILENAME file_name)
+  cmake_path(GET file_name EXTENSION LAST_ONLY ext)
+  string(SUBSTRING "${ext}" 1 -1 ext)
+
+  if(NOT (ext STREQUAL "diff" OR ext STREQUAL "patch") )
+    list(APPEND msg_state "rapids-cmake: Unable to apply ${file} as ${ext} is unsupported. Only .diff and .patch are supported")
+    set(msg_state ${msg_state} PARENT_SCOPE)
+    return()
+  endif()
+
+  set(command apply)
+  set(args)
+  if(ext STREQUAL "patch")
+    set(command am)
+    set(args -3)
+  endif()
+
+  set(result 1)
+  if(ext STREQUAL "diff")
+    execute_process(
+      COMMAND ${git_command} apply ${file}
+      RESULT_VARIABLE result
+      ERROR_VARIABLE repo_error_info
+    )
+    if(NOT result EQUAL 0)
+      # See if the diff was previously applied
+      execute_process(
+        COMMAND ${git_command} apply --reverse --check ${file}
+        RESULT_VARIABLE result
+      )
+    endif()
+  elseif(ext STREQUAL "patch")
+    # no need to check if the git patch was already applied
+    # `am` does that and returns a success error code for those cases
+    execute_process(
+      COMMAND ${git_command} am -3 ${file}
+      RESULT_VARIABLE result
+      ERROR_VARIABLE repo_error_info
+    )
+  endif()
+
+  if(result EQUAL 0)
+    list(APPEND msg_state "rapids-cmake [@package_name@]: applied ${ext} ${file_name} to fix issue: '${issue}'")
+  else()
+    list(APPEND msg_state "rapids-cmake [@package_name@]: failed to apply ${ext} ${file_name}")
+    list(APPEND msg_state "rapids-cmake [@package_name@]: git ${ext} output: ${repo_error_info}")
+  endif()
+  list(APPEND msg_state "\n")
+  set(msg_state ${msg_state} PARENT_SCOPE)
+endfunction()
+
+# We want to ensure that any patched files have a timestamp
+# that is at least 1 second newer compared to the git checkout
+# This ensures that all of CMake up-to-date install logic
+# considers these files as modified.
+#
+# This ensures that if our patch contains additional install rules
+# they will execute even when an existing install rule exists
+# with the same destination ( and our patch is listed last ).
+execute_process(COMMAND ${CMAKE_COMMAND} -E sleep 1)
+
+set(files "@patch_files_to_run@")
+set(issues "@patch_issues_to_ref@")
+set(output_file "@log_file@")
+foreach(file issue IN ZIP_LISTS files issues)
+  rapids_cpm_run_git_patch(${file} ${issue})
+endforeach()
+if(msg_state)
+  file(WRITE "${output_file}" ${msg_state})
+endif()

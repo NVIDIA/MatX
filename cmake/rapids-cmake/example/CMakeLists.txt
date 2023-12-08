@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +14,13 @@
 # limitations under the License.
 #=============================================================================
 
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.23.1 FATAL_ERROR)
 
-file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.04/RAPIDS.cmake
-    ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
+       ${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
+endif()
+include(${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
 
 include(rapids-cmake)
 include(rapids-cpm)
@@ -84,7 +86,7 @@ include(${rapids-cmake-dir}/cpm/rmm.cmake)
 rapids_cpm_rmm(BUILD_EXPORT_SET example-targets
                INSTALL_EXPORT_SET example-targets)
 
-# Bring in any abitrary package
+# Bring in any arbitrary package
 rapids_cpm_find(fmt 7.1.3
   GLOBAL_TARGETS fmt::fmt
   CPM_ARGS
@@ -96,8 +98,8 @@ rapids_cpm_find(fmt 7.1.3
 add_library(example SHARED source.cu)
 
 set_target_properties(example
-    PROPERTIES BUILD_RPATH                         "\$ORIGIN"
-               INSTALL_RPATH                       "\$ORIGIN"
+    PROPERTIES BUILD_RPATH                         "$ORIGIN"
+               INSTALL_RPATH                       "$ORIGIN"
                # set target compile options
                CXX_STANDARD                        17
                CXX_STANDARD_REQUIRED               ON

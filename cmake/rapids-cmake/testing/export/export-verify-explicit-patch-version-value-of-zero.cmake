@@ -59,7 +59,7 @@ if(NOT "${TEST_VERSION_MAJOR}.${TEST_VERSION_MINOR}" VERSION_EQUAL 21.09)
   message(FATAL_ERROR "rapids_export failed to export version major/minor information")
 endif()
 
-find_package(test 21.9.0 EXACT REQUIRED)
+find_package(test 21.09.0 EXACT REQUIRED)
 if(NOT TEST_VERSION STREQUAL "21.09.0")
   message(FATAL_ERROR "rapids_export failed to export version information")
 endif()

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ Generate a C++ header file that holds git revision information of the calling pr
   rapids_cmake_write_git_revision_file(<target_name> file_path [PREFIX <prefix>])
 
 Creates a global interface target called `target_name` that holds the includes to
-the generated header with the macros for git branch, sha1, version, and if any uncommited
+the generated header with the macros for git branch, sha1, version, and if any uncommitted
 changes exist. Users of the header file must use
 :cmake:command:`target_link_libraries <cmake:command:target_link_libraries>` to the target
 so that the header is generated before it is used.
@@ -47,12 +47,12 @@ This information will be recorded in the following defines:
     Will store the full SHA1 for the current git commit if one exists.
 
   - <PREFIX>_GIT_IS_DIRTY
-    Will exist if any git tracked file has any modifications that aren't commited ( dirty ).
+    Will exist if any git tracked file has any modifications that aren't committed ( dirty ).
 
   - <PREFIX>_GIT_VERSION
     Will store `<tag>[-<distance>-g<sha1>[-dirty]]` computed from running
     `git describe --tags --dirty --always`. For example "v21.10.00a-18-g7efb04f-dirty" indicates
-    that the lastest commit is "7efb04f" but has uncommitted changes (`-dirty`), and
+    that the latest commit is "7efb04f" but has uncommitted changes (`-dirty`), and
     that we are "18" commits after tag "v21.10.00a".
 
 ``file_path``
@@ -113,6 +113,6 @@ function(rapids_cmake_write_git_revision_file target file_path)
   add_dependencies(${target} ${target}_compute_git_info)
 
   cmake_path(GET file_path PARENT_PATH file_path_dir)
-  target_include_directories(${target} INTERFACE ${file_path_dir})
+  target_include_directories(${target} INTERFACE "$<BUILD_INTERFACE:${file_path_dir}>")
 
 endfunction()

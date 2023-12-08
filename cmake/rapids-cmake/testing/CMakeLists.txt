@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +14,22 @@
 # limitations under the License.
 #=============================================================================
 
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.23.1 FATAL_ERROR)
 project(rapids-cmake-testing LANGUAGES NONE)
 
 enable_testing()
 include(utils/cmake_config_test.cmake)
+include(utils/cmake_ctest_test.cmake)
 include(utils/cmake_build_test.cmake)
 
 add_subdirectory(cmake)
 add_subdirectory(cuda)
 add_subdirectory(export)
 add_subdirectory(find)
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/utils/determine_gpu_count.cmake")
+determine_gpu_count()
+add_subdirectory(test)
 
 option(RAPIDS_CMAKE_ENABLE_DOWNLOAD_TESTS "Enable tests that require downloads" ON)
 if(RAPIDS_CMAKE_ENABLE_DOWNLOAD_TESTS)
@@ -38,4 +43,3 @@ if(RAPIDS_CMAKE_ENABLE_DOWNLOAD_TESTS)
   add_subdirectory(cython)
   add_subdirectory(other)
 endif()
-
