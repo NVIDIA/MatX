@@ -78,7 +78,7 @@ typedef enum {
 struct CubParams_t {
   CUBOperation_t op;
   std::vector<index_t> size{10};
-  index_t batches;
+  index_t batches{0};
   MatXDataType_t dtype;
   cudaStream_t stream;
 };
