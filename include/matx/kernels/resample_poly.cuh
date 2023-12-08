@@ -40,10 +40,12 @@
 #include <stdio.h>
 #include <vector>
 
+#ifdef __CUDACC__
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 
 namespace cg = cooperative_groups;
+#endif
 
 #include "cuComplex.h"
 #include "matx/core/utils.h"
