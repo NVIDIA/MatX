@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,9 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
       "git_tag" : "my_tag",
       "always_download" : false
     },
+    "rmm" : {
+      "git_tag" : "my_tag"
+    },
     "GTest" : {
       "version" : "2.99"
     }
@@ -50,11 +53,22 @@ if(NOT repository STREQUAL nvbench_repository)
   message(FATAL_ERROR "default repository field was removed.")
 endif()
 if(NOT tag STREQUAL "my_tag")
-  message(FATAL_ERROR "custom git_tag field was ignored. ${tag} found instead of my_url")
+  message(FATAL_ERROR "custom git_tag field was ignored. ${tag} found instead of my_tag")
 endif()
 if(CPM_DOWNLOAD_ALL)
   message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be false since the nvbench override explicitly sets it to 'false'")
 endif()
+unset(CPM_DOWNLOAD_ALL)
+
+# Verify that the override works
+rapids_cpm_package_details(rmm version repository tag shallow exclude)
+if(NOT tag STREQUAL "my_tag")
+  message(FATAL_ERROR "custom git_tag field was ignored. ${tag} found instead of my_tag")
+endif()
+if(NOT CPM_DOWNLOAD_ALL)
+  message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be true since a custom git tag was used for rmm")
+endif()
+unset(CPM_DOWNLOAD_ALL)
 
 rapids_cpm_package_details(GTest version repository tag shallow exclude)
 if(NOT version STREQUAL "2.99")
@@ -63,6 +77,6 @@ endif()
 if(NOT tag MATCHES "2.99")
   message(FATAL_ERROR "custom version field not used when computing git_tag value. ${tag} was found instead")
 endif()
-if(NOT CPM_DOWNLOAD_ALL)
-  message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be enabled by default when an override exists")
+if(CPM_DOWNLOAD_ALL)
+  message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be false by default when an override exists that doesn't modify url or tag")
 endif()

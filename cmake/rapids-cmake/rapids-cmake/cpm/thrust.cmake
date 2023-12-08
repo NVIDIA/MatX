@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,13 @@ across all RAPIDS projects.
 .. |PKG_NAME| replace:: Thrust
 .. include:: common_package_args.txt
 
+.. versionadded:: v23.12.00
+  When `BUILD_EXPORT_SET` is specified the generated build export set dependency
+  file will automatically call `thrust_create_target(<namespace>::Thrust FROM_OPTIONS)`.
+
+  When `INSTALL_EXPORT_SET` is specified the generated install export set dependency
+  file will automatically call `thrust_create_target(<namespace>::Thrust FROM_OPTIONS)`.
+
 Result Targets
 ^^^^^^^^^^^^^^
   <namespace>::Thrust target will be created
@@ -52,11 +59,24 @@ Result Variables
   :cmake:variable:`Thrust_VERSION`    is set to the version of Thrust specified by the versions.json.
 
 #]=======================================================================]
+# cmake-lint: disable=R0915
 function(rapids_cpm_thrust NAMESPACE namespaces_name)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.thrust")
 
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(Thrust version repository tag shallow exclude)
+
+  set(to_install OFF)
+  if(INSTALL_EXPORT_SET IN_LIST ARGN AND NOT exclude)
+    set(to_install ON)
+    # Make sure we install thrust into the `include/rapids` subdirectory instead of the default
+    include(GNUInstallDirs)
+    set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/rapids")
+    set(CMAKE_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/rapids")
+  endif()
+
+  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
+  rapids_cpm_generate_patch_command(Thrust ${version} patch_command)
 
   include("${rapids-cmake-dir}/cpm/find.cmake")
   rapids_cpm_find(Thrust ${version} ${ARGN}
@@ -65,100 +85,44 @@ function(rapids_cpm_thrust NAMESPACE namespaces_name)
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
                   GIT_SHALLOW ${shallow}
+                  PATCH_COMMAND ${patch_command}
                   EXCLUDE_FROM_ALL ${exclude}
-                  OPTIONS "THRUST_ENABLE_INSTALL_RULES OFF")
+                  OPTIONS "THRUST_ENABLE_INSTALL_RULES ${to_install}")
 
-  if(NOT TARGET ${namespaces_name}::Thrust)
-    thrust_create_target(${namespaces_name}::Thrust FROM_OPTIONS)
-  endif()
+  include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
+  rapids_cpm_display_patch_status(Thrust)
 
-  # Since `GLOBAL_TARGET ${namespaces_name}::Thrust` will list the target to be promoted to global
-  # by `rapids_export` this will break consumers as the target doesn't exist when generating the
-  # dependencies.cmake file, but requires a call to `thrust_create_target`
-  #
-  # So determine what `BUILD_EXPORT_SET` and `INSTALL_EXPORT_SET` this was added to and remove
-  # ${namespaces_name}::Thrust
-  set(options CPM_ARGS)
+  set(options)
   set(one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET)
   set(multi_value)
   cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
-  if(_RAPIDS_BUILD_EXPORT_SET)
-    set(target_name rapids_export_build_${_RAPIDS_BUILD_EXPORT_SET})
-    get_target_property(global_targets ${target_name} GLOBAL_TARGETS)
-    list(REMOVE_ITEM global_targets "${namespaces_name}::Thrust")
-    set_target_properties(${target_name} PROPERTIES GLOBAL_TARGETS "${global_targets}")
+  set(post_find_code "if(NOT TARGET ${namespaces_name}::Thrust)"
+                     "  thrust_create_target(${namespaces_name}::Thrust FROM_OPTIONS)" "endif()")
+
+  if(Thrust_SOURCE_DIR)
+    # Store where CMake can find the Thrust-config.cmake that comes part of Thrust source code
+    include("${rapids-cmake-dir}/export/find_package_root.cmake")
+    include("${rapids-cmake-dir}/export/detail/post_find_package_code.cmake")
+    rapids_export_find_package_root(BUILD Thrust "${Thrust_SOURCE_DIR}/cmake"
+                                    EXPORT_SET ${_RAPIDS_BUILD_EXPORT_SET})
+    rapids_export_post_find_package_code(BUILD Thrust "${post_find_code}" EXPORT_SET
+                                         ${_RAPIDS_BUILD_EXPORT_SET})
+
+    rapids_export_find_package_root(INSTALL Thrust
+                                    [=[${CMAKE_CURRENT_LIST_DIR}/../../rapids/cmake/thrust]=]
+                                    EXPORT_SET ${_RAPIDS_INSTALL_EXPORT_SET} CONDITION to_install)
+    rapids_export_post_find_package_code(INSTALL Thrust "${post_find_code}" EXPORT_SET
+                                         ${_RAPIDS_INSTALL_EXPORT_SET} CONDITION to_install)
   endif()
 
-  if(_RAPIDS_INSTALL_EXPORT_SET)
-    set(target_name rapids_export_install_${_RAPIDS_INSTALL_EXPORT_SET})
-    get_target_property(global_targets ${target_name} GLOBAL_TARGETS)
-    list(REMOVE_ITEM global_targets "${namespaces_name}::Thrust")
-    set_target_properties(${target_name} PROPERTIES GLOBAL_TARGETS "${global_targets}")
-  endif()
-
-  # only install thrust when we have an in-source version
-  if(Thrust_SOURCE_DIR AND _RAPIDS_INSTALL_EXPORT_SET)
-    #[==[
-    Projects such as cudf, and rmm require a newer versions of thrust than can be found in the oldest supported CUDA toolkit.
-    This requires these components to install/packaged so that consumers use the same version. To make sure that the custom
-    version of thrust is used over the CUDA toolkit version we need to ensure we always use an user include and not a system.
-
-    By default if we allow thrust to install into `CMAKE_INSTALL_INCLUDEDIR` alongside rmm (or other pacakges)
-    we will get a install tree that looks like this:
-
-      install/include/rmm
-      install/include/cub
-      install/include/thrust
-
-    This is a problem for CMake+NVCC due to the rules around import targets, and user/system includes. In this case both
-    rmm and thrust will specify an include path of `install/include`, while thrust tries to mark it as an user include,
-    since rmm uses CMake's default of system include. Compilers when provided the same include as both user and system
-    always goes with system.
-
-    Now while rmm could also mark `install/include` as system this just pushes the issue to another dependency which
-    isn't built by RAPIDS and comes by and marks `install/include` as system.
-
-    Instead the more reliable option is to make sure that we get thrust to be placed in an unique include path that
-    to other project will use. In the case of rapids-cmake we install the headers to `include/rapids/thrust`
-    #]==]
-    include(GNUInstallDirs)
-    install(DIRECTORY "${Thrust_SOURCE_DIR}/thrust"
-            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rapids/thrust/" FILES_MATCHING
-            REGEX "\\.(h|inl)$")
-    install(DIRECTORY "${Thrust_SOURCE_DIR}/dependencies/cub/cub"
-            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rapids/thrust/dependencies/" FILES_MATCHING
-            PATTERN "*.cuh")
-
-    install(DIRECTORY "${Thrust_SOURCE_DIR}/thrust/cmake"
-            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rapids/thrust/thrust/")
-    install(DIRECTORY "${Thrust_SOURCE_DIR}/dependencies/cub/cub/cmake"
-            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rapids/thrust/dependencies/cub/")
-
-    include("${rapids-cmake-dir}/cmake/install_lib_dir.cmake")
-    rapids_cmake_install_lib_dir(install_location) # Use the correct conda aware path
-
-    # We need to install the forwarders in `lib/cmake/thrust` and `lib/cmake/cub`
-    set(scratch_dir
-        "${CMAKE_BINARY_DIR}/rapids-cmake/${_RAPIDS_INSTALL_EXPORT_SET}/install/scratch/")
-
-    file(WRITE "${scratch_dir}/thrust-config.cmake"
-         [=[include("${CMAKE_CURRENT_LIST_DIR}/../../../include/rapids/thrust/thrust/cmake/thrust-config.cmake")]=]
-    )
-    file(WRITE "${scratch_dir}/thrust-config-version.cmake"
-         [=[include("${CMAKE_CURRENT_LIST_DIR}/../../../include/rapids/thrust/thrust/cmake/thrust-config-version.cmake")]=]
-    )
-    install(FILES "${scratch_dir}/thrust-config.cmake" "${scratch_dir}/thrust-config-version.cmake"
-            DESTINATION "${install_location}/cmake/thrust")
-
-    file(WRITE "${scratch_dir}/cub-config.cmake"
-         [=[include("${CMAKE_CURRENT_LIST_DIR}/../../../include/rapids/thrust/dependencies/cub/cub-config.cmake")]=]
-    )
-    file(WRITE "${scratch_dir}/cub-config-version.cmake"
-         [=[include("${CMAKE_CURRENT_LIST_DIR}/../../../include/rapids/thrust/dependencies/cub/cub-config-version.cmake")]=]
-    )
-    install(FILES "${scratch_dir}/cub-config.cmake" "${scratch_dir}/cub-config-version.cmake"
-            DESTINATION "${install_location}/cmake/cub")
+  # Check for the existence of thrust_create_target so we support fetching Thrust with DOWNLOAD_ONLY
+  if(NOT TARGET ${namespaces_name}::Thrust AND COMMAND thrust_create_target)
+    thrust_create_target(${namespaces_name}::Thrust FROM_OPTIONS)
+    set_target_properties(${namespaces_name}::Thrust PROPERTIES IMPORTED_NO_SYSTEM ON)
+    if(TARGET _Thrust_Thrust)
+      set_target_properties(_Thrust_Thrust PROPERTIES IMPORTED_NO_SYSTEM ON)
+    endif()
   endif()
 
   # Propagate up variables that CPMFindPackage provide

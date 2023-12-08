@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,8 +32,9 @@ adds a test for each generator:
 
 .. code-block:: cmake
 
-  add_cmake_build_test( (config|build|run|install)
+  add_cmake_build_test( (config|build|test|install)
                          <SourceOrDir>
+                         [SERIAL]
                          [SHOULD_FAIL <expected error message string>]
                       )
 
@@ -42,17 +43,22 @@ adds a test for each generator:
   step. Expects the test to raise an error to mark failures
 
 ``build``
-  Generate and build a CMake project. The CMake config and generate
+  Generate and build a CMake project. The CMake configuration
   step is constructed as a setup fixture.
   Expects the test to either raise an error during config, or fail
   to build to mark failures
+
+``test``
+  Generate, build, and ctest a CMake project. The CMake config, and
+  build steps are constructed as a setup fixture.
+  Expects the underlying ctest execution to fail to mark failures
 
 ``install``
   - Not implemented
 
 #]=======================================================================]
 function(add_cmake_test mode source_or_dir)
-  set(options)
+  set(options SERIAL)
   set(one_value SHOULD_FAIL)
   set(multi_value)
   cmake_parse_arguments(RAPIDS_TEST "${options}" "${one_value}" "${multi_value}" ${ARGN})
@@ -93,6 +99,7 @@ function(add_cmake_test mode source_or_dir)
                ${extra_configure_flags}
                -Drapids-cmake-testing-dir=${PROJECT_SOURCE_DIR}
                -Drapids-cmake-dir=${PROJECT_SOURCE_DIR}/../rapids-cmake)
+
     elseif(mode STREQUAL "build")
       add_test(NAME ${test_name}_configure
                COMMAND ${CMAKE_COMMAND}
@@ -104,14 +111,46 @@ function(add_cmake_test mode source_or_dir)
 
       add_test(NAME ${test_name}
                COMMAND ${CMAKE_COMMAND}
-               --build ${build_dir} -j3 )
+               --build ${build_dir} -j3000 )
 
       set_tests_properties(${test_name}_configure PROPERTIES FIXTURES_SETUP ${test_name})
+      set_tests_properties(${test_name} PROPERTIES FIXTURES_REQUIRED ${test_name})
+    elseif(mode STREQUAL "test")
+      add_test(NAME ${test_name}_configure
+               COMMAND ${CMAKE_COMMAND}
+               -S ${src_dir} -B ${build_dir}
+               -G "${generator}"
+               ${extra_configure_flags}
+               -Drapids-cmake-testing-dir=${PROJECT_SOURCE_DIR}
+               -Drapids-cmake-dir=${PROJECT_SOURCE_DIR}/../rapids-cmake)
+
+      add_test(NAME ${test_name}_build
+               COMMAND ${CMAKE_COMMAND}
+               --build ${build_dir} -j3 )
+      set_tests_properties(${test_name}_build PROPERTIES DEPENDS ${test_name}_configure)
+
+      add_test(NAME ${test_name}
+               COMMAND ${CMAKE_CTEST_COMMAND} -C Debug -j400 -VV
+               WORKING_DIRECTORY ${build_dir})
+
+      set_tests_properties(${test_name}_configure PROPERTIES FIXTURES_SETUP ${test_name})
+      set_tests_properties(${test_name}_build PROPERTIES FIXTURES_SETUP ${test_name})
       set_tests_properties(${test_name} PROPERTIES FIXTURES_REQUIRED ${test_name})
     elseif(mode STREQUAL "install")
       message(FATAL_ERROR "install mode not yet implemented by add_cmake_build_test")
     else()
       message(FATAL_ERROR "${mode} mode not one of the valid modes (config|build|install) by add_cmake_build_test")
+    endif()
+
+    if(RAPIDS_TEST_SERIAL)
+      set_tests_properties(${test_name} PROPERTIES RUN_SERIAL ON)
+      if(TEST ${test_name}_configure)
+        message(STATUS "${test_name}_configure is serial")
+        set_tests_properties(${test_name}_configure PROPERTIES RUN_SERIAL ON)
+      endif()
+      if(TEST ${test_name}_build)
+        set_tests_properties(${test_name}_build PROPERTIES RUN_SERIAL ON)
+      endif()
     endif()
 
     if(RAPIDS_TEST_SHOULD_FAIL)

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/find/generate_module.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(rapids-test-project LANGUAGES CXX)
 
 set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -30,6 +30,13 @@ rapids_find_generate_module( RapidsTest
 
 find_package(RapidsTest REQUIRED)
 
+if(NOT RapidsTest_FOUND)
+  message(FATAL_ERROR "RapidsTest_FOUND should be set to TRUE")
+endif()
+if(NOT RAPIDSTEST_FOUND)
+  message(FATAL_ERROR "RAPIDSTEST_FOUND should be set to TRUE")
+endif()
+
 if(NOT TARGET RapidsTest::RapidsTest)
   message(FATAL_ERROR "RapidsTest target should be generated")
 endif()
@@ -37,6 +44,7 @@ endif()
 get_target_property(include_dir RapidsTest::RapidsTest INTERFACE_INCLUDE_DIRECTORIES)
 get_target_property(release_lib RapidsTest::RapidsTest IMPORTED_LOCATION_RELEASE)
 get_target_property(debug_lib RapidsTest::RapidsTest IMPORTED_LOCATION_DEBUG)
+get_target_property(is_global RapidsTest::RapidsTest IMPORTED_GLOBAL)
 
 if(NOT IS_DIRECTORY "${include_dir}")
   message(FATAL_ERROR "rapids_find_generate_module failed to generate correct include dir search logic")
@@ -50,6 +58,9 @@ if(debug_lib)
   message(FATAL_ERROR "rapids_find_generate_module incorrectly found a debug library")
 endif()
 
+if(NOT is_global)
+  message(FATAL_ERROR "rapids_find_generate_module created a target that is not global")
+endif()
 
 # verify header only lib
 rapids_find_generate_module( RapidsTestHeaderOnly

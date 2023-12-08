@@ -1,0 +1,41 @@
+diff --git a/cmake/libcudacxxInstallRules.cmake b/cmake/libcudacxxInstallRules.cmake
+index bd92a3be..f99a5606 100644
+--- a/cmake/libcudacxxInstallRules.cmake
++++ b/cmake/libcudacxxInstallRules.cmake
+@@ -28,10 +28,17 @@ install(DIRECTORY "${libcudacxx_SOURCE_DIR}/lib/cmake/libcudacxx"
+ # Need to configure a file to store CMAKE_INSTALL_INCLUDEDIR
+ # since it can be defined by the user. This is common to work around collisions
+ # with the CTK installed headers.
++set(install_location "${CMAKE_INSTALL_LIBDIR}/cmake/libcudacxx")
++# Transform to a list of directories, replace each directory with "../"
++# and convert back to a string
++string(REGEX REPLACE "/" ";" from_install_prefix "${install_location}")
++list(TRANSFORM from_install_prefix REPLACE ".+" "../")
++list(JOIN from_install_prefix "" from_install_prefix)
++
+ configure_file("${libcudacxx_SOURCE_DIR}/lib/cmake/libcudacxx/libcudacxx-header-search.cmake.in"
+   "${libcudacxx_BINARY_DIR}/lib/cmake/libcudacxx/libcudacxx-header-search.cmake"
+   @ONLY
+ )
+ install(FILES "${libcudacxx_BINARY_DIR}/lib/cmake/libcudacxx/libcudacxx-header-search.cmake"
+-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libcudacxx"
++  DESTINATION "${install_location}"
+ )
+diff --git a/lib/cmake/libcudacxx/libcudacxx-header-search.cmake.in b/lib/cmake/libcudacxx/libcudacxx-header-search.cmake.in
+index 9e7e187c..6130197f 100644
+--- a/lib/cmake/libcudacxx/libcudacxx-header-search.cmake.in
++++ b/lib/cmake/libcudacxx/libcudacxx-header-search.cmake.in
+@@ -1,8 +1,12 @@
+ # Parse version information from version header:
+ unset(_libcudacxx_VERSION_INCLUDE_DIR CACHE) # Clear old result to force search
++
++# Find CMAKE_INSTALL_INCLUDEDIR=@CMAKE_INSTALL_INCLUDEDIR@ directory"
++set(from_install_prefix "@from_install_prefix@")
++
+ find_path(_libcudacxx_VERSION_INCLUDE_DIR cuda/std/detail/__config
+   NO_DEFAULT_PATH # Only search explicit paths below:
+   PATHS
+-    "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_INCLUDEDIR@" # Install tree
++    "${CMAKE_CURRENT_LIST_DIR}/${from_install_prefix}/@CMAKE_INSTALL_INCLUDEDIR@" # Install tree
+ )
+ set_property(CACHE _libcudacxx_VERSION_INCLUDE_DIR PROPERTY TYPE INTERNAL)

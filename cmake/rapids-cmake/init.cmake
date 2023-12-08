@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 #
 if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 
-  # Be defensive of other projects over-writting CMAKE_MODULE_PATH on us!
+  # Be defensive of other projects over-writing CMAKE_MODULE_PATH on us!
   set(rapids-cmake-dir "${rapids-cmake-dir}" PARENT_SCOPE)
   if(NOT "${rapids-cmake-dir}" IN_LIST CMAKE_MODULE_PATH)
     list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")

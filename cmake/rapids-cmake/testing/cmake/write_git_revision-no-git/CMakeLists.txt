@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/cmake/write_git_revision_file.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 project(DEMO VERSION 2.4 LANGUAGES CXX)
 

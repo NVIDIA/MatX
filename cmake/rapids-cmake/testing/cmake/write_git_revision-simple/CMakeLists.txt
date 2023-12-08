@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 # limitations under the License.
 #=============================================================================
 include(${rapids-cmake-dir}/cmake/write_git_revision_file.cmake)
+include(${rapids-cmake-dir}/export/export.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 project(DEMO VERSION 2.4 LANGUAGES CXX)
 rapids_cmake_write_git_revision_file(demo_version "${CMAKE_CURRENT_BINARY_DIR}/demo/demo_git_version.hpp")
@@ -26,3 +27,8 @@ rapids_cmake_write_git_revision_file(nested_version "${CMAKE_CURRENT_BINARY_DIR}
 add_executable(write_git_version main.cpp)
 target_link_libraries(write_git_version PRIVATE demo_version nested_version)
 target_compile_features(write_git_version PRIVATE cxx_std_14)
+
+install(TARGETS write_git_version EXPORT write_git)
+rapids_export(BUILD DEMO
+  EXPORT_SET write_git
+  )

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,19 +30,18 @@ across all RAPIDS projects.
 .. code-block:: cmake
 
   rapids_cpm_nvbench( [BUILD_EXPORT_SET <export-name>]
+                      [INSTALL_EXPORT_SET <export-name>]
+                      [BUILD_STATIC]
                       [<CPM_ARGS> ...])
 
-``BUILD_EXPORT_SET``
-  Record that a :cmake:command:`CPMFindPackage(nvbench)` call needs to occur as part of
-  our build directory export set.
+.. |PKG_NAME| replace:: nvbench
+.. include:: common_package_args.txt
 
-``CPM_ARGS``
-  Any arguments after `CPM_ARGS` will be forwarded to the underlying :cmake:command:`CPMFindPackage(<PackageName> ...)` call
+.. versionadded:: v23.12.00
 
-.. note::
-
-  RAPIDS-cmake will error out if an INSTALL_EXPORT_SET is provided, as nvbench
-  doesn't provide any support for installation.
+``BUILD_STATIC``
+  Will build nvbench statically. No local searching for a previously
+  built version will occur.
 
 Result Targets
 ^^^^^^^^^^^^^^
@@ -61,10 +60,15 @@ Result Variables
 function(rapids_cpm_nvbench)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.nvbench")
 
-  set(to_install FALSE)
+  set(to_install OFF)
   if(INSTALL_EXPORT_SET IN_LIST ARGN)
-    message(FATAL_ERROR "nvbench doesn't provide install rules.
-            It can't be part of an INSTALL_EXPORT_SET")
+    set(to_install ON)
+  endif()
+
+  set(build_shared ON)
+  if(BUILD_STATIC IN_LIST ARGN)
+    set(build_shared OFF)
+    set(CPM_DOWNLOAD_nvbench ON) # Since we need static we build from source
   endif()
 
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
@@ -77,6 +81,9 @@ function(rapids_cpm_nvbench)
     set(nvbench_with_nvml "ON")
   endif()
 
+  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
+  rapids_cpm_generate_patch_command(nvbench ${version} patch_command)
+
   include("${rapids-cmake-dir}/cpm/find.cmake")
   rapids_cpm_find(nvbench ${version} ${ARGN}
                   GLOBAL_TARGETS nvbench::nvbench nvbench::main
@@ -84,9 +91,14 @@ function(rapids_cpm_nvbench)
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
                   GIT_SHALLOW ${shallow}
+                  PATCH_COMMAND ${patch_command}
                   EXCLUDE_FROM_ALL ${exclude}
                   OPTIONS "NVBench_ENABLE_NVML ${nvbench_with_nvml}" "NVBench_ENABLE_EXAMPLES OFF"
-                          "NVBench_ENABLE_TESTING OFF")
+                          "NVBench_ENABLE_TESTING OFF" "NVBench_ENABLE_INSTALL_RULES ${to_install}"
+                          "BUILD_SHARED_LIBS ${build_shared}")
+
+  include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
+  rapids_cpm_display_patch_status(nvbench)
 
   # Propagate up variables that CPMFindPackage provide
   set(nvbench_SOURCE_DIR "${nvbench_SOURCE_DIR}" PARENT_SCOPE)

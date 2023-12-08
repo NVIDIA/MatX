@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ rapids_export_write_dependencies
 
 .. code-block:: cmake
 
-Creates a self-containted file that searches for all dependencies for a given
+Creates a self-contained file that searches for all dependencies for a given
 export set.
 
   rapids_export_write_dependencies( (BUILD|INSTALL) <export_set> <file_path> )
@@ -42,6 +42,7 @@ a given export_set for the requested mode.
   CMake config module.
 
 #]=======================================================================]
+# cmake-lint: disable=R0915
 function(rapids_export_write_dependencies type export_set file_path)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.export.write_dependencies")
 
@@ -88,14 +89,12 @@ endif()\n")
     endif()
   endif()
 
-  if(find_root_dirs)
-    foreach(package IN LISTS find_root_dirs)
-      get_property(root_dir_path TARGET rapids_export_${type}_${export_set}
-                   PROPERTY "FIND_ROOT_FOR_${package}")
-      set(dep_content "set(${package}_ROOT \"${root_dir_path}\")")
-      string(APPEND _RAPIDS_EXPORT_CONTENTS "${dep_content}\n")
-    endforeach()
-  endif()
+  foreach(package IN LISTS find_root_dirs)
+    get_property(root_dir_path TARGET rapids_export_${type}_${export_set}
+                 PROPERTY "FIND_ROOT_FOR_${package}")
+    set(dep_content "set(${package}_ROOT \"${root_dir_path}\")")
+    string(APPEND _RAPIDS_EXPORT_CONTENTS "${dep_content}\n")
+  endforeach()
 
   if(find_modules)
     cmake_path(GET file_path PARENT_PATH find_module_dest)
@@ -116,6 +115,12 @@ endif()\n")
       file(READ "${dep_dir}/package_${dep}.cmake" dep_content)
     endif()
     string(APPEND _RAPIDS_EXPORT_CONTENTS "${dep_content}\n")
+
+    get_property(post_find_code TARGET rapids_export_${type}_${export_set}
+                 PROPERTY "${dep}_POST_FIND_CODE")
+    if(post_find_code)
+      string(APPEND _RAPIDS_EXPORT_CONTENTS "if(${dep}_FOUND)\n${post_find_code}\nendif()\n")
+    endif()
   endforeach()
   string(APPEND _RAPIDS_EXPORT_CONTENTS "\n")
 

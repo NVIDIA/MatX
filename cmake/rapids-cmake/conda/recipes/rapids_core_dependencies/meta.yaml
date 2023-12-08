@@ -1,0 +1,50 @@
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+
+{% set version = environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') %}
+{% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
+{% set cuda_major = cuda_version.split('.')[0] %}
+{% set date_string = environ['RAPIDS_DATE_STRING'] %}
+
+package:
+  name: rapids_core_dependencies
+  version: {{ version }}
+
+source:
+  git_url: ../../..
+
+build:
+  number: {{ GIT_DESCRIBE_NUMBER }}
+  string: cuda{{ cuda_major }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
+  ignore_run_exports_from:
+    {% if cuda_major == "11" %}
+    - {{ compiler('cuda11') }}
+    {% endif %}
+
+requirements:
+  build:
+    - cmake {{ cmake_version }}
+    - {{ compiler('cxx') }}
+    {% if cuda_major == "11" %}
+    - {{ compiler('cuda11') }} ={{ cuda_version }}
+    {% else %}
+    - {{ compiler('cuda') }}
+    {% endif %}
+    - cuda-version ={{ cuda_version }}
+    - make
+    - ninja
+    - sysroot_{{ target_platform }} {{ sysroot_version }}
+  host:
+    - cuda-version ={{ cuda_version }}
+  run:
+    - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
+
+about:
+  home: https://rapids.ai/
+  license: Apache-2.0
+  license_family: Apache
+  license_file: LICENSE
+  summary: RAPIDS patched CUDA dependencies
+  description: |
+    A subset of RAPIDS CUDA/C++ dependencies that need
+    to be packaged with custom C++ header locations to
+    avoid compiler issues.

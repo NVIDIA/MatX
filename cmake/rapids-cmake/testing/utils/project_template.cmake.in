@@ -13,33 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-cmake_minimum_required(VERSION 3.20.1)
+cmake_minimum_required(VERSION 3.23.1)
 
 include(FetchContent)
 
 set(local-rapids-cmake-root "${rapids-cmake-dir}/..")
-FetchContent_Declare(
-  rapids-cmake
-  GIT_REPOSITORY "${local-rapids-cmake-root}/.git"
-  GIT_TAG HEAD
-  )
+cmake_path(NORMAL_PATH local-rapids-cmake-root)
 
-FetchContent_GetProperties(rapids-cmake)
-FetchContent_Populate(rapids-cmake)
+set(scratch_dir "${CMAKE_CURRENT_BINARY_DIR}/_deps")
 
-# Copy any local uncommited changes over
-file(COPY ${local-rapids-cmake-root}/rapids-cmake/
-     DESTINATION ${rapids-cmake_SOURCE_DIR}/rapids-cmake/)
-file(COPY ${local-rapids-cmake-root}/CMakeLists.txt
-     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
-file(COPY ${local-rapids-cmake-root}/init.cmake
-     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
-file(COPY ${local-rapids-cmake-root}/RAPIDS.cmake
-     DESTINATION ${rapids-cmake_SOURCE_DIR}/)
+# emulate the variables and properties that FetchContent would set so
+# tests that themselves download rapids-cmake will use the version we have
+# symlinked.
+set(rapids-cmake_SOURCE_DIR "${scratch_dir}/rapids-cmake-src")
+set(rapids-cmake_BINARY_DIR "${scratch_dir}/rapids-cmake-build")
+set(rapids-cmake_POPULATED TRUE)
+set(prefix "_FetchContent_rapids-cmake")
+set_property(GLOBAL PROPERTY ${prefix}_sourceDir "${rapids-cmake_SOURCE_DIR}")
+set_property(GLOBAL PROPERTY ${prefix}_binaryDir "${rapids-cmake_BINARY_DIR}")
+define_property(GLOBAL PROPERTY ${prefix}_populated)
+
+
+# construct a symlink from the source to the build dir
+# so we get the latest local changes without issue
+execute_process(
+     COMMAND ${CMAKE_COMMAND} -E make_directory "${scratch_dir}")
+execute_process(
+     COMMAND ${CMAKE_COMMAND} -E create_symlink "${local-rapids-cmake-root}" "${rapids-cmake_SOURCE_DIR}"
+     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+     ECHO_OUTPUT_VARIABLE
+     ECHO_ERROR_VARIABLE)
+unset(scratch_dir)
 
 add_subdirectory(${rapids-cmake_SOURCE_DIR} ${rapids-cmake_BINARY_DIR})
 
 # We need to enable at least one language so that we get properly
 # generated system search paths.
-project(@test_name@ LANGUAGES CXX)
+project(@test_name_stem@ LANGUAGES CXX)
 include("@test_cmake_file@")

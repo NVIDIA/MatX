@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,5 +33,5 @@ set(to_match_string [=["NAME;RMM;VERSION;2.0;OPTIONS;FAKE_PACKAGE_ARGS FALSE"]=]
 file(READ "${CMAKE_CURRENT_BINARY_DIR}/export_set.cmake" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_export_write_dependencies(BUILD) failed to perserve quotes around CPM arguments")
+  message(FATAL_ERROR "rapids_export_write_dependencies(BUILD) failed to preserve quotes around CPM arguments")
 endif()

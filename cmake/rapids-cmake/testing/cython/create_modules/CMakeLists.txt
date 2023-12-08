@@ -40,5 +40,5 @@ rapids_cython_create_modules(
     )
 
 if(NOT TARGET test)
-  message(FATAL_ERROR "rapids_cython_init didn't create the target `test`")
+  message(FATAL_ERROR "rapids_cython_create_modules didn't create the target `test`")
 endif()

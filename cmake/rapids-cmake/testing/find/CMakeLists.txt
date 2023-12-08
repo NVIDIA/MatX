@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,13 @@ add_cmake_config_test( rapids-find.cmake )
 
 add_cmake_config_test( find_package-no-variable-leak.cmake )
 
+add_cmake_config_test( find_package-components )
+add_cmake_config_test( find_package-components-failed.cmake )
+
 add_cmake_config_test( find_package-build.cmake )
 add_cmake_config_test( find_package-install.cmake )
+
+add_cmake_config_test( find_package-cudatoolkit-patching.cmake )
 
 # The inverse of `find_package-optional-failed` is the
 # above two tests.
@@ -35,3 +40,7 @@ add_cmake_config_test( find_package-version-required-explicit-failed.cmake SHOUL
 add_cmake_config_test( find_generate_module-build )
 add_cmake_config_test( find_generate_module-install )
 add_cmake_config_test( find_generate_module-header-only )
+
+add_cmake_config_test( find_generate_module-code-blocks )
+add_cmake_config_test( find_generate_module-back-initial-code-block-var.cmake SHOULD_FAIL "INITIAL_CODE_BLOCK variable `var_doesn't_exist` doesn't exist")
+add_cmake_config_test( find_generate_module-back-final-code-block-var.cmake SHOULD_FAIL "FINAL_CODE_BLOCK variable `var_doesn't_exist` doesn't exist")

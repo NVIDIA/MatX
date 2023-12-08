@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,21 +44,35 @@ if( NOT "$ENV{CONDA_PREFIX}/lib" IN_LIST link_dirs)
   message(FATAL_ERROR "Expected for env{CONDA_PREFIX} to be in the link dirs of `conda_env`")
 endif()
 
+get_target_property(link_options conda_env INTERFACE_LINK_OPTIONS)
+if( "$<HOST_LINK:SHELL:LINKER:-rpath-link=$ENV{BUILD_PREFIX}/lib>" IN_LIST link_options)
+  message(FATAL_ERROR "Not expected rpath-link=env{BUILD_PREFIX} to be in the link options of `conda_env`")
+endif()
+if( "$<HOST_LINK:SHELL:LINKER:-rpath-link=$ENV{PREFIX}/lib>" IN_LIST link_options)
+  message(FATAL_ERROR "Not expected rpath-link=env{PREFIX} to be in the link options of `conda_env`")
+endif()
+if( NOT "$<HOST_LINK:SHELL:LINKER:-rpath-link=$ENV{CONDA_PREFIX}/lib>" IN_LIST link_options)
+  message(FATAL_ERROR "Expected for rpath-link=env{CONDA_PREFIX} to be in the link options of `conda_env`")
+endif()
+
 set(CMAKE_PREFIX_PATH "placeholder" )
+set(ENV{CMAKE_PREFIX_PATH} "env_1:env_2" )
 rapids_cmake_support_conda_env(conda_env_modify MODIFY_PREFIX_PATH)
 if(NOT TARGET conda_env_modify)
   message(FATAL_ERROR "Expected target conda_env_modify to exist")
 endif()
 
 list(LENGTH CMAKE_PREFIX_PATH len)
-if( len GREATER 2)
+if( len GREATER 4)
   message(FATAL_ERROR "CMAKE_PREFIX_PATH length is wrong after MODIFY_PREFIX_PATH")
 endif()
 
 list(GET CMAKE_PREFIX_PATH 0 first_value)
 list(GET CMAKE_PREFIX_PATH 1 second_value)
-set(correct_list "$ENV{CONDA_PREFIX}" "placeholder")
-set(actual_list "${first_value}" "${second_value}")
+list(GET CMAKE_PREFIX_PATH 2 third_value)
+list(GET CMAKE_PREFIX_PATH 3 fourth_value)
+set(correct_list "placeholder" "env_1" "env_2" "$ENV{CONDA_PREFIX}")
+set(actual_list "${first_value}" "${second_value}" "${third_value}" "${fourth_value}")
 
 foreach(correct actual IN ZIP_LISTS correct_list actual_list)
   if(NOT correct STREQUAL actual)

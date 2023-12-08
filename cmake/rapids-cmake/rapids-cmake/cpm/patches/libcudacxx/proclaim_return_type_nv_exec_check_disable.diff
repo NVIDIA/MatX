@@ -1,0 +1,74 @@
+diff --git a/include/cuda/std/detail/libcxx/include/__functional/invoke.h b/include/cuda/std/detail/libcxx/include/__functional/invoke.h
+index 1ab318d5..850d00a8 100644
+--- a/include/cuda/std/detail/libcxx/include/__functional/invoke.h
++++ b/include/cuda/std/detail/libcxx/include/__functional/invoke.h
+@@ -342,6 +342,9 @@ _LIBCUDACXX_INLINE_VISIBILITY __nat __invoke(__any, _Args&& ...__args);
+ 
+ // bullets 1, 2 and 3
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0, class ..._Args,
+           class = __enable_if_bullet1<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -350,6 +353,9 @@ __invoke(_Fp&& __f, _A0&& __a0, _Args&& ...__args)
+     _NOEXCEPT_(noexcept((static_cast<_A0&&>(__a0).*__f)(static_cast<_Args&&>(__args)...)))
+     { return           (static_cast<_A0&&>(__a0).*__f)(static_cast<_Args&&>(__args)...); }
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0, class ..._Args,
+           class = __enable_if_bullet2<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -358,6 +364,9 @@ __invoke(_Fp&& __f, _A0&& __a0, _Args&& ...__args)
+     _NOEXCEPT_(noexcept((__a0.get().*__f)(static_cast<_Args&&>(__args)...)))
+     { return          (__a0.get().*__f)(static_cast<_Args&&>(__args)...); }
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0, class ..._Args,
+           class = __enable_if_bullet3<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -368,6 +377,9 @@ __invoke(_Fp&& __f, _A0&& __a0, _Args&& ...__args)
+ 
+ // bullets 4, 5 and 6
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0,
+           class = __enable_if_bullet4<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -376,6 +388,9 @@ __invoke(_Fp&& __f, _A0&& __a0)
+     _NOEXCEPT_(noexcept(static_cast<_A0&&>(__a0).*__f))
+     { return          static_cast<_A0&&>(__a0).*__f; }
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0,
+           class = __enable_if_bullet5<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -384,6 +399,9 @@ __invoke(_Fp&& __f, _A0&& __a0)
+     _NOEXCEPT_(noexcept(__a0.get().*__f))
+     { return          __a0.get().*__f; }
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class _A0,
+           class = __enable_if_bullet6<_Fp, _A0> >
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+@@ -394,6 +412,9 @@ __invoke(_Fp&& __f, _A0&& __a0)
+ 
+ // bullet 7
+ 
++#ifdef __CUDACC__
++#pragma nv_exec_check_disable
++#endif
+ template <class _Fp, class ..._Args>
+ inline _LIBCUDACXX_INLINE_VISIBILITY
+ _LIBCUDACXX_CONSTEXPR decltype(_CUDA_VSTD::declval<_Fp>()(_CUDA_VSTD::declval<_Args>()...))

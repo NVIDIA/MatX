@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ Example on how to properly use :cmake:command:`rapids_cmake_parse_version`:
 
 Result Variables
 ^^^^^^^^^^^^^^^^
-  The variable `out_variable_name` will be created/modifed only when the version extraction
+  The variable `out_variable_name` will be created/modified only when the version extraction
   is successful
 
 

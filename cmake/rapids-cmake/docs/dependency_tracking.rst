@@ -82,7 +82,7 @@ Tracking CPM
     BUILD_EXPORT_SET example-targets
     )
 
-The :cmake:command:`rapids_cpm_find` combines the :cmake:command:`CPMFindPackage` command and dependency tracking, in a very simillar way
+The :cmake:command:`rapids_cpm_find` combines the :cmake:command:`CPMFindPackage` command and dependency tracking, in a very similar way
 to :cmake:command:`rapids_find_package`. In this example what we are saying is that nlohmann_json is only needed by the build directory `example-config`
 and not needed by the installed `example-config`. While this pattern is rare, it occurs when projects have some dependencies that aren't needed by consumers but are
 propagated through the usage requirements inside a project via $<BUILD_INTERFACE>. Why use a build directory `config` file at all? The most common

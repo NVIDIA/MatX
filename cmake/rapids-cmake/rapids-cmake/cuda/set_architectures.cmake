@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ Sets up :cmake:variable:`CMAKE_CUDA_ARCHITECTURES` based on the requested mode
 
 .. code-block:: cmake
 
-  rapids_cuda_set_architectures( (NATIVE|ALL) )
+  rapids_cuda_set_architectures( (NATIVE|RAPIDS) )
 
 Establishes what CUDA architectures that will be compiled for, overriding
 any existing :cmake:variable:`CMAKE_CUDA_ARCHITECTURES` value.
@@ -39,13 +39,7 @@ directly.
 .. note::
   This is automatically called by :cmake:command:`rapids_cuda_init_architectures`
 
-``NATIVE``:
-  When passed NATIVE as the first parameter will compile for all
-  GPU architectures present on the current machine. Requires that
-  the CUDA language be enabled for the current CMake project.
-
-``ALL``:
-  When passed ALL will compile for all supported RAPIDS GPU architectures
+.. include:: supported_cuda_architectures_values.txt
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -57,13 +51,19 @@ Result Variables
 function(rapids_cuda_set_architectures mode)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cuda.set_architectures")
 
-  set(supported_archs "60" "70" "75" "80" "86")
+  set(supported_archs "60" "70" "75" "80" "86" "90")
 
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA" AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.1.0)
     list(REMOVE_ITEM supported_archs "86")
   endif()
+  if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA" AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.8.0)
+    list(REMOVE_ITEM supported_archs "90")
+  endif()
 
-  if(${mode} STREQUAL "ALL")
+  include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/architectures_policy.cmake)
+  rapids_cuda_architectures_policy(FROM_SET mode)
+
+  if(${mode} STREQUAL "RAPIDS")
 
     # CMake architecture list entry of "80" means to build compute and sm. What we want is for the
     # newest arch only to build that way while the rest built only for sm.

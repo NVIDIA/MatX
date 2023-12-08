@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/cmake/write_version_file.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 project(DEMO VERSION 3.2.0 LANGUAGES NONE)
 rapids_cmake_write_version_file(demo_version.hpp)

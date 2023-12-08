@@ -18,9 +18,11 @@ Content](https://cmake.org/cmake/help/latest/module/FetchContent.html) into your
 
 cmake_minimum_required(...)
 
-file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-<VERSION_MAJOR>.<VERSION_MINOR>/RAPIDS.cmake
-    ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-<VERSION_MAJOR>.<VERSION_MINOR>/RAPIDS.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
+endif()
+include(${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
 
 include(rapids-cmake)
 include(rapids-cpm)
@@ -66,7 +68,7 @@ The `rapids-cmake` module contains helpful general CMake functionality
 The `rapids-cpm` module contains CPM functionality to allow projects to acquire dependencies consistently.
 For consistentcy All targets brought in via `rapids-cpm` are GLOBAL targets.
 
-- `raipds_cpm_init()` handles initialization of the CPM module.
+- `rapids_cpm_init()` handles initialization of the CPM module.
 - `raipds_cpm_find(<project> name BUILD_EXPORT_SET <name> INSTALL_EXPORT_SET <name>)` Will search for a module and fall back to installing via CPM. Offers support to track dependencies for easy package exporting
 
 ### cuda
@@ -76,6 +78,7 @@ The most commonly used function are:
 
 - `rapids_cuda_init_architectures(<project_name>)` handles initialization of `CMAKE_CUDA_ARCHITECTURE`. MUST BE CALLED BEFORE `PROJECT()`
 - `rapids_cuda_init_runtime(<mode>)` handles initialization of `CMAKE_CUDA_RUNTIME_LIBRARY`.
+- `rapids_cuda_patch_toolkit()` corrects bugs in the CUDAToolkit module that are being upstreamed.
 
 ### cython
 
@@ -105,26 +108,50 @@ The most commonly used function are:
 - `rapids_find_package(<project_name> BUILD_EXPORT_SET <name> INSTALL_EXPORT_SET <name> )` Combines `find_package` and support to track dependencies for easy package exporting
 - `rapids_generate_module(<PackageName> HEADER_NAMES <paths...> LIBRARY_NAMES <names...> )` Generate a FindModule for the given package. Allows association to export sets so the generated FindModule can be shipped with the project
 
+### test
+
+The `rapids_test` functions simplify CTest resource allocation, allowing for
+tests to run in parallel without overallocating GPU resources.
+
+The most commonly used functions are:
+- `rapids_test_add(NAME <test_name> GPUS <N> PERCENT <N>)`: State how many GPU resources a single
+  test requires
+
+
 ## Overriding RAPIDS.cmake
 
-At times projects or developers will need to verify ``rapids-cmake`` branches. To do this you need to override the default git repositry and branch that ``RAPIDS.cmake`` downloads, which should be done
-like this:
+At times projects or developers will need to verify ``rapids-cmake`` branches. To do this you can set variables that control which repository ``RAPIDS.cmake`` downloads, which should be done like this:
 
 ```cmake
+  # To override the version that is pulled:
+  set(rapids-cmake-version "<version>")
 
-  include(FetchContent)
-  FetchContent_Declare(
-    rapids-cmake
-    GIT_REPOSITORY https://github.com/<my_fork>/rapids-cmake.git
-    GIT_TAG        <my_feature_branch>
-  )
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-21.12/RAPIDS.cmake
-      ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-  include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+  # To override the GitHub repository:
+  set(rapids-cmake-repo "<my_fork>")
+
+  # To use an exact Git SHA:
+  set(rapids-cmake-sha "<my_git_sha>")
+
+  # To use a Git tag:
+  set(rapids-cmake-tag "<my_git_tag>")
+
+  # To override the repository branch:
+  set(rapids-cmake-branch "<my_feature_branch>")
+
+  # Or to override the entire repository URL (e.g. to use a GitLab repo):
+  set(rapids-cmake-url "https://gitlab.com/<my_user>/<my_fork>/-/archive/<my_branch>/<my_fork>-<my_branch>.zip")
+
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
+      ${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
+  include(${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
 ```
 
-This tells ``FetchContent`` to ignore the explicit url and branch in ``RAPIDS.cmake`` and use the
-ones provided.
+A few notes:
+
+- An explicitly defined ``rapids-cmake-url`` will always be used
+- `rapids-cmake-sha` takes precedence over `rapids-cmake-tag`
+- `rapids-cmake-tag` takes precedence over `rapids-cmake-branch`
+- It is advised to always set `rapids-cmake-version` to the version expected by the repo your modifications will pull
 
 ## Contributing
 

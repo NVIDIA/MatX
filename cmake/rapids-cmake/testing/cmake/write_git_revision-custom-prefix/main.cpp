@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,26 @@
  * limitations under the License.
  */
 
-#include <type_traits>
 #include <demo_git_version.hpp>
 #include <nested_git_version.h>
+#include <type_traits>
 
 constexpr const char* dbranch = DEMO_GIT_BRANCH;
-constexpr const char* dsha1 = DEMO_GIT_SHA1;
-constexpr const char* dvers = DEMO_GIT_VERSION;
+constexpr const char* dsha1   = DEMO_GIT_SHA1;
+constexpr const char* dvers   = DEMO_GIT_VERSION;
 #if defined(DEMO_GIT_IS_DIRTY)
-  constexpr const bool disdirty = true;
+constexpr const bool disdirty = true;
 #else
-  constexpr const bool disdirty = false;
+constexpr const bool disdirty = false;
 #endif
 
 constexpr const char* nbranch = NESTED_GIT_BRANCH;
-constexpr const char* nsha1 = NESTED_GIT_SHA1;
-constexpr const char* nvers = DEMO_GIT_VERSION;
+constexpr const char* nsha1   = NESTED_GIT_SHA1;
+constexpr const char* nvers   = DEMO_GIT_VERSION;
 #if defined(NESTED_GIT_IS_DIRTY)
-  constexpr const bool nisdirty = true;
+constexpr const bool nisdirty = true;
 #else
-  constexpr const bool nisdirty = false;
+constexpr const bool nisdirty = false;
 #endif
 
 int main()

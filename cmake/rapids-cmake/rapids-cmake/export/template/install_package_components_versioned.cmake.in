@@ -1,0 +1,2 @@
+find_package(@name@ @version@ QUIET COMPONENTS @components@)
+find_dependency(@name@ COMPONENTS @components@)

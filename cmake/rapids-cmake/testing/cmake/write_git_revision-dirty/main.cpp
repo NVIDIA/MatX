@@ -1,5 +1,5 @@
- /*
- * Copyright (c) 2021, NVIDIA CORPORATION.
+/*
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#include <type_traits>
-#include <iostream>
 #include <git_version.hpp>
+#include <iostream>
+#include <type_traits>
 
 int main()
 {
 #if defined(IS_DIRTY) && !defined(DEMO_GIT_IS_DIRTY)
-  # error "failed to encode dirty state correctly"
+#error "failed to encode dirty state correctly"
 #endif
 
 #if defined(DEMO_GIT_IS_DIRTY) && !defined(IS_DIRTY)
-  # error "failed to encode dirty state correctly"
+#error "failed to encode dirty state correctly"
 #endif
 
   return 0;

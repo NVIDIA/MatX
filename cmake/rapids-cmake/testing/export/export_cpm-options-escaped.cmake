@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,11 +53,11 @@ set(to_match_string [=["NAME;FAKE_CPM_PACKAGE;VERSION;1.0;OPTIONS;FAKE_PACKAGE_O
 file(READ "${CMAKE_BINARY_DIR}/rapids-cmake/test_export_set/build/cpm_FAKE_CPM_PACKAGE.cmake" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_export_cpm(BUILD) failed to perserve quotes around CPM arguments")
+  message(FATAL_ERROR "rapids_export_cpm(BUILD) failed to preserve quotes around CPM arguments")
 endif()
 
 file(READ "${CMAKE_BINARY_DIR}/rapids-cmake/test_export_set/install/cpm_FAKE_CPM_PACKAGE.cmake" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_export_cpm(INSTALL) failed to perserve quotes around CPM arguments")
+  message(FATAL_ERROR "rapids_export_cpm(INSTALL) failed to preserve quotes around CPM arguments")
 endif()

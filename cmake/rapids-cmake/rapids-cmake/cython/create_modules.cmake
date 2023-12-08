@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -57,9 +57,18 @@ $ORIGIN.
   useful when multiple Cython modules in different subpackages of the the same
   project have the same name. The default prefix is the empty string.
 
+``ASSOCIATED_TARGETS``
+  A list of targets that are associated with the Cython targets created in this
+  function. The target<-->associated target mapping is stored and may be
+  leveraged by the following functions:
+
+  - :cmake:command:`rapids_cython_add_rpath_entries` accepts a path for an
+    associated target and updates the RPATH of each target with which that
+    associated target is associated.
+
 Result Variables
 ^^^^^^^^^^^^^^^^
-  :cmake:variable:`_RAPIDS_CYTHON_CREATED_TARGETS` will be set to a list of
+  :cmake:variable:`RAPIDS_CYTHON_CREATED_TARGETS` will be set to a list of
   targets created by this function.
 
 #]=======================================================================]
@@ -71,7 +80,7 @@ function(rapids_cython_create_modules)
 
   set(_rapids_cython_options CXX)
   set(_rapids_cython_one_value INSTALL_DIR MODULE_PREFIX)
-  set(_rapids_cython_multi_value SOURCE_FILES LINKED_LIBRARIES)
+  set(_rapids_cython_multi_value SOURCE_FILES LINKED_LIBRARIES ASSOCIATED_TARGETS)
   cmake_parse_arguments(_RAPIDS_CYTHON "${_rapids_cython_options}" "${_rapids_cython_one_value}"
                         "${_rapids_cython_multi_value}" ${ARGN})
 
@@ -118,10 +127,21 @@ function(rapids_cython_create_modules)
     install(TARGETS ${cython_module} DESTINATION ${_RAPIDS_CYTHON_INSTALL_DIR})
 
     # Default the INSTALL_RPATH for all modules to $ORIGIN.
-    set_target_properties(${cython_module} PROPERTIES INSTALL_RPATH "\$ORIGIN")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      set(platform_rpath_origin "@loader_path")
+    else()
+      set(platform_rpath_origin "$ORIGIN")
+    endif()
+    set_target_properties(${cython_module} PROPERTIES INSTALL_RPATH "${platform_rpath_origin}")
+
+    # Store any provided associated targets in a global list
+    foreach(associated_target IN LISTS _RAPIDS_CYTHON_ASSOCIATED_TARGETS)
+      set_property(GLOBAL PROPERTY "rapids_cython_associations_${associated_target}"
+                                   "${cython_module}" APPEND)
+    endforeach()
 
     list(APPEND CREATED_TARGETS "${cython_module}")
   endforeach()
 
-  set(_RAPIDS_CYTHON_CREATED_TARGETS ${CREATED_TARGETS} PARENT_SCOPE)
+  set(RAPIDS_CYTHON_CREATED_TARGETS ${CREATED_TARGETS} PARENT_SCOPE)
 endfunction()

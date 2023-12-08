@@ -1,0 +1,171 @@
+# Dependency list for https://github.com/rapidsai/dependency-file-generator
+files:
+  test:
+    output: none
+    includes:
+      - build
+      - cudatoolkit
+      - docs
+      - py_version
+      - test
+  checks:
+    output: none
+    includes:
+      - build
+      - style_checks
+      - py_version
+  docs:
+    output: none
+    includes:
+      - cudatoolkit
+      - docs
+channels:
+  - rapidsai
+  - conda-forge
+dependencies:
+  build:
+    common:
+      - output_types: [conda, requirements]
+        packages:
+          - cmake>=3.23.1,!=3.25.0
+          - ninja
+      - output_types: conda
+        packages:
+          - c-compiler
+          - cxx-compiler
+          - make
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              arch: x86_64
+              cuda: "11.2"
+            packages:
+              - nvcc_linux-64=11.2
+          - matrix:
+              arch: aarch64
+              cuda: "11.2"
+            packages:
+              - nvcc_linux-aarch64=11.2
+          - matrix:
+              arch: x86_64
+              cuda: "11.4"
+            packages:
+              - nvcc_linux-64=11.4
+          - matrix:
+              arch: aarch64
+              cuda: "11.4"
+            packages:
+              - nvcc_linux-aarch64=11.4
+          - matrix:
+              arch: x86_64
+              cuda: "11.5"
+            packages:
+              - nvcc_linux-64=11.5
+          - matrix:
+              arch: aarch64
+              cuda: "11.5"
+            packages:
+              - nvcc_linux-aarch64=11.5
+          - matrix:
+              arch: x86_64
+              cuda: "11.8"
+            packages:
+              - nvcc_linux-64=11.8
+          - matrix:
+              arch: aarch64
+              cuda: "11.8"
+            packages:
+              - nvcc_linux-aarch64=11.8
+          - matrix:
+              cuda: "12.0"
+            packages:
+              - cuda-version=12.0
+              - cuda-nvcc
+  cudatoolkit:
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              cuda: "11.2"
+            packages:
+              - cuda-version=11.2
+              - cudatoolkit
+              - gcc<11.0.0
+              - sysroot_linux-64==2.17
+          - matrix:
+              cuda: "11.4"
+            packages:
+              - cuda-version=11.4
+              - cudatoolkit
+              - gcc<11.0.0
+              - sysroot_linux-64==2.17
+          - matrix:
+              cuda: "11.5"
+            packages:
+              - cuda-version=11.5
+              - cudatoolkit
+              - gcc<11.0.0
+              - sysroot_linux-64==2.17
+          - matrix:
+              cuda: "11.6"
+            packages:
+              - cuda-version=11.6
+              - cudatoolkit
+              - gcc<12.0.0
+              - sysroot_linux-64==2.17
+          - matrix:
+              cuda: "11.8"
+            packages:
+              - cuda-version=11.8
+              - cudatoolkit
+              - gcc<12.0.0
+              - sysroot_linux-64==2.17
+          - matrix:
+              cuda: "12.0"
+            packages:
+              - cuda-version=12.0
+              - cuda-cupti-dev
+              - gcc<13.0.0
+              - sysroot_linux-64==2.17
+  docs:
+    common:
+      - output_types: [conda]
+        packages:
+          - pip
+          - pip:
+              - sphinxcontrib-moderncmakedomain
+          - sphinx
+          - sphinx-copybutton
+          - sphinx_rtd_theme
+  test:
+    common:
+      - output_types: [conda, requirements]
+        packages:
+          - cython>=0.29,<0.30
+          - scikit-build>=0.13.1
+          - libpng
+          - zlib
+      - output_types: [conda]
+        packages:
+          - fmt==9.1.0
+  py_version:
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              py: "3.9"
+            packages:
+              - python=3.9
+          - matrix:
+              py: "3.10"
+            packages:
+              - python=3.10
+          - matrix:
+            packages:
+              - python>=3.9,<3.11
+  style_checks:
+    common:
+      - output_types: [conda, requirements]
+        packages:
+          - pre-commit
