@@ -27,22 +27,21 @@ untested. Other requirements for optional components are listed below.
 Required Third-party Dependencies
 ---------------------------------
 
-- CPM_ (this is included in the project source, so does not require a separate download)
+- `CPM <https://github.com/cpm-cmake/CPM.cmake>`_ (* Included in the project source and does not require a separate download)
 - `fmt <https://github.com/fmtlib/fmt>`_ (CPM dependency)
 - `nloghmann::json <https://github.com/nlohmann/json>`_ (CPM dependency)
-- `rapids-cmake <https://github.com/rapidsai/rapids-cmake>`_
-- `libcudacxx <https://github.com/NVIDIA/libcudacxx>`_
-
-.. _CPM: https://github.com/cpm-cmake/CPM.cmake 
+- `rapids-cmake <https://github.com/rapidsai/rapids-cmake>`_ (* Included in the project source and does not require a separate download)
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.2.0+
 
 
 Optional Third-party Dependencies
 ---------------------------------
-- `GoogleTest <https://github.com/google/googletest>`_
-- `pybind11 <https://github.com/pybind/pybind11>`_
-- `nvbench <https://github.com/NVIDIA/nvbench>`_
-- `cutensor <https://developer.nvidia.com/cutensor>`_
-- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_
+- `CMake <https://cmake.org/>`_ 3.23.1+ (Required for running unit tests, benchmarks, or examples)
+- `GoogleTest <https://github.com/google/googletest>`_ 1.11.0+ (Required to run unit tests)
+- `pybind11 <https://github.com/pybind/pybind11>`_ 2.6.2+ (Required for file I/O and some unit tests)
+- `nvbench <https://github.com/NVIDIA/nvbench>`_ Commit 1a13a2e (Required to run benchmarks)
+- `cutensor <https://developer.nvidia.com/cutensor>`_ 1.7.0.1+ (Required when using `einsum`)
+- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 23.03.0.20+ (Required when using `einsum`)
 
 Build Options
 =============
@@ -72,12 +71,7 @@ Building documentation will be covered later in this document.
 Unit tests
 ----------
 MatX unit tests are compiled using **Google Test** as the test framework, and **pybind11** for verification. pybind11 provides an interface
-to compare common Numpy and Scipy results with MatX without reimplementing complex functionality in C++. Required versions for these 
-libraries are:
-
-**Google test**: 1.11+
-
-**pybind11**: 2.6.2
+to compare common Numpy and Scipy results with MatX without reimplementing complex functionality in C++. 
 
 Both Google Test and pybind11 will be automatically downloaded by CPM when unit tests are enabled. If an offline copy of them exists, 
 ``CPM_USE_LOCAL_PACKAGES`` can be used to override the download. 
