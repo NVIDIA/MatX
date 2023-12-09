@@ -75,7 +75,7 @@ namespace matx
        * @param op value
        **/
       template <typename Op>
-        void Exec(Op &op) const noexcept {
+        void Exec(Op &op) const {
 #ifdef __CUDACC__      
           dim3 threads, blocks;  
 
@@ -131,7 +131,7 @@ namespace matx
             } 
           }
 #else
-          MATX_ASSERT(false, "Cannot call device executor using host compiler");
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
 #endif    
         }
 
