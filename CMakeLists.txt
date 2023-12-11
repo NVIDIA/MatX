@@ -20,6 +20,7 @@ option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
+option(MATX_DISABLE_MEM_TRACK_CHECK "Disable checking of memory allocation and frees" ON)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -170,6 +171,10 @@ endif()
 if (MATX_MULTI_GPU)
     include(cmake/FindNvshmem.cmake)
     find_package(Nvshmem REQUIRED)
+endif()
+
+if (MATX_DISABLE_MEM_TRACK_CHECK)
+    target_compile_definitions(matx INTERFACE MATX_DISABLE_MEM_TRACK_CHECK=1)
 endif()
 
 # Find python3 and pybind11 for generating unit tests and benchmarks

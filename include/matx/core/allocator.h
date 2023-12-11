@@ -79,9 +79,14 @@ struct matxPointerAttr_t {
 };
 }
 
+
 inline detail::matxMemoryStats_t matxMemoryStats; ///< Statistics object
 inline std::shared_mutex memory_mtx; ///< Mutex protecting updates from map
-inline std::unordered_map<void *, detail::matxPointerAttr_t> allocationMap; ///< Map recording allocations
+
+__MATX_INLINE__ std::unordered_map<void *, detail::matxPointerAttr_t> &GetAllocMap() {
+  static std::unordered_map<void *, detail::matxPointerAttr_t> allocationMap;
+  return allocationMap;
+}
 
 /**
  * @brief Determine if a pointer is printable by the host
@@ -137,9 +142,9 @@ inline bool IsAllocated(void *ptr) {
   }
 
   std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
+  auto iter = GetAllocMap().find(ptr);
 
-  return iter != allocationMap.end();
+  return iter != GetAllocMap().end();
 }
 
 /**
@@ -161,9 +166,9 @@ inline matxMemorySpace_t GetPointerKind(void *ptr)
   }
 
   std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
+  auto iter = GetAllocMap().find(ptr);
 
-  if (iter != allocationMap.end()) {
+  if (iter != GetAllocMap().end()) {
     return iter->second.kind;
   }
 
@@ -184,7 +189,7 @@ inline void matxPrintMemoryStatistics()
   printf("Memory Statistics(GB):  current: %.2f, total: %.2f, max: %.2f. Total "
          "allocations: %lu\n",
          static_cast<double>(current) / 1e9, static_cast<double>(total) / 1e9,
-         static_cast<double>(max) / 1e9, allocationMap.size());
+         static_cast<double>(max) / 1e9, GetAllocMap().size());
 }
 
 /**
@@ -237,7 +242,7 @@ inline void matxAlloc(void **ptr, size_t bytes,
   matxMemoryStats.totalBytesAllocated += bytes;
   matxMemoryStats.maxBytesAllocated = std::max(
       matxMemoryStats.maxBytesAllocated, matxMemoryStats.currentBytesAllocated);
-  allocationMap[*ptr] = {bytes, space, stream};
+  GetAllocMap()[*ptr] = {bytes, space, stream};
 }
 
 /**
@@ -254,10 +259,15 @@ inline void matxFree(void *ptr)
   }
 
   std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
+  auto iter = GetAllocMap().find(ptr);
 
-  if (iter == allocationMap.end()) {
+  if (iter == GetAllocMap().end()) {
+#ifdef MATX_DISABLE_MEM_TRACK_CHECK
+    // This error can occur in situations where the user includes MatX in multiple translation units
+    // and a deallocation occurs in a different one than it was allocated. Allow the user to ignore
+    // these cases if they know the issue.
     MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+#endif    
     return;
   }
 
@@ -283,8 +293,10 @@ inline void matxFree(void *ptr)
     MATX_THROW(matxInvalidType, "Invalid memory type");
   }
 
-  allocationMap.erase(iter);
+  GetAllocMap().erase(iter);
 }
+
+
 
 /**
  * @brief Allocator following the PMR interface using the internal MatX allocator/deallocator
