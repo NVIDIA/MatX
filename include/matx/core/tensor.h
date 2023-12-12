@@ -229,8 +229,8 @@ public:
   /**
    * Constructor for a rank-0 tensor.
    *
-   * @param shape
-   *   Tensor shape (empty braces)
+   * NOTE: Use empty braces {} for the unused parameter.
+   *
    */
   __MATX_INLINE__ tensor_t(const std::initializer_list<detail::no_size_t> /* unused */) :
     // The ctor argument is unused, but matches {} for rank-0 tensors. We do
