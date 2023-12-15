@@ -286,7 +286,7 @@ struct RandomOperatorOutputIterator {
 template <typename OperatorType>
 struct BeginOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = index_t;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -345,7 +345,7 @@ struct BeginOffset {
 template <typename OperatorType>
 struct EndOffset {
   using self_type = BeginOffset<OperatorType>;
-  using value_type = typename OperatorType::scalar_type;
+  using value_type = index_t;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
