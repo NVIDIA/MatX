@@ -102,7 +102,7 @@ set(CCCL_VERSION "v2.2.0" CACHE STRING "Version of CCCL to use")
 include(cmake/FindCCCL.cmake)
 
 target_include_directories(matx SYSTEM INTERFACE
-                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/libcudacxx>
+                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/libcudacxx/include>
                             $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/cub>
                             $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/thrust>)
 
