@@ -77,6 +77,45 @@ union MatMulScaleType_t {
   double cf64[2];
 };
 
+template <typename OpA, typename OpB, typename OpC, MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+constexpr bool CompatibleGemmTypes() {
+  if constexpr (!std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
+                !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type> &&
+                !std::is_same_v<typename OpA::scalar_type, typename OpC::scalar_type>) {
+    return false;
+  }
+
+  if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+    if constexpr (std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
+                  std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type>) {
+      // List of accepted types when A/B/C match
+      return  std::is_same_v<typename OpA::scalar_type, matxFp16> ||
+              std::is_same_v<typename OpA::scalar_type, matxBf16> ||
+              std::is_same_v<typename OpA::scalar_type, float> ||
+              std::is_same_v<typename OpA::scalar_type, double> ||
+              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<float>> ||
+              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<double>> ||
+              std::is_same_v<typename OpA::scalar_type, int8_t> ||
+              std::is_same_v<typename OpA::scalar_type, matxFp16Complex> ||
+              std::is_same_v<typename OpA::scalar_type, matxBf16Complex>;
+
+    }
+    // Accumulator type different from A/B
+    else if constexpr (  std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
+                        !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type>) {
+      return (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, int32_t>) ||
+              (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, float>) ||
+              (std::is_same_v<typename OpA::scalar_type, matxBf16> && std::is_same_v<typename OpC::scalar_type, float>) ||
+              (std::is_same_v<typename OpA::scalar_type, matxFp16> && std::is_same_v<typename OpC::scalar_type, float>) ||
+              (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, float>);
+    }
+  }
+  else {
+    // For now return true for other providers until we support more
+    return true;
+  }
+}
+
 /**
  * Parameters needed to execute a GEMM. For the most part, these are very
  * similar to that of a standard GEMM call
@@ -834,7 +873,7 @@ private:
              static_cast<int>(
                  params_.ldc)}, // Tensor-ref for destination matrix D (may be
                                 // different memory than source C matrix)
-            {alpha, beta});     // Scalars used in the Epilogue
+            {static_cast<T1>(alpha), static_cast<T1>(beta)});     // Scalars used in the Epilogue
 
         CutlassGemm gemm_operator;
         cutlass::Status status = gemm_operator(args, nullptr, stream);
@@ -895,7 +934,7 @@ private:
                     params_.ldc)}, // Tensor-ref for destination matrix D (may
                                   // be different memory than source C matrix)
               c_adj.Stride(RANK - 3), // Batch Stride C
-              {alpha, beta},
+              {static_cast<T1>(alpha), static_cast<T1>(beta)},
               params_.batch // Batch Dimension
           );                // Scalars used in the Epilogue
 
@@ -1117,6 +1156,10 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   // promote A and B to the type of C
   auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
   auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
+
+  static_assert(detail::CompatibleGemmTypes<decltype(A_), decltype(B_), TensorTypeC, PROV>(),
+      "Combination of A/B/C types are not supported");
+
 
   // CublasLt does not support operators and certain transpose modes.
   // Grab a suppported tensor here and copy in if necessary.
