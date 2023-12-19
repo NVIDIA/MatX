@@ -782,7 +782,8 @@ private:
     
     if constexpr (RANK > 3) {
       // Get total number of batches
-      total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - 3, 1, std::multiplies<shape_type>());
+      [[maybe_unused]] auto c_shape = c.Shape();
+      total_iter = std::accumulate(c_shape.begin(), c_shape.begin() + TensorTypeC::Rank() - 3, 1, std::multiplies<shape_type>());
     }
 
     // For cuBLASLt most of the parameters have already been set in the
@@ -1003,11 +1004,11 @@ private:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
-    if (b.Stride(RANK - 1) == 1) {
+    if (b.Stride(TensorTypeB::Rank() - 1) == 1) {
       MatMulDispatchC<OrderA, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
     }
-    else if (b.Stride(RANK - 2) == 1) {
+    else if (b.Stride(TensorTypeB::Rank() - 2) == 1) {
       MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
     }
@@ -1024,10 +1025,10 @@ private:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
-    if (a.Stride(RANK - 1) == 1) {
+    if (a.Stride(TensorTypeA::Rank() - 1) == 1) {
       MatMulDispatchB<MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha, beta);
     }
-    else if (a.Stride(RANK - 2) == 1) {
+    else if (a.Stride(TensorTypeA::Rank() - 2) == 1) {
       MatMulDispatchB<MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else {

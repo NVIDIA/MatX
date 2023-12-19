@@ -82,3 +82,32 @@ TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "c_cov", this->thresh);
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
+{
+  MATX_ENTER_HANDLER();
+  this->pb->RunTVGenerator("cov");
+  this->pb->NumpyToTensorView(this->av, "a");
+
+  const int m = 3;
+  const int n = 5;
+  const int k = 7;
+
+  // Test a batched 5D input
+  auto batched_in = make_tensor<TypeParam>({m, n, k, this->cov_dim, this->cov_dim});
+  auto batched_out = make_tensor<TypeParam>({m, n, k, this->cov_dim, this->cov_dim});
+  (batched_in = clone<5>(this->av, {m, n, k, matxKeepDim, matxKeepDim})).run();
+
+  (batched_out = cov(batched_in)).run();
+
+  for (int im = 0; im < m; im++) {
+    for (int in = 0; in < n; in++) {
+      for (int ik = 0; ik < k; ik++) {
+        auto bv = slice<2>(batched_out, {im,in,ik,0,0}, {matxDropDim,matxDropDim,matxDropDim,matxKeepDim,matxKeepDim});
+        MATX_TEST_ASSERT_COMPARE(this->pb, bv, "c_cov", this->thresh);
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
