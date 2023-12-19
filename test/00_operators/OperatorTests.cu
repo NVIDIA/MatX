@@ -2365,6 +2365,57 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsNumericAllExecs, TransposeVsTransposeMatrix)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  // example-begin transpose-test-1
+  // ExecType is an executor type (e.g. matx::cudaExecutor for executing on the GPU).
+  ExecType exec{};
+
+  const index_t m = 3;
+  const index_t n = 5;
+  const index_t p = 7;
+
+  // TestType is the tensor data type
+  tensor_t<TestType, 3> t3  ({m,n,p});
+  tensor_t<TestType, 3> t3t ({p,n,m});
+  tensor_t<TestType, 3> t3tm({m,p,n});
+
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      for (index_t k = 0; k < p; k++) {
+        t3(i, j, k) = static_cast<detail::value_promote_t<TestType>>(i*n*p + j*p + k);
+      }
+    }
+  }
+
+  (t3t = transpose(t3)).run(exec);
+  (t3tm = transpose_matrix(t3)).run(exec);
+
+  if constexpr (is_device_executor_v<ExecType>) {
+    cudaError_t error = cudaStreamSynchronize(0);
+    ASSERT_EQ(error, cudaSuccess);
+  }
+
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      for (index_t k = 0; k < p; k++) {
+        // transpose() permutes all dimensions whereas transpose_matrix() only permutes the
+        // last two dimensions.
+        EXPECT_EQ(t3(i,j,k), t3t(k,j,i));
+        EXPECT_EQ(t3(i,j,k), t3tm(i,k,j));
+      }
+    }
+  }
+  // example-end transpose-test-1
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, CloneAndAdd)
 {
   MATX_ENTER_HANDLER();
