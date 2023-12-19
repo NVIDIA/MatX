@@ -41,12 +41,13 @@ using namespace matx;
 template <typename T> class CovarianceTest : public ::testing::Test {
 
 protected:
-  const index_t cov_dim = 4;
+  const index_t cov_dim1 = 4;
+  const index_t cov_dim2 = 3;
   void SetUp() override
   {
     CheckTestTensorCoreTypeSupport<T>();
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim});
+    pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim1, cov_dim2});
 
     // Half precision needs a bit more tolerance when compared to
     // fp32
@@ -57,8 +58,8 @@ protected:
 
   void TearDown() { pb.reset(); }
 
-  tensor_t<T, 2> av{{cov_dim, cov_dim}};
-  tensor_t<T, 2> cv{{cov_dim, cov_dim}};
+  tensor_t<T, 2> av{{cov_dim1, cov_dim2}};
+  tensor_t<T, 2> cv{{cov_dim2, cov_dim2}};
 
   float thresh = 0.01f;
   std::unique_ptr<detail::MatXPybind> pb;
@@ -94,8 +95,8 @@ TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
   const int k = 7;
 
   // Test a batched 5D input
-  auto batched_in = make_tensor<TypeParam>({m, n, k, this->cov_dim, this->cov_dim});
-  auto batched_out = make_tensor<TypeParam>({m, n, k, this->cov_dim, this->cov_dim});
+  auto batched_in = make_tensor<TypeParam>({m, n, k, this->cov_dim1, this->cov_dim2});
+  auto batched_out = make_tensor<TypeParam>({m, n, k, this->cov_dim2, this->cov_dim2});
   (batched_in = clone<5>(this->av, {m, n, k, matxKeepDim, matxKeepDim})).run();
 
   (batched_out = cov(batched_in)).run();

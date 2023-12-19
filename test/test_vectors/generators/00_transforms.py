@@ -102,7 +102,7 @@ class cov_operators:
         np.random.seed(1234)
         self.size = size
         self.res = {
-            'a': matx_common.randn_ndarray((size[0], size[0]), dtype)
+            'a': matx_common.randn_ndarray((size[0], size[1]), dtype)
         }
 
     def cov(self) -> Dict[str, np.ndarray]:
