@@ -102,9 +102,9 @@ public:
     sys.attr("path").attr("append")(path);
   }
 
-  void RunTVGenerator(const std::string &func)
+  void RunTVGenerator(const char *func)
   {
-    res_dict = sx_obj.attr(func.c_str())();
+    res_dict = sx_obj.attr(func)();
   }
 
   template <typename T>
@@ -122,7 +122,7 @@ public:
 
   template <typename T>
   void InitAndRunTVGenerator(const std::string &mname, const std::string &cname,
-                             const std::string &func,
+                             const char *func,
                              const std::vector<index_t> &sizes)
   {
     InitTVGenerator<T>(mname, cname, sizes);
@@ -131,7 +131,7 @@ public:
 
   template <typename T>
   void InitAndRunTVGeneratorWithCfg(const std::string &mname, const std::string &cname,
-                             const std::string &func,
+                             const char *func,
                              const pybind11::dict &cfg)
   {
     mod = pybind11::module_::import(mname.c_str());

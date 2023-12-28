@@ -1129,8 +1129,8 @@ struct CubParamsKeyEq {
   }
 };
 
-// Static caches of Sort handles
-static matxCache_t<CubParams_t, CubParamsKeyHash, CubParamsKeyEq> cub_cache;
+using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
+
 }
 
 
@@ -1172,21 +1172,19 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
                             detail::CUB_OP_REDUCE,
-                            param_type>::GetCubParams(a_out, a, stream);  
-  auto ret = detail::cub_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>{
-        a_out, a, reduce_params, stream};
+                            param_type>::GetCubParams(a_out, a, stream);
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>;
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+    detail::CacheName::CUB,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->ExecReduce(a_out, a, stream);
+    }
+  );
 
-      detail::cub_cache.Insert(params, static_cast<void *>(tmp));  
-    tmp->ExecReduce(a_out, a, stream);
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
-  }
-  else {
-    auto type =
-        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type> *>(
-            ret.value());
-    type->ExecReduce(a_out, a, stream);
   }
 #else
     auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>{
@@ -1957,9 +1955,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
   cudaStream_t stream = exec.getStream();
   
   // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
-  typename InputOperator::scalar_type *sort_ptr;
-  matxAlloc((void **)&sort_ptr, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto sort_tensor = make_tensor<typename InputOperator::scalar_type>(sort_ptr, a.Shape());
+  auto sort_tensor = make_tensor<typename InputOperator::scalar_type>(a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   matx::sort_impl(sort_tensor, a, SORT_DIR_ASC, stream);
 

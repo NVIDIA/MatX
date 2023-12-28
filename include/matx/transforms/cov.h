@@ -202,8 +202,8 @@ struct CovParamsKeyEq {
   }
 };
 
-// Static caches of covariance matrices
-static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
+
+using cov_cache_t = std::unordered_map<CovParams_t, std::any, CovParamsKeyHash, CovParamsKeyEq>;
 
 } // end namespace detail
 /**
@@ -235,18 +235,17 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
   // Get parameters required by these tensors
   auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a, stream);
 
-  // Get cache or new cov plan if it doesn't exist
-  auto ret = detail::cov_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxCovHandle_t<TensorTypeC, TensorTypeA>{c, a, stream};
-    detail::cov_cache.Insert(params, static_cast<void *>(tmp));
-
-    tmp->Exec(c, a, stream);
-  }
-  else {
-    auto cov_type = static_cast<detail::matxCovHandle_t<TensorTypeC, TensorTypeA> *>(ret.value());
-    cov_type->Exec(c, a, stream);
-  }
+  using cache_val_type = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>;
+  detail::GetCache().LookupAndExec<detail::cov_cache_t>(
+    detail::CacheName::COV,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(c, a);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(c, a, stream);
+    }
+  );  
 }
 
 } // end namespace matx
