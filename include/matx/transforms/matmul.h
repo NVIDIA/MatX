@@ -133,6 +133,7 @@ struct MatMulParams_t {
   index_t lda;
   index_t ldb;
   index_t ldc;
+  int rank;
   int32_t batch; // Must be int32_t for cuBLASLt
   index_t astride; // batch stride
   index_t bstride; // batch stride
@@ -272,6 +273,7 @@ public:
     detail::MatMulParams_t params;
     params.dtype = TypeToInt<T1>();
     params.prov = PROV;
+    params.rank = c.Rank();
 
     // Batches
     params.batch = 1;
@@ -750,17 +752,23 @@ private:
       
       auto a_shape = a.Shape();
       *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
-      matxAlloc(&a_hp, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (a_hp == nullptr) {
+        matxAlloc(&a_hp, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      }
       auto a_planar = make_tensor<typename T2::value_type>(reinterpret_cast<typename T2::value_type*>(a_hp), a_shape, false);
 
       auto b_shape = b.Shape();
       *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
-      matxAlloc(&b_hp, b.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (b_hp == nullptr) {
+        matxAlloc(&b_hp, b.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      }
       auto b_planar = make_tensor<typename T3::value_type>(reinterpret_cast<typename T3::value_type*>(b_hp), b_shape, false);
       
       auto c_shape = c.Shape();
       *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
-      matxAlloc(&c_hp, c.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (c_hp == nullptr) {
+        matxAlloc(&c_hp, c.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      }
       auto c_planar = make_tensor<typename T1::value_type>(reinterpret_cast<typename T1::value_type*>(c_hp), c_shape, false);
 
       // Convert A/B to planar layout
@@ -1069,13 +1077,11 @@ struct MatMulParamsKeyEq {
            l.stream == t.stream && l.lda == t.lda &&
            l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
-           l.opB == t.opB;
+           l.opB == t.opB && l.rank == t.rank;
   }
 };
 
-// Static caches of GEMMs
-static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
-    gemm_cache;
+using gemm_cache_t = std::unordered_map<MatMulParams_t, std::any,  MatMulParamsKeyHash, MatMulParamsKeyEq>;
 
 }
 
@@ -1195,21 +1201,18 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
       detail::matxMatMulHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
     params.stream = stream;
 
-    // Get cache or new GEMM plan if it doesn't exist
-    auto ret = detail::gemm_cache.Lookup(params);
-    if (ret == std::nullopt) {
-      auto tmp = new detail::matxMatMulHandle_t<ctype, atype, btype, PROV>{c, a, b};
-      detail::gemm_cache.Insert(params, static_cast<void *>(tmp));
-
-      // Set the stream on this plan once on creation
-      tmp->Exec(c, a, b, stream, alpha, beta);
-    }
-    else {
-      auto gemm_type =
-        static_cast<detail::matxMatMulHandle_t<ctype, atype, btype, PROV> *>(ret.value());
-      gemm_type->Exec(c, a, b, stream, alpha, beta);
-    }
-  }
+    using cache_val_type = detail::matxMatMulHandle_t<ctype, atype, btype, PROV>;
+    detail::GetCache().LookupAndExec<detail::gemm_cache_t>(
+      detail::CacheName::GEMM,
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(c, a, b);
+      },
+      [&](std::shared_ptr<cache_val_type> cache_type) {
+        cache_type->Exec(c, a, b, stream, alpha, beta);
+      }
+    );
+   }
 
   // if c and C are not the same then we need to copy results out.
   if(!c.isSameView(C)) {

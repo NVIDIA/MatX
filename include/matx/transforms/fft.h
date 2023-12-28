@@ -378,18 +378,14 @@ protected:
                "Could not deduce FFT types from input and output view types!");
   }
 
-  /**
-   * Destructs an FFT plan
-   *
-   * Frees all memory associated with the plan.
-   **/
-  virtual ~matxFFTPlan_t()
-  {
-    if (workspace_ != nullptr) {
+  virtual ~matxFFTPlan_t() {
+    if (this->workspace_ != nullptr) {
+
       matxFree(workspace_);
       this->workspace_ = nullptr;
     }
-    cufftDestroy(this->plan_);
+
+    cufftDestroy(this->plan_); 
   }
 
   cufftHandle plan_;
@@ -489,6 +485,7 @@ matxFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream = 0
   MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
 
   matxAlloc((void **)&this->workspace_, workspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
+
   cufftSetWorkArea(this->plan_, this->workspace_);
 
   error = cufftXtMakePlanMany(
@@ -711,9 +708,8 @@ struct FftParamsKeyEq {
   }
 };
 
-// Static caches of 1D and 2D FFTs
-static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_1d;
-static matxCache_t<FftParams_t, FftParamsKeyHash, FftParamsKeyEq> cache_2d;
+using fft_cache_t = std::unordered_map<FftParams_t, std::any, FftParamsKeyHash, FftParamsKeyEq>;
+
 
 template <typename OutputTensor, typename InputTensor>
 auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
@@ -909,17 +905,17 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
   params.stream = stream;
 
-  // Get cache or new FFT plan if it doesn't exist
-  auto ret = detail::cache_1d.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxFFTPlan1D_t<decltype(out), decltype(in)>{out, in, stream};
-    detail::cache_1d.Insert(params, static_cast<void *>(tmp));
-    tmp->Forward(out, in, stream, norm);
-  }
-  else {
-    auto fft_type = static_cast<detail::matxFFTPlan1D_t<decltype(out), decltype(in)> *>(ret.value());
-    fft_type->Forward(out, in, stream, norm);
-  }
+  using cache_val_type = detail::matxFFTPlan1D_t<decltype(out), decltype(in)>;
+  detail::GetCache().LookupAndExec<detail::fft_cache_t>(
+    detail::CacheName::FFT_1D,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(out, in, stream);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Forward(out, in, stream, norm);
+    }
+  );
 
   if(!out.isSameView(o)) {
     (o = out).run(stream);
@@ -952,17 +948,17 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
   params.stream = stream;
 
-  // Get cache or new FFT plan if it doesn't exist
-  auto ret = detail::cache_1d.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxFFTPlan1D_t<decltype(out), decltype(in)>{out, in, stream};
-    detail::cache_1d.Insert(params, static_cast<void *>(tmp));
-    tmp->Inverse(out, in, stream, norm);
-  }
-  else {
-    auto fft_type = static_cast<detail::matxFFTPlan1D_t<decltype(out), decltype(in)> *>(ret.value());
-    fft_type->Inverse(out, in, stream, norm);
-  }
+  using cache_val_type = detail::matxFFTPlan1D_t<decltype(out), decltype(in)>;
+  detail::GetCache().LookupAndExec<detail::fft_cache_t>(
+    detail::CacheName::FFT_1D,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(out, in, stream);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Inverse(out, in, stream, norm);
+    }
+  );
 
   if(!out.isSameView(o)) {
     (o = out).run(stream);
@@ -1008,17 +1004,17 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i,
   auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 2);
   params.stream = stream;
 
-  // Get cache or new FFT plan if it doesn't exist
-  auto ret = detail::cache_2d.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxFFTPlan2D_t<decltype(out), decltype(in)>{out, in, stream};
-    detail::cache_2d.Insert(params, static_cast<void *>(tmp));
-    tmp->Forward(out, in, stream);
-  }
-  else {
-    auto fft_type = static_cast<detail::matxFFTPlan2D_t<decltype(out), decltype(in)> *>(ret.value());
-    fft_type->Forward(out, in, stream);
-  }
+  using cache_val_type = detail::matxFFTPlan2D_t<decltype(out), decltype(in)>;
+  detail::GetCache().LookupAndExec<detail::fft_cache_t>(
+    detail::CacheName::FFT_2D,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(out, in, stream);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Forward(out, in, stream);
+    }
+  );  
 
   if(!out.isSameView(o)) {
     (o = out).run(stream);
@@ -1065,16 +1061,18 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i,
   params.stream = stream;
   
   // Get cache or new FFT plan if it doesn't exist
-  auto ret = detail::cache_2d.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxFFTPlan2D_t<decltype(in), decltype(out)>{out, in, stream};
-    detail::cache_2d.Insert(params, static_cast<void *>(tmp));
-    tmp->Inverse(out, in, stream);
-  }
-  else {
-    auto fft_type = static_cast<detail::matxFFTPlan2D_t<decltype(in), decltype(out)> *>(ret.value());
-    fft_type->Inverse(out, in, stream);
-  }
+  using cache_val_type = detail::matxFFTPlan2D_t<decltype(out), decltype(in)>;
+  detail::GetCache().LookupAndExec<detail::fft_cache_t>(
+    detail::CacheName::FFT_2D,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(out, in, stream);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Inverse(out, in, stream);
+    }
+  );
+  
   if(!out.isSameView(o)) {
     (o = out).run(stream);
   }  

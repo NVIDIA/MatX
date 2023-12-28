@@ -143,9 +143,15 @@ public:
 
   void AllocateWorkspace(size_t batches)
   {
-    matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
+    if (dspace > 0) {
+      matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
+    }
+
     matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_DEVICE_MEMORY);
-    matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
+
+    if (hspace > 0) {
+      matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
+    }
   }
 
   virtual void GetWorkspaceSize(size_t *host, size_t *device) = 0;
@@ -308,9 +314,7 @@ struct DnCholParamsKeyEq {
   }
 };
 
-// Static caches of inverse handles
-static matxCache_t<DnCholParams_t, DnCholParamsKeyHash, DnCholParamsKeyEq>
-    dnchol_cache;
+using chol_cache_t = std::unordered_map<DnCholParams_t, std::any, DnCholParamsKeyHash, DnCholParamsKeyEq>;
 
 
 /***************************************** LU FACTORIZATION
@@ -482,7 +486,7 @@ struct DnLUParamsKeyEq {
 };
 
 // Static caches of LU handles
-static matxCache_t<DnLUParams_t, DnLUParamsKeyHash, DnLUParamsKeyEq> dnlu_cache;
+using lu_cache_t = std::unordered_map<DnLUParams_t, std::any, DnLUParamsKeyHash, DnLUParamsKeyEq>;
 
 
 /***************************************** QR FACTORIZATION
@@ -661,8 +665,7 @@ struct DnQRParamsKeyEq {
   }
 };
 
-// Static caches of QR handles
-static matxCache_t<DnQRParams_t, DnQRParamsKeyHash, DnQRParamsKeyEq> dnqr_cache;
+using qr_cache_t = std::unordered_map<DnQRParams_t, std::any, DnQRParamsKeyHash, DnQRParamsKeyEq>;
 
 
 /********************************************** SVD
@@ -741,12 +744,12 @@ public:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    scratch = make_tensor_p<T1>(a.Shape(), MATX_DEVICE_MEMORY);
-    params = GetSVDParams(u, s, v, *scratch, jobu, jobvt);
+    make_tensor(scratch, a.Shape(), MATX_DEVICE_MEMORY);
+    params = GetSVDParams(u, s, v, scratch, jobu, jobvt);
 
     GetWorkspaceSize(&hspace, &dspace);
 
-    SetBatchPointers(*scratch);
+    SetBatchPointers(scratch);
     AllocateWorkspace(params.batch_size);
   }
 
@@ -815,7 +818,7 @@ public:
     }
 
     cusolverDnSetStream(handle, stream);
-    matx::copy(*scratch, a, stream);
+    matx::copy(scratch, a, stream);
     int info;
 
     // At this time cuSolver does not have a batched 64-bit SVD interface. Change
@@ -850,7 +853,7 @@ public:
   ~matxDnSVDSolverPlan_t() {}
 
 private:
-  matx::tensor_t<T1, RANK> *scratch = nullptr;
+  matx::tensor_t<T1, RANK> scratch;
   std::vector<T3 *> batch_s_ptrs;
   std::vector<T4 *> batch_v_ptrs;
   std::vector<T2 *> batch_u_ptrs;  
@@ -881,10 +884,7 @@ struct DnSVDParamsKeyEq {
   }
 };
 
-// Static caches of SVD handles
-static matxCache_t<DnSVDParams_t, DnSVDParamsKeyHash, DnSVDParamsKeyEq>
-    dnsvd_cache;
-
+using svd_cache_t = std::unordered_map<DnSVDParams_t, std::any, DnSVDParamsKeyHash, DnSVDParamsKeyEq>;
 
 /*************************************** Eigenvalues and eigenvectors
  * *************************************/
@@ -1078,10 +1078,10 @@ struct DnEigParamsKeyEq {
   }
 };
 
-// Static caches of Eig handles
-static matxCache_t<DnEigParams_t, DnEigParamsKeyHash, DnEigParamsKeyEq>
-    dneig_cache;
+using eig_cache_t = std::unordered_map<DnEigParams_t, std::any, DnEigParamsKeyHash, DnEigParamsKeyEq>;
+
 }
+
 
 /**
  * Perform a Cholesky decomposition using a cached plan
@@ -1149,18 +1149,17 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   auto params = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(tv)>::GetCholParams(tv, uplo);
   params.uplo = uplo;
 
-  // Get cache or new inverse plan if it doesn't exist
-  auto ret = detail::dnchol_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>{tv, uplo};
-    detail::dnchol_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tv, tv, stream, uplo);
-  }
-  else {
-    auto chol_type =
-        static_cast<detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)> *>(ret.value());
-    chol_type->Exec(tv, tv, stream, uplo);
-  }
+  using cache_val_type = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>;
+  detail::GetCache().LookupAndExec<detail::chol_cache_t>(
+    detail::CacheName::CHOL,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(tv, uplo);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(tv, tv, stream, uplo);
+    }
+  );
 
   if (! allContiguous) {
     matx::copy(out, tv, stream);
@@ -1226,21 +1225,22 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   auto params = detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt);
 
   // Get cache or new LU plan if it doesn't exist
-  auto ret = detail::dnlu_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>{piv_new, tvt};
-
-    detail::dnlu_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tvt, piv_new, tvt, stream);
-  }
-  else {
-    auto lu_type = static_cast<detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)> *>(ret.value());
-    lu_type->Exec(tvt, piv_new, tvt, stream);
-  }
+  using cache_val_type = detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
+  detail::GetCache().LookupAndExec<detail::lu_cache_t>(
+    detail::CacheName::LU,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(piv_new, tvt);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(tvt, piv_new, tvt, stream);
+    }
+  );
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
   matx::copy(out, tv.PermuteMatrix(), stream);
+  matxFree(tp);
 }
 
 
@@ -1356,21 +1356,22 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
   auto params = detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt);
 
   // Get cache or new QR plan if it doesn't exist
-  auto ret = detail::dnqr_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>{tau_new, tvt};
-
-    detail::dnqr_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tvt, tau_new, tvt, stream);
-  }
-  else {
-    auto qr_type = static_cast<detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)> *>(ret.value());
-    qr_type->Exec(tvt, tau_new, tvt, stream);
-  }
+  using cache_val_type = detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
+  detail::GetCache().LookupAndExec<detail::qr_cache_t>(
+    detail::CacheName::QR,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(tau_new, tvt);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(tvt, tau_new, tvt, stream);
+    }
+  );
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
   matx::copy(out, tv.PermuteMatrix(), stream);
+  matxFree(tp);
 }
 
 
@@ -1449,18 +1450,19 @@ void svd_impl(UTensor &&u, STensor &&s,
       u_new, s_new, v_new, tvt, jobu, jobvt);
 
   // Get cache or new QR plan if it doesn't exist
-  auto ret = detail::dnsvd_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnSVDSolverPlan_t{u_new, s_new, v_new, tvt, jobu, jobvt};
+  using cache_val_type = detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)>;
+  detail::GetCache().LookupAndExec<detail::svd_cache_t>(
+    detail::CacheName::SVD,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(u_new, s_new, v_new, tvt, jobu, jobvt);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(u_new, s_new, v_new, tvt, jobu, jobvt, stream);
+    }
+  );  
 
-    detail::dnsvd_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(u_new, s_new, v_new, tvt, jobu, jobvt, stream);
-  }
-  else {
-    auto svd_type =
-        static_cast<detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)> *>(ret.value());
-    svd_type->Exec(u_new, s_new, v_new, tvt, jobu, jobvt, stream);
-  }
+  matxFree(tp);
 }
 
 
@@ -1529,21 +1531,21 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
       detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>::GetEigParams(w_new, tv, jobz, uplo);
 
   // Get cache or new eigen plan if it doesn't exist
-  auto ret = detail::dneig_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>{w_new, tv, jobz, uplo};
-
-    detail::dneig_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(tv, w_new, tv, jobz, uplo, stream);
-  }
-  else {
-    auto eig_type =
-        static_cast<detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)> *>(ret.value());
-    eig_type->Exec(tv, w_new, tv, jobz, uplo, stream);
-  }
+  using cache_val_type = detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
+  detail::GetCache().LookupAndExec<detail::eig_cache_t>(
+    detail::CacheName::EIG,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(w_new, tv, jobz, uplo);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(tv, w_new, tv, jobz, uplo, stream);
+    }
+  );
 
   /* Copy and free async buffer for transpose */
   matx::copy(out, tv.PermuteMatrix(), stream);
+  matxFree(tp);
 }
 
 

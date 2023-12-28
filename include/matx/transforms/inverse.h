@@ -338,9 +338,8 @@ struct InverseParamsKeyEq {
   }
 };
 
-// Static caches of inverse handles
-static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
-    inv_cache;
+using inv_cache_t = std::unordered_map<InverseParams_t, std::any, InverseParamsKeyHash, InverseParamsKeyEq>;
+
 
 }
 
@@ -364,18 +363,17 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
   params.stream = stream;
 
-  // Get cache or new inverse plan if it doesn't exist
-  auto ret = detail::inv_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxInversePlan_t{a_inv, a};
-    detail::inv_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(stream);
-  }
-  else {
-    auto inv_type =
-        static_cast<detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
-    inv_type->Exec(stream);
-  }
+  using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
+  detail::GetCache().LookupAndExec<detail::inv_cache_t>(
+    detail::CacheName::INV,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(a_inv, a);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(stream);
+    }
+  );
 }
 
 
