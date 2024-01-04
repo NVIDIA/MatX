@@ -213,10 +213,24 @@ public:
     // This must come before the things below to properly set class parameters
     params_ = GetGemmParams(c, a, b);
 
-    // // Workspace buffer
-    matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
-
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+      // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
+      // https://docs.nvidia.com/cuda/cublas/#cublassetworkspace
+      // Thus, try to detect if we are running on Hopper or newer and use a 32 MiB workspace
+      // if so. Otherwise, default to 4 MiB, which still works on Hopper+.
+      int device = 0, value = 0;
+      constexpr size_t MiB = 1024*1024;
+      constexpr int computeCompatMajorHopper = 9;
+      workspaceSize = 4*MiB;
+      if (cudaGetDevice(&device) == cudaSuccess &&
+        cudaDeviceGetAttribute(&value, cudaDevAttrComputeCapabilityMajor, device) == cudaSuccess &&
+        value >= computeCompatMajorHopper) {
+          workspaceSize = 32*MiB;
+      }
+
+      // Workspace buffer
+      matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
+
       ConfigureCublasLt();
     }
   }
@@ -510,7 +524,7 @@ private:
   void *c_hp = nullptr; // Make these void since they only work on complex types
   void *a_hp = nullptr;
   void *b_hp = nullptr;
-  size_t workspaceSize = 1 << 22UL; // 4MB buffer suggested by cuBLAS team
+  size_t workspaceSize = 0;
   void *workspace = nullptr;
   detail::MatMulParams_t params_;
 
