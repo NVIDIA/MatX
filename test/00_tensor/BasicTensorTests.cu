@@ -450,6 +450,17 @@ TYPED_TEST(BasicTensorTestsAll, Print)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicTensorTestsAll, DevicePrint)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({3}, MATX_DEVICE_MEMORY);
+  (t = ones(t.Shape())).run();
+  print(t);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicTensorTestsAll, DLPack)
 {
   MATX_ENTER_HANDLER();

@@ -758,7 +758,9 @@ void PrintData(const Op &op, Args... dims) {
     }
   }
   else {
-    InternalPrint(op, dims...);
+    auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+    (tmpv = op).run();    
+    InternalPrint(tmpv, dims...);
   }
 #else
   InternalPrint(op, dims...);
