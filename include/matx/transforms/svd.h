@@ -302,6 +302,36 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   }
 }
 
+template<typename AType>
+inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
+  using ATypeS = typename AType::scalar_type;
+  const int RANK = AType::Rank();
+
+  auto m = A.Size(RANK-2);  // rows
+  auto n = A.Size(RANK-1);  // cols
+  auto d = std::min(n,m); // dim for AAT or ATA
+
+  auto ATShape = A.Shape();
+  ATShape[RANK-2] = d;
+  ATShape[RANK-1] = d;
+
+  auto QShape = A.Shape();
+  QShape[RANK-1] = d;
+  QShape[RANK-2] = d;
+
+  auto RShape = A.Shape();
+  RShape[RANK-1] = d;
+  RShape[RANK-2] = d;  
+
+  // temp memory for block power iteration
+  auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Q = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+
+  return std::tuple(AT, Q, R, Z);
+}
+
 /**
  * Perform a SVD decomposition using the block power iteration.  This version of
  * SVD works well on small n/m with large batch.
@@ -327,12 +357,12 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
  * @param iterations
- *   The number of power iterations to perform for each singular value.  
+ *   The number of block power iterations to perform.  
  * @param stream
  *   CUDA stream
  */
 template<typename UType, typename SType, typename VTType, typename AType>
-void svdbpi_impl(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStream_t stream) {
+inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int iterations,  cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(U.Rank() == A.Rank());
@@ -346,63 +376,23 @@ void svdbpi_impl(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cuda
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
   auto d = std::min(n,m); // dim for AAT or ATA
-  
+
   // assert batch sizes are the same
   for(int i = 0 ; i < RANK-2; i++) {
     MATX_ASSERT_STR(U.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  U and A must have the same batch sizes");
     MATX_ASSERT_STR(VT.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  VT and A must have the same batch sizes");
     MATX_ASSERT_STR(S.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  S and A must have the same batch sizes");
   }
-  
+
   MATX_ASSERT_STR(U.Size(RANK-2) == m, matxInvalidDim, "svdbpi: U must have Size(RANK-2) == m");
   MATX_ASSERT_STR(U.Size(RANK-1) == d, matxInvalidDim, "svdbpi: U must have Size(RANK-1) == d");
   MATX_ASSERT_STR(VT.Size(RANK-2) == d, matxInvalidDim, "svdbpi: VT must have Size(RANK-2) == d");
   MATX_ASSERT_STR(VT.Size(RANK-1) == n, matxInvalidDim, "svdbpi: VT must have Size(RANK-1) == n");
   MATX_ASSERT_STR(S.Size(RANK-2) == d, matxInvalidDim, "svdbpi:  S must have Size(RANK-2) == d");
-  
 
-  auto ATShape = A.Shape();
-  ATShape[RANK-2] = d;
-  ATShape[RANK-1] = d;
 
-  auto QShape = A.Shape();
-  QShape[RANK-1] = d;
-  QShape[RANK-2] = d;
-  
-  auto RShape = A.Shape();
-  RShape[RANK-1] = d;
-  RShape[RANK-2] = d;  
-
-  // temp memory for block power iteration
-  auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto Q = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  std::array<index_t, RANK-2> NShape;
-  for(int i = 0; i < RANK-2; i++) {
-    NShape[i] = Z.Size(i);
-  }
-
-  std::array<index_t, RANK> VMShape;
-  for(int i = 0; i < RANK-1; i++) {
-    VMShape[i] = Z.Size(i);
-  }
-  VMShape[RANK-1] = 1;
-
-  std::array<index_t, RANK> HShape;
-  for(int i = 0; i < RANK-2; i++) {
-    HShape[i] = Z.Size(i);
-  }
-  HShape[RANK-2] = Z.Size(RANK-2);
-  HShape[RANK-1] = Z.Size(RANK-2);
-
-  // temp memory for qr
-  auto N = make_tensor<STypeS>(NShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto VM = make_tensor<ATypeS>(VMShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto H = make_tensor<ATypeS>(HShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto QN = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto RN = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto [AT, Q, R, Z] = svdbpi_impl_workspace(A, stream);
+  auto qr_workspace = qr_internal_workspace(Z, stream);
 
   // create spd matrix
   if ( m >= n ) {
@@ -410,43 +400,46 @@ void svdbpi_impl(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cuda
   } else {
     matmul_impl(AT, A, conj(transpose_matrix(A)), stream);
   }
-   
+
   auto e2 = eye({d,d});
   auto cShape = A.Shape();
   cShape[RANK-1] = matxKeepDim;
   cShape[RANK-2] = matxKeepDim;
-  
+
   (Q = clone<RANK>(e2, cShape)).run(stream);
 
   for(int i = 0; i < iterations; i++) {
     matmul_impl(Z, AT, Q, stream);
-    qr_internal(Q,R,Z,N,VM,H,QN,RN,stream);
+    qr_internal(Q, R, Z, qr_workspace, stream);
   }
 
   (S = real(sqrt(diag(R)))).run(stream);
-  
+
   if( m >= n ) {
     (VT = conj(transpose_matrix(Q))).run(stream);
     matmul_impl(U, A, Q, stream);
-    
+
     auto DShape = U.Shape();
     DShape.fill(matxKeepDim);
     DShape[RANK-2] = m;
     auto D = clone<RANK>(S, DShape);
-    
-    // normalize U by singular values
-    (U = U * STypeS(1) / D).run(stream);
+
+    // normalize U by singular values 
+    // IF required to avoid nans when singular value is 0
+    (IF(D != STypeS(0), U = U / D)).run(stream);
+
   } else {
     (U = Q).run(stream);
     matmul_impl(VT, conj(transpose_matrix(Q)), A, stream);
-    
+
     auto DShape = VT.Shape();
     DShape.fill(matxKeepDim);
     DShape[RANK-1] = n;
     auto D = clone<RANK>(S, DShape);
-    
+
     // normalize VT by singular values
-    (VT = VT * STypeS(1) / D).run(stream);
+    // IF required to avoid nans when singular value is 0
+    (IF(D != STypeS(0), VT = VT / D)).run(stream);
   }
 }
 
