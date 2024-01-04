@@ -38,6 +38,7 @@
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
 
+#define HOPPER_CC 9
 #define AMPERE_CC 8
 #define VOLTA_CC 7
 #define PASCAL_CC 6
@@ -47,14 +48,19 @@ namespace detail {
 __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
     int val;
     int dev;
-    cudaGetDevice(&dev);
-    [[maybe_unused]] auto err = cudaDeviceGetAttribute(&val, attr, dev);
+    [[maybe_unused]] auto err = cudaGetDevice(&dev);
+    MATX_ASSERT(err == cudaSuccess, matxCudaError);
+    err = cudaDeviceGetAttribute(&val, attr, dev);
     MATX_ASSERT(err == cudaSuccess, matxCudaError);
     return val;
 }
 
 __MATX_INLINE__ int GetComputeCapabilityMajor() {
     return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+}
+
+__MATX_INLINE__ bool IsHopperOrAbove() {
+    return GetComputeCapabilityMajor() >= HOPPER_CC;
 }
 
 __MATX_INLINE__ bool IsAmpereOrAbove() {

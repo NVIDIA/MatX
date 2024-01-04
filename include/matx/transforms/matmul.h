@@ -218,15 +218,8 @@ public:
       // https://docs.nvidia.com/cuda/cublas/#cublassetworkspace
       // Thus, try to detect if we are running on Hopper or newer and use a 32 MiB workspace
       // if so. Otherwise, default to 4 MiB, which still works on Hopper+.
-      int device = 0, value = 0;
       constexpr size_t MiB = 1024*1024;
-      constexpr int computeCompatMajorHopper = 9;
-      workspaceSize = 4*MiB;
-      if (cudaGetDevice(&device) == cudaSuccess &&
-        cudaDeviceGetAttribute(&value, cudaDevAttrComputeCapabilityMajor, device) == cudaSuccess &&
-        value >= computeCompatMajorHopper) {
-          workspaceSize = 32*MiB;
-      }
+      workspaceSize = detail::IsHopperOrAbove() ? 32*MiB : 4*MiB;
 
       // Workspace buffer
       matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
