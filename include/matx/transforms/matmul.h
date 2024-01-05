@@ -1107,7 +1107,8 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
       (in.Stride(RANK-1) != (index_t)1 && in.Stride(RANK-2) != (index_t)1) || 
       // cublas allows 0 strides, but verify that the corresponding size is 1
       (in.Stride(RANK-1) == (index_t)0 && in.Size(RANK-1) != (index_t)1) ||
-      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1)
+      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1) ||
+      in.Stride(RANK-2) == 0  // WAR for CUBLAS bug
       ) {
       supported = false;
     }
@@ -1191,6 +1192,10 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
 
   if(!b.isSameView(B_)) {
     (b = B_).run(stream);
+  }
+  
+  if(beta != 0 && !c.isSameView(C)) {
+    (c = C).run(stream);
   }
 
 #if MATX_ENABLE_CUTLASS != 1
