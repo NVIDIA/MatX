@@ -212,13 +212,18 @@ endif()
 
 # Add in all CUDA linker dependencies
 target_link_libraries(matx INTERFACE    CUDA::cudart
-                                        CUDA::nvToolsExt
                                         CUDA::cublas
                                         CUDA::cublasLt
                                         CUDA::cufft
                                         CUDA::cusolver
                                         CUDA::cuda_driver
                                         CUDA::curand)
+
+if (CMAKE_VERSION VERSION_LESS 3.25.0)
+    target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
+else()
+    target_link_libraries(matx INTERFACE CUDA::nvtx3)
+endif()
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
 # should have all build properties needed based on the options passed in
