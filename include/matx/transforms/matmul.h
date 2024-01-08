@@ -388,9 +388,26 @@ public:
         params.b_rows = b.Size(TensorTypeB::Rank() - 2);
         params.b_cols = b.Size(TensorTypeB::Rank() - 1);
        
-        // set lda/ldb according to transpose modes
-        params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(TensorTypeB::Rank() - 1) : b.Stride(TensorTypeB::Rank() - 2); 
-        params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(TensorTypeA::Rank() - 1) : a.Stride(TensorTypeA::Rank() - 2);
+        // set lda/ldb according to transpose modes. If we pass in a cloned tensor the second stride will be
+        // 0, which cuBLAS doesn't like even though it's unused. Set it to something that it would be if the
+        // matrix had more than 1 row.
+        if (params.opB == CUBLAS_OP_T) {
+          params.ldb = b.Stride(TensorTypeB::Rank() - 1);
+          params.ldb = (params.ldb == 0) ? b.Size(TensorTypeB::Rank() - 2) : params.ldb;
+        }
+        else {
+          params.ldb = b.Stride(TensorTypeB::Rank() - 2);
+          params.ldb = (params.ldb == 0) ? b.Size(TensorTypeB::Rank() - 1) : params.ldb;
+        }
+
+        if (params.opA == CUBLAS_OP_T) {
+          params.lda = a.Stride(TensorTypeA::Rank() - 1);
+          params.lda = (params.lda == 0) ? a.Size(TensorTypeA::Rank() - 2) : params.lda;
+        }
+        else {
+          params.lda = a.Stride(TensorTypeA::Rank() - 2);
+          params.lda = (params.lda == 0) ? a.Size(TensorTypeA::Rank() - 1) : params.lda;
+        }        
 
         // for complex half we have copied to planar row-major
         if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
@@ -444,7 +461,7 @@ public:
 
     matxFree(a_hp);
     matxFree(b_hp);
-    matxFree(c_hp);        
+    matxFree(c_hp);
   }
 
 /**
@@ -1107,8 +1124,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
       (in.Stride(RANK-1) != (index_t)1 && in.Stride(RANK-2) != (index_t)1) || 
       // cublas allows 0 strides, but verify that the corresponding size is 1
       (in.Stride(RANK-1) == (index_t)0 && in.Size(RANK-1) != (index_t)1) ||
-      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1) ||
-      in.Stride(RANK-2) == 0  // WAR for CUBLAS bug
+      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1)
       ) {
       supported = false;
     }

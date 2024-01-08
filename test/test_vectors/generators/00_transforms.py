@@ -329,3 +329,25 @@ class fft_operators:
             'a_in': seq,
             'a_out': np.fft.ifft2(seq, (self.size[1], self.size[1]))
         }
+
+
+class outer_operators:
+    def __init__(self,  dtype: str, size: List[int]):
+        np.random.seed(1234)
+        self.size = size
+        self.dtype = dtype
+
+        self.res = {
+            'a': matx_common.randn_ndarray((size[-2],), dtype),
+            'b': matx_common.randn_ndarray((size[-1],), dtype),
+            'ba': matx_common.randn_ndarray((size[-3], size[-2]), dtype),
+            'bb': matx_common.randn_ndarray((size[-3], size[-1]), dtype)
+        }
+
+    def run(self) -> Dict[str, np.ndarray]:
+        self.res['c'] = np.outer(self.res['a'], self.res['b'])
+        self.res['bc'] = np.ndarray((self.size[0], self.size[1], self.size[2]), dtype=self.dtype)
+        for b in range(self.size[-3]):
+            self.res['bc'][b] = np.outer(self.res['ba'][b], self.res['bb'][b])
+            
+        return self.res

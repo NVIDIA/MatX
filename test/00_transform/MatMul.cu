@@ -791,3 +791,42 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
 
   MATX_EXIT_HANDLER();
 }
+
+
+
+TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
+{
+  MATX_ENTER_HANDLER();
+  [[maybe_unused]] constexpr index_t an = 10;
+  [[maybe_unused]] constexpr index_t bn = 4;
+  [[maybe_unused]] constexpr index_t batches = 5;
+
+  auto a = make_tensor<TypeParam>({an});
+  auto b = make_tensor<TypeParam>({bn});
+  auto c = make_tensor<TypeParam>({an, bn});
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "outer_operators", "run", {batches, an, bn});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  // example-begin outer-test-1
+  (c = outer(a, b)).run();
+  // example-end outer-test-1
+
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  auto ba = make_tensor<TypeParam>({batches, an});
+  auto bb = make_tensor<TypeParam>({batches, bn});
+  this->pb->NumpyToTensorView(ba, "ba");
+  this->pb->NumpyToTensorView(bb, "bb");
+
+  auto bc = make_tensor<TypeParam>({batches, an, bn});  
+  (bc = outer(ba, bb)).run();
+
+  cudaStreamSynchronize(0);
+  MATX_TEST_ASSERT_COMPARE(this->pb, bc, "bc", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
