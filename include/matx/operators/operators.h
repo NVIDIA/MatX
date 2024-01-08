@@ -75,6 +75,7 @@
 #include "matx/operators/lu.h"
 #include "matx/operators/matmul.h"
 #include "matx/operators/matvec.h"
+#include "matx/operators/outer.h"
 #include "matx/operators/overlap.h"
 #include "matx/operators/percentile.h"
 #include "matx/operators/permute.h"
