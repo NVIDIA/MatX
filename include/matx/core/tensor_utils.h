@@ -760,6 +760,7 @@ void PrintData(const Op &op, Args... dims) {
   else {
     auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
     (tmpv = op).run();    
+    cudaStreamSynchronize(0);
     InternalPrint(tmpv, dims...);
   }
 #else
