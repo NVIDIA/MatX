@@ -46,3 +46,4 @@ Table of Contents
     api/index.rst
     examples/index.rst
     limitations
+    version
