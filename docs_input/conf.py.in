@@ -204,7 +204,7 @@ if "GITHUB_SHA" in os.environ:
     for k in ci_env_list:
         rst_epilog += f'\n.. |{k}| replace:: {os.getenv(k)}'
 
-    rst_epilog += f"\n.. |CI_COMMIT_URL| replace:: {os.getenv('GITHUB_SERVER_URL')}/{os.gitenv('GITHUB_REPOSITORY')}/tree/{os.getenv('GITHUB_SHA')}"
+    rst_epilog += f"\n.. |CI_COMMIT_URL| replace:: {os.getenv('GITHUB_SERVER_URL')}/{os.getenv('GITHUB_REPOSITORY')}/tree/{os.getenv('GITHUB_SHA')}"
 else:
     for k in ci_env_list:
         rst_epilog += f'\n.. |{k}| replace:: N/A'
