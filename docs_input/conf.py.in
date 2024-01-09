@@ -187,3 +187,25 @@ epub_title = project
 
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ['search.html']
+
+# Export some CICD info
+rst_epilog = f"""
+.. |ProjectVersion| replace:: {version}
+.. |ProjectRelease| replace:: {release}
+"""
+
+ci_env_list = [
+    'GITHUB_REPOSITORY',
+    'GITHUB_REF',
+    'GITHUB_REF_NAME',
+    'GITHUB_SHA'
+]
+if "GITHUB_SHA" in os.environ:
+    for k in ci_env_list:
+        rst_epilog += f'\n.. |{k}| replace:: {os.getenv(k)}'
+else:
+    for k in ci_env_list:
+        rst_epilog += f'\n.. |{k}| replace:: N/A'
+
+print(f"rst_epilog:\n{rst_epilog}")
+
