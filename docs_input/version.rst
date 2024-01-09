@@ -8,5 +8,6 @@ Version Info
     GITHUB_REF:                 |GITHUB_REF|
     GITHUB_REF_NAME:            |GITHUB_REF_NAME|
     GITHUB_SHA:                 |GITHUB_SHA|
+    CI_COMMIT_URL:              |CI_COMMIT_URL|
     ========================    ========================
 

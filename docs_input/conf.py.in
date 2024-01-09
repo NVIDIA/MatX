@@ -25,9 +25,9 @@ copyright = '2021-2024, Nvidia'
 author = 'Nvidia'
 
 # The short X.Y version
-version = ''
+version = '0.7'
 # The full version, including alpha/beta/rc tags
-release = ''
+release = '0.7'
 
 
 # -- General configuration ---------------------------------------------------
@@ -203,9 +203,13 @@ ci_env_list = [
 if "GITHUB_SHA" in os.environ:
     for k in ci_env_list:
         rst_epilog += f'\n.. |{k}| replace:: {os.getenv(k)}'
+
+    rst_epilog += f"\n.. |CI_COMMIT_URL| replace:: {os.getenv('GITHUB_SERVER_URL')}/{os.gitenv('GITHUB_REPOSITORY')}/tree/{os.getenv('GITHUB_SHA')}"
 else:
     for k in ci_env_list:
         rst_epilog += f'\n.. |{k}| replace:: N/A'
+    
+    rst_epilog += f"\n.. |CI_COMMIT_URL| replace:: N/A"
 
 print(f"rst_epilog:\n{rst_epilog}")
 
