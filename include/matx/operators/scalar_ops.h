@@ -662,6 +662,60 @@ template <typename T1> struct NotF {
 };
 template <typename T1> using NotOp = UnOp<T1, NotF<T1>>;
 
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isnan(T v1)
+{
+  using conversionType = typename matx::detail::value_promote_t<T>;  
+  if constexpr(!std::is_floating_point_v<conversionType>) {
+    return false;
+  } 
+
+  using castType = matx::detail::matx_convert_complex_type<T>;
+  if constexpr(is_complex_v<T>) {
+    return cuda::std::isnan(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isnan(static_cast<typename castType::value_type>(v1.imag()));
+  } else {
+    return cuda::std::isnan(static_cast<castType>(v1));
+  }
+
+  return false;  
+}
+template <typename T>
+struct IsNan {
+  static __MATX_INLINE__ std::string str() { return "isnan"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_isnan(v1);
+  }
+};
+template <typename T> using IsNanOp = UnOp<T, IsNan<T>>;   
+
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isinf(T v1)
+{
+  using conversionType = typename matx::detail::value_promote_t<T>;  
+  if constexpr(!std::is_floating_point_v<conversionType>) {
+    return false;
+  } 
+
+  using castType = matx::detail::matx_convert_complex_type<T>;
+  if constexpr(is_complex_v<T>) {
+    return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
+  } else {
+    return cuda::std::isinf(static_cast<castType>(v1));
+  }
+
+  return false;  
+}
+template <typename T>
+struct IsInf {
+  static __MATX_INLINE__ std::string str() { return "isinf"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_isinf(v1);
+  }
+};
+template <typename T> using IsInfOp = UnOp<T, IsInf<T>>;   
+
 template <typename T1, typename T2> struct AndF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "&" + str2 + ")"; }
 

@@ -336,6 +336,21 @@ namespace matx
  *   Input operator
  */
   Op imag(Op t) {}  
+
+ /**
+ * Returns a truth value if operator value is NaN
+ * @param t
+ *   Input operator
+ */
+  Op isnan(Op t) {}  
+
+ /**
+ * Returns a truth value if operator value is infinite
+  * @param x
+ *   Input operator
+ */
+  Op isinf( Op x) {}  
+
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
   DEFINE_UNARY_OP(exp, detail::ExpOp);
@@ -401,6 +416,8 @@ namespace matx
 #endif
   DEFINE_UNARY_OP(imag, detail::ImagOp);  
   DEFINE_UNARY_OP(operator-, detail::SubNegOp );
+  DEFINE_UNARY_OP(isnan, detail::IsNanOp);
+  DEFINE_UNARY_OP(isinf, detail::IsInfOp);
 #endif
 
 } // end namespace matx
