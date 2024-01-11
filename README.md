@@ -97,9 +97,6 @@ cmake -DMATX_BUILD_TESTS=ON ..
 make -j
 ```
 
-Note that if documentation is selected all other build options are off. This eases the dependencies needed to build documentation
-so large libraries such as CUDA don't need to be installed.
-
 ### Integrating MatX With Your Own Projects
 MatX uses CMake as a first-class build generator, and therefore provides the proper config files to include into your own project. There are
 typically two ways to do this: 

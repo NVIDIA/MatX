@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.23.1)
 
+set(MATX_VERSION 0.7.0)
+
 # Used for config file generation
 if(NOT DEFINED PROJECT_NAME)
   set(NOT_SUBPROJECT ON)
@@ -30,7 +32,7 @@ set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (MATX_BUILD_DOCS)
-    project(MATX_DOCS)
+    project(MATX_DOCS VERSION ${MATX_VERSION})
     add_subdirectory(docs_input)
 endif()
 
@@ -55,7 +57,7 @@ endif()
 project(MATX
         LANGUAGES CUDA CXX
         DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
-        VERSION 0.7.0
+        VERSION ${MATX_VERSION}
         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
 
 if (NOT CMAKE_CUDA_ARCHITECTURES)
