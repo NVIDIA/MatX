@@ -139,18 +139,10 @@ namespace detail {
       ncShape[RANK-2] = m;
       auto nc = clone<RANK-1>(N,ncShape);
 
-      std::array<index_t, RANK> umShape;
-      umShape.fill(matxKeepDim);
-      umShape[RANK-1] = 1;
-
-      auto um = clone<RANK>(u, umShape);
-      auto vm = clone<RANK>(v, umShape);
-      
       // aliasing some memory here to share storage and provide clarity in the code below
       auto s = N; // alias 
       auto sc = nc; // alias
       auto w = v; // alias 
-      auto wm = vm; // alias
 
       for(int i = 0 ; i < k ; i++) {
 
@@ -179,15 +171,12 @@ namespace detail {
 
         (u = matvec(conj(transpose_matrix(R)), w, 2 , 0)).run(stream);
 
-        // TODO replace with outer API
-        matmul_impl(R, wm, conj(transpose_matrix(um)), stream, -1, 1);
+        (R = outer(w, conj(u), -1, 1)).run(stream);
 
         // entries below diagonal should be numerical zero.  Zero them out to avoid additional FP error.
         (IF(index(x.Rank()-1) > i, r = ATypeS(0)) ).run(stream);
 
-
-        // TODO replace with outer API
-        matmul_impl(wwt, wm, conj(transpose_matrix(wm)), stream);
+        (wwt = outer(w, conj(w))).run(stream);
 
         (Qin = Q).run(stream);  // save input 
         matmul_impl(Q, Qin, wwt, stream, -2, 1);
