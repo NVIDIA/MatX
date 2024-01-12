@@ -173,8 +173,7 @@ namespace matx
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
           if constexpr (T::Rank() == 0) {
-            std::array<index_t, 1> sizes_{1};
-            return sizes_;
+            return std::array<index_t, 0> {};
           }
           else {
             std::array<index_t, T::Rank()> sizes_;
