@@ -323,13 +323,20 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
   RShape[RANK-1] = d;
   RShape[RANK-2] = d;  
 
+  std::array<index_t,RANK-2> l2NormShape;
+  for(int i=0;i<RANK-2;i++) {
+    l2NormShape[i] = A.Size(i);
+  }
+
   // temp memory for block power iteration
   auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto Q = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Qold = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  return std::tuple(AT, Q, R, Z);
+  auto l2Norm = make_tensor<float>(l2NormShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream); 
+  return std::tuple(AT, Q, Qold, R, Z, l2Norm, converged);
 }
 
 /**
@@ -356,14 +363,16 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
  *   VT tensor or operator for right singular vectors output as VH with size "batches by min(m,n) by n"
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
- * @param iterations
- *   The number of block power iterations to perform.  
+ * @param max_iters
+ *   The approximate maximum number of QR iterations to perform. 
+ * @param tol
+ *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  * @param stream
  *   CUDA stream
  */
 template<typename UType, typename SType, typename VTType, typename AType>
-inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int iterations,  cudaStream_t stream) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_iters, float tol,  cudaStream_t stream) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
 
   static_assert(U.Rank() == A.Rank());
   static_assert(VT.Rank() == A.Rank());
@@ -390,8 +399,15 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int iter
   MATX_ASSERT_STR(VT.Size(RANK-1) == n, matxInvalidDim, "svdbpi: VT must have Size(RANK-1) == n");
   MATX_ASSERT_STR(S.Size(RANK-2) == d, matxInvalidDim, "svdbpi:  S must have Size(RANK-2) == d");
 
+  int converged_host = false;
+  cudaStream_t d2h;
+  cudaEvent_t event;
+  if(tol>0.0f) {
+    cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking);
+    cudaEventCreate(&event);
+  }
 
-  auto [AT, Q, R, Z] = svdbpi_impl_workspace(A, stream);
+  auto [AT, Q, Qold, R, Z, l2Norm, converged] = svdbpi_impl_workspace(A, stream);
   auto qr_workspace = qr_internal_workspace(Z, stream);
 
   // create spd matrix
@@ -406,11 +422,49 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int iter
   cShape[RANK-1] = matxKeepDim;
   cShape[RANK-2] = matxKeepDim;
 
-  (Q = clone<RANK>(e2, cShape)).run(stream);
+  (Qold = Q = clone<RANK>(e2, cShape)).run(stream);
 
-  for(int i = 0; i < iterations; i++) {
+  // TODO multistream?
+  for(int i = 0; i < max_iters; i+=2)
+  {
+
+    // double pump this iteration so we get Qold and Q for tolerance checking.
+    // We might take an extra iteration but it will overheads associated with checking concergence.
     matmul_impl(Z, AT, Q, stream);
+    qr_internal(Qold, R, Z, qr_workspace, stream);
+
+    matmul_impl(Z, AT, Qold, stream);
     qr_internal(Q, R, Z, qr_workspace, stream);
+
+    if(tol!=0.0f) {
+
+      cudaStreamSynchronize(d2h);  // wait for d2h transfer to finish
+      if(converged_host == true) {
+        // if converged exit loop
+        break;
+      }
+
+      //compute L2(Q-Qold)
+      // sqrt folded into next operation
+      (l2Norm = sum(norm(Q-Qold))).run(stream);  
+
+      // compute if all batches have converged
+      if constexpr (RANK > 2) {
+        (converged = all(as_int(sqrt(l2Norm) < tol))).run(stream);
+      } else {
+        (converged = as_int(sqrt(l2Norm) < tol)).run(stream);
+      }
+      
+      // event to record when converged is ready in stream
+      cudaEventRecord(event, stream);
+      // wait for d2h transfer until converged is ready
+      cudaStreamWaitEvent(d2h, event);
+
+      // copy convergence criteria to host.  
+      // This is in unpinned memory and cannot on most systems run asynchronously.  
+      // We do this here to hide the copy/sync behind prior launch latency/execution of next iteration.
+      cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
+    }
   }
 
   (S = real(sqrt(diag(R)))).run(stream);
@@ -440,6 +494,11 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int iter
     // normalize VT by singular values
     // IF required to avoid nans when singular value is 0
     (IF(D != STypeS(0), VT = VT / D)).run(stream);
+  }
+
+  if(tol>0.0f) {
+    cudaEventDestroy(event);
+    cudaStreamDestroy(d2h);
   }
 }
 

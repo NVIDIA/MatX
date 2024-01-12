@@ -41,12 +41,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
+#if 1
   //using AType = float;
   using AType = cuda::std::complex<float>;
   using SType = float;
 
   cudaStream_t stream = 0;
-  int batch = 1; 
 
   int m = 5;
   int n = 4;
@@ -54,6 +54,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   int d = std::min(m,n);
   int k = d;  // number of singular values to find
 
+#if 0
+  int batch = 1; 
   auto A = make_tensor<AType>({batch, m, n});
   auto U = make_tensor<AType>({batch, m, k});
   auto VT = make_tensor<AType>({batch, k, n});
@@ -66,19 +68,40 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto UTU = make_tensor<AType>({batch, k, k});
   auto VVT = make_tensor<AType>({batch, n, n});
   auto VTV = make_tensor<AType>({batch, k, k});
+  auto x0 = random<float>({batch, d}, NORMAL);
+    
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
+
+#else
+  auto A = make_tensor<AType>({m, n});
+  auto U = make_tensor<AType>({m, k});
+  auto VT = make_tensor<AType>({k, n});
+  auto S = make_tensor<SType>({k});
+
+  // for correctness checking
+  auto UD = make_tensor<AType>({m, k});
+  auto UDVT = make_tensor<AType>({m, n});
+  auto UUT = make_tensor<AType>({m, m});
+  auto UTU = make_tensor<AType>({k, k});
+  auto VVT = make_tensor<AType>({n, n});
+  auto VTV = make_tensor<AType>({k, k});
+  auto x0 = random<float>({d}, NORMAL);
+  
+  (A = random<float>({m, n}, NORMAL)).run(stream);
+
+#endif
   std::array<index_t, U.Rank()> Dshape;
   Dshape.fill(matxKeepDim);
   Dshape[U.Rank()-2] = m;
   // cloning D across
   auto D = clone<U.Rank()>(S, Dshape);
 
-  int iterations = 10;
+  float tol = (float)1e-3;
+  int iterations = 20;
+  
   {
-    auto x0 = random<float>({batch, d}, NORMAL);
 
     printf("iterations: %d\n", iterations);
-
-    (A = random<float>({batch, m, n}, NORMAL)).run(stream);
 
     A.PrefetchDevice(stream);
     U.PrefetchDevice(stream);
@@ -138,6 +161,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("A-UDVT\n");
     print(A);
   }
+  
   // Same as above but with svdbpi
   {
 
@@ -145,7 +169,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (S = 0).run(stream);
     (VT = 0).run(stream);
     // TODO add k
-    (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
+    (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(stream);
 
     cudaDeviceSynchronize();
     printf("svdbpi:\n");
@@ -194,7 +218,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("A-UDVT\n");
     print(A);
   }
-
+#endif
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }
