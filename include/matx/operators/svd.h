@@ -182,7 +182,8 @@ namespace detail {
   {
     private:
       OpA a_;
-      int iterations_;
+      int max_iters_;
+      float tol_;
 
     public:
       using matxop = bool;
@@ -191,7 +192,7 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDBPIOp(const OpA &a, int iterations) : a_(a), iterations_(iterations)
+      __MATX_INLINE__ SVDBPIOp(const OpA &a, int max_iters, float tol) : a_(a), max_iters_(max_iters), tol_(tol)
       { }
 
       // This should never be called
@@ -203,7 +204,7 @@ namespace detail {
         static_assert(is_device_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, V) = svdbpi(A))");
 
-        svdbpi_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, iterations_, ex.getStream());
+        svdbpi_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, max_iters_, tol_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -236,12 +237,14 @@ namespace detail {
  *
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
- * @param iterations
- *   The number of power iterations to perform for each singular value.  
+ * @param max_iters
+ *   The approximate maximum number of QR iterations to perform. 
+ * @param tol
+ *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  */
 template<typename AType>
-__MATX_INLINE__ auto svdbpi(AType &A, int iterations) {
-  return detail::SVDBPIOp(A, iterations);
+__MATX_INLINE__ auto svdbpi(AType &A, int max_iters=10, float tol=0.0f) {
+  return detail::SVDBPIOp(A, max_iters, tol);
 }
 
 }
