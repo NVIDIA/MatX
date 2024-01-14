@@ -35,7 +35,7 @@
 #include <mutex>
 #include <string>
 #include <utility>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 namespace matx
 {
