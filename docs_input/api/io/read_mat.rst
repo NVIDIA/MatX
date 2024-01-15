@@ -6,7 +6,7 @@ read_mat
 Read a CSV file into a tensor
 
 .. note::
-   This function requires the optional `MATX_ENABLE_FILEIO` compile flag
+   This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
 
 .. doxygenfunction:: matx::io::read_mat(TensorType &t, const std::string fname, const std::string var)
