@@ -219,3 +219,46 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
   }
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({2, 3});
+
+  // example-begin read_npy-test-1
+  io::read_npy(t, "../test/00_io/test.npy");
+  // example-end read_npy-test-1
+
+  // The test npy is [[1.5, 2.5, 3.5], [4.5, 5.5, 6.5]]
+  ASSERT_NEAR(t(0, 0), 1.5, 0.001);
+  ASSERT_NEAR(t(0, 1), 2.5, 0.001);
+  ASSERT_NEAR(t(0, 2), 3.5, 0.001);
+  ASSERT_NEAR(t(1, 0), 4.5, 0.001);
+  ASSERT_NEAR(t(1, 1), 5.5, 0.001);
+  ASSERT_NEAR(t(1, 2), 6.5, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYWrite)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({2, 3});
+  auto t2 = make_tensor<TypeParam>({2, 3});
+  t.SetVals({{1, 2, 3}, {4, 5, 6}});
+
+  // example-begin write_npy-test-1
+  io::write_npy(t, "test_write.npy");
+  // example-end write_npy-test-1
+
+  io::read_npy(t2, "test_write.npy");
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
+      ASSERT_EQ(t(i, j), t2(i, j));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}

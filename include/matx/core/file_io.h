@@ -307,6 +307,61 @@ void write_mat(const TensorType &t, const std::string fname,
   auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
 }
 
+/**
+ * @brief Read a NPY file into a tensor view
+ *
+ * NPY files are a simple binary format for storing arrays of numbers.
+ *
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File name of .npy file
+ */
+template <typename TensorType>
+void read_npy(TensorType &t, const std::string& fname)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  if (!std::filesystem::exists(fname)) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+  
+  auto pb = std::make_unique<detail::MatXPybind>();
+
+  auto np = pybind11::module_::import("numpy");
+  auto obj = np.attr("load")("file"_a = fname);
+
+  pb->NumpyToTensorView(t, obj);
+}
+
+/**
+ * @brief Write a NPY file from a tensor view
+ * 
+ * NPY files are a simple binary format for storing arrays of numbers.
+ *
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to write data from
+ * @param fname
+ *   File name of .npy file
+ */
+template <typename TensorType>
+void write_npy(const TensorType &t, const std::string& fname)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  auto pb = std::make_unique<detail::MatXPybind>();
+  auto np = pybind11::module_::import("numpy");
+
+  auto np_ten = pb->TensorViewToNumpy(t);
+
+  np.attr("save")("file"_a = fname, "arr"_a = np_ten);
+}
+
 }; // namespace io
 }; // namespace matx
 
