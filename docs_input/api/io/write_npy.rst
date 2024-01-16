@@ -3,7 +3,7 @@
 write_npy
 =========
 
-Write a NPY file from a tensor
+Write an NPY file from a tensor
 
 .. note::
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag

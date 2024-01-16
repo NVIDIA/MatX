@@ -3,7 +3,7 @@
 read_npy
 ========
 
-Read a NPY file into a tensor
+Read an NPY file into a tensor
 
 .. note::
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
