@@ -3,7 +3,7 @@
 Data Types
 ##########
 
-MatX attempts to use the default C++ type system rules whereever possible; the inner types
+MatX attempts to use the default C++ type system rules wherever possible; the inner types
 of operators should behave identically to normal C++ rules. For example, assigning a tensor
 of type double to a tensor of type float will have the same implications as assigning the simple
 data types to each other. For example:
