@@ -43,7 +43,8 @@ endif()
 if(NOT DEFINED rapids-cmake-dir)
   add_subdirectory(cmake/rapids-cmake)
 else()
-  list(APPEND CMAKE_PREFIX_PATH "${rapids-cmake-dir}")
+  # The include() commands below search the module path for the corresponding .cmake files
+  list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 endif()
 
 include(rapids-cmake)
