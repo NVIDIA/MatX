@@ -191,6 +191,15 @@ namespace matx
   Op abs(Op t) {}
 
   /**
+ * Compute squared absolute value of every element in the tensor. For complex numbers
+ * this returns the squared magnitude, or real(t)^2 + imag(t)^2. For real numbers
+ * this returns the squared value, or t*t.
+ * @param t
+ *   Tensor or operator input
+ */
+  Op abs2(Op t) {}
+
+  /**
  * Compute the sine of every element in the tensor
  * @param t
  *   Tensor or operator input
@@ -379,6 +388,7 @@ namespace matx
 #endif
   DEFINE_UNARY_OP(norm, detail::NormOp);
   DEFINE_UNARY_OP(abs, detail::AbsOp);
+  DEFINE_UNARY_OP(abs2, detail::Abs2Op);
   DEFINE_UNARY_OP(sin, detail::SinOp);
   DEFINE_UNARY_OP(cos, detail::CosOp);
   DEFINE_UNARY_OP(tan, detail::TanOp);
