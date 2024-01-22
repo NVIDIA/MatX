@@ -4,8 +4,8 @@ abs2
 ====
 
 Squared absolute value. For complex numbers, this is the squared
-complex magnitude, or real(t)^2 + imag(t)^2. For real numbers,
-this is equivalent to the squared value, or t*t.
+complex magnitude, or real(t)\ :sup:`2` + imag(t)\ :sup:`2`. For real numbers,
+this is equivalent to the squared value, or t\ :sup:`2`.
 
 .. doxygenfunction:: abs2(Op t) 
   
