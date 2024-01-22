@@ -1,4 +1,4 @@
-.. _abss_func:
+.. _abs2_func:
 
 abs2
 ====
