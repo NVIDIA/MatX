@@ -285,6 +285,20 @@ template <typename T> struct ExpjF {
 };
 template <typename T> using ExpjOp = UnOp<T, ExpjF<T>>;
 
+template <typename T> struct Abs2F {
+  static __MATX_INLINE__ std::string str() { return "abs2"; }
+
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v)
+  {
+    if constexpr (is_complex_v<T>) {
+      return v.real() * v.real() + v.imag() * v.imag();
+    }
+    else {
+      return v * v;
+    }
+  }
+};
+template <typename T> using Abs2Op = UnOp<T, Abs2F<T>>;
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
