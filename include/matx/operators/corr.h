@@ -53,7 +53,8 @@ namespace matx
         matxConvCorrMethod_t method_;
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
-        mutable matx::tensor_t<out_t, max_rank> tmp_out_;
+        mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+        mutable out_t *ptr; 
 
       public:
         using matxop = bool;
@@ -146,7 +147,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -154,11 +155,15 @@ namespace matx
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }          
+          }           
+        }      
 
-          if constexpr (is_cuda_executor_v<Executor>) {
-            make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-          }
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));        
+
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }

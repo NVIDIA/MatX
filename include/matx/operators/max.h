@@ -49,7 +49,8 @@ namespace detail {
     private:
       OpA a_;
       cuda::std::array<index_t, ORank> out_dims_;
-      mutable matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;      
+      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr;    
 
     public:
       using matxop = bool;
@@ -80,18 +81,19 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
+        }          
+      }      
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);          
-        }
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));    
+
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
@@ -131,7 +133,7 @@ namespace detail {
 template <typename InType, int D>
 __MATX_INLINE__ auto max(const InType &in, const int (&dims)[D])
 {
-  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
@@ -142,7 +144,7 @@ template <typename InType, int D>
 [[deprecated("Use max() instead of rmax() for reductions")]]
 __MATX_INLINE__ auto rmax(const InType &in, const int (&dims)[D])
 {
-  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 

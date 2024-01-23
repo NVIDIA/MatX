@@ -870,7 +870,9 @@ inline void ExecSort(OutputTensor &a_out,
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
         return cub::DeviceReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
+
       auto rv = ReduceInput(ft, out_base, in_base);
+
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Max");
     }
 #endif

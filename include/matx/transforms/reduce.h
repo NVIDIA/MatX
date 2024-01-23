@@ -1897,7 +1897,8 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] H
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0));
+        auto f = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0));
+        *(lout + b) = f;
       }
     }
   };

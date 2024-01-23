@@ -154,14 +154,14 @@ namespace detail {
         (xz = (index(x.Rank()-1) >= i) * x).run(stream);
 
         // compute L2 norm without sqrt. 
-        (N = sum(norm(xz))).run(stream);
+        (N = sum(abs2(xz))).run(stream);
         //(N = sqrt(N)).run(stream);  // sqrt folded into next op
 
         (v = xz + (index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
 
         auto r = x;  // alias column of R happens to be the same as x
 
-        (s = sum(norm(v))).run(stream);
+        (s = sum(abs2(v))).run(stream);
         //(s = sqrt(s)).run(stream);  // sqrt folded into next op
 
         // IFELSE to avoid nans when dividing by zero

@@ -78,6 +78,7 @@ class tensor_impl_t {
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
     using matxoplvalue = bool;
+    using self_type = tensor_impl_t<T, RANK, Desc>;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -230,6 +231,12 @@ class tensor_impl_t {
         : desc_{std::forward<DescriptorType>(desc)}
     {
     }      
+
+    __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
+    {
+      ldata_ = rhs.ldata_;
+      desc_ = rhs.desc_;
+    }    
 
     /**
      * Lazy assignment operator=. Used to create a "set" object for deferred
@@ -811,7 +818,7 @@ class tensor_impl_t {
      * 
      * @return data pointer 
      */
-    auto Data() const noexcept {
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto Data() const noexcept {
       return ldata_;
     } 
 

@@ -176,13 +176,6 @@ namespace matx
   Op conj(Op t) {}
 
   /**
- * Compute the squared magnitude of every element in the tensor
- * @param t
- *   Tensor or operator input
- */
-  Op norm(Op t) {}
-
-  /**
  * Compute absolute value of every element in the tensor. For complex numbers
  * this returns the magnitude, or sqrt(x^2+y^2)
  * @param t
@@ -387,7 +380,6 @@ namespace matx
     }
   }
 #endif
-  DEFINE_UNARY_OP(norm, detail::NormOp);
   DEFINE_UNARY_OP(abs, detail::AbsOp);
   DEFINE_UNARY_OP(abs2, detail::Abs2Op);
   DEFINE_UNARY_OP(sin, detail::SinOp);

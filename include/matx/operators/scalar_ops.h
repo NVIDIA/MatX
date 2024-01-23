@@ -202,7 +202,7 @@ MATX_UNARY_OP_GEN(log10, Log10);
 MATX_UNARY_OP_GEN(log2, Log2);
 MATX_UNARY_OP_GEN(log, Log);
 MATX_UNARY_OP_GEN(abs, Abs);
-MATX_UNARY_OP_GEN(norm, Norm);
+
 
 // Trigonometric functions
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)

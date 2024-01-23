@@ -17,6 +17,7 @@ set (test_sources
     00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
+    00_transform/Norm.cu
     00_transform/ResamplePoly.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu

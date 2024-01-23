@@ -44,7 +44,8 @@ namespace detail {
   {
     private:
       OpA a_;
-      mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
 
     public:
       using matxop = bool;
