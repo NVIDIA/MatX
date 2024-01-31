@@ -1452,6 +1452,16 @@ public:
     int d = 0;
     bool def_stride = (strides[0] == -1);
 
+    int end_count = 0;
+    for (int i = 0; i < RANK; i++) {
+      if (ends[i] == matxDropDim) {
+        end_count++;
+      }
+    }
+
+    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize, 
+            "Number of matxDropDim specifiers must match the output rank");
+
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
       typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
@@ -1474,20 +1484,22 @@ public:
       // offset by first
       data += first * Stride(i);
 
-      if (end != matxDropDim) {
-        if (end == matxEnd) {
-          n[d] = this->Size(i) - first;
-        }
-        else {
-          n[d] = end - first;
-        }
+      if constexpr (N > 0) {
+        if (end != matxDropDim) {
+          if (end == matxEnd) {
+            n[d] = this->Size(i) - first;
+          }
+          else {
+            n[d] = end - first;
+          }
 
-        // New length is shorter if we have a non-1 stride
-        n[d] = static_cast<typename Desc::shape_type>(std::ceil(
-            static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
+          // New length is shorter if we have a non-1 stride
+          n[d] = static_cast<typename Desc::shape_type>(std::ceil(
+              static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
 
-        s[d] = Stride(i) * stride_mult;
-        d++;
+          s[d] = Stride(i) * stride_mult;
+          d++;
+        }
       }
     }
 
