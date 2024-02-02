@@ -55,6 +55,8 @@ namespace matx
         std::array<index_t, max_rank> out_dims_;
         mutable matx::tensor_t<out_t, max_rank> tmp_out_;
 
+        static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
+
       public:
         using matxop = bool;
         using scalar_type = out_t;
@@ -72,13 +74,16 @@ namespace matx
                           method == MATX_C_METHOD_DIRECT, 
             matxInvalidType, "FFT convolutions do not support half precision float currently");
 
+          index_t min_axis;
+          index_t max_axis;
+
           // Currently when using the axis parameter the rank of inputs must be equal
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
               const int axis = perm[r];
               if (axis == Rank() - 1) {
-                const auto max_axis = std::max(a_.Size(r), b_.Size(r));
-                const auto min_axis = std::min(a_.Size(r), b_.Size(r));
+                max_axis = std::max(a_.Size(r), b_.Size(r));
+                min_axis = std::min(a_.Size(r), b_.Size(r));
 
                 if (mode_ == MATX_C_MODE_FULL) {
                   out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
@@ -107,8 +112,9 @@ namespace matx
               }
             }
 
-            const auto max_axis = std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
-            const auto min_axis = std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            max_axis = std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            min_axis = std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+
             if (mode_ == MATX_C_MODE_FULL) {
               out_dims_[max_rank-1] = max_axis + min_axis - 1;
             }
@@ -119,6 +125,10 @@ namespace matx
               out_dims_[max_rank-1] = max_axis - min_axis + 1;
             }
           }
+
+          MATX_ASSERT_STR(method == MATX_C_METHOD_FFT || min_axis <= MAX_MIN_DIMENSION_DIRECT, 
+                          matxInvalidSize, "Dimension too large for direct convolution. "
+                          "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }
 
         template <typename... Is>
