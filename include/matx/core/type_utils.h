@@ -272,8 +272,8 @@ constexpr bool is_executor_t()
 
 
 namespace detail {
-template<typename T> struct is_device_executor : std::false_type {};
-template<> struct is_device_executor<matx::cudaExecutor> : std::true_type {};
+template<typename T> struct is_cuda_executor : std::false_type {};
+template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
 }
 
 /**
@@ -282,11 +282,11 @@ template<> struct is_device_executor<matx::cudaExecutor> : std::true_type {};
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_device_executor_v = detail::is_device_executor<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
 
 namespace detail {
-template<typename T> struct is_single_thread_host_executor : std::false_type {};
-template<> struct is_single_thread_host_executor<matx::HostExecutor> : std::true_type {};
+template<typename T> struct is_host_executor : std::false_type {};
+template<> struct is_host_executor<matx::HostExecutor> : std::true_type {};
 }
 
 /**
@@ -295,7 +295,7 @@ template<> struct is_single_thread_host_executor<matx::HostExecutor> : std::true
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_single_thread_host_executor_v = detail::is_single_thread_host_executor<remove_cvref_t<T>>::value;
+inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref_t<T>>::value;
 
 
 namespace detail {

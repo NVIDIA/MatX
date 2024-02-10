@@ -134,7 +134,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_device_executor_v<Executor>, "corr() only supports the CUDA executor currently");
+          static_assert(is_cuda_executor_v<Executor>, "corr() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "corr: inputs and outputs must have same rank to use corr with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
@@ -156,7 +156,7 @@ namespace matx
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }          
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 

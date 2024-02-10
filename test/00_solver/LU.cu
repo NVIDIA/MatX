@@ -42,10 +42,12 @@ constexpr int n = 50;
 
 template <typename T> class LUSolverTest : public ::testing::Test {
 protected:
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;   
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "lu", "run", {m, n});
+    pb->InitAndRunTVGenerator<GTestType>("00_solver", "lu", "run", {m, n});
     pb->NumpyToTensorView(Av, "A");
     pb->NumpyToTensorView(Lv, "L");
     pb->NumpyToTensorView(Uv, "U");
@@ -53,12 +55,13 @@ protected:
 
   void TearDown() { pb.reset(); }
 
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Av{{m, n}};
-  tensor_t<T, 2> Atv{{n, m}};
+  tensor_t<GTestType, 2> Av{{m, n}};
+  tensor_t<GTestType, 2> Atv{{n, m}};
   tensor_t<int64_t, 1> PivV{{std::min(m, n)}};
-  tensor_t<T, 2> Lv{{m, std::min(m, n)}};
-  tensor_t<T, 2> Uv{{std::min(m, n), n}};
+  tensor_t<GTestType, 2> Lv{{m, std::min(m, n)}};
+  tensor_t<GTestType, 2> Uv{{std::min(m, n), n}};
 };
 
 template <typename TensorType>
@@ -66,13 +69,13 @@ class LUSolverTestNonComplexFloatTypes : public LUSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(LUSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(LUSolverTestNonComplexFloatTypes, LUBasic)
 {
   MATX_ENTER_HANDLER();
   // example-begin lu-test-1
-  (mtie(this->Av, this->PivV) =  lu(this->Av)).run();
+  (mtie(this->Av, this->PivV) =  lu(this->Av)).run(this->exec);
   // example-end lu-test-1
   cudaStreamSynchronize(0);
 

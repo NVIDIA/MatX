@@ -349,6 +349,7 @@ class fft_operators:
     def rfft_2d(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray(
             (self.size[0], self.size[1]), self.dtype)
+
         return {
             'a_in': seq,
             'a_out': np.fft.rfft2(seq, (self.size[0], self.size[1]))

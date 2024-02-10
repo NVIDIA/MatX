@@ -43,7 +43,7 @@
 #include "matx/core/type_utils.h"
 
 #include "matx/transforms/copy.h"
-#include "matx/transforms/fft.h"
+#include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
 typedef enum {

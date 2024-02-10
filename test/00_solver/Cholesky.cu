@@ -55,11 +55,14 @@ class CholSolverTestNonHalfFloatTypes : public CholSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
-                 MatXFloatNonHalfTypes);
+  MatXFloatNonHalfTypesCUDAExec);
 
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  ExecType exec;
 
   const std::array dims {
     16,
@@ -71,20 +74,20 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
   };
 
   for (size_t k = 0; k < dims.size(); k++) {
-    this->pb->template InitAndRunTVGenerator<TypeParam>("00_solver", "cholesky", "run", {dims[k]});
-    auto Bv = make_tensor<TypeParam>({dims[k], dims[k]});
-    auto Lv = make_tensor<TypeParam>({dims[k], dims[k]});
+    this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "cholesky", "run", {dims[k]});
+    auto Bv = make_tensor<TestType>({dims[k], dims[k]});
+    auto Lv = make_tensor<TestType>({dims[k], dims[k]});
     this->pb->NumpyToTensorView(Bv, "B");
     this->pb->NumpyToTensorView(Lv, "L");
 
     // example-begin chol-test-1
-    (Bv = chol(Bv, CUBLAS_FILL_MODE_LOWER)).run();
+    (Bv = chol(Bv, CUBLAS_FILL_MODE_LOWER)).run(exec);
     // example-end chol-test-1
     cudaStreamSynchronize(0);
 
     // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
     // and destroys the upper triangular portion.
-    if constexpr (is_complex_v<TypeParam>) {
+    if constexpr (is_complex_v<TestType>) {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
           ASSERT_NEAR(Bv(i, j).real(), Lv(i, j).real(), 0.001);
@@ -106,6 +109,9 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  ExecType exec;  
 
   const std::array dims {
     50,
@@ -116,22 +122,22 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
   };
 
   for (size_t k = 0; k < dims.size(); k++) {
-    this->pb->template InitAndRunTVGenerator<TypeParam>("00_solver", "cholesky", "run", {dims[k]});
-    auto Bv = make_tensor<TypeParam>({2*dims[k], 3*dims[k]});
+    this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "cholesky", "run", {dims[k]});
+    auto Bv = make_tensor<TestType>({2*dims[k], 3*dims[k]});
     auto Bslice = slice<2>(Bv, {11, 50}, {dims[k]+11, dims[k]+50});
-    auto Cv = make_tensor<TypeParam>({dims[k], dims[k]});
-    auto Lv = make_tensor<TypeParam>({dims[k], dims[k]});
+    auto Cv = make_tensor<TestType>({dims[k], dims[k]});
+    auto Lv = make_tensor<TestType>({dims[k], dims[k]});
     this->pb->NumpyToTensorView(Cv, "B");
     this->pb->NumpyToTensorView(Lv, "L");
-    (Bslice = Cv).run();
+    (Bslice = Cv).run(exec);
     cudaStreamSynchronize(0);
 
-    (Bslice = chol(Bslice, CUBLAS_FILL_MODE_LOWER)).run();
+    (Bslice = chol(Bslice, CUBLAS_FILL_MODE_LOWER)).run(exec);
     cudaStreamSynchronize(0);
 
     // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
     // and destroys the upper triangular portion.
-    if constexpr (is_complex_v<TypeParam>) {
+    if constexpr (is_complex_v<TestType>) {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
           ASSERT_NEAR(Bslice(i, j).real(), Lv(i, j).real(), 0.001);

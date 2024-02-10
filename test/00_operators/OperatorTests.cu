@@ -117,22 +117,9 @@ template <typename TensorType>
 class OperatorTestsBooleanAllExecs : public ::testing::Test {
 };
 
-TYPED_TEST_SUITE(OperatorTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(OperatorTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(OperatorTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(OperatorTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(OperatorTestsNumericNonComplex,
-                 MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatNonHalf, MatXFloatNonHalfTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalf,
-                 MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(OperatorTestsBoolean, MatXBoolTypes);
-TYPED_TEST_SUITE(OperatorTestsFloatHalf, MatXFloatHalfTypes);
-TYPED_TEST_SUITE(OperatorTestsNumericNoHalf, MatXNumericNoHalfTypes);
 
-
+TYPED_TEST_SUITE(OperatorTestsFloatNonHalf,
+  MatXFloatNonHalfTypesAllExecs);  
 TYPED_TEST_SUITE(OperatorTestsNumericNonComplexAllExecs,
                  MatXNumericNonComplexTypesAllExecs);  
 TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalfAllExecs,
@@ -144,7 +131,7 @@ TYPED_TEST_SUITE(OperatorTestsNumericAllExecs,
 TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);          
 TYPED_TEST_SUITE(OperatorTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
-TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXTypesAllExecs);
+TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXAllTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecs);
 TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
 TYPED_TEST_SUITE(OperatorTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
@@ -664,7 +651,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
   }    
 
-  if constexpr (is_device_executor_v<ExecType>)
+  if constexpr (is_cuda_executor_v<ExecType>)
   { // clone of a nested transform; conv2d currently only has a device executor
     auto tiv = make_tensor<TestType>({M,K});
     auto tov = make_tensor<TestType>({N,M,K});
@@ -725,7 +712,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
 
   ASSERT_EQ(t0(), t2(1, 4));  
 
-  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+  if constexpr (is_cuda_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
     using ComplexType = detail::complex_from_scalar_t<TestType>;
     auto c0 = make_tensor<ComplexType>({});
     (c0 = at(fft(t1), 0)).run(exec);
@@ -1072,7 +1059,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
-  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  if constexpr (is_cuda_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
   { // rcollapse with nested transform operator
     auto tov = make_tensor<TestType>({N,M*K});
     auto delta = make_tensor<TestType>({1,1});
@@ -1097,7 +1084,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
-  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  if constexpr (is_cuda_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
   { // lcollapse with nested transform operator
     auto tov = make_tensor<TestType>({N*M,K});
     auto delta = make_tensor<TestType>({1,1});
@@ -1197,7 +1184,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
 
     (tov = (TestType)0).run(exec);
-    (remap<0>(tov, idx) = tiv).run(exec);
+
+    (remap<0>(tov, idx) = tiv).run();
+    
     cudaStreamSynchronize(0);
 
     for( int i = 0; i < N ; i++) {
@@ -2504,7 +2493,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, TransposeVsTransposeMatrix)
   (t3t = transpose(t3)).run(exec);
   (t3tm = transpose_matrix(t3)).run(exec);
 
-  if constexpr (is_device_executor_v<ExecType>) {
+  if constexpr (is_cuda_executor_v<ExecType>) {
     cudaError_t error = cudaStreamSynchronize(0);
     ASSERT_EQ(error, cudaSuccess);
   }
@@ -2755,6 +2744,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
     auto t0 = make_tensor<TestType>({});
     tensor_t<TestType, 4> t4i({10, 20, 30, 40});
     tensor_t<TestType, 4> t4o({10, 20, 30, 40});
+    (t4o = t0).run(exec);
 
     t0() = (TestType)2.0f;
     for (index_t i = 0; i < t4i.Size(0); i++) {
@@ -3107,7 +3097,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   }
 
   // Test contcat with nested transforms
-  if constexpr (is_device_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+  if constexpr (is_cuda_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
     auto delta = make_tensor<TestType>({1});
     delta.SetVals({1.0});
 
@@ -3546,11 +3536,18 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, R2COp)
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
 {
   MATX_ENTER_HANDLER();
-  using TestType = TypeParam;
-  using ComplexType = detail::complex_from_scalar_t<TypeParam>;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{}; 
+  using ComplexType = detail::complex_from_scalar_t<TestType>;
+
+  // r2c requires FFT support, so we need to check the executor here
+  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+    GTEST_SKIP();
+  }  
 
   const int N1 = 5;
   const int N2 = 6;
@@ -3578,8 +3575,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, R2COp)
   const TestType thresh = static_cast<TestType>(1.0e-6);
 
   // Test the regular r2c path with fft() deducing the transform size
-  (T1 = r2c(fft(t1), N1)).run();
-  (T2 = r2c(fft(t2), N2)).run();
+  (T1 = r2c(fft(t1), N1)).run(exec);
+  (T2 = r2c(fft(t2), N2)).run(exec);
 
   cudaStreamSynchronize(0);
 
@@ -3594,8 +3591,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, R2COp)
   }
 
   // Test the r2c path when specifying the fft() transform size
-  (T1 = r2c(fft(t1, N1), N1)).run();
-  (T2 = r2c(fft(t2, N2), N2)).run();
+  (T1 = r2c(fft(t1, N1), N1)).run(exec);
+  (T2 = r2c(fft(t2, N2), N2)).run(exec);
 
   cudaStreamSynchronize(0);
 
@@ -3612,8 +3609,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, R2COp)
   // Add an ifft to the composition to return the original tensor,
   // but now in complex rather than real form. The imaginary components
   // should be ~0.
-  (T1 = ifft(r2c(fft(t1), N1))).run();
-  (T2 = ifft(r2c(fft(t2), N2))).run();
+  (T1 = ifft(r2c(fft(t1), N1))).run(exec);
+  (T2 = ifft(r2c(fft(t2), N2))).run(exec);
 
   cudaStreamSynchronize(0);
 
@@ -3633,9 +3630,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalf, R2COp)
 TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
 {
   MATX_ENTER_HANDLER();
-  using TestType = TypeParam;
+  using TestType = std::tuple_element_t<0, TypeParam>;
   using inner_type = typename inner_op_type_t<TestType>::type;
-  using complex_type = detail::complex_from_scalar_t<typename inner_op_type_t<TestType>::type>;
+  using complex_type = detail::complex_from_scalar_t<inner_type>;
 
   [[maybe_unused]] const inner_type thresh = static_cast<inner_type>(1.0e-6);
 

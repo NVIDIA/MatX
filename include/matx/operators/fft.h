@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/fft.h"
+#include "matx/transforms/fft/fft_cuda.h"
+#ifdef MATX_EN_CPU_FFT
+  #include "matx/transforms/fft/fft_fftw.h"
+#endif  
 
 namespace matx
 {
@@ -139,21 +142,20 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_device_executor_v<Executor>, "fft()/ifft() only supports the CUDA executor currently");
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) {
-              fft_impl(std::get<0>(out), a_, fft_size_, norm_, ex.getStream());
+              fft_impl(std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
-              ifft_impl(std::get<0>(out), a_, fft_size_, norm_, ex.getStream());
+              ifft_impl(std::get<0>(out), a_, fft_size_, norm_, ex);
             }
           }
           else {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex.getStream());
+              fft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
             else {
-              ifft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex.getStream());
+              ifft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
           }
         }
@@ -165,9 +167,12 @@ namespace matx
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
+          else if constexpr (is_host_executor_v<Executor>) {
+            make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
+          }          
 
           Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -178,7 +183,7 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
     };
   }
 
@@ -250,7 +255,7 @@ namespace matx
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
    * @param norm
-   *   Normalization to apply to FFT
+   *   Normalization to apply to IFFT
    */
   template<typename OpA>
   __MATX_INLINE__ auto ifft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
@@ -275,7 +280,7 @@ namespace matx
    * @param fft_size
    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
    * @param norm
-   *   Normalization to apply to FFT
+   *   Normalization to apply to IFFT
    */
   template<typename OpA>
   __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
@@ -292,6 +297,7 @@ namespace matx
         OpA a_;
         PermDims perm_;
         FFTType type_;
+        FFTNorm norm_;
         std::array<index_t, OpA::Rank()> out_dims_;
         mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>,
                                           typename OpA::scalar_type, 
@@ -312,7 +318,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFT2Op(OpA a, PermDims perm, FFTType t) : a_(a),  perm_(perm), type_(t) {
+        __MATX_INLINE__ FFT2Op(OpA a, PermDims perm, FFTType t, FFTNorm norm) : a_(a),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }
@@ -343,21 +349,20 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_device_executor_v<Executor>, "fft()/ifft() only supports the CUDA executor currently");
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft2_impl(std::get<0>(out), a_, ex.getStream());
+              fft2_impl(std::get<0>(out), a_, norm_, ex);
             }
             else {
-              ifft2_impl(std::get<0>(out), a_, ex.getStream());
+              ifft2_impl(std::get<0>(out), a_, norm_, ex);
             }
           }
           else {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), ex.getStream());
+              fft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
             else {
-              ifft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), ex.getStream());
+              ifft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
           }
         }
@@ -369,9 +374,12 @@ namespace matx
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
+          else if constexpr (is_host_executor_v<Executor>) {
+            make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
+          }          
 
           Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -389,11 +397,13 @@ namespace matx
  * @tparam OpA
  *   Input operator or tensor
  * @param a
- *   input operator or tensor
+ *   Input operator or tensor
+ * @param norm
+ *   Normalization to apply to FFT
  */
   template<typename OpA>
-  __MATX_INLINE__ auto fft2(OpA &&a) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::fft_t{});
+  __MATX_INLINE__ auto fft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD) {
+    return detail::FFT2Op(a, detail::no_permute_t{}, detail::fft_t{}, norm);
   }
 
 /**
@@ -409,12 +419,14 @@ namespace matx
  *   input operator or tensor
  * @param axis
  *   axes to perform fft on
+ * @param norm
+ *   Normalization to apply to FFT
  */
   template<typename OpA>
-  __MATX_INLINE__ auto fft2(OpA &&a, const int32_t (&axis)[2]) {
+  __MATX_INLINE__ auto fft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
 
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::fft_t{});
+    return detail::FFT2Op(a, perm, detail::fft_t{}, norm);
   }
 
 /**
@@ -428,10 +440,12 @@ namespace matx
  *   Input operator or tensor type
  * @param a
  *   Input operator
+ * @param norm
+ *   Normalization to apply to IFFT
  */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft2(OpA &&a) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::ifft_t{});
+  __MATX_INLINE__ auto ifft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD) {
+    return detail::FFT2Op(a, detail::no_permute_t{}, detail::ifft_t{}, norm);
   }
 
 /**
@@ -447,11 +461,13 @@ namespace matx
  *   Input operator or tensor
  * @param axis
  *   axes to perform ifft on
+ * @param norm
+ *   Normalization to apply to IFFT
  */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft2(OpA &&a, const int32_t (&axis)[2]) {
+  __MATX_INLINE__ auto ifft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::ifft_t{});
+    return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
   }  
 
 }

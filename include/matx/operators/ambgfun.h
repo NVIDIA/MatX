@@ -105,7 +105,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_device_executor_v<Executor>, "ambgfun() only supports the CUDA executor currently");
+          static_assert(is_cuda_executor_v<Executor>, "ambgfun() only supports the CUDA executor currently");
           static_assert(std::tuple_element_t<0, remove_cvref_t<Out>>::Rank() == 2, "Output tensor of ambgfun must be 2D");
           ambgfun_impl(std::get<0>(out), x_, y_, fs_, cut_, cut_val_, ex.getStream());
         }
@@ -121,7 +121,7 @@ namespace matx
             y_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }          
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 

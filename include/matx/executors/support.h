@@ -32,6 +32,29 @@
 
 #pragma once
 
-#include "matx/executors/support.h"
-#include "matx/executors/device.h"
-#include "matx/executors/host.h"
+#include "matx/core/type_utils.h"
+
+// Utility functions to determine what support is available per-executor
+
+namespace matx {
+  namespace detail {
+
+// FFT
+#if defined(MATX_EN_NVPL)
+    #define MATX_EN_CPU_FFT 1
+#else
+    #define MATX_EN_CPU_FFT 0
+#endif  
+
+template <typename Exec>
+constexpr bool CheckFFTSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return MATX_EN_CPU_FFT;
+  }
+  else {
+    return true;
+  }
+}
+
+}; // detail
+}; // matx

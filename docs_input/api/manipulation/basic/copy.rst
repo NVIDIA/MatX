@@ -14,7 +14,7 @@ since it cannot be chained with other expressions.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../include/matx/transforms/fft.h
+.. literalinclude:: ../../../../include/matx/transforms/fft/fft_common.h
    :language: cpp
    :start-after: example-begin copy-test-1
    :end-before: example-end copy-test-1

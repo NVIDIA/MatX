@@ -95,6 +95,8 @@ class HostExecutor {
       }
     }
 
+    int GetNumThreads() const { return params_.GetNumThreads(); }
+
     private:
       HostExecParams params_;
 };

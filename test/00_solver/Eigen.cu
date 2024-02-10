@@ -41,25 +41,28 @@ constexpr int dim_size = 100;
 
 template <typename T> class EigenSolverTest : public ::testing::Test {
 protected:
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;      
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "eig", "run", {dim_size});
+    pb->InitAndRunTVGenerator<GTestType>("00_solver", "eig", "run", {dim_size});
     pb->NumpyToTensorView(Bv, "B");
   }
 
   void TearDown() { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Bv{{dim_size, dim_size}};
-  tensor_t<T, 2> Btv{{dim_size, dim_size}};
-  tensor_t<T, 2> Evv{{dim_size, dim_size}};
+  GExecType exec{};
+  tensor_t<GTestType, 2> Bv{{dim_size, dim_size}};
+  tensor_t<GTestType, 2> Btv{{dim_size, dim_size}};
+  tensor_t<GTestType, 2> Evv{{dim_size, dim_size}};
 
-  tensor_t<T, 2> Wv{{dim_size, 1}};
-  tensor_t<T, 1> Wov{{dim_size}};
+  tensor_t<GTestType, 2> Wv{{dim_size, 1}};
+  tensor_t<GTestType, 1> Wov{{dim_size}};
 
-  tensor_t<T, 2> Gtv{{dim_size, 1}};
-  tensor_t<T, 2> Lvv{{dim_size, 1}};
+  tensor_t<GTestType, 2> Gtv{{dim_size, 1}};
+  tensor_t<GTestType, 2> Lvv{{dim_size, 1}};
 };
 
 template <typename TensorType>
@@ -67,7 +70,7 @@ class EigenSolverTestNonComplexFloatTypes : public EigenSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(EigenSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
 {
@@ -75,7 +78,7 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
   // example-begin eig-test-1
   // Note that eigenvalue/vector solutions are not necessarily ordered in the same way other libraries
   // may order them. When comparing against other libraries it's best to check A*v = lambda * v
-  (mtie(this->Evv, this->Wov) = eig(this->Bv)).run();
+  (mtie(this->Evv, this->Wov) = eig(this->Bv)).run(this->exec);
   // example-end eig-test-1
 
   // Now we need to go through all the eigenvectors and eigenvalues and make
@@ -87,10 +90,10 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
 
     // Compute lambda*v
     auto b = v * this->Wov(i);
-    (this->Lvv = b).run();
+    (this->Lvv = b).run(this->exec);
     // Compute A*v
 
-    (this->Gtv = matmul(this->Bv, this->Wv)).run();
+    (this->Gtv = matmul(this->Bv, this->Wv)).run(this->exec);
     cudaStreamSynchronize(0);
     // Compare
     for (index_t j = 0; j < dim_size; j++) {

@@ -38,16 +38,19 @@
 
 using namespace matx;
 
-template <typename TensorType> struct ViewTestsData {
-  tensor_t<TensorType, 0> t0{{}};
-  tensor_t<TensorType, 1> t1{{10}};
-  tensor_t<TensorType, 2> t2{{20, 10}};
-  tensor_t<TensorType, 3> t3{{30, 20, 10}};
-  tensor_t<TensorType, 4> t4{{40, 30, 20, 10}};
+template <typename T> struct ViewTestsData {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;  
+  tensor_t<GTestType, 0> t0{{}};
+  tensor_t<GTestType, 1> t1{{10}};
+  tensor_t<GTestType, 2> t2{{20, 10}};
+  tensor_t<GTestType, 3> t3{{30, 20, 10}};
+  tensor_t<GTestType, 4> t4{{40, 30, 20, 10}};
 
-  tensor_t<TensorType, 2> t2s = t2.Permute({1, 0});
-  tensor_t<TensorType, 3> t3s = t3.Permute({2, 1, 0});
-  tensor_t<TensorType, 4> t4s = t4.Permute({3, 2, 1, 0});
+  tensor_t<GTestType, 2> t2s = t2.Permute({1, 0});
+  tensor_t<GTestType, 3> t3s = t3.Permute({2, 1, 0});
+  tensor_t<GTestType, 4> t4s = t4.Permute({3, 2, 1, 0});
+  GExecType exec{};
 };
 
 template <typename TensorType>
@@ -97,31 +100,15 @@ class ViewTestsFloatNonComplexNonHalfAllExecs : public ::testing::Test,
 
 
 
-TYPED_TEST_SUITE(ViewTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(ViewTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(ViewTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(ViewTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(ViewTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(ViewTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(ViewTestsNumericNonComplex, MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(ViewTestsBoolean, MatXBoolTypes);
-TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypes);
-
-TYPED_TEST_SUITE(ViewTestsNumericNonComplexAllExecs,
-                 MatXNumericNonComplexTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalfAllExecs,
-                 MatXFloatNonComplexNonHalfTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsFloatNonComplexAllExecs,
-                 MatXTypesFloatNonComplexAllExecs);
-TYPED_TEST_SUITE(ViewTestsNumericAllExecs,
-                 MatXTypesNumericAllExecs);
-TYPED_TEST_SUITE(ViewTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsAllExecs, MatXTypesAllExecs);
-TYPED_TEST_SUITE(ViewTestsFloatAllExecs, MatXTypesFloatAllExecs);
-TYPED_TEST_SUITE(ViewTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
-TYPED_TEST_SUITE(ViewTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
+TYPED_TEST_SUITE(ViewTestsAll, MatXAllTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsComplex, MatXComplexTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloat, MatXTypesFloatAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloatNonComplex, MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(ViewTestsNumeric, MatXTypesNumericAllExecs);
+TYPED_TEST_SUITE(ViewTestsIntegral, MatXTypesIntegralAllExecs);
+TYPED_TEST_SUITE(ViewTestsNumericNonComplex, MatXNumericNonComplexTypesAllExecs);
+TYPED_TEST_SUITE(ViewTestsBoolean, MatXTypesBooleanAllExecs);
+TYPED_TEST_SUITE(ViewTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypesAllExecs);
 
 
 TYPED_TEST(ViewTestsAll, Stride)
@@ -429,22 +416,19 @@ TEST(BasicTensorTest, Clone)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(ViewTestsFloatNonComplexNonHalfAllExecs, Random)
+TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 {
   MATX_ENTER_HANDLER();
   {
     using TestType = std::tuple_element_t<0, TypeParam>;
-    using ExecType = std::tuple_element_t<1, TypeParam>;
-
-    ExecType exec{}; 
 
     // example-begin random-test-1
     index_t count = 50;
 
     tensor_t<TestType, 3> t3f({count, count, count});
 
-    (t3f = (TestType)-1000000).run(exec);
-    (t3f = random<TestType>({count, count, count}, UNIFORM)).run(exec);
+    (t3f = (TestType)-1000000).run(this->exec);
+    (t3f = random<TestType>({count, count, count}, UNIFORM)).run(this->exec);
     // example-end random-test-1    
     cudaDeviceSynchronize();
 
@@ -463,8 +447,8 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalfAllExecs, Random)
 
     ASSERT_LT(fabs(total / (count * count * count)), .05);
 
-    (t3f = (TestType)-1000000).run(exec);
-    (t3f = random<TestType>({count, count, count}, NORMAL)).run(exec);
+    (t3f = (TestType)-1000000).run(this->exec);
+    (t3f = random<TestType>({count, count, count}, NORMAL)).run(this->exec);
     cudaDeviceSynchronize();
 
     total = 0;
@@ -488,14 +472,16 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalfAllExecs, Random)
 TYPED_TEST(ViewTestsComplex, RealComplexView)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 1> tc({10});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+
+  tensor_t<TestType, 1> tc({10});
   auto tr = tc.RealView();
   auto ti = tc.ImagView();
 
   for (int i = 0; i < 10; i++) {
-    TypeParam val(
-        static_cast<promote_half_t<typename TypeParam::value_type>>(i),
-        static_cast<promote_half_t<typename TypeParam::value_type>>(i + 10));
+    TestType val(
+        static_cast<promote_half_t<typename TestType::value_type>>(i),
+        static_cast<promote_half_t<typename TestType::value_type>>(i + 10));
     tc(i) = val;
   }
 

@@ -90,7 +90,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          static_assert(is_device_executor_v<Executor>, "pwelch() only supports the CUDA executor currently");
+          static_assert(is_cuda_executor_v<Executor>, "pwelch() only supports the CUDA executor currently");
           pwelch_impl(std::get<0>(out), x_, w_, nperseg_, noverlap_, nfft_, ex.getStream());
         }
 
@@ -105,7 +105,7 @@ namespace matx
             w_.PreRun(Shape(w_), std::forward<Executor>(ex));
           }
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 

@@ -432,7 +432,7 @@ public:
       __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex)
       {
 #ifdef __CUDACC__
-        if constexpr (is_device_executor_v<Executor>) {
+        if constexpr (is_cuda_executor_v<Executor>) {
           if (!init_) {
             auto stream = ex.getStream();
             matxAlloc((void **)&states_,
@@ -446,7 +446,7 @@ public:
             device_ = true;
           }
         }
-        else if constexpr (is_single_thread_host_executor_v<Executor>) {
+        else if constexpr (is_host_executor_v<Executor>) {
           if (!init_) {
             [[maybe_unused]] curandStatus_t ret;
 
@@ -468,10 +468,10 @@ public:
       template <typename ST, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
-        if constexpr (is_device_executor_v<Executor>) {
+        if constexpr (is_cuda_executor_v<Executor>) {
           matxFree(states_);
         }
-        else if constexpr (is_single_thread_host_executor_v<Executor>) {
+        else if constexpr (is_host_executor_v<Executor>) {
           curandDestroyGenerator(gen_);
           //matxFree(val);
         }

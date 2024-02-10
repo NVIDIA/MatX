@@ -94,20 +94,20 @@ template <typename TensorType>
 class ReductionTestsNumericNonComplexAllExecs : public ::testing::Test {
 };
 
-TYPED_TEST_SUITE(ReductionTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(ReductionTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(ReductionTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(ReductionTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(ReductionTestsIntegral, MatXAllIntegralTypes);
+TYPED_TEST_SUITE(ReductionTestsAll, MatXAllTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsComplex, MatXComplexTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsFloat, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsNumeric, MatXNumericTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsIntegral, MatXAllIntegralTypesCUDAExec);
 TYPED_TEST_SUITE(ReductionTestsNumericNonComplex,
-                 MatXNumericNonComplexTypes);               
-TYPED_TEST_SUITE(ReductionTestsFloatNonComplex, MatXFloatNonComplexTypes);
+                 MatXNumericNonComplexTypesCUDAExec);               
+TYPED_TEST_SUITE(ReductionTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
 TYPED_TEST_SUITE(ReductionTestsFloatNonComplexNonHalf,
-                 MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(ReductionTestsBoolean, MatXBoolTypes);
-TYPED_TEST_SUITE(ReductionTestsFloatHalf, MatXFloatHalfTypes);
-TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNoHalfTypes);
-TYPED_TEST_SUITE(ReductionTestsComplexNonHalfTypes, MatXComplexNonHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsBoolean, MatXBoolTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsFloatHalf, MatXFloatHalfTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsNumericNoHalf, MatXNumericNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(ReductionTestsComplexNonHalfTypes, MatXComplexNonHalfTypesCUDAExec);
 
 
 TYPED_TEST_SUITE(ReductionTestsNumericNonComplexAllExecs,
@@ -312,26 +312,30 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};  
 
   auto pb = std::make_unique<detail::MatXPybind>();
   constexpr index_t size = 300;
-  pb->InitAndRunTVGenerator<TypeParam>("00_reductions", "softmax", "run", {80, size, size});
+  pb->InitAndRunTVGenerator<TestType>("00_reductions", "softmax", "run", {80, size, size});
 
-  tensor_t<TypeParam, 1> t1({size});
-  tensor_t<TypeParam, 1> t1_out({size});
+  tensor_t<TestType, 1> t1({size});
+  tensor_t<TestType, 1> t1_out({size});
   pb->NumpyToTensorView(t1, "t1");
 
   // example-begin softmax-test-1
-  (t1_out = softmax(t1)).run();
+  (t1_out = softmax(t1)).run(exec);
   // example-end softmax-test-1
 
   MATX_TEST_ASSERT_COMPARE(pb, t1_out, "t1_sm", 0.01);
 
-  auto t3    = make_tensor<TypeParam>({80,size,size});
-  auto t3_out = make_tensor<TypeParam>({80,size,size});
+  auto t3    = make_tensor<TestType>({80,size,size});
+  auto t3_out = make_tensor<TestType>({80,size,size});
   pb->NumpyToTensorView(t3, "t3");
   // example-begin softmax-test-2
-  (t3_out = softmax(t3, {2})).run();
+  (t3_out = softmax(t3, {2})).run(exec);
   // example-end softmax-test-2
   
   MATX_TEST_ASSERT_COMPARE(pb, t3_out, "t3_sm_axis2", 0.01);

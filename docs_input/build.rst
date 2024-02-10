@@ -43,6 +43,16 @@ Optional Third-party Dependencies
 - `cutensor <https://developer.nvidia.com/cutensor>`_ 1.7.0.1+ (Required when using `einsum`)
 - `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 23.03.0.20+ (Required when using `einsum`)
 
+Host (CPU) Support
+------------------
+Host support is provided both by the C++ standard library and NVIDIA's NVPL_ library. Host support is
+considered experimental and is still a work in progress. Currently all reduction functions are supported, 
+but only FFT transforms are supported. All host support is limited to a single thread in this release.
+
+To enable NVPL support use the CMake option `-DMATX_EN_NVPL=ON`.
+
+.. _NVPL: https://developer.nvidia.com/nvpl
+
 Build Options
 =============
 MatX provides 5 primary options for builds, and each can be configured independently:

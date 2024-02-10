@@ -42,14 +42,16 @@ constexpr index_t n = 50;
 
 template <typename T> class SVDSolverTest : public ::testing::Test {
 protected:
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;     
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "svd", "run", {m, n});
+    pb->InitAndRunTVGenerator<GTestType>("00_solver", "svd", "run", {m, n});
   }
 
   void TearDown() { pb.reset(); }
-
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
 };
 
@@ -58,36 +60,38 @@ class SVDSolverTestNonHalfTypes : public SVDSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes,
-                 MatXFloatNonHalfTypes);
+  MatXFloatNonHalfTypesCUDAExec);
 
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;      
 
-  using scalar_type = typename inner_op_type_t<TypeParam>::type;
-  tensor_t<TypeParam, 2> Av{{m, n}};
-  tensor_t<TypeParam, 2> Atv{{n, m}};
+  using scalar_type = typename inner_op_type_t<TestType>::type;
+  tensor_t<TestType, 2> Av{{m, n}};
+  tensor_t<TestType, 2> Atv{{n, m}};
   tensor_t<scalar_type, 1> Sv{{std::min(m, n)}};
-  tensor_t<TypeParam, 2> Uv{{m, m}};
-  tensor_t<TypeParam, 2> Vv{{n, n}};
+  tensor_t<TestType, 2> Uv{{m, m}};
+  tensor_t<TestType, 2> Vv{{n, n}};
 
   tensor_t<scalar_type, 2> Sav{{m, n}};
-  tensor_t<TypeParam, 2> SSolav{{m, n}};
-  tensor_t<TypeParam, 2> Uav{{m, m}};
-  tensor_t<TypeParam, 2> Vav{{n, n}};
+  tensor_t<TestType, 2> SSolav{{m, n}};
+  tensor_t<TestType, 2> Uav{{m, m}};
+  tensor_t<TestType, 2> Vav{{n, n}};
 
   this->pb->NumpyToTensorView(Av, "A");
 
   // Used only for validation
-  auto tmpV = make_tensor<TypeParam>({m, n});
+  auto tmpV = make_tensor<TestType>({m, n});
 
   // example-begin svd-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  (Atv = transpose(Av)).run();
+  (Atv = transpose(Av)).run(this->exec);
 
   auto Atv2 = Atv.View({m, n});
-  (mtie(Uv, Sv, Vv) = svd(Atv2)).run();
+  (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
   // example-end svd-test-1
 
   cudaStreamSynchronize(0);
@@ -96,11 +100,11 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
   // However, U and V are in column-major format, so we have to transpose them
   // back to verify the identity.
-  (Uav = transpose(Uv)).run();
-  (Vav = transpose(Vv)).run();
+  (Uav = transpose(Uv)).run(this->exec);
+  (Vav = transpose(Vv)).run(this->exec);
 
   // Zero out s
-  (Sav = zeros<typename inner_op_type_t<TypeParam>::type>({m, n})).run();
+  (Sav = zeros<typename inner_op_type_t<TestType>::type>({m, n})).run(this->exec);
   cudaStreamSynchronize(0);
 
   // Construct S matrix since it's just a vector from cuSolver
@@ -110,21 +114,21 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 
   cudaStreamSynchronize(0);
 
-  (SSolav = 0).run();
-  if constexpr (is_complex_v<TypeParam>) {
-    (SSolav.RealView() = Sav).run();
+  (SSolav = 0).run(this->exec);
+  if constexpr (is_complex_v<TestType>) {
+    (SSolav.RealView() = Sav).run(this->exec);
   }
   else {
-    (SSolav = Sav).run();
+    (SSolav = Sav).run(this->exec);
   }
 
-  (tmpV = matmul(Uav, SSolav)).run(); // U * S
-  (SSolav = matmul(tmpV, Vav)).run(); // (U * S) * V'
+  (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
+  (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < Av.Size(0); i++) {
     for (index_t j = 0; j < Av.Size(1); j++) {
-      if constexpr (is_complex_v<TypeParam>) {
+      if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(Av(i, j).real(), SSolav(i, j).real(), 0.001) << i << " " << j;
         ASSERT_NEAR(Av(i, j).imag(), SSolav(i, j).imag(), 0.001) << i << " " << j;
       }
@@ -140,34 +144,36 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;      
 
   constexpr index_t batches = 10;
 
-  using scalar_type = typename inner_op_type_t<TypeParam>::type;
-  auto Av1 = make_tensor<TypeParam>({m, n});
+  using scalar_type = typename inner_op_type_t<TestType>::type;
+  auto Av1 = make_tensor<TestType>({m, n});
   this->pb->NumpyToTensorView(Av1, "A");
-  auto Av = make_tensor<TypeParam>({batches, m, n});
-  auto Atv = make_tensor<TypeParam>({batches, n, m});
-  (Av = Av1).run();  
+  auto Av = make_tensor<TestType>({batches, m, n});
+  auto Atv = make_tensor<TestType>({batches, n, m});
+  (Av = Av1).run(this->exec);  
 
   auto Sv = make_tensor<scalar_type>({batches, std::min(m, n)});
-  auto Uv = make_tensor<TypeParam>({batches, m, m});
-  auto Vv = make_tensor<TypeParam>({batches, n, n});
+  auto Uv = make_tensor<TestType>({batches, m, m});
+  auto Vv = make_tensor<TestType>({batches, n, n});
 
   auto Sav = make_tensor<scalar_type>({batches, m, n});
-  auto SSolav = make_tensor<TypeParam>({batches, m, n});
-  auto Uav = make_tensor<TypeParam>({batches, m, m});
-  auto Vav = make_tensor<TypeParam>({batches, n, n});
+  auto SSolav = make_tensor<TestType>({batches, m, n});
+  auto Uav = make_tensor<TestType>({batches, m, m});
+  auto Vav = make_tensor<TestType>({batches, n, n});
 
   // Used only for validation
-  auto tmpV = make_tensor<TypeParam>({batches, m, n});
+  auto tmpV = make_tensor<TestType>({batches, m, n});
 
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  (Atv = transpose_matrix(Av)).run();
+  (Atv = transpose_matrix(Av)).run(this->exec);
 
   auto Atv2 = Atv.View({batches, m, n});
-  (mtie(Uv, Sv, Vv) = svd(Atv2)).run();
+  (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
 
   cudaStreamSynchronize(0);
 
@@ -175,11 +181,11 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
   // However, U and V are in column-major format, so we have to transpose them
   // back to verify the identity.
-  (Uav = transpose_matrix(Uv)).run();
-  (Vav = transpose_matrix(Vv)).run();
+  (Uav = transpose_matrix(Uv)).run(this->exec);
+  (Vav = transpose_matrix(Vv)).run(this->exec);
 
   // Zero out s
-  (Sav = zeros<typename inner_op_type_t<TypeParam>::type>({batches, m, n})).run();
+  (Sav = zeros<typename inner_op_type_t<TestType>::type>({batches, m, n})).run(this->exec);
   cudaStreamSynchronize(0);
 
   // Construct S matrix since it's just a vector from cuSolver
@@ -191,22 +197,22 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   cudaStreamSynchronize(0);
 
-  (SSolav = 0).run();
-  if constexpr (is_complex_v<TypeParam>) {
-    (SSolav.RealView() = Sav).run();
+  (SSolav = 0).run(this->exec);
+  if constexpr (is_complex_v<TestType>) {
+    (SSolav.RealView() = Sav).run(this->exec);
   }
   else {
-    (SSolav = Sav).run();
+    (SSolav = Sav).run(this->exec);
   }
 
-  (tmpV = matmul(Uav, SSolav)).run(); // U * S
-  (SSolav = matmul(tmpV, Vav)).run(); // (U * S) * V'
+  (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
+  (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
   cudaStreamSynchronize(0);
 
   for (index_t b = 0; b < batches; b++) {
     for (index_t i = 0; i < Av.Size(0); i++) {
       for (index_t j = 0; j < Av.Size(1); j++) {
-        if constexpr (is_complex_v<TypeParam>) {
+        if constexpr (is_complex_v<TestType>) {
           ASSERT_NEAR(Av(b, i, j).real(), SSolav(b, i, j).real(), 0.001) << i << " " << j;
           ASSERT_NEAR(Av(b, i, j).imag(), SSolav(b, i, j).imag(), 0.001) << i << " " << j;
         }
@@ -220,14 +226,12 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   MATX_EXIT_HANDLER();
 }
 
-template <typename TypeParam, int RANK>
-void svdpi_test( const index_t (&AshapeA)[RANK]) {
+template <typename TypeParam, int RANK, typename Executor>
+void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   using AType = TypeParam;
   using SType = typename inner_op_type_t<AType>::type;
 
   std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
-
-  cudaStream_t stream = 0;
 
   index_t mm = Ashape[RANK-2];
   index_t nn = Ashape[RANK-1];
@@ -253,14 +257,14 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 
   int iterations = 100;
 
-  (A = random<AType>(AshapeA, NORMAL)).run(stream);
+  (A = random<AType>(AshapeA, NORMAL)).run(exec);
   auto x0 = random<SType>(std::move(Sshape), NORMAL);
 
-  (U = 0).run(stream);
-  (S = 0).run(stream);
-  (VT = 0).run(stream);
+  (U = 0).run(exec);
+  (S = 0).run(exec);
+  (VT = 0).run(exec);
 
-  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(stream);
+  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(exec);
   // example-end svdpi-test-1
 
   auto Rshape = Ushape;
@@ -276,8 +280,8 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose_matrix(U)) , U)).run(stream);
-  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); 
+  (UTU = matmul(conj(transpose_matrix(U)) , U)).run(exec);
+  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
@@ -286,9 +290,9 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
   // cloning D across matrix
   auto D = clone<RANK>(S, Dshape);
   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-  (UD = U * D).run(stream);
+  (UD = U * D).run(exec);
 
-  (UDVT = matmul(UD, VT)).run(stream);
+  (UDVT = matmul(UD, VT)).run(exec);
 
   auto e = eye<SType>({r,r});
   auto eShape = Rshape;
@@ -301,13 +305,13 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 
   auto I = clone<RANK>(e, eShape);
 
-  (UTUd = abs(UTU - I)).run(stream);
-  (VTVd = abs(VTV - I)).run(stream);
-  (Ad = abs(A - UDVT)).run(stream);
+  (UTUd = abs(UTU - I)).run(exec);
+  (VTVd = abs(VTV - I)).run(exec);
+  (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = rmax(UTUd)).run(stream);
-  (mdiffV = rmax(VTVd)).run(stream);
-  (mdiffA = rmax(Ad)).run(stream);
+  (mdiffU = rmax(UTUd)).run(exec);
+  (mdiffV = rmax(VTVd)).run(exec);
+  (mdiffA = rmax(Ad)).run(exec);
 
   cudaDeviceSynchronize();
 
@@ -335,30 +339,30 @@ void svdpi_test( const index_t (&AshapeA)[RANK]) {
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDPI)
 {
   MATX_ENTER_HANDLER();
-  
-  svdpi_test<TypeParam>({4,4});
-  svdpi_test<TypeParam>({4,16});
-  svdpi_test<TypeParam>({16,4});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+    
+  svdpi_test<TestType>({4,4}, this->exec);
+  svdpi_test<TestType>({4,16}, this->exec);
+  svdpi_test<TestType>({16,4}, this->exec);
 
-  svdpi_test<TypeParam>({25,4,4});
-  svdpi_test<TypeParam>({25,4,16});
-  svdpi_test<TypeParam>({25,16,4});
+  svdpi_test<TestType>({25,4,4}, this->exec);
+  svdpi_test<TestType>({25,4,16}, this->exec);
+  svdpi_test<TestType>({25,16,4}, this->exec);
 
-  svdpi_test<TypeParam>({5,5,4,4});
-  svdpi_test<TypeParam>({5,5,4,16});
-  svdpi_test<TypeParam>({5,5,16,4});
+  svdpi_test<TestType>({5,5,4,4}, this->exec);
+  svdpi_test<TestType>({5,5,4,16}, this->exec);
+  svdpi_test<TestType>({5,5,16,4}, this->exec);
   
   MATX_EXIT_HANDLER();
 }
 
-template <typename TypeParam, int RANK>
-void svdbpi_test( const index_t (&AshapeA)[RANK]) {
+template <typename TypeParam, int RANK, typename Executor>
+void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   using AType = TypeParam;
   using SType = typename inner_op_type_t<AType>::type;
 
   std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
-  cudaStream_t stream = 0;
   cudaDeviceSynchronize();
 
   index_t mm = Ashape[RANK-2];
@@ -385,14 +389,14 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
 
   int iterations = 100;
 
-  (A = random<AType>(std::move(Ashape), NORMAL)).run(stream);
+  (A = random<AType>(std::move(Ashape), NORMAL)).run(exec);
 
 
-  (U = 0).run(stream);
-  (S = 0).run(stream);
-  (VT = 0).run(stream);
+  (U = 0).run(exec);
+  (S = 0).run(exec);
+  (VT = 0).run(exec);
 
-  (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
+  (mtie(U, S, VT) = svdbpi(A, iterations)).run(exec);
   // example-end svdbpi-test-1
 
   auto Rshape = Ushape;
@@ -408,8 +412,8 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   auto VTVd = make_tensor<SType>(Rshape);
   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
-  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); 
+  (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
+  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
   std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
@@ -418,9 +422,9 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
   // cloning D across matrix
   auto D = clone<RANK>(S, Dshape);
   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-  (UD = U * D).run(stream);
+  (UD = U * D).run(exec);
 
-  (UDVT = matmul(UD, VT)).run(stream);
+  (UDVT = matmul(UD, VT)).run(exec);
 
   auto e = eye<SType>({r,r});
   auto eShape = Rshape;
@@ -433,13 +437,13 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
 
   auto I = clone<RANK>(e, eShape);
 
-  (UTUd = abs(UTU - I)).run(stream);
-  (VTVd = abs(VTV - I)).run(stream);
-  (Ad = abs(A - UDVT)).run(stream);
+  (UTUd = abs(UTU - I)).run(exec);
+  (VTVd = abs(VTV - I)).run(exec);
+  (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = rmax(UTUd)).run(stream);
-  (mdiffV = rmax(VTVd)).run(stream);
-  (mdiffA = rmax(Ad)).run(stream);
+  (mdiffU = rmax(UTUd)).run(exec);
+  (mdiffV = rmax(VTVd)).run(exec);
+  (mdiffA = rmax(Ad)).run(exec);
 
   cudaDeviceSynchronize();
 
@@ -469,18 +473,19 @@ void svdbpi_test( const index_t (&AshapeA)[RANK]) {
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBPI)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;  
 
-  svdbpi_test<TypeParam>({4,4});
-  svdbpi_test<TypeParam>({4,16});
-  svdbpi_test<TypeParam>({16,4});
+  svdbpi_test<TestType>({4,4}, this->exec);
+  svdbpi_test<TestType>({4,16}, this->exec);
+  svdbpi_test<TestType>({16,4}, this->exec);
 
-  svdbpi_test<TypeParam>({25,4,4});
-  svdbpi_test<TypeParam>({25,4,16});
-  svdbpi_test<TypeParam>({25,16,4});
+  svdbpi_test<TestType>({25,4,4}, this->exec);
+  svdbpi_test<TestType>({25,4,16}, this->exec);
+  svdbpi_test<TestType>({25,16,4}, this->exec);
 
-  svdbpi_test<TypeParam>({5,5,4,4});
-  svdbpi_test<TypeParam>({5,5,4,16});
-  svdbpi_test<TypeParam>({5,5,16,4});
+  svdbpi_test<TestType>({5,5,4,4}, this->exec);
+  svdbpi_test<TestType>({5,5,4,16}, this->exec);
+  svdbpi_test<TestType>({5,5,16,4}, this->exec);
 
   MATX_EXIT_HANDLER();
 }

@@ -2545,7 +2545,7 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
   matxMemorySpace_t space;
   using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
 
-  if constexpr (is_device_executor_v<Executor>) {
+  if constexpr (is_cuda_executor_v<Executor>) {
     space = MATX_ASYNC_DEVICE_MEMORY;
   }
   else {

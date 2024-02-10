@@ -73,58 +73,62 @@ template <typename TensorType>
 class BasicGeneratorTestsAll : public ::testing::Test {
 };
 
-TYPED_TEST_SUITE(BasicGeneratorTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsIntegral, MatXAllIntegralTypes);
+TYPED_TEST_SUITE(BasicGeneratorTestsAll, MatXAllTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsComplex, MatXComplexTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsFloat, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsNumeric, MatXNumericTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsIntegral, MatXAllIntegralTypesCUDAExec);
 TYPED_TEST_SUITE(BasicGeneratorTestsNumericNonComplex,
-                 MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsFloatNonComplex, MatXFloatNonComplexTypes);
+                 MatXNumericNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
 TYPED_TEST_SUITE(BasicGeneratorTestsFloatNonComplexNonHalf,
-                 MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsBoolean, MatXBoolTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsFloatHalf, MatXFloatHalfTypes);
-TYPED_TEST_SUITE(BasicGeneratorTestsNumericNoHalf, MatXNumericNoHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsBoolean, MatXBoolTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsFloatHalf, MatXFloatHalfTypesCUDAExec);
+TYPED_TEST_SUITE(BasicGeneratorTestsNumericNoHalf, MatXNumericNonHalfTypesCUDAExec);
 
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 {
   MATX_ENTER_HANDLER();
 
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};
+
   auto pb = std::make_unique<detail::MatXPybind>();
   const index_t win_size = 100;
-  pb->InitAndRunTVGenerator<TypeParam>("00_operators", "window", "run",
+  pb->InitAndRunTVGenerator<TestType>("00_operators", "window", "run",
                                        {win_size});
   std::array<index_t, 1> shape({win_size});
-  auto ov = make_tensor<TypeParam>(shape);
+  auto ov = make_tensor<TestType>(shape);
 
   // example-begin hanning-gen-test-1
   // Assign a Hanning window of size `win_size` to `ov`
-  (ov = hanning<0>({win_size})).run();
+  (ov = hanning<0>({win_size})).run(exec);
   // example-end hanning-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hanning", 0.01);
 
   // example-begin hamming-gen-test-1
   // Assign a Hamming window of size `win_size` to `ov`
-  (ov = hamming<0>({win_size})).run();
+  (ov = hamming<0>({win_size})).run(exec);
   // example-end hamming-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "hamming", 0.01);
 
   // example-begin bartlett-gen-test-1
   // Assign a bartlett window of size `win_size` to `ov`
-  (ov = bartlett<0>({win_size})).run();
+  (ov = bartlett<0>({win_size})).run(exec);
   // example-end bartlett-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "bartlett", 0.01);
 
   // example-begin blackman-gen-test-1
   // Assign a blackman window of size `win_size` to `ov`
-  (ov = blackman<0>({win_size})).run();
+  (ov = blackman<0>({win_size})).run(exec);
   // example-end blackman-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "blackman", 0.01);
 
   // example-begin flattop-gen-test-1
   // Assign a flattop window of size `win_size` to `ov`
-  (ov = flattop<0>({win_size})).run();
+  (ov = flattop<0>({win_size})).run(exec);
   // example-end flattop-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "flattop", 0.01);
 
@@ -134,24 +138,28 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 
 TYPED_TEST(BasicGeneratorTestsAll, Diag)
 {
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};
+
   MATX_ENTER_HANDLER();
   {
     // example-begin diag-op-test-1
     // The generator form of `diag()` takes an operator input and returns only
     // the diagonal elements as output
-    auto tc = make_tensor<TypeParam>({10, 10});
-    auto td = make_tensor<TypeParam>({10});
+    auto tc = make_tensor<TestType>({10, 10});
+    auto td = make_tensor<TestType>({10});
 
     // Initialize the diagonal elements of `tc`
     for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 10; j++) {
-        TypeParam val(static_cast<detail::value_promote_t<TypeParam>>(i * 10 + j));
+        TestType val(static_cast<detail::value_promote_t<TestType>>(i * 10 + j));
         tc(i, j) = val;
       }
     }
 
     // Assign the diagonal elements of `tc` to `td`.
-    (td = diag(tc)).run();
+    (td = diag(tc)).run(exec);
     // example-end diag-op-test-1
     cudaStreamSynchronize(0);
 
@@ -165,14 +173,14 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 
     // Test with a nested transform. Restrict to floating point types for
     // the convolution
-    if constexpr (std::is_same_v<TypeParam,float> || std::is_same_v<TypeParam,double>)
+    if constexpr (std::is_same_v<TestType,float> || std::is_same_v<TestType,double>)
     {
-      auto delta = make_tensor<TypeParam>({1});
-      delta(0) = static_cast<TypeParam>(1.0);
+      auto delta = make_tensor<TestType>({1});
+      delta(0) = static_cast<TestType>(1.0);
       cudaStreamSynchronize(0);
 
-      (td = 0).run();
-      (td = diag(conv1d(tc, delta, MATX_C_MODE_SAME))).run();
+      (td = 0).run(exec);
+      (td = diag(conv1d(tc, delta, MATX_C_MODE_SAME))).run(exec);
       cudaStreamSynchronize(0);
 
       for (int i = 0; i < 10; i++) {
@@ -190,18 +198,21 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};  
 
   // example-begin alternate-gen-test-1
-  auto td = make_tensor<TypeParam>({10});
+  auto td = make_tensor<TestType>({10});
 
   // td contains the sequence 1, -1, 1, -1, 1, -1, 1, -1, 1, -1
-  (td = alternate(10)).run();
+  (td = alternate(10)).run(exec);
   // example-end alternate-gen-test-1
 
   cudaStreamSynchronize(0);
 
   for (int i = 0; i < 10; i++) {
-    MATX_ASSERT_EQ(td(i), (TypeParam)-2* (TypeParam)(i&1) + (TypeParam)1)
+    MATX_ASSERT_EQ(td(i), (TestType)-2* (TestType)(i&1) + (TestType)1)
   }
 
   MATX_EXIT_HANDLER();
@@ -210,6 +221,8 @@ TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
 TEST(OperatorTests, Kron)
 {
   MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};    
   using dtype = int;
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->InitTVGenerator<dtype>("00_operators", "kron_operator", {});
@@ -220,7 +233,7 @@ TEST(OperatorTests, Kron)
   auto ov = make_tensor<dtype>({8, 8});
   bv.SetVals({{1, -1}, {-1, 1}});
 
-  (ov = kron(eye({4, 4}), bv)).run();
+  (ov = kron(eye({4, 4}), bv)).run(exec);
   // example-end kron-gen-test-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, ov, "square", 0);
@@ -229,7 +242,7 @@ TEST(OperatorTests, Kron)
   tensor_t<dtype, 2> ov2({4, 6});
   av.SetVals({{1, 2, 3}, {4, 5, 6}});
 
-  (ov2 = kron(av, ones({2, 2}))).run();
+  (ov2 = kron(av, ones({2, 2}))).run(exec);
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, ov2, "rect", 0);
 
@@ -239,6 +252,8 @@ TEST(OperatorTests, Kron)
 TEST(OperatorTests, MeshGrid)
 {
   MATX_ENTER_HANDLER();
+  
+  cudaExecutor exec{};  
   using dtype = int;
   auto pb = std::make_unique<detail::MatXPybind>();
   constexpr dtype xd = 3;
@@ -255,8 +270,8 @@ TEST(OperatorTests, MeshGrid)
   // Create a mesh grid with "x" as x extents and "y" as y extents and assign it to "xv"/"yv"
   auto [xx, yy] = meshgrid(x, y);
 
-  (xv = xx).run();
-  (yv = yy).run();
+  (xv = xx).run(exec);
+  (yv = yy).run(exec);
   // example-end meshgrid-gen-test-1
 
   cudaStreamSynchronize(0);
@@ -269,28 +284,32 @@ TEST(OperatorTests, MeshGrid)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};
+
   auto pb = std::make_unique<detail::MatXPybind>();
-  pb->template InitAndRunTVGenerator<TypeParam>(
+  pb->template InitAndRunTVGenerator<TestType>(
       "01_signal", "fftfreq", "run", {100});
 
 
-  auto t1 = make_tensor<TypeParam>({100});
-  auto t2 = make_tensor<TypeParam>({101});
+  auto t1 = make_tensor<TestType>({100});
+  auto t2 = make_tensor<TestType>({101});
 
   // example-begin fftfreq-gen-test-1
   // Generate FFT frequencies using the length of the "t1" tensor and assign to t1
-  (t1 = fftfreq(t1.Size(0))).run();
+  (t1 = fftfreq(t1.Size(0))).run(exec);
   // example-end fftfreq-gen-test-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F1", 0.1);
 
-  (t2 = fftfreq(t2.Size(0))).run();
+  (t2 = fftfreq(t2.Size(0))).run(exec);
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t2, "F2", 0.1);
 
   // example-begin fftfreq-gen-test-2
   // Generate FFT frequencies using the length of the "t1" tensor and a sample spacing of 0.5 and assign to t1
-  (t1 = fftfreq(t1.Size(0), 0.5)).run();
+  (t1 = fftfreq(t1.Size(0), 0.5)).run(exec);
   // example-end fftfreq-gen-test-2
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);  
@@ -302,23 +321,26 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};    
   // example-begin zeros-gen-test-1    
   index_t count = 100;
 
   std::array<index_t, 1> s({count});
-  auto t1 = make_tensor<TypeParam>(s);
+  auto t1 = make_tensor<TestType>(s);
 
-  (t1 = zeros(s)).run();
+  (t1 = zeros(s)).run(exec);
   // example-end zeros-gen-test-1
 
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
-    if constexpr (IsHalfType<TypeParam>()) {
+    if constexpr (IsHalfType<TestType>()) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (float)0));
     }
     else {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)0));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)0));
     }
   }
   MATX_EXIT_HANDLER();
@@ -327,21 +349,24 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 TYPED_TEST(BasicGeneratorTestsAll, Ones)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};    
   // example-begin ones-gen-test-1    
   index_t count = 100;
   std::array<index_t, 1> s({count});
-  auto t1 = make_tensor<TypeParam>(s);
+  auto t1 = make_tensor<TestType>(s);
 
-  (t1 = ones(s)).run();
+  (t1 = ones(s)).run(exec);
   // example-end ones-gen-test-1    
   cudaStreamSynchronize(0);
 
   for (index_t i = 0; i < count; i++) {
-    if constexpr (IsHalfType<TypeParam>()) {
+    if constexpr (IsHalfType<TestType>()) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (float)1));
     }
     else {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TypeParam)1));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)1));
     }
   }
   MATX_EXIT_HANDLER();
@@ -350,51 +375,55 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};   
+
   // example-begin range-gen-test-1
   index_t count = 100;
-  tensor_t<TypeParam, 1> t1{{count}};
+  tensor_t<TestType, 1> t1{{count}};
 
   // Generate a sequence of 100 numbers starting at 1 and spaced by 1
-  (t1 = range<0>(t1.Shape(), 1, 1)).run();
+  (t1 = range<0>(t1.Shape(), 1, 1)).run(exec);
   // example-end range-gen-test-1  
   cudaStreamSynchronize(0);
 
-  TypeParam one = 1;
-  TypeParam two = 1;
-  TypeParam three = 1;
+  TestType one = 1;
+  TestType two = 1;
+  TestType three = 1;
 
   for (index_t i = 0; i < count; i++) {
-    TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+    TestType it = static_cast<detail::value_promote_t<TestType>>(i);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), it + one));
   }
 
   {
-    (t1 = t1 * t1).run();
+    (t1 = t1 * t1).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType it = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (it + one) * (it + one)));
     }
   }
 
   {
-    (t1 = t1 * two).run();
+    (t1 = t1 * two).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType it = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(
           MatXUtils::MatXTypeCompare(t1(i), ((it + one) * (it + one)) * two));
     }
   }
 
   {
-    (t1 = three * t1).run();
+    (t1 = three * t1).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
-      TypeParam it = static_cast<detail::value_promote_t<TypeParam>>(i);
+      TestType it = static_cast<detail::value_promote_t<TestType>>(i);
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), ((it + one) * (it + one)) *
                                                         two * three));
     }
@@ -406,13 +435,17 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};   
+
   // example-begin linspace-gen-test-1
   index_t count = 100;
-  auto t1 = make_tensor<TypeParam>({count});
+  auto t1 = make_tensor<TestType>({count});
 
   // Create a set of linearly-spaced numbers starting at 1, ending at 100, and 
   // with `count` points in between
-  (t1 = linspace<0>(t1.Shape(), (TypeParam)1, (TypeParam)100)).run();
+  (t1 = linspace<0>(t1.Shape(), (TestType)1, (TestType)100)).run(exec);
   // example-end linspace-gen-test-1
   cudaStreamSynchronize(0);
 
@@ -421,7 +454,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   }
 
   {
-    (t1 = t1 + t1).run();
+    (t1 = t1 + t1).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
@@ -430,7 +463,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   }
 
   {
-    (t1 = (TypeParam)1 + t1).run();
+    (t1 = (TestType)1 + t1).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
@@ -440,7 +473,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   }
 
   {
-    (t1 = t1 + (TypeParam)2).run();
+    (t1 = t1 + (TestType)2).run(exec);
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < count; i++) {
@@ -454,15 +487,19 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};   
+
   // example-begin logspace-gen-test-1
   index_t count = 20;
-  tensor_t<TypeParam, 1> t1{{count}};
-  TypeParam start = 1.0f;
-  TypeParam stop = 2.0f;
+  tensor_t<TestType, 1> t1{{count}};
+  TestType start = 1.0f;
+  TestType stop = 2.0f;
   auto s = t1.Shape();
 
   // Create a logarithmically-spaced sequence of numbers and assign to tensor "t1"
-  (t1 = logspace<0>(s, start, stop)).run();
+  (t1 = logspace<0>(s, start, stop)).run(exec);
   // example-end logspace-gen-test-1
 
   cudaStreamSynchronize(0);
@@ -473,7 +510,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
                 static_cast<double>(s[s.size() - 1] - 1);
 
   for (index_t i = 0; i < count; i++) {
-    if constexpr (IsHalfType<TypeParam>()) {
+    if constexpr (IsHalfType<TestType>()) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i),
           cuda::std::powf(10, static_cast<double>(start) +
@@ -498,25 +535,29 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};   
+
   // example-begin eye-gen-test-1
   index_t count = 10;
 
-  auto t2 = make_tensor<TypeParam>({count, count});
-  auto t3 = make_tensor<TypeParam>({count, count, count});
-  auto t4 = make_tensor<TypeParam>({count, count, count, count});
+  auto t2 = make_tensor<TestType>({count, count});
+  auto t3 = make_tensor<TestType>({count, count, count});
+  auto t4 = make_tensor<TestType>({count, count, count, count});
 
-  auto eye_op = eye<TypeParam>();
+  auto eye_op = eye<TestType>();
 
 
   // For each of t2, t3, and t4 the values on the diagonal where each index is the same
   // is 1, and 0 everywhere else
-  (t2 = eye_op).run();
-  (t3 = eye_op).run();
-  (t4 = eye_op).run();
+  (t2 = eye_op).run(exec);
+  (t3 = eye_op).run(exec);
+  (t4 = eye_op).run(exec);
   // example-end eye-gen-test-1
 
-  TypeParam one = 1.0f;
-  TypeParam zero = 0.0f;
+  TestType one = 1.0f;
+  TestType zero = 0.0f;
 
   cudaDeviceSynchronize();
 
@@ -558,25 +599,28 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};     
   index_t count = 10;
-  TypeParam c = GenerateData<TypeParam>();
+  TestType c = GenerateData<TestType>();
 
   // example-begin diag-gen-test-1
   // Create a 2D, 3D, and 4D tensor and make only their diagonal elements set to `c`
-  auto t2 = make_tensor<TypeParam>({count, count});
-  auto t3 = make_tensor<TypeParam>({count, count, count});
-  auto t4 = make_tensor<TypeParam>({count, count, count, count});
+  auto t2 = make_tensor<TestType>({count, count});
+  auto t3 = make_tensor<TestType>({count, count, count});
+  auto t4 = make_tensor<TestType>({count, count, count, count});
 
-  auto diag2 = diag<TypeParam>({count, count}, c);
-  auto diag3 = diag<TypeParam>({count, count, count}, c);
-  auto diag4 = diag<TypeParam>({count, count, count, count}, c);
+  auto diag2 = diag<TestType>({count, count}, c);
+  auto diag3 = diag<TestType>({count, count, count}, c);
+  auto diag4 = diag<TestType>({count, count, count, count}, c);
 
-  (t2 = diag2).run();
-  (t3 = diag3).run();
-  (t4 = diag4).run();
+  (t2 = diag2).run(exec);
+  (t3 = diag3).run(exec);
+  (t4 = diag4).run(exec);
   // example-end diag-gen-test-1
 
-  TypeParam zero = 0.0f;
+  TestType zero = 0.0f;
 
   cudaDeviceSynchronize();
 
@@ -618,27 +662,31 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};   
+    
   index_t count = 1500;
-  TypeParam end = 10;
-  TypeParam f0 = -200;
-  TypeParam f1 = 300;
+  TestType end = 10;
+  TestType f0 = -200;
+  TestType f1 = 300;
   
   auto pb = std::make_unique<detail::MatXPybind>();
-  pb->template InitAndRunTVGenerator<TypeParam>(
+  pb->template InitAndRunTVGenerator<TestType>(
       "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
 
   // example-begin chirp-gen-test-1
-  auto t1 = make_tensor<TypeParam>({count});
+  auto t1 = make_tensor<TestType>({count});
   // Create a chirp of length "count" and assign it to tensor "t1"
-  (t1 = chirp(count, end, f0, end, f1)).run();
+  (t1 = chirp(count, end, f0, end, f1)).run(exec);
   // example-end chirp-gen-test-1
 
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
   // example-begin cchirp-gen-test-1
-  auto t1c = make_tensor<cuda::std::complex<TypeParam>>({count});
+  auto t1c = make_tensor<cuda::std::complex<TestType>>({count});
   // Create a complex chirp of length "count" and assign it to tensor "t1"
-  (t1c = cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run();
+  (t1c = cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run(exec);
   // example-end cchirp-gen-test-1
 
   pb.reset();

@@ -43,11 +43,11 @@ class QR2SolverTestNonHalfTypes : public ::testing::Test{
 };
 
 TYPED_TEST_SUITE(QR2SolverTestNonHalfTypes,
-                 MatXFloatNonHalfTypes);
+  MatXFloatNonHalfTypesCUDAExec);
 
-template <typename TypeParam, int RANK>
-void qr_test( const index_t (&AshapeA)[RANK]) {
-  using AType = TypeParam;
+template <typename TestType, int RANK>
+void qr_test( const index_t (&AshapeA)[RANK]) { 
+  using AType = TestType;
   using SType = typename inner_op_type_t<AType>::type;
   
   cudaStream_t stream = 0;
@@ -114,18 +114,19 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
 TYPED_TEST(QR2SolverTestNonHalfTypes, QR2)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;  
   
-  qr_test<TypeParam>({4,4});
-  qr_test<TypeParam>({4,16});
-  qr_test<TypeParam>({16,4});
+  qr_test<TestType>({4,4});
+  qr_test<TestType>({4,16});
+  qr_test<TestType>({16,4});
 
-  qr_test<TypeParam>({25,4,4});
-  qr_test<TypeParam>({25,4,16});
-  qr_test<TypeParam>({25,16,4});
+  qr_test<TestType>({25,4,4});
+  qr_test<TestType>({25,4,16});
+  qr_test<TestType>({25,16,4});
 
-  qr_test<TypeParam>({5,5,4,4});
-  qr_test<TypeParam>({5,5,4,16});
-  qr_test<TypeParam>({5,5,16,4});
+  qr_test<TestType>({5,5,4,4});
+  qr_test<TestType>({5,5,4,16});
+  qr_test<TestType>({5,5,16,4});
   
   MATX_EXIT_HANDLER();
 }

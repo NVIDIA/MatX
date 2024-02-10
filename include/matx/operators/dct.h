@@ -39,7 +39,7 @@
 #include "matx/core/error.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
-#include "matx/transforms/fft.h"
+#include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
 

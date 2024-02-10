@@ -83,6 +83,8 @@ namespace matx
 
             // compute dims and sizes
             if(end != matxDropDim) {
+              MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
+              
               dims_[d] = i;
 
               if(end == matxEnd) {

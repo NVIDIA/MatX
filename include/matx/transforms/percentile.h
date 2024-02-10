@@ -103,7 +103,7 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
   if constexpr (OutType::Rank() == 0) {
     auto insize = TotalSize(in);
     matx::tensor_t<typename InType::scalar_type, 1> sort_out;
-    if constexpr (is_device_executor_v<Executor>) {
+    if constexpr (is_cuda_executor_v<Executor>) {
       make_tensor(sort_out, {insize}, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     }
     else {

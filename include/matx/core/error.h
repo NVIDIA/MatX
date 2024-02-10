@@ -65,7 +65,8 @@ namespace matx
     matxLUError,
     matxInverseError,
     matxSolverError,
-    matxcuTensorError
+    matxcuTensorError,
+    matxInvalidExecutor
   };
 
   static constexpr const char *matxErrorString(matxError_t e)
