@@ -489,3 +489,18 @@ TYPED_TEST(BasicTensorTestsAll, DLPack)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicTensorTestsAll, StreamDestroy)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaStream_t stream;
+  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+
+  auto t = make_tensor<TypeParam>({3}, MATX_ASYNC_DEVICE_MEMORY, stream);
+  (t = ones(t.Shape())).run();
+  print(t);
+
+  matxStreamDestroy(stream);
+
+  MATX_EXIT_HANDLER();
+}

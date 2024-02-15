@@ -207,6 +207,19 @@ struct MemTracker {
     return MATX_INVALID_MEMORY;
   }
 
+  auto stream_destroy(cudaStream_t stream) 
+  {
+    // check change references to stream to nullptr in allocationMap
+    for (auto & [ptr, ptr_attr] : allocationMap)
+    {
+      if (ptr_attr.stream == stream) {
+        ptr_attr.stream = nullptr;
+      }
+    }
+  
+    return cudaStreamDestroy(stream);
+  }
+
   ~MemTracker() {
     while (allocationMap.size()) {
       deallocate(allocationMap.begin()->first);
@@ -334,7 +347,19 @@ inline void matxFree(void *ptr)
   return GetAllocMap().deallocate(ptr);
 }
 
+/**
+ * @brief Destroy cudaStream and handle accounting in memtracker
+ * 
+ * Destroys the stream and checks allocationMap for references to stream that will be invalid after stream is destroyed
+ * 
+ * @param stream CUDA stream (for stream allocations)
+ */
+inline void matxStreamDestroy(cudaStream_t stream) 
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
+  auto error = GetAllocMap().stream_destroy(stream);
+}
 
 /**
  * @brief Allocator following the PMR interface using the internal MatX allocator/deallocator
