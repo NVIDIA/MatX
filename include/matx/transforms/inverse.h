@@ -197,10 +197,10 @@ public:
    */
   ~matxInversePlan_t()
   {
-    matxFree(d_A_array);
-    matxFree(d_A_inv_array);
-    matxFree(d_pivot);
-    matxFree(d_info);
+    matxFree(d_A_array, cudaStreamDefault);
+    matxFree(d_A_inv_array, cudaStreamDefault);
+    matxFree(d_pivot, cudaStreamDefault);
+    matxFree(d_info, cudaStreamDefault);
 
     cublasDestroy(handle);
   }

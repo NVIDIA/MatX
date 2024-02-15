@@ -380,8 +380,8 @@ protected:
 
   virtual ~matxFFTPlan_t() {
     if (this->workspace_ != nullptr) {
-
-      matxFree(workspace_);
+      // Pass the default stream until we allow user-deletable caches
+      matxFree(workspace_, cudaStreamDefault);
       this->workspace_ = nullptr;
     }
 

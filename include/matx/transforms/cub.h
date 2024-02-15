@@ -234,7 +234,7 @@ public:
    */
   ~matxCubPlan_t()
   {
-    matxFree(d_temp);
+    matxFree(d_temp, cudaStreamDefault);
   }
 
   template <typename Func>
