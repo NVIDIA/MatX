@@ -74,9 +74,9 @@ public:
 
   virtual ~matxDnSolver_t()
   {
-    matxFree(d_workspace);
-    matxFree(h_workspace);
-    matxFree(d_info);
+    matxFree(d_workspace, cudaStreamDefault);
+    matxFree(h_workspace, cudaStreamDefault);
+    matxFree(d_info, cudaStreamDefault);
     cusolverDnDestroy(handle);
   }
 

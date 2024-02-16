@@ -371,7 +371,7 @@ public:
 
   ~matxEinsumHandle_t()
   {
-    matxFree(workspace_);
+    matxFree(workspace_, cudaStreamDefault);
   }
 
   inline void Exec(OutputTensor &out, cudaStream_t stream, const InT... tensors)

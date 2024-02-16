@@ -90,7 +90,19 @@ struct MemTracker {
     return allocationMap.size();
   }
 
-  auto deallocate(void *ptr) {
+  void update_stream(void *ptr, cudaStream_t stream) {
+    std::unique_lock lck(memory_mtx);
+    auto iter = allocationMap.find(ptr);
+    if (iter == allocationMap.end()) {
+      MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+      return;
+    }
+
+    iter->second.stream = stream;
+  }
+
+  template <typename StreamType>
+  auto deallocate_internal(void *ptr, StreamType st) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     std::unique_lock lck(memory_mtx);
@@ -122,7 +134,12 @@ struct MemTracker {
       free(ptr);
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
-      cudaFreeAsync(ptr, iter->second.stream);
+      if constexpr (std::is_same_v<no_stream_t, StreamType>) {
+        cudaFreeAsync(ptr, iter->second.stream);
+      }
+      else {
+        cudaFreeAsync(ptr, st.stream);
+      }
       break;
     default:
       MATX_THROW(matxInvalidType, "Invalid memory type");
@@ -130,6 +147,17 @@ struct MemTracker {
 
     allocationMap.erase(ptr);    
   }
+
+  struct no_stream_t{};
+  struct valid_stream_t { cudaStream_t stream; };
+
+  auto deallocate(void *ptr) {
+    deallocate_internal(ptr, no_stream_t{});
+  }
+
+  auto deallocate(void *ptr, cudaStream_t stream) {
+    deallocate_internal(ptr, valid_stream_t{stream});
+  }    
 
   void allocate(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -335,6 +363,22 @@ inline void matxFree(void *ptr)
 }
 
 
+inline void matxFree(void *ptr, cudaStream_t stream)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  return GetAllocMap().deallocate(ptr, stream);
+}
+
+/**
+  Update the stream a pointer in the cache is using. This should be used when the call wants to use 
+  memory that was allocated in stream A inside of stream B. The caller must ensure that the pointer
+  and stream being used are valid.
+*/
+inline void update_stream(void *ptr, cudaStream_t stream)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  GetAllocMap().update_stream(ptr, stream);
+}
 
 /**
  * @brief Allocator following the PMR interface using the internal MatX allocator/deallocator
