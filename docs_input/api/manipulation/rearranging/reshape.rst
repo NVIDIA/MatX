@@ -7,7 +7,7 @@ Reshape an operator by giving it new sizes. The total size of the reshaped opera
 the original size.
 
 .. doxygenfunction:: reshape(const T &op, ShapeType &&s)
-.. doxygenfunction:: reshape( const T &op, const int32_t (&sizes)[RANK])
+.. doxygenfunction:: reshape( const T &op, const index_t (&sizes)[RANK])
 
 Examples
 ~~~~~~~~
