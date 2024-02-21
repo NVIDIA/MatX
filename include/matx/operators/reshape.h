@@ -194,7 +194,7 @@ namespace matx
    */
   template <int RANK, typename T>
     __MATX_INLINE__ auto reshape( const T &op, 
-        const int32_t (&sizes)[RANK]) {
+        const index_t (&sizes)[RANK]) {
       return reshape<RANK, T>(op, detail::to_array(sizes));
     }
 } // end namespace matx
