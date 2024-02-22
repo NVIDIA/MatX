@@ -19,7 +19,7 @@ of `t`. This same rule applies with 0D operators, which are effectively scalar v
 .. code-block:: cpp
 
     auto t0 = make_tensor<float>();
-    auto t2 = make_tensor<float>({10, 20);
+    auto t2 = make_tensor<float>({10, 20});
     (t2 = t0).run();
 
 Besides scalars, other rank operators can also be broadcasted:
@@ -27,7 +27,7 @@ Besides scalars, other rank operators can also be broadcasted:
 .. code-block:: cpp
 
     auto t1 = make_tensor<float>({20});
-    auto t2 = make_tensor<float>({10, 20);
+    auto t2 = make_tensor<float>({10, 20});
     (t2 = t1).run();
 
 In fact, any operator can be broadcasted to another operator as long as the dimensions are *compatible*. For
@@ -41,7 +41,7 @@ The first rule is discussed above. The second rule can be explained with this ex
 .. code-block:: cpp
 
     auto t3 = make_tensor<float>({3, 4, 20});
-    auto t5 = make_tensor<float>({10, 6, 3, 4, 20);
+    auto t5 = make_tensor<float>({10, 6, 3, 4, 20});
     (t5 = t3).run();
 
 In this example `t3`'s dimensions (3, 4, 20) match the right-most (fastest-changing) dimensions in `t5`, so
