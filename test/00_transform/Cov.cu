@@ -101,10 +101,12 @@ TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
 
   (batched_out = cov(batched_in)).run();
 
+  cudaDeviceSynchronize();
+
   for (int im = 0; im < m; im++) {
     for (int in = 0; in < n; in++) {
       for (int ik = 0; ik < k; ik++) {
-        auto bv = slice<2>(batched_out, {im,in,ik,0,0}, {matxDropDim,matxDropDim,matxDropDim,matxKeepDim,matxKeepDim});
+        auto bv = slice<2>(batched_out, {im,in,ik,0,0}, {matxDropDim,matxDropDim,matxDropDim,matxEnd,matxEnd});
         MATX_TEST_ASSERT_COMPARE(this->pb, bv, "c_cov", this->thresh);
       }
     }

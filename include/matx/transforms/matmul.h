@@ -808,7 +808,9 @@ private:
 
     // Prep for batch looping
     using shape_type = typename TensorTypeA::desc_type::shape_type;
-    [[maybe_unused]] std::array<shape_type, TensorTypeA::Rank()> idx{0};
+    [[maybe_unused]] std::array<shape_type, TensorTypeA::Rank()> a_idx{0};
+    [[maybe_unused]] std::array<shape_type, TensorTypeB::Rank()> b_idx{0};
+    [[maybe_unused]] std::array<shape_type, TensorTypeC::Rank()> c_idx{0};
     [[maybe_unused]] auto a_shape = a.Shape();    
     [[maybe_unused]] size_t total_iter = 1;
     
@@ -855,9 +857,9 @@ private:
         for (size_t iter = 0; iter < total_iter; iter++) {
 
           // Get pointers into A/B/C for this round
-          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
-          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
-          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
+          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
+          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
           auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
                   Adesc, (void *)bp, Bdesc, &sbeta,
@@ -868,7 +870,9 @@ private:
           MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
           // Update all but the last 3 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, a_idx, 3);
+          UpdateIndices<TensorTypeB, shape_type, TensorTypeB::Rank()>(b_adj, b_idx, 3);
+          UpdateIndices<TensorTypeC, shape_type, TensorTypeC::Rank()>(c_adj, c_idx, 3);
         }
       }
     }
