@@ -659,6 +659,66 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulBroadcast)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t n = 16;
+  constexpr index_t b = 8;
+  constexpr index_t x = 3;
+  constexpr index_t y = 4;
+
+  tensor_t<TypeParam, 2> eye2{{n, n}};
+  tensor_t<TypeParam, 5> a5{{x, y, b, n, n}};
+  tensor_t<TypeParam, 5> c5{{x, y, b, n, n}};
+
+  const TypeParam two { 2.0 };
+  const TypeParam three { 3.0 };
+
+  (eye2 = two*eye<TypeParam>({n,n})).run();
+  (a5 = three).run();
+
+  (c5 = 0).run();
+  // Broadcast eye2, scaling each entry in a5 by 2
+  (c5 = matmul(eye2, a5)).run();
+
+  cudaDeviceSynchronize();
+
+  for (index_t i0 = 0; i0 < x; i0++)
+    for (index_t i1 = 0; i1 < y; i1++)
+      for (index_t i2 = 0; i2 < b; i2++)
+        for (index_t i3 = 0; i3 < n; i3++)
+          for (index_t i4 = 0; i4 < n; i4++) {
+            if constexpr (is_complex_v<TypeParam>) {
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4).real(), 2.0*a5(i0,i1,i2,i3,i4).real(), this->thresh);
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4).imag(), 2.0*a5(i0,i1,i2,i3,i4).imag(), this->thresh);
+            } else {
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4), two*a5(i0,i1,i2,i3,i4), this->thresh);
+            }
+          }
+
+  (c5 = 0).run();
+  // Broadcast eye2, scaling each entry in a5 by 2
+  (c5 = matmul(a5, eye2)).run();
+
+  cudaDeviceSynchronize();
+
+  for (index_t i0 = 0; i0 < x; i0++)
+    for (index_t i1 = 0; i1 < y; i1++)
+      for (index_t i2 = 0; i2 < b; i2++)
+        for (index_t i3 = 0; i3 < n; i3++)
+          for (index_t i4 = 0; i4 < n; i4++) {
+            if constexpr (is_complex_v<TypeParam>) {
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4).real(), 2.0*a5(i0,i1,i2,i3,i4).real(), this->thresh);
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4).imag(), 2.0*a5(i0,i1,i2,i3,i4).imag(), this->thresh);
+            } else {
+              ASSERT_NEAR(c5(i0,i1,i2,i3,i4), two*a5(i0,i1,i2,i3,i4), this->thresh);
+            }
+          }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
 {
   MATX_ENTER_HANDLER();
