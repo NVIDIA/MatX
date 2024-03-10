@@ -203,20 +203,26 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
 template <class Op>
 __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> sizes, index_t mult) {
   std::array<index_t, Op::Rank()> indices;
+
+  // This kernel is currently only used for ranks > 4. We assume the rank is
+  // at least one in the following accesses into sizes and indices
+  static_assert(Op::Rank() >= 1, "rank must exceed zero");
   
   // Compute the index into the operator for this thread. N-D tensors require more computations
   // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
   // our index.
   index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-  bool valid = x_abs < mult*sizes[0];
-  #pragma unroll
-  for (int r = 0; r < Op::Rank(); r++) {
-    indices[r] = x_abs / mult;
-    x_abs -= indices[r] * mult;      
-    mult /= sizes[r+1]; 
-  }
+  const bool valid = x_abs < mult*sizes[0];
 
   if (valid) {
+    #pragma unroll
+    for (int r = 0; r < Op::Rank()-1; r++) {
+      indices[r] = x_abs / mult;
+      x_abs -= indices[r] * mult;
+      mult /= sizes[r+1];
+    }
+    indices[Op::Rank()-1] = x_abs / mult;
+
     if constexpr (std::is_pointer_v<Op>) {
       (*op)(indices); 
     }
