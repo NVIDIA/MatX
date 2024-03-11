@@ -319,7 +319,23 @@ class fft_operators:
             (self.size[0], self.size[1]), self.dtype)
         return {
             'a_in': seq,
-            'a_out': np.fft.fft2(seq, (self.size[1], self.size[1]))
+            'a_out': np.fft.fft2(seq, (self.size[0], self.size[1]))
+        }
+
+    def fft_2d_batched(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray(
+            (self.size[0], self.size[1], self.size[2]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft2(seq, (self.size[1], self.size[2]))
+        }
+
+    def fft_2d_batched_strided(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray(
+            (self.size[0], self.size[1], self.size[2]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft2(seq, (self.size[0], self.size[2]), axes=(0, 2))
         }
 
     def ifft_2d(self) -> Dict[str, np.ndarray]:
@@ -327,7 +343,23 @@ class fft_operators:
             (self.size[0], self.size[1]), self.dtype)
         return {
             'a_in': seq,
-            'a_out': np.fft.ifft2(seq, (self.size[1], self.size[1]))
+            'a_out': np.fft.ifft2(seq, (self.size[0], self.size[1]))
+        }
+
+    def rfft_2d(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray(
+            (self.size[0], self.size[1]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.rfft2(seq, (self.size[0], self.size[1]))
+        }
+
+    def irfft_2d(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray(
+            (self.size[0], self.size[1]), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.irfft2(seq, (self.size[0], self.size[1]))
         }
 
 
