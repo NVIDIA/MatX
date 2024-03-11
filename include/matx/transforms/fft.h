@@ -235,8 +235,8 @@ public:
     else if (fft_rank == 2) {
       if (params.transform_type == CUFFT_C2R ||
           params.transform_type == CUFFT_Z2D) {
-        params.n[0] = o.Size(RANK-1);
-        params.n[1] = o.Size(RANK-2);
+        params.n[1] = o.Size(RANK-1);
+        params.n[0] = o.Size(RANK-2);
       }
       else {
         params.n[1] = i.Size(RANK-1);
@@ -244,14 +244,14 @@ public:
       }
 
       params.batch = (RANK == 2) ? 1 : i.Size(RANK - 3);
-      params.inembed[1] = o.Size(RANK-1);
-      params.onembed[1] = i.Size(RANK-1);
+      params.inembed[1] = i.Size(RANK-1);
+      params.onembed[1] = o.Size(RANK-1);
       params.istride = i.Stride(RANK-1);
       params.ostride = o.Stride(RANK-1);
       params.idist = (RANK<=2) ? 1 : (int) i.Stride(RANK-3);
       params.odist = (RANK<=2) ? 1 : (int) o.Stride(RANK-3);
 
-      if constexpr (is_complex_half_v<T1> || is_complex_half_v<T1>) {
+      if constexpr (is_complex_half_v<T1> || is_half_v<T1>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0 ||
             (params.n[1] & (params.n[1] - 1)) != 0) {
           MATX_THROW(matxInvalidDim,
@@ -367,7 +367,7 @@ protected:
       if constexpr (is_complex_half_v<T2>) {
         return CUFFT_C2C;
       }
-      else if constexpr (is_half_v<T1>) {
+      else if constexpr (is_half_v<T2>) {
         return CUFFT_R2C;
       }
     }
@@ -1057,7 +1057,7 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i,
   }
 
     // Get parameters required by these tensors
-  auto params = detail::matxFFTPlan_t<decltype(in), decltype(out)>::GetFFTParams(out, in, 2);
+  auto params = detail::matxFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 2);
   params.stream = stream;
   
   // Get cache or new FFT plan if it doesn't exist
