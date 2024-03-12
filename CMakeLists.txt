@@ -78,6 +78,13 @@ rapids_cmake_write_version_file(include/version_config.h)
 set(CMAKE_CXX_STANDARD 17)
 set(CUDA_CXX_STANDARD 17)
 
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+    if (NOT GCC_VERSION VERSION_GREATER 8)
+        message(FATAL_ERROR "${PROJECT_NAME} requires g++ 9 or higher if using g++ host compiler")
+    endif()
+endif()
+
 # CPM is required for all package management
 include(public/cpm-cmake/cmake/CPM.cmake)
 # Helper for selecting build type
