@@ -21,6 +21,7 @@ option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
+option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
@@ -150,6 +151,15 @@ if (MATX_EN_CUTLASS)
 else()
     set (CUTLASS_INC "")
     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
+endif()
+
+if (MATX_EN_NVPL)
+    message(STATUS "Enabling NVPL library support")
+    # find_package is currently broken in NVPL. Use proper targets once working
+    #find_package(nvpl REQUIRED COMPONENTS fft)
+    #target_link_libraries(matx INTERFACE nvpl::fftw)
+    target_link_libraries(matx INTERFACE nvpl_fftw)
+    target_compile_definitions(matx INTERFACE MATX_EN_NVPL=1)
 endif()
 
 if (MATX_DISABLE_CUB_CACHE)
@@ -291,4 +301,3 @@ if (MATX_BUILD_TESTS)
     include(cmake/GetGTest.cmake)
     add_subdirectory(test)
 endif()
-

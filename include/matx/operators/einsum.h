@@ -66,7 +66,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
+        static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
 
         std::apply([&](auto... args) {
           ::matx::cutensor::einsum_impl(std::get<0>(out), subscripts_, ex.getStream(), args...);

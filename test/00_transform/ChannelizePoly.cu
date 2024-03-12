@@ -41,15 +41,17 @@ using namespace matx;
 
 template <typename T>
 class ChannelizePolyTest : public ::testing::Test {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;
 protected:
   void SetUp() override
   {
-    CheckTestTypeSupport<T>();
+    CheckTestTypeSupport<GTestType>();
     pb = std::make_unique<detail::MatXPybind>();
 
-    if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
+    if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 1.0e-1;
-    } else if constexpr (std::is_same_v<T, double>) {
+    } else if constexpr (std::is_same_v<GTestType, double>) {
       thresh = 1.0e-12;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
@@ -59,7 +61,7 @@ protected:
   }
 
   void TearDown() { pb.reset(); }
-
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   double thresh;;
 };
@@ -111,15 +113,16 @@ namespace test_types {
     };
 }
 
-TYPED_TEST_SUITE(ChannelizePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypes);
-TYPED_TEST_SUITE(ChannelizePolyTestDoubleType, double);
+TYPED_TEST_SUITE(ChannelizePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(ChannelizePolyTestDoubleType, MatXDoubleOnlyTypeCUDAExec);
 
 // Simple tests use random input and filter values
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
 {
   MATX_ENTER_HANDLER();
 
-  using ComplexType = typename test_types::complex_type<TypeParam>::type;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
 
   struct {
     index_t a_len;
@@ -153,18 +156,18 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     // Currently do not support oversampled channelization
     const index_t decimation_factor = num_channels;
     [[maybe_unused]] const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
     auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
 
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
     // example-begin channelize_poly-test-1
     // Channelize "a" into "num_channels" channels using filter "f" and "decimation_factor" decimation
-    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(stream);
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
     // example-end channelize_poly-test-1
 
     cudaStreamSynchronize(stream);
@@ -172,8 +175,8 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
 
     // Now test with a multiplicative operator on the input. The channelizer is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    (b = channelize_poly(static_cast<TypeParam>(4.0) * a, f, num_channels, decimation_factor)).run(stream);
-    (b = b * static_cast<TypeParam>(0.25)).run(stream);
+    (b = channelize_poly(static_cast<TestType>(4.0) * a, f, num_channels, decimation_factor)).run(this->exec);
+    (b = b * static_cast<TestType>(0.25)).run(this->exec);
     cudaStreamSynchronize(stream);
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
@@ -187,7 +190,8 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
 {
   MATX_ENTER_HANDLER();
 
-  using ComplexType = typename test_types::complex_type<TypeParam>::type;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
 
   constexpr int BATCH_DIMS = 2;
   struct {
@@ -211,7 +215,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     [[maybe_unused]] const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
     std::vector<index_t> sizes = { a_len, f_len, num_channels };
     sizes.insert(sizes.end(), test_cases[i].batch_dims.begin(), test_cases[i].batch_dims.end());
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "channelize_poly_operators", "channelize", sizes);
     const std::array<index_t, BATCH_DIMS+1> a_dims = {
       test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], a_len
@@ -219,13 +223,13 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     const std::array<index_t, BATCH_DIMS+2> b_dims = {
       test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], b_len_per_channel, num_channels
     };
-    auto a = make_tensor<TypeParam>(a_dims);
-    auto f = make_tensor<TypeParam>({f_len});
+    auto a = make_tensor<TestType>(a_dims);
+    auto f = make_tensor<TestType>({f_len});
     auto b = make_tensor<ComplexType>(b_dims);
 
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
-    (b = channelize_poly(a, f, num_channels, decimation_factor)).run();
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -233,8 +237,8 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
 
     // Now test with a multiplicative operator on the input. The channelizer is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    (b = channelize_poly(static_cast<TypeParam>(4.0) * a, f, num_channels, decimation_factor)).run();
-    (b = b * static_cast<TypeParam>(0.25)).run();
+    (b = channelize_poly(static_cast<TestType>(4.0) * a, f, num_channels, decimation_factor)).run(this->exec);
+    (b = b * static_cast<TestType>(0.25)).run(this->exec);
     cudaStreamSynchronize(0);
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
@@ -251,19 +255,20 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
 {
   MATX_ENTER_HANDLER();
 
-  using InnerType = typename test_types::inner_type<TypeParam>::type;
-  using ComplexType = typename test_types::complex_type<TypeParam>::type;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
 
   const index_t a_len = 4;
   [[maybe_unused]] const index_t f_len = 2;
   // It would be simpler to test with 1 channel, but we currently do not support single channel
   // cases (a single channel channelizer is just a convolution).
   const index_t num_channels = 2;
-  this->pb->template InitAndRunTVGenerator<TypeParam>(
+  this->pb->template InitAndRunTVGenerator<TestType>(
     "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels });
 
-  auto a = make_tensor<TypeParam>({a_len});
-  auto f = make_tensor<TypeParam>({f_len});
+  auto a = make_tensor<TestType>({a_len});
+  auto f = make_tensor<TestType>({f_len});
   const index_t b_elem_per_channel = a_len / num_channels;
   auto b = make_tensor<ComplexType>({ b_elem_per_channel, num_channels });
 
@@ -273,7 +278,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
   cudaStreamSynchronize(0);
 
   const index_t decimation_factor = num_channels;
-  (b = channelize_poly(a, f, num_channels, decimation_factor)).run();
+  (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
   cudaStreamSynchronize(0);
 
@@ -304,19 +309,20 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
 {
   MATX_ENTER_HANDLER();
 
-  using InnerType = typename test_types::inner_type<TypeParam>::type;
-  using ComplexType = typename test_types::complex_type<TypeParam>::type;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
 
   cudaStream_t stream = 0;
 
   const index_t a_len = 2500;
   [[maybe_unused]] const index_t f_len = 90;
   const index_t num_channels = 10;
-  this->pb->template InitAndRunTVGenerator<TypeParam>(
+  this->pb->template InitAndRunTVGenerator<TestType>(
     "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels });
 
-  auto a = make_tensor<TypeParam>({a_len});
-  auto f = make_tensor<TypeParam>({f_len});
+  auto a = make_tensor<TestType>({a_len});
+  auto f = make_tensor<TestType>({f_len});
   [[maybe_unused]] const index_t b_elem_per_channel = a_len / num_channels;
   auto bp = make_tensor<ComplexType>({ num_channels, b_elem_per_channel });
 
@@ -327,7 +333,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
 
   const index_t decimation_factor = num_channels;
   auto b = permute(bp, {1, 0});
-  (b = channelize_poly(shift<0>(shift<0>(a, 8), -8), f, num_channels, decimation_factor)).run(stream);
+  (b = channelize_poly(shift<0>(shift<0>(a, 8), -8), f, num_channels, decimation_factor)).run(this->exec);
 
   cudaStreamSynchronize(stream);
 
@@ -344,8 +350,9 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
 {
   MATX_ENTER_HANDLER();
 
-  using InnerType = typename test_types::inner_type<TypeParam>::type;
-  using ComplexType = typename test_types::complex_type<TypeParam>::type;
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
 
   cudaStream_t stream = 0;
 
@@ -593,18 +600,18 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
   const index_t signal_len = static_cast<index_t>(input.size());
   const index_t num_channels = 10;
 
-  auto a = make_tensor<TypeParam>({signal_len});
-  auto f = make_tensor<TypeParam>({filter_len});
+  auto a = make_tensor<TestType>({signal_len});
+  auto f = make_tensor<TestType>({filter_len});
   const index_t b_elem_per_channel = signal_len / num_channels;
   auto b = make_tensor<ComplexType>({ b_elem_per_channel, num_channels });
 
-  cudaMemcpyAsync(a.Data(), input.data(), signal_len * sizeof(TypeParam), cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync(f.Data(), filter.data(), filter_len * sizeof(TypeParam), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(a.Data(), input.data(), signal_len * sizeof(TestType), cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(f.Data(), filter.data(), filter_len * sizeof(TestType), cudaMemcpyHostToDevice, stream);
 
   cudaStreamSynchronize(stream);
 
   const index_t decimation_factor = num_channels;
-  (b = channelize_poly(a, f, num_channels, decimation_factor)).run(stream);
+  (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
   cudaStreamSynchronize(stream);
 

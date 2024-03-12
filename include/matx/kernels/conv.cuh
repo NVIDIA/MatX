@@ -189,9 +189,25 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
 
 template <typename T>
-union Uninitialized {
-    __host__ __device__ constexpr Uninitialized() {}
+struct Uninitialized {
+    __host__ __device__ constexpr Uninitialized() {};
     T data;
+};
+
+template <typename T, int X_LEN>
+struct ShmBuffer2D {
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ ShmBuffer2D(char *p) {
+    ptr = reinterpret_cast<T*>(p);
+  }
+  __MATX_INLINE__  __MATX_DEVICE__ __MATX_HOST__ const T &operator()(index_t y, index_t x) const noexcept {
+    return *(ptr + y * X_LEN + x);
+  }
+
+  __MATX_INLINE__  __MATX_DEVICE__ __MATX_HOST__ T &operator()(index_t y, index_t x) noexcept {
+    return *(ptr + y * X_LEN + x);
+  }  
+
+  T *ptr;
 };
 
 template <typename OutType, typename InType1, typename InType2, 
@@ -216,8 +232,17 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
 
   constexpr int Rank = OutType::Rank();
 
-  __shared__ Uninitialized<in1type> s_signal[SIGNAL_CHUNK_Y][SIGNAL_CHUNK_X];
-  __shared__ Uninitialized<in2type> s_filter[FILTER_SHARED_CHUNK_Y][FILTER_SHARED_CHUNK_X];
+  constexpr int type2off = 
+    std::ceil(static_cast<double>(sizeof(in1type) * SIGNAL_CHUNK_Y * SIGNAL_CHUNK_X) / sizeof(in2type) * 
+              sizeof(in2type));
+  __shared__ char shared_buf[type2off + sizeof(in2type) * FILTER_SHARED_CHUNK_Y * FILTER_SHARED_CHUNK_X];
+
+  // __shared__ Uninitialized<in1type> s_signal[SIGNAL_CHUNK_Y][SIGNAL_CHUNK_X];
+  // __shared__ Uninitialized<in2type> s_filter[FILTER_SHARED_CHUNK_Y][FILTER_SHARED_CHUNK_X];
+
+  // Workaround for ARM compiler bug that will not allow the union type above
+  ShmBuffer2D<in1type, SIGNAL_CHUNK_X> s_signal{&shared_buf[0]};
+  ShmBuffer2D<in2type, FILTER_SHARED_CHUNK_X> s_filter{&shared_buf[type2off]};
 
   in2type r_filter[FILTER_REG_CHUNK_Y][FILTER_REG_CHUNK_X];
 
@@ -279,7 +304,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                   detail::mapply([&](auto &&...args) { val = d_in2.operator()(args...); }, bdims);
                 }
                 // store in shared
-                s_filter[ii][jj].data = val;
+                s_filter(ii, jj) = val;
               }
             }
 
@@ -300,7 +325,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                 }
                 
                 // store in shared
-                s_signal[ii][jj].data = val;
+                s_signal(ii,jj) = val;
               }
             }
 
@@ -320,7 +345,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                 for(int ii = 0; ii < FILTER_REG_CHUNK_Y; ii++) {
 #pragma unroll
                   for(int jj = 0; jj < FILTER_REG_CHUNK_X; jj++) {
-                    r_filter[ii][jj] = s_filter[nn+ii][mm+jj].data;
+                    r_filter[ii][jj] = s_filter(nn+ii, mm+jj);
                   }
                 }
 
@@ -341,7 +366,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                     // load ILPY signal points
 #pragma unroll
                       for(int u = 0; u < ILPY; u++) {
-                        i1[u] = s_signal[nn+n+threadIdx.y*ILPY + u][mm+m+threadIdx.x].data;
+                        i1[u] = s_signal(nn+n+threadIdx.y*ILPY + u, mm+m+threadIdx.x);
                       }
                     } else {
                       // advance/shift signal points in registers
@@ -351,7 +376,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                       }
 
                       // load new signal point at end of the array
-                      i1[ILPY-1] = s_signal[nn+n+threadIdx.y*ILPY + ILPY - 1][mm+m+threadIdx.x].data;
+                      i1[ILPY-1] = s_signal(nn+n+threadIdx.y*ILPY + ILPY - 1,mm+m+threadIdx.x);
                     }
 
                     // inner convolution loop

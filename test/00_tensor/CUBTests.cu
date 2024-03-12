@@ -39,20 +39,20 @@
 using namespace matx;
 
 
-template <typename TensorType> struct CUBTestsData {
-  using TypeParam = std::tuple_element_t<0, TensorType>;
-  using ExecType = std::tuple_element_t<1, TensorType>;
-  ExecType exec{};   
+template <typename T> struct CUBTestsData {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;   
+  GExecType exec{};   
 
-  tensor_t<TypeParam, 0> t0{{}};
-  tensor_t<TypeParam, 1> t1{{10}};
-  tensor_t<TypeParam, 2> t2{{20, 10}};
-  tensor_t<TypeParam, 3> t3{{30, 20, 10}};
-  tensor_t<TypeParam, 4> t4{{40, 30, 20, 10}};
+  tensor_t<GTestType, 0> t0{{}};
+  tensor_t<GTestType, 1> t1{{10}};
+  tensor_t<GTestType, 2> t2{{20, 10}};
+  tensor_t<GTestType, 3> t3{{30, 20, 10}};
+  tensor_t<GTestType, 4> t4{{40, 30, 20, 10}};
 
-  tensor_t<TypeParam, 2> t2s = t2.Permute({1, 0});
-  tensor_t<TypeParam, 3> t3s = t3.Permute({2, 1, 0});
-  tensor_t<TypeParam, 4> t4s = t4.Permute({3, 2, 1, 0});
+  tensor_t<GTestType, 2> t2s = t2.Permute({1, 0});
+  tensor_t<GTestType, 3> t3s = t3.Permute({2, 1, 0});
+  tensor_t<GTestType, 4> t4s = t4.Permute({3, 2, 1, 0});
 };
 
 template <typename TensorType>
@@ -95,21 +95,21 @@ class CUBTestsNumericNonComplexAllExecs : public ::testing::Test, public CUBTest
 };
 
 
-TYPED_TEST_SUITE(CUBTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(CUBTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(CUBTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(CUBTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(CUBTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(CUBTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(CUBTestsNumericNonComplex, MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(CUBTestsBoolean, MatXBoolTypes);
+TYPED_TEST_SUITE(CUBTestsAll, MatXAllTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsComplex, MatXComplexTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsFloat, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsNumeric, MatXNumericTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsIntegral, MatXAllIntegralTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsNumericNonComplex, MatXNumericNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(CUBTestsBoolean, MatXBoolTypesCUDAExec);
 
 TYPED_TEST_SUITE(CUBTestsNumericNonComplexAllExecs,
                  MatXFloatNonComplexNonHalfTypesAllExecs);  
 
 TEST(TensorStats, Hist)
 {
-  MATX_ENTER_HANDLER();
+  MATX_ENTER_HANDLER(); 
 
   constexpr int levels = 7;
   tensor_t<float, 1> inv({10});

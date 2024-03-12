@@ -40,15 +40,18 @@ using namespace matx;
 
 template <typename T>
 class ResamplePolyTest : public ::testing::Test {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;  
+
 protected:
   void SetUp() override
   {
-    CheckTestTypeSupport<T>();
+    CheckTestTypeSupport<GTestType>();
     pb = std::make_unique<detail::MatXPybind>();
 
-    if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
+    if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 1.0e-1;
-    } else if constexpr (std::is_same_v<T, double>) {
+    } else if constexpr (std::is_same_v<GTestType, double>) {
       thresh = 1.0e-10;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
@@ -58,7 +61,7 @@ protected:
   }
 
   void TearDown() { pb.reset(); }
-
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   double thresh;;
 };
@@ -73,14 +76,15 @@ class ResamplePolyTestFloatTypes
     : public ResamplePolyTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(ResamplePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypes);
-TYPED_TEST_SUITE(ResamplePolyTestFloatTypes, MatXFloatTypes);
+TYPED_TEST_SUITE(ResamplePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(ResamplePolyTestFloatTypes, MatXFloatTypesCUDAExec);
 
 // SimpleOddLength tests use random input and filter values and
 // odd-length filters.
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -111,17 +115,17 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     const index_t down = test_cases[i].down;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({b_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
     // example-begin resample_poly-test-1
     // Resample "a" using input signal "f" by rate up/down
-    (b = resample_poly(a, f, up, down)).run();
+    (b = resample_poly(a, f, up, down)).run(this->exec);
     // example-end resample_poly-test-1
 
     cudaStreamSynchronize(0);
@@ -130,8 +134,8 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    (b = resample_poly(static_cast<TypeParam>(4.0) * a, f, up, down)).run();
-    (b = b * static_cast<TypeParam>(0.25)).run();
+    (b = resample_poly(static_cast<TestType>(4.0) * a, f, up, down)).run(this->exec);
+    (b = b * static_cast<TestType>(0.25)).run(this->exec);
     cudaStreamSynchronize(0);
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
@@ -145,6 +149,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -175,15 +180,15 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
     const index_t down = test_cases[i].down;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({b_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
-    (b = resample_poly(a, f, up, down)).run();
+    (b = resample_poly(a, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -191,8 +196,8 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
-    (b = resample_poly(static_cast<TypeParam>(4.0) * a, f, up, down)).run();
-    (b = b * static_cast<TypeParam>(0.25)).run();
+    (b = resample_poly(static_cast<TestType>(4.0) * a, f, up, down)).run(this->exec);
+    (b = b * static_cast<TestType>(0.25)).run(this->exec);
     cudaStreamSynchronize(0);
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
@@ -205,6 +210,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -229,18 +235,18 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
     const index_t f_len = 2 * 10 * std::max(up, down) + 1;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, 1, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({b_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_default");
 
     cudaStreamSynchronize(0);
 
-    (b = resample_poly(a, f, up, down)).run();
+    (b = resample_poly(a, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -256,6 +262,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
 TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -280,18 +287,18 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
     const index_t f_len = 2 * 10 * std::max(up, down) + 1;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, 1, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({b_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_default");
 
     cudaStreamSynchronize(0);
 
-    (b = resample_poly(a, f, up, down)).run();
+    (b = resample_poly(a, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -304,6 +311,7 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -321,20 +329,20 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     const index_t down = test_cases[i].down;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
    
     const int nA = 16;
     const int nB = 37;
     const int nC = 55;
 
-    auto a = make_tensor<TypeParam>({a_len});
+    auto a = make_tensor<TestType>({a_len});
     auto ac = matx::clone<4>(a, {nA, nB, nC, matx::matxKeepDim});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({nA, nB, nC, b_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({nA, nB, nC, b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
-    (b = resample_poly(ac, f, up, down)).run();
+    (b = resample_poly(ac, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -349,13 +357,13 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     }
 
     // Now use a full 4D tensor rather than just a cloned tensor as input
-    auto full = make_tensor<TypeParam>({nA, nB, nC, a_len});
-    (full = ac).run();
-    (b = 0).run();
+    auto full = make_tensor<TestType>({nA, nB, nC, a_len});
+    (full = ac).run(this->exec);
+    (b = 0).run(this->exec);
 
     cudaStreamSynchronize(0);
 
-    (b = resample_poly(ac, f, up, down)).run();
+    (b = resample_poly(ac, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -378,6 +386,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -388,28 +397,28 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
     { 3501, 7, 7 }
   };
 
-  auto zero = make_tensor<TypeParam>({1});
-  (zero = 0).run();
+  auto zero = make_tensor<TestType>({1});
+  (zero = 0).run(this->exec);
   cudaStreamSynchronize(0);
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
     const index_t up = test_cases[i].up;
     const index_t down = test_cases[i].down;
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, 1, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto b = make_tensor<TypeParam>({a_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto b = make_tensor<TestType>({a_len});
     this->pb->NumpyToTensorView(a, "a");
-    (b = resample_poly(a, zero, up, down)).run();
+    (b = resample_poly(a, zero, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
     // The output should equal the input because up == down.
     for (index_t k = 0; k < a_len; k++) {
-      TypeParam ak { a(k) };
-      TypeParam bk { b(k) };
+      TestType ak { a(k) };
+      TestType bk { b(k) };
       ASSERT_EQ(ak, bk);
     }
   }
@@ -420,6 +429,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -430,28 +440,28 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
     { 21003, 1, 3 }
   };
 
-  auto seven = make_tensor<TypeParam>({1});
-  (seven = 7).run();
+  auto seven = make_tensor<TestType>({1});
+  (seven = 7).run(this->exec);
   cudaStreamSynchronize(0);
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
     const index_t up = test_cases[i].up;
     const index_t down = test_cases[i].down;
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, 1, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
+    auto a = make_tensor<TestType>({a_len});
     const index_t b_len = a_len / down;
-    auto b = make_tensor<TypeParam>({b_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
-    (b = resample_poly(a, seven, up, down)).run();
+    (b = resample_poly(a, seven, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
     for (index_t j = 0; j < b_len; j++) {
       double aj, bj;
-      if constexpr (is_complex_v<TypeParam>) {
+      if constexpr (is_complex_v<TestType>) {
         aj = cuda::std::abs(7 * a(j*down));
         bj = cuda::std::abs(b(j));
       } else {
@@ -468,6 +478,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -478,25 +489,25 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
     { 21003, 3, 1 }
   };
 
-  auto f = make_tensor<TypeParam>({1});
+  auto f = make_tensor<TestType>({1});
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
     const index_t up = test_cases[i].up;
     const index_t down = test_cases[i].down;
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, 1, up, down});
 
     // The resample kernel scales the filter by up, so we use 1/up to get an
     // effective filter of 1.
-    (f = 1.0/static_cast<double>(up)).run();
+    (f = 1.0/static_cast<double>(up)).run(this->exec);
     cudaStreamSynchronize(0);
 
-    auto a = make_tensor<TypeParam>({a_len});
+    auto a = make_tensor<TestType>({a_len});
     const index_t b_len = a_len * up;
-    auto b = make_tensor<TypeParam>({b_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
-    (b = resample_poly(a, f, up, down)).run();
+    (b = resample_poly(a, f, up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 
@@ -505,7 +516,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
     // from a. The kernel scales the filter by up, so it was set to 1/up above.
     for (index_t j = 0; j < b_len; j++) {
       double aj, bj;
-      if constexpr (is_complex_v<TypeParam>) {
+      if constexpr (is_complex_v<TestType>) {
         aj = (j % up == 0) ? cuda::std::abs(a(j/up)) : 0;
         bj = cuda::std::abs(b(j));
       } else {
@@ -528,6 +539,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -548,18 +560,18 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
     const index_t down = test_cases[i].down;
     const index_t up_len = a_len * up;
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
-    this->pb->template InitAndRunTVGenerator<TypeParam>(
+    this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
 
-    auto a = make_tensor<TypeParam>({a_len});
-    auto f = make_tensor<TypeParam>({f_len});
-    auto b = make_tensor<TypeParam>({b_len});
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<TestType>({b_len});
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
 
     cudaStreamSynchronize(0);
 
-    (b = resample_poly(shift<0>(shift<0>(a, 8), -8), shift<0>(shift<0>(f, 3), -3), up, down)).run();
+    (b = resample_poly(shift<0>(shift<0>(a, 8), -8), shift<0>(shift<0>(f, 3), -3), up, down)).run(this->exec);
 
     cudaStreamSynchronize(0);
 

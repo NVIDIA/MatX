@@ -78,7 +78,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
 
         channelize_poly_impl(std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
       }
@@ -99,7 +99,7 @@ namespace detail {
           f_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }          
 
-        if constexpr (is_device_executor_v<Executor>) {
+        if constexpr (is_cuda_executor_v<Executor>) {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 

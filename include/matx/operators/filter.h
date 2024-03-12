@@ -76,7 +76,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
+        static_assert(is_cuda_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
 
         filter_impl(std::get<0>(out), a_, h_rec_, h_nonrec_, ex.getStream());
       }
@@ -93,7 +93,7 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }     
 
-        if constexpr (is_device_executor_v<Executor>) {
+        if constexpr (is_cuda_executor_v<Executor>) {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 

@@ -43,7 +43,7 @@ class CopyTestsAll : public ::testing::Test
 {
 };
 
-TYPED_TEST_SUITE(CopyTestsAll, MatXTypesAllExecs);
+TYPED_TEST_SUITE(CopyTestsAll, MatXAllTypesAllExecs);
 
 TYPED_TEST(CopyTestsAll, CopyOutParam)
 {

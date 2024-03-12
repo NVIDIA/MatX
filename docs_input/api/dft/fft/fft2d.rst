@@ -9,8 +9,8 @@ Perform a 2D FFT
    These functions are currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: fft2(OpA &&a)
-.. doxygenfunction:: fft2(OpA &&a, const int32_t (&axis)[2])  
+.. doxygenfunction:: fft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: fft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)  
 
 Examples
 ~~~~~~~~

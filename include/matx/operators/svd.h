@@ -65,7 +65,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "svd() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "svd() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, V) = svd(A))");
 
         svd_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, ex.getStream(), jobu_, jobv_);
@@ -124,7 +124,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, V) = svdpi(A))");
 
         svdpi_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, x_, iterations_, ex.getStream(), k_);
@@ -201,7 +201,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, V) = svdbpi(A))");
 
         svdbpi_impl(std::get<0>(out), std::get<1>(out), std::get<2>(out), a_, max_iters_, tol_, ex.getStream());

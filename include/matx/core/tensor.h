@@ -1486,6 +1486,7 @@ public:
 
       if constexpr (N > 0) {
         if (end != matxDropDim) {
+          MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
           if (end == matxEnd) {
             n[d] = this->Size(i) - first;
           }

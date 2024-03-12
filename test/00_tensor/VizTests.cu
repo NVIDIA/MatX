@@ -41,15 +41,17 @@
 using namespace matx;
 
 template <typename TensorType> struct VizTestsData {
-  tensor_t<TensorType, 0> t0{{}};
-  tensor_t<TensorType, 1> t1{{10}};
-  tensor_t<TensorType, 2> t2{{20, 10}};
-  tensor_t<TensorType, 3> t3{{30, 20, 10}};
-  tensor_t<TensorType, 4> t4{{40, 30, 20, 10}};
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;   
+  tensor_t<GTestType, 0> t0{{}};
+  tensor_t<GTestType, 1> t1{{10}};
+  tensor_t<GTestType, 2> t2{{20, 10}};
+  tensor_t<GTestType, 3> t3{{30, 20, 10}};
+  tensor_t<GTestType, 4> t4{{40, 30, 20, 10}};
 
-  tensor_t<TensorType, 2> t2s = t2.Permute({1, 0});
-  tensor_t<TensorType, 3> t3s = t3.Permute({2, 1, 0});
-  tensor_t<TensorType, 4> t4s = t4.Permute({3, 2, 1, 0});
+  tensor_t<GTestType, 2> t2s = t2.Permute({1, 0});
+  tensor_t<GTestType, 3> t3s = t3.Permute({2, 1, 0});
+  tensor_t<GTestType, 4> t4s = t4.Permute({3, 2, 1, 0});
 };
 
 template <typename TensorType>
@@ -83,14 +85,14 @@ template <typename TensorType>
 class VizTestsAll : public ::testing::Test, public VizTestsData<TensorType> {
 };
 
-TYPED_TEST_SUITE(VizTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(VizTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(VizTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(VizTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(VizTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(VizTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(VizTestsNumericNonComplex, MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(VizTestsBoolean, MatXBoolTypes);
+TYPED_TEST_SUITE(VizTestsAll, MatXAllTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsComplex, MatXComplexTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsFloat, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsNumeric, MatXNumericTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsIntegral, MatXAllIntegralTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsNumericNonComplex, MatXNumericNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(VizTestsBoolean, MatXBoolTypesCUDAExec);
 
 TYPED_TEST(VizTestsNumericNonComplex, Line)
 {
@@ -105,9 +107,10 @@ TYPED_TEST(VizTestsNumericNonComplex, Line)
 TYPED_TEST(VizTestsNumericNonComplex, Scatter)
 {
   MATX_ENTER_HANDLER();
-
+  using TestType = std::tuple_element_t<0, TypeParam>;
+   
   this->t1.SetVals({1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
-  tensor_t<TypeParam, 1> t1y({10});
+  tensor_t<TestType, 1> t1y({10});
 
   t1y.SetVals({1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
   viz::scatter(this->t1, t1y, "My Scatter Plot", "Y label", "X label",
@@ -119,9 +122,10 @@ TYPED_TEST(VizTestsNumericNonComplex, Scatter)
 TYPED_TEST(VizTestsNumericNonComplex, Bar)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
   this->t1.SetVals({0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-  tensor_t<TypeParam, 1> t1y({10});
+  tensor_t<TestType, 1> t1y({10});
 
   t1y.SetVals({1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
   viz::bar(this->t1, "My Bar Plot", "X label", "bar.html");

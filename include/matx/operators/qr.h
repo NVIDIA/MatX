@@ -61,7 +61,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "svd() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "svd() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 3 outputs on qr(). ie: (mtie(Q, R) = qr(A))");
 
         qr_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream());
@@ -128,7 +128,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_device_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
         static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(A, tau) = eig(A))");     
 
         cusolver_qr_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream());

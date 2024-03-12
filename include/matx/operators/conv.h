@@ -148,7 +148,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_device_executor_v<Executor>, "conv1d() only supports the CUDA executor currently");
+          static_assert(is_cuda_executor_v<Executor>, "conv1d() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
@@ -170,7 +170,7 @@ namespace matx
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          if constexpr (is_device_executor_v<Executor>) {
+          if constexpr (is_cuda_executor_v<Executor>) {
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
@@ -319,7 +319,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_device_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
 
         if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
           conv2d_impl(permute(std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
@@ -340,7 +340,7 @@ namespace detail {
           b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }          
 
-        if constexpr (is_device_executor_v<Executor>) {
+        if constexpr (is_cuda_executor_v<Executor>) {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 

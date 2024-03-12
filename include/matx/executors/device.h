@@ -66,7 +66,7 @@ namespace matx
       /*
        * @breif Returns stream associated with executor
        */
-      auto getStream() { return stream_; }
+      auto getStream() const { return stream_; }
 
       /**
        * Execute an operator on a device
