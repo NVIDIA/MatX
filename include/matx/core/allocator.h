@@ -102,7 +102,7 @@ struct MemTracker {
   }
 
   template <typename StreamType>
-  auto deallocate_internal(void *ptr, StreamType st) {
+  auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     std::unique_lock lck(memory_mtx);

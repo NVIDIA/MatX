@@ -68,4 +68,7 @@ static_assert(false, "Must choose either 64-bit or 32-bit index mode");
     #define __MATX_INLINE__ inline
 #endif
 
+// std::ceil is not constexpr until C++23
+#define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
+
 }

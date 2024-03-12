@@ -261,8 +261,8 @@ struct FftFFTWparams_t {
 
     auto exec_plans = [&](typename OutputTensor::value_type *out_ptr, 
                           typename InputTensor::value_type *in_ptr) {
-      fftwf_plan plan{};
       if constexpr (fp32) {
+        fftwf_plan plan{};
         if constexpr (DeduceFFTTransformType<OutputTensor, InputTensor>() == FFTType::C2C) {
           plan  = fftwf_plan_many_dft( params.fft_rank, 
                                       params.n, 
@@ -312,6 +312,7 @@ struct FftFFTWparams_t {
         fftwf_cleanup();         
       }
       else {
+        fftw_plan plan{};
         if constexpr (DeduceFFTTransformType<OutputTensor, InputTensor>() == FFTType::Z2Z) {
           plan  = fftw_plan_many_dft( params.fft_rank, 
                                       params.n, 
