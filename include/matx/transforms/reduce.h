@@ -1586,7 +1586,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto tmp_max = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
-  rmax_impl(tmp_max, in, cudaExecutor{stream});
+  max_impl(tmp_max, in, cudaExecutor{stream});
   sum_impl(tmp_sum, exp(in - tmp_max), stream);
   (dest = exp(in - tmp_max) / tmp_sum).run(stream);
 #endif
@@ -1655,7 +1655,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 
   auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto tmp_max = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  rmax_impl(tmp_max, permute(in, perm), stream);
+  max_impl(tmp_max, permute(in, perm), stream);
   sum_impl(tmp_sum, exp(permute(in, perm) - clone<InType::Rank()>(tmp_max, clone_dims)), stream);
 
   (dest = exp(in - clone<InType::Rank()>(tmp_max, clone_dims)) / clone<InType::Rank()>(tmp_sum, clone_dims)).run(stream);
@@ -2002,10 +2002,10 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] 
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ max_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  MATX_NVTX_START("rmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
   cub_max<OutType, InType>(dest, in, stream);
@@ -2033,9 +2033,9 @@ void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, cudaExecutor exec
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmax_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
+void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
-  MATX_NVTX_START("rmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
@@ -2130,7 +2130,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
   // This could be more efficient by not running two reductions to find the same values, but
   // for brevity this is faster
   ReduceInput(ft, idest, in);
-  rmax_impl(dest, in, exec);
+  max_impl(dest, in, exec);
 }
 
 
@@ -2139,9 +2139,6 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  * Compute min reduction of a tensor
  *
  * Returns a tensor representing the min of all numbers in the reduction
- *
- * @note This function uses the name rmin instead of min to not collide with the
- * element-wise operator min.
  *
  * @tparam OutType
  *   Output data type
@@ -2156,10 +2153,10 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ min_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  MATX_NVTX_START("rmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
   cub_min<OutType, InType>(dest, in, stream);
@@ -2187,9 +2184,9 @@ void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, cudaExecutor exec
  *   Single threaded host executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ rmin_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
+void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor exec)
 {
-  MATX_NVTX_START("rmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       *lout = *std::min_element(lin, lin + TotalSize(in));
@@ -2280,7 +2277,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
   // This could be more efficient by not running two reductions to find the same values, but
   // for brevity this is faster
   ReduceInput(ft, idest, in);
-  rmin_impl(dest, in, exec);
+  min_impl(dest, in, exec);
 }
 
 

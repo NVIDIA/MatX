@@ -424,12 +424,12 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   if constexpr (!is_complex_v<TestType>)
   {
-    // example-begin rmax-test-2
+    // example-begin max-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction        
-    (t2a = rmax(permute(t4,{2,3,0,1}))).run(exec);
-    (t2b = rmax(t4, {0,1})).run(exec);
-    // example-end rmax-test-2
+    (t2a = max(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = max(t4, {0,1})).run(exec);
+    // example-end max-test-2
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -442,12 +442,12 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
   if constexpr (!is_complex_v<TestType>)
   {
-    // example-begin rmin-test-2
+    // example-begin min-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction
-    (t2a = rmin(permute(t4,{2,3,0,1}))).run(exec);
-    (t2b = rmin(t4, {0,1})).run(exec);
-    // example-end rmin-test-2
+    (t2a = min(permute(t4,{2,3,0,1}))).run(exec);
+    (t2b = min(t4, {0,1})).run(exec);
+    // example-end min-test-2
 
     cudaStreamSynchronize(0);
     for (index_t i = 0; i < t2a.Size(0); i++) {
@@ -844,15 +844,15 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
   {
     ExecType exec{};
     using T = TestType;
-    // example-begin rmax-test-1
+    // example-begin max-test-1
     auto t0 = make_tensor<TestType>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
     // Reduce all inputs in "t1o" into "t0" by the maximum of all elements
-    (t0 = rmax(t1o)).run(exec);
-    // example-end rmax-test-1
+    (t0 = max(t1o)).run(exec);
+    // example-end max-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));    
   }
@@ -869,15 +869,15 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
   {
     ExecType exec{};
     using T = TestType;
-    // example-begin rmin-test-1
+    // example-begin min-test-1
     auto t0 = make_tensor<TestType>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
     // Reduce all inputs in "t1o" into "t0" by the minimum of all elements
-    (t0 = rmin(t1o)).run(exec);
-    // example-end rmin-test-1
+    (t0 = min(t1o)).run(exec);
+    // example-end min-test-1
     cudaStreamSynchronize(0);
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1))); 
   }

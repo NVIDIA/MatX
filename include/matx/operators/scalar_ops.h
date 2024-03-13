@@ -592,25 +592,25 @@ template <typename T1, typename T2> struct PowF {
 };
 template <typename T1, typename T2> using PowOp = BinOp<T1, T2, PowF<T1, T2>>;
 
-template <typename T1, typename T2> struct MaxF {
-  static std::string str(const std::string &str1, const std::string &str2) { return "max(" + str1 + "," + str2 + ")"; }
+template <typename T1, typename T2> struct MaximumF {
+  static std::string str(const std::string &str1, const std::string &str2) { return "maximum(" + str1 + "," + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return std::max(v1, v2);
   }
 };
-template <typename T1, typename T2> using MaxOp = BinOp<T1, T2, MaxF<T1, T2>>;
+template <typename T1, typename T2> using MaximumOp = BinOp<T1, T2, MaximumF<T1, T2>>;
 
-template <typename T1, typename T2> struct MinF {
-  static std::string str(const std::string &str1, const std::string &str2) { return "min(" + str1 + "," + str2 + ")"; }
+template <typename T1, typename T2> struct MinimumF {
+  static std::string str(const std::string &str1, const std::string &str2) { return "minimum(" + str1 + "," + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return std::min(v1, v2);
   }
 };
-template <typename T1, typename T2> using MinOp = BinOp<T1, T2, MinF<T1, T2>>;
+template <typename T1, typename T2> using MinimumOp = BinOp<T1, T2, MinimumF<T1, T2>>;
 
 // Logical Operators
 template <typename T1, typename T2> struct LTF {

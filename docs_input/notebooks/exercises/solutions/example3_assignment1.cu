@@ -88,7 +88,7 @@ int main() {
    * value. Scale the original tensor by this max value and do another max
    * reduction. The final reduction should be 1.0.
    *
-   * Hint: the reduction function is named rmax and takes the output, input, and
+   * Hint: the reduction function is named max and takes the output, input, and
    * stream as parameters
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/api/reduce.html
    ****************************************************************************************************/
@@ -98,9 +98,9 @@ int main() {
   (dv = random<float>(dv.Shape(), NORMAL)).run();
 
   tensor_t<float, 0> redv;
-  rmax(redv, dv, 0);
+  max(redv, dv, 0);
   (dv = dv / redv).run();
-  rmax(redv, dv, 0);
+  max(redv, dv, 0);
   /*** End editing ***/
 
   cudaStreamSynchronize(0);

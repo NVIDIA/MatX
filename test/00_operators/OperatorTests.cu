@@ -1760,17 +1760,17 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
   tiv0() = c;
   TestType d = c + 1;
 
-  // example-begin max-test-1
-  (tov0 = max(tiv0, d)).run(exec);
-  // example-end max-test-1
+  // example-begin maximum-test-1
+  (tov0 = maximum(tiv0, d)).run(exec);
+  // example-end maximum-test-1
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), max(c, d)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::max(c, d)));
 
-  // example-begin min-test-1
-  (tov0 = min(tiv0, d)).run(exec);
-  // example-end min-test-1
+  // example-begin minimum-test-1
+  (tov0 = minimum(tiv0, d)).run(exec);
+  // example-end minimum-test-1
   cudaStreamSynchronize(0);
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), min(c, d)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::min(c, d)));
 
   // These operators convert type T into bool
   auto tob = make_tensor<bool>({});

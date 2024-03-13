@@ -3,16 +3,22 @@
 min
 ===
 
-Element-wise minimum
+Reduces the input by the minimum values across the specified axes.
 
-.. doxygenfunction:: min(Op t, Op t2)
+.. doxygenfunction:: min(const InType &in, const int (&dims)[D])
+.. doxygenfunction:: min(const InType &in)
 
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/ReductionTests.cu
    :language: cpp
    :start-after: example-begin min-test-1
    :end-before: example-end min-test-1
    :dedent:
 
+.. literalinclude:: ../../../../test/00_operators/ReductionTests.cu
+   :language: cpp
+   :start-after: example-begin min-test-2
+   :end-before: example-end min-test-2
+   :dedent:
