@@ -232,9 +232,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
 
   constexpr int Rank = OutType::Rank();
 
-  constexpr int type2off = 
-    std::ceil(static_cast<double>(sizeof(in1type) * SIGNAL_CHUNK_Y * SIGNAL_CHUNK_X) / sizeof(in2type) * 
-              sizeof(in2type));
+  constexpr int type2off = MATX_ROUND_UP(sizeof(in1type) * SIGNAL_CHUNK_Y * SIGNAL_CHUNK_X, sizeof(in2type));
   __shared__ char shared_buf[type2off + sizeof(in2type) * FILTER_SHARED_CHUNK_Y * FILTER_SHARED_CHUNK_X];
 
   // __shared__ Uninitialized<in1type> s_signal[SIGNAL_CHUNK_Y][SIGNAL_CHUNK_X];
