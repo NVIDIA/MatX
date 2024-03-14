@@ -309,9 +309,9 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (VTVd = abs(VTV - I)).run(exec);
   (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = rmax(UTUd)).run(exec);
-  (mdiffV = rmax(VTVd)).run(exec);
-  (mdiffA = rmax(Ad)).run(exec);
+  (mdiffU = max(UTUd)).run(exec);
+  (mdiffV = max(VTVd)).run(exec);
+  (mdiffA = max(Ad)).run(exec);
 
   cudaDeviceSynchronize();
 
@@ -441,9 +441,9 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (VTVd = abs(VTV - I)).run(exec);
   (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = rmax(UTUd)).run(exec);
-  (mdiffV = rmax(VTVd)).run(exec);
-  (mdiffA = rmax(Ad)).run(exec);
+  (mdiffU = max(UTUd)).run(exec);
+  (mdiffV = max(VTVd)).run(exec);
+  (mdiffA = max(Ad)).run(exec);
 
   cudaDeviceSynchronize();
 

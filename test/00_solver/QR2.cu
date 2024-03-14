@@ -93,7 +93,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
     eShape[RANK-2] = matxKeepDim;
     auto I = clone<RANK>(e, eShape);
   
-    (mdiffQTQ = rmax(abs(QTQ-I))).run(stream);
+    (mdiffQTQ = max(abs(QTQ-I))).run(stream);
 
   }
 
@@ -102,7 +102,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
     auto QR = make_tensor<AType>(Ashape);
     (QR = matmul(Q, R)).run(stream);
     
-    (mdiffQR = rmax(abs(A-QR))).run(stream);
+    (mdiffQR = max(abs(A-QR))).run(stream);
   }
 
   cudaDeviceSynchronize();

@@ -82,7 +82,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   (Bout = matvec(A, X)).run();
   (norm = sum((Bout-B)*(Bout-B))).run();
-  (maxn = matx::rmax(sqrt(norm))).run();
+  (maxn = matx::max(sqrt(norm))).run();
 
   cudaDeviceSynchronize();
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));
