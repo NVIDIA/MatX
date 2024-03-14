@@ -138,6 +138,17 @@ __MATX_INLINE__ auto max(const InType &in, const int (&dims)[D])
   return detail::MaxOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
+template <typename InType, int D>
+[[deprecated("Use max() instead of rmax() for reductions")]]
+__MATX_INLINE__ auto rmax(const InType &in, const int (&dims)[D])
+{
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  auto permop = permute(in, perm);
+
+  return detail::MaxOp<decltype(permop), InType::Rank() - D>(permop);
+}
+
 /**
  * Compute max reduction of an operator
  *
@@ -152,6 +163,13 @@ __MATX_INLINE__ auto max(const InType &in, const int (&dims)[D])
  */
 template <typename InType>
 __MATX_INLINE__ auto max(const InType &in)
+{
+  return detail::MaxOp<decltype(in), 0>(in);
+}
+
+template <typename InType>
+[[deprecated("Use max() instead of rmax() for reductions")]]
+__MATX_INLINE__ auto rmax(const InType &in)
 {
   return detail::MaxOp<decltype(in), 0>(in);
 }

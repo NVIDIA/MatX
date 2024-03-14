@@ -138,6 +138,17 @@ __MATX_INLINE__ auto min(const InType &in, const int (&dims)[D])
   return detail::MinOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
+template <typename InType, int D>
+[[deprecated("Use min() instead of rmin() for reductions")]]
+__MATX_INLINE__ auto rmin(const InType &in, const int (&dims)[D])
+{
+  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  auto perm = detail::getPermuteDims<InType::Rank()>(dims);
+  auto permop = permute(in, perm);
+
+  return detail::MinOp<decltype(permop), InType::Rank() - D>(permop);
+}
+
 /**
  * Compute min reduction of an operator
  *
@@ -152,6 +163,13 @@ __MATX_INLINE__ auto min(const InType &in, const int (&dims)[D])
  */
 template <typename InType>
 __MATX_INLINE__ auto min(const InType &in)
+{
+  return detail::MinOp<decltype(in), 0>(in);
+}
+
+template <typename InType>
+[[deprecated("Use min() instead of rmin() for reductions")]]
+__MATX_INLINE__ auto rmin(const InType &in)
 {
   return detail::MinOp<decltype(in), 0>(in);
 }

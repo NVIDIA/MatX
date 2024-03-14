@@ -248,22 +248,22 @@ namespace matx
   Op pow(Op t, Op t2) {}
 
   /**
-   * Compute element-wise maximum(t, t2) of two operators or tensors
+   * Compute element-wise max(t, t2) of two operators or tensors
    * @param t
    *   LHS tensor or operator input
    * @param t2
    *   RHS tensor or operator input
    */
-  Op maximum(Op t, Op t2) {}
+  Op max(Op t, Op t2) {}
 
   /**
-   * Compute element-wise minimum(t, t2) of two operators or tensors
+   * Compute element-wise min(t, t2) of two operators or tensors
    * @param t
    *   LHS tensor or operator input
    * @param t2
    *   RHS tensor or operator input
    */
-  Op minimum(Op t, Op t2) {}
+  Op min(Op t, Op t2) {}
 
   /**
    * Compute t < t2 of two operators or tensors
@@ -384,9 +384,9 @@ namespace matx
   DEFINE_BINARY_OP(operator&, detail::AndOp);
   DEFINE_BINARY_OP(operator^, detail::XorOp);
   DEFINE_BINARY_OP(pow, detail::PowOp);
-  DEFINE_BINARY_OP(maximum, detail::MaximumOp);
+  DEFINE_BINARY_OP(max, detail::MaximumOp);
   DEFINE_BINARY_OP(atan2, detail::Atan2Op);
-  DEFINE_BINARY_OP(minimum, detail::MinimumOp);
+  DEFINE_BINARY_OP(min, detail::MinimumOp);
   DEFINE_BINARY_OP(operator<, detail::LTOp);
   DEFINE_BINARY_OP(operator>, detail::GTOp);
   DEFINE_BINARY_OP(operator<=, detail::LTEOp);
