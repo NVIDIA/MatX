@@ -5,9 +5,9 @@ Printing
 
 MatX allows printing of any operator or tensor for debugging. If the operator is not backed by memory MatX will
 fetch all values based on the size and rank. If the operator is a tensor, MatX can determine whether
-the memory is on the host or device and print the tensor appropriately. The `print` function takes an 
+the memory is on the host or device and print the tensor appropriately. The `print` function takes an
 operator as the first parameter, and optionally the number of elements to print in each dimension. The
-value of 0 is a special placeholder for "all", and using it prints all values in that dimension. 
+value of 0 is a special placeholder for "all", and using it prints all values in that dimension.
 
 To print a tensor:
 
@@ -41,3 +41,10 @@ element in the second dimension, and 10 elements in the last dimension.
 
     auto t = make_tensor<TypeParam>({3, 10, 20});
     print(ones(t.Shape()), 1, 0, 10);
+
+
+Print Formatting Styles
+~~~~~~~~~~~~~~~~~~~~~~~
+
+MatX supports printing tensors with formatting styles that allows direct cut & paste into either MATLAB or Python.
+See :ref:`set_print_format_type_func`

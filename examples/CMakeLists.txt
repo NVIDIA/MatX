@@ -15,7 +15,8 @@ set(examples
     spherical_harmonics
     svd_power
     qr
-    black_scholes)
+    black_scholes
+    print_styles)
 
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
