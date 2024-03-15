@@ -1186,6 +1186,7 @@ public:
    *   0 initializer list value
    *
    */
+  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
     static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
@@ -1239,6 +1240,9 @@ public:
    *   1D/2D initializer list of values
    *
    */
+  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 2) ||
+                                               (is_cuda_complex_v<T> && M == 1),
+                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<T>>
               &vals)
@@ -1276,6 +1280,9 @@ public:
    *   3D/2D initializer list of values
    *
    */
+  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 3) ||
+                                               (is_cuda_complex_v<T> && M == 2),
+                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<T>>>
@@ -1317,6 +1324,9 @@ public:
    *   3D/4D initializer list of values
    *
    */
+  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 4) ||
+                                               (is_cuda_complex_v<T> && M == 3),
+                                           bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>
@@ -1367,6 +1377,8 @@ public:
    *   4D initializer list of values
    *
    */
+  template <int M = RANK,
+            std::enable_if_t<is_cuda_complex_v<T> && M == 4, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<
