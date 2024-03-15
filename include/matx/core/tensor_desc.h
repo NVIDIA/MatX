@@ -311,7 +311,7 @@ public:
     /*  In release mode with O3 on g++ seems to give incorrect warnings on this line from Clone()
         and clone(). It appears there's no valid code path that would cause this to be unitialized,
         so we're ignoring the warning in this one spot. */
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__clang__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     return *(stride_.begin() + dim); 
