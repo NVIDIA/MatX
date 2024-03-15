@@ -3,7 +3,10 @@ find_package(Doxygen REQUIRED)
 find_package(Sphinx REQUIRED)
 
 # Find all the public headers
-file(GLOB_RECURSE MATX_PUBLIC_HEADERS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
+file(GLOB_RECURSE MATX_PUBLIC_HEADERS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../include/matx/*.h)
+
+# Find all the rst documentation
+file(GLOB_RECURSE MATX_RST_DOCS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.rst)
 
 set(DOXYGEN_INPUT_DIR ${PROJECT_SOURCE_DIR}/)
 set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
@@ -33,7 +36,7 @@ add_custom_command(OUTPUT ${DOXYGEN_INDEX_FILE}
                    DEPENDS ${MATX_PUBLIC_HEADERS}
                    COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE_OUT}
                    MAIN_DEPENDENCY ${DOXYFILE_OUT} ${DOXYFILE_IN}
-                   COMMENT "Generating docs")
+                   COMMENT "Generating documentation with Doxygen")
 
 add_custom_target(Doxygen ALL DEPENDS ${DOXYGEN_INDEX_FILE})
 
@@ -55,7 +58,7 @@ add_custom_command(OUTPUT ${SPHINX_INDEX_FILE}
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                    DEPENDS
                    # Other docs files you want to track should go here (or in some variable)
-                   ${CMAKE_CURRENT_SOURCE_DIR}/index.rst
+                   ${MATX_RST_DOCS}
                    ${DOXYGEN_INDEX_FILE}
                    MAIN_DEPENDENCY ${SPHINX_CFG_OUT}
                    COMMENT "Generating documentation with Sphinx")
