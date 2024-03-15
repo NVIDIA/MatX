@@ -530,49 +530,49 @@ namespace detail {
 
     if constexpr (is_complex_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("%."s + prec + "e%+." + prec + "ej ").c_str();
+      const auto fmt_s = ("% ."s + prec + "e%+." + prec + "ej ").c_str();
       fprintf(fp, fmt_s, static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
     }
     else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("%."s + prec + "e ").c_str();
+      const auto fmt_s = ("% ."s + prec + "e ").c_str();
       fprintf(fp, fmt_s, static_cast<float>(val));
     }
     else if constexpr (std::is_floating_point_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("%."s + prec + "e ").c_str();
+      const auto fmt_s = ("% ."s + prec + "e ").c_str();
       fprintf(fp, fmt_s, val);
     }
     else if constexpr (std::is_same_v<T, long long int>) {
-      fprintf(fp, "%lld ", val);
+      fprintf(fp, "% lld ", val);
     }
     else if constexpr (std::is_same_v<T, int64_t>) {
-      fprintf(fp, "%" PRId64 " ", val);
+      fprintf(fp, "% " PRId64 " ", val);
     }
     else if constexpr (std::is_same_v<T, int32_t>) {
-      fprintf(fp, "%" PRId32 " ", val);
+      fprintf(fp, "% " PRId32 " ", val);
     }
     else if constexpr (std::is_same_v<T, int16_t>) {
-      fprintf(fp, "%" PRId16 " ", val);
+      fprintf(fp, "% " PRId16 " ", val);
     }
     else if constexpr (std::is_same_v<T, int8_t>) {
-      fprintf(fp, "%" PRId8 " ", val);
+      fprintf(fp, "% " PRId8 " ", val);
     }
     else if constexpr (std::is_same_v<T, uint64_t>) {
-      fprintf(fp, "%" PRIu64 " ", val);
+      fprintf(fp, "+%" PRIu64 " ", val);
     }
     else if constexpr (std::is_same_v<T, uint32_t>) {
-      fprintf(fp, "%" PRIu32 " ", val);
+      fprintf(fp, "+%" PRIu32 " ", val);
     }
     else if constexpr (std::is_same_v<T, uint16_t>) {
-      fprintf(fp, "%" PRIu16 " ", val);
+      fprintf(fp, "+%" PRIu16 " ", val);
     }
     else if constexpr (std::is_same_v<T, uint8_t>) {
-      fprintf(fp, "%" PRIu8 " ", val);
+      fprintf(fp, "+%" PRIu8 " ", val);
     }
     else if constexpr (std::is_same_v<T, bool>) {
-      fprintf(fp, "%d ", val);
+      fprintf(fp, "% d ", val);
     }
   }
 
@@ -636,26 +636,25 @@ namespace detail {
     else if constexpr (sizeof...(Args) == 1) {
       auto& k =detail:: pp_get<0>(dims...);
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
-        if (_k == 0)
-        {
-          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON))
-          {
+        if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
+          if (_k == 0) {
             fprintf(fp, "[");
           }
+          else {
+            fprintf(fp, " ");
+          }
         }
-        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+          fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+        }
         PrintVal(fp, op.operator()(_k));
-        if (_k == (op.Size(0)-1))
-        {
-          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON))
-          {
+        if (_k == (op.Size(0)-1)) {
+          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
             fprintf(fp, "]");
           }
         }
-        else
-        {
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-          {
+        else {
+          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
             fprintf(fp, ",");
           }
         }
@@ -666,47 +665,55 @@ namespace detail {
       auto& k = detail::pp_get<0>(dims...);
       auto& l = detail::pp_get<1>(dims...);
       for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
-        if (_k == 0)
-        {
-          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON))
-          {
+        if (_k == 0) {
+          if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
             fprintf(fp, "[");
           }
         }
         for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
-          if (_l == 0)
-          {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT)
-            {
+          if (_l == 0) {
+            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
               fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
             }
-            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-            {
-              if (_k == 0) fprintf(fp, "[");
-              else fprintf(fp, " [");
+            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+              if (_k == 0) {
+                fprintf(fp, "[");
+              }
+              else {
+                fprintf(fp, " [");
+              }
+            }
+            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+              if (_k != 0) {
+                fprintf(fp, " ");
+              }
             }
           }
 
           PrintVal(fp, op.operator()(_k, _l));
 
-          if (_l == (op.Size(1)-1))
-          {
-            if (_k == (op.Size(0)-1))
-            {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "]");
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]]");
+          if (_l == (op.Size(1)-1)) {
+            if (_k == (op.Size(0)-1)) {
+              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                fprintf(fp, "]");
+              }
+              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                fprintf(fp, "]]");
+              }
             }
-            else
-            {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "; ...");
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "],");
+            else {
+              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                fprintf(fp, "; ...");
+              }
+              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                fprintf(fp, "],");
+              }
             }
           }
           else
           {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-            {
-              fprintf(fp, ",");
+            if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
+              fprintf(fp, ", ");
             }
           }
         }
@@ -718,69 +725,95 @@ namespace detail {
       auto& k = detail::pp_get<1>(dims...);
       auto& l = detail::pp_get<2>(dims...);
       for (index_t _j = 0; _j < ((j == 0) ? op.Size(0) : j); _j++) {
-        if (_j == 0)
-        {
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "cat(3, ...\n");
-          else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "[");
+        if (_j == 0) {
+          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+            fprintf(fp, "cat(3, ...\n");
+          }
+          else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+            fprintf(fp, "[");
+          }
         }
-        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "[%06" INDEX_T_FMT ",:,:]\n", _j);
+        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+          fprintf(fp, "[%06" INDEX_T_FMT ",:,:]\n", _j);
+        }
         for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "       ");
-          if (_k == 0)
-          {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "[");
-            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-            {
-              if (_j == 0) fprintf(fp, "[");
-              else fprintf(fp, " [");
+          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+            fprintf(fp, "       ");
+          }
+          if (_k == 0) {
+            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+              fprintf(fp, "[");
+            }
+            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+              if (_j == 0) {
+                fprintf(fp, "[");
+              }
+              else {
+                fprintf(fp, " [");
+              }
+            }
+          }
+          else {
+            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+              fprintf(fp, " ");
             }
           }
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
-            if (_l == 0)
-            {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-              {
-                if (_k == 0) fprintf(fp, "[");
-                else fprintf(fp, "  [");
+            if (_l == 0) {
+              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+                fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+              }
+              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                if (_k == 0) {
+                  fprintf(fp, "[");
+                }
+                else {
+                  fprintf(fp, "  [");
+                }
               }
             }
 
             PrintVal(fp, op.operator()(_j, _k, _l));
 
-            if (_l == (op.Size(2)-1))
-            {
-              if (_k == (op.Size(1)-1))
-              {
-                if (_j == (op.Size(0)-1))
-                {
-                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "])\n");
-                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]]]");
+            if (_l == (op.Size(2)-1)) {
+              if (_k == (op.Size(1)-1)) {
+                if (_j == (op.Size(0)-1)) {
+                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                    fprintf(fp, "])\n");
+                  }
+                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                    fprintf(fp, "]]]");
+                  }
                 }
-                else
-                {
-                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "], ...");
-                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]],");
+                else {
+                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                    fprintf(fp, "], ...");
+                  }
+                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                    fprintf(fp, "]],");
+                  }
                 }
               }
-              else
-              {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "; ...");
-                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "],");
+              else {
+                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                  fprintf(fp, "; ...");
+                }
+                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                  fprintf(fp, "],");
+                }
               }
             }
-            else
-            {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-              {
-                fprintf(fp, ",");
+            else {
+              if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
+                fprintf(fp, ", ");
               }
             }
-
           }
           fprintf(fp, "\n");
         }
-        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "\n");
+        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+          fprintf(fp, "\n");
+        }
       }
     }
     else if constexpr (sizeof...(Args) == 4) {
@@ -789,86 +822,119 @@ namespace detail {
       auto& k = detail::pp_get<2>(dims...);
       auto& l = detail::pp_get<3>(dims...);
       for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
-        if (_i == 0)
-        {
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "cat(4, ...\n");
-          else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "[");
+        if (_i == 0) {
+          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+            fprintf(fp, "cat(4, ...\n");
+          }
+          else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+            fprintf(fp, "[");
+          }
         }
         for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
-          if (_j == 0)
-          {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "       cat(3, ...\n");
-            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-            {
-              if (_i == 0) fprintf(fp, "[");
-              else fprintf(fp, " [");
+          if (_j == 0) {
+            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+              fprintf(fp, "       cat(3, ...\n");
+            }
+            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+              if (_i == 0) {
+                fprintf(fp, "[");
+              }
+              else {
+                fprintf(fp, " [");
+              }
             }
           }
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
+          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+            fprintf(fp, "[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
+          }
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "              ");
-            if (_k == 0)
-            {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "[");
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-              {
-                if (_j == 0) fprintf(fp, "[");
-                else fprintf(fp, "  [");
+            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+              fprintf(fp, "              ");
+            }
+            if (_k == 0) {
+              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                fprintf(fp, "[");
+              }
+              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                if (_j == 0) {
+                  fprintf(fp, "[");
+                }
+                else {
+                  fprintf(fp, "  [");
+                }
+              }
+            }
+            else {
+              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                fprintf(fp, " ");
               }
             }
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
-              if (_l == 0)
-              {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
-                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-                {
-                  if (_k == 0) fprintf(fp, "[");
-                  else fprintf(fp, "   [");
+              if (_l == 0) {
+                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+                  fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                }
+                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                  if (_k == 0) {
+                    fprintf(fp, "[");
+                  }
+                  else {
+                    fprintf(fp, "   [");
+                  }
                 }
               }
 
               PrintVal(fp, op.operator()(_i, _j, _k, _l));
 
-              if (_l == (op.Size(3)-1))
-              {
-                if (_k == (op.Size(2)-1))
-                {
-                  if (_j == (op.Size(1)-1))
-                  {
-                    if (_i == (op.Size(0)-1))
-                    {
-                      if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "]))\n");
-                      else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]]]]");
+              if (_l == (op.Size(3)-1)) {
+                if (_k == (op.Size(2)-1)) {
+                  if (_j == (op.Size(1)-1)) {
+                    if (_i == (op.Size(0)-1)) {
+                      if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                        fprintf(fp, "]))\n");
+                      }
+                      else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                        fprintf(fp, "]]]]");
+                      }
                     }
-                    else
-                    {
-                      if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "]), ...");
-                      else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]]],");
+                    else {
+                      if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                        fprintf(fp, "]), ...");
+                      }
+                      else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                        fprintf(fp, "]]],");
+                      }
                     }
                   }
-                  else
-                  {
-                    if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "], ...");
-                    else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "]],");
+                  else {
+                    if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                      fprintf(fp, "], ...");
+                    }
+                    else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                      fprintf(fp, "]],");
+                    }
                   }
                 }
-                else
-                {
-                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) fprintf(fp, "; ...");
-                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) fprintf(fp, "],");
+                else {
+                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+                    fprintf(fp, "; ...");
+                  }
+                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+                    fprintf(fp, "],");
+                  }
                 }
               }
-              else
-              {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)
-                {
-                  fprintf(fp, ",");
+              else {
+                if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
+                  fprintf(fp, ", ");
                 }
               }
             }
             fprintf(fp, "\n");
           }
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) fprintf(fp, "\n");
+          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+            fprintf(fp, "\n");
+          }
         }
       }
     }
