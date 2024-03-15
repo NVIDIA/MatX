@@ -1066,7 +1066,7 @@ public:
    * @returns Overlapping view of data
    *
    */
-  template <int N>  
+  template <int N>
   __MATX_INLINE__ auto
   OverlapView(const std::array<typename Desc::shape_type, N> &windows,
               const std::array<typename Desc::stride_type, N> &strides) const
@@ -1206,6 +1206,9 @@ public:
    *   1D initializer list of values
    *
    */
+  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 1) ||
+                                            (is_cuda_complex_v<T> && M == 0),
+                                            bool> = true>
   __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
