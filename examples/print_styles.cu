@@ -49,17 +49,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   MATX_ENTER_HANDLER();
   // example-begin print-example-1
   using complex = cuda::std::complex<double>;
-  const complex Ainit[16] {
+
+  auto A1 = make_tensor<complex>({16});
+  A1.SetVals({
     {  1,  -1}, {  2,   2}, {  3,  -3}, {  4,  4},
     { -5,   5}, { -6,  -6}, { -7,   7}, { -8, -8},
     {  9,  -9}, { 10,  10}, { 11, -11}, { 12, 12},
-    {-13,  13}, {-14,  14}, {-15,  15}, {-16, 16}};
-
-  auto A1 = make_tensor<complex>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit[k];
-  }
+    {-13,  13}, {-14,  14}, {-15,  15}, {-16, 16}
+  });
 
   auto A2 = reshape(A1, {4,4});
   auto A3 = reshape(A1, {2,2,4});

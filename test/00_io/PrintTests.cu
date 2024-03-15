@@ -41,9 +41,17 @@ class PrintTest : public ::testing::Test
 {
 public:
 
+  tensor_t<cuda::std::complex<double>, 1> A1 {{16}};
+
   void SetUp() override
   {
     set_print_format_type(MATX_PRINT_FORMAT_DEFAULT);
+    A1.SetVals({
+        {-9.2466e-01, +9.9114e-01}, {-4.2534e-01, +1.0676e+00}, {-2.6438e+00, -6.2723e-01}, { 1.4518e-01, +3.2016e-01},
+        {-1.2087e-01, -3.1101e-01}, {-5.7973e-01, -3.4408e-01}, {-6.2285e-01, -1.1709e+00}, {-3.2839e-01, -5.3706e-01},
+        {-1.0745e+00, +1.3390e+00}, {-3.6314e-01, -2.4011e-01}, {-1.6711e+00, +1.2149e+00}, { 2.2655e+00, -2.0518e-01},
+        { 3.1168e-01, +1.2999e+00}, {-1.8419e-01, +2.1812e-01}, { 1.2866e+00, -1.2135e+00}, { 1.1820e+00, -1.3723e+00}
+    });
   }
 
   void TearDown() override
@@ -83,21 +91,9 @@ public:
   }
 };
 
-const cuda::std::complex<double> Ainit_test0[16] = {
-  {-9.2466e-01, +9.9114e-01}, {-4.2534e-01, +1.0676e+00}, {-2.6438e+00, -6.2723e-01}, { 1.4518e-01, +3.2016e-01},
-  {-1.2087e-01, -3.1101e-01}, {-5.7973e-01, -3.4408e-01}, {-6.2285e-01, -1.1709e+00}, {-3.2839e-01, -5.3706e-01},
-  {-1.0745e+00, +1.3390e+00}, {-3.6314e-01, -2.4011e-01}, {-1.6711e+00, +1.2149e+00}, { 2.2655e+00, -2.0518e-01},
-  { 3.1168e-01, +1.2999e+00}, {-1.8419e-01, +2.1812e-01}, { 1.2866e+00, -1.2135e+00}, { 1.1820e+00, -1.3723e+00}};
-
 TEST_F(PrintTest, DefaultTest1)
 {
   MATX_ENTER_HANDLER();
-
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
 
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
@@ -125,11 +121,6 @@ TEST_F(PrintTest, DefaultTest2)
 {
   MATX_ENTER_HANDLER();
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A2 = reshape(A1, {4,4});
 
   print_checker(A2,
@@ -146,11 +137,6 @@ TEST_F(PrintTest, DefaultTest3)
 {
   MATX_ENTER_HANDLER();
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A3 = reshape(A1, {2,2,4});
 
   print_checker(A3,
@@ -170,11 +156,6 @@ TEST_F(PrintTest, DefaultTest4)
 {
   MATX_ENTER_HANDLER();
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A4 = reshape(A1, {2,2,2,2});
 
   print_checker(A4,
@@ -203,12 +184,6 @@ TEST_F(PrintTest, MlabTest1)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
-
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
       "[-9.2466e-01+9.9114e-01j \n"
@@ -236,11 +211,6 @@ TEST_F(PrintTest, MlabTest2)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A2 = reshape(A1, {4,4});
 
   print_checker(A2,
@@ -258,11 +228,6 @@ TEST_F(PrintTest, MlabTest3)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A3 = reshape(A1, {2,2,4});
 
   print_checker(A3,
@@ -281,11 +246,6 @@ TEST_F(PrintTest, MlabTest4)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A4 = reshape(A1, {2,2,2,2});
 
   print_checker(A4,
@@ -309,12 +269,6 @@ TEST_F(PrintTest, PythonTest1)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
-
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
 
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
@@ -343,11 +297,6 @@ TEST_F(PrintTest, PythonTest2)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A2 = reshape(A1, {4,4});
 
   print_checker(A2,
@@ -365,11 +314,6 @@ TEST_F(PrintTest, PythonTest3)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A3 = reshape(A1, {2,2,4});
 
   print_checker(A3,
@@ -387,11 +331,6 @@ TEST_F(PrintTest, PythonTest4)
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
 
-  auto A1 = make_tensor<cuda::std::complex<double>>({16});
-  for (int k=0; k<16; k++)
-  {
-    A1(k) = Ainit_test0[k];
-  }
   auto A4 = reshape(A1, {2,2,2,2});
 
   print_checker(A4,
