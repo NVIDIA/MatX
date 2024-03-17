@@ -818,7 +818,7 @@ class tensor_impl_t {
 
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
-      return TotalSize() * sizeof(*ldata_);
+      return static_cast<size_t>(TotalSize()) * sizeof(*ldata_);
     }   
 
     /**

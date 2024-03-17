@@ -250,7 +250,7 @@ public:
    */
   __MATX_INLINE__ tensor_t(const typename Desc::shape_type (&shape)[RANK]) :
     detail::tensor_impl_t<T, RANK, Desc>(shape),
-    storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
+    storage_{typename Storage::container{static_cast<size_t>(this->desc_.TotalSize())*sizeof(T)}}
   {
     this->SetLocalData(storage_.data());
   }
@@ -758,7 +758,7 @@ public:
 
     int dev;
     cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), dev, stream);
+    cudaMemPrefetchAsync(this->ldata_, static_cast<size_t>(this->desc_.TotalSize()) * sizeof(T), dev, stream);
   }
 
   /**
@@ -775,7 +775,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
+    cudaMemPrefetchAsync(this->ldata_, static_cast<size_t>(this->desc_.TotalSize()) * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
 
@@ -799,13 +799,13 @@ public:
     std::array<typename Desc::stride_type, RANK> strides;
 
 #pragma unroll
-    for (int i = 0; i < RANK; i++) {
+    for (size_t i = 0; i < RANK; i++) {
       strides[i] = this->desc_.Stride(i);
     }
 
     if constexpr (RANK > 0) {
 #pragma unroll
-      for (int i = 0; i < RANK; i++) {
+      for (size_t i = 0; i < RANK; i++) {
         strides[i] *= 2;
       }
     }
@@ -883,7 +883,7 @@ public:
     [[maybe_unused]] bool done[RANK] = {0};
 
 #pragma unroll
-    for (int i = 0; i < RANK; i++) {
+    for (size_t i = 0; i < RANK; i++) {
       int d = dims[i];
       MATX_ASSERT_STR(d < RANK, matxInvalidDim,
                       "Index to permute is larger than tensor rank");
@@ -1399,7 +1399,6 @@ public:
                    m + 1)
                       ->real();
               this->operator()(i, j, k, l) = {real, imag};
-              m++;
             }
           }
         }
@@ -1452,9 +1451,9 @@ public:
     int d = 0;
     bool def_stride = (strides[0] == -1);
 
-    int end_count = 0;
-    for (int i = 0; i < RANK; i++) {
-      if (ends[i] == matxDropDim) {
+    [[maybe_unused]] int end_count = 0;
+    for (size_t i = 0; i < RANK; i++) {
+      if (ends[i] == static_cast<typename Desc::shape_type>(matxDropDim)) {
         end_count++;
       }
     }
@@ -1463,9 +1462,9 @@ public:
             "Number of matxDropDim specifiers must match the output rank");
 
 #pragma unroll
-    for (int i = 0; i < RANK; i++) {
-      typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
-      typename Desc::shape_type end = ends[i]   < 0 ? this->Size(i) + ends[i]   : ends[i];
+    for (size_t i = 0; i < RANK; i++) {
+      typename Desc::shape_type first = firsts[i] < static_cast<typename Desc::shape_type>(0) ? this->Size(i) + firsts[i] : firsts[i];
+      typename Desc::shape_type end = ends[i]     < static_cast<typename Desc::shape_type>(0) ? this->Size(i) + ends[i]   : ends[i];
 
       MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= this->Size(i)), matxInvalidDim,
         "Slice end index out of range of operator");

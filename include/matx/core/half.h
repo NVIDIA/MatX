@@ -54,14 +54,14 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
    * @brief Default constructor
    * 
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf() = default;
+  __MATX_INLINE__ matxHalf() = default;
 
   /**
    * @brief Default copy constructor
    * 
    * @param x_ Parameter to copy
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept = default;
+  __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept = default;
 
   /**
    * @brief Copy constructor from arbitrary type
@@ -116,7 +116,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
    * 
    * @param rhs Value to copy
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> &operator=(const matxHalf<T> &rhs) = default;
+  __MATX_INLINE__ matxHalf<T> &operator=(const matxHalf<T> &rhs) = default;
 
   /**
    * @brief Copy assignment operator

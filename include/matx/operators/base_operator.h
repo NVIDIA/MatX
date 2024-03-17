@@ -178,8 +178,8 @@ namespace matx
           else {
             std::array<index_t, T::Rank()> sizes_;
 
-            for(int i = 0 ; i < T::Rank(); i++) {
-              sizes_[i] = static_cast<const T*>(this)->Size(i);
+            for(size_t i = 0 ; i < T::Rank(); i++) {
+              sizes_[i] = static_cast<const T*>(this)->Size(static_cast<int32_t>(i));
             }
             return sizes_;
           }

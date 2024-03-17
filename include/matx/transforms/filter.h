@@ -222,8 +222,8 @@ private:
       MATX_THROW(matxCudaError, "allocation error");
     }
 
-    for (uint32_t row = 0; row < num_recursive; row++) {
-      for (uint32_t col = 0; col < CORR_COLS * RECURSIVE_VALS_PER_THREAD;
+    for (int row = 0; row < num_recursive; row++) {
+      for (int col = 0; col < CORR_COLS * RECURSIVE_VALS_PER_THREAD;
            col++) {
         // There are an implicit num_recursive columns prior to
         // the actual coefficients beginning that are needed for computation
@@ -236,7 +236,7 @@ private:
           res = 0;
         }
 
-        for (uint32_t k = 0; k < num_recursive; k++) {
+        for (int k = 0; k < num_recursive; k++) {
           int offs = col - k - 1;
           if (offs < 0) {
             // We're in the implicit coefficients

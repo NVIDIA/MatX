@@ -109,8 +109,8 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   dim3 grid(num_batches, 1, 1);
   // comp_unit is either a thread or a warp, depending on the kernel. It is the size of the computational
   // unit that collectively computes a single output value.
-  auto compute_elems_per_comp_unit = [&grid, DESIRED_MIN_GRID_SIZE](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
-    const int start_batch_size = grid.x * grid.y;
+  auto compute_elems_per_comp_unit = [&grid](index_t max_outlen_per_cta, unsigned int cta_comp_unit_count) -> index_t {
+    const unsigned int start_batch_size = grid.x * grid.y;
     const index_t desired_extra_batches = (DESIRED_MIN_GRID_SIZE + start_batch_size - 1) /
       start_batch_size;
     const index_t max_outlen_per_comp_unit = (max_outlen_per_cta + cta_comp_unit_count - 1) /
@@ -121,10 +121,10 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 
   constexpr int THREADS = MATX_RESAMPLE_POLY_MAX_NUM_THREADS;
   if (kernel == ResampleKernel::PhaseBlock) {
-    const size_t smemBytes = (sizeof(filter_t) * max_phase_len <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
+    const size_t smemBytes = (sizeof(filter_t) * static_cast<size_t>(max_phase_len) <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
       sizeof(filter_t) * max_phase_len : 0;
     const index_t max_output_len_per_phase = (output_len + up - 1) / up;
-    grid.y = static_cast<int>(up);
+    grid.y = static_cast<unsigned int>(up);
     const index_t elems_per_thread = compute_elems_per_comp_unit(max_output_len_per_phase, THREADS);
     if (downcast_to_32b_index()) {
       ResamplePoly1D_PhaseBlock<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
@@ -135,7 +135,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
         o, i, filter, up, down, elems_per_thread);
     }
   } else if (kernel == ResampleKernel::ElemBlock) {
-    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+static_cast<index_t>(1)) : sizeof(filter_t)*filter_len;
     const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
     const index_t elems_per_thread = compute_elems_per_comp_unit(output_len, THREADS);
     if (downcast_to_32b_index()) {

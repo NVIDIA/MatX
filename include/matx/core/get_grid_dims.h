@@ -38,10 +38,10 @@ namespace detail {
 
 template <int RANK>
 inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
-                          int max_cta_size = 1024)
+                          unsigned int max_cta_size = 1024)
 {
   bool stride = false;
-  [[maybe_unused]] int nt = 1;
+  [[maybe_unused]] unsigned int nt = 1;
   threads.x = 1;
   threads.y = 1;
   threads.z = 1;
@@ -55,7 +55,7 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    blocks.x = static_cast<unsigned int>((sizes[0] + threads.x - 1) / threads.x);
     blocks.y = 1;
     blocks.z = 1;  
   }
@@ -70,8 +70,8 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
-    blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
+    blocks.x = static_cast<unsigned int>((sizes[1] + threads.x - 1) / threads.x);
+    blocks.y = static_cast<unsigned int>((sizes[0] + threads.y - 1) / threads.y);
     blocks.z = 1; 
 
     if(blocks.y > 65535) {
@@ -149,10 +149,10 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t,
   }  
   else {
     size_t dims = std::accumulate(std::begin(sizes), std::end(sizes), 1, std::multiplies<index_t>());
-    threads.x = std::min(((int)dims + 31)/32 * 32, max_cta_size);
+    threads.x = std::min(((unsigned int)dims + 31U)/32U * 32U, max_cta_size);
 
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((dims + threads.x - 1) / threads.x);
+    blocks.x = static_cast<unsigned>((dims + threads.x - 1) / threads.x);
     blocks.y = 1;
     blocks.z = 1;
   } 

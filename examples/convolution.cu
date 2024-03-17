@@ -104,7 +104,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   printf("Convolution kernel time = %.2fus (%.2fGB/s), %.2f billion/s\n",
          time_ms * 1e3,
-         static_cast<double>(batches * inView.Size(1) * sizeof(InType) * 2) /
+         static_cast<double>(batches * inView.Size(1) * static_cast<index_t>(sizeof(InType)) * 2) /
              1e9 / (time_ms / 1e3),
          static_cast<double>(batches * inView.Size(1)) / 1e9 / (time_ms / 1e3));
 

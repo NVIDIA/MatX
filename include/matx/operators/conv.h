@@ -79,8 +79,8 @@ namespace matx
 
           // Currently when using the axis parameter the rank of inputs must be equal
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            for (int r = 0; r < Rank(); r++) {
-              const int axis = perm[r];
+            for (size_t r = 0; r < Rank(); r++) {
+              const auto axis = perm[r];
               if (axis == Rank() - 1) {
                 max_axis = std::max(a_.Size(r), b_.Size(r));
                 min_axis = std::min(a_.Size(r), b_.Size(r));

@@ -91,8 +91,8 @@ namespace matx
           }
           else {
             std::array<index_t, Op::Rank()> sizes;
-            for (int i = 0; i < Op::Rank(); i++) {
-              sizes[i] = op.Size(i);
+            for (size_t i = 0; i < Op::Rank(); i++) {
+              sizes[i] = op.Size(static_cast<int32_t>(i));
             }        
 
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);

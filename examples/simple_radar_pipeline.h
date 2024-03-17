@@ -93,7 +93,7 @@ public:
    * @param i dimension
    * @return Size of dimension 
    */
-  __host__ __device__ inline index_t Size(uint32_t i) const
+  __host__ __device__ inline index_t Size(int32_t i) const
   {
     return out_.Size(i);
   }

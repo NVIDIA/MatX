@@ -48,7 +48,7 @@ namespace matx
     {
       private:
         OpA a_;
-        uint64_t fft_size_;
+        index_t fft_size_;
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;
@@ -74,7 +74,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFTOp(OpA a, uint64_t size, PermDims perm, FFTType t, FFTNorm norm) : 
+        __MATX_INLINE__ FFTOp(OpA a, index_t size, PermDims perm, FFTType t, FFTNorm norm) : 
             a_(a), fft_size_(size),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
@@ -207,7 +207,7 @@ namespace matx
    *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto fft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto fft(OpA &&a, index_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::fft_t{}, norm);
   }
 
@@ -232,7 +232,7 @@ namespace matx
    *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto fft(OpA &&a, const int32_t (&axis)[1], index_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
 
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
     return detail::FFTOp(a, fft_size, perm, detail::fft_t{}, norm);
@@ -258,7 +258,7 @@ namespace matx
    *   Normalization to apply to IFFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto ifft(OpA &&a, index_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     return detail::FFTOp(a, fft_size, detail::no_permute_t{}, detail::ifft_t{}, norm);
   }
 
@@ -283,7 +283,7 @@ namespace matx
    *   Normalization to apply to IFFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], index_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
     return detail::FFTOp(a, fft_size, perm, detail::ifft_t{}, norm);
   }  

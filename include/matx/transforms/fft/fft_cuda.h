@@ -633,11 +633,13 @@ private:
 struct FftCUDAParamsKeyHash {
   std::size_t operator()(const FftCUDAParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
-           (std::hash<uint64_t>()(k.fft_rank)) +
-           (std::hash<uint64_t>()(k.exec_type)) +
-           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
-           (std::hash<uint64_t>()((uint64_t)k.stream));
+    return  (std::hash<uint64_t>()(static_cast<uint64_t>(k.n[0]))) + 
+            (std::hash<uint64_t>()(static_cast<uint64_t>(k.n[1]))) +
+            (std::hash<uint64_t>()(static_cast<uint64_t>(k.fft_rank))) +
+            (std::hash<uint64_t>()(static_cast<uint64_t>(k.exec_type))) +
+            (std::hash<uint64_t>()(static_cast<uint64_t>(k.batch))) + 
+            (std::hash<uint64_t>()(static_cast<uint64_t>(k.istride))) +
+            (std::hash<uint64_t>()((uint64_t)k.stream));
   }
 };
 

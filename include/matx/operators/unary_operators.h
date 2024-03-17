@@ -73,13 +73,13 @@ namespace matx
 
     __MATX_INLINE__ matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
       if constexpr (Rank() > 0) {
-        for (int32_t i = 0; i < Rank(); i++) {
-          size_[i] = get_size(in1_, i);
+        for (size_t i = 0; i < Rank(); i++) {
+          size_[i] = get_size(in1_, static_cast<int32_t>(i));
         }
       }
     }
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(const std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(const std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
       return mapply([&](auto &&...args)  {
           return this->operator()(args...);
@@ -98,9 +98,9 @@ namespace matx
       return detail::get_rank<I1>();
     }
 
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int32_t dim) const noexcept
     {
-      return size_[dim];
+      return size_[static_cast<size_t>(dim)];
     }
 
     template <typename ShapeType, typename Executor>

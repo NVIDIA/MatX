@@ -126,7 +126,7 @@ namespace matx
       }
 
       template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(const ArrayType &idx) const noexcept
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(const ArrayType &idx) const noexcept
       {
         return mapply([&](auto &&...args)  {
             return this->operator()(args...);

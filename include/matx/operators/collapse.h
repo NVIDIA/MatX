@@ -112,7 +112,7 @@ namespace matx
 #pragma unroll
             for(int i = 0; i < DIM; i++) {
               int d = DIM - i - 1;
-              out[d] = ind % op_.Size(d);
+              out[d] = static_cast<index_t>(ind % op_.Size(d));
               ind /= op_.Size(d);
             }
 

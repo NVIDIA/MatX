@@ -1096,12 +1096,12 @@ struct CubParamsKeyHash {
   {
     uint64_t shash = 0;
     for (size_t r = 0; r < k.size.size(); r++) {
-      shash += std::hash<uint64_t>()(k.size[r]);
+      shash += std::hash<uint64_t>()(static_cast<uint64_t>(k.size[r]));
     }
 
-    return (std::hash<uint64_t>()(k.batches)) +
+    return (std::hash<uint64_t>()(static_cast<uint64_t>(k.batches))) +
            (std::hash<uint64_t>()((uint64_t)k.stream)) +
-           (std::hash<uint64_t>()((uint64_t)k.op)) +
+           (std::hash<uint64_t>()(static_cast<uint64_t>(k.op))) +
            shash;
   }
 };
