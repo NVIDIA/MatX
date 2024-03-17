@@ -114,6 +114,8 @@ source into the directory structure of your project. Using this method, you can 
 add_subdirectory(path/to/matx)
 ```
 
+An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory.
+
 #### MatX Installed to the System
 The other option is to install MatX and use the configuration file provided after building. This is typically done in a way similar to what is
 shown below:
@@ -131,8 +133,6 @@ system. With the package installed you can use ``find_package`` as follows:
 ```cmake
 find_package(matx CONFIG REQUIRED)
 ```
-
-An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory
 
 #### MatX CMake Targets
 Once either of the two methods above are done, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``.
