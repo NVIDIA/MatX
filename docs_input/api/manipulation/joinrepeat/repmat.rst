@@ -6,7 +6,7 @@ repmat
 Repeat an operator
 
 .. doxygenfunction:: repmat(T1 t, index_t reps)    
-.. doxygenfunction:: repmat(T1 t, const index_t(&reps)[])
+.. doxygenfunction:: repmat(T1 t, const index_t(&reps)[N])
 .. doxygenfunction:: repmat(T1 t, const index_t *reps)
 
 Examples

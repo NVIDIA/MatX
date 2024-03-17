@@ -109,7 +109,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   dim3 grid(num_batches, 1, 1);
   // comp_unit is either a thread or a warp, depending on the kernel. It is the size of the computational
   // unit that collectively computes a single output value.
-  auto compute_elems_per_comp_unit = [&grid, DESIRED_MIN_GRID_SIZE](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
+  auto compute_elems_per_comp_unit = [&grid](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
     const int start_batch_size = grid.x * grid.y;
     const index_t desired_extra_batches = (DESIRED_MIN_GRID_SIZE + start_batch_size - 1) /
       start_batch_size;

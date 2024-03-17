@@ -56,7 +56,7 @@ protected:
     pb->RunTVGenerator("run");
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   uint32_t iterations = 100;
   index_t numChannels = 16;
   index_t numPulses = 128;

@@ -80,7 +80,7 @@ namespace matx
           }
           else {
             for (int r = 0; r < Rank() - 2; r++) {
-              out_dims_[r] = OpA::Rank() > OpB::Rank() ? a_.Size(r) : b_.Size(r);
+              out_dims_[(size_t)r] = OpA::Rank() > OpB::Rank() ? a_.Size(r) : b_.Size(r);
             }
 
             out_dims_[Rank() - 2] = a_.Size(OpA::Rank() - 2);

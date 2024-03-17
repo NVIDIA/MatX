@@ -106,8 +106,6 @@ public:
     }
   }
 
-  set &operator=(const set &) = delete;
-
   template <typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {

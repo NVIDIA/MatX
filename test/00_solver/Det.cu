@@ -51,7 +51,7 @@ protected:
     pb->NumpyToTensorView(Av, "A");
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 2> Av{{m, m}};

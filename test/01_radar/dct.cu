@@ -50,7 +50,7 @@ protected:
     pb->NumpyToTensorView(xv, "x");
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   tensor_t<float, 1> xv{{sig_size}};
   std::unique_ptr<detail::MatXPybind> pb;

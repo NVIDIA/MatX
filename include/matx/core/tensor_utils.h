@@ -120,7 +120,7 @@ namespace detail {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
     using l_stride_type = index_t;
     using l_shape_type = index_t;
-    constexpr int RANK = op.Rank();
+    constexpr int RANK = Op::Rank();
 
     std::array<l_shape_type, RANK> indices;
 
@@ -280,7 +280,7 @@ namespace detail {
 
   template <class T, class M = T>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto get_size([[maybe_unused]] T &a,
-                                              [[maybe_unused]] uint32_t dim)
+                                              [[maybe_unused]] int32_t dim)
   {
     if constexpr (is_matx_op<M>())
       return a.Size(dim);
@@ -296,7 +296,7 @@ namespace detail {
 
   template <int RANK, class T, class M = T>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto
-  get_expanded_size([[maybe_unused]] T &a, [[maybe_unused]] uint32_t dim)
+  get_expanded_size([[maybe_unused]] T &a, [[maybe_unused]] int32_t dim)
   {
     index_t size = 0;
     constexpr int32_t rank = get_rank<T>();
@@ -531,19 +531,19 @@ namespace detail {
 
     if constexpr (is_complex_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("% ."s + prec + "e%+." + prec + "ej ").c_str();
-      fprintf(fp, fmt_s, static_cast<float>(val.real()),
+      const auto fmt_s = ("% ."s + prec + "e%+." + prec + "ej ");
+      fprintf(fp, fmt_s.c_str(), static_cast<float>(val.real()),
             static_cast<float>(val.imag()));
     }
     else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("% ."s + prec + "e ").c_str();
-      fprintf(fp, fmt_s, static_cast<float>(val));
+      const auto fmt_s = ("% ."s + prec + "e ");
+      fprintf(fp, fmt_s.c_str(), static_cast<float>(val));
     }
     else if constexpr (std::is_floating_point_v<T>) {
       const auto prec = std::to_string(PRINT_PRECISION);
-      const auto fmt_s = ("% ."s + prec + "e ").c_str();
-      fprintf(fp, fmt_s, val);
+      const auto fmt_s = ("% ."s + prec + "e ");
+      fprintf(fp, fmt_s.c_str(), val);
     }
     else if constexpr (std::is_same_v<T, long long int>) {
       fprintf(fp, "% lld ", val);
@@ -627,8 +627,8 @@ namespace detail {
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    MATX_STATIC_ASSERT(op.Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
-    MATX_STATIC_ASSERT(op.Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
+    MATX_STATIC_ASSERT(Op::Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
+    MATX_STATIC_ASSERT(Op::Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
 
     if constexpr (sizeof...(Args) == 0) {
       PrintVal(fp, op.operator()());

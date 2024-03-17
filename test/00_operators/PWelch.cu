@@ -71,7 +71,7 @@ public:
     if (params.nfft > 8) thresh = 1.f; // use higher threshold for larger fft sizes
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
   float thresh = 0.01f;
@@ -143,7 +143,7 @@ TEST_P(PWelchComplexExponentialTest, xin_complex_double)
   helper<cuda::std::complex<double>>(*this);
 }
 
-INSTANTIATE_TEST_CASE_P(PWelchComplexExponentialTests, PWelchComplexExponentialTest,::testing::ValuesIn(CONFIGS));
+INSTANTIATE_TEST_SUITE_P(PWelchComplexExponentialTests, PWelchComplexExponentialTest,::testing::ValuesIn(CONFIGS));
 
 
 TEST(PWelchOpTest, xin_complex_float)
