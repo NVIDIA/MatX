@@ -29,6 +29,7 @@ set (test_sources
     00_solver/Inverse.cu
     00_operators/PythonEmbed.cu
     00_io/FileIOTests.cu
+    00_io/PrintTests.cu
     01_radar/MultiChannelRadarPipeline.cu
     01_radar/MVDRBeamformer.cu
     01_radar/ambgfun.cu
