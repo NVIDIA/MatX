@@ -94,6 +94,8 @@ public:
 TEST_F(PrintTest, DefaultTest1)
 {
   MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
 
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
@@ -120,6 +122,8 @@ TEST_F(PrintTest, DefaultTest1)
 TEST_F(PrintTest, DefaultTest2)
 {
   MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
 
   auto A2 = reshape(A1, {4,4});
 
@@ -136,6 +140,8 @@ TEST_F(PrintTest, DefaultTest2)
 TEST_F(PrintTest, DefaultTest3)
 {
   MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
 
   auto A3 = reshape(A1, {2,2,4});
 
@@ -155,6 +161,8 @@ TEST_F(PrintTest, DefaultTest3)
 TEST_F(PrintTest, DefaultTest4)
 {
   MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
 
   auto A4 = reshape(A1, {2,2,2,2});
 
@@ -183,6 +191,8 @@ TEST_F(PrintTest, MlabTest1)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
 
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
@@ -210,6 +220,8 @@ TEST_F(PrintTest, MlabTest2)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
 
   auto A2 = reshape(A1, {4,4});
 
@@ -227,6 +239,8 @@ TEST_F(PrintTest, MlabTest3)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
 
   auto A3 = reshape(A1, {2,2,4});
 
@@ -245,6 +259,8 @@ TEST_F(PrintTest, MlabTest4)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
 
   auto A4 = reshape(A1, {2,2,2,2});
 
@@ -269,6 +285,8 @@ TEST_F(PrintTest, PythonTest1)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
 
   print_checker(A1,
       "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
@@ -296,6 +314,8 @@ TEST_F(PrintTest, PythonTest2)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
 
   auto A2 = reshape(A1, {4,4});
 
@@ -313,6 +333,8 @@ TEST_F(PrintTest, PythonTest3)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
 
   auto A3 = reshape(A1, {2,2,4});
 
@@ -330,6 +352,8 @@ TEST_F(PrintTest, PythonTest4)
 {
   MATX_ENTER_HANDLER();
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
 
   auto A4 = reshape(A1, {2,2,2,2});
 

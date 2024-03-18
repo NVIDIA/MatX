@@ -40,27 +40,28 @@
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
 
-/**
- * Print formatting type specifier.  Default: MATX_PRINT_FORMAT_DEFAULT
- */
-enum PrintFormatType
-{
-  /// Original MATX print formatting
-  MATX_PRINT_FORMAT_DEFAULT,
-
-  /// Print formatting allowing cut&paste as MATLAB or Octave multi-dimensional matrix
-  MATX_PRINT_FORMAT_MLAB,
-
-  /// Print formatting allowing cut&paste as Python list or list of lists
-  MATX_PRINT_FORMAT_PYTHON
-};
-static enum PrintFormatType PRINT_FORMAT_TYPE = MATX_PRINT_FORMAT_DEFAULT;
-
-static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
-static unsigned int PRINT_PRECISION = 4;            ///< control PrintVal()'s precision
 
 namespace matx
 {
+  static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
+  inline unsigned int PRINT_PRECISION = 4;            ///< control PrintVal()'s precision
+
+  /**
+   * Print formatting type specifier.  Default: MATX_PRINT_FORMAT_DEFAULT
+   */
+  enum PrintFormatType
+  {
+    /// Original MATX print formatting
+    MATX_PRINT_FORMAT_DEFAULT,
+
+    /// Print formatting allowing cut&paste as MATLAB or Octave multi-dimensional matrix
+    MATX_PRINT_FORMAT_MLAB,
+
+    /// Print formatting allowing cut&paste as Python list or list of lists
+    MATX_PRINT_FORMAT_PYTHON
+  };
+  inline enum PrintFormatType PRINT_FORMAT_TYPE = MATX_PRINT_FORMAT_DEFAULT;
+
     /**
    * @brief Returns Total Size of the Operation
    *
@@ -1209,6 +1210,15 @@ __MATX_INLINE__ __MATX_HOST__ unsigned int get_print_precision() {
  */
 __MATX_INLINE__ __MATX_HOST__ void set_print_format_type(enum PrintFormatType format_type) {
   PRINT_FORMAT_TYPE = format_type;
+}
+
+/**
+ * @brief Get the print() format type
+ *
+ * @return The print format type
+ */
+__MATX_INLINE__ __MATX_HOST__ enum PrintFormatType get_print_format_type() {
+  return PRINT_FORMAT_TYPE;
 }
 
 }
