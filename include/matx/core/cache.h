@@ -55,6 +55,7 @@ enum class CacheName {
   GEMM,
   COV,
   FILTER,
+  EINSUM,
   INV
 };
 
@@ -72,7 +73,7 @@ public:
   ~matxCache_t() {
     // Destroy all outstanding objects in the cache to free memory
     for (auto &[k, v]: cache) {
-      v.reset(); 
+      v.reset();
     }
   }
 

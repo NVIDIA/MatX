@@ -71,7 +71,7 @@ struct EinsumParams_t {
   cudaStream_t stream;
 };
 
-template <typename OutputTensor, typename... InT> 
+template <typename OutputTensor, typename... InT>
 class matxEinsumHandle_t {
 public:
   using first_type = std::tuple_element_t<0, std::tuple<InT...>>;
@@ -83,7 +83,7 @@ public:
   {
     [[maybe_unused]] cutensornetStatus_t status;
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     size_t i;
     params_ = GetEinsumParams(out, subscripts, tensors...);
 
@@ -105,21 +105,21 @@ public:
 
     status = cutensornetCreate(&handle_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-      "Failed to create cuTensorNet handle");    
+      "Failed to create cuTensorNet handle");
 
     // setup tensor network
     status = cutensornetCreateNetworkDescriptor(handle_,
-                                                sizeof...(InT), 
-                                                params_.nmodes_.data(), 
-                                                extents, 
-                                                strides, 
-                                                modes, 
+                                                sizeof...(InT),
+                                                params_.nmodes_.data(),
+                                                extents,
+                                                strides,
+                                                modes,
                                                 nullptr,
-                                                out.Rank(), 
-                                                extents[sizeof...(InT)], 
-                                                strides[sizeof...(InT)], 
-                                                modes[sizeof...(InT)], 
-                                                MatXTypeToCudaType<typename OutputTensor::scalar_type>(), 
+                                                out.Rank(),
+                                                extents[sizeof...(InT)],
+                                                strides[sizeof...(InT)],
+                                                modes[sizeof...(InT)],
+                                                MatXTypeToCudaType<typename OutputTensor::scalar_type>(),
                                                 CUTENSORNET_COMPUTE_32F,
                                                 &descNet_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
@@ -127,7 +127,7 @@ public:
 
     cutensornetContractionOptimizerConfig_t optimizerConfig;
     status = cutensornetCreateContractionOptimizerConfig(handle_, &optimizerConfig);
-    
+
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to create cuTensorNet optimizer config");
 
@@ -143,7 +143,7 @@ public:
                                                                CUTENSORNET_CONTRACTION_OPTIMIZER_CONFIG_GRAPH_IMBALANCE_FACTOR,
                                                                &imbalance_factor,
                                                                sizeof(imbalance_factor));
-    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to run contraction optimizer");      
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to run contraction optimizer");
 
     size_t freeMem, totalMem;
     auto err = cudaMemGetInfo(&freeMem, &totalMem);
@@ -172,7 +172,7 @@ public:
     MATX_ASSERT(params_.num_slices_ > 0, matxcuTensorError);
 
     status = cutensornetCreateWorkspaceDescriptor(handle_, &workDesc_);
-    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to create cuTENSOR workspace descriptor");  
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to create cuTENSOR workspace descriptor");
 
     int64_t requiredWorkspaceSize = 0;
     status = cutensornetWorkspaceComputeContractionSizes(handle_,
@@ -180,7 +180,7 @@ public:
                                                          optimizerInfo,
                                                          workDesc_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-        "Failed to compute cuTENSOR workspace size");  
+        "Failed to compute cuTENSOR workspace size");
 
     status = cutensornetWorkspaceGetMemorySize(handle_,
                                                    workDesc_,
@@ -190,7 +190,7 @@ public:
                                                    &requiredWorkspaceSize);
 
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-      "Failed to get cuTENSOR memory size");  
+      "Failed to get cuTENSOR memory size");
 
     MATX_ASSERT_STR(workSize_ > requiredWorkspaceSize, matxOutOfMemory, "Not enough workspace memory is available.");
 
@@ -204,7 +204,7 @@ public:
                                                requiredWorkspaceSize);
 
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
-      "Failed to set cuTENSOR memory");     
+      "Failed to set cuTENSOR memory");
 
     /*******************************
      * Initialize all pair-wise contraction plans (for cuTENSOR)
@@ -242,7 +242,7 @@ public:
                             plan_,
                             data_in,
                             out.Data(),
-                            workDesc_, 
+                            workDesc_,
                             autotunePref,
                             stream);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
@@ -250,20 +250,20 @@ public:
 
     status = cutensornetDestroyContractionAutotunePreference(autotunePref);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetDestroyContractionAutotunePreference failed"); 
+      matxcuTensorError, "cutensornetDestroyContractionAutotunePreference failed");
 
   }
 
   /**
    * @brief Tokenizes an einsum string into a vector
-   * 
+   *
    * @param str einsum string
    * @param out tokenized vector
-   * @return true if tokenized successfully, or false otherwise 
+   * @return true if tokenized successfully, or false otherwise
    */
   static bool ParseEinsum(const std::string &str, std::vector<std::string> &out) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     // Find output separator
     auto iout = str.find("->");
     if (iout == std::string::npos) {
@@ -292,8 +292,8 @@ public:
   static EinsumParams_t<InT...> GetEinsumParams(OutputTensor &out, const std::string &subscripts, const InT&... tensors)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
-    EinsumParams_t<InT...> params; 
+
+    EinsumParams_t<InT...> params;
     std::vector<std::string> tokens;
     size_t i;
 
@@ -306,14 +306,14 @@ public:
       for (const char &c: tokens[i]) {
         params.modes_[i].push_back(static_cast<int32_t>(c));
       }
-    } 
-    
+    }
+
     i = 0;
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
     i = 0;
-    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim, 
-        "Tensor rank must match number of einsum subscripts");    
+    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim,
+        "Tensor rank must match number of einsum subscripts");
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
@@ -335,14 +335,14 @@ public:
       else {
         strides.push_back(1);
       }
-    }; 
+    };
 
     i = 0;
     ((set_sizes(tensors, params.extents_[i++])), ...);
     set_sizes(out, params.extents_[i]); // output tensor
 
     i = 0;
-    ((set_strides(tensors, params.strides_[i++])), ...);  
+    ((set_strides(tensors, params.strides_[i++])), ...);
     set_strides(out, params.strides_[i]); // output tensor
 
     // Align pointers
@@ -383,7 +383,7 @@ public:
     status = cutensornetCreateSliceGroupFromIDRange(handle_, 0, params_.num_slices_, 1, &sliceGroup);
     MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
       matxcuTensorError, "cutensornetCreateSliceGroupFromIDRange failed");
-    
+
     void *data_in[sizeof...(InT)];
     size_t i = 0;
     ((data_in[i++] = tensors.Data()), ...);
@@ -394,8 +394,8 @@ public:
                               data_in,
                               out.Data(),
                               accumulateOutput,
-                              workDesc_, 
-                              sliceGroup, 
+                              workDesc_,
+                              sliceGroup,
                               stream);
 
     MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
@@ -452,9 +452,6 @@ struct EinsumParamsKeyEq {
   }
 };
 
-template <typename... InT>
-// Static caches of covariance matrices
-static matxCache_t<EinsumParams_t<InT...>, EinsumParamsKeyHash<InT...>, EinsumParamsKeyEq<InT...>> einsum_cache;
 } // end namespace cutensor
 } // end namespace detail
 } // end namespace matx
@@ -464,19 +461,19 @@ namespace matx {
 namespace cutensor {
   /**
    * @brief Evaluates the Einstein summation on the operands
-   * 
+   *
    * einsum() is a multi-purpose tool capable of performing various operations on tensors in a compact
    * syntax. A non-exhaustive list of operations are: tensor contractions, GEMMs, dot products, and tranposes.
    * Because einsum is extremely powerful, not all features are supported or tested in MatX yet. Currently only
    * tensor contractions are tested. Other operations may work, but they're not tested yet.
-   * 
+   *
    * MatX uses a syntax very similar to NumPy's einsum syntax:
    * https://numpy.org/doc/stable/reference/generated/numpy.einsum.html
-   * 
+   *
    * Ellipses are not supported yet, but a variadic list of tensors for contraction is supported. The output
    * operator '->' is required in MatX currently, and serves to provide error checking on the output tensor size.
-   *  
-   * 
+   *
+   *
    * @tparam OutputType Output tensor type
    * @tparam InT Types of input tensors
    * @param out Output tensor
@@ -487,27 +484,31 @@ namespace cutensor {
   template <typename OutputType, typename... InT>
   void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors)
   {
-#if MATX_ENABLE_CUTENSOR    
+#if MATX_ENABLE_CUTENSOR
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     // Get parameters required by these tensors
     auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
     params.stream = stream;
 
-    auto ret = matx::detail::cutensor::einsum_cache<InT...>.Lookup(params);
-    if (ret == std::nullopt) {
-      auto tmp = new matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>{out, subscripts, stream, tensors...};
-      matx::detail::cutensor::einsum_cache<InT...>.Insert(params, static_cast<void *>(tmp));
-
-      tmp->Exec(out, stream, tensors...);
-    }
-    else {
-      auto einsum_type = static_cast<matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...> *>(ret.value());
-      einsum_type->Exec(out, stream, tensors...);
-    }
-#endif    
+    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
+    detail::GetCache().LookupAndExec<std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>>(
+      detail::CacheName::EINSUM,
+      params,
+      [&]() {
+        auto tmp = std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);
+        //printf("Creating an EINSUM cache item %p\n",tmp.get());
+        return tmp;
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        //printf("Using an EINSUM cache item %p\n",ctype.get());
+        ctype->Exec(out, stream, tensors...);
+      }
+    );
+#else
+    MATX_THROW(matxNotSupported, "einsum() currently requires MATX_ENABLE_CUTENSOR=ON but MATX_ENABLE_CUTENSOR=OFF");
+#endif
   }
 }
 
 } // end namespace matx
-
