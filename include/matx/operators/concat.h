@@ -138,14 +138,14 @@ namespace matx
         }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
         {
           std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<0, sizeof...(Ts)>(indices);
         }
       
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... is)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
           std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<0, sizeof...(Ts)>(indices);

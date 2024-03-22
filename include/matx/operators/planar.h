@@ -70,7 +70,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
           auto tup = cuda::std::make_tuple(indices...);

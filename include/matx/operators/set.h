@@ -109,7 +109,7 @@ public:
   set &operator=(const set &) = delete;
 
   template <typename... Is>
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(Is... indices) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
@@ -150,7 +150,7 @@ public:
       return r;
     }
   }
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<shape_type, T::Rank()> idx) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(std::array<shape_type, T::Rank()> idx) const noexcept
   {
     auto res = mapply([&](auto &&...args)  {
         return _internal_mapply(args...);

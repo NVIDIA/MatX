@@ -72,7 +72,7 @@ namespace matx
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
             index_t shift = -get_value(shift_, indices...);
@@ -88,7 +88,7 @@ namespace matx
           }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             auto tup = cuda::std::make_tuple(indices...);
             index_t shift = -get_value(shift_, indices...);

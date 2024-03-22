@@ -98,7 +98,7 @@ namespace matx
        * @param indices Index values
        */
       template <typename... Is>
-        auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
           if (get_value(cond_, indices...)) {
             get_value(op_, indices...);
           }

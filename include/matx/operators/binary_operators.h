@@ -118,7 +118,7 @@ namespace matx
       }
 
       template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
+      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         auto i1 = get_value(in1_, indices...);
         auto i2 = get_value(in2_, indices...);
@@ -126,7 +126,7 @@ namespace matx
       }
 
       template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(const ArrayType &idx) const noexcept
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return mapply([&](auto &&...args)  {
             return this->operator()(args...);

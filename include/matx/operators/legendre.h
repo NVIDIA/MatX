@@ -100,7 +100,7 @@ namespace matx
         }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             std::array<index_t, Rank()> inds{indices...};
             std::array<index_t, T3::Rank()> xinds;

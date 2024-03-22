@@ -61,7 +61,7 @@ namespace detail {
 
       // This should never be called
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -120,7 +120,7 @@ namespace detail {
 
       // This should never be called
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
@@ -197,7 +197,7 @@ namespace detail {
 
       // This should never be called
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const = delete;
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
