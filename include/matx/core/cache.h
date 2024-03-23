@@ -50,7 +50,7 @@ inline std::atomic<CacheId> CacheIdCounter{0};
 template<typename CacheType>
 CacheId GetCacheIdFromType()
 {
-  static uint64_t id = CacheIdCounter.fetch_add(1);
+  static CacheId id = CacheIdCounter.fetch_add(1);
 
   return id;
 }
