@@ -45,24 +45,14 @@ namespace detail {
 
 using CacheId = uint64_t;
 
-inline std::atomic<CacheId> CacheIdCounter;
+inline std::atomic<CacheId> CacheIdCounter{0};
 
-template<typename FunctionType>
-CacheId GetCacheIdFromFunction([[maybe_unused]] FunctionType f)
+template<typename CacheType>
+CacheId GetCacheIdFromType()
 {
-  static uint64_t id = CacheIdCounter++;
-
-#if 0
-  static bool printed = false;
-  if (printed == false)
-  {
-    printf("GetCacheIdFromFunction(%s) -> %lu\n", typeid(FunctionType).name(), id);
-    printed = true;
-  }
-#endif
+  static uint64_t id = CacheIdCounter.fetch_add(1);
 
   return id;
-  //return reinterpret_cast<CacheId>(f);
 }
 
 /**

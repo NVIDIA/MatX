@@ -1176,7 +1176,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
     &cub_reduce(a_out, a, init, stream),
-    detail::GetCacheIdFromFunction(static_cast<void(*)(OutputTensor&, const InputOperator&, typename InputOperator::scalar_type, const cudaStream_t)>(cub_reduce)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);

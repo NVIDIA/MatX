@@ -365,7 +365,7 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(TensorTypeAInv&, const TensorTypeA&, cudaStream_t)>(inv_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_inv, a);

@@ -1082,11 +1082,6 @@ using eig_cache_t = std::unordered_map<DnEigParams_t, std::any, DnEigParamsKeyHa
 
 }
 
-// Forward declaration for GetCacheIdFromFunction
-template <typename OutputTensor, typename ATensor>
-void chol_impl(OutputTensor &&out, const ATensor &a,
-          cudaStream_t stream = 0,
-          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER);
 
 /**
  * Perform a Cholesky decomposition using a cached plan
@@ -1114,8 +1109,8 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
  */
 template <typename OutputTensor, typename ATensor>
 void chol_impl(OutputTensor &&out, const ATensor &a,
-          cudaStream_t stream,
-          cublasFillMode_t uplo)
+          cudaStream_t stream = 0,
+          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1156,7 +1151,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   using cache_val_type = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::chol_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(OutputTensor&&, const ATensor&, cudaStream_t, cublasFillMode_t)>(chol_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tv, uplo);
@@ -1172,11 +1167,6 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 }
 
 
-
-// Forward declaration for GetCacheIdFromFunction
-template <typename OutputTensor, typename PivotTensor, typename ATensor>
-void lu_impl(OutputTensor &&out, PivotTensor &&piv,
-        const ATensor &a, const cudaStream_t stream = 0);
 
 /**
  * Perform an LU decomposition
@@ -1203,7 +1193,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
  */
 template <typename OutputTensor, typename PivotTensor, typename ATensor>
 void lu_impl(OutputTensor &&out, PivotTensor &&piv,
-        const ATensor &a, const cudaStream_t stream)
+        const ATensor &a, const cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1237,7 +1227,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::lu_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(OutputTensor&&, PivotTensor&&, const ATensor&, const cudaStream_t)>(lu_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(piv_new, tvt);
@@ -1308,11 +1298,6 @@ void det_impl(OutputTensor &out, const InputTensor &a,
 }
 
 
-// Forward declaration for GetCacheIdFromFunction
-template <typename OutTensor, typename TauTensor, typename ATensor>
-void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
-        const ATensor &a, cudaStream_t stream = 0);
-
 /**
  * Perform a QR decomposition using a cached plan
  *
@@ -1338,7 +1323,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
  */
 template <typename OutTensor, typename TauTensor, typename ATensor>
 void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
-        const ATensor &a, cudaStream_t stream)
+        const ATensor &a, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1372,7 +1357,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::qr_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(OutTensor&&, TauTensor&&, const ATensor&, cudaStream_t)>(cusolver_qr_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt);
@@ -1389,12 +1374,6 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
 }
 
 
-
-// Forward declaration for GetCacheIdFromFunction
-template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
-void svd_impl(UTensor &&u, STensor &&s,
-         VTensor &&v, const ATensor &a,
-         cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A');
 
 /**
  * Perform a SVD decomposition using a cached plan
@@ -1430,7 +1409,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
 void svd_impl(UTensor &&u, STensor &&s,
          VTensor &&v, const ATensor &a,
-         cudaStream_t stream, const char jobu, const char jobvt)
+         cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1472,7 +1451,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)>;
   detail::GetCache().LookupAndExec<detail::svd_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(UTensor&&, STensor&&, VTensor&&, const ATensor&, cudaStream_t, const char, const char)>(svd_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_new, s_new, v_new, tvt, jobu, jobvt);
@@ -1485,13 +1464,6 @@ void svd_impl(UTensor &&u, STensor &&s,
   matxFree(tp);
 }
 
-
-// Forward declaration for GetCacheIdFromFunction
-template <typename OutputTensor, typename WTensor, typename ATensor>
-void eig_impl(OutputTensor &&out, WTensor &&w,
-         const ATensor &a, cudaStream_t stream = 0,
-         cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
-         cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER);
 
 /**
  * Perform a Eig decomposition using a cached plan
@@ -1524,9 +1496,9 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
  */
 template <typename OutputTensor, typename WTensor, typename ATensor>
 void eig_impl(OutputTensor &&out, WTensor &&w,
-         const ATensor &a, cudaStream_t stream,
-         cusolverEigMode_t jobz,
-         cublasFillMode_t uplo)
+         const ATensor &a, cudaStream_t stream = 0,
+         cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
+         cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1560,7 +1532,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::eig_cache_t>(
-    detail::GetCacheIdFromFunction(static_cast<void(*)(OutputTensor&&, WTensor&&, const ATensor&, cudaStream_t, cusolverEigMode_t, cublasFillMode_t)>(eig_impl)),
+    detail::GetCacheIdFromType<cache_val_type>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz, uplo);

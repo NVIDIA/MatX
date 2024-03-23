@@ -461,10 +461,6 @@ struct EinsumParamsKeyEq {
 namespace matx {
 namespace cutensor {
 
-  // Forward declaration for GetCacheIdFromFunction
-  template <typename OutputType, typename... InT>
-  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors);
-
   /**
    * @brief Evaluates the Einstein summation on the operands
    *
@@ -500,7 +496,7 @@ namespace cutensor {
     using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
 
     detail::GetCache().LookupAndExec<std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>>(
-      detail::GetCacheIdFromFunction(static_cast<void(*)(OutputType&,const std::string&, cudaStream_t, InT...)>(einsum_impl)),
+      detail::GetCacheIdFromType<cache_val_type>(),
       params,
       [&]() {
         auto tmp = std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);
