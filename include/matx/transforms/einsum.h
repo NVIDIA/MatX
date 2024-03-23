@@ -493,10 +493,10 @@ namespace cutensor {
     auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
     params.stream = stream;
 
+    using einsum_cache_t = std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>;
     using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
-
-    detail::GetCache().LookupAndExec<std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>>(
-      detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCache().LookupAndExec<einsum_cache_t>(
+      detail::GetCacheIdFromType<einsum_cache_t>(),
       params,
       [&]() {
         auto tmp = std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);

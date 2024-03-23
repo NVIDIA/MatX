@@ -1151,7 +1151,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   using cache_val_type = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::chol_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<detail::chol_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tv, uplo);
@@ -1227,7 +1227,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::lu_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<detail::lu_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(piv_new, tvt);
@@ -1357,7 +1357,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::qr_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<detail::qr_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt);
@@ -1451,7 +1451,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)>;
   detail::GetCache().LookupAndExec<detail::svd_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<idetail::svd_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_new, s_new, v_new, tvt, jobu, jobvt);
@@ -1532,7 +1532,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::eig_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<detail::eig_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz, uplo);

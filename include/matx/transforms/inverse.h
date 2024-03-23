@@ -365,7 +365,7 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
-    detail::GetCacheIdFromType<cache_val_type>(),
+    detail::GetCacheIdFromType<detail::inv_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_inv, a);
