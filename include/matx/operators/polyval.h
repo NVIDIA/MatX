@@ -60,7 +60,7 @@ namespace matx
           MATX_STATIC_ASSERT_STR(op.Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(index_t idx) const
         {
           // Horner's method for computing polynomial
           scalar_type ttl{coeffs_(0)};

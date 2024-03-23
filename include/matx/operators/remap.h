@@ -66,7 +66,7 @@ namespace matx
 	__MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -85,7 +85,7 @@ namespace matx
           }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));

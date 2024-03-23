@@ -80,7 +80,7 @@ namespace matx
             return mapply(op_, ind);
           }
 
-          return static_cast<scalar_type>(0);
+          return static_cast<typename decltype(op_)::scalar_type>(0);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

@@ -85,12 +85,12 @@ namespace matx
           s_[0] = stride_size;
         };
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i0, index_t i1) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
           return op_(i0*s_[0] + i1);
         }
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(index_t i0, index_t i1)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
           return op_(i0*s_[0] + i1);
         }

@@ -52,7 +52,7 @@ namespace matx
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ T operator()(Is...) const { 
           return v_; };
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const

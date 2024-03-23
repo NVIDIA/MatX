@@ -62,7 +62,7 @@ namespace matx
         __MATX_INLINE__ DiagOp(T1 op) : op_(op) {}
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer index than rank of operator");
             static_assert(RANK > 1, "Cannot make get diagonals from 0D tensor");

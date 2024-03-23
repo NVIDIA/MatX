@@ -56,11 +56,11 @@ namespace matx
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            std::array<index_t, sizeof...(Is)> inds{indices...};
-            return inds[dim_];
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t operator()(Is... indices) const 
+        {
+          std::array<index_t, sizeof...(Is)> inds{indices...};
+          return inds[dim_];
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

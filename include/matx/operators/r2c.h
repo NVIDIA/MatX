@@ -56,6 +56,8 @@ namespace matx
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
 
+        // This version of the operator returns auto rather than decltype(auto) because we need to force the 
+        // return type to be by value and not pass through references
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
@@ -71,7 +73,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           auto tup = cuda::std::make_tuple(indices...);
 
