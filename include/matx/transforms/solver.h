@@ -1451,7 +1451,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)>;
   detail::GetCache().LookupAndExec<detail::svd_cache_t>(
-    detail::GetCacheIdFromType<idetail::svd_cache_t>(),
+    detail::GetCacheIdFromType<detail::svd_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_new, s_new, v_new, tvt, jobu, jobvt);
