@@ -81,8 +81,8 @@ public:
     static_assert(RANK >= 2);
     MATX_ASSERT(c.Size(RANK - 1) == c.Size(RANK - 2), matxInvalidSize);
     MATX_ASSERT(a.Size(RANK - 1) == c.Size(RANK - 1), matxInvalidSize);
-    
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
+
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     // Ensure batch dimensions are equal
     for (int i = 2; i < RANK - 2; i++) {
@@ -144,7 +144,7 @@ public:
   inline void Exec(TensorTypeC &c, const TensorTypeA &a,
                    cudaStream_t stream)
   {
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Calculate a matrix of means
     matmul_impl(means, onesM, a, stream,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
@@ -167,7 +167,7 @@ public:
     // Multiply by itself and scale by N-1 for the final covariance
     matmul_impl(c, devsT, devs, stream,
                 1.0f / static_cast<float>(a.Size(RANK - 2) - 1));
-  }    
+  }
 
   private:
     // Member variables
@@ -231,13 +231,13 @@ template <typename TensorTypeC, typename TensorTypeA>
 void cov_impl(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)    
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
   auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a, stream);
 
   using cache_val_type = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>;
   detail::GetCache().LookupAndExec<detail::cov_cache_t>(
-    detail::CacheName::COV,
+    detail::GetCacheIdFromFunction(static_cast<void(*)(TensorTypeC&, const TensorTypeA&, cudaStream_t)>(cov_impl)),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(c, a);
@@ -245,7 +245,7 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(c, a, stream);
     }
-  );  
+  );
 }
 
 } // end namespace matx

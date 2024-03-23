@@ -43,22 +43,27 @@
 namespace matx {
 namespace detail {
 
-enum class CacheName {
-  FFT_1D,
-  FFT_2D,
-  CHOL,
-  LU,
-  QR,
-  SVD,
-  EIG,
-  CUB,
-  GEMM,
-  COV,
-  FILTER,
-  EINSUM,
-  INV
-};
+using CacheId = uint64_t;
 
+inline std::atomic<CacheId> CacheIdCounter;
+
+template<typename FunctionType>
+CacheId GetCacheIdFromFunction([[maybe_unused]] FunctionType f)
+{
+  static uint64_t id = CacheIdCounter++;
+
+#if 0
+  static bool printed = false;
+  if (printed == false)
+  {
+    printf("GetCacheIdFromFunction(%s) -> %lu\n", typeid(FunctionType).name(), id);
+    printed = true;
+  }
+#endif
+
+  return id;
+  //return reinterpret_cast<CacheId>(f);
+}
 
 /**
  * Generic caching object for caching parameters. This class is used for
@@ -82,22 +87,22 @@ public:
    *
    */
   template <typename CacheType>
-  void Clear(const CacheName &name) {
-    auto el = cache.find(name);
+  void Clear(const CacheId &id) {
+    auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
 
     std::any_cast<CacheType>(el->second).clear();
   }
 
   template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun>
-  void LookupAndExec(const CacheName &name, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
+  void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
     // Create named cache if it doesn't exist
-    auto el = cache.find(name);
+    auto el = cache.find(id);
     if (el == cache.end()) {
-      cache[name] = CacheType{};
+      cache[id] = CacheType{};
     }
 
-    auto &cval = cache[name];
+    auto &cval = cache[id];
     auto &rmap = std::any_cast<CacheType&>(cval);
     auto cache_el = rmap.find(params);
     if (cache_el == rmap.end()) {
@@ -111,7 +116,7 @@ public:
   }
 
 private:
-  std::unordered_map<CacheName, std::any> cache;
+  std::unordered_map<CacheId, std::any> cache;
 };
 
 /**

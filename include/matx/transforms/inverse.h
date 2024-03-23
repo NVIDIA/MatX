@@ -43,7 +43,7 @@ namespace matx {
 
 /**
  * @brief Algorithm to use for matrix inverse
- * 
+ *
  */
 typedef enum {
   MAT_INVERSE_ALGO_LU,
@@ -102,9 +102,9 @@ public:
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     // Ok to remove since we're just passing a list of RO pointers
-    //using a_nc = typename std::remove_const<decltype(a)>(a); 
+    //using a_nc = typename std::remove_const<decltype(a)>(a);
 
     // Ensure matrix is square
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
@@ -137,13 +137,13 @@ public:
         for (size_t iter = 0; iter < total_iter; iter++) {
           auto ip = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
           auto op = std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
-          
+
           in_pointers.push_back(ip);
           out_pointers.push_back(op);
 
           // Update all but the last 2 indices
           UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, idx, batch_offset);
-        }        
+        }
       }
 
       // Allocate any workspace needed by inverse
@@ -222,7 +222,7 @@ public:
   inline void Exec(cudaStream_t stream)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     cublasSetStream(handle, stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
@@ -345,7 +345,7 @@ using inv_cache_t = std::unordered_map<InverseParams_t, std::any, InverseParamsK
 
 /**
  * @brief Perform a matrix inverse
- * 
+ *
  * @tparam TensorTypeAInv Inverse type
  * @tparam TensorTypeA Input type
  * @tparam ALGO Algorithm to use
@@ -365,7 +365,7 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
-    detail::CacheName::INV,
+    detail::GetCacheIdFromFunction(static_cast<void(*)(TensorTypeAInv&, const TensorTypeA&, cudaStream_t)>(inv_impl)),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_inv, a);

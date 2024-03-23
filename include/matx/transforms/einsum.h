@@ -366,6 +366,7 @@ public:
     params.alignment_out_ = getMaximalPointerAlignment(out.Data());
     params.dtype = TypeToInt<typename EinsumParams_t<InT...>::first_value_type>();
 
+    params.subs = subscripts;
     return params;
   }
 
@@ -459,6 +460,11 @@ struct EinsumParamsKeyEq {
 
 namespace matx {
 namespace cutensor {
+
+  // Forward declaration for GetCacheIdFromFunction
+  template <typename OutputType, typename... InT>
+  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors);
+
   /**
    * @brief Evaluates the Einstein summation on the operands
    *
@@ -492,16 +498,15 @@ namespace cutensor {
     params.stream = stream;
 
     using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
+
     detail::GetCache().LookupAndExec<std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>>(
-      detail::CacheName::EINSUM,
+      detail::GetCacheIdFromFunction(static_cast<void(*)(OutputType&,const std::string&, cudaStream_t, InT...)>(einsum_impl)),
       params,
       [&]() {
         auto tmp = std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);
-        //printf("Creating an EINSUM cache item %p\n",tmp.get());
         return tmp;
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
-        //printf("Using an EINSUM cache item %p\n",ctype.get());
         ctype->Exec(out, stream, tensors...);
       }
     );

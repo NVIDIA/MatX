@@ -46,7 +46,7 @@
 
 namespace matx {
 namespace detail {
-template <size_t num_recursive, size_t num_non_recursive, 
+template <size_t num_recursive, size_t num_non_recursive,
           typename OutType, typename InType, typename FilterType>
 class matxFilter_t {
   static constexpr int RANK = OutType::Rank();
@@ -59,7 +59,7 @@ public:
       : h_nonr_copy(h_nonrec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     // o may be unused. We use the (void) idiom rather than [[maybe_unused]] due to
     // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429
     (void) o;
@@ -161,7 +161,7 @@ public:
     MATX_THROW(matxNotSupported, "convolution not supported on host");
 #else
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if (num_recursive > 0) {
       auto grid =
           dim3(static_cast<int>(
@@ -189,7 +189,7 @@ private:
   void ClearState()
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if (num_recursive > 0) {
       MATX_CUDA_CHECK(cudaMemset(
           (void *)d_status, 0,
@@ -393,7 +393,7 @@ auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   auto rec_v = make_tensor<FilterType>({static_cast<index_t>(h_rec.size())});
   auto nonrec_v = make_tensor<FilterType>({static_cast<index_t>(h_nonrec.size())});
 
@@ -459,7 +459,7 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
             [[maybe_unused]] const std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   // Get parameters required by these tensors
   auto params = detail::FilterParams_t();
   auto rhash = detail::PodArrayToHash<FilterType, NR>(h_rec);
@@ -478,7 +478,7 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
 
   using cache_val_type = detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>;
   detail::GetCache().LookupAndExec<detail::filter_cache_t>(
-    detail::CacheName::FILTER,
+    detail::GetCacheIdFromFunction(static_cast<void(*)(OutType&, const InType&, const std::array<FilterType, NR>, const std::array<FilterType, NNR>, cudaStream_t)>(filter_impl)),
     params,
     [&]() {
       return matxMakeFilter(o, i, h_rec, h_nonrec);
