@@ -37,27 +37,24 @@
 #include <optional>
 #include <any>
 #include <unordered_map>
+#include <cuda/atomic>
 
 #include "matx/core/error.h"
 
 namespace matx {
 namespace detail {
 
-enum class CacheName {
-  FFT_1D,
-  FFT_2D,
-  CHOL,
-  LU,
-  QR,
-  SVD,
-  EIG,
-  CUB,
-  GEMM,
-  COV,
-  FILTER,
-  INV
-};
+using CacheId = uint64_t;
 
+inline cuda::std::atomic<CacheId> CacheIdCounter{0};
+
+template<typename CacheType>
+CacheId GetCacheIdFromType()
+{
+  static CacheId id = CacheIdCounter.fetch_add(1);
+
+  return id;
+}
 
 /**
  * Generic caching object for caching parameters. This class is used for
@@ -72,7 +69,7 @@ public:
   ~matxCache_t() {
     // Destroy all outstanding objects in the cache to free memory
     for (auto &[k, v]: cache) {
-      v.reset(); 
+      v.reset();
     }
   }
 
@@ -81,22 +78,22 @@ public:
    *
    */
   template <typename CacheType>
-  void Clear(const CacheName &name) {
-    auto el = cache.find(name);
+  void Clear(const CacheId &id) {
+    auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
 
     std::any_cast<CacheType>(el->second).clear();
   }
 
   template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun>
-  void LookupAndExec(const CacheName &name, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
+  void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
     // Create named cache if it doesn't exist
-    auto el = cache.find(name);
+    auto el = cache.find(id);
     if (el == cache.end()) {
-      cache[name] = CacheType{};
+      cache[id] = CacheType{};
     }
 
-    auto &cval = cache[name];
+    auto &cval = cache[id];
     auto &rmap = std::any_cast<CacheType&>(cval);
     auto cache_el = rmap.find(params);
     if (cache_el == rmap.end()) {
@@ -110,7 +107,7 @@ public:
   }
 
 private:
-  std::unordered_map<CacheName, std::any> cache;
+  std::unordered_map<CacheId, std::any> cache;
 };
 
 /**

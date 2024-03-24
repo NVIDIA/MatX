@@ -44,7 +44,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
-#include "matx/core/operator_utils.h" 
+#include "matx/core/operator_utils.h"
 
 
 namespace matx {
@@ -149,9 +149,9 @@ public:
         MATX_ASSERT(a.Size(i) == a_out.Size(i), matxInvalidSize);
       }
     }
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if constexpr (op == CUB_OP_RADIX_SORT) {
       ExecSort(a_out, a, cparams_.dir, stream);
     }
@@ -208,11 +208,11 @@ public:
     }
     else if constexpr (op == CUB_OP_INC_SUM || op == CUB_OP_HIST_EVEN) {
       params.batches = TotalSize(a) / a.Size(a.Rank() - 1);
-    } else if constexpr ( op == CUB_OP_REDUCE || 
-                          op == CUB_OP_REDUCE_SUM || 
-                          op == CUB_OP_REDUCE_MIN || 
+    } else if constexpr ( op == CUB_OP_REDUCE ||
+                          op == CUB_OP_REDUCE_SUM ||
+                          op == CUB_OP_REDUCE_MIN ||
                           op == CUB_OP_REDUCE_MAX) {
-      
+
     }
     else {
       params.batches = 1;
@@ -241,7 +241,7 @@ public:
   void RunBatches(OutputTensor &a_out, const InputOperator &a, const Func &f, int batch_offset)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     using shape_type = index_t;
     size_t total_iter = 1;
     for (int i = 0; i < InputOperator::Rank() - batch_offset; i++) {
@@ -318,7 +318,7 @@ public:
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -372,7 +372,7 @@ public:
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -422,7 +422,7 @@ public:
  inline void OptimizedExecSort(
                               OutputTensor &a_out,
                               const InputOperator &a,
-                              const SortDirection_t dir,                   
+                              const SortDirection_t dir,
                               const cudaStream_t stream
                               )
 {
@@ -564,9 +564,9 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
   static_assert(is_tensor_view_v<InputOperator>, "Sorting only accepts tensors for now (no operators)");
   MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
-  
+
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
 #if (CUB_MAJOR_VERSION == 1 && CUB_MINOR_VERSION  >  14) || (CUB_MAJOR_VERSION > 1)
   // use optimized segmented sort if:
   //    - it is available (cub > 1.4)
@@ -711,28 +711,28 @@ inline void ExecSort(OutputTensor &a_out,
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     typename detail::base_type_t<InputOperator> in_base = a;
-    typename detail::base_type_t<OutputTensor> out_base = a_out;  
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
 
     // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) { 
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
           return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
-                                    cparams_.init, stream); 
+                                    cparams_.init, stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
     }
     else {
-      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) { 
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
         return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), cparams_.reduce_op,
-                                    cparams_.init, stream); 
+                                    cparams_.init, stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Reduce");
-    }    
-    
+    }
+
 #endif
   }
 
@@ -760,23 +760,23 @@ inline void ExecSort(OutputTensor &a_out,
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     typename detail::base_type_t<InputOperator> in_base = a;
-    typename detail::base_type_t<OutputTensor> out_base = a_out;  
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
 
     // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) { 
-          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream); 
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
     }
     else {
-      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) { 
-        return cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream); 
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
+        return cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in ub::DeviceReduce::Sum");
@@ -808,21 +808,21 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     typename detail::base_type_t<InputOperator> in_base = a;
-    typename detail::base_type_t<OutputTensor> out_base = a_out;  
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
 
     // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) { 
-          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream); 
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Min");
     }
     else {
-      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) { 
-        return cub::DeviceReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream); 
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
+        return cub::DeviceReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DevicdReduce::Min");
@@ -854,21 +854,21 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     typename detail::base_type_t<InputOperator> in_base = a;
-    typename detail::base_type_t<OutputTensor> out_base = a_out;   
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
 
     // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) { 
-          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream); 
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Max");
     }
     else {
-      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) { 
-        return cub::DeviceReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream); 
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
+        return cub::DeviceReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
       auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Max");
@@ -900,7 +900,7 @@ inline void ExecSort(OutputTensor &a_out,
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if constexpr (is_tensor_view_v<InputOperator>) {
       const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
       if (a.IsContiguous()) {
@@ -978,7 +978,7 @@ inline void ExecSort(OutputTensor &a_out,
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if constexpr (is_tensor_view_v<InputOperator>) {
       if (a.IsContiguous()) {
         cub::DeviceSelect::If(d_temp,
@@ -1039,7 +1039,7 @@ inline void ExecSort(OutputTensor &a_out,
   {
 #ifdef __CUDACC__
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-      
+
       if constexpr (is_tensor_view_v<InputOperator>) {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
@@ -1122,7 +1122,7 @@ struct CubParamsKeyEq {
         return false;
       }
     }
-    
+
 
     return l.batches == t.batches && l.dtype == t.dtype &&
            l.stream == t.stream && l.op == t.op;
@@ -1175,7 +1175,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
                             param_type>::GetCubParams(a_out, a, stream);
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-    detail::CacheName::CUB,
+    detail::GetCacheIdFromType<detail::cub_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);
@@ -1218,7 +1218,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-#ifndef MATX_DISABLE_CUB_CACHE  
+#ifndef MATX_DISABLE_CUB_CACHE
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
@@ -1229,17 +1229,17 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
     tmp->ExecSum(a_out, a, stream);
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));   
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto type =
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM> *>(ret.value());
     type->ExecSum(a_out, a, stream);
   }
-#else      
+#else
     auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
     tmp.ExecSum(a_out, a, stream);
-#endif    
+#endif
 #endif
 }
 
@@ -1264,7 +1264,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-#ifndef MATX_DISABLE_CUB_CACHE  
+#ifndef MATX_DISABLE_CUB_CACHE
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -1276,8 +1276,8 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN>{
         a_out, a, {}, stream};
 
-    tmp->ExecMin(a_out, a, stream);  
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));        
+    tmp->ExecMin(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto type =
@@ -1289,8 +1289,8 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN>{
       a_out, a, {}, stream};
 
-  tmp.ExecMin(a_out, a, stream);     
-#endif  
+  tmp.ExecMin(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1324,9 +1324,9 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
-        a_out, a, {}, stream};   
-    tmp->ExecMax(a_out, a, stream); 
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp));   
+        a_out, a, {}, stream};
+    tmp->ExecMax(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto type =
@@ -1336,9 +1336,9 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
   }
 #else
     auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
-        a_out, a, {}, stream};   
-    tmp.ExecMax(a_out, a, stream);     
-#endif    
+        a_out, a, {}, stream};
+    tmp.ExecMax(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1377,10 +1377,10 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  
+
   detail::SortParams_t p{dir};
 
-#ifndef MATX_DISABLE_CUB_CACHE  
+#ifndef MATX_DISABLE_CUB_CACHE
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
@@ -1401,9 +1401,9 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
   }
 #else
     auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
-        a_out, a, p, stream};  
-    tmp.ExecSort(a_out, a, dir, stream);      
-#endif    
+        a_out, a, p, stream};
+    tmp.ExecSort(a_out, a, dir, stream);
+#endif
 #endif
 }
 
@@ -1418,37 +1418,37 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
   typename detail::base_type_t<OutputTensor>  out_base = a_out;
   auto lin  = matx::RandomOperatorIterator{in_base};
   auto lout = matx::RandomOperatorOutputIterator{out_base};
-  
+
   if constexpr (InputOperator::Rank() == 1) {
     if (dir == SORT_DIR_ASC) {
-      std::partial_sort_copy( lin, 
-                              lin  + a.Size(0), 
-                              lout, 
+      std::partial_sort_copy( lin,
+                              lin  + a.Size(0),
+                              lout,
                               lout + a_out.Size(0));
     }
     else {
-      std::partial_sort_copy( lin, 
-                              lin  + a.Size(0), 
-                              lout, 
-                              lout + a_out.Size(0), 
+      std::partial_sort_copy( lin,
+                              lin  + a.Size(0),
+                              lout,
+                              lout + a_out.Size(0),
                               std::greater<typename InputOperator::scalar_type>());
-    }      
+    }
   }
   else {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::partial_sort_copy( lin  + b*a.Size(1), 
-                                lin  + (b+1)*a.Size(1), 
-                                lout + b*a.Size(1), 
+        std::partial_sort_copy( lin  + b*a.Size(1),
+                                lin  + (b+1)*a.Size(1),
+                                lout + b*a.Size(1),
                                 lout + (b+1)*a.Size(1));
       }
       else {
-        std::partial_sort_copy( lin  + b*a.Size(1), 
-                                lin  + (b+1)*a.Size(1), 
-                                lout + b*a.Size(1), 
+        std::partial_sort_copy( lin  + b*a.Size(1),
+                                lin  + (b+1)*a.Size(1),
+                                lout + b*a.Size(1),
                                 lout + (b+1)*a.Size(1),
                                 std::greater<typename InputOperator::scalar_type>());
-      }             
+      }
     }
   }
 }
@@ -1479,7 +1479,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
 
   cudaStream_t stream = exec.getStream();
 
-#ifndef MATX_DISABLE_CUB_CACHE    
+#ifndef MATX_DISABLE_CUB_CACHE
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a, stream);
@@ -1488,8 +1488,8 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
   auto ret = detail::cub_cache.Lookup(params);
   if (ret == std::nullopt) {
     auto tmp =
-        new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};   
-    tmp->ExecPrefixScanEx(a_out, a, stream); 
+        new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};
+    tmp->ExecPrefixScanEx(a_out, a, stream);
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
@@ -1497,11 +1497,11 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM> *>(ret.value());
     sort_type->ExecPrefixScanEx(a_out, a, stream);
   }
-#else 
+#else
     auto tmp =
-        detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};   
-    tmp.ExecPrefixScanEx(a_out, a, stream);     
-#endif      
+        detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>{a_out, a, {}, stream};
+    tmp.ExecPrefixScanEx(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1517,22 +1517,22 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
   auto lout = matx::RandomOperatorOutputIterator{out_base};
 
   if constexpr (OutputTensor::Rank() == 1) {
-    std::partial_sum( lin, 
-                      lin  + a.Size(0), 
-                      lout);     
+    std::partial_sum( lin,
+                      lin  + a.Size(0),
+                      lout);
   }
   else if constexpr (InputOperator::Rank() == 2) {
     for (index_t b = 0; b < a.Size(0); b++) {
-      std::partial_sum( lin  + b     * a.Size(1), 
-                        lin  + (b+1) * a.Size(1), 
-                        lout + b     * a.Size(1));             
+      std::partial_sum( lin  + b     * a.Size(1),
+                        lin  + (b+1) * a.Size(1),
+                        lout + b     * a.Size(1));
     }
   }
   else {
     MATX_ASSERT_STR(false, matxInvalidParameter, "Only 1 and 2D cumulative sums supported on host");
   }
-  
- 
+
+
 #endif
 }
 
@@ -1571,8 +1571,8 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
-#ifndef MATX_DISABLE_CUB_CACHE   
-  // Get parameters required by these tensors  
+#ifndef MATX_DISABLE_CUB_CACHE
+  // Get parameters required by these tensors
   auto params =
        detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a, stream);
 
@@ -1586,9 +1586,9 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
                                           detail::CUB_OP_HIST_EVEN,
                                           detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
- 
-    tmp->ExecHistEven(a_out, a, lower, upper, stream);  
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp)); 
+
+    tmp->ExecHistEven(a_out, a, lower, upper, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto sort_type =
@@ -1597,15 +1597,15 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
             ret.value());
     sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   }
-#else 
+#else
     auto tmp = detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_HIST_EVEN,
                                           detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
         a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
- 
-    tmp.ExecHistEven(a_out, a, lower, upper, stream);      
-#endif    
+
+    tmp.ExecHistEven(a_out, a, lower, upper, stream);
+#endif
 
 #endif
 }
@@ -1714,10 +1714,10 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};  
+  auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
   cudaStream_t stream = exec.getStream();
 
-#ifndef MATX_DISABLE_CUB_CACHE  
+#ifndef MATX_DISABLE_CUB_CACHE
 
   // Get parameters required by these tensors
   auto params =
@@ -1732,9 +1732,9 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT,
-                                          decltype(cparams)>{a_out, a, cparams, stream}; 
-    tmp->ExecSelect(a_out, a, stream); 
-    detail::cub_cache.Insert(params, static_cast<void *>(tmp)); 
+                                          decltype(cparams)>{a_out, a, cparams, stream};
+    tmp->ExecSelect(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
   else {
     auto sort_type =
@@ -1742,13 +1742,13 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
             ret.value());
     sort_type->ExecSelect(a_out, a, stream);
   }
-#else 
+#else
     auto tmp = detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT,
-                                          decltype(cparams)>{a_out, a, cparams, stream}; 
-    tmp.ExecSelect(a_out, a, stream);     
-#endif    
+                                          decltype(cparams)>{a_out, a, cparams, stream};
+    tmp.ExecSelect(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1809,7 +1809,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
  * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe,
  * this can be the same size as the input, but if something is known about the data to indicate not as many
- * entries are needed, the output can be smaller. 
+ * entries are needed, the output can be smaller.
  *
  * @tparam SelectType
  *   Type of select functor
@@ -1840,7 +1840,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
   cudaStream_t stream = exec.getStream();
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
-#ifndef MATX_DISABLE_CUB_CACHE 
+#ifndef MATX_DISABLE_CUB_CACHE
   // Get parameters required by these tensors
   auto params =
        detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, SelectType>::GetCubParams(a_out, a, stream);
@@ -1853,7 +1853,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT_IDX,
-                                          decltype(cparams)>{a_out, a, cparams, stream}; 
+                                          decltype(cparams)>{a_out, a, cparams, stream};
     tmp->ExecSelectIndex(a_out, a, stream);
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
   }
@@ -1863,13 +1863,13 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
             ret.value());
     sort_type->ExecSelectIndex(a_out, a, stream);
   }
-#else 
+#else
     auto tmp = detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_SELECT_IDX,
-                                          decltype(cparams)>{a_out, a, cparams, stream}; 
-    tmp.ExecSelectIndex(a_out, a, stream); 
-#endif  
+                                          decltype(cparams)>{a_out, a, cparams, stream};
+    tmp.ExecSelectIndex(a_out, a, stream);
+#endif
 #endif
 }
 
@@ -1880,7 +1880,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
  * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe,
  * this can be the same size as the input, but if something is known about the data to indicate not as many
- * entries are needed, the output can be smaller. 
+ * entries are needed, the output can be smaller.
  *
  * @tparam SelectType
  *   Type of select functor
@@ -1953,7 +1953,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  
+
   // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
   auto sort_tensor = make_tensor<typename InputOperator::scalar_type>(a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
@@ -1961,7 +1961,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
 
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
 
-#ifndef MATX_DISABLE_CUB_CACHE 
+#ifndef MATX_DISABLE_CUB_CACHE
   // Get parameters required by these tensors
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, decltype(cparams)>::GetCubParams(a_out, sort_tensor, stream);
@@ -1984,13 +1984,13 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
             ret.value());
     sort_type->ExecUnique(a_out, sort_tensor, stream);
   }
-#else 
+#else
     auto tmp = detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_UNIQUE,
                                           decltype(cparams)>{a_out, sort_tensor, cparams, stream};
     tmp.ExecUnique(a_out, sort_tensor, stream);
-#endif   
+#endif
 #endif
 }
 
@@ -2022,7 +2022,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
 #ifdef __CUDACC__
   static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   if (a.Size(a.Rank() - 1) == 0) {
     num_found() = 0;
     return;
@@ -2030,7 +2030,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
 
   std::partial_sort_copy(cbegin(a), cend(a), begin(a_out), end(a_out));
   auto last = std::unique(begin(a_out), end(a_out));
-  num_found() = static_cast<int>(last - begin(a_out));  
+  num_found() = static_cast<int>(last - begin(a_out));
 #endif
 }
 }; // namespace matx

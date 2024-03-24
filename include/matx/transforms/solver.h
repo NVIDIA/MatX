@@ -54,7 +54,7 @@ public:
   matxDnSolver_t()
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     [[maybe_unused]] cusolverStatus_t  ret;
     ret = cusolverDnCreate(&handle);
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
@@ -66,7 +66,7 @@ public:
   matxError_t SetAdvancedOptions(cusolverDnFunction_t function,
                                  cusolverAlgMode_t algo)
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo); 
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo);
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
     return matxSuccess;
@@ -86,7 +86,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     batch_a_ptrs.clear();
-    
+
     if constexpr (TensorType::Rank() == 2) {
       batch_a_ptrs.push_back(&a(0, 0));
     }
@@ -123,7 +123,7 @@ public:
   TransposeCopy(typename TensorType::scalar_type *tp, const TensorType &a, cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     auto pa = a.PermuteMatrix();
     auto tv = make_tensor(tp, pa.Shape());
     matx::copy(tv, pa, stream);
@@ -214,7 +214,7 @@ public:
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     params = GetCholParams(a, uplo);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -250,7 +250,7 @@ public:
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     // Ensure output size matches input
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT(out.Size(i) == a.Size(i), matxInvalidSize);
@@ -339,7 +339,7 @@ class matxDnLUSolverPlan_t : public matxDnSolver_t {
   static constexpr int RANK = OutTensor_t::Rank();
   using T1 = typename OutTensor_t::scalar_type;
   static_assert(RANK-1 == PivotTensor::Rank(), "Pivot tensor rank must be one less than output");
-  static_assert(std::is_same_v<typename PivotTensor::scalar_type, int64_t>, "Pivot tensor type must be int64_t");  
+  static_assert(std::is_same_v<typename PivotTensor::scalar_type, int64_t>, "Pivot tensor type must be int64_t");
 
 public:
   /**
@@ -364,7 +364,7 @@ public:
                        const ATensor &a)
   {
     static_assert(RANK >= 2);
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     params = GetLUParams(piv, a);
@@ -400,7 +400,7 @@ public:
             const ATensor &a, const cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     cusolverDnSetStream(handle, stream);
     int info;
 
@@ -541,7 +541,7 @@ public:
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     params = GetQRParams(tau, a);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -575,7 +575,7 @@ public:
             const ATensor &a, cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     batch_tau_ptrs.clear();
 
     // Ensure output size matches input
@@ -794,7 +794,7 @@ public:
     batch_s_ptrs.clear();
     batch_v_ptrs.clear();
     batch_u_ptrs.clear();
-        
+
     if constexpr (RANK == 2) {
       batch_s_ptrs.push_back(&s(0));
       batch_u_ptrs.push_back(&u(0, 0));
@@ -856,7 +856,7 @@ private:
   matx::tensor_t<T1, RANK> scratch;
   std::vector<T3 *> batch_s_ptrs;
   std::vector<T4 *> batch_v_ptrs;
-  std::vector<T2 *> batch_u_ptrs;  
+  std::vector<T2 *> batch_u_ptrs;
   DnSVDParams_t params;
 };
 
@@ -945,7 +945,7 @@ public:
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     params = GetEigParams(w, a, jobz, uplo);
     GetWorkspaceSize(&hspace, &dspace);
     AllocateWorkspace(params.batch_size);
@@ -989,7 +989,7 @@ public:
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     batch_w_ptrs.clear();
 
     // Ensure output size matches input
@@ -1113,7 +1113,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
           cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
   using T1 = typename OutputTensor_t::scalar_type;
 
@@ -1121,7 +1121,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   if(!a_new.isSameView(a)) {
     (a_new = a).run(stream);
-  }  
+  }
 
   // cuSolver assumes column-major matrices and MatX uses row-major matrices.
   // One way to address this is to create a transposed copy of the input to
@@ -1151,7 +1151,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   using cache_val_type = detail::matxDnCholSolverPlan_t<OutputTensor_t, decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::chol_cache_t>(
-    detail::CacheName::CHOL,
+    detail::GetCacheIdFromType<detail::chol_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tv, uplo);
@@ -1196,7 +1196,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
         const ATensor &a, const cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using T1 = typename remove_cvref_t<OutputTensor>::scalar_type;
 
   auto piv_new = OpToTensor(piv, stream);
@@ -1227,7 +1227,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUSolverPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::lu_cache_t>(
-    detail::CacheName::LU,
+    detail::GetCacheIdFromType<detail::lu_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(piv_new, tvt);
@@ -1270,7 +1270,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
          const cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
   constexpr int RANK = InputTensor::Rank();
 
@@ -1296,7 +1296,6 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   lu_impl(ac, piv, a_new, stream);
   (out = prod(diag(ac))).run(stream);
 }
-
 
 
 /**
@@ -1327,7 +1326,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
         const ATensor &a, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using T1 = typename remove_cvref_t<OutTensor>::scalar_type;
 
   auto tau_new = OpToTensor(tau, stream);
@@ -1338,7 +1337,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
   }
   if(!a_new.isSameView(a)) {
     (a_new = a).run(stream);
-  }  
+  }
 
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
@@ -1358,7 +1357,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRSolverPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::qr_cache_t>(
-    detail::CacheName::QR,
+    detail::GetCacheIdFromType<detail::qr_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt);
@@ -1413,7 +1412,7 @@ void svd_impl(UTensor &&u, STensor &&s,
          cudaStream_t stream = 0, const char jobu = 'A', const char jobvt = 'A')
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using T1 = typename ATensor::scalar_type;
 
   auto u_new = OpToTensor(u, stream);
@@ -1452,7 +1451,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDSolverPlan_t<decltype(u_new), decltype(s_new), decltype(v_new), decltype(tvt)>;
   detail::GetCache().LookupAndExec<detail::svd_cache_t>(
-    detail::CacheName::SVD,
+    detail::GetCacheIdFromType<detail::svd_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_new, s_new, v_new, tvt, jobu, jobvt);
@@ -1460,7 +1459,7 @@ void svd_impl(UTensor &&u, STensor &&s,
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(u_new, s_new, v_new, tvt, jobu, jobvt, stream);
     }
-  );  
+  );
 
   matxFree(tp);
 }
@@ -1502,7 +1501,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   /* Temporary WAR
      cuSolver doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
@@ -1533,7 +1532,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigSolverPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::eig_cache_t>(
-    detail::CacheName::EIG,
+    detail::GetCacheIdFromType<detail::eig_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz, uplo);
