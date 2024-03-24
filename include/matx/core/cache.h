@@ -37,6 +37,7 @@
 #include <optional>
 #include <any>
 #include <unordered_map>
+#include <cuda/atomic>
 
 #include "matx/core/error.h"
 
@@ -45,7 +46,7 @@ namespace detail {
 
 using CacheId = uint64_t;
 
-inline std::atomic<CacheId> CacheIdCounter{0};
+inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 
 template<typename CacheType>
 CacheId GetCacheIdFromType()
