@@ -800,7 +800,7 @@ public:
 
 #pragma unroll
     for (size_t i = 0; i < RANK; i++) {
-      strides[i] = this->desc_.Stride(i);
+      strides[i] = this->desc_.Stride(static_cast<int32_t>(i));
     }
 
     if constexpr (RANK > 0) {
@@ -884,7 +884,7 @@ public:
 
 #pragma unroll
     for (size_t i = 0; i < RANK; i++) {
-      int d = dims[i];
+      int32_t d = dims[i];
       MATX_ASSERT_STR(d < RANK, matxInvalidDim,
                       "Index to permute is larger than tensor rank");
       MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
@@ -1448,7 +1448,7 @@ public:
     std::array<typename Desc::stride_type, N> s = {};
 
     T *data = this->ldata_;
-    int d = 0;
+    size_t d = 0;
     bool def_stride = (strides[0] == -1);
 
     [[maybe_unused]] int end_count = 0;
@@ -1463,8 +1463,8 @@ public:
 
 #pragma unroll
     for (size_t i = 0; i < RANK; i++) {
-      typename Desc::shape_type first = firsts[i] < static_cast<typename Desc::shape_type>(0) ? this->Size(i) + firsts[i] : firsts[i];
-      typename Desc::shape_type end = ends[i]     < static_cast<typename Desc::shape_type>(0) ? this->Size(i) + ends[i]   : ends[i];
+      typename Desc::shape_type first = firsts[i] < static_cast<typename Desc::shape_type>(0) ? this->Size(static_cast<int32_t>(i)) + firsts[i] : firsts[i];
+      typename Desc::shape_type end = ends[i]     < static_cast<typename Desc::shape_type>(0) ? this->Size(static_cast<int32_t>(i)) + ends[i]   : ends[i];
 
       MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= this->Size(i)), matxInvalidDim,
         "Slice end index out of range of operator");
@@ -1481,13 +1481,13 @@ public:
                       "Requested slice start index out of bounds");
 
       // offset by first
-      data += first * Stride(i);
+      data += first * Stride(static_cast<int32_t>(i));
 
       if constexpr (N > 0) {
         if (end != matxDropDim) {
           MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
           if (end == matxEnd) {
-            n[d] = this->Size(i) - first;
+            n[d] = this->Size(static_cast<int32_t>(i)) - first;
           }
           else {
             n[d] = end - first;
@@ -1497,7 +1497,7 @@ public:
           n[d] = static_cast<typename Desc::shape_type>(std::ceil(
               static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
 
-          s[d] = Stride(i) * stride_mult;
+          s[d] = Stride(static_cast<int32_t>(i)) * stride_mult;
           d++;
         }
       }

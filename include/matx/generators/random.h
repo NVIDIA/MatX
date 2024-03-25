@@ -415,14 +415,14 @@ public:
           }
 
           #pragma unroll
-          for (int i = 0; i < RANK; ++i)
+          for (size_t i = 0; i < RANK; ++i)
           {
             shape_[i] = s[i];
           }
 
 
           #pragma unroll
-          for (int i = RANK - 2; i >= 0; i--) {
+          for (size_t i = RANK - 2; i >= 0; i--) {
             strides_[i] = strides_[i+1] * s[i+1];
           }
         }

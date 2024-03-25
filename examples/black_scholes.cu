@@ -81,7 +81,7 @@ public:
     out_(idx) = S * cdf_d1 - K * expRT * cdf_d2;
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const  { return out_.Size(i); }
+  __host__ __device__ inline index_t Size(int32_t i) const  { return out_.Size(i); }
   static inline constexpr __host__ __device__ int32_t Rank() { return O::Rank(); }
 };
 
