@@ -40,8 +40,8 @@ Optional Third-party Dependencies
 - `GoogleTest <https://github.com/google/googletest>`_ 1.11.0+ (Required to run unit tests)
 - `pybind11 <https://github.com/pybind/pybind11>`_ 2.6.2+ (Required for file I/O and some unit tests)
 - `nvbench <https://github.com/NVIDIA/nvbench>`_ Commit 1a13a2e (Required to run benchmarks)
-- `cutensor <https://developer.nvidia.com/cutensor>`_ 1.7.0.1+ (Required when using `einsum`)
-- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 23.03.0.20+ (Required when using `einsum`)
+- `cutensor <https://developer.nvidia.com/cutensor>`_ 2.0.1.2+ (Required when using `einsum`)
+- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 24.03.0.4+ (Required when using `einsum`)
 
 Host (CPU) Support
 ------------------
