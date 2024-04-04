@@ -193,6 +193,14 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+*v0.8.0*:
+- Features
+    * Updated cuTENSOR and cuTensorNet versions
+    * Added configurable print formatting
+    * ARM FFT support via NVPL
+    * New operators: abs2(), outer(), isnan(), isinf()
+    * Many more unit tests for CPU tests
+- Bug fixes for matmul on Hopper, 2D FFTs, and more
 *v0.7.0*:
 - Features
     * Automatic documentation generation
@@ -212,10 +220,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Bug fixes
     * Fixed cache issues
     * Fixed stride = 0 in matmul
-
-*v0.5.0*:
-* Polyphase resampler
-* Documentation overhaul with examples for each function
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
