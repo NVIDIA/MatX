@@ -41,5 +41,5 @@ function(find_and_configure_pybind11 VERSION)
     endif()
 endfunction()
 
-set(CUDA_MATX_MIN_VERSION_pybind11 2.6.2)
+set(CUDA_MATX_MIN_VERSION_pybind11 2.12.0)
 find_and_configure_pybind11(${CUDA_MATX_MIN_VERSION_pybind11})
