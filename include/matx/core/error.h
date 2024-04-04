@@ -225,7 +225,7 @@ namespace matx
 #define MATX_CUDA_CHECK(e)                                      \
   if (e != cudaSuccess)                                         \
   {                                                             \
-    fprintf(stderr, "CUDA Error: %s\n", cudaGetErrorString(e)); \
+    fprintf(stderr, "%s:%d CUDA Error: %s\n", __FILE__,__LINE__, cudaGetErrorString(e)); \
     MATX_THROW(matx::matxCudaError, cudaGetErrorString(e));           \
   }
 
