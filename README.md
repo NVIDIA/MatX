@@ -193,16 +193,17 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
-*v0.8.0*:
-- Features
+**v0.8.0**:
+- *Features*
     * Updated cuTENSOR and cuTensorNet versions
     * Added configurable print formatting
     * ARM FFT support via NVPL
     * New operators: abs2(), outer(), isnan(), isinf()
     * Many more unit tests for CPU tests
 - Bug fixes for matmul on Hopper, 2D FFTs, and more
-*v0.7.0*:
-- Features
+  
+**v0.7.0**:
+- *Features*
     * Automatic documentation generation
     * Use CCCL instead of CUB/libcudac++
     * New operators: `polyval`, `matvec`
@@ -210,10 +211,11 @@ We provide a variety of training materials and examples to quickly learn the Mat
     * Optimized polyphase resampler
     * Negative slice indexing
 - Many new bug fixes and error checking
-*v0.6.0*:
+  
+**v0.6.0**:
 - Breaking changes
     * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`. 
-- Features
+- *Features*
     * Polyphase channelizer
     * Many new operators, including upsample, downsample, pwelch, overlap, at, etc
     * Added more lvalue semantics for operators based on view manipulation
