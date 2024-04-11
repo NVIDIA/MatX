@@ -1152,11 +1152,11 @@ void fprint(FILE* fp, const Op &op, Args... dims)
 /**
  * @brief Print a tensor's all values to output file stream
  *
- * This form of `print()` is an alias of `print(op, 0)`, `print(op, 0, 0)`,
- * `print(op, 0, 0, 0)` and `print(op, 0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
- * respectively. It passes the proper number of zeros to `print(...)`
+ * This form of `fprint()` is an alias of `fprint(fp, op, 0)`, `fprint(fp, op, 0, 0)`,
+ * `fprint(fp, op, 0, 0, 0)` and `fprint(fp, op, 0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
+ * respectively. It passes the proper number of zeros to `fprint(...)`
  * automatically according to the rank of this tensor. The user only have to
- * invoke `print(op)` to print the whole tensor, instead of passing zeros
+ * invoke `fprint(fp, op)` to print the whole tensor, instead of passing zeros
  * manually.
  *
  * @tparam Op Operator input type
@@ -1173,8 +1173,34 @@ void fprint(FILE* fp, const Op &op, Args... dims) {
   std::apply([&](auto &&...args) { fprint(fp, op, args...); }, tp);
 }
 
-#define print(op, ...) fprint(stdout, op, ##__VA_ARGS__)
-#endif
+// Complete hide this version from doxygen, otherwise we get
+// "error: argument 'op' from the argument list of matx::print has multiple @param documentation sections"
+// due to the Rank==0 definition above
+/**
+ * @brief Print a tensor's all values to stdout
+ *
+ * This form of `print()` is an alias of `print(op, 0)`, `print(op, 0, 0)`,
+ * `print(op, 0, 0, 0)` and `print(op, 0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
+ * respectively. It passes the proper number of zeros to `print(...)`
+ * automatically according to the rank of this tensor. The user only have to
+ * invoke `print(op)` to print the whole tensor, instead of passing zeros
+ * manually.
+ *
+ * @tparam Op Operator input type
+ * @tparam Args Bounds type
+ * @param fp Output file stream
+ * @param op Operator input
+ * @param dims Bounds for printing
+ */
+template <typename Op, typename... Args,
+          std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
+void print(const Op &op, Args... dims) {
+  std::array<int, Op::Rank()> arr = {0};
+  auto tp = std::tuple_cat(arr);
+  std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, tp);
+}
+
+#endif // not DOXYGEN_ONLY
 
 template <typename Op>
 auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
