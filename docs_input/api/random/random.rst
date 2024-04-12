@@ -9,8 +9,8 @@ uses cuRAND on the device to generate random numbers from device code.
 .. note::
     randomGenerator_t has been deprecated after release 0.5.0. Please use the ``random()`` operator instead
 
-.. doxygenfunction:: matx::random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, T alpha = 1, T beta = 0)
-.. doxygenfunction:: matx::random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, T alpha = 1, T beta = 0)
+.. doxygenfunction:: matx::random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
+.. doxygenfunction:: matx::random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
 
 Examples
 ~~~~~~~~

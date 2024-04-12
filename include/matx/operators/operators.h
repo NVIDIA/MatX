@@ -62,6 +62,7 @@
 #include "matx/operators/fftshift.h"
 #include "matx/operators/filter.h"
 #include "matx/operators/flatten.h"
+#include "matx/operators/frexp.h"
 #include "matx/operators/hermitian.h"
 #include "matx/operators/hist.h"
 #include "matx/operators/if.h"

@@ -379,6 +379,7 @@ public:
     template <typename T, typename ShapeType>
     class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
       private:
+        using inner_t = typename inner_op_type_t<T>::type;
         static constexpr int RANK = std::tuple_size<ShapeType>{};
         Distribution_t dist_;
         std::array<index_t, RANK> shape_;
@@ -386,8 +387,8 @@ public:
         index_t total_size_;
         curandStatePhilox4_32_10_t *states_;
         uint64_t seed_;
-        T alpha_;
-        T beta_;
+        inner_t alpha_;
+        inner_t beta_;
         bool init_ = false;
         bool device_;
 
@@ -405,7 +406,7 @@ public:
         // Shapeless constructor to be allocated at run invocation
         RandomOp() = delete;
 
-        inline RandomOp(ShapeType &&s, Distribution_t dist, uint64_t seed, T alpha, T beta) :
+        inline RandomOp(ShapeType &&s, Distribution_t dist, uint64_t seed, inner_t alpha, inner_t beta) :
           dist_(dist), seed_(seed), alpha_(alpha), beta_(beta)
         {
           total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
@@ -514,15 +515,15 @@ public:
           else if constexpr (std::is_same_v<T, double>) {
             curandGenerateUniformDouble(gen_, &val, 1);
           }
-          if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
             float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateUniform(gen_, &val[0], 1);
-            curandGenerateUniform(gen_, &val[1], 1);
+            curandGenerateUniform(gen_, &tmp[0], 1);
+            curandGenerateUniform(gen_, &tmp[1], 1);
           }
-          if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
             double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateUniformDouble(gen_, &val[0], 1);
-            curandGenerateUniformDouble(gen_, &val[1], 1);
+            curandGenerateUniformDouble(gen_, &tmp[0], 1);
+            curandGenerateUniformDouble(gen_, &tmp[1], 1);
           }
 
           val = alpha_ * val + beta_;
@@ -534,15 +535,15 @@ public:
           else if constexpr (std::is_same_v<T, double>) {
             curandGenerateNormalDouble(gen_, &val, 1, beta_, alpha_);
           }
-          if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
             float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateNormal(gen_, &val[0], 1, beta_, alpha_);
-            curandGenerateNormal(gen_, &val[1], 1, beta_, alpha_);
+            curandGenerateNormal(gen_, &tmp[0], 1, beta_, alpha_);
+            curandGenerateNormal(gen_, &tmp[1], 1, beta_, alpha_);
           }
-          if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
             double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateNormalDouble(gen_, &val[0], 1, beta_, alpha_);
-            curandGenerateNormalDouble(gen_, &val[1], 1, beta_, alpha_);
+            curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
+            curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
           }
         }
 #endif
@@ -565,6 +566,7 @@ public:
    *
    * @tparam ShapeType Shape type
    * @tparam T Type of output
+   * @tparam LowerType Either T or the inner type of T if T is complex* 
    * @param s Shape of operator
    * @param dist Distribution (either NORMAL or UNIFORM)
    * @param seed Random number seed
@@ -572,9 +574,9 @@ public:
    * @param beta Value to add to each number
    * @return Random number operator
    */
-  template <typename T, typename ShapeType,
+  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
            std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
-  inline auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, T alpha = 1, T beta = 0)
+  inline auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     using shape_strip_t = remove_cvref_t<ShapeType>;
     return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), dist, seed, alpha, beta);
@@ -585,6 +587,7 @@ public:
    *
    * @tparam RANK Rank of operator
    * @tparam T Type of output
+   * @tparam LowerType Either T or the inner type of T if T is complex
    * @param s Array of dimensions
    * @param dist Distribution (either NORMAL or UNIFORM)
    * @param seed Random number seed
@@ -592,8 +595,8 @@ public:
    * @param beta Value to add to each number
    * @return Random number operator
    */
-  template <typename T, int RANK>
-  inline auto random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, T alpha = 1, T beta = 0)
+  template <typename T, int RANK, typename LowerType = typename inner_op_type_t<T>::type>
+  inline auto random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     auto sarray = detail::to_array(s);
     return random<T, decltype(sarray)>(std::move(sarray), dist, seed, alpha, beta);
