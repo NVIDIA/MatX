@@ -49,11 +49,11 @@ namespace matx
    *   Shape of tensor
    */
   template <typename T = int, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto ones(ShapeType &&s)
-             {
-               return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));
-             }
+    std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  inline auto ones(ShapeType &&s)
+  {
+    return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));
+  }
 
   /**
    * Return one for all elements
@@ -68,9 +68,27 @@ namespace matx
    *   Shape of tensor
    */
   template <typename T = int, int RANK> 
-    inline auto ones(const index_t (&s)[RANK])
-    {
-      return ones<T>(detail::to_array(s));
-    }
+  inline auto ones(const index_t (&s)[RANK])
+  {
+    return ones<T>(detail::to_array(s));
+  }
+
+  /**
+   * Return one for all elements
+   *
+   * Ones is used as an operator that always returns a 1 type for all
+   * elements. It can be used in place of memset to set all values to 1.
+   * This version of ones() is shapeless and can be used in contexts where the shape
+   * can be deduced.
+   *
+   * @tparam T
+   *   Data type
+   *
+   */
+  template <typename T = int> 
+  inline auto ones()
+  {
+    return ones<T, NoShape>(NoShape{});
+  }  
 
 } // end namespace matx

@@ -166,8 +166,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
   auto b2 = make_tensor<TestType>({20,10});
   auto c2 = make_tensor<TestType>({10,10});    
   auto c22 = make_tensor<TestType>({10,10});   
-  (a2 = ones(a2.Shape())).run(exec);
-  (b2 = ones(b2.Shape())).run(exec); 
+  (a2 = ones()).run(exec);
+  (b2 = ones()).run(exec); 
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   (c2 = cutensor::einsum("mk,kn->mn", a2, b2)).run(exec);
@@ -196,8 +196,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
   auto b2 = make_tensor<TestType>({20,10});
   auto c2 = make_tensor<TestType>({10,5});    
   auto c22 = make_tensor<TestType>({5,10});   
-  (a2 = ones(a2.Shape())).run(exec);
-  (b2 = ones(b2.Shape())).run(exec); 
+  (a2 = ones()).run(exec);
+  (b2 = ones()).run(exec); 
 
   // Perform a GEMM of a2 * b2 and store the results transposed
   (c2 = cutensor::einsum("mk,kn->nm", a2, b2)).run(exec);
@@ -225,8 +225,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
   auto a = make_tensor<TestType>({5,20,4,3});
   auto b = make_tensor<TestType>({20,3,4,5});
   auto b2 = make_tensor<TestType>({20,3,4,5});
-  (a = ones(a.Shape())).run(exec);
-  (b = ones(b.Shape())).run(exec);
+  (a = ones()).run(exec);
+  (b = ones()).run(exec);
 
   // Permute a 4D tensor. This gives the same output as Permute, but is much faster
   (b = cutensor::einsum("ijkl->jlki", a)).run(exec);
@@ -287,7 +287,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
   auto a2 = make_tensor<TestType>({10,10});
   auto c0_0 = make_tensor<TestType>({});
   auto c0_1 = make_tensor<TestType>({});
-  (a2 = ones(a2.Shape())).run(exec);
+  (a2 = ones()).run(exec);
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   (c0_0 = cutensor::einsum("ii->", a2)).run(exec);
