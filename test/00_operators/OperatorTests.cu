@@ -1559,7 +1559,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
   // 2D source tensor cases
   {
     auto from = make_tensor<int>({N,N});
-    (from = ones(from.Shape())).run(exec);
+    (from = ones()).run(exec);
     sync();
 
     auto i0 = make_tensor<int>({});

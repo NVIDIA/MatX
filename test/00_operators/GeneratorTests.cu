@@ -242,7 +242,10 @@ TEST(OperatorTests, Kron)
   tensor_t<dtype, 2> ov2({4, 6});
   av.SetVals({{1, 2, 3}, {4, 5, 6}});
 
+  // example-begin ones-gen-test-2 
+  // Explicit shape specified in ones()
   (ov2 = kron(av, ones({2, 2}))).run(exec);
+  // example-end ones-gen-test-2  
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(pb, ov2, "rect", 0);
 
@@ -330,7 +333,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
   std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
-  (t1 = zeros(s)).run(exec);
+  (t1 = zeros()).run(exec);
   // example-end zeros-gen-test-1
 
   cudaStreamSynchronize(0);
@@ -357,7 +360,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
   std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
-  (t1 = ones(s)).run(exec);
+  (t1 = ones()).run(exec);
   // example-end ones-gen-test-1    
   cudaStreamSynchronize(0);
 
@@ -369,6 +372,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)1));
     }
   }
+
   MATX_EXIT_HANDLER();
 }
 

@@ -462,7 +462,7 @@ TYPED_TEST(BasicTensorTestsAll, Print)
   using TestType = std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({3});
-  (t = ones(t.Shape())).run(this->exec);
+  (t = ones()).run(this->exec);
   print(t);
 
   MATX_EXIT_HANDLER();
@@ -474,7 +474,7 @@ TYPED_TEST(BasicTensorTestsAll, DevicePrint)
   using TestType = std::tuple_element_t<0, TypeParam>; 
 
   auto t = make_tensor<TestType>({3}, MATX_DEVICE_MEMORY);
-  (t = ones(t.Shape())).run(this->exec);
+  (t = ones()).run(this->exec);
   print(t);
 
   MATX_EXIT_HANDLER();

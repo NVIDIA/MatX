@@ -48,11 +48,11 @@ namespace matx
    *   Shape of tensor
    */
   template <typename T = int, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto zeros(ShapeType &&s)
-             {
-               return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
-             }
+    std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  inline auto zeros(ShapeType &&s)
+  {
+    return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(0));
+  }
 
   /**
    * Return zero for all elements
@@ -67,8 +67,26 @@ namespace matx
    *   Shape of tensor
    */
   template <typename T = int, int RANK>
-    inline auto zeros(const index_t (&s)[RANK])
-    {
-      return zeros<T>(detail::to_array(s));
-    }
+  inline auto zeros(const index_t (&s)[RANK])
+  {
+    return zeros<T>(detail::to_array(s));
+  }
+
+  /**
+   * Return zeros for all elements
+   *
+   * zeros is used as an operator that always returns a 0 type for all
+   * elements. It can be used in place of memset to set all values to 0.
+   * This version of zeros() is shapeless and can be used in contexts where the shape
+   * can be deduced.
+   *
+   * @tparam T
+   *   Data type
+   *
+   */
+  template <typename T = int> 
+  inline auto zeros()
+  {
+    return zeros<T, NoShape>(NoShape{});
+  }    
 } // end namespace matx
