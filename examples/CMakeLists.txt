@@ -5,6 +5,7 @@ set(examples
     convolution
     conv2d
     cgsolve
+    eigenExample
     fft_conv
     resample
     mvdr_beamformer
