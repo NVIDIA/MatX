@@ -28,6 +28,7 @@ set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
+set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
 
 # Enable compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
