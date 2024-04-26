@@ -19,6 +19,9 @@ set(examples
     black_scholes
     print_styles)
 
+# include_directories(SYSTEM eigen/) # Uncomment_Eigen
+
+ 
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
