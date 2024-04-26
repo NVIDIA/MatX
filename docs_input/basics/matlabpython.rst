@@ -7,6 +7,8 @@ efficient MatX code by learning the syntax mapping between the tools. Most of th
 found inside either the unit tests or the source code as well.
 
 Due to its popularity in linear algebra applications, examples of common Eigen operations have been added to the below table. An example file is provided at ``examples/eigenExample.cu`` with examples of common operations in Eigen and their MatX equivalent.
+If you have Eigen installed on your system, you can build the examples with Eigen by setting the cmake variable ``eigen_DIR=/path/to/eigen/``. 
+
 A few key notes to be aware of when using MatX and Eigen in the same environment:
 
 1. The below example are only valid for 2D data. Eigen and its API is primarily targeting 2D problems (without the unsupported/tensor library), so there is not a single pattern to follow for porting code with rank > 2 tensors from Eigen to MatX; each user's solution for higher rank data will result in a unique mapping to MatX tensor memory. 
