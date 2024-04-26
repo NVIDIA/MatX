@@ -52,11 +52,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //////////////               Eigen Test Data Setup               //////////////
   ///////////////////////////////////////////////////////////////////////////////
 #ifdef USE_EIGEN
-  Eigen::MatrixXd a(dimX, dimY);
-  Eigen::MatrixXd b(dimX, dimY);
-  Eigen::MatrixXf matrix10x10(10, 10);
+  
+  typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXdRowMajor; // define a custom type that is aligned to MatX row-Major.
+  
+  Eigen::MatrixXd  a(dimX, dimY);
+  MatrixXdRowMajor b(dimX, dimY);
   Eigen::RowVectorXd rowVec(dimX);
   Eigen::Matrix<std::complex<double>, 2, 2> complexMatrix;
+  Eigen::MatrixXf matrix10x10(10, 10);
 #endif
   ///////////////////////////////////////////////////////////////////////////////
   //////////////                MatX Test Data Setup               //////////////
@@ -64,8 +67,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto aTensor  = matx::make_tensor<double>({dimX,dimY});
   auto bTensor  = matx::make_tensor<double>({dimX,dimY});
   auto tensor1D = matx::make_tensor<double>({dimX});
-  auto matTensor10x10 = matx::make_tensor<float>({10,10});
   auto complexTensor = matx::make_tensor<cuda::std::complex<double>>({2,2});
+  auto matTensor10x10 = matx::make_tensor<float>({10,10});
 
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -90,8 +93,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // provide data in tensors if eigen is not used
   (aTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run();
   (bTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run();
-  (matTensor10x10 = matx::random<double>({10, 10}, matx::UNIFORM)).run();
   (complexTensor = matx::random<cuda::std::complex<double>>({2, 2}, matx::UNIFORM)).run();
+  (matTensor10x10 = matx::random<double>({10, 10}, matx::UNIFORM)).run();
 
 #endif
 
@@ -104,13 +107,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #ifdef USE_EIGEN
   cudaMemcpy(aTensor.Data(), a.data(), sizeof(double) * dimX * dimY, cudaMemcpyHostToDevice);
   cudaMemcpy(bTensor.Data(), b.data(), sizeof(double) * dimX * dimY, cudaMemcpyHostToDevice);
-  cudaMemcpy(matTensor10x10.Data(), matrix10x10.data(), sizeof(float)*10*10, cudaMemcpyHostToDevice);
   cudaMemcpy(complexTensor.Data(), complexMatrix.data(), sizeof(std::complex<double>)*2*2, cudaMemcpyHostToDevice);
+  cudaMemcpy(matTensor10x10.Data(), matrix10x10.data(), sizeof(float)*10*10, cudaMemcpyHostToDevice);
 
   (aTensor = matx::transpose(aTensor)).run();
-  (bTensor = matx::transpose(bTensor)).run();
-  (matTensor10x10 = matx::transpose(matTensor10x10)).run();
+  // (bTensor = matx::transpose(bTensor)).run(); // do not need to transpose because b has the same layout
   (complexTensor = matx::transpose(complexTensor)).run();
+  (matTensor10x10 = matx::transpose(matTensor10x10)).run();
 #endif
 
   tensor1D(0) = 1;
@@ -132,6 +135,39 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   ///////////////////////////////////////////////////////////////////////////////
   //////////////                 Operation Examples                //////////////
   ///////////////////////////////////////////////////////////////////////////////
+
+
+  //
+  // Data Mapping Example
+  // 
+#ifdef USE_EIGEN  
+  std::cout << "=================== Data Map Example ===================" << std::endl;
+  double *raw_data;
+  // memory could be any type of allocation, but choosing to use managed memory so it's valid on the host and device (this does cost performance)
+  cudaMallocManaged((void**)&raw_data, dimX*dimY * sizeof(double)); 
+  
+  for(int i=0; i < dimX * dimY; i++)
+  {
+    raw_data[i] = 0.1 + i * 0.1;
+  }
+  
+  // map user memory into Eigen Matrix
+  Eigen::Map<MatrixXdRowMajor> mappedMatrix(raw_data, dimX, dimY);
+  std::cout << "Eigen Mapped Data :\n" << mappedMatrix << std::endl;
+
+  // map user memory into Eigen Matrix
+  auto mappedTensor = matx::make_tensor(raw_data, {dimX, dimY}, false); // create MatX tensor with non-owning user allocated memory
+  matx::print(mappedTensor);
+  
+  // modify the data from each of the references  
+  raw_data[4] = 117;
+  mappedMatrix(0,1) = 42;
+  mappedTensor(2,1) = 87;
+  
+  // print modified data
+  std::cout << "Eigen Mapped Data After Modified :\n" << mappedMatrix << std::endl;
+  matx::print(mappedTensor);
+#endif 
 
   //
   // Basic Indexing
