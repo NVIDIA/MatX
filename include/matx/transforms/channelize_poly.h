@@ -52,6 +52,11 @@ namespace detail {
 // channel counts.
 constexpr index_t MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD = 6;
 
+// Number of output samples per channel per iteration for the kernel that stores
+// the input data in shared memory. Ideally, this value would be determined dynamically
+// to balance occupancy and CTA size. For now, we choose a reasonable default.
+constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
+
 template <typename OutType, typename InType, typename FilterType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
                                      const FilterType &filter, cudaStream_t stream)
@@ -75,6 +80,70 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
   ChannelizePoly1D<THREADS, OutType, InType, FilterType><<<grid, THREADS, 0, stream>>>(
       o, i, filter);
+#endif
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline size_t matxChannelizePoly1DInternal_SmemSizeBytes(const OutType &o, const InType &, const FilterType &filter)
+{
+  using input_t = typename InType::scalar_type;
+  using filter_t = typename FilterType::scalar_type;
+
+  index_t filter_len = filter.Size(FilterType::Rank()-1);
+
+  const index_t num_channels = o.Size(OutType::Rank()-1);
+  const index_t nout_per_channel = o.Size(OutType::Rank()-2);
+  const index_t filter_phase_len = (filter_len + num_channels - 1) / num_channels;
+
+  size_t smem_size = sizeof(filter_t)*(num_channels)*(filter_phase_len) +
+    sizeof(input_t)*(num_channels)*(filter_phase_len + MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER - 1);
+  const size_t max_sizeof = std::max(sizeof(filter_t), sizeof(input_t));
+  if (smem_size % max_sizeof) {
+    smem_size += max_sizeof - (smem_size % max_sizeof);
+  }
+  return smem_size;
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline size_t matxChannelizePoly1DInternal_ShouldUseSmemKernel(const OutType &out, const InType &in, const FilterType &filter)
+{
+  // 48 KB is the largest shared memory allocation that does not require
+  // explicit opt-in via cudaFuncSetAttribute()
+  const size_t MAX_SMEM_BYTES = 48 * 1024;
+  // The full shared memory kernel uses blocks of size
+  // (num_channels, detail::MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER), so ensure
+  // that the resulting thread per block count will not exceed MAX_NUM_THREADS_PER_BLOCK
+  const int MAX_NUM_THREADS_PER_BLOCK = 1024;
+  const index_t num_channels = out.Size(OutType::Rank()-1);
+  return (
+      matxChannelizePoly1DInternal_SmemSizeBytes(out, in, filter) <= MAX_SMEM_BYTES &&
+      num_channels <= (MAX_NUM_THREADS_PER_BLOCK/detail::MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER));
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline void matxChannelizePoly1DInternal_Smem(OutType o, const InType &i, const FilterType &filter, cudaStream_t stream)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  using input_t = typename InType::scalar_type;
+  using filter_t = typename FilterType::scalar_type;
+
+  index_t filter_len = filter.Size(FilterType::Rank()-1);
+
+  const index_t num_channels = o.Size(OutType::Rank()-1);
+  const index_t nout_per_channel = o.Size(OutType::Rank()-2);
+  const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
+
+  const int target_num_blocks = 1024;
+  const int elem_per_block = static_cast<int>(
+    (nout_per_channel + target_num_blocks - 1) / target_num_blocks);
+  dim3 block(static_cast<int>(num_channels), MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER);
+  const uint32_t num_blocks = static_cast<uint32_t>((nout_per_channel + elem_per_block - 1) / elem_per_block);
+  dim3 grid(num_blocks, 1, num_batches);
+  const size_t smem_size = matxChannelizePoly1DInternal_SmemSizeBytes(o, i, filter);
+  ChannelizePoly1D_Smem<OutType, InType, FilterType><<<grid, block, smem_size, stream>>>(
+      o, i, filter, elem_per_block);
 #endif
 }
 
@@ -237,7 +306,11 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
         }
       }();
 
-      matxChannelizePoly1DInternal(fft_in_slice, in, f, stream);
+      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+        matxChannelizePoly1DInternal_Smem(fft_in_slice, in, f, stream);
+      } else {
+        matxChannelizePoly1DInternal(fft_in_slice, in, f, stream);
+      }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
       (out_packed = fft(fft_in_slice, num_channels)).run(stream);
@@ -247,7 +320,11 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan(out, in, f, stream);
     } else {
-      matxChannelizePoly1DInternal(out, in, f, stream);
+      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+        matxChannelizePoly1DInternal_Smem(out, in, f, stream);
+      } else {
+        matxChannelizePoly1DInternal(out, in, f, stream);
+      }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.
       (out = ifft(out, num_channels, FFTNorm::FORWARD)).run(stream);
