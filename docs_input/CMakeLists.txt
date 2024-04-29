@@ -30,7 +30,10 @@ configure_file(${PROJECT_SOURCE_DIR}/docs_input/_templates/layout.html ${CMAKE_C
 configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)
 configure_file(${SPHINX_CFG_IN} ${SPHINX_CFG_OUT} @ONLY)
 
-file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}) #Doxygen won't create this for us
+file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}/html)  # Doxygen won't create this for us
+file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}/xml)   # Doxygen won't create this for us
+file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}/latex) # Doxygen won't create this for us
+
 
 add_custom_command(OUTPUT ${DOXYGEN_INDEX_FILE}
                    DEPENDS ${MATX_PUBLIC_HEADERS}
@@ -57,9 +60,9 @@ add_custom_command(OUTPUT ${SPHINX_INDEX_FILE}
                    ${SPHINX_SOURCE} ${SPHINX_BUILD}
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                    DEPENDS
-                   # Other docs files you want to track should go here (or in some variable)
-                   ${MATX_RST_DOCS}
-                   ${DOXYGEN_INDEX_FILE}
+                    # Other docs files you want to track should go here (or in some variable)
+                    ${MATX_RST_DOCS}
+                    ${DOXYGEN_INDEX_FILE}
                    MAIN_DEPENDENCY ${SPHINX_CFG_OUT}
                    COMMENT "Generating documentation with Sphinx")
 
