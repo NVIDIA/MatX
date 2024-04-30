@@ -145,6 +145,8 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     { 271374, 31*14+4, 14 },
     { 27137, 301*13+3, 13 },
     { 27138, 301*14+4, 14 },
+    { 1000000, 32*16, 32 },
+    { 1000000, 40*16, 40 }
   };
 
   cudaStream_t stream = 0;
