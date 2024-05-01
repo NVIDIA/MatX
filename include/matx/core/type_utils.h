@@ -544,6 +544,24 @@ struct is_matx_descriptor<T, std::void_t<typename T::matx_descriptor>>
 template <typename T>
 inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename remove_cvref<T>::type>::value;
 
+namespace detail {
+template <typename T, typename = void>
+struct is_matx_static_descriptor : std::false_type {
+};
+template <typename T>
+struct is_matx_static_descriptor<T, std::void_t<typename T::matx_static_descriptor>>
+    : std::true_type {
+};
+}
+
+/**
+ * @brief Determine if a type is a MatX static descriptor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool is_matx_static_descriptor_v = detail::is_matx_static_descriptor<typename remove_cvref<T>::type>::value;
+
 
 namespace detail {
 template <typename T, typename = void>
