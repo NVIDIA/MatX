@@ -42,6 +42,10 @@ tensor:
 
 Note that for a static tensor the shape is moved to the template parameters instead of function arguments.
 
+.. note::
+   While static tensors are preferred over dynamic tensors, they currently have limitations when calling certain library functions. 
+   These limitations may be removed over time, but in cases where they don't work a dynamic tensor will work.
+
 After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
 pass their own pointers in a different for of the ``make_`` family of functions to allow for more control over buffer types and ownership
 semantics.

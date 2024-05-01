@@ -76,6 +76,8 @@ namespace detail {
     index_type nom_fft_size = in_size;
     index_type act_fft_size;
 
+    static_assert(!is_matx_static_descriptor_v<decltype(i.Descriptor())>, "FFTs cannot use static descriptors at this time");
+
     // Auto-detect FFT size
     if (fft_size == 0) {
       act_fft_size = o.Lsize();
