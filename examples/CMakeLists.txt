@@ -5,6 +5,7 @@ set(examples
     convolution
     conv2d
     cgsolve
+    eigenExample
     fft_conv
     resample
     mvdr_beamformer
@@ -18,12 +19,21 @@ set(examples
     black_scholes
     print_styles)
 
+
+    
+    
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
 target_link_libraries(example_lib INTERFACE matx::matx) # Transitive properties
 
 set_property(TARGET example_lib PROPERTY ENABLE_EXPORTS 1)
+    
+if(eigen_DIR)
+    include_directories(SYSTEM ${eigen_DIR})
+    add_definitions(-DUSE_EIGEN)
+    target_compile_definitions(example_lib INTERFACE USE_EIGEN)
+endif()
 
 if (MSVC)
     target_compile_options(example_lib INTERFACE /W4 /WX)
