@@ -178,9 +178,11 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)
     return cuda::std::sqrt(v1);
   }
   else {
+    ///\todo TYLER_TODO should probably protect for only float types
     return sqrt(static_cast<cuda::std::complex<T>>(v1));
   }
   if constexpr (!is_cuda_complex_v<T>) {
+    ///\todo TYLER_TODO should probably protect for only float types
     return sqrt(static_cast<cuda::std::complex<T>>(v1));
   }
   else {
