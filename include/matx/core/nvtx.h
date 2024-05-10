@@ -66,6 +66,7 @@ const int32_t NVTX_PINK   = 0xFFC0CB;
 const int32_t NVTX_WHITE  = 0xFFFFFF;
 
 static const int32_t nunNvtxColors = 10;
+static uint32_t numNvtxTrackedRanges = 0;
 
 /**
  * @brief automatic NVTX Colors
@@ -116,10 +117,16 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                 )
 
   #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
+  #define MATX_NVTX_START_RANGE_RETURN( message, nvtxLevel ) matx::NvtxEvent( __FUNCTION__, message, nvtxLevel, __COUNTER__ );
+  #define MATX_NVTX_START_RANGE_AUTO(message, nvtxLevel) matx::autoCreateNvtxEvent(__FUNCTION__, message, nvtxLevel );
 
   #define MATX_NVTX_END_RANGE( id ) matx::endEvent( id );
 
+  #define MATX_NVTX_END_RANGE_EVENT( event ) matx::endEvent( event.userHandle_ );
+
   #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) matx::setNVTXLogLevel( nvtxLevel );
+  
+  #define MATX_NVTX_GET_ID() matx::getNVTX_Range_ID();
 
 ////////////             Disable NVTX Macros          /////////////////
 #else
@@ -139,10 +146,33 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
   #define MATX_NVTX_END_RANGE( id );
 
   #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel );
+  // #define MATX_NVTX_END_RANGE_EVENT( event );
+  #define MATX_NVTX_START_RANGE_RETURN( message, nvtxLevel ) 0;
+  #define MATX_NVTX_START_RANGE_AUTO(message, nvtxLevel) 0;
+  #define MATX_NVTX_GET_ID() 0; 
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
 
+
+////////////////////////////////////////////////////////////////////////////////
+///
+///\brief Utility Function to get a unique ID for an NVTX range
+///
+////////////////////////////////////////////////////////////////////////////////
+[[maybe_unused]] static int getNVTX_Range_ID( )
+{
+  int newID = ++numNvtxTrackedRanges;
+  auto foundIter = nvtx_eventMap.find( newID );
+  
+  while(foundIter != nvtx_eventMap.end())
+  {
+    newID = ++numNvtxTrackedRanges;
+    foundIter = nvtx_eventMap.find( newID );
+  }
+  
+  return newID;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -214,13 +244,14 @@ class NvtxEvent
   ////////////////////////////////////////////////////////////////////////////////
   NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL, int registerId = -1 )
   {
+    userHandle_ = -1;
+    persistent_ = false;
 
     if( nvtxLevel > globalNvtxLevel )
     {
-      userHandle_ = -1;
       return;
     }
-
+  
     int32_t curColor = nvtxColors[ curColorIdx % nunNvtxColors];
     curColorIdx++;
 
@@ -245,17 +276,27 @@ class NvtxEvent
       eventAttrib.message.ascii =  functionName.c_str();
     }
 
+    persistent_ = false;
+    
     // save the id
     rangeId_ = nvtxRangeStartEx(&eventAttrib);
     userHandle_ = registerId;
+    
     // if register with global map
     if( registerId >= 0 )
     {
+      persistent_ = true;
       registerEvent( registerId, rangeId_ );
     }
 
   }
 
+  NvtxEvent( int invalidClass)
+  {     
+    userHandle_ = -1;
+    persistent_ = false;
+    return;
+  }
 
   ////////////////////////////////////////////////////////////////////////////////
   ///
@@ -264,17 +305,38 @@ class NvtxEvent
   ////////////////////////////////////////////////////////////////////////////////
   ~NvtxEvent( )
   {
-    if(userHandle_ != -1)
-    {
-      endEvent( userHandle_ );
+    if( !persistent_ )
+    {  
+      if(userHandle_ != -1)
+      {
+        endEvent( userHandle_ );
+      }
+      else
+      {
+        nvtxRangeEnd(rangeId_);
+      }
     }
-
-    nvtxRangeEnd(rangeId_);
+    
   }
 
-
-  nvtxRangeId_t  rangeId_;
-  int            userHandle_;
+  nvtxRangeId_t  rangeId_;    // id of the nvtxRange 
+  int            userHandle_; // user provided handle to this event
+  bool           persistent_; // if the nvtx range lives beyond the life of the NvtxEvent Class's scope
 };
+
+////////////////////////////////////////////////////////////////////////////////
+///
+///\brief Utility Function to get a unique ID for an NVTX range
+///
+////////////////////////////////////////////////////////////////////////////////
+int autoCreateNvtxEvent(std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL)
+{
+  int newID = matx::getNVTX_Range_ID();
+  
+  matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( functionName, message, nvtxLevel, newID );
+  
+  return newID;
+  
+}
 
 } // end matx namespace
