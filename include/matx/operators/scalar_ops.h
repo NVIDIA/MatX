@@ -170,6 +170,8 @@ template <typename T> struct SqrtF {
   }
 };
 
+template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
+
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)
 {
@@ -186,7 +188,6 @@ template <typename T> struct CSqrtF {
 };
 
 
-template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
 template <typename T> using CsqrtOp = UnOp<T, CSqrtF<T>>;
 
 template <typename T>
