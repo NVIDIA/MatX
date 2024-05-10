@@ -261,7 +261,7 @@ class NvtxEvent
 
   ///
   ////////////////////////////////////////////////////////////////////////////////
-  NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL, int registerId = -1 )
+  NvtxEvent( std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_USER, int registerId = -1 )
   {
     userHandle_ = -1;
     persistent_ = false;
