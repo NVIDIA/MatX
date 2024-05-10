@@ -225,7 +225,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ///       MATX_NVTX_END_RANGE macro with the same parameters
 ///
 ////////////////////////////////////////////////////////////////////////////////
-static void endEvent( int id )
+[[maybe_unused]] static void endEvent( int id )
 {
   std::unique_lock lck(nvtx_memory_mtx);
 
@@ -347,7 +347,7 @@ class NvtxEvent
 ///\brief Utility Function to create an NVTX range with a unique ID and return it
 ///
 ////////////////////////////////////////////////////////////////////////////////
-int autoCreateNvtxEvent(std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_USER)
+[[maybe_unused]] static int autoCreateNvtxEvent(std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_USER)
 {
   int newID = matx::getNVTX_Range_ID();
   
