@@ -309,7 +309,7 @@ class NvtxEvent
 
   }
 
-  NvtxEvent( int invalidClass)
+  NvtxEvent( [[maybe_unused]] int invalidClass )
   {     
     userHandle_ = -1;
     persistent_ = false;
