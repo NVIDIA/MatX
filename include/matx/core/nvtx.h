@@ -116,24 +116,31 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                 MATX_NVTX_1(__VA_ARGS__)\
                                 )
 
-  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id ) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
-  #define MATX_NVTX_START_RANGE_RETURN( message, nvtxLevel ) matx::NvtxEvent( __FUNCTION__, message, nvtxLevel, __COUNTER__ );
-  #define MATX_NVTX_START_RANGE_AUTO(message, nvtxLevel) matx::autoCreateNvtxEvent(__FUNCTION__, message, nvtxLevel );
-
+  
+  
+                                       
+  #define MATX_NVTX_RANGE_1( message ) matx::autoCreateNvtxEvent(__FUNCTION__, message );
+  #define MATX_NVTX_RANGE_2( message, nvtxLevel ) matx::autoCreateNvtxEvent(__FUNCTION__, message, nvtxLevel );
+  #define MATX_NVTX_RANGE_3( message, nvtxLevel, id) matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( __FUNCTION__, message, nvtxLevel, id );
+  
+  #define MATX_NVTX_RANGE_X(x,A,B,C,FUNC, ...)  FUNC 
+  
+  #define MATX_NVTX_START_RANGE(...)   MATX_NVTX_RANGE_X(,##__VA_ARGS__,\
+                                       MATX_NVTX_RANGE_3(__VA_ARGS__),\
+                                       MATX_NVTX_RANGE_2(__VA_ARGS__),\
+                                       MATX_NVTX_RANGE_1(__VA_ARGS__)\
+                                       )
+                                       
   #define MATX_NVTX_END_RANGE( id ) matx::endEvent( id );
-
-  #define MATX_NVTX_END_RANGE_EVENT( event ) matx::endEvent( event.userHandle_ );
 
   #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel ) matx::setNVTXLogLevel( nvtxLevel );
   
-  #define MATX_NVTX_GET_ID() matx::getNVTX_Range_ID();
 
 ////////////             Disable NVTX Macros          /////////////////
 #else
 
   #define MATX_NVTX_1( message );
   #define MATX_NVTX_2( message, customId );
-  #define MATX_NVTX_START_RANGE( message, nvtxLevel, id );
 
   #define MATX_NVTX_X(x,A,B,FUNC, ...)  FUNC
 
@@ -143,13 +150,25 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
                                   MATX_NVTX_1(__VA_ARGS__)\
                                   )
 
+
+
+
+  #define MATX_NVTX_RANGE_1( message ) 0;
+  #define MATX_NVTX_RANGE_2( message, nvtxLevel ) 0;
+  #define MATX_NVTX_RANGE_3( message, nvtxLevel, id) 0;
+
+  #define MATX_NVTX_RANGE_X(x,A,B,C,FUNC, ...)  FUNC 
+  
+  #define MATX_NVTX_START_RANGE(...)  MATX_NVTX_RANGE_X(,##__VA_ARGS__,\
+                                       MATX_NVTX_RANGE_3(__VA_ARGS__),\
+                                       MATX_NVTX_RANGE_2(__VA_ARGS__),\
+                                       MATX_NVTX_RANGE_1(__VA_ARGS__)\
+                                       )
+
   #define MATX_NVTX_END_RANGE( id );
 
   #define MATX_NVTX_SET_LOG_LEVEL( nvtxLevel );
-  // #define MATX_NVTX_END_RANGE_EVENT( event );
-  #define MATX_NVTX_START_RANGE_RETURN( message, nvtxLevel ) 0;
-  #define MATX_NVTX_START_RANGE_AUTO(message, nvtxLevel) 0;
-  #define MATX_NVTX_GET_ID() 0; 
+  
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +348,7 @@ class NvtxEvent
 ///\brief Utility Function to get a unique ID for an NVTX range
 ///
 ////////////////////////////////////////////////////////////////////////////////
-int autoCreateNvtxEvent(std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL)
+int autoCreateNvtxEvent(std::string functionName, std::string message="",  matx_nvxtLogLevels nvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_USER)
 {
   int newID = matx::getNVTX_Range_ID();
   
