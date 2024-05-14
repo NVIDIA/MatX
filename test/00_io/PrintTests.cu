@@ -192,13 +192,12 @@ TEST_F(PrintTest, DefaultTest5)
   MATX_ENTER_HANDLER();
   auto pft = get_print_format_type();
   ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
+  
+  auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
 
-  auto testVal = matx::make_tensor<float>({});
-  testVal() = 123.456f;
-
-  print_checker(testVal,
-      "Tensor{float} Rank: 0, Sizes:[], Strides:[]\n"
-      " 1.2346e+02 \n");
+  print_checker(testSlice,
+      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "-9.2466e-01+9.9114e-01j \n");
 
   MATX_EXIT_HANDLER();
 }
@@ -297,6 +296,22 @@ TEST_F(PrintTest, MlabTest4)
   MATX_EXIT_HANDLER();
 }
 
+TEST_F(PrintTest, MlabTest5)
+{
+  MATX_ENTER_HANDLER();
+  set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
+
+  auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
+
+  print_checker(testSlice,
+      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "-9.2466e-01+9.9114e-01j \n");
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST_F(PrintTest, PythonTest1)
 {
   MATX_ENTER_HANDLER();
@@ -387,5 +402,20 @@ TEST_F(PrintTest, PythonTest4)
   MATX_EXIT_HANDLER();
 }
 
+TEST_F(PrintTest, PythonTest5)
+{
+  MATX_ENTER_HANDLER();
+  set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
+
+  auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
+
+  print_checker(testSlice,
+      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "-9.2466e-01+9.9114e-01j \n");
+
+  MATX_EXIT_HANDLER();
+}
 
 
