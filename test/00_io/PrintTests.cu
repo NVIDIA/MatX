@@ -187,6 +187,22 @@ TEST_F(PrintTest, DefaultTest4)
   MATX_EXIT_HANDLER();
 }
 
+TEST_F(PrintTest, DefaultTest5)
+{
+  MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
+
+  auto testVal = matx::make_tensor<float>({});
+  testVal() = 123.456f;
+
+  print_checker(testVal,
+      "Tensor{float} Rank: 0, Sizes:[], Strides:[]\n"
+      " 1.2346e+02 \n");
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST_F(PrintTest, MlabTest1)
 {
   MATX_ENTER_HANDLER();
@@ -370,3 +386,6 @@ TEST_F(PrintTest, PythonTest4)
 
   MATX_EXIT_HANDLER();
 }
+
+
+
