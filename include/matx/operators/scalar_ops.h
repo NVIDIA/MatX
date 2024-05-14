@@ -172,6 +172,23 @@ template <typename T> struct SqrtF {
 
 template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
 
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)
+{
+  static_assert(std::is_floating_point_v<T>, "csqrt() only supports non-complex floating point inputs");
+  return sqrt(static_cast<cuda::std::complex<T>>(v1));
+}
+
+template <typename T> struct CSqrtF {
+  static __MATX_INLINE__ std::string str() { return "csqrt"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_csqrt(v1);
+  }
+};
+
+
+template <typename T> using CsqrtOp = UnOp<T, CSqrtF<T>>;
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
