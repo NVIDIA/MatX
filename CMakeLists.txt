@@ -134,13 +134,13 @@ set(WARN_FLAGS  -Wall
                 -Wextra
                 -Wcast-align
                 -Wunused
-                -Wconversion
                 -Wno-unknown-pragmas
                 -Wnon-virtual-dtor
                 -Wshadow)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(WARN_FLAGS ${WARN_FLAGS}
+        -Wconversion
         -Wmisleading-indentation
         -Wduplicated-cond
         -Wduplicated-branches

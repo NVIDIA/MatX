@@ -401,6 +401,11 @@ public:
         using scalar_type = T;
         using matxop = bool;
 
+        static_assert(std::is_same_v<T, float> || 
+                      std::is_same_v<T, double> ||
+                      std::is_same_v<T, cuda::std::complex<float>> ||
+                      std::is_same_v<T, cuda::std::complex<double>>);        
+
         __MATX_INLINE__ std::string str() const { return "random"; }
 
         // Shapeless constructor to be allocated at run invocation
@@ -508,6 +513,7 @@ public:
 
         val = alpha_ * val + beta_;
 #else
+
         if (dist_ == UNIFORM) {
           if constexpr (std::is_same_v<T, float>) {
             curandGenerateUniform(gen_, &val, 1);
@@ -545,6 +551,9 @@ public:
             curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
             curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
           }
+        }
+        else {
+          val = 0;
         }
 #endif
 

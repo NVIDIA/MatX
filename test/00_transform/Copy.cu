@@ -54,7 +54,7 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
 
   ExecType exec{};
 
-  auto sync = [&exec]() constexpr {
+  auto sync = []() constexpr {
     if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
       cudaDeviceSynchronize();
     }
@@ -148,7 +148,7 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
 
   ExecType exec{};
 
-  auto sync = [&exec]() constexpr {
+  auto sync = []() constexpr {
     if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
       cudaDeviceSynchronize();
     }

@@ -198,10 +198,10 @@ namespace matx
    * @returns
    *   New operator with repeated data
    */
-  template <typename T1>
-    auto __MATX_INLINE__ repmat(T1 t, const index_t (&reps)[])
+  template <typename T1, int N>
+    auto __MATX_INLINE__ repmat(T1 t, const index_t (&reps)[N])
     {
-      return detail::RepMatOp<T1, T1::Rank()>(t, reps);
+      return detail::RepMatOp<T1, T1::Rank()>(t, detail::to_array(reps));
     };
 
   /**

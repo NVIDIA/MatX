@@ -170,19 +170,19 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   size_t signal_shm = sizeof(strip_input_t) * (CONV1D_ELEMENTS_PER_BLOCK + filter_len);
 
   // align filter size to signal size
-  int align = std::alignment_of_v<InType>;
+  size_t align = std::alignment_of_v<InType>;
   filter_shm = (filter_shm + align - 1) / align * align;
 
   size_t shmsize = filter_shm + signal_shm;
 
   shape_type sig_len = i.Size(OutputType::Rank() - 1);
   int work_per_block = CONV1D_ELEMENTS_PER_BLOCK;
-  int num_blocks = (int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
+  unsigned int num_blocks = (unsigned int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
 
   // number below was chosen arbitrarily.  Cannot be more than 65536.
-  num_blocks = std::min(num_blocks, 10000);
+  num_blocks = std::min(num_blocks, 10000U);
 
-  int grid_size = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
+  unsigned int grid_size = static_cast<unsigned int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
   dim3 gsize(grid_size, num_blocks);
   constexpr int EPT = 4;
@@ -316,7 +316,7 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     // clone i2
     auto ci2 = clone<LRank>(i2, shape);
 
-    static_assert(i1.Rank() == ci2.Rank());
+    static_assert(In1Type::Rank() == decltype(ci2)::Rank());
 
     conv1d_impl_internal(o, i1, ci2, mode, method, stream);
 

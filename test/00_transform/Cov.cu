@@ -59,7 +59,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};
   tensor_t<GTestType, 2> av{{cov_dim1, cov_dim2}};
   tensor_t<GTestType, 2> cv{{cov_dim2, cov_dim2}};

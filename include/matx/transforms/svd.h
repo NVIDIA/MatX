@@ -78,9 +78,9 @@ template<typename UType, typename SType, typename VTType, typename AType, typena
 void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  static_assert(U.Rank() == A.Rank());
-  static_assert(VT.Rank() == A.Rank());
-  static_assert(S.Rank() == A.Rank()-1);
+  static_assert(UType::Rank() == AType::Rank());
+  static_assert(VTType::Rank() == AType::Rank());
+  static_assert(SType::Rank() == AType::Rank()-1);
 
   using ATypeS = typename AType::scalar_type;
   using STypeS = typename SType::scalar_type;
@@ -152,7 +152,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   // for each singular value
   for(int i = 0; i < k; i++) {
 
-    std::array<index_t, S.Rank()> sShapeB, sShapeE;
+    std::array<index_t, SType::Rank()> sShapeB, sShapeE;
 
     sShapeB.fill(0);
     sShapeE.fill(matxEnd);
@@ -374,9 +374,9 @@ template<typename UType, typename SType, typename VTType, typename AType>
 inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_iters, float tol,  cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
 
-  static_assert(U.Rank() == A.Rank());
-  static_assert(VT.Rank() == A.Rank());
-  static_assert(S.Rank() == A.Rank()-1);
+  static_assert(UType::Rank() == AType::Rank());
+  static_assert(VTType::Rank() == AType::Rank());
+  static_assert(SType::Rank() == AType::Rank()-1);
 
   using ATypeS = typename AType::scalar_type;
   using STypeS = typename SType::scalar_type;

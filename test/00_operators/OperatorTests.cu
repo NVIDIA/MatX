@@ -1526,7 +1526,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
 
   ExecType exec{};
 
-  auto sync = [&exec]() constexpr {
+  auto sync = []() constexpr {
     if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
       cudaDeviceSynchronize();
     }
@@ -1674,7 +1674,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
 
   ExecType exec{};
 
-  auto sync = [&exec]() constexpr {
+  auto sync = []() constexpr {
     if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
       cudaDeviceSynchronize();
     }
@@ -3456,9 +3456,9 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   ExecType exec{}; 
 
   // example-begin repmat-test-1
-  index_t count0 = 4;
-  index_t count1 = 4;
-  index_t same_reps = 10;
+  const index_t count0 = 4;
+  const index_t count1 = 4;
+  const index_t same_reps = 10;
   tensor_t<TestType, 2> t2({count0, count1});
   tensor_t<TestType, 2> t2s({count0 * same_reps, count1 * same_reps});
 

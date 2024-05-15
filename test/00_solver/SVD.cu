@@ -50,7 +50,7 @@ protected:
     pb->InitAndRunTVGenerator<GTestType>("00_solver", "svd", "run", {m, n});
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
 };

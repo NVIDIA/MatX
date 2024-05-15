@@ -71,12 +71,12 @@ namespace detail {
     inline void qr_internal(QType &Q, RType &R, const AType &A, WType workspace, cudaStream_t stream) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-      static_assert(A.Rank() >= 2);
-      static_assert(Q.Rank() == A.Rank());
-      static_assert(R.Rank() == A.Rank());
+      static_assert(AType::Rank() >= 2);
+      static_assert(QType::Rank() == AType::Rank());
+      static_assert(RType::Rank() == AType::Rank());
 
-      MATX_ASSERT_STR(A.Rank() == Q.Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
-      MATX_ASSERT_STR(A.Rank() == R.Rank(), matxInvalidDim, "qr: A and R must have the same rank");
+      MATX_ASSERT_STR(AType::Rank() == QType::Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
+      MATX_ASSERT_STR(AType::Rank() == RType::Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
       using ATypeS = typename AType::scalar_type;
       using NTypeS = typename inner_op_type_t<ATypeS>::type;
@@ -91,9 +91,9 @@ namespace detail {
       auto wwt  = std::get<1>(workspace);
       auto u = std::get<2>(workspace);
 
-      static_assert(Qin.Rank() == Q.Rank());
-      static_assert(wwt.Rank() == Q.Rank());
-      static_assert(u.Rank() == Q.Rank()-1);
+      static_assert(decltype(Qin)::Rank() == QType::Rank());
+      static_assert(decltype(wwt)::Rank() == QType::Rank());
+      static_assert(decltype(u)::Rank() == QType::Rank()-1);
 
       // Create Identity matrix
       auto E = eye<ATypeS>({m, m});
@@ -208,12 +208,12 @@ template<typename QType, typename RType, typename AType>
 inline void qr_impl(QType &Q, RType &R, const AType &A, cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  static_assert(A.Rank() >= 2);
-  static_assert(Q.Rank() == A.Rank());
-  static_assert(R.Rank() == A.Rank());
+  static_assert(AType::Rank() >= 2);
+  static_assert(QType::Rank() == AType::Rank());
+  static_assert(RType::Rank() == AType::Rank());
 
-  MATX_ASSERT_STR(A.Rank() == Q.Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
-  MATX_ASSERT_STR(A.Rank() == R.Rank(), matxInvalidDim, "qr: A and R must have the same rank");
+  MATX_ASSERT_STR(AType::Rank() == QType::Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
+  MATX_ASSERT_STR(AType::Rank() == RType::Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
   auto workspace = qr_internal_workspace(A, stream);
   qr_internal(Q,R,A,workspace,stream);

@@ -316,6 +316,8 @@ public:
     #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     return *(stride_.begin() + dim); 
     #pragma GCC diagnostic pop
+#else
+    return *(stride_.begin() + dim);
 #endif    
   }
 
