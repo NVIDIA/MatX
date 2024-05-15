@@ -31,7 +31,11 @@ call is needed, with optional inputs defined below. If no message is provided, t
 the NVTX range’s message.
 
 The Manual Range NVTX API requires the user to make a call to the NVTX API at both the beginning and end of the desired range. The Manual 
-Range API uses a user defined handle (int) to reference the NVTX range. A Manual NVTX Range must be fully qualified on every instantiation. 
+Range API uses a user defined handle (int) to reference the NVTX range. A Manual NVTX Range can be fully qualified, or the user can allow the API to auto-enumerate the range. 
+If the user chooses to allow the API to define the handle, an int is returned from the call for the user.
+
+.. note::
+  If a user chooses to use a manual range, they must manually call ``MATX_NVTX_END_RANGE(RANGE_HANDLE)``, or the range will not terminate until the end of execution.
 
 NVTX Examples
 -------------
@@ -43,11 +47,15 @@ NVTX Examples
   * - Command 
     - Result
   * - MATX_NVTX_START("")
-    - NVTX range scoped to this function, named the same as function with log level of Internal 
+    - NVTX range scoped to this function, named the same as function with log level of User 
   * - MATX_NVTX_START("MY_MESSAGE")
-    - NVTX range scoped to this function, named “MY_MESSAGE” with log level of Internal
+    - NVTX range scoped to this function, named “MY_MESSAGE” with log level of User
   * - MATX_NVTX_START("MY_MESSAGE", matx::MATX_NVTX_LOG_API )
     - NVTX range scoped to this function, named “MY_MESSAGE” with log level of API
+  * - MATX_NVTX_START_RANGE( "MY_MESSAGE" )
+    - NVTX range with manual scope, named “MY_MESSAGE”, log level of User, and an auto-enumerated handle
+  * - MATX_NVTX_START_RANGE( "MY_MESSAGE", matx_nvxtLogLevels::MATX_NVTX_LOG_INTERNAL )
+    - NVTX range with manual scope, named “MY_MESSAGE”, log level of Internal, and an auto-enumerated handle    
   * - MATX_NVTX_START_RANGE( "MY_MESSAGE", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1 )
     - NVTX range with manual scope, named “MY_MESSAGE”, log level of USER, and handle ID of 1
   * - MATX_NVTX_END_RANGE(1)

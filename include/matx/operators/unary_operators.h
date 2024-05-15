@@ -362,6 +362,7 @@ namespace matx
 
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
+  DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
   DEFINE_UNARY_OP(exp, detail::ExpOp);
   DEFINE_UNARY_OP(expj, detail::ExpjOp);
   DEFINE_UNARY_OP(log10, detail::Log10Op);
