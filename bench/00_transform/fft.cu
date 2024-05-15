@@ -18,7 +18,7 @@ void fft1d_no_batches_pow_2(nvbench::state &state,
   xv.PrefetchDevice(0);
 
   state.exec(
-      [&xv](nvbench::launch &launch) { fft(xv, xv, 0, launch.get_stream()); });
+      [&xv](nvbench::launch &launch) { (xv = fft(xv)).run(cudaExecutor(launch.get_stream())); });
 }
 NVBENCH_BENCH_TYPES(fft1d_no_batches_pow_2, NVBENCH_TYPE_AXES(fft_types))
     .add_int64_power_of_two_axis("FFT size", nvbench::range(10, 18, 1));
@@ -35,7 +35,7 @@ void fft1d_no_batches_non_pow_2(nvbench::state &state,
   xv.PrefetchDevice(0);
 
   state.exec(
-      [&xv](nvbench::launch &launch) { fft(xv, xv, 0, launch.get_stream()); });
+      [&xv](nvbench::launch &launch) { (xv = fft(xv)).run(cudaExecutor(launch.get_stream())); });
 }
 NVBENCH_BENCH_TYPES(fft1d_no_batches_non_pow_2, NVBENCH_TYPE_AXES(fft_types))
     .add_int64_axis("FFT size", nvbench::range(50000, 250000, 50000));
@@ -50,7 +50,7 @@ void fft1d_batches_pow_2(nvbench::state &state, nvbench::type_list<ValueType>)
   xv.PrefetchDevice(0);
 
   state.exec(
-      [&xv](nvbench::launch &launch) { fft(xv, xv, 0, launch.get_stream()); });
+      [&xv](nvbench::launch &launch) { (xv = fft(xv)).run(cudaExecutor(launch.get_stream())); });
 }
 NVBENCH_BENCH_TYPES(fft1d_batches_pow_2, NVBENCH_TYPE_AXES(fft_types))
     .add_int64_power_of_two_axis("FFT size", nvbench::range(10, 18, 1));

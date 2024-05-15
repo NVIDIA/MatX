@@ -43,7 +43,7 @@ class CopyTestsAll : public ::testing::Test
 {
 };
 
-TYPED_TEST_SUITE(CopyTestsAll, MatXTypesAllExecs);
+TYPED_TEST_SUITE(CopyTestsAll, MatXAllTypesAllExecs);
 
 TYPED_TEST(CopyTestsAll, CopyOutParam)
 {
@@ -106,8 +106,8 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
   // only hold a single value. Thus, we create a 0D tensor with value TEST_VAL
   // and verify that the copy receives the same value.
   {
-    auto in = make_tensor<TestType>();
-    auto out = make_tensor<TestType>();
+    auto in = make_tensor<TestType>({});
+    auto out = make_tensor<TestType>({});
     in() = TEST_VAL;
     sync();
     matx::copy(out, in, exec);
@@ -199,7 +199,7 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
   // only hold a single value. Thus, we create a 0D tensor with value TEST_VAL
   // and verify that the copy receives the same value.
   {
-    auto in = make_tensor<TestType>();
+    auto in = make_tensor<TestType>({});
     in() = TEST_VAL;
     sync();
     auto out = matx::copy(in, exec);

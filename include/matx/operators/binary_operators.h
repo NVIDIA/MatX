@@ -94,8 +94,8 @@ namespace matx
       class matxBinaryOp : public BaseOp<matxBinaryOp<I1,I2,Op>>
     {
       private:
-        typename base_type<I1>::type in1_;
-        typename base_type<I2>::type in2_;
+        mutable typename base_type<I1>::type in1_;
+        mutable typename base_type<I2>::type in2_;
         typename base_type<Op>::type op_;
 
       public:
@@ -118,7 +118,7 @@ namespace matx
       }
 
       template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
+      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         auto i1 = get_value(in1_, indices...);
         auto i2 = get_value(in2_, indices...);
@@ -126,7 +126,7 @@ namespace matx
       }
 
       template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(const ArrayType &idx) const noexcept
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return mapply([&](auto &&...args)  {
             return this->operator()(args...);
@@ -145,6 +145,30 @@ namespace matx
         index_t size2 = detail::get_expanded_size<Rank()>(in2_, dim);
         return detail::matx_max(size1,size2);
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<I1>()) {
+          in1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<I2>()) {
+          in2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+      {
+        if constexpr (is_matx_op<I1>()) {
+          in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<I2>()) {
+          in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }      
     };
   }
 
@@ -224,7 +248,7 @@ namespace matx
   Op pow(Op t, Op t2) {}
 
   /**
-   * Compute max(t, t2) of two operators or tensors
+   * Compute element-wise max(t, t2) of two operators or tensors
    * @param t
    *   LHS tensor or operator input
    * @param t2
@@ -233,7 +257,7 @@ namespace matx
   Op max(Op t, Op t2) {}
 
   /**
-   * Compute min(t, t2) of two operators or tensors
+   * Compute element-wise min(t, t2) of two operators or tensors
    * @param t
    *   LHS tensor or operator input
    * @param t2
@@ -314,6 +338,33 @@ namespace matx
   Op operator||(Op t, Op t2) {}
 
   /**
+   * Compute t & t2 (bitwise AND) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator&(Op t, Op t2) {}
+
+  /**
+   * Compute t | t2 (bitwise OR) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator|(Op t, Op t2) {}  
+
+  /**
+   * Compute t ^ t2 (bitwise XOR) of two operators or tensors
+   * @param t
+   *   LHS tensor or operator input
+   * @param t2
+   *   RHS tensor or operator input
+   */
+  Op operator^(Op t, Op t2) {}    
+
+  /**
    * Compute the arctangent of two inputs
    * @param t
    *   X value of input
@@ -333,9 +384,9 @@ namespace matx
   DEFINE_BINARY_OP(operator&, detail::AndOp);
   DEFINE_BINARY_OP(operator^, detail::XorOp);
   DEFINE_BINARY_OP(pow, detail::PowOp);
-  DEFINE_BINARY_OP(max, detail::MaxOp);
+  DEFINE_BINARY_OP(max, detail::MaximumOp);
   DEFINE_BINARY_OP(atan2, detail::Atan2Op);
-  DEFINE_BINARY_OP(min, detail::MinOp);
+  DEFINE_BINARY_OP(min, detail::MinimumOp);
   DEFINE_BINARY_OP(operator<, detail::LTOp);
   DEFINE_BINARY_OP(operator>, detail::GTOp);
   DEFINE_BINARY_OP(operator<=, detail::LTEOp);

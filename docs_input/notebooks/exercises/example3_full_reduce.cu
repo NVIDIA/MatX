@@ -40,9 +40,7 @@ int main() {
   auto MD0 = make_tensor<float>();
   auto AD0 = make_tensor<float>();
 
-  randomGenerator_t<float> randData(A.TotalSize(), 0);
-  auto randTensor1 = randData.GetTensorView<2>({4,5}, NORMAL);
-  (A = randTensor1).run();    
+  (A = random<float>({4, 5}, NORMAL)).run();    
   
   // Initialize max and average to 0
   (MD0 = 0).run();

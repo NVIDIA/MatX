@@ -66,7 +66,7 @@ namespace matx
       /*
        * @breif Returns stream associated with executor
        */
-      auto getStream() { return stream_; }
+      auto getStream() const { return stream_; }
 
       /**
        * Execute an operator on a device
@@ -75,7 +75,7 @@ namespace matx
        * @param op value
        **/
       template <typename Op>
-        void Exec(Op &op) const noexcept {
+        void Exec(Op &op) const {
 #ifdef __CUDACC__      
           dim3 threads, blocks;  
 
@@ -131,7 +131,7 @@ namespace matx
             } 
           }
 #else
-          #error "Cannot execute device function from host compiler"
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
 #endif    
         }
 

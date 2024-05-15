@@ -35,25 +35,28 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include "matx/transforms/transpose.h"
 
 using namespace matx;
 constexpr int m = 15;
 
 template <typename T> class DetSolverTest : public ::testing::Test {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;   
 protected:
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "det", "run", {m});
+    pb->InitAndRunTVGenerator<GTestType>("00_solver", "det", "run", {m});
     pb->NumpyToTensorView(Av, "A");
   }
 
   void TearDown() { pb.reset(); }
-
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Av{{m, m}};
-  tensor_t<T, 2> Atv{{m, m}};
-  tensor_t<T, 0> detv{};
+  tensor_t<GTestType, 2> Av{{m, m}};
+  tensor_t<GTestType, 2> Atv{{m, m}};
+  tensor_t<GTestType, 0> detv{{}};
 };
 
 template <typename TensorType>
@@ -61,7 +64,7 @@ class DetSolverTestNonComplexFloatTypes : public DetSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(DetSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
 {
@@ -69,10 +72,10 @@ TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
 
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  transpose(this->Atv, this->Av, 0);
+  (this->Atv = transpose(this->Av)).run(this->exec);
 
-  det(this->detv, this->Atv);
-  transpose(this->Av, this->Atv, 0); // Transpose back to row-major
+  (this->detv = det(this->Atv)).run(this->exec);
+  (this->Av = transpose(this->Atv)).run(this->exec); // Transpose back to row-major
   cudaStreamSynchronize(0);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->detv, "det", 0.1);

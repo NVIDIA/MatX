@@ -46,20 +46,24 @@
 
 namespace matx {
 namespace detail {
-template <size_t num_recursive, size_t num_non_recursive, 
+template <size_t num_recursive, size_t num_non_recursive,
           typename OutType, typename InType, typename FilterType>
 class matxFilter_t {
   static constexpr int RANK = OutType::Rank();
   using filter_tensor = matx::tensor_t<FilterType, 1>;
 
 public:
-  matxFilter_t([[maybe_unused]] OutType &o, const InType &i,
+  matxFilter_t(OutType &o, const InType &i,
                const filter_tensor &h_rec,
                const filter_tensor &h_nonrec)
       : h_nonr_copy(h_nonrec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
+    // o may be unused. We use the (void) idiom rather than [[maybe_unused]] due to
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429
+    (void) o;
+
     if constexpr (RANK == 1) {
       MATX_ASSERT(o.Size(0) == i.Size(0), matxInvalidSize);
 
@@ -157,7 +161,7 @@ public:
     MATX_THROW(matxNotSupported, "convolution not supported on host");
 #else
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if (num_recursive > 0) {
       auto grid =
           dim3(static_cast<int>(
@@ -176,7 +180,7 @@ public:
       // Just call the convolution kernel directly if they
       // don't require recursive coefficients. Default to SAME. Do we want to
       // use SAME here or give them an option? IIR doesn't have the same concept
-      conv1d(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
+      conv1d_impl(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, matxConvCorrMethod_t::MATX_C_METHOD_DIRECT, stream);
     }
 #endif
   }
@@ -185,7 +189,7 @@ private:
   void ClearState()
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     if (num_recursive > 0) {
       MATX_CUDA_CHECK(cudaMemset(
           (void *)d_status, 0,
@@ -339,61 +343,10 @@ struct FilterParamsKeyEq {
   }
 };
 
-// Static caches of 1D and 2D FFTs
-static matxCache_t<FilterParams_t, FilterParamsKeyHash, FilterParamsKeyEq>
-    filter_cache;
+using filter_cache_t = std::unordered_map<FilterParams_t, std::any, FilterParamsKeyHash, FilterParamsKeyEq>;
 
 } // end namspace detail
 
-
-/**
- * FIR and IIR filtering
- *
- * matxFilter_t provides an interface for executing recursive (IIR) and
- *non-recursive (FIR) filters. The IIR filter uses the algorithm from "S. Maleki
- *and M. Burtscher. "Automatic Hierarchical Parallelization of Linear
- *Recurrences." 23rd ACM International Conference on Architectural Support for
- *Programming Languages and Operating Systems. March 2018." for an optimized
- *implementation on highly-parallel processors. While the IIR implementation is
- *fast for recursive filters, it is inefficient for non-recursive filtering. If
- *the number of recursive coefficients is 0, the filter operation will revert to
- *use an algorithm optimized for non-recursive filters.
- *
- * @note If you are only using non-recursive filters, it's advised to use the
- *convolution API directly instead since it can be easier to use.
- *
- * @tparam NR
- *   Number of recursive coefficients
- * @tparam NNR
- *   Number of non-recursive coefficients
- * @tparam RANK
- *   Rank of input and output signal
- * @tparam OutType
- *   Ouput type
- * @tparam InType
- *   Input type
- * @tparam FilterType
- *   Filter type
- *
- * @param o
- *   Output tensor
- * @param i
- *   Input tensor
- * @param h_rec
- *   1D input tensor of recursive filter coefficients
- * @param h_nonrec
- *   1D input tensor of recursive filter coefficients
- **/
-template <size_t NR, size_t NNR, typename OutType, typename InType,
-          typename FilterType>
-static auto matxMakeFilter(OutType &o, const InType &i,
-                           tensor_t<FilterType, 1> &h_rec,
-                           tensor_t<FilterType, 1> &h_nonrec)
-{
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  return detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>{o, i, h_rec,
-                                                                  h_nonrec};
-}
 
 /**
  * FIR and IIR filtering
@@ -435,12 +388,12 @@ static auto matxMakeFilter(OutType &o, const InType &i,
  **/
 template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-static auto matxMakeFilter(OutType &o, const InType &i,
+auto matxMakeFilter(OutType &o, const InType &i,
                            const std::array<FilterType, NR> &h_rec,
                            const std::array<FilterType, NNR> &h_nonrec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   auto rec_v = make_tensor<FilterType>({static_cast<index_t>(h_rec.size())});
   auto nonrec_v = make_tensor<FilterType>({static_cast<index_t>(h_nonrec.size())});
 
@@ -452,8 +405,8 @@ static auto matxMakeFilter(OutType &o, const InType &i,
     nonrec_v(static_cast<index_t>(j)) = h_nonrec[j];
   }
 
-  return new detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>{
-      o, i, rec_v, nonrec_v};
+  return std::make_shared<detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>>(
+      o, i, rec_v, nonrec_v);
 }
 
 
@@ -501,12 +454,12 @@ static auto matxMakeFilter(OutType &o, const InType &i,
 // TODO: Update later once we support compile-time shapes
 template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
-void filter(OutType &o, const InType &i,
-            const std::array<FilterType, NR> h_rec,
-            const std::array<FilterType, NNR> h_nonrec, cudaStream_t stream = 0)
+void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
+            [[maybe_unused]] const std::array<FilterType, NR> h_rec,
+            [[maybe_unused]] const std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   // Get parameters required by these tensors
   auto params = detail::FilterParams_t();
   auto rhash = detail::PodArrayToHash<FilterType, NR>(h_rec);
@@ -523,21 +476,17 @@ void filter(OutType &o, const InType &i,
   params.ftype = detail::TypeToInt<FilterType>(); // Update when we support different types
   params.hash = rhash + nrhash;
 
-  // Get cache or new FFT plan if it doesn't exist
-  auto ret = detail::filter_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = matxMakeFilter<NR, NNR, OutType, InType, FilterType>(
-        o, i, h_rec, h_nonrec);
-    detail::filter_cache.Insert(params, static_cast<void *>(tmp));
-
-    tmp->Exec(o, i, stream);
-  }
-  else {
-    auto filter_type =
-        static_cast<detail::matxFilter_t<NR, NNR, OutType, InType, FilterType> *>(
-            ret.value());
-    filter_type->Exec(o, i, stream);
-  }
+  using cache_val_type = detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>;
+  detail::GetCache().LookupAndExec<detail::filter_cache_t>(
+    detail::GetCacheIdFromType<detail::filter_cache_t>(),
+    params,
+    [&]() {
+      return matxMakeFilter(o, i, h_rec, h_nonrec);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(o, i, stream);
+    }
+  );
 }
 
 } // end namespace matx

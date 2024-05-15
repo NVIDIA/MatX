@@ -31,7 +31,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#ifdef __CUDACC__
 #include <cuda_runtime_api.h>
+#endif
 #include <cuda/std/ccomplex>
 
 #include "matx/core/defines.h"
@@ -42,6 +44,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
+#include "matx/core/tie.h"
 #include "matx/core/utils.h"
 #include "matx/core/viz.h"
 

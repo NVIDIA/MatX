@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ include(${rapids-cmake-dir}/cpm/spdlog.cmake)
 rapids_cpm_init()
 
 if(TARGET spdlog::spdlog_header_only)
-  message(FATAL_ERROR "Expected spdlog::spdlog_header_only expected to not exist")
+  message(FATAL_ERROR "Expected spdlog::spdlog_header_only not to exist")
 endif()
 
 rapids_cpm_spdlog()

@@ -62,11 +62,11 @@ template <typename ValueType>
 void random(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   auto x = make_tensor<ValueType>({1966800});
+  auto y = make_tensor<ValueType>({1966800});
   x.PrefetchDevice(0);
+  y.PrefetchDevice(0);
 
-  randomGenerator_t<ValueType> gen(x.TotalSize(), 0);
-  
-  auto y = gen.template GetTensorView<x.Rank()>(x.Shape(), NORMAL);
+  (y = random<float>(x.Shape(), NORMAL)).run();
 
   state.add_element_count(x.TotalSize(), "NumElements");
   state.add_global_memory_writes<ValueType>(x.TotalSize());    

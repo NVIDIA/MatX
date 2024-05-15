@@ -59,24 +59,40 @@ namespace matx
         __MATX_INLINE__ SignOp(T op, scalar_type zval) : op_(op), zval_(zval) {};  
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            auto v = get_value(op_,indices...);
-            if constexpr (is_complex_v<scalar_type> ) {
-              if ( v == scalar_type(0)) {
-                return zval_;
-              } else {
-                return v / abs(v); // sign defintion for complex values
-              }
-            } else {  // real branch
-              if( v < 0) 
-                return scalar_type(-1);
-              else if ( v > 0 ) 
-                return scalar_type(1);
-              else 
-                return zval_;
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          auto v = get_value(op_,indices...);
+          if constexpr (is_complex_v<scalar_type> ) {
+            if ( v == scalar_type(0)) {
+              return zval_;
+            } else {
+              return v / abs(v); // sign defintion for complex values
             }
+          } else {  // real branch
+            if( v < 0) 
+              return scalar_type(-1);
+            else if ( v > 0 ) 
+              return scalar_type(1);
+            else 
+              return zval_;
           }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

@@ -38,14 +38,38 @@
 
 namespace matx 
 {
+
+// Matches current Linux max
+static constexpr int MAX_CPUS = 1024;
+struct cpu_set_t {
+  using set_type = uint64_t;
+
+  std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
+};
+
+struct HostExecParams {
+  HostExecParams(int threads = 1) : threads_(threads) {}
+  HostExecParams(cpu_set_t cpu_set) : cpu_set_(cpu_set) {
+    MATX_ASSERT_STR(false, matxNotSupported, "CPU affinity not supported yet");
+  }
+
+  int GetNumThreads() const { return threads_; }
+
+  private:
+    int threads_;
+    cpu_set_t cpu_set_;
+};
+
 /**
  * @brief Executor for running an operator on a single host thread
  * 
  */
-class SingleThreadHostExecutor {
+class HostExecutor {
   public:
-    using matx_cpu = bool; ///< Type trait indicating this is an executor
+    using matx_cpu = bool; ///< Type trait indicating this is a CPU executor
     using matx_executor = bool; ///< Type trait indicating this is an executor
+
+    HostExecutor(const HostExecParams &params = HostExecParams{}) : params_(params) {}
 
     /**
      * @brief Execute an operator
@@ -55,19 +79,26 @@ class SingleThreadHostExecutor {
      */
     template <typename Op>
     void Exec(Op &op) const noexcept {
-      if constexpr (Op::Rank() == 0) {
-        op();
-      }
-      else {
-        index_t size = TotalSize(op);
-        for (index_t i = 0; i < size; i++) {
-          auto idx = GetIdxFromAbs(op, i);
-          std::apply([&](auto... args) {
-            return op(args...);
-          }, idx);        
-        }      
+      if (params_.GetNumThreads() == 1) {
+        if constexpr (Op::Rank() == 0) {
+          op();
+        }
+        else {
+          index_t size = TotalSize(op);
+          for (index_t i = 0; i < size; i++) {
+            auto idx = GetIdxFromAbs(op, i);
+            std::apply([&](auto... args) {
+              return op(args...);
+            }, idx);        
+          }      
+        }
       }
     }
+
+    int GetNumThreads() const { return params_.GetNumThreads(); }
+
+    private:
+      HostExecParams params_;
 };
 
 }

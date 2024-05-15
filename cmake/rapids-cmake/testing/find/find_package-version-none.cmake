@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 include(${rapids-cmake-dir}/find/package.cmake)
 
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,12 +44,12 @@ set(path "${CMAKE_BINARY_DIR}/rapids-cmake/test_export_set/build/package_CUDAToo
 file(READ "${path}" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_find_package(BUILD) failed to perserve version information in exported file")
+  message(FATAL_ERROR "rapids_find_package(BUILD) failed to preserve version information in exported file")
 endif()
 
 set(path "${CMAKE_BINARY_DIR}/rapids-cmake/test_export_set/install/package_CUDAToolkit.cmake")
 file(READ "${path}" contents)
 string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
-  message(FATAL_ERROR "rapids_find_package(INSTALL) failed to perserve version information in exported file")
+  message(FATAL_ERROR "rapids_find_package(INSTALL) failed to preserve version information in exported file")
 endif()

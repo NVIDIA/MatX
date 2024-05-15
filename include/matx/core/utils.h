@@ -38,6 +38,7 @@
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
 
+#define HOPPER_CC 9
 #define AMPERE_CC 8
 #define VOLTA_CC 7
 #define PASCAL_CC 6
@@ -47,14 +48,19 @@ namespace detail {
 __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
     int val;
     int dev;
-    cudaGetDevice(&dev);
-    [[maybe_unused]] auto err = cudaDeviceGetAttribute(&val, attr, dev);
+    [[maybe_unused]] auto err = cudaGetDevice(&dev);
+    MATX_ASSERT(err == cudaSuccess, matxCudaError);
+    err = cudaDeviceGetAttribute(&val, attr, dev);
     MATX_ASSERT(err == cudaSuccess, matxCudaError);
     return val;
 }
 
 __MATX_INLINE__ int GetComputeCapabilityMajor() {
     return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+}
+
+__MATX_INLINE__ bool IsHopperOrAbove() {
+    return GetComputeCapabilityMajor() >= HOPPER_CC;
 }
 
 __MATX_INLINE__ bool IsAmpereOrAbove() {
@@ -161,8 +167,11 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
   }
 }
 
-template <int RANK, int D>
-auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+
+
+template <int RANK, typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type>, bool> = true>
+auto __MATX_INLINE__ getPermuteDims(T dims) {
+  constexpr auto D = dims.size();
   std::array<int, RANK> perm;
   std::array<bool, RANK> visited;
 
@@ -190,6 +199,11 @@ auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
   }
 
   return perm;
+}
+
+template <int RANK, int D>
+auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+  return getPermuteDims<RANK>(detail::to_array(dims));
 }
 
 };

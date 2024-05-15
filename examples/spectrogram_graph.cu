@@ -31,6 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "matx/transforms/transpose.h"
 #include <cassert>
 #include <cstdio>
 #include <math.h>
@@ -72,7 +73,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t nfft = 256;
   index_t noverlap = nperseg / 8;
   index_t nstep = nperseg - noverlap;
-  constexpr uint32_t num_iterations = 100;
+  constexpr uint32_t num_iterations = 20;
   float time_ms;
 
   std::array<index_t, 1> num_samps{N};
@@ -89,9 +90,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       {(N - noverlap) / nstep, nfft / 2 + 1});
   tensor_t<float, 1> s_time({(N - noverlap) / nstep});
 
-  randomGenerator_t<float> randData({N}, 0);
-  auto randDataView = randData.GetTensorView<1>(num_samps, NORMAL);
-
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
   (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
@@ -101,7 +99,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
   (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(stream);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * randDataView).run(stream);
+  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(stream);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(stream);
   // x = carrier + noise
@@ -119,9 +117,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         .run(stream);
 
     // Create overlapping matrix of segments.
-    auto stackedMatrix = x.OverlapView({nperseg}, {nstep});
+    auto stackedMatrix = overlap(x, {nperseg}, {nstep});
     // FFT along rows
-    fft(fftStackedMatrix, stackedMatrix, 0, stream);
+    (fftStackedMatrix = fft(stackedMatrix)).run(stream);
     // Absolute value
     (fftStackedMatrix = conj(fftStackedMatrix) * fftStackedMatrix)
         .run(stream);
@@ -147,9 +145,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
+
+  cudaStreamSynchronize(0);
   // Time graph execution of same kernels
   cudaEventRecord(start, stream);
-  for (uint32_t i = 0; i < num_iterations; i++) {
+  for (uint32_t i = 0; i < 10; i++) {
     cudaGraphLaunch(instance, stream);
   }
   cudaEventRecord(stop, stream);

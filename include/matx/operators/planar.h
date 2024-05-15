@@ -57,22 +57,36 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
-            auto tup = cuda::std::make_tuple(indices...);
-            if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
-              cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
-              return mapply(op_, tup).imag();
-            }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+          auto tup = cuda::std::make_tuple(indices...);
+          if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
+            cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
+            return mapply(op_, tup).imag();
+          }
 
-            return op_(indices...).real();      
-          }   
+          return op_(indices...).real();      
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        {
+          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+          auto tup = cuda::std::make_tuple(indices...);
+          if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
+            cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
+            return mapply(op_, tup).imag();
+          }
+
+          return op_(indices...).real();
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return detail::get_rank<T1>();
         }
+
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
           if constexpr (Rank() <= 1)
@@ -83,6 +97,22 @@ namespace matx
           return (dim == static_cast<int>(Rank()) - 2) ? op_.Size(dim) * 2
             : op_.Size(dim);
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }               
     };
   }
 

@@ -38,16 +38,18 @@
 
 using namespace matx;
 
-template <typename TensorType> struct TensorCreationTestsData {
-  tensor_t<TensorType, 0> t0{};
-  tensor_t<TensorType, 1> t1{{10}};
-  tensor_t<TensorType, 2> t2{{20, 10}};
-  tensor_t<TensorType, 3> t3{{30, 20, 10}};
-  tensor_t<TensorType, 4> t4{{40, 30, 20, 10}};
+template <typename T> struct TensorCreationTestsData {
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;     
+  tensor_t<GTestType, 0> t0{{}};
+  tensor_t<GTestType, 1> t1{{10}};
+  tensor_t<GTestType, 2> t2{{20, 10}};
+  tensor_t<GTestType, 3> t3{{30, 20, 10}};
+  tensor_t<GTestType, 4> t4{{40, 30, 20, 10}};
 
-  tensor_t<TensorType, 2> t2s = t2.Permute({1, 0});
-  tensor_t<TensorType, 3> t3s = t3.Permute({2, 1, 0});
-  tensor_t<TensorType, 4> t4s = t4.Permute({3, 2, 1, 0});
+  tensor_t<GTestType, 2> t2s = t2.Permute({1, 0});
+  tensor_t<GTestType, 3> t3s = t3.Permute({2, 1, 0});
+  tensor_t<GTestType, 4> t4s = t4.Permute({3, 2, 1, 0});
 };
 
 template <typename TensorType>
@@ -85,25 +87,24 @@ class TensorCreationTestsAll : public ::testing::Test,
                             public TensorCreationTestsData<TensorType> {
 };
 
-TYPED_TEST_SUITE(TensorCreationTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(TensorCreationTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(TensorCreationTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(TensorCreationTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(TensorCreationTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(TensorCreationTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(TensorCreationTestsNumericNonComplex, MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(TensorCreationTestsBoolean, MatXBoolTypes);
+
+
+TYPED_TEST_SUITE(TensorCreationTestsAll, MatXAllTypesAllExecs);
 
 TYPED_TEST(TensorCreationTestsAll, MakeShape)
 {
-  auto mt2 = make_tensor<TypeParam>({2, 2});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};  
+  auto mt2 = make_tensor<TestType>({2, 2});
   ASSERT_EQ(mt2.Size(0), 2);
   ASSERT_EQ(mt2.Size(1), 2);
 
-  auto mt0 = make_tensor<TypeParam>();
-  auto mt1 = make_tensor<TypeParam>({10});
-  auto mt3 = make_tensor<TypeParam>({10, 5, 4});
-  auto mt4 = make_tensor<TypeParam>({10, 5, 4, 3});
+  auto mt0 = make_tensor<float>({});
+  auto mt1 = make_tensor<cuda::std::complex<float>>({10});
+  auto mt3 = make_tensor<TestType>({10, 5, 4});
+  auto mt4 = make_tensor<TestType>({10, 5, 4, 3});
 
   ASSERT_EQ(mt1.Size(0), 10);
   ASSERT_EQ(mt3.Size(0), 10);
@@ -115,23 +116,23 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
   ASSERT_EQ(mt4.Size(3), 3);  
 }
 
-// TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
-// {
-//   auto mt1 = make_static_tensor<TypeParam, 10>();
-//   ASSERT_EQ(mt1.Size(0), 10);
+TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
+{
+  auto mt1 = make_static_tensor<TypeParam, 10>();
+  ASSERT_EQ(mt1.Size(0), 10);
 
-//   auto mt2 = make_static_tensor<TypeParam, 10, 40>();
-//   ASSERT_EQ(mt2.Size(0), 10);
-//   ASSERT_EQ(mt2.Size(1), 40);
+  auto mt2 = make_static_tensor<float, 10, 40>();
+  ASSERT_EQ(mt2.Size(0), 10);
+  ASSERT_EQ(mt2.Size(1), 40);
 
-//   auto mt3 = make_static_tensor<TypeParam, 10, 40, 30>();
-//   ASSERT_EQ(mt3.Size(0), 10);
-//   ASSERT_EQ(mt3.Size(1), 40);  
-//   ASSERT_EQ(mt3.Size(2), 30);  
+  auto mt3 = make_static_tensor<TypeParam, 10, 40, 30>();
+  ASSERT_EQ(mt3.Size(0), 10);
+  ASSERT_EQ(mt3.Size(1), 40);  
+  ASSERT_EQ(mt3.Size(2), 30);  
 
-//   auto mt4 = make_static_tensor<TypeParam, 10, 40, 30, 6>();
-//   ASSERT_EQ(mt4.Size(0), 10);
-//   ASSERT_EQ(mt4.Size(1), 40);  
-//   ASSERT_EQ(mt4.Size(2), 30);    
-//   ASSERT_EQ(mt4.Size(3), 6);    
-// }
+  auto mt4 = make_static_tensor<TypeParam, 10, 40, 30, 6>();
+  ASSERT_EQ(mt4.Size(0), 10);
+  ASSERT_EQ(mt4.Size(1), 40);  
+  ASSERT_EQ(mt4.Size(2), 30);    
+  ASSERT_EQ(mt4.Size(3), 6);    
+}

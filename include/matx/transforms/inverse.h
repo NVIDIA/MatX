@@ -43,11 +43,13 @@ namespace matx {
 
 /**
  * @brief Algorithm to use for matrix inverse
- * 
+ *
  */
 typedef enum {
   MAT_INVERSE_ALGO_LU,
 } MatInverseAlgo_t;
+
+
 
 namespace detail {
 /**
@@ -100,9 +102,9 @@ public:
     static_assert(RANK >= 2);
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     // Ok to remove since we're just passing a list of RO pointers
-    //using a_nc = typename std::remove_const<decltype(a)>(a); 
+    //using a_nc = typename std::remove_const<decltype(a)>(a);
 
     // Ensure matrix is square
     MATX_ASSERT(a.Size(RANK - 1) == a.Size(RANK - 2), matxInvalidSize);
@@ -135,13 +137,13 @@ public:
         for (size_t iter = 0; iter < total_iter; iter++) {
           auto ip = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
           auto op = std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
-          
+
           in_pointers.push_back(ip);
           out_pointers.push_back(op);
 
           // Update all but the last 2 indices
           UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, idx, batch_offset);
-        }        
+        }
       }
 
       // Allocate any workspace needed by inverse
@@ -195,10 +197,10 @@ public:
    */
   ~matxInversePlan_t()
   {
-    matxFree(d_A_array);
-    matxFree(d_A_inv_array);
-    matxFree(d_pivot);
-    matxFree(d_info);
+    matxFree(d_A_array, cudaStreamDefault);
+    matxFree(d_A_inv_array, cudaStreamDefault);
+    matxFree(d_pivot, cudaStreamDefault);
+    matxFree(d_info, cudaStreamDefault);
 
     cublasDestroy(handle);
   }
@@ -220,7 +222,7 @@ public:
   inline void Exec(cudaStream_t stream)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     cublasSetStream(handle, stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
@@ -336,15 +338,14 @@ struct InverseParamsKeyEq {
   }
 };
 
-// Static caches of inverse handles
-static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
-    inv_cache;
+using inv_cache_t = std::unordered_map<InverseParams_t, std::any, InverseParamsKeyHash, InverseParamsKeyEq>;
+
 
 }
 
 /**
  * @brief Perform a matrix inverse
- * 
+ *
  * @tparam TensorTypeAInv Inverse type
  * @tparam TensorTypeA Input type
  * @tparam ALGO Algorithm to use
@@ -353,28 +354,27 @@ static matxCache_t<InverseParams_t, InverseParamsKeyHash, InverseParamsKeyEq>
  * @param stream CUDA stream
  */
 template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
-void inv(TensorTypeAInv &a_inv, const TensorTypeA &a,
+void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
   params.stream = stream;
 
-  // Get cache or new inverse plan if it doesn't exist
-  auto ret = detail::inv_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxInversePlan_t{a_inv, a};
-    detail::inv_cache.Insert(params, static_cast<void *>(tmp));
-    tmp->Exec(stream);
-  }
-  else {
-    auto inv_type =
-        static_cast<detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO> *>(ret.value());
-    inv_type->Exec(stream);
-  }
+  using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
+  detail::GetCache().LookupAndExec<detail::inv_cache_t>(
+    detail::GetCacheIdFromType<detail::inv_cache_t>(),
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(a_inv, a);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(stream);
+    }
+  );
 }
+
 
 } // end namespace matx

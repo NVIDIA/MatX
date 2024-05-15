@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/cuda/init_architectures.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 unset(CMAKE_CUDA_ARCHITECTURES )
 
@@ -30,4 +30,4 @@ if(CMAKE_CUDA_ARCHITECTURES STREQUAL "ALL")
   message(FATAL_ERROR "rapids_cuda_init_architectures didn't init CUDA_ARCHITECTURES")
 endif()
 
-include("${rapids-cmake-testing-dir}/cuda/validate-cuda-all.cmake")
+include("${rapids-cmake-testing-dir}/cuda/validate-cuda-rapids.cmake")

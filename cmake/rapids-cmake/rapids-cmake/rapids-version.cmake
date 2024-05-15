@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,4 +16,6 @@
 # can't have an include guard on this file
 # that breaks its usage by cpm/detail/package_details
 
-set(rapids-cmake-version 22.10)
+if(NOT DEFINED rapids-cmake-version)
+  set(rapids-cmake-version 23.12)
+endif()

@@ -1,0 +1,7 @@
+
+``NATIVE`` or ``""``:
+  When passed as the value for :cmake:variable:`CMAKE_CUDA_ARCHITECTURES <cmake:variable:CMAKE_CUDA_ARCHITECTURES>` or :cmake:envvar:`ENV{CUDAARCHS} <cmake:envvar:CUDAARCHS>`
+  will compile for all GPU architectures present on the current machine.
+
+``RAPIDS``, ``ALL``, or no value in :cmake:variable:`CMAKE_CUDA_ARCHITECTURES <cmake:variable:CMAKE_CUDA_ARCHITECTURES>` and :cmake:envvar:`ENV{CUDAARCHS} <cmake:envvar:CUDAARCHS>`:
+  When passed as the value for :cmake:variable:`CMAKE_CUDA_ARCHITECTURES <cmake:variable:CMAKE_CUDA_ARCHITECTURES>` or :cmake:envvar:`ENV{CUDAARCHS} <cmake:envvar:CUDAARCHS>` will compile for all supported RAPIDS GPU architectures.

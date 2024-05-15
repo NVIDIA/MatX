@@ -101,7 +101,7 @@ public:
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1) { return F::op(v1); }
 
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1) const { return op(v1); }
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1 &v1) const { return op(v1); }
 
   using scalar_type = std::invoke_result_t<decltype(op), T1>;
 };
@@ -117,7 +117,7 @@ public:
     return F::op(v1, v2);
   }
 
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2) const
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1 &v1, const T2 &v2) const
   {
     return op(v1, v2);
   }
@@ -133,7 +133,7 @@ public:
     return F::op(v1, v2, v3);
   }
 
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(const T1 &v1, const T2 &v2, const T3 &v3) const
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1 &v1, const T2 &v2, const T3 &v3) const
   {
     return op(v1, v2, v3);
   }
@@ -172,6 +172,23 @@ template <typename T> struct SqrtF {
 
 template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
 
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)
+{
+  static_assert(std::is_floating_point_v<T>, "csqrt() only supports non-complex floating point inputs");
+  return sqrt(static_cast<cuda::std::complex<T>>(v1));
+}
+
+template <typename T> struct CSqrtF {
+  static __MATX_INLINE__ std::string str() { return "csqrt"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_csqrt(v1);
+  }
+};
+
+
+template <typename T> using CsqrtOp = UnOp<T, CSqrtF<T>>;
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
@@ -285,6 +302,20 @@ template <typename T> struct ExpjF {
 };
 template <typename T> using ExpjOp = UnOp<T, ExpjF<T>>;
 
+template <typename T> struct Abs2F {
+  static __MATX_INLINE__ std::string str() { return "abs2"; }
+
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v)
+  {
+    if constexpr (is_complex_v<T>) {
+      return v.real() * v.real() + v.imag() * v.imag();
+    }
+    else {
+      return v * v;
+    }
+  }
+};
+template <typename T> using Abs2Op = UnOp<T, Abs2F<T>>;
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
@@ -578,25 +609,25 @@ template <typename T1, typename T2> struct PowF {
 };
 template <typename T1, typename T2> using PowOp = BinOp<T1, T2, PowF<T1, T2>>;
 
-template <typename T1, typename T2> struct MaxF {
-  static std::string str(const std::string &str1, const std::string &str2) { return "max(" + str1 + "," + str2 + ")"; }
+template <typename T1, typename T2> struct MaximumF {
+  static std::string str(const std::string &str1, const std::string &str2) { return "maximum(" + str1 + "," + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return std::max(v1, v2);
   }
 };
-template <typename T1, typename T2> using MaxOp = BinOp<T1, T2, MaxF<T1, T2>>;
+template <typename T1, typename T2> using MaximumOp = BinOp<T1, T2, MaximumF<T1, T2>>;
 
-template <typename T1, typename T2> struct MinF {
-  static std::string str(const std::string &str1, const std::string &str2) { return "min(" + str1 + "," + str2 + ")"; }
+template <typename T1, typename T2> struct MinimumF {
+  static std::string str(const std::string &str1, const std::string &str2) { return "minimum(" + str1 + "," + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
     return std::min(v1, v2);
   }
 };
-template <typename T1, typename T2> using MinOp = BinOp<T1, T2, MinF<T1, T2>>;
+template <typename T1, typename T2> using MinimumOp = BinOp<T1, T2, MinimumF<T1, T2>>;
 
 // Logical Operators
 template <typename T1, typename T2> struct LTF {
@@ -661,6 +692,60 @@ template <typename T1> struct NotF {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1) { return !v1; }
 };
 template <typename T1> using NotOp = UnOp<T1, NotF<T1>>;
+
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isnan(T v1)
+{
+  using conversionType = typename matx::detail::value_promote_t<T>;  
+  if constexpr(!std::is_floating_point_v<conversionType>) {
+    return false;
+  } 
+
+  using castType = matx::detail::matx_convert_complex_type<T>;
+  if constexpr(is_complex_v<T>) {
+    return cuda::std::isnan(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isnan(static_cast<typename castType::value_type>(v1.imag()));
+  } else {
+    return cuda::std::isnan(static_cast<castType>(v1));
+  }
+
+  return false;  
+}
+template <typename T>
+struct IsNan {
+  static __MATX_INLINE__ std::string str() { return "isnan"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_isnan(v1);
+  }
+};
+template <typename T> using IsNanOp = UnOp<T, IsNan<T>>;   
+
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isinf(T v1)
+{
+  using conversionType = typename matx::detail::value_promote_t<T>;  
+  if constexpr(!std::is_floating_point_v<conversionType>) {
+    return false;
+  } 
+
+  using castType = matx::detail::matx_convert_complex_type<T>;
+  if constexpr(is_complex_v<T>) {
+    return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
+  } else {
+    return cuda::std::isinf(static_cast<castType>(v1));
+  }
+
+  return false;  
+}
+template <typename T>
+struct IsInf {
+  static __MATX_INLINE__ std::string str() { return "isinf"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_isinf(v1);
+  }
+};
+template <typename T> using IsInfOp = UnOp<T, IsInf<T>>;   
 
 template <typename T1, typename T2> struct AndF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "&" + str2 + ")"; }

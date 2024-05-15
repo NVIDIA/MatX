@@ -41,24 +41,28 @@ using namespace matx;
 template <typename T> class CovarianceTest : public ::testing::Test {
 
 protected:
-  const index_t cov_dim = 4;
+  const index_t cov_dim1 = 4;
+  const index_t cov_dim2 = 3;
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;
+
   void SetUp() override
   {
-    CheckTestTensorCoreTypeSupport<T>();
+    CheckTestTensorCoreTypeSupport<GTestType>();
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("00_transforms", "cov_operators", {cov_dim});
+    pb->InitTVGenerator<GTestType>("00_transforms", "cov_operators", {cov_dim1, cov_dim2});
 
     // Half precision needs a bit more tolerance when compared to
     // fp32
-    if constexpr (is_complex_half_v<T> || is_matx_half_v<T>) {
+    if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 0.1f;
     }
   }
 
   void TearDown() { pb.reset(); }
-
-  tensor_t<T, 2> av{{cov_dim, cov_dim}};
-  tensor_t<T, 2> cv{{cov_dim, cov_dim}};
+  GExecType exec{};
+  tensor_t<GTestType, 2> av{{cov_dim1, cov_dim2}};
+  tensor_t<GTestType, 2> cv{{cov_dim2, cov_dim2}};
 
   float thresh = 0.01f;
   std::unique_ptr<detail::MatXPybind> pb;
@@ -68,15 +72,51 @@ template <typename TensorType>
 class CovarianceTestFloatTypes : public CovarianceTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(CovarianceTestFloatTypes, MatXFloatTypes);
+TYPED_TEST_SUITE(CovarianceTestFloatTypes, MatXFloatTypesCUDAExec);
 
 TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
 {
   MATX_ENTER_HANDLER();
   this->pb->RunTVGenerator("cov");
   this->pb->NumpyToTensorView(this->av, "a");
-  cov(this->cv, this->av, 0);
-
+  // example-begin cov-test-1
+  (this->cv = cov(this->av)).run(this->exec);
+  // example-end cov-test-1
+  cudaDeviceSynchronize();
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "c_cov", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
+// The previous slice code was incorrect, but passing on x86. When compiling on ARM all the sizes
+// were incorrect. The slice syntax was fixed, but after doing that it fails on the 8th element
+// in the batch
+TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->RunTVGenerator("cov");
+  this->pb->NumpyToTensorView(this->av, "a");
+
+  const int m = 3;
+  const int n = 5;
+  const int k = 7;
+
+  // Test a batched 5D input
+  auto batched_in = make_tensor<TestType>({m, n, k, this->cov_dim1, this->cov_dim2});
+  auto batched_out = make_tensor<TestType>({m, n, k, this->cov_dim2, this->cov_dim2});
+  (batched_in = clone<5>(this->av, {m, n, k, matxKeepDim, matxKeepDim})).run(this->exec);
+
+  (batched_out = cov(batched_in)).run(this->exec);
+  cudaDeviceSynchronize();
+
+  for (int im = 0; im < m; im++) {
+    for (int in = 0; in < n; in++) {
+      for (int ik = 0; ik < k; ik++) {
+        auto bv = slice<2>(batched_out, {im,in,ik,0,0}, {matxDropDim,matxDropDim,matxDropDim,matxEnd,matxEnd});
+        MATX_TEST_ASSERT_COMPARE(this->pb, bv, "c_cov", this->thresh);
+      }
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }

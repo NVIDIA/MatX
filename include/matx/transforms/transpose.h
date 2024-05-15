@@ -59,7 +59,7 @@ namespace matx
    *
    */
   template <typename OutputTensor, typename InputTensor>
-    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
+    __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
         const InputTensor &in, cudaExecutor exec)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -103,17 +103,19 @@ namespace matx
     };
   
   template <typename OutputTensor, typename InputTensor>
-    __MATX_INLINE__ void transpose([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in, SingleThreadHostExecutor exec)
+    __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
+        const InputTensor &in, HostExecutor exec)
     {
-      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-      
-      constexpr int RANK = OutputTensor::Rank();
-      if constexpr (RANK <= 1)
-      {
-        return;
-      }
-      
-      (out = transpose(in)).run(exec);
-    };
+      static_assert(InputTensor::Rank() >= 2, "transpose_matrix operator must be on rank 2 or greater");
+
+      int32_t dims[InputTensor::Rank()];
+      for(int i = 0; i < InputTensor::Rank(); i++) 
+        dims[i] = i;
+      int32_t dim1 = InputTensor::Rank() - 1;
+      int32_t dim2 = InputTensor::Rank() - 2;
+
+      std::swap(dims[dim1],dims[dim2]);
+      (out = permute(in, detail::to_array(dims))).run(exec);
+    }
+
 } // end namespace matx

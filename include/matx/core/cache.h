@@ -35,12 +35,26 @@
 
 #include <functional>
 #include <optional>
+#include <any>
 #include <unordered_map>
+#include <cuda/atomic>
 
 #include "matx/core/error.h"
 
 namespace matx {
 namespace detail {
+
+using CacheId = uint64_t;
+
+inline cuda::std::atomic<CacheId> CacheIdCounter{0};
+
+template<typename CacheType>
+CacheId GetCacheIdFromType()
+{
+  static CacheId id = CacheIdCounter.fetch_add(1);
+
+  return id;
+}
 
 /**
  * Generic caching object for caching parameters. This class is used for
@@ -49,48 +63,51 @@ namespace detail {
  * needed to define an FFT, and if that plan already exists, a user doesn't need
  * to create another plan.
  */
-template <typename InParams, typename KeyHash, typename KeyEq>
 class matxCache_t {
 public:
   matxCache_t() {}
-
-  /**
-   * Look up parameters in the cache
-   *
-   * @param in
-   *   Input parameters
-   * @returns
-   *   nullopt if no match exists, or the object request if exists
-   */
-  std::optional<void *> Lookup(InParams &in)
-  {
-    auto el = cache.find(in);
-    if (el == cache.end()) {
-      return std::nullopt;
+  ~matxCache_t() {
+    // Destroy all outstanding objects in the cache to free memory
+    for (auto &[k, v]: cache) {
+      v.reset();
     }
-
-    return el->second;
   }
-
-  /**
-   * Insert an object into the cache
-   *
-   * @param params
-   *   Input parameters (key)
-   * @param obj
-   *   Object to store (value)
-   *
-   */
-  void Insert(InParams &params, void *obj) { cache.insert({params, obj}); }
 
   /**
    * Deletes the entire contents of the cache
    *
    */
-  void Clear() { cache.clear(); }
+  template <typename CacheType>
+  void Clear(const CacheId &id) {
+    auto el = cache.find(id);
+    MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
+
+    std::any_cast<CacheType>(el->second).clear();
+  }
+
+  template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun>
+  void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
+    // Create named cache if it doesn't exist
+    auto el = cache.find(id);
+    if (el == cache.end()) {
+      cache[id] = CacheType{};
+    }
+
+    auto &cval = cache[id];
+    auto &rmap = std::any_cast<CacheType&>(cval);
+    auto cache_el = rmap.find(params);
+    if (cache_el == rmap.end()) {
+      std::any tmp = mfun();
+      rmap.insert({params, tmp});
+      efun(std::any_cast<decltype(mfun())>(tmp));
+    }
+    else {
+      efun(std::any_cast<decltype(mfun())>(cache_el->second));
+    }
+  }
 
 private:
-  std::unordered_map<InParams, void *, KeyHash, KeyEq> cache;
+  std::unordered_map<CacheId, std::any> cache;
 };
 
 /**
@@ -105,6 +122,18 @@ inline size_t PodArrayToHash(std::array<T, len> c)
   }
 
   return hash;
+}
+
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ matxCache_t &InitCache() {
+  static matxCache_t cache;
+  return cache;
+}
+
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ matxCache_t &GetCache() {
+  const auto &tracker = GetAllocMap();
+  return InitCache();
 }
 
 }  // namespace detail

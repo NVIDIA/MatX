@@ -43,11 +43,11 @@ class QR2SolverTestNonHalfTypes : public ::testing::Test{
 };
 
 TYPED_TEST_SUITE(QR2SolverTestNonHalfTypes,
-                 MatXFloatNonHalfTypes);
+  MatXFloatNonHalfTypesCUDAExec);
 
-template <typename TypeParam, int RANK>
-void qr_test( const index_t (&AshapeA)[RANK]) {
-  using AType = TypeParam;
+template <typename TestType, int RANK>
+void qr_test( const index_t (&AshapeA)[RANK]) { 
+  using AType = TestType;
   using SType = typename inner_op_type_t<AType>::type;
   
   cudaStream_t stream = 0;
@@ -69,40 +69,40 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   auto Q = make_tensor<AType>(Qshape);
   auto R = make_tensor<AType>(Rshape);
   
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-  auto random = gen.GetTensorView(Ashape, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>(Ashape, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   Q.PrefetchDevice(stream);
   R.PrefetchDevice(stream);
   
-  qr(Q, R, A, stream);
+  // example-begin qr-test-1
+  (mtie(Q, R) = qr(A)).run(stream);
+  // example-end qr-test-1
 
-  auto mdiffQTQ = make_tensor<SType>();
-  auto mdiffQR = make_tensor<SType>();
+  auto mdiffQTQ = make_tensor<SType>({});
+  auto mdiffQR = make_tensor<SType>({});
 
   {
     // QTQ == Identity
     auto QTQ = make_tensor<AType>(Qshape);
-    matmul(QTQ, conj(transpose(Q)), Q, stream);
-    auto e = eye<SType>({m,m});
+    (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(stream);
+    auto e = eye<SType>({m, m});
 
     auto eShape = Qshape;
     eShape[RANK-1] = matxKeepDim;
     eShape[RANK-2] = matxKeepDim;
     auto I = clone<RANK>(e, eShape);
   
-    rmax(mdiffQTQ, abs(QTQ-I), stream);
+    (mdiffQTQ = max(abs(QTQ-I))).run(stream);
 
   }
 
   {
     // Q*R == A
     auto QR = make_tensor<AType>(Ashape);
-    matmul(QR, Q, R, stream);
+    (QR = matmul(Q, R)).run(stream);
     
-    rmax(mdiffQR, abs(A-QR), stream);
+    (mdiffQR = max(abs(A-QR))).run(stream);
   }
 
   cudaDeviceSynchronize();
@@ -114,18 +114,19 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
 TYPED_TEST(QR2SolverTestNonHalfTypes, QR2)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;  
   
-  qr_test<TypeParam>({4,4});
-  qr_test<TypeParam>({4,16});
-  qr_test<TypeParam>({16,4});
+  qr_test<TestType>({4,4});
+  qr_test<TestType>({4,16});
+  qr_test<TestType>({16,4});
 
-  qr_test<TypeParam>({25,4,4});
-  qr_test<TypeParam>({25,4,16});
-  qr_test<TypeParam>({25,16,4});
+  qr_test<TestType>({25,4,4});
+  qr_test<TestType>({25,4,16});
+  qr_test<TestType>({25,16,4});
 
-  qr_test<TypeParam>({5,5,4,4});
-  qr_test<TypeParam>({5,5,4,16});
-  qr_test<TypeParam>({5,5,16,4});
+  qr_test<TestType>({5,5,4,4});
+  qr_test<TestType>({5,5,4,16});
+  qr_test<TestType>({5,5,16,4});
   
   MATX_EXIT_HANDLER();
 }

@@ -311,10 +311,12 @@ public:
     /*  In release mode with O3 on g++ seems to give incorrect warnings on this line from Clone()
         and clone(). It appears there's no valid code path that would cause this to be unitialized,
         so we're ignoring the warning in this one spot. */
+#if defined(__GNUC__) && !defined(__clang__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     return *(stride_.begin() + dim); 
     #pragma GCC diagnostic pop
+#endif    
   }
 
   /**
@@ -345,11 +347,12 @@ private:
 template <index_t I, index_t... Is> 
 class static_tensor_desc_t {
 public:
-  using ShapeContainer = std::array<index_t, sizeof...(Is)>;  ///< Type trait of shape type
-  using StrideContainer = std::array<index_t, sizeof...(Is)>; ///< Type trait of stride type
+  using shape_container = std::array<index_t, sizeof...(Is) + 1>;  ///< Type trait of shape type
+  using stride_container = std::array<index_t, sizeof...(Is) + 1>; ///< Type trait of stride type
   using shape_type  = index_t; ///< Type trait of shape container
   using stride_type = index_t; ///< Type trait of stride container
   using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
+  using matx_static_descriptor = bool; ///< Type trait to indicate this is a static tensor descriptor
 
   /**
    * Check if a descriptor is linear in memory for all elements in the view
@@ -377,6 +380,15 @@ public:
    * @return Stride of dimension
    */  
   static constexpr auto Stride(int dim) { return stride_[dim]; }
+
+  /**
+   * @brief Return strides contaienr of descriptor
+   * 
+   * @return Strides container
+   */
+  static constexpr auto Strides() { 
+    return stride_;
+  }  
 
   /**
    * @brief Get rank of descriptor
@@ -417,8 +429,8 @@ private:
       return m;
   }
 
-  static constexpr ShapeContainer shape_ = make_shape();
-  static constexpr StrideContainer stride_ = make_strides();  
+  static constexpr shape_container shape_ = make_shape();
+  static constexpr stride_container stride_ = make_strides();  
 };
 
 /**

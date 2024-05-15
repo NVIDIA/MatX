@@ -63,15 +63,26 @@ template <typename T, typename Op>
 class set : public BaseOp<set<T, Op>> {
 private:
   mutable typename base_type<T>::type out_;
-  typename base_type<Op>::type op_;
+  mutable typename base_type<Op>::type op_;
 
 public:
   // Type specifier for reflection on class
   using scalar_type = typename T::scalar_type;
   using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>;
+  using tensor_type = T;
+  using op_type = Op;
+  using matx_setop = bool;
 
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
+  }
+
+  auto &get_lhs() {
+    return out_;
+  }
+
+  auto &get_rhs() {
+    return op_;
   }
 
   /**
@@ -86,14 +97,19 @@ public:
   inline set(T &out, const Op op) : out_(out), op_(op)
   {
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
+    static_assert(!is_matx_transform_op<T>(), "Cannot use transform operator on LHS of assignment");
 
-    ASSERT_COMPATIBLE_OP_SIZES(op);
+    // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
+    // sizes
+    if constexpr (!is_mtie<T>()) {
+      ASSERT_COMPATIBLE_OP_SIZES(op);
+    }
   }
 
   set &operator=(const set &) = delete;
 
   template <typename... Is>
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(Is... indices) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
@@ -134,7 +150,7 @@ public:
       return r;
     }
   }
-  __MATX_DEVICE__ __MATX_HOST__ inline auto operator()(std::array<shape_type, T::Rank()> idx) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(std::array<shape_type, T::Rank()> idx) const noexcept
   {
     auto res = mapply([&](auto &&...args)  {
         return _internal_mapply(args...);
@@ -142,6 +158,28 @@ public:
     );
 
     return res;
+  }
+
+  template <typename ShapeType, typename Executor>
+  __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+  {
+    if constexpr (is_matx_op<T>()) {
+      out_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }    
+    if constexpr (is_matx_op<Op>()) {
+      op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+  }
+
+  template <typename ShapeType, typename Executor>
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+  {
+    if constexpr (is_matx_op<T>()) {
+      out_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }     
+    if constexpr (is_matx_op<Op>()) {
+      op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
   }
 
   /**

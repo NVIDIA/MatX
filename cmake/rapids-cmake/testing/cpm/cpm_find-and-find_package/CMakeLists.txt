@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 include(${rapids-cmake-dir}/cpm/init.cmake)
 include(${rapids-cmake-dir}/cpm/find.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(rapids-test-project LANGUAGES CXX)
 
 
@@ -36,4 +36,3 @@ endif()
 if(NOT TARGET MOCK_CUCXX)
   message(FATAL_ERROR "cucxx targets should be generated")
 endif()
-

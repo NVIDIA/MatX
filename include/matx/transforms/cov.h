@@ -40,6 +40,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/transforms/matmul.h"
+#include "matx/transforms/transpose.h"
 
 namespace matx {
 namespace detail {
@@ -75,13 +76,13 @@ public:
    * @param c
    *   C output covariance matrix view
    */
-  matxCovHandle_t(TensorTypeC &c, const TensorTypeA &a)
+  matxCovHandle_t(TensorTypeC &c, const TensorTypeA &a, cudaStream_t stream = 0)
   {
     static_assert(RANK >= 2);
     MATX_ASSERT(c.Size(RANK - 1) == c.Size(RANK - 2), matxInvalidSize);
     MATX_ASSERT(a.Size(RANK - 1) == c.Size(RANK - 1), matxInvalidSize);
-    
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
+
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     // Ensure batch dimensions are equal
     for (int i = 2; i < RANK - 2; i++) {
@@ -89,45 +90,34 @@ public:
     }
 
     // This must come before the things below to properly set class parameters
-    params_ = GetCovParams(c, a);
+    params_ = GetCovParams(c, a, stream);
 
-    onesM = make_tensor_p<T1>({a.Size(RANK - 2), a.Size(RANK - 2)});
-    means = make_tensor_p<T1>(a.Shape());
-    devs = make_tensor_p<T1>(a.Shape());
+    make_tensor(onesM, {a.Size(RANK - 2), a.Size(RANK - 2)}, MATX_ASYNC_DEVICE_MEMORY, stream);
+    make_tensor(means, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    make_tensor(devs, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
     // Transposed view of deviations
     std::array<index_t, RANK> tmp;
-    for (int i = 0; i < RANK; i++) {
-      tmp[i] = a.Size(RANK - i - 1);
+    for (int i = 0; i < RANK-2; i++) {
+      tmp[i] = a.Size(i);
     }
+    tmp[RANK-2] = a.Size(RANK-1);
+    tmp[RANK-1] = a.Size(RANK-2);
 
-    devsT = make_tensor_p<T1>(std::move(tmp));
+    make_tensor(devsT, tmp, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     // Populate our ones matrix
-    (*onesM = ones({a.Size(RANK - 2), a.Size(RANK - 2)})).run();
+    (onesM = ones()).run(stream);
   }
 
-  static CovParams_t GetCovParams([[maybe_unused]] TensorTypeC &c, const TensorTypeA &a)
+  static CovParams_t GetCovParams([[maybe_unused]] TensorTypeC &c, const TensorTypeA &a, cudaStream_t stream = 0)
   {
     CovParams_t params;
     params.dtype = TypeToInt<T1>();
     params.A = a.Data();
+    params.stream = stream;
 
     return params;
-  }
-
-  /**
-   * Cov handle destructor
-   *
-   * Destroys any helper data used for provider type and any workspace memory
-   * created
-   *
-   */
-  ~matxCovHandle_t()
-  {
-    delete onesM;
-    delete means;
-    delete devs;
   }
 
 /**
@@ -154,13 +144,13 @@ public:
   inline void Exec(TensorTypeC &c, const TensorTypeA &a,
                    cudaStream_t stream)
   {
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Calculate a matrix of means
-    matmul(*means, *onesM, a, stream,
+    matmul_impl(means, onesM, a, stream,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
 
     // Subtract the means from the observations to get the deviations
-    (*devs = a - *means).run(stream);
+    (devs = a - means).run(stream);
 
     if constexpr (is_complex_v<T1>) {
       // This step is not really necessary since BLAS can do it for us, but
@@ -168,23 +158,23 @@ public:
       // to have this in a temporary variable. Note that we use the Python
       // convention of E[XX'] instead of MATLAB's E[X'X]. Both are "correct",
       // but we need to match python output
-      (*devsT = hermitianT(*devs)).run(stream);      
+      (devsT = hermitianT(devs)).run(stream);
     }
     else {
-      transpose(*devsT, *devs, stream);
+      (devsT = transpose_matrix(devs)).run(stream);
     }
 
     // Multiply by itself and scale by N-1 for the final covariance
-    matmul(c, *devsT, *devs, stream,
+    matmul_impl(c, devsT, devs, stream,
                 1.0f / static_cast<float>(a.Size(RANK - 2) - 1));
-  }    
+  }
 
   private:
     // Member variables
-    matx::tensor_t<T1, 2> *onesM;
-    matx::tensor_t<T1, RANK> *means;
-    matx::tensor_t<T1, RANK> *devs;
-    matx::tensor_t<T1, RANK> *devsT;  
+    matx::tensor_t<T1, 2> onesM;
+    matx::tensor_t<T1, RANK> means;
+    matx::tensor_t<T1, RANK> devs;
+    matx::tensor_t<T1, RANK> devsT;
     CovParams_t params_;
 };
 
@@ -212,8 +202,8 @@ struct CovParamsKeyEq {
   }
 };
 
-// Static caches of covariance matrices
-static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
+
+using cov_cache_t = std::unordered_map<CovParams_t, std::any, CovParamsKeyHash, CovParamsKeyEq>;
 
 } // end namespace detail
 /**
@@ -238,26 +228,24 @@ static matxCache_t<CovParams_t, CovParamsKeyHash, CovParamsKeyEq> cov_cache;
  *   CUDA stream
  */
 template <typename TensorTypeC, typename TensorTypeA>
-void cov(TensorTypeC &c, const TensorTypeA &a,
+void cov_impl(TensorTypeC &c, const TensorTypeA &a,
          cudaStream_t stream = 0)
 {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)    
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
-  auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a);
-  params.stream = stream;
+  auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a, stream);
 
-  // Get cache or new cov plan if it doesn't exist
-  auto ret = detail::cov_cache.Lookup(params);
-  if (ret == std::nullopt) {
-    auto tmp = new detail::matxCovHandle_t<TensorTypeC, TensorTypeA>{c, a};
-    detail::cov_cache.Insert(params, static_cast<void *>(tmp));
-
-    tmp->Exec(c, a, stream);
-  }
-  else {
-    auto cov_type = static_cast<detail::matxCovHandle_t<TensorTypeC, TensorTypeA> *>(ret.value());
-    cov_type->Exec(c, a, stream);
-  }
+  using cache_val_type = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>;
+  detail::GetCache().LookupAndExec<detail::cov_cache_t>(
+    detail::GetCacheIdFromType<detail::cov_cache_t>(),
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(c, a);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(c, a, stream);
+    }
+  );
 }
 
 } // end namespace matx

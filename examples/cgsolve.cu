@@ -52,7 +52,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto B = make_tensor<TypeParam, 2> ({BATCH, N});
   auto Bout = make_tensor<TypeParam, 2> ({BATCH, N});
   auto norm = make_tensor<TypeParam, 1>({BATCH});
-  auto maxn = make_tensor<TypeParam>();
+  auto maxn = make_tensor<TypeParam>({});
 
 
   // Simple Poisson matrix
@@ -78,11 +78,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   (X = TypeParam(1)).run();
 
-  cgsolve(X, A, B, .0001, max_iters);
+  (X = cgsolve(A, B, .0001, max_iters)).run();
 
-  matvec(Bout, A, X);
-  sum(norm, (Bout-B)*(Bout-B));
-  matx::rmax(maxn, sqrt(norm), 0);
+  (Bout = matvec(A, X)).run();
+  (norm = sum((Bout-B)*(Bout-B))).run();
+  (maxn = matx::max(sqrt(norm))).run();
 
   cudaDeviceSynchronize();
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));

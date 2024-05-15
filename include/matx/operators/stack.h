@@ -123,7 +123,7 @@ namespace matx
         }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... is) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
         {
           std::array<index_t, RANK + 1> indices = {{is...}};
           std::array<index_t, RANK> indices_o;
@@ -144,7 +144,7 @@ namespace matx
         }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... is)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
           std::array<index_t, RANK + 1> indices = {{is...}};
           std::array<index_t, RANK> indices_o;
@@ -181,7 +181,15 @@ namespace matx
         }
       }
 
-     template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+      template<typename R> 
+      __MATX_INLINE__ auto operator=(const R &rhs) { 
+        if constexpr (is_matx_transform_op<R>()) {
+          return mtie(*this, rhs);
+        }
+        else {          
+          return set(*this, rhs); 
+        }
+      }
 
       private:
       cuda::std::tuple<Ts...> ops_;

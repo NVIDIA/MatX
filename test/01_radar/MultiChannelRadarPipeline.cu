@@ -39,12 +39,14 @@
 
 template <typename T> class MultiChannelRadarPipeline : public ::testing::Test {
 protected:
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;
   void SetUp() override
   {
     assert(numSamples > waveformLength);
 
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitTVGenerator<T>("01_radar", "simple_radar_pipeline",
+    pb->InitTVGenerator<GTestType>("01_radar", "simple_radar_pipeline",
                            {numPulses, numSamples, waveformLength});
 
     // Set the number of channels before running
@@ -55,7 +57,6 @@ protected:
   }
 
   void TearDown() { pb.reset(); }
-
   uint32_t iterations = 100;
   index_t numChannels = 16;
   index_t numPulses = 128;
@@ -71,18 +72,19 @@ class MultiChannelRadarPipelineTypes
     : public MultiChannelRadarPipeline<TensorType> {
 };
 
-TYPED_TEST_SUITE(MultiChannelRadarPipelineTypes, MatXComplexNonHalfTypes);
+TYPED_TEST_SUITE(MultiChannelRadarPipelineTypes, MatXComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  auto p = RadarPipeline<TypeParam>(this->numPulses, this->numSamples,
+  auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
   auto d = p.GetInputView();
 
   auto data =
-      tensor_t<TypeParam, 2>({this->numPulses, this->numSamplesRnd});
+      tensor_t<TestType, 2>({this->numPulses, this->numSamplesRnd});
   auto x_in = data.Slice({0, 0}, {this->numPulses, this->numSamples});
   auto x_clone =
       data.template Clone<3>({this->numChannels, matxKeepDim, matxKeepDim});
@@ -112,8 +114,9 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
 TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  auto p = RadarPipeline<TypeParam>(this->numPulses, this->numSamples,
+  auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
 
   auto d = p.GetInputView();
@@ -142,8 +145,9 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
 TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  auto p = RadarPipeline<TypeParam>(this->numPulses, this->numSamples,
+  auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
   auto in = p.GetTPCView();
 
@@ -164,11 +168,12 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
 TYPED_TEST(MultiChannelRadarPipelineTypes, CFARDetection)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
   const int fft_size = 256;
   const int cfarMaskX = 13;
   const int cfarMaskY = 5;
 
-  auto p = RadarPipeline<TypeParam>(this->numPulses, this->numSamples,
+  auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
   auto inView = p.GetTPCView();
 

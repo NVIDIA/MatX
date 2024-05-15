@@ -22,7 +22,7 @@ into three categories:
 
 While RAPIDS core provides commonly used scripts we know that they aren't universal and might need to be composed in different ways.
 
-This means that the code we are developing should be designed for composibility, and all side-effects
+This means that the code we are developing should be designed for composability, and all side-effects
 or CMake behavior changes should be explicitly opt-in.
 
 So when writing new rapids-cmake features make sure to think about how users might want to opt-in, and
@@ -69,14 +69,14 @@ that don't/can't use `rapids_add_library` to still opt-in to other features.
 
 Please ensure that when you are creating new features you follow the following guidelines:
    - Each function should follow the `rapids_<component>_<file_name>` naming pattern
-   - Each function should go into a separate `.cmake` file in the approiate directory
+   - Each function should go into a separate `.cmake` file in the appropriate directory
    - Each user facing `.cmake` file should have include guards (`include_guard(GLOBAL)`)
    - Each user facing `.cmake` file should be documented following the rst structure
    - Each user facing function should be added to the `cmake-format.json` document
     - Run `cmake-genparsers -f json` on the `.cmake` file as a starting point
    - Each function first line should be `list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.<component>.<function>")`
    - A file should not modify any state simply by being included. State modification should
-     only occur inside functions unless absolutely neccessary due to restrctions of the CMake
+     only occur inside functions unless absolutely necessary due to restrictions of the CMake
      language.
         - Any files that do need to break this rule can't be part of `rapids-<component>.cmake`.
 

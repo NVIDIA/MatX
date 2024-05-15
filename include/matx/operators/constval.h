@@ -52,14 +52,25 @@ namespace matx
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ T operator()(Is...) const { 
           return v_; };
 
-      constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
-      {
-        return *(s_.begin() + dim);
+      constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const {
+        if constexpr (!is_noshape_v<ShapeType>) {
+          return *(s_.begin() + dim);
+        }
+        else {
+          return index_t(0);
+        }
       }
-      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+        if constexpr (!is_noshape_v<ShapeType>) {
+          return RANK;
+        }
+        else {
+          return matxNoRank;
+        }
+      }
     };
   }
 } // end namespace matx

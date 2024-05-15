@@ -49,13 +49,14 @@ are necessary
 ## Requirements
 MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
-**Note**: Both CUDA 12.0.0 and CUDA 12.1.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. We are looking into this issue. CUDA 11.8 does not have either of these issues.
+**Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 11.4-11.8 or CUDA 12.2.1+ with MatX.
 
 MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.4 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
-MatX has been tested on and supports Pascal, Turing, Volta, Ampere, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
+MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
-**Note for CUDA 11.4**: A bug in libcuda++ that ships with CUDA 11.4 and below prevents MatX from compiling. This can be worked around by updating libcuda++ to at least version **1.7.0-ea**, or upgrade to CUDA 11.5+. When building tests/examples directly the CMake file will grab the right version, but this can be overriden.
+The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments) 
+and pay attention to the [required versions of the dependencies](https://nvidia.github.io/MatX/build.html#required-third-party-dependencies).
 
 **Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator on CPU, please report it in the issues above. 
 
@@ -99,9 +100,6 @@ cmake -DMATX_BUILD_TESTS=ON ..
 make -j
 ```
 
-Note that if documentation is selected all other build options are off. This eases the dependencies needed to build documentation
-so large libraries such as CUDA don't need to be installed.
-
 ### Integrating MatX With Your Own Projects
 MatX uses CMake as a first-class build generator, and therefore provides the proper config files to include into your own project. There are
 typically two ways to do this: 
@@ -115,6 +113,8 @@ source into the directory structure of your project. Using this method, you can 
 ```cmake
 add_subdirectory(path/to/matx)
 ```
+
+An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory.
 
 #### MatX Installed to the System
 The other option is to install MatX and use the configuration file provided after building. This is typically done in a way similar to what is
@@ -133,8 +133,6 @@ system. With the package installed you can use ``find_package`` as follows:
 ```cmake
 find_package(matx CONFIG REQUIRED)
 ```
-
-An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory
 
 #### MatX CMake Targets
 Once either of the two methods above are done, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``.
@@ -195,30 +193,35 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
-*v0.4.0*:
-* SVD power iteration function
-* `sign`, and `index` operators
-* Batched QR for small matrices
-* dlpack export support
-* 16-bit float reductions
-* Output iterator support in CUB
-
-*v0.3.0*:
-* Many new operators, including `flatten`, `remap`, `lcollapse`. `rcollapse`, `fmod`, `clone`, `slice`
-* Extended N-D tensor support to more functions
-* Allow operators on reduction inputs
-* g++11 support
-* NVTX support
-* Many, many bug fixes
-
-*v0.2.3*:
-* Several new functions: `find`, `find_idx`, `unique`, and `chirp`
-* cuTENSOR and cuTensorNet integration for new `einsum` function
-   * Tensor contraction support
-* Better error reporting
-   
-*v0.2.2*:
-* Arbitrary tensor ranks
+**v0.8.0**:
+- *Features*
+    * Updated cuTENSOR and cuTensorNet versions
+    * Added configurable print formatting
+    * ARM FFT support via NVPL
+    * New operators: abs2(), outer(), isnan(), isinf()
+    * Many more unit tests for CPU tests
+- Bug fixes for matmul on Hopper, 2D FFTs, and more
+  
+**v0.7.0**:
+- *Features*
+    * Automatic documentation generation
+    * Use CCCL instead of CUB/libcudac++
+    * New operators: `polyval`, `matvec`
+    * Improved caching and teardown of transforms
+    * Optimized polyphase resampler
+    * Negative slice indexing
+- Many new bug fixes and error checking
+  
+**v0.6.0**:
+- Breaking changes
+    * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`. 
+- *Features*
+    * Polyphase channelizer
+    * Many new operators, including upsample, downsample, pwelch, overlap, at, etc
+    * Added more lvalue semantics for operators based on view manipulation
+- Bug fixes
+    * Fixed cache issues
+    * Fixed stride = 0 in matmul
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.

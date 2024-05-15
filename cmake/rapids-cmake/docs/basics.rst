@@ -12,9 +12,11 @@ Content <https://cmake.org/cmake/help/latest/module/FetchContent.html>`_ into yo
 
   cmake_minimum_required(...)
 
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
-    ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-  include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+  if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/<PROJ>_RAPIDS.cmake)
+    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-23.12/RAPIDS.cmake
+      ${CMAKE_CURRENT_BINARY_DIR}/<PROJ>_RAPIDS.cmake)
+  endif()
+  include(${CMAKE_CURRENT_BINARY_DIR}/<PROJ>_RAPIDS.cmake)
   include(rapids-cmake)
   include(rapids-cpm)
   include(rapids-cuda)
@@ -31,9 +33,11 @@ this `rapids-cmake` comprises the following primary components:
 
 - `cmake <api.html#common>`__
 - `cpm <api.html#cpm>`__
+- `cython <api.html#cython>`__
 - `cuda <api.html#cuda>`__
 - `export <api.html#export>`__
 - `find <api.html#find>`__
+- `testing <api.html#testing>`__
 
 There are two ways projects can use ``rapids-cmake`` functions.
 
@@ -43,7 +47,7 @@ There are two ways projects can use ``rapids-cmake`` functions.
 Overriding RAPIDS.cmake
 ***********************
 
-At times projects or developers will need to verify ``rapids-cmake`` branches. To do this you need to override the default git repositry and branch that ``RAPIDS.cmake`` downloads, which should be done
+At times projects or developers will need to verify ``rapids-cmake`` branches. To do this you need to override the default git repository and branch that ``RAPIDS.cmake`` downloads, which should be done
 like this:
 
 .. code-block:: cmake
@@ -54,9 +58,9 @@ like this:
     GIT_REPOSITORY https://github.com/<my_fork>/rapids-cmake.git
     GIT_TAG        <my_feature_branch>
   )
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
-      ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-  include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-23.12/RAPIDS.cmake
+      ${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
+  include(${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
 
 
 This tells ``FetchContent`` to ignore the explicit url and branch in ``RAPIDS.cmake`` and use the

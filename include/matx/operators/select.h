@@ -60,11 +60,18 @@ namespace matx
         __MATX_INLINE__ SelectOp(T op, IdxType idx) : op_(op), idx_(idx) {};  
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t i) const 
-          {
-            auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
-            return op_(arrs);     
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
+        {
+          auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
+          return op_(arrs);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) 
+        {
+          auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
+          return op_(arrs);
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -74,6 +81,30 @@ namespace matx
         {
           return idx_.Size(dim);
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<IdxType>()) {
+            idx_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<IdxType>()) {
+            idx_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }          
+        }        
     };
   }   
 

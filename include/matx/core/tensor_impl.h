@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <type_traits>
 #include <cuda/std/functional>
 #include "matx/core/error.h"
@@ -76,6 +77,7 @@ class tensor_impl_t {
     using desc_type = Desc;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
+    using matxoplvalue = bool;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -677,9 +679,12 @@ class tensor_impl_t {
      *
      */
     template <int M = RANK, typename... Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T &operator()(Is... indices) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif
       return *(ldata_ + GetValC<0, Is...>(std::make_tuple(indices...)));
     }
 
@@ -694,9 +699,12 @@ class tensor_impl_t {
      */
     template <int M = RANK, typename... Is, 
       std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(Is... indices) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif      
       return *(ldata_ + GetVal<0, Is...>(std::make_tuple(indices...)));
     }    
 
@@ -706,7 +714,7 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const T operator()(const std::array<index_t, RANK> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const std::array<index_t, RANK> &idx) const noexcept
     {
       return std::apply([&](auto &&...args) -> T {
           return this->operator()(args...);
@@ -719,7 +727,7 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const std::array<index_t, RANK> &idx) noexcept
     {
       return std::apply([&](auto &&...args) -> T& {
           return this->operator()(args...);
@@ -831,6 +839,16 @@ class tensor_impl_t {
      */
     void SetLocalData(T* data) {
       ldata_ = data;
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept 
+    {
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept 
+    {
     }
 
 

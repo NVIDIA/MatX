@@ -40,17 +40,36 @@ foreach(lang IN LISTS rapids_global_languages)
 endforeach()
 unset(rapids_global_languages)
 
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/@project_name@-dependencies.cmake")
-  include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-dependencies.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-dependencies.cmake" OPTIONAL)
+include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-targets.cmake" OPTIONAL)
+
+if(@_RAPIDS_HAS_COMPONENTS@)
+  set(@project_name@_comp_names @_RAPIDS_COMPONENTS@)
+  # find dependencies before creating targets that use them
+  # this way if a dependency can't be found we fail
+  foreach(comp IN LISTS @project_name@_FIND_COMPONENTS)
+    if(${comp} IN_LIST @project_name@_comp_names)
+      file(GLOB @project_name@_component_dep_files LIST_DIRECTORIES FALSE
+           "${CMAKE_CURRENT_LIST_DIR}/@project_name@-${comp}*-dependencies.cmake")
+      foreach(f IN LISTS  @project_name@_component_dep_files)
+        include("${f}")
+      endforeach()
+    endif()
+  endforeach()
+
+  foreach(comp IN LISTS @project_name@_FIND_COMPONENTS)
+    if(${comp} IN_LIST @project_name@_comp_names)
+      file(GLOB @project_name@_component_target_files LIST_DIRECTORIES FALSE
+           "${CMAKE_CURRENT_LIST_DIR}/@project_name@-${comp}*-targets.cmake")
+      foreach(f IN LISTS  @project_name@_component_target_files)
+        include("${f}")
+      endforeach()
+      set(@project_name@_${comp}_FOUND TRUE)
+    endif()
+  endforeach()
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/@project_name@-targets.cmake")
-  include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-targets.cmake")
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/@project_name@-config-version.cmake")
-  include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-config-version.cmake")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/@project_name@-config-version.cmake" OPTIONAL)
 
 # Set our version variables
 set(@project_name_uppercase@_VERSION_MAJOR @rapids_orig_major_version@)
@@ -61,8 +80,8 @@ set(@project_name_uppercase@_VERSION @rapids_orig_version@)
 
 set(rapids_global_targets @_RAPIDS_GLOBAL_TARGETS@)
 set(rapids_namespaced_global_targets @_RAPIDS_GLOBAL_TARGETS@)
-if(rapids_namespaced_global_targets)
-  list(TRANSFORM rapids_namespaced_global_targets PREPEND @_RAPIDS_NAMESPACE@ )
+if((NOT "@_RAPIDS_NAMESPACE@" STREQUAL "") AND rapids_namespaced_global_targets)
+  list(TRANSFORM rapids_namespaced_global_targets PREPEND "@_RAPIDS_NAMESPACE@")
 endif()
 
 foreach(target IN LISTS rapids_namespaced_global_targets)
@@ -91,6 +110,8 @@ if("rapids_config_@type@" STREQUAL "rapids_config_build")
   endforeach()
 endif()
 
+unset(rapids_comp_names)
+unset(rapids_comp_unique_ids)
 unset(rapids_global_targets)
 unset(rapids_namespaced_global_targets)
 

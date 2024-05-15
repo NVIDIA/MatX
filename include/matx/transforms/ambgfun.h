@@ -43,12 +43,13 @@
 #include "matx/core/type_utils.h"
 
 #include "matx/transforms/copy.h"
+#include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
 typedef enum {
-  AMGBFUN_CUT_TYPE_2D,
-  AMGBFUN_CUT_TYPE_DELAY,
-  AMGBFUN_CUT_TYPE_DOPPLER,
+  AMBGFUN_CUT_TYPE_2D,
+  AMBGFUN_CUT_TYPE_DELAY,
+  AMBGFUN_CUT_TYPE_DOPPLER,
 } AMBGFunCutType_t;
 };
 
@@ -159,7 +160,7 @@ public:
 };
 
 template <typename AMFTensor, typename XTensor>
-void InternalAmbgFun(AMFTensor &amf, XTensor &x,
+void ambgfun_impl(AMFTensor &amf, XTensor &x,
                      std::optional<XTensor> &y,
                      [[maybe_unused]] double fs, ::matx::AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
@@ -174,9 +175,9 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   //tensor_t<T1, RANK> ry(x);
 
   auto x_normdiv_v = make_tensor<T1>(x.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto x_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto x_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-  sum(x_norm_v, norm(x), stream);
+  (x_norm_v = sum(norm(x))).run(stream);
   (x_norm_v = sqrt(x_norm_v)).run(stream);
   (x_normdiv_v = x / x_norm_v).run(stream);
 
@@ -185,9 +186,9 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
   if (y) {
     ry.Reset(y.value().Data(), y.value().Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
-    auto y_norm_v = make_tensor<float>(MATX_ASYNC_DEVICE_MEMORY, stream);
+    auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-    sum(y_norm_v, norm(ry), stream);
+    (y_norm_v = sum(norm(ry))).run(stream);
     (y_normdiv_v = ry / y_norm_v).run(stream);
   }
 
@@ -196,7 +197,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
       powf(2.0, static_cast<float>(std::ceil(std::log2(len_seq - 1)))));
   index_t xlen = x_normdiv_v.Size(RANK - 1);
 
-  if (cut == ::matx::AMGBFUN_CUT_TYPE_2D) {
+  if (cut == ::matx::AMBGFUN_CUT_TYPE_2D) {
           
     auto new_ynorm_v = make_tensor<T1>({len_seq - 1, xlen}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
@@ -208,7 +209,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     (fullfft = 0).run(stream);
     matx::copy(partfft, new_ynorm_v, stream);
 
-    ifft(fullfft, fullfft, 0, stream);
+    ifft_impl(fullfft, fullfft, 0, FFTNorm::BACKWARD, stream);
 
     // We need to temporarily allocate a complex output version of AMF since we
     // have no way to convert complex to real in an operator currently
@@ -217,15 +218,15 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     (amf_tmp_v = (float)nfreq * abs(fftshift1D(fullfft))).run(stream);
     matx::copy(amf, amf_tmp_v.RealView(), stream);
   }
-  else if (cut == ::matx::AMGBFUN_CUT_TYPE_DELAY) {
+  else if (cut == ::matx::AMBGFUN_CUT_TYPE_DELAY) {
     auto fullfft_x = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     auto partfft_x = fullfft_x.Slice({0}, {xlen});
     (fullfft_x = 0).run(stream);
     matx::copy(partfft_x, x_normdiv_v, stream);
 
-    fft(fullfft_x, fullfft_x, 0, stream);
+    fft_impl(fullfft_x, fullfft_x, 0, FFTNorm::BACKWARD, stream);
     AmbgFftXOp(fullfft_x, fullfft_x, fs, cut_val, (float)nfreq).run(stream);
-    ifft(fullfft_x, fullfft_x, 0, stream);
+    ifft_impl(fullfft_x, fullfft_x, 0, FFTNorm::BACKWARD, stream);
 
     auto fullfft_y = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = 0).run(stream);
@@ -233,7 +234,7 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto partfft_y = fullfft_y.Slice({0}, {xlen});
     matx::copy(partfft_y, y_normdiv_v, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
-    ifft(fullfft_y, fullfft_y, 0, stream);
+    ifft_impl(fullfft_y, fullfft_y, 0, FFTNorm::BACKWARD, stream);
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
@@ -245,13 +246,13 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
     matx::copy(amf, amfv.RealView(), stream);
   }
-  else if (cut == ::matx::AMGBFUN_CUT_TYPE_DOPPLER) {
+  else if (cut == ::matx::AMBGFUN_CUT_TYPE_DOPPLER) {
     auto fullfft_y = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     auto partfft_y = fullfft_y.Slice({0}, {y_normdiv_v.Size(0)});
 
     (fullfft_y = 0).run(stream);
     matx::copy(partfft_y, y_normdiv_v, stream);
-    fft(fullfft_y, fullfft_y, 0, stream);
+    fft_impl(fullfft_y, fullfft_y, 0, FFTNorm::BACKWARD, stream);
 
     auto fullfft_x = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_x = 0).run(stream);
@@ -260,13 +261,13 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
     auto partfft_x = make_tensor(fullfft_x.GetStorage(), xnd_size);
 
     AmbgDoppX(partfft_x, x_normdiv_v, fs, cut_val).run(stream);
-    fft(fullfft_x, fullfft_x, 0, stream);
+    fft_impl(fullfft_x, fullfft_x, 0, FFTNorm::BACKWARD, stream);
 
     // This allocation should not be necessary, but we're getting compiler
     // errors when cloning/slicing
     auto amf_tmp_v = make_tensor<T1>({fullfft_x.Size(0)}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
-    ifft(fullfft_y, fullfft_y, 0, stream);
+    ifft_impl(fullfft_y, fullfft_y, 0, FFTNorm::BACKWARD, stream);
 
     (amf_tmp_v = abs(fftshift1D(fullfft_y))).run(stream);
 
@@ -277,95 +278,5 @@ void InternalAmbgFun(AMFTensor &amf, XTensor &x,
 }
 
 }
-}
-
-namespace matx {
-
-/**
- * Cross-ambiguity function
- *
- * Generates a cross-ambiguity magnitude function from inputs x and y. The
- * ambiguity function generates a 2D delay vs doppler matrix of the cross
- * ambiguity of x and y.
- *
- * @tparam T1
- *   x/y vector types
- * @tparam T2
- *   Type of output
- * @tparam RANK
- *   Rank of input matrix. Must be 1 currently
- *
- * @param amf
- *   2D output matrix where rows are the Doppler (Hz) shift and columns are the
- * delay in seconds.
- * @param x
- *   First input signal
- * @param y
- *   Second input signal
- * @param fs
- *   Sampling frequency
- * @param cut
- *   Type of cut. 2D is effectively no cut. Delay cut returns a cut with zero
- * time delay. Doppler generates a cut with zero Doppler shift. Note that in
- * both Delay and Doppler mode, the output matrix must be a 2D tensor where the
- * first dimension is 1 to match the type of 2D mode.
- * @param cut_val
- *   Value to perform the cut at
- * @param stream
- *   CUDA stream
- *
- */
-template <typename AMFTensor, typename XTensor, typename YTensor>
-inline void ambgfun(AMFTensor &amf, XTensor &x,
-                    YTensor &y, double fs, AMBGFunCutType_t cut,
-                    float cut_val = 0.0, cudaStream_t stream = 0)
-{
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  detail::InternalAmbgFun(amf, x, std::make_optional(y), fs, cut, cut_val, stream);
-}
-
-/**
- * Ambiguity function
- *
- * Generates an ambiguity magnitude function from input signal x. The ambiguity
- * function generates a 2D delay vs doppler matrix of the input signal.
- *
- * @tparam T1
- *   x vector type
- * @tparam T2
- *   Type of output
- * @tparam RANK
- *   Rank of input matrix. Must be 1 currently
- *
- * @param amf
- *   2D output matrix where rows are the Doppler (Hz) shift and columns are the
- * delay in seconds.
- * @param x
- *   First input signal
- * @param fs
- *   Sampling frequency
- * @param cut
- *   Type of cut. 2D is effectively no cut. Delay cut returns a cut with zero
- * time delay. Doppler generates a cut with zero Doppler shift. Note that in
- * both Delay and Doppler mode, the output matrix must be a 2D tensor where the
- * first dimension is 1 to match the type of 2D mode.
- * @param cut_val
- *   Value to perform the cut at
- * @param stream
- *   CUDA stream
- *
- */
-template <typename AMFTensor, typename XTensor>
-inline void ambgfun(AMFTensor &amf, XTensor &x,
-                    double fs, AMBGFunCutType_t cut, float cut_val = 0.0,
-                    cudaStream_t stream = 0)
-{
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  static_assert(AMFTensor::Rank() == 2, "Output tensor of ambgfun must be 2D");
-  
-  std::optional<XTensor> nil = std::nullopt;
-  ::matx::detail::InternalAmbgFun(amf, x, nil, fs, cut, cut_val, stream);
-}
-
 
 }; // namespace matx

@@ -1,4 +1,4 @@
-Welcome to MatX's documentation!
+Welcome To MatX's Documentation!
 ================================
 
 **MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and limited support for CPUs. The main
@@ -23,6 +23,11 @@ examples have full walk-throughs in the :ref:`examples` section of the documenta
 
 Lastly, an :ref:`api` guide is available for every function in MatX. 
 
+.. note::
+    We strive to make sure that every function in the MatX API has at least one example and one unit test. All example
+    code in the API section is cross-referenced from the unit tests. This means that the examples in this documentation
+    should always be correct and unit tests would catch any errors before they're introduced or modified in the docs.
+
 License
 -------
 MatX is released under the BSD-3-Clause license. Several external packages are used optionally and may have different
@@ -33,11 +38,12 @@ Table of Contents
 ^^^^^^^^^^^^^^^^^
 .. toctree::
     :maxdepth: 2
+    :caption: MatX Documentation
 
-    build
     quickstart
-    creation
-    api/index    
-    matlabpython
-    examples/index
+    build.rst
+    basics/index.rst
+    api/index.rst
+    examples/index.rst
     limitations
+    version

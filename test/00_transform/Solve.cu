@@ -43,26 +43,29 @@ template <typename TensorType>
 class SolveTestsFloatNonComplexNonHalf : public ::testing::Test {
 };
 
-TYPED_TEST_SUITE(SolveTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypes);
+TYPED_TEST_SUITE(SolveTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(SolveTestsFloatNonComplexNonHalf, CGSolve)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  ExecType exec{};
 
   int gN = 4;
   int N = gN * gN;
   int BATCH = 4;
 
-  auto A = make_tensor<TypeParam, 3> ({BATCH, N, N}); 
-  auto X = make_tensor<TypeParam, 2> ({BATCH, N}); 
-  auto B = make_tensor<TypeParam, 2> ({BATCH, N}); 
+  auto A = make_tensor<TestType, 3> ({BATCH, N, N}); 
+  auto X = make_tensor<TestType, 2> ({BATCH, N}); 
+  auto B = make_tensor<TestType, 2> ({BATCH, N}); 
 
 
   // Simple 1D Poisson matrix
   for(int b = 0; b < BATCH; b++) {
     for(int i = 0; i < N; i++) {
-      X(b,i) = TypeParam(0+b);
-      B(b,i) = TypeParam(1+b);
+      X(b,i) = TestType(0+b);
+      B(b,i) = TestType(1+b);
       for(int j = 0; j < N; j++) {
         if(i==j) 
           A(b,i,j) = 2;
@@ -76,13 +79,15 @@ TYPED_TEST(SolveTestsFloatNonComplexNonHalf, CGSolve)
     }
   }
 
-  cgsolve(X, A, B, .00001, 10);
-  matvec(B, A, X);
+  // example-begin cgsolve-test-1
+  (X = cgsolve(A, B, .00001, 10)).run(exec);
+  // example-end cgsolve-test-1
+  (B = matvec(A, X)).run(exec);
   cudaDeviceSynchronize();
 
   for(int i = 0; i < BATCH; i++) {
     for(int j = 0; j < N; j++) {
-      ASSERT_NEAR(B(i,j), TypeParam(1+i), .0001);
+      ASSERT_NEAR(B(i,j), TestType(1+i), .0001);
     }
   }
   MATX_EXIT_HANDLER();

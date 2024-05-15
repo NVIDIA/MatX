@@ -29,17 +29,15 @@ void sort1d(
   auto sortedData = matx::make_tensor<ValueType>({dataSize});
   auto randomData = matx::make_tensor<ValueType>({dataSize});
 
-  randomGenerator_t < ValueType > randData(dataSize, 0);
-
   sortedData.PrefetchDevice(0);
   randomData.PrefetchDevice(0);
   cudaDeviceSynchronize();
 
-  auto randTensorView = randData.template GetTensorView<sortedData.Rank()>(sortedData.Shape(), NORMAL);
+  (randomData = random<float>(sortedData.Shape(), NORMAL)).run();
 
-  (randomData = randTensorView).run();
-
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { 
+    (sortedData = matx::sort(randomData, SORT_DIR_ASC)).run(cudaExecutor(launch.get_stream())); 
+  });
 
 }
 
@@ -71,13 +69,11 @@ void sort2d(
   auto sortedData = matx::make_tensor<ValueType>({dim1Size, dim2Size});
   auto randomData = matx::make_tensor<ValueType>({dim1Size, dim2Size});
 
-  randomGenerator_t < ValueType > randData(dim1Size*dim2Size, 0);
+  (randomData = random<float>(sortedData.Shape(), NORMAL)).run();
 
-  auto randTensorView = randData.template GetTensorView<sortedData.Rank()>(sortedData.Shape(), NORMAL);
-
-  (randomData = randTensorView).run();
-
-  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { matx::sort(sortedData, randomData, SORT_DIR_ASC, (cudaStream_t)launch.get_stream()); });
+  state.exec( [&sortedData, &randomData](nvbench::launch &launch) { 
+    (sortedData = matx::sort(randomData, SORT_DIR_ASC)).run(cudaExecutor(launch.get_stream())); 
+  });
 
 }
 

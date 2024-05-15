@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ rapids_export_write_language
 
 .. versionadded:: v21.06.00
 
-Creates a self-containted file that makes sure the requested language is enabled
+Creates a self-contained file that makes sure the requested language is enabled
 globally.
 
 .. code-block:: cmake
@@ -78,7 +78,7 @@ endif()
 #    used by commands such target_compile_features.
 #
 # 2. Make sure that every directory including root also re-executes
-#    `CMake@lang@Information` This can't be defered as the contents
+#    `CMake@lang@Information` This can't be deferred as the contents
 #    are required if any target is constructed
 #
 

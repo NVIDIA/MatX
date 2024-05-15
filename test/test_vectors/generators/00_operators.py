@@ -4,6 +4,21 @@ import numpy as np
 import scipy.signal as ss
 from typing import Dict, List
 
+class polyval_operator:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        pass
+
+    def run(self) -> Dict[str, np.array]:
+        c = np.random.rand(self.size[0])
+        x = np.random.rand(self.size[1])
+
+        return {
+            'c': c,
+            'x': x,
+            'out': np.polyval(c, x),
+        }
+
 
 class kron_operator:
     def __init__(self, dtype: str, size: List[int]):
@@ -87,4 +102,42 @@ class contraction:
             'a_float3d': a1,
             'b_float3d': b1,
             'c_float3d': c1
+        }
+
+class pwelch_operators:
+    def __init__(self, dtype: str, cfg: Dict): #PWelchGeneratorCfg):
+        self.dtype = dtype
+
+        self.signal_size = cfg['signal_size']
+        self.nperseg = cfg['nperseg']
+        self.noverlap = cfg['noverlap']
+        self.nfft = cfg['nfft']
+        self.ftone = cfg['ftone']
+        self.sigma = cfg['sigma']
+        self.window_name = cfg['window_name']
+        if (cfg['window_name'] == 'none'):
+            self.window_name = 'boxcar'
+
+        np.random.seed(1234)
+
+
+    def pwelch_complex_exponential(self) -> Dict[str, np.ndarray]:
+        s = np.exp(2j*np.pi*self.ftone*np.linspace(0,self.signal_size-1,self.signal_size)/self.nfft)
+        n = np.random.normal(loc=0,scale=self.sigma,size=self.signal_size) + 1j*np.random.normal(loc=0,scale=self.sigma,size=self.signal_size)
+        x = s + n
+        w = ss.get_window(self.window_name,self.nperseg,fftbins=False)
+        f, Pxx = ss.welch(x,
+                          fs=1.,
+                          window=w,
+                          nperseg=self.nperseg,
+                          noverlap=self.noverlap,
+                          nfft=self.nfft,
+                          return_onesided=False,
+                          scaling = 'density',
+                          detrend=False)
+        w_scale = np.sum(w*w)
+        Pxx = Pxx * w_scale
+        return {
+            'x_in': x,
+            'Pxx_out': Pxx
         }

@@ -79,9 +79,176 @@ struct matxPointerAttr_t {
 };
 }
 
+
 inline detail::matxMemoryStats_t matxMemoryStats; ///< Statistics object
 inline std::shared_mutex memory_mtx; ///< Mutex protecting updates from map
-inline std::unordered_map<void *, detail::matxPointerAttr_t> allocationMap; ///< Map recording allocations
+
+struct MemTracker {
+  std::unordered_map<void *, detail::matxPointerAttr_t> allocationMap;
+
+  auto size() {
+    return allocationMap.size();
+  }
+
+  void update_stream(void *ptr, cudaStream_t stream) {
+    std::unique_lock lck(memory_mtx);
+    auto iter = allocationMap.find(ptr);
+    if (iter == allocationMap.end()) {
+      MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+      return;
+    }
+
+    iter->second.stream = stream;
+  }
+
+  template <typename StreamType>
+  auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st) {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    std::unique_lock lck(memory_mtx);
+    auto iter = allocationMap.find(ptr);
+
+    if (iter == allocationMap.end()) {
+  #ifdef MATX_DISABLE_MEM_TRACK_CHECK
+      // This error can occur in situations where the user includes MatX in multiple translation units
+      // and a deallocation occurs in a different one than it was allocated. Allow the user to ignore
+      // these cases if they know the issue.
+      MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+  #endif    
+      return;
+    }
+
+    size_t bytes = iter->second.size;
+    matxMemoryStats.currentBytesAllocated -= bytes;
+
+    switch (iter->second.kind) {
+    case MATX_MANAGED_MEMORY:
+      [[fallthrough]];
+    case MATX_DEVICE_MEMORY:
+      cudaFree(ptr);
+      break;
+    case MATX_HOST_MEMORY:
+      cudaFreeHost(ptr);
+      break;
+    case MATX_HOST_MALLOC_MEMORY:
+      free(ptr);
+      break;
+    case MATX_ASYNC_DEVICE_MEMORY:
+      if constexpr (std::is_same_v<no_stream_t, StreamType>) {
+        cudaFreeAsync(ptr, iter->second.stream);
+      }
+      else {
+        cudaFreeAsync(ptr, st.stream);
+      }
+      break;
+    default:
+      MATX_THROW(matxInvalidType, "Invalid memory type");
+    }
+
+    allocationMap.erase(ptr);    
+  }
+
+  struct no_stream_t{};
+  struct valid_stream_t { cudaStream_t stream; };
+
+  auto deallocate(void *ptr) {
+    deallocate_internal(ptr, no_stream_t{});
+  }
+
+  auto deallocate(void *ptr, cudaStream_t stream) {
+    deallocate_internal(ptr, valid_stream_t{stream});
+  }    
+
+  void allocate(void **ptr, size_t bytes,
+                      matxMemorySpace_t space = MATX_MANAGED_MEMORY,
+                      cudaStream_t stream = 0) {
+    [[maybe_unused]] cudaError_t err = cudaSuccess;
+    
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    if (ptr == nullptr) {
+      MATX_THROW(matxInvalidParameter, "nullptr on allocate");
+    }
+
+    *ptr = nullptr;
+    
+    switch (space) {
+    case MATX_MANAGED_MEMORY:
+      err = cudaMallocManaged(ptr, bytes);
+      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+      break;
+    case MATX_HOST_MEMORY:
+      err = cudaMallocHost(ptr, bytes);
+      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+      break;
+    case MATX_HOST_MALLOC_MEMORY:
+      *ptr = malloc(bytes);
+      break;
+    case MATX_DEVICE_MEMORY:
+      err = cudaMalloc(ptr, bytes);
+      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+      break;
+    case MATX_ASYNC_DEVICE_MEMORY:
+      err = cudaMallocAsync(ptr, bytes, stream);
+      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
+      break;
+    case MATX_INVALID_MEMORY:
+      MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
+      break;
+    };
+
+    if (*ptr == nullptr) {
+      MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
+    }
+
+    std::unique_lock lck(memory_mtx);
+    matxMemoryStats.currentBytesAllocated += bytes;
+    matxMemoryStats.totalBytesAllocated += bytes;
+    matxMemoryStats.maxBytesAllocated = std::max(
+        matxMemoryStats.maxBytesAllocated, matxMemoryStats.currentBytesAllocated);
+    allocationMap[*ptr] = {bytes, space, stream};
+  }
+
+  bool is_allocated(void *ptr) {
+    if (ptr == nullptr) {
+      return false;
+    }
+
+    std::unique_lock lck(memory_mtx);
+    auto iter = allocationMap.find(ptr);
+
+    return iter != allocationMap.end();    
+  }
+
+  matxMemorySpace_t get_pointer_kind(void *ptr) {
+    if (ptr == nullptr) {
+      return MATX_INVALID_MEMORY;
+    }
+
+    std::unique_lock lck(memory_mtx);
+    auto iter = allocationMap.find(ptr);
+
+    if (iter != allocationMap.end()) {
+      return iter->second.kind;
+    }
+
+    return MATX_INVALID_MEMORY;
+  }
+
+  ~MemTracker() {
+    while (allocationMap.size()) {
+      deallocate(allocationMap.begin()->first);
+    }
+  }
+};
+
+
+
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ MemTracker &GetAllocMap() {
+  static MemTracker tracker;
+  return tracker;
+}
 
 /**
  * @brief Determine if a pointer is printable by the host
@@ -132,14 +299,7 @@ inline void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
  * @return True if allocator
  */
 inline bool IsAllocated(void *ptr) {
-  if (ptr == nullptr) {
-    return false;
-  }
-
-  std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
-
-  return iter != allocationMap.end();
+  return GetAllocMap().is_allocated(ptr);
 }
 
 /**
@@ -156,19 +316,7 @@ inline bool IsAllocated(void *ptr) {
  **/
 inline matxMemorySpace_t GetPointerKind(void *ptr)
 {
-  if (ptr == nullptr) {
-    return MATX_INVALID_MEMORY;
-  }
-
-  std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
-
-  if (iter != allocationMap.end()) {
-    return iter->second.kind;
-  }
-
-
-  return MATX_INVALID_MEMORY;
+  return GetAllocMap().get_pointer_kind(ptr);
 }
 
 /**
@@ -184,7 +332,7 @@ inline void matxPrintMemoryStatistics()
   printf("Memory Statistics(GB):  current: %.2f, total: %.2f, max: %.2f. Total "
          "allocations: %lu\n",
          static_cast<double>(current) / 1e9, static_cast<double>(total) / 1e9,
-         static_cast<double>(max) / 1e9, allocationMap.size());
+         static_cast<double>(max) / 1e9, GetAllocMap().size());
 }
 
 /**
@@ -201,89 +349,35 @@ inline void matxAlloc(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0)
 {
-  [[maybe_unused]] cudaError_t err = cudaSuccess;
-  
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  switch (space) {
-  case MATX_MANAGED_MEMORY:
-    err = cudaMallocManaged(ptr, bytes);
-    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
-    break;
-  case MATX_HOST_MEMORY:
-    err = cudaMallocHost(ptr, bytes);
-    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
-    break;
-  case MATX_HOST_MALLOC_MEMORY:
-    *ptr = malloc(bytes);
-    break;
-  case MATX_DEVICE_MEMORY:
-    err = cudaMalloc(ptr, bytes);
-    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
-    break;
-  case MATX_ASYNC_DEVICE_MEMORY:
-    err = cudaMallocAsync(ptr, bytes, stream);
-    MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
-    break;
-  case MATX_INVALID_MEMORY:
-    MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
-    break;
-  };
-  
-  MATX_ASSERT(ptr != nullptr, matxOutOfMemory);
-
-  std::unique_lock lck(memory_mtx);
-  matxMemoryStats.currentBytesAllocated += bytes;
-  matxMemoryStats.totalBytesAllocated += bytes;
-  matxMemoryStats.maxBytesAllocated = std::max(
-      matxMemoryStats.maxBytesAllocated, matxMemoryStats.currentBytesAllocated);
-  allocationMap[*ptr] = {bytes, space, stream};
+  return GetAllocMap().allocate(ptr, bytes, space, stream);
 }
 
-/**
- * @brief Free previously-allocated pointer
- * 
- * @param ptr Pointer to free
- */
+
 inline void matxFree(void *ptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  if (ptr == nullptr) {
-    return;
-  }
+  return GetAllocMap().deallocate(ptr);
+}
 
-  std::unique_lock lck(memory_mtx);
-  auto iter = allocationMap.find(ptr);
 
-  if (iter == allocationMap.end()) {
-    MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
-    return;
-  }
+inline void matxFree(void *ptr, cudaStream_t stream)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  return GetAllocMap().deallocate(ptr, stream);
+}
 
-  size_t bytes = iter->second.size;
-  matxMemoryStats.currentBytesAllocated -= bytes;
-
-  switch (iter->second.kind) {
-  case MATX_MANAGED_MEMORY:
-    [[fallthrough]];
-  case MATX_DEVICE_MEMORY:
-    cudaFree(ptr);
-    break;
-  case MATX_HOST_MEMORY:
-    cudaFreeHost(ptr);
-    break;
-  case MATX_HOST_MALLOC_MEMORY:
-    free(ptr);
-    break;
-  case MATX_ASYNC_DEVICE_MEMORY:
-    cudaFreeAsync(ptr, iter->second.stream);
-    break;
-  default:
-    MATX_THROW(matxInvalidType, "Invalid memory type");
-  }
-
-  allocationMap.erase(iter);
+/**
+  Update the stream a pointer in the cache is using. This should be used when the call wants to use 
+  memory that was allocated in stream A inside of stream B. The caller must ensure that the pointer
+  and stream being used are valid.
+*/
+inline void update_stream(void *ptr, cudaStream_t stream)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  GetAllocMap().update_stream(ptr, stream);
 }
 
 /**
@@ -318,5 +412,7 @@ struct matx_allocator {
     matxFree(ptr);
   }  
 };
+
+
 
 } // end namespace matx

@@ -35,6 +35,9 @@
 #include "matx/transforms/reduce.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
+#include "matx/operators/all.h"
+#include "matx/operators/if.h"
+#include "matx/operators/clone.h"
 
 namespace matx
 {
@@ -56,7 +59,7 @@ namespace matx
    *
    */
   template <typename XType, typename AType, typename BType>
-    __MATX_INLINE__ void cgsolve(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
+    __MATX_INLINE__ void cgsolve_impl(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
     {
       using scalar_type = typename XType::scalar_type;
       const int VRANK = XType::Rank();
@@ -99,7 +102,7 @@ namespace matx
       auto pAp = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
       auto norm = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-      auto converged = make_tensor<int>(MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       // create aliases to reuse memory
       //auto b = a;
@@ -117,15 +120,15 @@ namespace matx
       auto pApc = clone<VRANK>(pAp, clone_shape);
     
       // A*X
-      matvec(Ap, A, X, stream);
+      (Ap = matvec(A, X)).run(stream);
       // r0 = B - A*X   
       // p = r0 
       (p = r0 = B - Ap).run(stream);  
       
-      sum(r0r0, r0*r0, stream);
+      (r0r0 = sum(r0*r0)).run(stream);
       
       if(tol>0.0f) {
-        all(converged, as_int(sqrt(r0r0) < tol), stream);
+        (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
       
         cudaEventRecord(event, stream);
         cudaStreamWaitEvent(d2h, event);
@@ -134,10 +137,10 @@ namespace matx
       int i;
       for (i = 0 ; i < max_iters; i++) {
         // Ap = matvec(A, p) 
-        matvec(Ap, A, p, stream);
+        (Ap = matvec(A, p)).run(stream);
 
         // pAp = dot(p,Ap)  
-        sum(pAp, p*Ap, stream);
+        (pAp = sum(p*Ap)).run(stream);
         
         // if pAp is zero then we have exactly numerically converged.
         // However, this is batched so we may iterate more.  Iterating
@@ -152,7 +155,7 @@ namespace matx
         (IF( pApc != scalar_type(0), updateOp)).run(stream);
         
         // r1r1 = dot(r1, r1)
-        sum(r1r1, r1*r1, stream);
+        (r1r1 = sum(r1*r1)).run(stream);
         
         if(tol>0.0f) {
           // copy convergence criteria to host.  
@@ -165,7 +168,7 @@ namespace matx
             break;
           }
 
-          all(converged, as_int(sqrt(r1r1) < tol), stream);
+          (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
         
           cudaEventRecord(event, stream);
           cudaStreamWaitEvent(d2h, event);

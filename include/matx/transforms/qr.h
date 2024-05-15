@@ -35,6 +35,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/operators/slice.h"
 #include <cstdio>
 #include <numeric>
 
@@ -42,145 +43,146 @@ namespace matx {
 
 namespace detail {
 
-  // internal qr implementation which takes memory in api call
-  template<typename QType, typename RType, typename AType, 
-    typename NType, typename VMType, typename HType, typename QNType, typename RNType>
-      void qr_internal(QType Q, RType R, AType A,
-          NType N, VMType VM, HType H, QNType QN, RNType RN, cudaStream_t stream) {
-        MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  template<typename AType>
+    inline auto qr_internal_workspace(const AType &A, cudaStream_t stream) {
+      using ATypeS = typename AType::scalar_type;
+      const int RANK = AType::Rank();
 
-        static_assert(A.Rank() >= 2);
-        static_assert(Q.Rank() == A.Rank());
-        static_assert(R.Rank() == A.Rank());
+      index_t m = A.Size(RANK-2);
+      index_t n = A.Size(RANK-1);
 
-        MATX_ASSERT_STR(A.Rank() == Q.Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
-        MATX_ASSERT_STR(A.Rank() == R.Rank(), matxInvalidDim, "qr: A and R must have the same rank");
+      std::array<index_t, RANK-1> uShape;
+      for(int i = 0; i < RANK-2; i++) {
+        uShape[i] = A.Size(i);
+      }
+      uShape[RANK-2] = A.Size(RANK-1);
 
-        using ATypeS = typename AType::scalar_type;
-        using NTypeS = typename inner_op_type_t<ATypeS>::type;
-        const int RANK = AType::Rank();
+      auto QShape = A.Shape();
+      QShape[RANK-1] = m;
 
-        index_t m = A.Size(RANK-2);
-        index_t n = A.Size(RANK-1);
-        index_t k = std::min(m,n);
-        if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
+      auto Qin = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto wwt = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto u = make_tensor<ATypeS>(uShape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-        // Create Identity matrix
-        auto E = eye<ATypeS>({m,m});
+      return std::make_tuple(Qin, wwt, u);
+    }
 
-        // Clone over batch Dims
-        auto ECShape = Q.Shape();
-        ECShape[RANK-1] = matxKeepDim;
-        ECShape[RANK-2] = matxKeepDim;
+  template<typename QType, typename RType, typename AType, typename WType>
+    inline void qr_internal(QType &Q, RType &R, const AType &A, WType workspace, cudaStream_t stream) {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-        auto I = clone<RANK>(E, ECShape);
+      static_assert(A.Rank() >= 2);
+      static_assert(Q.Rank() == A.Rank());
+      static_assert(R.Rank() == A.Rank());
 
-        auto ci = N;  // alias
+      MATX_ASSERT_STR(A.Rank() == Q.Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
+      MATX_ASSERT_STR(A.Rank() == R.Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
-        // Inititalize Q
-        (Q = I).run(stream);
-        (R = A).run(stream);
+      using ATypeS = typename AType::scalar_type;
+      using NTypeS = typename inner_op_type_t<ATypeS>::type;
+      const int RANK = AType::Rank();
 
-        // setup slices
-        std::array<index_t, RANK> mSliceB, mSliceE;  // matrix slice starting at i,i
-        mSliceB.fill(0); mSliceE.fill(matxEnd);
+      index_t m = A.Size(RANK-2);
+      index_t n = A.Size(RANK-1);
+      index_t k = std::min(m,n);
+      if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
 
-        std::array<index_t, RANK> qSliceB, qSliceE;  // matrix slice starting at 0,i
-        qSliceB.fill(0); qSliceE.fill(matxEnd);
+      auto Qin = std::get<0>(workspace);
+      auto wwt  = std::get<1>(workspace);
+      auto u = std::get<2>(workspace);
 
-        std::array<index_t, RANK> xSliceB, xSliceE;  // vector slice starting at i,i
-        xSliceB.fill(0); xSliceE.fill(matxEnd);
-        xSliceE[RANK-1] = matxDropDim; // drop last dim to make a vector
+      static_assert(Qin.Rank() == Q.Rank());
+      static_assert(wwt.Rank() == Q.Rank());
+      static_assert(u.Rank() == Q.Rank()-1);
 
-        std::array<index_t, RANK> vSliceB, vSliceE;  // vector slice starting at i,0?
-        vSliceB.fill(0); vSliceE.fill(matxEnd);
-        vSliceE[RANK-1] = matxDropDim; // drop last dim to make a vector
+      // Create Identity matrix
+      auto E = eye<ATypeS>({m, m});
 
-        std::array<index_t, RANK> vmSliceB, vmSliceE;  // vector slice as a matrix starting at i
-        vmSliceB.fill(0); vmSliceE.fill(matxEnd);
+      // Clone over batch Dims
+      auto ECShape = Q.Shape();
+      ECShape[RANK-1] = matxKeepDim;
+      ECShape[RANK-2] = matxKeepDim;
 
-        // N cloned across x.
-        std::array<index_t, RANK-1> ncShape;
-        ncShape.fill(matxKeepDim);
+      auto I = clone<RANK>(E, ECShape);
 
-        // clone  ci across hi
-        std::array<index_t, RANK> cicShape;
-        cicShape.fill(matxKeepDim);
+      // Inititalize Q
+      (Q = I).run(stream);
+      (R = A).run(stream);
 
-        for(int i = 0 ; i < k ; i++) {
+      // we will slice X directly from R.
+      std::array<index_t, RANK> xSliceB, xSliceE;   
+      xSliceB.fill(0); xSliceE.fill(matxEnd);
+      xSliceE[RANK-1] = matxDropDim; // drop last dim to make a vector
 
-          // update top left corner of slice
-          mSliceB[RANK-2] = i;
-          mSliceB[RANK-1] = i;
 
-          // update q slice
-          qSliceB[RANK-1] = i;
+      // v is of size m x 1.  Instead of allocating additional memory we will just reuse a row of Qin
+      std::array<index_t, RANK> vSliceB, vSliceE;   
+      vSliceB.fill(0); vSliceE.fill(matxEnd);
+      // select a single row of Q to alias as v
+      vSliceE[RANK-2] = matxDropDim; 
+      auto v = slice<RANK-1>(Qin, vSliceB, vSliceE);
+      auto xz = v; // alias 
 
-          // update v/vm slices to start at i
-          xSliceB[RANK-2] = i;
-          xSliceB[RANK-1] = i;
-          vmSliceB[RANK-2] = i;
-          vSliceB[RANK-2] = i;
 
-          // matrix slices
-          auto qi = slice<RANK>(Q, qSliceB, qSliceE);
-          auto qn = slice<RANK>(QN, qSliceB, qSliceE);
-          auto ri = slice<RANK>(R, mSliceB, mSliceE);
-          auto rn = slice<RANK>(RN, mSliceB, mSliceE);
-          auto hi = slice<RANK>(H, mSliceB, mSliceE);
-          auto vm = slice<RANK>(VM, vmSliceB, vmSliceE);
+      // N is of size 1.  Instead of allocating additional memory we will just reuse an entry of Qin
+      std::array<index_t, RANK> nSliceB, nSliceE;   
+      nSliceB.fill(0); nSliceE.fill(matxEnd);
+      // select a single row of Q to alias as v
+      nSliceE[RANK-2] = matxDropDim; 
+      nSliceE[RANK-1] = matxDropDim; 
 
-          // vector slices
-          auto v = slice<RANK-1>(VM, vSliceB, vSliceE);
-          auto x = slice<RANK-1>(R, xSliceB, xSliceE);
+      auto N = slice<RANK-2>(wwt, nSliceB, nSliceE);
 
-          //update clone shape
-          ncShape[RANK-2] = m-i;
-          auto nc = clone<RANK-1>(N,ncShape);
+      // N cloned with RANK-2 of size m.
+      std::array<index_t, RANK-1> ncShape;
+      ncShape.fill(matxKeepDim);
+      ncShape[RANK-2] = m;
+      auto nc = clone<RANK-1>(N,ncShape);
 
-          // update cloned ci shape
-          cicShape[RANK-2] = m - i;
-          cicShape[RANK-1] = m - i;
-          auto cic = clone<RANK>(ci, cicShape);
+      // aliasing some memory here to share storage and provide clarity in the code below
+      auto s = N; // alias 
+      auto sc = nc; // alias
+      auto w = v; // alias 
 
-          // create identity matrix and clone across full rank
-          auto Ei = eye<ATypeS>({m-i,m-i});
-          auto Ii = clone<RANK>(Ei, ECShape);
+      for(int i = 0 ; i < k ; i++) {
 
-          sum(N, norm(x), stream);
-          (N = sqrt(N)).run(stream);
+        // slice off a column of R and alias as x
+        xSliceB[RANK-1] = i;
+        auto x = slice<RANK-1>(R, xSliceB, xSliceE);
 
-          // copy x into v and apply signed addition of nc
-          (IFELSE( (index(v.Rank()-1) == 0),
-                   v = x + sign(x, ATypeS(1) ) * nc,
-                   v = x)).run(stream);
+        // operator which zeros out values above current index in matrix
+        (xz = (index(x.Rank()-1) >= i) * x).run(stream);
 
-          sum(ci, norm(v), stream);
+        // compute L2 norm without sqrt. 
+        (N = sum(norm(xz))).run(stream);
+        //(N = sqrt(N)).run(stream);  // sqrt folded into next op
 
-          (ci = NTypeS(2) / ci).run(stream);
+        (v = xz + (index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
 
-          matmul(hi, vm, conj(transpose(vm)), stream);
+        auto r = x;  // alias column of R happens to be the same as x
 
-          (hi = Ii - cic * hi).run(stream);
+        (s = sum(norm(v))).run(stream);
+        //(s = sqrt(s)).run(stream);  // sqrt folded into next op
 
-          // update panel of r
-          matmul(rn, hi, ri, stream);
+        // IFELSE to avoid nans when dividing by zero
+        (IFELSE(sc != NTypeS(0), 
+                w = (v / sqrt(sc)),
+                w = NTypeS(0))).run(stream);
 
-          // update panel of q
-          matmul(qn, qi, hi, stream); 
+        (u = matvec(conj(transpose_matrix(R)), w, 2 , 0)).run(stream);
 
-          // deep copy required (can't swap)
-          // copy current panels into output matrix
-          (ri = rn).run(stream);
-          (qi = qn).run(stream);
+        (R = outer(w, conj(u), -1, 1)).run(stream);
 
-          // R & Q now contain latest
-        }
+        // entries below diagonal should be numerical zero.  Zero them out to avoid additional FP error.
+        (IF(index(x.Rank()-1) > i, r = ATypeS(0)) ).run(stream);
 
-        // zero out lower triangular part of R
-        (IF(index(RANK-1) < index(RANK-2), R = 0)).run(stream);
+        (wwt = outer(w, conj(w))).run(stream);
+
+        (Qin = Q).run(stream);  // save input 
+        matmul_impl(Q, Qin, wwt, stream, -2, 1);
 
       }
+    }
 } // end namespace detail
 
 /**
@@ -203,7 +205,7 @@ namespace detail {
  *   CUDA stream
  */
 template<typename QType, typename RType, typename AType>
-void qr(QType Q, RType R, AType A, cudaStream_t stream) {
+inline void qr_impl(QType &Q, RType &R, const AType &A, cudaStream_t stream) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(A.Rank() >= 2);
@@ -213,40 +215,8 @@ void qr(QType Q, RType R, AType A, cudaStream_t stream) {
   MATX_ASSERT_STR(A.Rank() == Q.Rank(), matxInvalidDim, "qr: A and Q must have the same rank");
   MATX_ASSERT_STR(A.Rank() == R.Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
-  using ATypeS = typename AType::scalar_type;
-  using NTypeS = typename inner_op_type_t<ATypeS>::type;
-  const int RANK = AType::Rank();
-
-  index_t m = A.Size(RANK-2);
-  index_t n = A.Size(RANK-1);
-  index_t k = std::min(m,n);
-  if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
-
-  std::array<index_t, RANK-2> NShape;
-  for(int i = 0; i < RANK-2; i++) {
-    NShape[i] = A.Size(i);
-  }
-
-  std::array<index_t, RANK> VMShape;
-  for(int i = 0; i < RANK-1; i++) {
-    VMShape[i] = A.Size(i);
-  }
-  VMShape[RANK-1] = 1;
-
-  std::array<index_t, RANK> HShape;
-  for(int i = 0; i < RANK-2; i++) {
-    HShape[i] = A.Size(i);
-  }
-  HShape[RANK-2] = m;
-  HShape[RANK-1] = m;
-
-  auto N = make_tensor<NTypeS>(NShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto VM = make_tensor<ATypeS>(VMShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto H = make_tensor<ATypeS>(HShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto QN = make_tensor<ATypeS>(Q.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto RN = make_tensor<ATypeS>(R.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  qr_internal(Q,R,A,N,VM,H,QN,RN,stream);
+  auto workspace = qr_internal_workspace(A, stream);
+  qr_internal(Q,R,A,workspace,stream);
 }
 
 } // end namespace matx

@@ -75,7 +75,7 @@ namespace matx {
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
 template<typename UType, typename SType, typename VTType, typename AType, typename X0Type>
-void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
+void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(U.Rank() == A.Rank());
@@ -171,16 +171,16 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       if ( ufirst ) {
         // compute A*AT
         // use conj transpose for complex
-        matmul(AT, Ap, conj(transpose(Ap)), stream);
+        matmul_impl(AT, Ap, conj(transpose_matrix(Ap)), stream);
       } else { // !ufirst
         // use conj transpose for complex
-        matmul(AT, conj(transpose(Ap)), Ap, stream);
+        matmul_impl(AT, conj(transpose_matrix(Ap)), Ap, stream);
       } // end ufirst
 
       // for each fixed point iteration
       for(int it = 0; it < iterations; it++) {
 
-        matmul(xm, AT, xm, stream);
+        matmul_impl(xm, AT, xm, stream);
 
         // normalize x at each iteration to avoid instability
         // first compute sum of squares, norm will work for complex and real
@@ -188,8 +188,8 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
         sum(s, norm(x), stream);
 #else
         //WAR cub not supporting strided output
-        sum(sums, norm(x), stream);
-        (s = sums).run(stream);;
+        (sums = sum(norm(x))).run(stream);
+        (s = sums).run(stream);
 #endif
 
         const int CRANK = s.Rank()+1;  // adding one more dim to s
@@ -219,8 +219,8 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
     vmShapeB[RANK-2] = i;
     vmShapeE[RANK-2] = i+1;
 
-    auto um = slice<RANK>(U, umShapeB, umShapeE);         // as matrix for matmul
-    auto vm = slice<RANK>(VT, vmShapeB, vmShapeE);         // as matrix for matmul
+    auto um = slice<RANK>(U, umShapeB, umShapeE);         // as matrix for matmul_impl
+    auto vm = slice<RANK>(VT, vmShapeB, vmShapeE);         // as matrix for matmul_impl
 
     // u/v will drop the dim that is one element a vector
     umShapeE[RANK-1] = matxDropDim;
@@ -235,7 +235,9 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
 
       // compute v
       // for complex we need the conj transpose of Ap
-      matmul(transpose(vm), conj(transpose(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      // example-begin transpose_matrix-test-1
+      matmul_impl(transpose_matrix(vm), conj(transpose_matrix(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      // example-end transpose_matrix-test-1
 
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
@@ -243,7 +245,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       sum(s, norm(v), stream);
 #else
       //WAR cub not supporting strided output
-      sum(sums, norm(v), stream);
+      (sums = sum(norm(v))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);
@@ -263,14 +265,14 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       (v = conj(x)).run(stream);
 
       // compute u, undo conj
-      matmul(um, Ap, conj(transpose(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
+      matmul_impl(um, Ap, conj(transpose_matrix(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
       sum(s, norm(u), stream);
 #else
       //WAR cub not supporting strided output
-      sum(sums, norm(u), stream);
+      (sums = sum(norm(u))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);
@@ -287,7 +289,7 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
     if(i < k - 1) {
 
       // vm is already conj for complex so no need to conj here
-      matmul(uv, um, vm, stream);
+      matmul_impl(uv, um, vm, stream);
 
       const int CRANK = s.Rank()+ 2;  // adding one more dim to s
       std::array<index_t, CRANK> sCloneShape;
@@ -298,6 +300,43 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
       (Ap = Ap - clone(s, sCloneShape)  * uv).run(stream);
     }
   }
+}
+
+template<typename AType>
+inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
+  using ATypeS = typename AType::scalar_type;
+  const int RANK = AType::Rank();
+
+  auto m = A.Size(RANK-2);  // rows
+  auto n = A.Size(RANK-1);  // cols
+  auto d = std::min(n,m); // dim for AAT or ATA
+
+  auto ATShape = A.Shape();
+  ATShape[RANK-2] = d;
+  ATShape[RANK-1] = d;
+
+  auto QShape = A.Shape();
+  QShape[RANK-1] = d;
+  QShape[RANK-2] = d;
+
+  auto RShape = A.Shape();
+  RShape[RANK-1] = d;
+  RShape[RANK-2] = d;  
+
+  std::array<index_t,RANK-2> l2NormShape;
+  for(int i=0;i<RANK-2;i++) {
+    l2NormShape[i] = A.Size(i);
+  }
+
+  // temp memory for block power iteration
+  auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Q = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Qold = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto l2Norm = make_tensor<float>(l2NormShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream); 
+  return std::tuple(AT, Q, Qold, R, Z, l2Norm, converged);
 }
 
 /**
@@ -324,14 +363,16 @@ void svdpi(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,
  *   VT tensor or operator for right singular vectors output as VH with size "batches by min(m,n) by n"
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
- * @param iterations
- *   The number of power iterations to perform for each singular value.  
+ * @param max_iters
+ *   The approximate maximum number of QR iterations to perform. 
+ * @param tol
+ *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  * @param stream
  *   CUDA stream
  */
 template<typename UType, typename SType, typename VTType, typename AType>
-void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStream_t stream) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_iters, float tol,  cudaStream_t stream) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
 
   static_assert(U.Rank() == A.Rank());
   static_assert(VT.Rank() == A.Rank());
@@ -344,107 +385,120 @@ void svdbpi(UType &U, SType &S, VTType &VT, AType &A, int iterations,  cudaStrea
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
   auto d = std::min(n,m); // dim for AAT or ATA
-  
+
   // assert batch sizes are the same
   for(int i = 0 ; i < RANK-2; i++) {
     MATX_ASSERT_STR(U.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  U and A must have the same batch sizes");
     MATX_ASSERT_STR(VT.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  VT and A must have the same batch sizes");
     MATX_ASSERT_STR(S.Size(i) == A.Size(i), matxInvalidDim, "svdbpi:  S and A must have the same batch sizes");
   }
-  
+
   MATX_ASSERT_STR(U.Size(RANK-2) == m, matxInvalidDim, "svdbpi: U must have Size(RANK-2) == m");
   MATX_ASSERT_STR(U.Size(RANK-1) == d, matxInvalidDim, "svdbpi: U must have Size(RANK-1) == d");
   MATX_ASSERT_STR(VT.Size(RANK-2) == d, matxInvalidDim, "svdbpi: VT must have Size(RANK-2) == d");
   MATX_ASSERT_STR(VT.Size(RANK-1) == n, matxInvalidDim, "svdbpi: VT must have Size(RANK-1) == n");
   MATX_ASSERT_STR(S.Size(RANK-2) == d, matxInvalidDim, "svdbpi:  S must have Size(RANK-2) == d");
-  
 
-  auto ATShape = A.Shape();
-  ATShape[RANK-2] = d;
-  ATShape[RANK-1] = d;
-
-  auto QShape = A.Shape();
-  QShape[RANK-1] = d;
-  QShape[RANK-2] = d;
-  
-  auto RShape = A.Shape();
-  RShape[RANK-1] = d;
-  RShape[RANK-2] = d;  
-
-  // temp memory for block power iteration
-  auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto Q = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  std::array<index_t, RANK-2> NShape;
-  for(int i = 0; i < RANK-2; i++) {
-    NShape[i] = Z.Size(i);
+  int converged_host = false;
+  cudaStream_t d2h;
+  cudaEvent_t event;
+  if(tol>0.0f) {
+    cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking);
+    cudaEventCreate(&event);
   }
 
-  std::array<index_t, RANK> VMShape;
-  for(int i = 0; i < RANK-1; i++) {
-    VMShape[i] = Z.Size(i);
-  }
-  VMShape[RANK-1] = 1;
-
-  std::array<index_t, RANK> HShape;
-  for(int i = 0; i < RANK-2; i++) {
-    HShape[i] = Z.Size(i);
-  }
-  HShape[RANK-2] = Z.Size(RANK-2);
-  HShape[RANK-1] = Z.Size(RANK-2);
-
-  // temp memory for qr
-  auto N = make_tensor<STypeS>(NShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto VM = make_tensor<ATypeS>(VMShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto H = make_tensor<ATypeS>(HShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto QN = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto RN = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto [AT, Q, Qold, R, Z, l2Norm, converged] = svdbpi_impl_workspace(A, stream);
+  auto qr_workspace = qr_internal_workspace(Z, stream);
 
   // create spd matrix
   if ( m >= n ) {
-    matmul(AT, conj(transpose(A)), A, stream);
+    matmul_impl(AT, conj(transpose_matrix(A)), A, stream);
   } else {
-    matmul(AT, A, conj(transpose(A)), stream);
+    matmul_impl(AT, A, conj(transpose_matrix(A)), stream);
   }
-   
+
   auto e2 = eye({d,d});
   auto cShape = A.Shape();
   cShape[RANK-1] = matxKeepDim;
   cShape[RANK-2] = matxKeepDim;
-  
-  (Q = clone<RANK>(e2, cShape)).run(stream);
 
-  for(int i = 0; i < iterations; i++) {
-    matmul(Z, AT, Q, stream);
-    qr_internal(Q,R,Z,N,VM,H,QN,RN,stream);
+  (Qold = Q = clone<RANK>(e2, cShape)).run(stream);
+
+  // TODO multistream?
+  for(int i = 0; i < max_iters; i+=2)
+  {
+
+    // double pump this iteration so we get Qold and Q for tolerance checking.
+    // We might take an extra iteration but it will overheads associated with checking concergence.
+    matmul_impl(Z, AT, Q, stream);
+    qr_internal(Qold, R, Z, qr_workspace, stream);
+
+    matmul_impl(Z, AT, Qold, stream);
+    qr_internal(Q, R, Z, qr_workspace, stream);
+
+    if(tol!=0.0f) {
+
+      cudaStreamSynchronize(d2h);  // wait for d2h transfer to finish
+      if(converged_host == true) {
+        // if converged exit loop
+        break;
+      }
+
+      //compute L2(Q-Qold)
+      // sqrt folded into next operation
+      (l2Norm = sum(norm(Q-Qold))).run(stream);  
+
+      // compute if all batches have converged
+      if constexpr (RANK > 2) {
+        (converged = all(as_int(sqrt(l2Norm) < tol))).run(stream);
+      } else {
+        (converged = as_int(sqrt(l2Norm) < tol)).run(stream);
+      }
+      
+      // event to record when converged is ready in stream
+      cudaEventRecord(event, stream);
+      // wait for d2h transfer until converged is ready
+      cudaStreamWaitEvent(d2h, event);
+
+      // copy convergence criteria to host.  
+      // This is in unpinned memory and cannot on most systems run asynchronously.  
+      // We do this here to hide the copy/sync behind prior launch latency/execution of next iteration.
+      cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
+    }
   }
 
   (S = real(sqrt(diag(R)))).run(stream);
-  
+
   if( m >= n ) {
-    (VT = conj(transpose(Q))).run(stream);
-    matmul(U, A, Q, stream);
-    
+    (VT = conj(transpose_matrix(Q))).run(stream);
+    matmul_impl(U, A, Q, stream);
+
     auto DShape = U.Shape();
     DShape.fill(matxKeepDim);
     DShape[RANK-2] = m;
     auto D = clone<RANK>(S, DShape);
-    
-    // normalize U by singular values
-    (U = U * STypeS(1) / D).run(stream);
+
+    // normalize U by singular values 
+    // IF required to avoid nans when singular value is 0
+    (IF(D != STypeS(0), U = U / D)).run(stream);
+
   } else {
     (U = Q).run(stream);
-    matmul(VT, conj(transpose(Q)), A, stream);
-    
+    matmul_impl(VT, conj(transpose_matrix(Q)), A, stream);
+
     auto DShape = VT.Shape();
     DShape.fill(matxKeepDim);
     DShape[RANK-1] = n;
     auto D = clone<RANK>(S, DShape);
-    
+
     // normalize VT by singular values
-    (VT = VT * STypeS(1) / D).run(stream);
+    // IF required to avoid nans when singular value is 0
+    (IF(D != STypeS(0), VT = VT / D)).run(stream);
+  }
+
+  if(tol>0.0f) {
+    cudaEventDestroy(event);
+    cudaStreamDestroy(d2h);
   }
 }
 

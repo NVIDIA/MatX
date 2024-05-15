@@ -9,12 +9,15 @@ set (test_sources
     00_tensor/EinsumTests.cu
     00_operators/OperatorTests.cu
     00_operators/GeneratorTests.cu
+    00_operators/PWelch.cu
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
     00_transform/MatMul.cu
+    00_transform/ChannelizePoly.cu
     00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
+    00_transform/ResamplePoly.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
     00_solver/LU.cu
@@ -26,6 +29,7 @@ set (test_sources
     00_solver/Inverse.cu
     00_operators/PythonEmbed.cu
     00_io/FileIOTests.cu
+    00_io/PrintTests.cu
     01_radar/MultiChannelRadarPipeline.cu
     01_radar/MVDRBeamformer.cu
     01_radar/ambgfun.cu
@@ -33,28 +37,25 @@ set (test_sources
     main.cu
 )
 
-# Some of <00_io> tests need csv files and the binary 'test.mat' which all 
+# Some of <00_io> tests need csv files and the binary 'test.mat' which all
 # are located under 'CMAKE_SOURCE_DIR/test/00_io'. When calling the test
 # executable <matx_test> from its location in 'CMAKE_BINARY_DIR/test' the
-# search paths according <FileIOTests.cu> are 
-# '../test/00_io/small_csv_comma_nh.csv' and 
+# search paths according <FileIOTests.cu> are
+# '../test/00_io/small_csv_comma_nh.csv' and
 # '../test/00_io/small_csv_complex_comma_nh.csv' respectively. Therefore
 # they must be copied to the correct location:
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/00_io)
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_comma_nh.csv
-	${CMAKE_BINARY_DIR}/test/00_io/small_csv_comma_nh.csv
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/small_csv_complex_comma_nh.csv
-	${CMAKE_BINARY_DIR}/test/00_io/small_csv_complex_comma_nh.csv
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
-file(COPY_FILE
+file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/test.mat
-	${CMAKE_BINARY_DIR}/test/00_io/test.mat
-	ONLY_IF_DIFFERENT
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
 
 # Find proprietary parameters
@@ -94,7 +95,3 @@ target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} gtest)
 add_custom_target(test
     DEPENDS matx_test
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/matx_test)
-
-
-
-

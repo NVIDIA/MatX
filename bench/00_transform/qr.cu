@@ -25,20 +25,16 @@ void qr_batch(nvbench::state &state,
   auto A = make_tensor<AType>({batch, m, n});
   auto Q = make_tensor<AType>({batch, m, m});
   auto R = make_tensor<AType>({batch, m, n});
-
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
   
   A.PrefetchDevice(stream);
   Q.PrefetchDevice(stream);
   R.PrefetchDevice(stream);
   
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
 
   // warm up
   nvtxRangePushA("Warmup");
-  qr(Q, R, A, stream);
+  (mtie(Q, R) = qr(A)).run(stream);
 
   cudaDeviceSynchronize();
   nvtxRangePop();
@@ -46,7 +42,7 @@ void qr_batch(nvbench::state &state,
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
    [&Q, &R, &A](nvbench::launch &launch) {
-      qr(Q, R, A, launch.get_stream()); });
+      (mtie(Q, R) = qr(A)).run(cudaExecutor{launch.get_stream()}); });
   MATX_NVTX_END_RANGE( 1 )
 
 }

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2018-2021, NVIDIA CORPORATION.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,4 +30,3 @@ string(FIND "${contents}" "${to_match_string}" is_found)
 if(is_found EQUAL -1)
   message(FATAL_ERROR "rapids_export_package failed to generate a find_package configuration with version")
 endif()
-

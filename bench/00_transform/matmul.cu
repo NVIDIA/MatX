@@ -30,7 +30,7 @@ void pow2_matmul_bench(nvbench::state &state, nvbench::type_list<ValueType>)
   // Report throughput stats:
 
   state.exec([&av, &bv, &cv](nvbench::launch &launch) {
-    matmul(cv, av, bv, launch.get_stream());
+    (cv = matmul(av, bv)).run(cudaExecutor(launch.get_stream()));
   });
 
   auto seconds =

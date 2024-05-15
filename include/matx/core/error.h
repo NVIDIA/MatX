@@ -33,9 +33,11 @@
 #pragma once
 
 #include <cstdio>
-#include <cuda.h>
 #include <exception>
 #include <sstream>
+#ifdef __CUDACC__
+#include <cuda.h>
+#endif
 
 #include "matx/core/stacktrace.h"
 
@@ -63,7 +65,8 @@ namespace matx
     matxLUError,
     matxInverseError,
     matxSolverError,
-    matxcuTensorError
+    matxcuTensorError,
+    matxInvalidExecutor
   };
 
   static constexpr const char *matxErrorString(matxError_t e)
@@ -164,7 +167,7 @@ namespace matx
 
 #define MATX_EXIT_HANDLER()                                     \
   }                                                             \
-  catch (detail::matxException & e)                                     \
+  catch (matx::detail::matxException & e)                                     \
   {                                                             \
     fprintf(stderr, "%s\n", e.what());                          \
     fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str()); \
@@ -173,7 +176,7 @@ namespace matx
 
 #define MATX_THROW(e, str)                           \
   {                                                  \
-    throw detail::matxException(e, str, __FILE__, __LINE__); \
+    throw matx::detail::matxException(e, str, __FILE__, __LINE__); \
   }
 
 #ifndef NDEBUG
@@ -222,8 +225,8 @@ namespace matx
 #define MATX_CUDA_CHECK(e)                                      \
   if (e != cudaSuccess)                                         \
   {                                                             \
-    fprintf(stderr, "CUDA Error: %s\n", cudaGetErrorString(e)); \
-    MATX_THROW(matxCudaError, cudaGetErrorString(e));           \
+    fprintf(stderr, "%s:%d CUDA Error: %s\n", __FILE__,__LINE__, cudaGetErrorString(e)); \
+    MATX_THROW(matx::matxCudaError, cudaGetErrorString(e));           \
   }
 
 // Macro for checking cuda errors following a cuda launch or api call
@@ -238,7 +241,7 @@ namespace matx
   if constexpr (Rank() > 0) {                                        \
     _Pragma("unroll")                                                \
     for (int32_t i = 0; i < Rank(); i++) {                           \
-      [[maybe_unused]] index_t size = detail::get_expanded_size<Rank()>(op, i);       \
+      [[maybe_unused]] index_t size = matx::detail::get_expanded_size<Rank()>(op, i);       \
       MATX_ASSERT_STR(size == 0 || size == Size(i), matxInvalidSize, "incompatible op sizes:" + str());    \
     }                                                                \
   } 

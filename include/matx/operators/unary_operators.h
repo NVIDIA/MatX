@@ -79,7 +79,7 @@ namespace matx
       }
     }
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ const auto operator()(const std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
       return mapply([&](auto &&...args)  {
           return this->operator()(args...);
@@ -87,7 +87,7 @@ namespace matx
     }  
 
     template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       auto i1 = get_value(in1_, indices...);
       return op_(i1);
@@ -101,6 +101,18 @@ namespace matx
     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return size_[dim];
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+    {
+      in1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept  
+    {
+      in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   };
   }
@@ -177,6 +189,15 @@ namespace matx
  *   Tensor or operator input
  */
   Op abs(Op t) {}
+
+  /**
+ * Compute squared absolute value of every element in the tensor. For complex numbers
+ * this returns the squared magnitude, or real(t)^2 + imag(t)^2. For real numbers
+ * this returns the squared value, or t*t.
+ * @param t
+ *   Tensor or operator input
+ */
+  Op abs2(Op t) {}
 
   /**
  * Compute the sine of every element in the tensor
@@ -309,9 +330,39 @@ namespace matx
  * @param t
  *   LHS tensor or operator input
  */
-  Op operator-(Op t) {}  
+  Op operator-(Op t) {}
+
+ /**
+ * Return real components of an operator
+ * @param t
+ *   Input operator
+ */
+  Op real(Op t) {}  
+
+ /**
+ * Return imaginary components of an operator
+ * @param t
+ *   Input operator
+ */
+  Op imag(Op t) {}  
+
+ /**
+ * Returns a truth value if operator value is NaN
+ * @param t
+ *   Input operator
+ */
+  Op isnan(Op t) {}  
+
+ /**
+ * Returns a truth value if operator value is infinite
+  * @param x
+ *   Input operator
+ */
+  Op isinf( Op x) {}  
+
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
+  DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
   DEFINE_UNARY_OP(exp, detail::ExpOp);
   DEFINE_UNARY_OP(expj, detail::ExpjOp);
   DEFINE_UNARY_OP(log10, detail::Log10Op);
@@ -338,6 +389,7 @@ namespace matx
 #endif
   DEFINE_UNARY_OP(norm, detail::NormOp);
   DEFINE_UNARY_OP(abs, detail::AbsOp);
+  DEFINE_UNARY_OP(abs2, detail::Abs2Op);
   DEFINE_UNARY_OP(sin, detail::SinOp);
   DEFINE_UNARY_OP(cos, detail::CosOp);
   DEFINE_UNARY_OP(tan, detail::TanOp);
@@ -375,6 +427,8 @@ namespace matx
 #endif
   DEFINE_UNARY_OP(imag, detail::ImagOp);  
   DEFINE_UNARY_OP(operator-, detail::SubNegOp );
+  DEFINE_UNARY_OP(isnan, detail::IsNanOp);
+  DEFINE_UNARY_OP(isinf, detail::IsInfOp);
 #endif
 
 } // end namespace matx

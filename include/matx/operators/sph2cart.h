@@ -65,20 +65,52 @@ namespace matx
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            [[maybe_unused]] auto theta = get_value(theta_, indices...);
-            [[maybe_unused]] auto phi = get_value(phi_, indices...);
-            auto r = get_value(r_, indices...);
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          [[maybe_unused]] auto theta = get_value(theta_, indices...);
+          [[maybe_unused]] auto phi = get_value(phi_, indices...);
+          auto r = get_value(r_, indices...);
 
-            if constexpr (WHICH==0) { // X
-              return r * _internal_cos(phi) * _internal_cos(theta);
-            } else if constexpr (WHICH==1) { // Y
-              return r * _internal_cos(phi) * _internal_sin(theta);
-            } else {  // Z
-              return r * _internal_sin(phi);
-            }
-          }    
+          if constexpr (WHICH==0) { // X
+            return r * _internal_cos(phi) * _internal_cos(theta);
+          } else if constexpr (WHICH==1) { // Y
+            return r * _internal_cos(phi) * _internal_sin(theta);
+          } else {  // Z
+            return r * _internal_sin(phi);
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            theta_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T2>()) {
+            phi_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T3>()) {
+            r_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            theta_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T2>()) {
+            phi_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T3>()) {
+            r_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

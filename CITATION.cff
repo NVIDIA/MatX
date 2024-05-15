@@ -11,6 +11,6 @@ authors:
   given-names: "Adam"
   orcid: "https://orcid.org/0000-0001-9690-6357"
 title: "MatX Primitives Library for GPU-Accelerated Numerical Computing in C++"
-version: 0.1.0
-date-released: 2021-10-26
+version: 0.6.0
+date-released: 2023-10-02
 url: "https://github.com/NVIDIA/matx"

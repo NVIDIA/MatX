@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,14 +21,15 @@ rapids_cpm_package_override
 
 .. versionadded:: v21.10.00
 
-Override `CPM` preset package information for the project.
+Overrides the :cmake:command:`rapids_cpm_find`, `rapids_cpm_* <../api.html#cpm-pre-configured-packages>`__,
+`CPM <https://github.com/cpm-cmake/CPM.cmake>`_, and :cmake:module:`FetchContent() <cmake:module:FetchContent>` package information for the project.
 
 .. code-block:: cmake
 
   rapids_cpm_package_override(<json_file_path>)
 
-Allows projects to override the default values for any rapids-cmake
-pre-configured cpm package.
+Allows projects to override the default values for any :cmake:command:`rapids_cpm_find`,
+`rapids_cpm_* <../api.html#cpm-pre-configured-packages>`__, `CPM <https://github.com/cpm-cmake/CPM.cmake>`_, and :cmake:module:`FetchContent() <cmake:module:FetchContent>` package.
 
 The user provided json file must follow the `versions.json` format,
 which is :ref:`documented here<cpm_version_format>`  and shown in the below
@@ -48,11 +49,17 @@ projects.
 
 .. note::
 
+  .. versionadded:: v23.10.00
+
+    When the variable `CPM_<package_name>_SOURCE` exists, any override entries
+    for `package_name` will be ignored.
+
+
+.. note::
   If the override file doesn't specify a value or package entry the default
   version will be used.
 
   Must be called before any invocation of :cmake:command:`rapids_cpm_find`.
-
 
 #]=======================================================================]
 function(rapids_cpm_package_override filepath)
@@ -73,11 +80,12 @@ function(rapids_cpm_package_override filepath)
     # cmake-lint: disable=E1120
     foreach(index RANGE ${package_count})
       string(JSON package_name MEMBER "${json_data}" packages ${index})
-      string(JSON data GET "${json_data}" packages "${package_name}")
       get_property(override_exists GLOBAL PROPERTY rapids_cpm_${package_name}_override_json DEFINED)
-      if(NOT override_exists)
+      if(NOT (override_exists OR DEFINED CPM_${package_name}_SOURCE))
         # only add the first override for a project we encounter
+        string(JSON data GET "${json_data}" packages "${package_name}")
         set_property(GLOBAL PROPERTY rapids_cpm_${package_name}_override_json "${data}")
+        set_property(GLOBAL PROPERTY rapids_cpm_${package_name}_override_json_file "${filepath}")
       endif()
     endforeach()
 
@@ -85,7 +93,15 @@ function(rapids_cpm_package_override filepath)
     include(FetchContent)
     include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
     rapids_cpm_package_details(${package_name} version repository tag shallow exclude)
-    FetchContent_Declare(${package_name} GIT_REPOSITORY ${repository} GIT_TAG ${tag})
+
+    include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
+    rapids_cpm_generate_patch_command(${package_name} ${version} patch_command)
+
+    FetchContent_Declare(${package_name}
+                         GIT_REPOSITORY ${repository}
+                         GIT_TAG ${tag}
+                         GIT_SHALLOW ${shallow}
+                         PATCH_COMMAND ${patch_command} EXCLUDE_FROM_ALL ${exclude})
 
   endif()
 endfunction()

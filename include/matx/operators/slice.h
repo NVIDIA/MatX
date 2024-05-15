@@ -70,14 +70,21 @@ namespace matx
                                       const std::array<shape_type, T::Rank()> &strides) : op_(op) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
-            shape_type start = starts[i];
-            shape_type end = ends[i];
+            shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
+            shape_type end   = ends[i]   < 0 ? op.Size(i) + ends[i]   : ends[i];
+
+            MATX_ASSERT_STR((start > matxIdxSentinel) || (start < op.Size(i)), matxInvalidDim,
+              "Slice slice index out of range of operator");
+            MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= op.Size(i)), matxInvalidDim,
+              "Slice end index out of range of operator");
 
             starts_[i] = start;
             strides_[i] = strides[i];
 
             // compute dims and sizes
             if(end != matxDropDim) {
+              MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
+              
               dims_[d] = i;
 
               if(end == matxEnd) {
@@ -95,7 +102,7 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -119,7 +126,7 @@ namespace matx
           }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -151,7 +158,31 @@ namespace matx
           return sizes_[dim];
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
     };
   }
 

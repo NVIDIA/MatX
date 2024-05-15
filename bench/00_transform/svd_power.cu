@@ -28,13 +28,9 @@ void svdpi_batch(nvbench::state &state,
   auto VT = make_tensor<AType>({batch, r, n});
   auto S = make_tensor<SType>({batch, r});
 
-  randomGenerator_t<AType> gen(batch*m*n,0);
-  auto x0 = gen.GetTensorView({batch, r}, NORMAL);
-
   int iterations = 10;
 
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   U.PrefetchDevice(stream);
@@ -44,17 +40,18 @@ void svdpi_batch(nvbench::state &state,
   (U = 0).run(stream);
   (S = 0).run(stream);
   (VT = 0).run(stream);
+  auto x0 = random<float>({batch, r}, NORMAL);
 
   // warm up
   nvtxRangePushA("Warmup");
-  svdpi(U, S, VT, A, x0, iterations, stream, r);
+  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(stream);
   cudaDeviceSynchronize();
   nvtxRangePop();
 
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
    [&U, &S, &VT, &A, &x0, &iterations, &r](nvbench::launch &launch) {
-      svdpi(U, S, VT, A, x0, iterations, launch.get_stream(), r); });
+      (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(cudaExecutor{launch.get_stream()}); });
   MATX_NVTX_END_RANGE( 1 )
 
 }
@@ -86,10 +83,7 @@ void svdbpi_batch(nvbench::state &state,
 
   int iterations = 10;
   
-  randomGenerator_t<AType> gen(A.TotalSize(),0);
-
-  auto random = gen.GetTensorView({batch, m, n}, NORMAL);
-  (A = random).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
   
   A.PrefetchDevice(stream);
   U.PrefetchDevice(stream);
@@ -102,14 +96,14 @@ void svdbpi_batch(nvbench::state &state,
 
   // warm up
   nvtxRangePushA("Warmup");
-  svdbpi(U, S, VT, A, iterations, stream);
+  (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
   cudaDeviceSynchronize();
   nvtxRangePop();
 
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
    [&U, &S, &VT, &A, &iterations, &r](nvbench::launch &launch) {
-      svdbpi(U, S, VT, A, iterations, launch.get_stream()); });
+      (mtie(U, S, VT) = svdbpi(A, iterations)).run(cudaExecutor{launch.get_stream()}); });
   MATX_NVTX_END_RANGE( 1 )
 }
 

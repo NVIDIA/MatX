@@ -37,65 +37,43 @@
 namespace matx
 {
   namespace detail {
-    template <typename T> class Alternating {
+    template <typename T> 
+      class Alternating : public BaseOp<Alternating<T>>{
       private:
         index_t size_;
 
       public:
         using scalar_type = T;
+        using matxop = bool;        
 
-	__MATX_INLINE__ std::string str() const { return "alternate"; }
+	      __MATX_INLINE__ std::string str() const { return "alternate"; }
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
         {
           return (-2 * (i & 1)) + 1;
         }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 
-
   /**
    * Creates an alternating +1/-1 sequence
    *
    * @tparam T
    *   Data type
-   * @tparam Dim
-   *   Dimension to create window over
-   * @tparam RANK
-   *   The RANK of the shape, can be deduced from shape
    *
-   * @param s
-   *   The shape of the tensor
-   *
-   * Returns values for alternating sequence
-   */
-  template <int Dim, typename ShapeType, typename T = float, 
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto alternate(ShapeType &&s)
-             {
-               constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
-               static_assert(RANK > Dim);
-               detail::Alternating<T> h( *(s.begin() + Dim));
-               return detail::matxGenerator1D_t<detail::Alternating<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);
-             }
-
-  /**
-   * Creates an alternating +1/-1 sequence
-   *
-   * @tparam T
-   *   Data type
-   * @tparam Dim
-   *   Dimension to create window over
-   * @tparam RANK
-   *   The RANK of the shape, can be deduced from shape
-   *
-   * @param s
-   *   C array representing shape of the tensor
+   * @param len
+   *   Length of sequence
    *
    */
-  template <int Dim, int RANK, typename T = float>
-    inline auto alternate(const index_t (&s)[RANK])
+  template <typename T = float>
+    inline auto alternate(const index_t len)
     {
-      return alternate<Dim>(detail::to_array(s));
+      return detail::Alternating<T>{len};
     }
 } // end namespace matx

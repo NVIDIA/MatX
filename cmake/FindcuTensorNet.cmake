@@ -81,8 +81,7 @@ endif()
 if(NOT cuTensorNet_FOUND)
   message(STATUS "cuTensorNet not found. Downloading library. By continuing this download you accept to the license terms of cuQuantum SDK")
 
-  set(CUTENSORNET_VERSION 22.03.0.40)
-  set(CUTENSORNET_FILENAME cuquantum-linux-x86_64-${CUTENSORNET_VERSION}-archive)
+  set(CUTENSORNET_FILENAME cuquantum-linux-x86_64-${CUTENSORNET_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive)
   
   CPMAddPackage(
                NAME cutensornet

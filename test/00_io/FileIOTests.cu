@@ -40,31 +40,36 @@ using namespace matx;
 
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;     
+
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_file_io", "csv", "run", {});
+    pb->InitAndRunTVGenerator<GTestType>("00_file_io", "csv", "run", {});
   }
 
   void TearDown() { pb.reset(); }
-
+  GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   const std::string small_csv = "../test/00_io/small_csv_comma_nh.csv";
   const std::string small_complex_csv = "../test/00_io/small_csv_complex_comma_nh.csv";
-  tensor_t<T, 2> Av{{10, 2}};
+  tensor_t<GTestType, 2> Av{{10, 2}};
 };
 
 template <typename TensorType> class FileIoTestsNonComplexFloatTypes : public FileIoTests<TensorType> {};
 template <typename TensorType> class FileIoTestsComplexFloatTypes : public FileIoTests<TensorType> {};
 
-TYPED_TEST_SUITE(FileIoTestsNonComplexFloatTypes, MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(FileIoTestsComplexFloatTypes, MatXComplexNonHalfTypes);
+TYPED_TEST_SUITE(FileIoTestsNonComplexFloatTypes, MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(FileIoTestsComplexFloatTypes, MatXComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
-  io::ReadCSV(this->Av, this->small_csv, ",");
+  // example-begin read_csv-test-1
+  io::read_csv(this->Av, this->small_csv, ",");
+  // example-end read_csv-test-1
   MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -74,7 +79,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
-  io::ReadCSV(this->Av, this->small_complex_csv, ",");
+  io::read_csv(this->Av, this->small_complex_csv, ",");
   MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_complex_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -83,11 +88,15 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 {
   MATX_ENTER_HANDLER();
-  tensor_t<TypeParam, 2> Avs{{10, 2}};
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  tensor_t<TestType, 2> Avs{{10, 2}};
 
   this->pb->NumpyToTensorView(this->Av, this->small_csv.c_str());
-  io::WriteCSV(this->Av, "temp.csv", ",");
-  io::ReadCSV(Avs, "temp.csv", ",", false);
+  // example-begin write_csv-test-1
+  io::write_csv(this->Av, "temp.csv", ",");
+  // example-end write_csv-test-1
+  io::read_csv(Avs, "temp.csv", ",", false);
   MATX_TEST_ASSERT_COMPARE(this->pb, Avs, this->small_csv.c_str(), 0.01);
 
   MATX_EXIT_HANDLER();
@@ -96,11 +105,14 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  auto t = make_tensor<TestType>({1,10});
 
-  auto t = make_tensor<TypeParam>({1,10});
-
+  // example-begin read_mat-test-1
   // Read "myvar" from mat file
-  io::ReadMAT(t, "../test/00_io/test.mat", "myvar");
+  io::read_mat(t, "../test/00_io/test.mat", "myvar");
+  // example-end read_mat-test-1
   ASSERT_NEAR(t(0,0), 1.456, 0.001);
 
   MATX_EXIT_HANDLER();
@@ -110,13 +122,17 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
 {
   MATX_ENTER_HANDLER();
 
-  auto t = make_tensor<TypeParam>({2,3});
-  auto t2 = make_tensor<TypeParam>({2,3});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  auto t = make_tensor<TestType>({2,3});
+  auto t2 = make_tensor<TestType>({2,3});
   t.SetVals({{1,2,3},{4,5,6}});
 
-  // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  io::ReadMAT(t2, "test_write.mat", "myvar");
+  // Write "myvar" to mat file
+  // example-begin write_mat-test-1
+  io::write_mat(t, "test_write.mat", "myvar");
+  // example-end write_mat-test-1
+  io::read_mat(t2, "test_write.mat", "myvar");
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
       ASSERT_EQ(t(i,j), t2(i,j));
@@ -130,18 +146,18 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
 {
   MATX_ENTER_HANDLER();
 
-  auto t = make_tensor<TypeParam>({2,3,1,2,3});
-  auto t2 = make_tensor<TypeParam>({2,3,1,2,3});
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  auto t = make_tensor<TestType>({2,3,1,2,3});
+  auto t2 = make_tensor<TestType>({2,3,1,2,3});
+
+  (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  io::ReadMAT(t2, "test_write.mat", "myvar");
+  io::write_mat(t, "test_write.mat", "myvar");
+  io::read_mat(t2, "test_write.mat", "myvar");
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
       for (index_t k = 0; k < t.Size(2); k++) {
@@ -159,19 +175,18 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  auto t = make_tensor<TypeParam>({2,3,1,2,3});
-  tensor_t<TypeParam,5> t2;
+  auto t = make_tensor<TestType>({2,3,1,2,3});
+  tensor_t<TestType,5> t2;
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  t2.Shallow(io::ReadMAT<decltype(t2)>("test_write.mat", "myvar"));
+  io::write_mat(t, "test_write.mat", "myvar");
+  t2.Shallow(io::read_mat<decltype(t2)>("test_write.mat", "myvar"));
 
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
@@ -191,18 +206,18 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
 {
   MATX_ENTER_HANDLER();
 
-  auto t = make_tensor<TypeParam>({2,3,1,2,3});
-  tensor_t<TypeParam,5> t2;
+  using TestType = std::tuple_element_t<0, TypeParam>;
 
-  randomGenerator_t<TypeParam> gen(t.TotalSize(), 0);
-  auto random = gen.GetTensorView(t.Shape(), UNIFORM);
-  (t = random).run();
+  auto t = make_tensor<TestType>({2,3,1,2,3});
+  tensor_t<TestType,5> t2;
+
+  (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
   cudaDeviceSynchronize();
 
   // Read "myvar" from mat file
-  io::WriteMAT(t, "test_write.mat", "myvar");
-  t2.Shallow(io::ReadMAT<decltype(t2)>("test_write.mat", "myvar"));
+  io::write_mat(t, "test_write.mat", "myvar");
+  t2.Shallow(io::read_mat<decltype(t2)>("test_write.mat", "myvar"));
 
   for (index_t i = 0; i < t.Size(0); i++) {
     for (index_t j = 0; j < t.Size(1); j++) {
@@ -215,5 +230,50 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
       }
     }
   }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({2, 3});
+
+  // example-begin read_npy-test-1
+  io::read_npy(t, "../test/00_io/test.npy");
+  // example-end read_npy-test-1
+
+  // The test npy is [[1.5, 2.5, 3.5], [4.5, 5.5, 6.5]]
+  ASSERT_NEAR(t(0, 0), 1.5, 0.001);
+  ASSERT_NEAR(t(0, 1), 2.5, 0.001);
+  ASSERT_NEAR(t(0, 2), 3.5, 0.001);
+  ASSERT_NEAR(t(1, 0), 4.5, 0.001);
+  ASSERT_NEAR(t(1, 1), 5.5, 0.001);
+  ASSERT_NEAR(t(1, 2), 6.5, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYWrite)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({2, 3});
+  auto t2 = make_tensor<TestType>({2, 3});
+  t.SetVals({{1, 2, 3}, {4, 5, 6}});
+
+  // example-begin write_npy-test-1
+  io::write_npy(t, "test_write.npy");
+  // example-end write_npy-test-1
+
+  io::read_npy(t2, "test_write.npy");
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
+      ASSERT_EQ(t(i, j), t2(i, j));
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }

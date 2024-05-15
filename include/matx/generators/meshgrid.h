@@ -40,7 +40,7 @@ namespace matx
   namespace detail {
 
     template <typename T1, int RANK, int AXIS> 
-      class MeshGridOp {
+      class MeshGridOp : public BaseOp<MeshGridOp<T1, RANK, AXIS>> {
         private:
           T1 t1_;
           std::array<index_t, RANK> shape_;
@@ -58,7 +58,7 @@ namespace matx
           }
 
           template <typename... Is>
-            __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+            __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
 
               std::array<index_t, Rank()> inds{indices...};
               // get index for the axis
@@ -71,6 +71,22 @@ namespace matx
           __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
             return shape_[dim];
           }
+
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+          {
+            if constexpr (is_matx_op<T1>()) {
+              t1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+          }
+
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+          {
+            if constexpr (is_matx_op<T1>()) {
+              t1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
+          }            
 
           static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
       };

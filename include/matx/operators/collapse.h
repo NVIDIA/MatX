@@ -70,7 +70,7 @@ namespace matx
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             // indices coming in
             std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -95,7 +95,7 @@ namespace matx
           }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices) 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
           {
             // indices coming in
             std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -132,7 +132,31 @@ namespace matx
             return op_.Size(DIM + dim - 1);
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
     };
   }
   /**
@@ -195,7 +219,7 @@ namespace matx
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             // indices coming in
             std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -220,7 +244,7 @@ namespace matx
           }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             // indices coming in
             std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -257,7 +281,31 @@ namespace matx
             return op_.Size(dim);
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
     };
   }
   /**

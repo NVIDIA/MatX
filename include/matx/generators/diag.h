@@ -36,7 +36,8 @@
 namespace matx
 {
   namespace detail {
-    template <typename T, typename ShapeType> class Diag {
+    template <typename T, typename ShapeType> 
+      class Diag : public BaseOp<Diag<T, ShapeType>>{
       static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
 
       private:
@@ -52,11 +53,13 @@ namespace matx
 
       Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
       {
-        static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");
+        if constexpr (!is_noshape_v<ShapeType>) {
+          static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");
+        }
       };
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
           if (((pp_get<0>(indices...) == indices) && ...)) {
             return T(val_);
           }
@@ -67,10 +70,43 @@ namespace matx
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
       {
-        return *(s_.begin() + dim);
+        if constexpr (!is_noshape_v<ShapeType>) {
+          return *(s_.begin() + dim);
+        }
+        else {
+          return index_t(0);
+        }
       }
-      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+        if constexpr (!is_noshape_v<ShapeType>) {
+          return RANK;
+        }
+        else {
+          return matxNoRank;
+        }
+      }
     };
+  }
+
+  /**
+   * Creates a diagonal tensor with a given value on the diagonals
+   *
+   * diag returns a given value on all elements on the diagonals of a tensor, and
+   * 0 otherwise. In other words, if the index of every dimension is the same, the
+   * value is returned, otherwise a zero is returned. This version of diag() is
+   * shapeless and can be indexed using any input dimension and it will return a
+   * valid value. It is preferred to use it over the shaped versions if the shape
+   * can be deduced by other contexts.
+   *
+   * @tparam T Data type
+   * 
+   * @param val Value to return
+   *
+   */
+  template <typename T = int, std::enable_if_t<std::is_arithmetic_v<T>, bool> = true>
+  inline auto diag(T val)
+  {
+    return detail::Diag<T, NoShape>(NoShape{}, T(val));
   }
 
   /**
@@ -85,11 +121,11 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto diag(ShapeType &&s, T val)
-             {
-               return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
-             }
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  inline auto diag(ShapeType &&s, T val)
+  {
+    return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
+  }
 
   /**
    * Creates a diagonal tensor with a given value on the diagonals
@@ -98,15 +134,18 @@ namespace matx
    * 0 otherwise. In other words, if the index of every dimension is the same, the
    * value is returned, otherwise a zero is returned.
    *
-   * @tparam T
-   *   Data type
+   * @tparam T Data type
+   * @tparam RANK Rank of input
+   * 
+   * @param s Array of operator dimensions
+   * @param val Value to return
    *
    */
   template <typename T = int, int RANK>
-    inline auto diag(const index_t (&s)[RANK], T val)
-    {
-      return diag(detail::to_array(s), val);
-    }
+  inline auto diag(const index_t (&s)[RANK], T val)
+  {
+    return diag(detail::to_array(s), val);
+  }
 
   /**
    * Creates an identity patterns on the tensor
@@ -120,11 +159,11 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto eye(ShapeType &&s)
-             {
-               return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
-             }
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  inline auto eye(ShapeType &&s)
+  {
+    return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
+  }
 
   /**
    * Creates an identity patterns on the tensor
@@ -137,8 +176,27 @@ namespace matx
    *   Data type
    *
    */
-  template <typename T = int, int RANK> inline auto eye(const index_t (&s)[RANK])
+  template <typename T = int, int RANK>
+  inline auto eye(const index_t (&s)[RANK])
   {
     return eye<T>(detail::to_array(s));
+  }
+
+  /**
+   * Creates an identity generator
+   *
+   * eye() returns 1 on all elements on the diagonals of a tensor, and 0 otherwise.
+   * In other words, if the index of every dimension is the same, a 1 is returned,
+   * otherwise a zero is returned. This version of eye() is shapeless and can be indexed 
+   * using any input dimension and it will return a valid value. It is preferred to use
+   * it over the shaped versions if the shape can be deduced by other contexts.
+   *
+   * @tparam T Data type
+   *
+   */
+  template <typename T = int>
+  inline auto eye()
+  {
+    return detail::Diag<T, NoShape>(NoShape{}, T(1));
   }
 } // end namespace matx

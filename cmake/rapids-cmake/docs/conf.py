@@ -1,3 +1,5 @@
+# Copyright (c) 2023, NVIDIA CORPORATION.
+#
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -10,12 +12,12 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
+import sphinx_rtd_theme
 
 # -- Project information -----------------------------------------------------
 
 project = "rapids-cmake"
-copyright = "2021, NVIDIA"
+copyright = "2021-2023, NVIDIA"
 author = "NVIDIA"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -23,9 +25,9 @@ author = "NVIDIA"
 # built documents.
 #
 # The short X.Y version.
-version = "22.10"
+version = "23.12"
 # The full version, including alpha/beta/rc tags.
-release = "22.10.00"
+release = "23.12.00"
 
 
 # -- General configuration ---------------------------------------------------
@@ -64,7 +66,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -84,20 +86,8 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 
-html_theme = "sphinx_pydata_theme"
-
-# on_rtd is whether we are on readthedocs.org
-on_rtd = os.environ.get("READTHEDOCS", None) == "True"
-
-if not on_rtd:
-    # only import and set the theme if we're building docs locally
-    # otherwise, readthedocs.org uses their theme by default,
-    # so no need to specify it
-    import sphinx_rtd_theme
-
-    html_theme = "sphinx_rtd_theme"
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-
+html_theme = "sphinx_rtd_theme"
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -132,5 +122,5 @@ autoclass_content = "init"
 
 def setup(app):
     app.add_js_file("copybutton_pydocs.js")
-    app.add_css_file("params.css")
     app.add_css_file("https://docs.rapids.ai/assets/css/custom.css")
+    app.add_js_file("https://docs.rapids.ai/assets/js/custom.js", loading_method="defer")

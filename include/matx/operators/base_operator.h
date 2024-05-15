@@ -35,9 +35,11 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/operator_utils.h"
 
 namespace matx
 {
+
   /**
    * @brief Provides a base class with functions common to all operators
    * 
@@ -50,17 +52,34 @@ namespace matx
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
 
-	__MATX_INLINE__ std::string str() const { return "BaseOp"; }
+	      __MATX_INLINE__ std::string str() const { return "BaseOp"; }
         /**
          * @brief Launch kernel in a GPU stream
          * 
          * @param stream CUDA stream
          */
-        __MATX_INLINE__ void run(cudaStream_t stream = 0) noexcept
+        __MATX_INLINE__ void run(cudaStream_t stream = 0)
         {
-          MATX_NVTX_START(get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
+          MATX_NVTX_START(detail::get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
+          auto tp = static_cast<T *>(this);
           auto ex = cudaExecutor(stream);
-          ex.Exec(*static_cast<T *>(this));
+
+          // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+          // async allocation we'd normally have to do
+          if constexpr (is_mtie<T>() ) {
+            tp->Exec(ex);
+          }
+          else {
+            if constexpr (is_matx_op<T>()) {
+              tp->PreRun(tp->Shape(), ex);
+            }
+
+            ex.Exec(*tp);
+
+            if constexpr (is_matx_op<T>()) {
+              tp->PostRun(tp->Shape(), ex);
+            }
+          }
         }
 
         /**
@@ -69,12 +88,56 @@ namespace matx
          * @param ev CUDA event
          * @param stream CUDA stream
          */
-        __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0) noexcept
+        __MATX_INLINE__ void run(cudaEvent_t ev, cudaStream_t stream = 0)
         {
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
           auto ex = cudaExecutor(stream);
-          ex.Exec(*static_cast<T *>(this));
-          cudaEventRecord(ev, stream);
+          auto tp = static_cast<T *>(this);
+
+          // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+          // async allocation we'd normally have to do
+          if constexpr (is_mtie<T>() ) {
+            tp->Exec(ex);
+          }
+          else {
+            if constexpr (is_matx_op<T>()) {
+              tp->PreRun(tp->Shape(), ex);
+            }
+
+            ex.Exec(*tp);
+
+            if constexpr (is_matx_op<T>()) {
+              tp->PostRun(tp->Shape(), ex);
+            }
+
+            cudaEventRecord(ev, stream);
+          }
+        }
+
+        /**
+         * @brief Function to run before the executor
+         * 
+         * @tparam ShapeType Type of shape
+         * @tparam Executor Executor type
+         * @param shape Shape
+         * @param ex Executor
+         */
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+        }
+
+        /**
+         * @brief Function to run before the executor
+         * 
+         * @tparam ShapeType Type of shape
+         * @tparam Executor Executor type
+         * @param shape Shape
+         * @param ex Executor
+         */
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
         }
 
         /**
@@ -84,19 +147,42 @@ namespace matx
          * @param ex Executor
          */
         template <typename Ex>
-          __MATX_INLINE__ void run (Ex ex) {
+          __MATX_INLINE__ void run (Ex &&ex) {
             MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
             static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
-            ex.Exec(*static_cast<T *>(this));
+
+            auto tp = static_cast<T *>(this);
+
+            // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
+            // async allocation we'd normally have to do
+            if constexpr (is_mtie<T>() ) {
+              tp->Exec(ex);
+            }
+            else {            
+              if constexpr (is_matx_op<T>()) {
+                tp->PreRun(tp->Shape(), ex);
+              }
+
+              ex.Exec(*tp);
+
+              if constexpr (is_matx_op<T>()) {
+                tp->PostRun(tp->Shape(), ex);
+              }
+            }
           }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
-          std::array<index_t, T::Rank()> sizes_;
-
-          for(int i = 0 ; i < T::Rank(); i++) {
-            sizes_[i] = static_cast<const T*>(this)->Size(i);
+          if constexpr (T::Rank() == 0) {
+            return std::array<index_t, 0> {};
           }
-          return sizes_;
+          else {
+            std::array<index_t, T::Rank()> sizes_;
+
+            for(int i = 0 ; i < T::Rank(); i++) {
+              sizes_[i] = static_cast<const T*>(this)->Size(i);
+            }
+            return sizes_;
+          }
         }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t TotalSize() const {

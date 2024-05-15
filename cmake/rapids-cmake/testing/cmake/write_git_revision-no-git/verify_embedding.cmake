@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 file(STRINGS "${EXECUTABLE}" contents)
 
 execute_process(
@@ -48,6 +48,3 @@ endif()
 if(NOT contents MATCHES "version=${RAPIDS_WRITE_VERSION}")
   message(FATAL_ERROR "git version not embedded")
 endif()
-
-
-

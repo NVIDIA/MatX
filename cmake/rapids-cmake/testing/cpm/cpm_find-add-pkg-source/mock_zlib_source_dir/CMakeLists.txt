@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(ZLIB LANGUAGES CXX)
 
 add_library(MOCK_ZLIB INTERFACE)

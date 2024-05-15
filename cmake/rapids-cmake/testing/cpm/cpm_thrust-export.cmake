@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,14 +29,4 @@ endif()
 get_target_property(packages rapids_export_install_test2 PACKAGE_NAMES)
 if(NOT Thrust IN_LIST packages)
   message(FATAL_ERROR "rapids_cpm_thrust failed to record thrust needs to be exported")
-endif()
-
-get_target_property(packages rapids_export_build_test GLOBAL_TARGETS)
-if(A::Thrust IN_LIST packages)
-  message(FATAL_ERROR "rapids_cpm_thrust incorrectly added A::Thrust to build GLOBAL_TARGETS")
-endif()
-
-get_target_property(packages rapids_export_install_test2 GLOBAL_TARGETS)
-if(B::Thrust IN_LIST packages)
-  message(FATAL_ERROR "rapids_cpm_thrust incorrectly added B::Thrust to install GLOBAL_TARGETS")
 endif()

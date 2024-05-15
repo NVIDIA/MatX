@@ -43,10 +43,13 @@ constexpr int n = 50;
 template <typename T> class QRSolverTest : public ::testing::Test {
 protected:
   using dtype = float;
+  using GTestType = std::tuple_element_t<0, T>;
+  using GExecType = std::tuple_element_t<1, T>;   
+   
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<T>("00_solver", "qr", "run", {m, n});
+    pb->InitAndRunTVGenerator<GTestType>("00_solver", "qr", "run", {m, n});
     pb->NumpyToTensorView(Av, "A");
     pb->NumpyToTensorView(Qv, "Q");
     pb->NumpyToTensorView(Rv, "R");
@@ -55,11 +58,12 @@ protected:
   void TearDown() { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<T, 2> Av{{m, n}};
-  tensor_t<T, 2> Atv{{n, m}};
-  tensor_t<T, 1> TauV{{std::min(m, n)}};
-  tensor_t<T, 2> Qv{{m, std::min(m, n)}};
-  tensor_t<T, 2> Rv{{std::min(m, n), n}};
+  GExecType exec{};   
+  tensor_t<GTestType, 2> Av{{m, n}};
+  tensor_t<GTestType, 2> Atv{{n, m}};
+  tensor_t<GTestType, 1> TauV{{std::min(m, n)}};
+  tensor_t<GTestType, 2> Qv{{m, std::min(m, n)}};
+  tensor_t<GTestType, 2> Rv{{std::min(m, n), n}};
 };
 
 template <typename TensorType>
@@ -67,15 +71,17 @@ class QRSolverTestNonComplexFloatTypes : public QRSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(QRSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypes);
+                 MatXFloatNonComplexNonHalfTypesCUDAExec);
 
 TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
 {
   MATX_ENTER_HANDLER();
 
+  // example-begin cusolver_qr-test-1
   // cuSolver only supports col-major solving today, so we need to transpose,
   // solve, then transpose again to compare to Python
-  cusolver_qr(this->Av, this->TauV, this->Av);
+  (mtie(this->Av, this->TauV) = cusolver_qr(this->Av)).run(this->exec);
+  // example-end cusolver_qr-test-1
   cudaStreamSynchronize(0);
 
   // For now we're only verifying R. Q is a bit more complex to compute since

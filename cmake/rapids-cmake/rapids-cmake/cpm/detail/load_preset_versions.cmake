@@ -55,6 +55,7 @@ function(rapids_cpm_load_preset_versions)
     string(JSON package_name MEMBER "${json_data}" packages ${index})
     string(JSON data GET "${json_data}" packages "${package_name}")
     set_property(GLOBAL PROPERTY rapids_cpm_${package_name}_json "${data}")
+    set_property(GLOBAL PROPERTY rapids_cpm_${package_name}_json_file "${filepath}")
   endforeach()
 
 endfunction()

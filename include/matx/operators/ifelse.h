@@ -106,7 +106,7 @@ namespace matx
        * @param indices Index values
        */
       template <typename... Is>
-        auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
           if (get_value(cond_, indices...)) {
             get_value(op1_, indices...);
           }
@@ -124,6 +124,38 @@ namespace matx
       {
         return detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>());
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<T1>()) {
+          op1_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<T2>()) {
+          op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }        
+
+        if constexpr (is_matx_op<C1>()) {
+          cond_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }        
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<T1>()) {
+          op1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<T2>()) {
+          op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }        
+
+        if constexpr (is_matx_op<C1>()) {
+          cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }        
 
       /**
        * @brief Size of dimension of operator

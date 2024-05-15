@@ -67,10 +67,12 @@ namespace matx
         __MATX_INLINE__ ShiftOp(T1 op, T2 shift) : op_(op), shift_(shift)
       {
         static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
+        ASSERT_COMPATIBLE_OP_SIZES(shift_); 
+        ASSERT_COMPATIBLE_OP_SIZES(op_); 
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
             index_t shift = -get_value(shift_, indices...);
@@ -85,17 +87,59 @@ namespace matx
             return mapply(op_, tup);
           }    
 
+        template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+          {
+            auto tup = cuda::std::make_tuple(indices...);
+            index_t shift = -get_value(shift_, indices...);
+
+
+            shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
+
+            if(shift<0) shift += Size(DIM);
+
+            cuda::std::get<DIM>(tup) = shift;
+
+            return mapply(op_, tup);
+          }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }          
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return detail::get_rank<T1>();
+          return detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>());
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          return op_.Size(dim);
+          index_t size1 = detail::get_expanded_size<Rank()>(op_, dim);
+          index_t size2 = detail::get_expanded_size<Rank()>(shift_, dim);
+          return detail::matx_max(size1,size2);
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
     };
   }
   /**

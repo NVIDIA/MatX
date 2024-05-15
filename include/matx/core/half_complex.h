@@ -53,10 +53,10 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
   using value_type = T; ///< Type trait to get type
 
   /**
-   * @brief Constructor a half complex object with defaults of zero
+   * @brief Default constructor
    * 
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex() : x(0.0f), y(0.0f) {}
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex() = default;
 
   /**
    * @brief Copy constructor from a complex float

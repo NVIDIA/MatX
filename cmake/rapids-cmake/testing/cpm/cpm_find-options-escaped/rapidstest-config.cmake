@@ -15,7 +15,7 @@
 #=============================================================================
 @PACKAGE_INIT@
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 
 include("${CMAKE_CURRENT_LIST_DIR}/rapidstest-config-version.cmake")
 

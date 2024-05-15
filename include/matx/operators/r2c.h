@@ -50,25 +50,41 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename T1::scalar_type; 
 
-	 __MATX_INLINE__ std::string str() const { return "r2c(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "r2c(" + op_.str() + ")"; }
 
         __MATX_INLINE__ R2COp(T1 op, index_t orig) : op_(op), orig_size_(orig) {
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
 
+        // This version of the operator returns auto rather than decltype(auto) because we need to force the 
+        // return type to be by value and not pass through references
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            auto tup = cuda::std::make_tuple(indices...);
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
 
-            // If we're on the upper part of the spectrum, return the conjugate of the first half
-            if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
-              cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
-              return cuda::std::conj(mapply(op_, tup));
-            }
+          // If we're on the upper part of the spectrum, return the conjugate of the first half
+          if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
+            cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
+            return conj(mapply(op_, tup));
+          }
 
-            return mapply(op_, tup);
-          }   
+          return mapply(op_, tup);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
+
+          // If we're on the upper part of the spectrum, return the conjugate of the first half
+          if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
+            cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
+            return conj(mapply(op_, tup));
+          }
+
+          return mapply(op_, tup);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -76,11 +92,27 @@ namespace matx
         }
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          if (dim == (uint32_t)(Rank() - 1)) {
+          if (dim == Rank() - 1) {
             return orig_size_;
           }
           else {
             return op_.Size(dim);
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
         }
     };

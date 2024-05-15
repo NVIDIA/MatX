@@ -42,6 +42,10 @@ tensor:
 
 Note that for a static tensor the shape is moved to the template parameters instead of function arguments.
 
+.. note::
+   While static tensors are preferred over dynamic tensors, they currently have limitations when calling certain library functions. 
+   These limitations may be removed over time, but in cases where they don't work a dynamic tensor will work.
+
 After calling the make function, MatX will allocate CUDA managed memory large enough to accommodate the specified tensor size. Users can also
 pass their own pointers in a different for of the ``make_`` family of functions to allow for more control over buffer types and ownership
 semantics.
@@ -72,7 +76,7 @@ Tensors can also be initialized using initializer list syntax using the ``SetVal
 .. code-block:: cpp
 
     auto myT = make_tensor<float>({3, 3});
-    myT.SetVals({ {1,2,3}, {4,5,6}, {7,8,9} });
+    myT.SetVals({{1,2,3}, {4,5,6}, {7,8,9}});
 
 In other languages it's very common to initialize a tensor with a set of values on creation (ones, zeros, ranges). This will be covered later 
 in the tutorial when we discuss operators, and it should become clear why we initialize this way.
@@ -110,16 +114,16 @@ Slicing and dicing
 ------------------
 As the name implies, ``t`` is a view into a region of memory. When the initial view is created and memory is allocated, the tensor view is
 of the entire 10x20 contiguous block of memory. Often we don't want to see the entire block of memory, but only want to view a subset of the
-underlying data. To do this, we use the ``Slice`` member function of the view class:
+underlying data. To do this, we use the ``slice`` operator:
 
 .. code-block:: cpp
 
-    auto tCube  = t.Slice({3, 5}, {6, 8});                      // Cube of t using rows 3-5 and cols 5-7
-    auto tRectS = t.Slice({0, 0}, {matxEnd, matxEnd}, {2, 2});  // Rectangle with stride of 2 in both dimensions
-    auto tCol   = t.Slice<1>({0, 4}, {matxEnd, matxDropDim});   // Create a 1D tensor with only column 5
-    auto tRow   = t.Slice<1>({4, 0}, {matxDropDim, matxEnd});   // Create a 1D tensor with only row 5
+    auto tCube  = slice(t, {3, 5}, {6, 8});                      // Cube of t using rows 3-5 and cols 5-7
+    auto tRectS = slice(t, {0, 0}, {matxEnd, matxEnd}, {2, 2});  // Rectangle with stride of 2 in both dimensions
+    auto tCol   = slice<1>(t, {0, 4}, {matxEnd, matxDropDim});   // Create a 1D tensor with only column 5
+    auto tRow   = slice<1>(t, {4, 0}, {matxDropDim, matxEnd});   // Create a 1D tensor with only row 5
     
-``Slice`` returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
+``slice`` returns a new view of the tensor using start, stop, and optional stride parameters. Since views are simply
 light-weight views into memory, none of these variants modify the data; they return an object with new parameters describing
 how the data is viewed. The resulting variables can be used exactly as the original view above:
 
@@ -134,27 +138,34 @@ All view functions can be used on any type of existing view:
 
 .. code-block:: cpp
 
-    auto tCubeP  = t.Slice({3, 5}, {6, 8}).Permute({1, 0});
+    auto tCubeP  = permute(slice(t, {3, 5}, {6, 8}), {1, 0});
 
 The above code takes the same cube as before, but permutes the cube view by swapping the two dimensions. 
 
+``slice`` is not limited to only tensors; it can be used on any operator as input:
+
+.. code-block:: cpp
+
+    slice(eye(t.Shape()), {3, 5}, {6, 8});
+
 Permuting
 ---------
-Permuting a tensor is done using the ``Permute`` member function of a view:
+Permuting a tensor is done using the ``permute`` function:
 
 .. code-block:: cpp
 
     auto t = make_tensor<float>({10, 20});
-    auto tp = t.Permute({1,0});
+    auto tp = permute(t, {1,0});
 
-``tp`` is now a view into ``t`` where the rows and columns are swapped (transpose). ``Permute`` is not limited to matrices, though:
+``tp`` is now a view into ``t`` where the rows and columns are swapped (transpose). ``permute`` is not limited to matrices, though:
 
 .. code-block:: cpp
 
     auto t4 = make_tensor<float>({10, 20, 5, 2});
-    auto tp4 = t.Permute({1,3,2,0});
+    auto tp4 = permute(t, {1,3,2,0});
 
-``t4p`` is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list.
+``t4p`` is now a permuted view of the original 4D tensor, but with the dimensions swapped as ordered in the initializer list. Just like
+with ``slice``, ``permute`` works on operators as well.
 
 Note that since no data is moved, permuting a tensor can be detrimental to performance, depending on the context. Permuting usually
 changes the strides of dimensions such that the memory access patterns are no longer optimal, and accessing the permuted view
@@ -166,7 +177,13 @@ a new tensor so that the new layout is contiguous. Using the variables from abov
     auto t4pc = make_tensor<float>(tp4.Shape());
     copy(t4pc, t4p);
 
-``t4pc`` will now contain the permuted data, but in contiguous memory.
+``t4pc`` will now contain the permuted data, but in contiguous memory. Copying a tensor (or operator) can also be done by the assignment 
+operator:
+
+.. code-block:: cpp
+
+    (t4pc = t4p).run();
+
 
 Reshaping
 ---------
@@ -192,7 +209,7 @@ all rows in a matrix, you can clone the tensor to a higher rank to match the oth
     auto t2 = make_tensor<float>({16, 16});
     // ... Initialize tensors
 
-    auto t1c = t1.Clone<2>({16, matxKeepDim});
+    auto t1c = clone<2>(t1, {16, matxKeepDim});
 
 ``t1c`` is now a new tensor view where each row is a replica of the tensor ``t1``. Again, this is just a view and no data was modified or
 allocated, so modifying a row/column in either of these tensors will affect the other. 
@@ -201,9 +218,9 @@ The keyword ``matxKeepDim`` tells MatX which dimensions should be kept from the 
 In this example we used it in the columns place of the shape, but we also could have used ``{matxKeepDim, 16}`` and we would have a 2D
 view where all columns of ``t1c`` matches ``t1``.
 
-Note in some cases MatX's *broadcasting* feature can be used instead of ``Clone``. This allows an implicit expansion of ranks during an 
+Note in some cases MatX's *broadcasting* feature can be used instead of ``clone``. This allows an implicit expansion of ranks during an 
 element-wise operation. For example, adding a 4D tensor to a 1D tensor will work as long as the outer dimension of the 4D tensor matches
-that of the 1D tensor. Broadcasting is covered in the documentation. ``Clone`` is much more powerful since it gives more control over which 
+that of the 1D tensor. Broadcasting is covered in the documentation. ``clone`` is much more powerful since it gives more control over which 
 dimensions are cloned instead of assuming the outer dimensions.
 
 Creating a view from an existing pointer
@@ -277,11 +294,11 @@ The example above uses the ``ones`` generator to create a tensor with only the v
 value ``1`` any time an element of it is requested, and no data is ever loaded from memory.
 
 Implicit in the ``run`` call above is a CUDA executor type. As a beta feature, MatX also supports executing code on the host using a different executor.
-To run the same code on the host, a ``SingleThreadHostExecutor`` can be passed into ``run``:
+To run the same code on the host, a ``HostExecutor`` can be passed into ``run``:
 
 .. code-block:: cpp
 
-    (c = (a*a) + ones(a.Shape())).run(SingleThreadHostExecutor{});
+    (c = (a*a) + ones(a.Shape())).run(HostExecutor{});
 
 Instead of a CUDA stream, we pass an executor to ``run`` that instructs MatX to execute the code on the host instead of the device using a single CPU thread.
 Unlike CUDA calls, host executors are synchronous, and the line above will block until finished executing.
@@ -319,6 +336,7 @@ device, at which point only *one* of these assignments will occur.
 
 Initialization of operators and generators
 ##########################################
+
 As mentioned above, it's common in high-level languages to initialize a tensor/array with a known set of values. For example, generating a range of linearly-
 spaced values, all ones, or a diagonal matrix. These are all operations that do not need to be generated and stored in memory before using since they are 
 all generated from a formula. MatX calls these types of operators a *generator*, indicating that they generate data without storage. 
@@ -345,35 +363,37 @@ expression and are not limited to simply assigning to a tensor. Expanding on our
 Instead of setting ``t1`` to a range, we multiply the range by 5.0, and add that range to a vector of ones using the ``ones`` generator. Without any
 intermediate storage, we combined two generators, a multiply, and an add operator into a single kernel.
 
-Executors
----------
-As mentioned above, the ``exec`` function is an executor for launching operators onto the device. ``exec`` is a special type of executor since it can take
-either views or operators as inputs and transform them in an element-wise kernel. Often the type of operation we are trying to do cannot be expressed as 
-an MatX element-wise operator, so ``exec`` cannot be used. Other types of executors exist for this purpose. These executors typically do more complex 
-transformations on the data compared to an element-wise kernel, and often use optimized libraries on the back-end to execute. Some examples are fft (Fast 
-Fourier Transform), matmul (Matrix Multiply), and sort. 
-
-MatX provides an easy-to-use API for executing complex functions, like those mentioned above. These executors currently cannot be part of an operator
-expression and must be executed as their own statement:
+Transforms
+----------
+As mentioned above, the ``run`` function takes an executor describing where to launch the work. In the examples above ``run`` the operator
+expressions created a single fused element-wise operation. Often the type of operation we are trying to do cannot be expressed as 
+an element-wise operator and therefor can't be fused with other operations without synchronization. These classes of operators are called *transforms*. 
+Transforms can be used anywhere operators are used:
 
 .. code-block:: cpp
 
-    fft(B, A, stream);
+    (B = fft(A) * C).run(stream);
 
-The ``fft`` executor above performs a 1D FFT on the tensor ``A``, and stores it in ``B``. All executors use the same calling convention where the outputs
-are listed first, followed by inputs, and finally an optional stream. Except for ``exec``, executors can only operate on tensor views, and not
-on generators or operators. For instance, you cannot take an fft of ``ones()``. 
+The ``fft`` transform above performs a 1D FFT on the tensor ``A``, multiplies the output by ``C``, and stores it in ``B``. Since the FFT
+may require synchronizing before performing the multiply, MatX can internally create a temporary buffer for the FFT output and free it when
+the expression goes out of scope.
 
-Unless documented otherwise, executors work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
+Unless documented otherwise, transforms work on tensors of a specific size. Matrix multiplies require a 2D tensor (matrix), 1D FFTs require
 a 1D tensor (vector), etc. If the dimension of the tensor is higher than the expected dimension, all higher dimensions will be batched. In the FFT 
 call above, if ``A`` and ``B`` are 4D tensors, the inner 3 dimensions will launch a batched 1D FFT with no change in syntax.
 
-As mentioned above, the same tensor views can be used in operator expressions before or after executors:
+As mentioned above, the same tensor views can be used in operator expressions before or after transforms:
 
 .. code-block:: cpp
 
     (a = b + 2).run(stream);
-    matmul(c, a, b, stream);
+    (c = matmul(a, d)).run(stream);
+
+Or fused in a single line:
+
+.. code-block:: cpp
+
+    (c = matmul(b + 2, d)).run(stream);
 
 The code above executes a kernel to store the result of ``b + 2`` into ``a``, then subsequently performs the matrix multiply ``C = A * B``. Since
 the operator and matrix multiply are launched in the same CUDA stream, they will be executed serially.
@@ -384,10 +404,12 @@ Common reduction executors are also available, such as ``sum()``, ``mean()``, ``
 
     auto t4 = make_tensor<float>({100, 100, 100, 100});
     auto t0 = make_tensor<float>();
-    sum(t0, t4);
+    (t0 = sum(t4)).run();
 
 The above code performs an optimized sum reduction of ``t4`` into ``t0``. Currently reduction type exectors *can* take operators as an input. Please
 see the documentation for a list of which ones are compatible.
+
+For more information about operation fusion, see :ref:`fusion`.
 
 Random numbers
 --------------
@@ -396,24 +418,19 @@ is slightly different than other types above:
 
 .. code-block:: cpp
 
-    auto t = make_tensor<float>({100, 50});
-    randomGenerator_t<float> randData(t.TotalSize(), 0);
-    auto randTensor = randData.GetTensorView<2>({100,50}, NORMAL);
+    auto t2 = make_tensor<float>({100, 50});
+    auto randOp = random<float>(t.Shape(), NORMAL);
 
-The code above constructs a random tensor view inside of ``randTensor`` that can be used in expressions as a random-valued tensor. The first line where
-the ``randomGenerator_t`` type is constructed allocates enough memory on the device to provide random numbers for a 100x50 tensor. The second line
-gets a view from the generator. These two steps are important because you typically want to limit how many generators you create due to their memory
-consumption, and instead create views from a small set of generators.
+The code above creates a 100x50 2D tensor, followed by a random operator that produces normally-distributed numbers with the same shape as ``t2``.
 
-Using the random tensor view above in an expression is the same as any other view:
+Using the random operator above uses the same assignment as with any operator, and when the values are fetched on the device a new random number
+will be generated for each element.
 
 .. code-block:: cpp
 
-    auto t2 = make_tensor<float>({100, 50});
-    (t2 = randTensor*5 + randTensor).run(stream);
+    (t2 = randOp*5 + randOp).run(stream);
 
-Unlike normal views, ``randTensor`` will give a new random value every time it is accessed. Not only will every element in the first multiply get A
-different random number, but when it's access again to add to the previous value, a new random number is generated for every element. 
+In the example above ``randOp`` is accessed twice. On each access a new random number is generated.
 
 That's it!
 ----------

@@ -16,7 +16,7 @@
 include(${rapids-cmake-dir}/cpm/init.cmake)
 include(${rapids-cmake-dir}/cpm/find.cmake)
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23.1)
 project(rapids-cpm-find-add-pkg-source LANGUAGES CXX)
 
 set(CPM_ZLIB_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/mock_zlib_source_dir")

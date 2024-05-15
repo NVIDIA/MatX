@@ -39,6 +39,7 @@
 #include "matx/core/error.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
+#include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
 
@@ -102,7 +103,7 @@ void dct(OutputTensor &out, const InputTensor &in,
 
   tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
 
-  fft(tmp, in, 0, stream);
+  fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
   auto s = tmp.Slice({0}, {N});
   detail::dctOp(out, s, N).run(stream);
 }

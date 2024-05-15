@@ -77,14 +77,13 @@ public:
    * @param idz Z position
    * @param idy Y position
    * @param idx X position
-   * @return Detection value 
    */
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {
     typename I1::type xpow = xpow_(idz, idy, idx);
     typename I2::type ba = ba_(idz, idy, idx);
     typename I2::type norm = norm_(idz, idy, idx);
-    typename I2::type alpha = norm * (std::pow(pfa_, -1.0 / norm) - 1);
+    typename I2::type alpha = norm * (cuda::std::powf(pfa_, -1.0f / norm) - 1.f);
     out_(idz, idy, idx) = (xpow > alpha * ba) ? 1 : 0;
   }
 
@@ -202,8 +201,8 @@ public:
                            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}});
 
     // Pre-process CFAR convolution
-    conv2d(normT, ones({numChannels, numPulsesRnd, numCompressedSamples}),
-           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL, stream);
+    (normT = conv2d(ones({numChannels, numPulsesRnd, numCompressedSamples}),
+           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
 
     cancelMask.PrefetchDevice(stream);
     ba.PrefetchDevice(stream);
@@ -246,16 +245,16 @@ public:
     (waveformPart = waveformPart * hamming<0>({waveformLength})).run(stream);
 
     // compute L2 norm
-    sum(norms, norm(waveformPart), stream);
+    (norms = sum(norm(waveformPart))).run(stream);
     (norms = sqrt(norms)).run(stream);
 
     (waveformPart = waveformPart / norms).run(stream);
-    fft(waveformFull, waveformPart, 0, stream);
+    (waveformFull = fft(waveformPart, numSamplesRnd)).run(stream);
     (waveformFull = conj(waveformFull)).run(stream);
 
-    fft(x, x, 0, stream);
+    (x = fft(x)).run(stream);
     (x = x * waveformT).run(stream);
-    ifft(x, x, 0, stream);
+    (x = ifft(x)).run(stream);
   }
 
 
@@ -282,7 +281,7 @@ public:
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
     auto xo = tpcView.Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    conv1d(xo, x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME, stream);
+    (xo = conv1d(x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME)).run(stream);
   }
 
   /**
@@ -311,7 +310,7 @@ public:
     (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask.Size(0) - 1),
                           numCompressedSamples}))
         .run(stream);
-    fft(xf, xf, 0, stream);
+    (xf = fft(xf)).run(stream);
   }
 
   /**
@@ -355,8 +354,7 @@ public:
 
     // Estimate the background average power in each cell
     // background_averages = conv2(Xpow, mask, 'same') ./ norm;
-    conv2d(ba, xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL,
-           stream);
+    (ba = conv2d(xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
 
     // Computing number of cells contributing to each cell.
     // This can be done with a convolution of the cfarMask with

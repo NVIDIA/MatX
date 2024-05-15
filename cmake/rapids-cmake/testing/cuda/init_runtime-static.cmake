@@ -16,6 +16,6 @@
 include(${rapids-cmake-dir}/cuda/init_runtime.cmake)
 
 rapids_cuda_init_runtime(USE_STATIC TRUE)
-if( NOT CMAKE_CUDA_RUNTIME_LIBRARY STREQUAL "Static")
+if( NOT CMAKE_CUDA_RUNTIME_LIBRARY STREQUAL "STATIC")
   message(FATAL_ERROR "rapids_cuda_init_runtime didn't correctly set CMAKE_CUDA_RUNTIME_LIBRARY")
 endif()

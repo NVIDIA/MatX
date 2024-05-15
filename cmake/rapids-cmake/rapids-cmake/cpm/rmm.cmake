@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,16 +68,22 @@ function(rapids_cpm_rmm)
     set(to_exclude ON)
   endif()
 
+  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
+  rapids_cpm_generate_patch_command(rmm ${version} patch_command)
+
   include("${rapids-cmake-dir}/cpm/find.cmake")
-  # Once we can require CMake 3.22 this can use `only_major_minor` for version searches
-  rapids_cpm_find(rmm "${version}.0" ${_RAPIDS_UNPARSED_ARGUMENTS}
+  rapids_cpm_find(rmm ${version} ${ARGN} ${_RAPIDS_UNPARSED_ARGUMENTS}
                   GLOBAL_TARGETS rmm::rmm
                   CPM_ARGS
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
                   GIT_SHALLOW ${shallow}
+                  PATCH_COMMAND ${patch_command}
                   EXCLUDE_FROM_ALL ${to_exclude}
                   OPTIONS "BUILD_TESTS OFF" "BUILD_BENCHMARKS OFF")
+
+  include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
+  rapids_cpm_display_patch_status(rmm)
 
   # Propagate up variables that CPMFindPackage provide
   set(rmm_SOURCE_DIR "${rmm_SOURCE_DIR}" PARENT_SCOPE)

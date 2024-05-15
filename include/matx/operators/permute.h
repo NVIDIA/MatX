@@ -77,7 +77,7 @@ namespace matx
 
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -97,7 +97,7 @@ namespace matx
           }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& operator()(Is... indices)
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             static_assert(sizeof...(Is)==Rank());
             //          static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -119,7 +119,31 @@ namespace matx
           return op_.Size(dims_[dim]);
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }               
+
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
     };
   }
   
@@ -163,30 +187,5 @@ namespace matx
       return permute(op, detail::to_array(dims));
     }
 
-  /**
-   * @brief Operator to transpose the dimensions of a tensor or operator.
-   *
-   * The each dimension must appear in the dims array once.
-
-   * This operator can appear as an rvalue or lvalue. 
-   *
-   * @tparam T Input operator/tensor type
-   * @param op Input operator
-   * @return permuted operator
-   */
-  template <typename T>
-    __MATX_INLINE__ auto transpose( const T op) {
-    
-      static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
-
-      int32_t dims[T::Rank()];
-      for(int i = 0; i < T::Rank(); i++) 
-        dims[i] = i;
-      int32_t dim1 = T::Rank() - 1;
-      int32_t dim2 = T::Rank() - 2;
-
-      std::swap(dims[dim1],dims[dim2]);
-      return permute(op, detail::to_array(dims));
-    }
 
 } // end namespace matx

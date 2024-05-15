@@ -79,37 +79,87 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ninds;
-                  
-            index_t idx = 0;
-            index_t stride = 1;
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          std::array<index_t, Rank()> inds{indices...};
+          std::array<index_t, T::Rank()> ninds;
 
-            // linearlize incoming index
+          index_t idx = 0;
+          index_t stride = 1;
+
+          // linearlize incoming index
 #pragma unroll
-            for(int i = Rank() - 1 ; i >= 0 ; i--) {
-              idx += stride * inds[i];
-              stride *= Size(i);
-            }
-
-            // extract new indices
-#pragma unroll
-            for(int i = T::Rank() - 1; i >= 0; i--) {
-              ninds[i] = idx % op_.Size(i);
-              idx /= op_.Size(i);
-            }
-
-            return mapply(op_, ninds);
+          for(int i = Rank() - 1 ; i >= 0 ; i--) {
+            idx += stride * inds[i];
+            stride *= Size(i);
           }
+
+          // extract new indices
+#pragma unroll
+          for(int i = T::Rank() - 1; i >= 0; i--) {
+            ninds[i] = idx % op_.Size(i);
+            idx /= op_.Size(i);
+          }
+
+          return mapply(op_, ninds);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          std::array<index_t, Rank()> inds{indices...};
+          std::array<index_t, T::Rank()> ninds;
+
+          index_t idx = 0;
+          index_t stride = 1;
+
+          // linearlize incoming index
+#pragma unroll
+          for(int i = Rank() - 1 ; i >= 0 ; i--) {
+            idx += stride * inds[i];
+            stride *= Size(i);
+          }
+
+          // extract new indices
+#pragma unroll
+          for(int i = T::Rank() - 1; i >= 0; i--) {
+            ninds[i] = idx % op_.Size(i);
+            idx /= op_.Size(i);
+          }
+
+          return mapply(op_, ninds);
+        }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           return sizes_[dim];
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
+        template <typename S2, typename Executor>
+        __MATX_INLINE__ void PreRun(S2 &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PreRun(std::forward<S2>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename S2, typename Executor>
+        __MATX_INLINE__ void PostRun(S2 &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.PostRun(std::forward<S2>(shape), std::forward<Executor>(ex));
+          }
+        }               
+
+        template<typename R> 
+        __MATX_INLINE__ auto operator=(const R &rhs) { 
+          if constexpr (is_matx_transform_op<R>()) {
+            return mtie(*this, rhs);
+          }
+          else {          
+            return set(*this, rhs); 
+          }
+        }
     };
   }
 
@@ -144,7 +194,7 @@ namespace matx
    */
   template <int RANK, typename T>
     __MATX_INLINE__ auto reshape( const T &op, 
-        const int32_t (&sizes)[RANK]) {
+        const index_t (&sizes)[RANK]) {
       return reshape<RANK, T>(op, detail::to_array(sizes));
     }
 } // end namespace matx

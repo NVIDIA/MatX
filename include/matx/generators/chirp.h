@@ -47,7 +47,7 @@ namespace matx
 
   namespace detail {
     template <typename SpaceOp, typename FreqType> 
-      class Chirp {
+      class Chirp : public BaseOp<Chirp<SpaceOp, FreqType>> {
         using space_type = typename SpaceOp::scalar_type;
 
 
@@ -72,7 +72,7 @@ namespace matx
           method_(method)
         {}
 
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
           if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
             return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
@@ -89,7 +89,7 @@ namespace matx
       };
 
     template <typename SpaceOp, typename FreqType> 
-      class ComplexChirp {
+      class ComplexChirp  : public BaseOp<ComplexChirp<SpaceOp, FreqType>> {
         using space_type = typename SpaceOp::scalar_type;
 
 
@@ -114,7 +114,7 @@ namespace matx
           method_(method)
         {}
 
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
           if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
             FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));

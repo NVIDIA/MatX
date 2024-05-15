@@ -86,34 +86,41 @@ template <typename TensorType>
 class EinsumTestsAll : public EinsumTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(EinsumTestsAll, MatXAllTypes);
-TYPED_TEST_SUITE(EinsumTestsComplex, MatXComplexTypes);
-TYPED_TEST_SUITE(EinsumTestsFloat, MatXFloatTypes);
-TYPED_TEST_SUITE(EinsumTestsFloatNonComplex, MatXFloatNonComplexTypes);
-TYPED_TEST_SUITE(EinsumTestsFloatNonComplexNonHalfTypes, MatXFloatNonComplexNonHalfTypes);
-TYPED_TEST_SUITE(EinsumTestsNumeric, MatXNumericTypes);
-TYPED_TEST_SUITE(EinsumTestsIntegral, MatXAllIntegralTypes);
-TYPED_TEST_SUITE(EinsumTestsNumericNonComplex, MatXNumericNonComplexTypes);
-TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypes);
+TYPED_TEST_SUITE(EinsumTestsAll, MatXAllTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsComplex, MatXComplexTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsFloat, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsFloatNonComplexNonHalfTypes, MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsNumeric, MatXNumericTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsIntegral, MatXAllIntegralTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsNumericNonComplex, MatXNumericNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypesCUDAExec);
 
 #if MATX_ENABLE_CUTENSOR
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  this->pb->template InitAndRunTVGenerator<TypeParam>(
+  ExecType exec{};    
+
+  this->pb->template InitAndRunTVGenerator<TestType>(
       "00_operators", "contraction", "run", {});  
 
-  auto a1 = make_tensor<TypeParam>({60});
-  auto b1 = make_tensor<TypeParam>({24});
-  auto c2 = make_tensor<TypeParam>({5,2});
+  // example-begin einsum-contraction-1
+  auto a1 = make_tensor<TestType>({60});
+  auto b1 = make_tensor<TestType>({24});
+  auto c2 = make_tensor<TestType>({5,2});
 
-  (a1 = linspace<0>(a1.Shape(), (TypeParam)0, static_cast<TypeParam>(a1.Size(0) - 1))).run();
-  (b1 = linspace<0>(b1.Shape(), (TypeParam)0, static_cast<TypeParam>(b1.Size(0) - 1))).run();
+  (a1 = linspace<0>(a1.Shape(), (TestType)0, static_cast<TestType>(a1.Size(0) - 1))).run(exec);
+  (b1 = linspace<0>(b1.Shape(), (TestType)0, static_cast<TestType>(b1.Size(0) - 1))).run(exec);
   auto a = a1.View({3,4,5});
   auto b = b1.View({4,3,2});
 
-  cutensor::einsum(c2, "ijk,jil->kl", 0, a, b);
+  // Perform a 3D tensor contraction
+  (c2 = cutensor::einsum("ijk,jil->kl", a, b)).run(exec);
+  // example-end einsum-contraction-1
   cudaStreamSynchronize(0);
   MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
 
@@ -124,12 +131,21 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 {
   MATX_ENTER_HANDLER();
 
-  auto a1 = make_tensor<TypeParam>({60});
-  auto b1 = make_tensor<TypeParam>({60});
-  auto c0 = make_tensor<TypeParam>();
-  (a1 = ones(a1.Shape()) * 2).run();
-  (b1 = ones(b1.Shape()) * 2).run(); 
-  cutensor::einsum(c0, "i,i->", 0, a1, b1);   
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  // example-begin einsum-dot-1
+  auto a1 = make_tensor<TestType>({60});
+  auto b1 = make_tensor<TestType>({60});
+  auto c0 = make_tensor<TestType>({});
+  (a1 = ones(a1.Shape()) * 2).run(exec);
+  (b1 = ones(b1.Shape()) * 2).run(exec); 
+
+  // Perform a dot product of b1 with itself and store in a1
+  (c0 = cutensor::einsum("i,i->", a1, b1)).run(exec);
+  // example-end einsum-dot-1
   cudaStreamSynchronize(0);
   MATX_ASSERT_EQ(c0(), 4 * a1.Size(0));
 
@@ -139,16 +155,24 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 {
   MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  auto a2 = make_tensor<TypeParam>({10,20});
-  auto b2 = make_tensor<TypeParam>({20,10});
-  auto c2 = make_tensor<TypeParam>({10,10});    
-  auto c22 = make_tensor<TypeParam>({10,10});   
-  (a2 = ones(a2.Shape())).run();
-  (b2 = ones(b2.Shape())).run(); 
+  ExecType exec{}; 
 
-  cutensor::einsum(c2, "mk,kn->mn", 0, a2, b2);
-  matmul(c22, a2, b2);
+
+  // example-begin einsum-gemm-1
+  auto a2 = make_tensor<TestType>({10,20});
+  auto b2 = make_tensor<TestType>({20,10});
+  auto c2 = make_tensor<TestType>({10,10});    
+  auto c22 = make_tensor<TestType>({10,10});   
+  (a2 = ones()).run(exec);
+  (b2 = ones()).run(exec); 
+
+  // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
+  (c2 = cutensor::einsum("mk,kn->mn", a2, b2)).run(exec);
+  (c22 = matmul(a2, b2)).run(exec);
+  // example-end einsum-gemm-1
   cudaStreamSynchronize(0);
 
   for (auto i = 0; i < c2.Size(0); i++) {
@@ -162,36 +186,52 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
 {
-    auto a2 = make_tensor<TypeParam>({5,20});
-    auto b2 = make_tensor<TypeParam>({20,10});
-    auto c2 = make_tensor<TypeParam>({10,5});    
-    auto c22 = make_tensor<TypeParam>({5,10});   
-    (a2 = ones(a2.Shape())).run();
-    (b2 = ones(b2.Shape())).run(); 
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-    cutensor::einsum(c2, "mk,kn->nm", 0, a2, b2);
-    matmul(c22, a2, b2);
-    cudaStreamSynchronize(0);
+  ExecType exec{}; 
 
-    auto c22t = c22.Permute({1,0}); // Permute to match cutensor
+  // example-begin einsum-gemm-2
+  auto a2 = make_tensor<TestType>({5,20});
+  auto b2 = make_tensor<TestType>({20,10});
+  auto c2 = make_tensor<TestType>({10,5});    
+  auto c22 = make_tensor<TestType>({5,10});   
+  (a2 = ones()).run(exec);
+  (b2 = ones()).run(exec); 
 
-    for (auto i = 0; i < c2.Size(0); i++) {
-      for (auto j = 0; j < c2.Size(1); j++) {
-        MATX_ASSERT_EQ(c2(i,j), c22t(i,j));
-      }
+  // Perform a GEMM of a2 * b2 and store the results transposed
+  (c2 = cutensor::einsum("mk,kn->nm", a2, b2)).run(exec);
+  // example-end einsum-gemm-2
+  (c22 = matmul(a2, b2)).run(exec);
+  cudaStreamSynchronize(0);
+
+  auto c22t = c22.Permute({1,0}); // Permute to match cutensor
+
+  for (auto i = 0; i < c2.Size(0); i++) {
+    for (auto j = 0; j < c2.Size(1); j++) {
+      MATX_ASSERT_EQ(c2(i,j), c22t(i,j));
     }
+  }
 }
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 {
-  auto a = make_tensor<TypeParam>({5,20,4,3});
-  auto b = make_tensor<TypeParam>({20,3,4,5});  
-  auto b2 = make_tensor<TypeParam>({20,3,4,5});  
-  (a = ones(a.Shape())).run();
-  (b = ones(b.Shape())).run(); 
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
 
-  cutensor::einsum(b, "ijkl->jlki", 0, a);
-  (b2 = a.Permute({1,3,2,0})).run();
+  ExecType exec{}; 
+
+  // example-begin einsum-permute-1
+  auto a = make_tensor<TestType>({5,20,4,3});
+  auto b = make_tensor<TestType>({20,3,4,5});
+  auto b2 = make_tensor<TestType>({20,3,4,5});
+  (a = ones()).run(exec);
+  (b = ones()).run(exec);
+
+  // Permute a 4D tensor. This gives the same output as Permute, but is much faster
+  (b = cutensor::einsum("ijkl->jlki", a)).run(exec);
+  (b2 = a.Permute({1,3,2,0})).run(exec);
+  // example-end einsum-permute-1
   cudaStreamSynchronize(0);
 
   for (auto i = 0; i < b.Size(0); i++) {
@@ -207,24 +247,59 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
 {
-  auto a = matx::make_tensor<TypeParam, 2>({2, 3});
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{}; 
+
+  // example-begin einsum-sum-1
+  auto a = matx::make_tensor<TestType>({2, 3});
   a.SetVals({
       {1, 2, 3},
       {4, 5, 6}
   });  
 
-  auto b = matx::make_tensor<TypeParam, 1>({3});
-  matx::cutensor::einsum(b, "ij->j", 0, a);
+  auto b = matx::make_tensor<TestType>({3});
+  // Sum the columns of "a"
+  (b = matx::cutensor::einsum("ij->j", a)).run(exec);
+  // example-end einsum-sum-1
     
   cudaStreamSynchronize(0);
   for (auto i = 0; i < a.Size(1); i++) {
-    TypeParam s = 0;
+    TestType s = 0;
     for (auto j = 0; j < a.Size(0); j++) {
       s += a(j, i);
     }
 
     MATX_ASSERT_EQ(s, b(i));
   }
+}
+
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};  
+
+  // example-begin einsum-trace-1
+  auto a2 = make_tensor<TestType>({10,10});
+  auto c0_0 = make_tensor<TestType>({});
+  auto c0_1 = make_tensor<TestType>({});
+  (a2 = ones()).run(exec);
+
+  // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
+  (c0_0 = cutensor::einsum("ii->", a2)).run(exec);
+  (c0_1 = trace(a2)).run(exec);
+
+  // example-end einsum-trace-1
+  cudaStreamSynchronize(0);
+
+  MATX_ASSERT_EQ(c0_0(), c0_1());
+  MATX_ASSERT_EQ(c0_0(), 10);
+
+  MATX_EXIT_HANDLER();
 }
 
 

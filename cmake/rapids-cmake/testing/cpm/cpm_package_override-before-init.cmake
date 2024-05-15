@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,4 +46,3 @@ endif()
 if(NOT tag STREQUAL "my_tag")
   message(FATAL_ERROR "custom git_tag field was ignored. ${tag} found instead of my_tag")
 endif()
-

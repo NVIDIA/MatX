@@ -41,9 +41,7 @@ int main() {
 
   filt.SetVals({1.0/3, 1.0/3, 1.0/3});
 
-  randomGenerator_t<float> randData(C.TotalSize(), 0);
-  auto randTensor1 = randData.GetTensorView<1>({16}, NORMAL);
-  (C = randTensor1).run();  
+  (C = random<float>({16}, NORMAL)).run();  
 
   printf("Initial C tensor:\n");
   print(C);

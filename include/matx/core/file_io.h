@@ -49,7 +49,7 @@
 
 
 
-#if MATX_ENABLE_FILEIO
+#if MATX_ENABLE_FILEIO || DOXYGEN_ONLY
 
 namespace matx {
 namespace io {
@@ -73,7 +73,7 @@ using namespace pybind11::literals;
 //  * we have to convert ours to.
 //  **/
 // template <typename T, int RANK>
-// void ReadCSV(tensor_t<T, RANK> &t, [[maybe_unused]] const std::string
+// void read_csv(tensor_t<T, RANK> &t, [[maybe_unused]] const std::string
 // fname, [[maybe_unused]] bool header=true) {
 //   if (!t.IsLinear()) {
 //     MATX_THROW(matxInvalidParameter, "Tensor reading into a CSV must have
@@ -118,16 +118,27 @@ using namespace pybind11::literals;
 
 
 /**
- * Read a CSV file into a tensor view
+ * @brief Read a CSV file into a tensor view
  *
  * CSVs are currently read in using the Python interpreter through pybind11.
- *This has a startup performance hit, but CSV reading is intended to be a
- *slow-path function, so this is not a critical component to speed up. Currently
- *1D and 2D tensors are supported only.
+ * This has a startup performance hit, but CSV reading is intended to be a
+ * slow-path function, so this is not a critical component to speed up. Currently
+ * 1D and 2D tensors are supported only.
+ * 
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File path of .csv file
+ * @param delimiter
+ *   Delimiter to use for CSV file
+ * @param skip_header
+ *   Skip the header row of the CSV file, default as `true`.
  **/
 template <typename TensorType>
-void ReadCSV(TensorType &t, const std::string fname,
-             const std::string delimiter, bool header = true)
+void read_csv(TensorType &t, const std::string fname,
+             const std::string delimiter, bool skip_header = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
@@ -146,21 +157,30 @@ void ReadCSV(TensorType &t, const std::string fname,
 
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")("fname"_a = fname.c_str(), "delimiter"_a = delimiter,
-                                   "skip_header"_a = header ? 1 : 0,
+                                   "skip_header"_a = skip_header,
                                    "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::scalar_type>());
   pb->NumpyToTensorView(t, obj);
 }
 
 /**
- * Read a CSV file into a tensor view
+ * Write a CSV file from a tensor view
  *
- * CSVs are currently read in using the Python interpreter through pybind11.
- *This has a startup performance hit, but CSV reading is intended to be a
- *slow-path function, so this is not a critical component to speed up. Currently
- *1D and 2D tensors are supported only.
+ * CSVs are currently written using the Python interpreter through pybind11.
+ * This has a startup performance hit, but CSV writing is intended to be a
+ * slow-path function, so this is not a critical component to speed up. Currently
+ * 1D and 2D tensors are supported only.
+ * 
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to write data from
+ * @param fname
+ *   File path of .csv file
+ * @param delimiter
+ *   Delimiter to use for CSV file
  **/
 template <typename TensorType>
-void WriteCSV(const TensorType &t, const std::string fname,
+void write_csv(const TensorType &t, const std::string fname,
               const std::string delimiter)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -196,7 +216,7 @@ void WriteCSV(const TensorType &t, const std::string fname,
  *
  **/
 template <typename TensorType>
-void ReadMAT(TensorType &t, const std::string fname,
+void read_mat(TensorType &t, const std::string fname,
              const std::string var)
 {
 
@@ -220,7 +240,7 @@ void ReadMAT(TensorType &t, const std::string fname,
 }
 
 /**
- * @brief Read a MAT file into a tensor view
+ * @brief Read a MAT file and return a tensor view
  *
  * MAT files use SciPy's loadmat() function to read various MATLAB file
  * types in. MAT files are supersets of HDF5 files, and are allowed to
@@ -228,16 +248,15 @@ void ReadMAT(TensorType &t, const std::string fname,
  *
  * @tparam TensorType
  *   Data type of tensor
- * @param t
- *   Tensor to read data into
  * @param fname
  *   File name of .mat file
  * @param var
  *   Variable name inside of .mat to read
- *
+ * @return
+ *  Tensor view of data read from file
  **/
 template <typename TensorType>
-auto ReadMAT(const std::string fname,
+auto read_mat(const std::string fname,
              const std::string var)
 {
 
@@ -272,7 +291,7 @@ auto ReadMAT(const std::string fname,
  *   Variable name to save inside of mat file
  */
 template <typename TensorType>
-void WriteMAT(const TensorType &t, const std::string fname,
+void write_mat(const TensorType &t, const std::string fname,
               const std::string var)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -286,6 +305,61 @@ void WriteMAT(const TensorType &t, const std::string fname,
   auto td = pybind11::dict{};
   td[var.c_str()] = np_ten;
   auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
+}
+
+/**
+ * @brief Read a NPY file into a tensor view
+ *
+ * NPY files are a simple binary format for storing arrays of numbers.
+ *
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to read data into
+ * @param fname
+ *   File name of .npy file
+ */
+template <typename TensorType>
+void read_npy(TensorType &t, const std::string& fname)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  if (!std::filesystem::exists(fname)) {
+    const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
+    MATX_THROW(matxIOError, errorMessage.c_str());
+  }
+  
+  auto pb = std::make_unique<detail::MatXPybind>();
+
+  auto np = pybind11::module_::import("numpy");
+  auto obj = np.attr("load")("file"_a = fname);
+
+  pb->NumpyToTensorView(t, obj);
+}
+
+/**
+ * @brief Write a NPY file from a tensor view
+ * 
+ * NPY files are a simple binary format for storing arrays of numbers.
+ *
+ * @tparam TensorType
+ *   Data type of tensor
+ * @param t
+ *   Tensor to write data from
+ * @param fname
+ *   File name of .npy file
+ */
+template <typename TensorType>
+void write_npy(const TensorType &t, const std::string& fname)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  auto pb = std::make_unique<detail::MatXPybind>();
+  auto np = pybind11::module_::import("numpy");
+
+  auto np_ten = pb->TensorViewToNumpy(t);
+
+  np.attr("save")("file"_a = fname, "arr"_a = np_ten);
 }
 
 }; // namespace io

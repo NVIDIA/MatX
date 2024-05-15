@@ -97,4 +97,22 @@ namespace matx {
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInputNoConvert(Func &&func, OutputOp &&out, InputOp &&in) {
     return ReduceInput<Func, OutputOp, InputOp, false>(std::forward<Func>(func), std::forward<OutputOp>(out), std::forward<InputOp>(in));
   }
+
+  constexpr bool RankGTE(int32_t rank1, int32_t rank2) {
+    return rank1 >= rank2 || rank1 == matxNoRank;
+  }
+
+  constexpr bool RankGT(int32_t rank1, int32_t rank2) {
+    return rank1 > rank2 || rank1 == matxNoRank;
+  }
+
+  template <typename Op>
+  std::array<index_t, Op::Rank()> Shape(const Op &op) {
+    std::array<index_t, Op::Rank()> shape;
+    for (int r = 0; r < Op::Rank(); r++) {
+      shape[r] = op.Size(r);
+    }
+
+    return shape;
+  }
 }; 
