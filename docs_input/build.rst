@@ -31,7 +31,7 @@ Required Third-party Dependencies
 - `fmt <https://github.com/fmtlib/fmt>`_ (CPM dependency)
 - `nloghmann::json <https://github.com/nlohmann/json>`_ (CPM dependency)
 - `rapids-cmake <https://github.com/rapidsai/rapids-cmake>`_ (* Included in the project source and does not require a separate download)
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.2.0+
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.4.0+
 
 
 Optional Third-party Dependencies

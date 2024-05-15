@@ -115,13 +115,10 @@ endif()
 
 # libcudacxx is now part of CCCL, so grab that repo if needed
 message(STATUS "Need CCCL. Finding...")
-set(CCCL_VERSION "v2.2.0" CACHE STRING "Version of CCCL to use")
+set(CCCL_VERSION "v2.4.0" CACHE STRING "Version of CCCL to use")
 include(cmake/FindCCCL.cmake)
 
-target_include_directories(matx SYSTEM INTERFACE
-                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/libcudacxx/include>
-                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/cub>
-                            $<BUILD_INTERFACE:${CCCL_SOURCE_DIR}/thrust>)
+target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
