@@ -131,9 +131,13 @@ set(WARN_FLAGS  -Wall
                 -Wextra
                 -Wcast-align
                 -Wunused
-                -Wno-unknown-pragmas
-                -Wnon-virtual-dtor
                 -Wshadow)
+
+if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
+    set(WARN_FLAGS ${WARN_FLAGS}
+        -Wno-unknown-pragmas
+        -Wnon-virtual-dtor)
+endif()                
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(WARN_FLAGS ${WARN_FLAGS}
