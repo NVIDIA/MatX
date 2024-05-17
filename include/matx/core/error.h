@@ -75,55 +75,41 @@ namespace matx
     {
     case matxSuccess:
       return "matxSuccess";
-      break;
     case matxNotSupported:
       return "matxNotSupported";
-      break;
     case matxInvalidParameter:
       return "matxInvalidParameter";
-      break;
     case matxInvalidDim:
       return "matxInvalidDim";
-      break;
     case matxInvalidSize:
       return "matxInvalidSize";
-      break;
     case matxCudaError:
       return "matxCudaError";
-      break;
     case matxCufftError:
       return "matxCufftError";
-      break;
     case matxMatMulError:
       return "matxMatMulError";
-      break;
     case matxOutOfMemory:
       return "matxOutOfMemory";
-      break;
     case matxIOError:
       return "matxIOError";
-      break;
     case matxAssertError:
       return "matxAssertError";
-      break;
     case matxInvalidType:
       return "matxInvalidType";
-      break;
     case matxLUError:
       return "matxLUError";
-      break;
     case matxInverseError:
       return "matxInverseError";
-      break;
     case matxSolverError:
       return "matxSolverError";
-      break;
     case matxcuTensorError:
-      return "matxcuTensorError";
       break;
     default:
       return "Unknown";
     };
+
+    return "Unknown";
   }
 
   namespace detail {

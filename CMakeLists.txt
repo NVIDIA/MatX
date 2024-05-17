@@ -109,8 +109,8 @@ target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
 # 11.2 and above required for async allocation
-if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.4)
-    message(FATAL_ERROR "MatX requires CUDA 11.4 or higher. Please update before using.")
+if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
+    message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
 endif()
 
 # libcudacxx is now part of CCCL, so grab that repo if needed
@@ -126,28 +126,30 @@ if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -g -lineinfo)
 endif()
 
-# Set preferred compiler warning flags
-set(WARN_FLAGS  -Wall
-                -Wextra
-                -Wcast-align
-                -Wunused
-                -Wshadow)
-
-if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
-    set(WARN_FLAGS ${WARN_FLAGS}
+# Set preferred compiler warning flags. nvc++ doesn't support most warnings
+string(FIND "${CMAKE_CUDA_HOST_COMPILER}" "nvc++" IS_NVCPP)
+if (NOT ${IS_NVCPP} GREATER -1)
+    set(WARN_FLAGS
+        -Wall
+        -Wextra
+        -Wcast-align
+        -Wunused
+        -Wshadow    
         -Wno-unknown-pragmas
         -Wnon-virtual-dtor)
-endif()                
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(WARN_FLAGS ${WARN_FLAGS}
-        -Wconversion
-        -Wmisleading-indentation
-        -Wduplicated-cond
-        -Wduplicated-branches
-        -Wlogical-op
-        -Wnull-dereference)
+        
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(WARN_FLAGS ${WARN_FLAGS}
+            -Wconversion
+            -Wmisleading-indentation
+            -Wduplicated-cond
+            -Wduplicated-branches
+            -Wlogical-op
+            -Wnull-dereference)
+    endif()        
 endif()
+
+
 
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)

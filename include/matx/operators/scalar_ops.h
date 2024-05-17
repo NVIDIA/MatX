@@ -52,12 +52,6 @@ namespace detail {
     else {                                                                     \
       return cuda::std::FUNC(v1);                                              \
     }                                                                          \
-    if constexpr (!is_matx_type_v<T>) {                                        \
-      return cuda::std::FUNC(v1);                                              \
-    }                                                                          \
-    else {                                                                     \
-      return FUNC(v1);                                                         \
-    }                                                                          \
   }                                                                            \
   template <typename T> struct OPNAME##F {                                     \
     static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
@@ -78,12 +72,6 @@ namespace detail {
     }                                                                          \
     else {                                                                     \
       return cuda::std::FUNC(v1, v2);                                          \
-    }                                                                          \
-    if constexpr (!(is_matx_type_v<T1> || is_matx_type_v<T2>)) {               \
-      return cuda::std::FUNC(v1, v2);                                          \
-    }                                                                          \
-    else {                                                                     \
-      return FUNC(v1, v2);                                                     \
     }                                                                          \
   }                                                                            \
   template <typename T> struct OPNAME##F {                                     \
@@ -155,12 +143,6 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sqrt(T v1)
   else {
     return sqrt(v1);
   }
-  if constexpr (is_matx_type_v<T>) {
-    return sqrt(v1);
-  }
-  else {
-    return cuda::std::sqrt(v1);
-  }
 }
 template <typename T> struct SqrtF {
   static __MATX_INLINE__ std::string str() { return "sqrt"; }
@@ -199,12 +181,6 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
   else {
     return conj(v1);
   }
-  if constexpr (!is_cuda_complex_v<T>) {
-    return conj(v1);
-  }
-  else {
-    return cuda::std::conj(v1);
-  }
 }
 template <typename T> struct ConjF {
   static __MATX_INLINE__ std::string str() { return "conj"; }
@@ -213,8 +189,9 @@ template <typename T> struct ConjF {
     if constexpr (is_complex_v<T>) {
       return _internal_conj(v1);
     }
-
-    return v1;
+    else {
+      return v1;
+    }
   }
 };
 
@@ -235,12 +212,6 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
   else {
     return cuda::std::sin(v1);
   }
-  if constexpr (!is_matx_type_v<T>) {
-    return cuda::std::sin(v1);
-  }
-  else {
-    return sin(v1);
-  }
 }
 template <typename T> struct SinF {
   static __MATX_INLINE__ std::string str() { return "sin"; }
@@ -255,12 +226,6 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
   }
   else {
     return cuda::std::cos(v1);
-  }
-  if constexpr (!is_matx_type_v<T>) {
-    return cuda::std::cos(v1);
-  }
-  else {
-    return cos(v1);
   }
 }
 template <typename T> struct CosF {
@@ -351,12 +316,6 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_angle(T v1)
   else {
     return atan2(v1.imag(), v1.real());
   }
-  if constexpr (!is_cuda_complex_v<T>) {
-    return atan2(v1.imag(), v1.real());
-  }
-  else {
-    return cuda::std::atan2(v1.imag(), v1.real());
-  }
 }
 template <typename T>
 struct Angle {
@@ -410,9 +369,6 @@ template <typename T1, typename T2> struct AddF {
     else {
       return v1 + v2;
     }
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
 };
 template <typename T1, typename T2> using AddOp = BinOp<T1, T2, AddF<T1, T2>>;
@@ -446,9 +402,6 @@ template <typename T1, typename T2> struct SubF {
     else {
       return v1 - v2;
     }
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
 };
 template <typename T1, typename T2> using SubOp = BinOp<T1, T2, SubF<T1, T2>>;
@@ -483,9 +436,6 @@ template <typename T1, typename T2> struct MulF {
     else {
       return v1 * v2;
     }
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
 };
 template <typename T1, typename T2> using MulOp = BinOp<T1, T2, MulF<T1, T2>>;
@@ -519,9 +469,6 @@ template <typename T1, typename T2> struct DivF {
     else {
       return v1 / v2;
     }
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};
   }
 };
 template <typename T1, typename T2> using DivOp = BinOp<T1, T2, DivF<T1, T2>>;
@@ -590,12 +537,6 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_pow(T1 v1, T
   }
   else {
     return cuda::std::pow(v1, v2);
-  }
-  if constexpr (!is_matx_type_v<T1>) { /* Compiler bug WAR */
-    return cuda::std::pow(v1, v2);
-  }
-  else {
-    return pow(v1, v2);
   }
 }
 
