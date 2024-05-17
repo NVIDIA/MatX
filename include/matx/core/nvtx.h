@@ -177,7 +177,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static int getNVTX_Range_ID( )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
     
   int newID = ++numNvtxTrackedRanges;
   auto foundIter = nvtx_eventMap.find( newID );
@@ -200,7 +200,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void setNVTXLogLevel( matx_nvxtLogLevels newNVTXLevel)
 {
-  std::unique_lock lck(nvtx_memory_mtx);  
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);  
   globalNvtxLevel = newNVTXLevel;
 }
 
@@ -212,7 +212,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void registerEvent( int registerId, nvtxRangeId_t eventId )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
 
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   nvtx_eventMap.insert(newPair);
@@ -227,7 +227,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void endEvent( int id )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
 
   auto foundIter = nvtx_eventMap.find( id );
 
@@ -351,7 +351,7 @@ class NvtxEvent
 {
   int newID = matx::getNVTX_Range_ID();
   
-  matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( functionName, message, nvtxLevel, newID );
+  [[maybe_unused]] matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( functionName, message, nvtxLevel, newID );
   
   return newID;
   

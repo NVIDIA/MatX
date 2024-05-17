@@ -169,21 +169,6 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 
 } // end namespace detail
 
-// Simple gcd implementation using the Euclidean algorithm.
-// If large number support is needed, or if this function becomes performance
-// sensitive, then this implementation may be insufficient. Typically, up/down
-// factors for resampling will be known in a signal processing pipeline and
-// thus the user would already supply co-prime up/down factors. In that case,
-// b will be 0 below after one iteration and this implementation quickly identifies
-// the factors as co-prime.
-static index_t gcd(index_t a, index_t b) {
-  while (b != 0) {
-    const index_t t = b;
-    b = a % b;
-    a = t;
-  }
-  return a;
-};
 
 /**
  * @brief 1D polyphase resampler
@@ -220,7 +205,7 @@ inline void resample_poly_impl(OutType &out, const InType &in, const FilterType 
   [[maybe_unused]] const index_t outlen = up_size / down + ((up_size % down) ? 1 : 0);
   MATX_ASSERT_STR(out.Size(RANK-1) == outlen, matxInvalidDim, "resample_poly: output size mismatch");
 
-  const index_t g = gcd(up, down);
+  const index_t g = std::gcd(up, down);
   up /= g;
   down /= g;
 

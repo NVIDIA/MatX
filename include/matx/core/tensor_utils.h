@@ -83,8 +83,6 @@ namespace matx
 
       return total;
     }
-
-    return 0;
   }
 
 
@@ -259,8 +257,6 @@ namespace detail {
     else {
         return matx_max(matx_max(t0, t1), tn...);
     }
-
-    return t0; // 11.4 compiler has a bug. This is dead code
   }
 
   template <class T, class M = T>
@@ -270,12 +266,6 @@ namespace detail {
       return T::Rank();
     else
       return -1;
-
-    // work around for compiler bug/warning
-    if constexpr (!is_matx_op<M>())
-      return -1;
-    else
-      return T::Rank();
   }
 
   template <class T, class M = T>
@@ -286,12 +276,6 @@ namespace detail {
       return a.Size(dim);
     else
       return 1;
-
-    // work around for compiler bug/warning
-    if constexpr (!is_matx_op<M>())
-      return 1;
-    else
-      return a.Size(dim);
   }
 
   template <int RANK, class T, class M = T>
@@ -998,7 +982,7 @@ void PrintData(FILE* fp, const Op &op, Args... dims) {
       CUmemorytype mtype;
       void *data[] = {&mtype};
       CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-      auto ret = cuPointerGetAttributes(1,
+      [[maybe_unused]] auto ret = cuPointerGetAttributes(1,
                                         &attrs[0],
                                         data,
                                         reinterpret_cast<CUdeviceptr>(op.Data()));
@@ -1194,7 +1178,7 @@ void fprint(FILE* fp, const Op &op, Args... dims) {
  */
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-void print(const Op &op, Args... dims) {
+void print(const Op &op, [[maybe_unused]] Args... dims) {
   std::array<int, Op::Rank()> arr = {0};
   auto tp = std::tuple_cat(arr);
   std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, tp);

@@ -186,7 +186,8 @@ public:
 
       if (i.IsContiguous() && o.IsContiguous()) {
         size_t freeMem, totalMem;
-        auto err = cudaMemGetInfo(&freeMem, &totalMem);
+        [[maybe_unused]] auto err = cudaMemGetInfo(&freeMem, &totalMem);
+        MATX_ASSERT_STR(err == cudaSuccess, matxCudaError, "Failed to get memInfo from device");
         // Use up to 30% of free memory to batch, assuming memory use matches batch size
         double max_for_fft_workspace = static_cast<double>(freeMem) * 0.3;
 
@@ -665,9 +666,6 @@ using fft_cuda_cache_t = std::unordered_map<FftCUDAParams_t, std::any, FftCUDAPa
 
 template <typename TensorOp>
 __MATX_INLINE__ auto getCufft1DSupportedTensor( const TensorOp &in, cudaStream_t stream) {
-
-  constexpr int RANK=TensorOp::Rank();
-
   if constexpr ( !(is_tensor_view_v<TensorOp>)) {
     return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
@@ -686,7 +684,7 @@ __MATX_INLINE__ auto getCufft1DSupportedTensor( const TensorOp &in, cudaStream_t
 template <typename TensorOp>
 __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t stream) {
 
-  constexpr int RANK=TensorOp::Rank();
+  constexpr int IRANK = TensorOp::Rank();
 
   if constexpr ( !is_tensor_view_v<TensorOp>) {
     return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -694,10 +692,10 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
     bool supported = true;
 
     // only a subset of strides are supported per cufft indexing scheme.
-    if ( in.Stride(RANK-2) != in.Stride(RANK-1) * in.Size(RANK-1)) {
+    if ( in.Stride(IRANK-2) != in.Stride(IRANK-1) * in.Size(IRANK-1)) {
       supported = false;
-    } else if constexpr ( RANK > 2) {
-      if(in.Stride(RANK-3) != in.Size(RANK-2) * in.Stride(RANK-2)) {
+    } else if constexpr ( IRANK > 2) {
+      if(in.Stride(IRANK-3) != in.Size(IRANK-2) * in.Stride(IRANK-2)) {
         supported = false;
       }
     }
