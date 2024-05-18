@@ -23,6 +23,7 @@ option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
+option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -179,6 +180,11 @@ endif()
 
 if (MATX_DISABLE_CUB_CACHE)
     target_compile_definitions(matx INTERFACE MATX_DISABLE_CUB_CACHE=1)
+endif()
+
+if (MATX_EN_COVERAGE)
+    target_compile_options(matx INTERFACE -fprofile-arcs -ftest-coverage)
+    target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
 
 # Get the tensor libraries if we need them
