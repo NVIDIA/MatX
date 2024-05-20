@@ -81,8 +81,8 @@ __MATX_INLINE__ void outer_impl(TensorTypeC C, const TensorTypeA A,
   MATX_ASSERT_STR(C.Size(C.Rank() - 1) == B.Size(B.Rank() - 1), matxInvalidSize,
       "outer: last dimension of C must match last dimension of B");
 
-  std::array<index_t, TensorTypeA::Rank() + 1> ac;
-  std::array<index_t, TensorTypeB::Rank() + 1> bc;
+  cuda::std::array<index_t, TensorTypeA::Rank() + 1> ac;
+  cuda::std::array<index_t, TensorTypeB::Rank() + 1> bc;
 
   ac.fill(matxKeepDim);
   bc.fill(matxKeepDim);

@@ -39,8 +39,8 @@
 using namespace matx;
 
 template <typename T> class InvSolverTest : public ::testing::Test {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
 protected:
   void SetUp() override
   {
@@ -63,7 +63,7 @@ TYPED_TEST_SUITE(InvSolverTestFloatTypes,
 TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto A = make_tensor<TestType>({4, 4});
   auto Ainv = make_tensor<TestType>({4, 4});
@@ -97,7 +97,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
 TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto A = make_tensor<TestType>({100, 4, 4});
   auto Ainv = make_tensor<TestType>({100, 4, 4});
@@ -130,7 +130,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
 TYPED_TEST(InvSolverTestFloatTypes, Inv8x8)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto A = make_tensor<TestType>({8, 8});
   auto Ainv = make_tensor<TestType>({8, 8});
@@ -161,7 +161,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8)
 TYPED_TEST(InvSolverTestFloatTypes, Inv8x8Batched)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto A = make_tensor<TestType>({100, 8, 8});
   auto Ainv = make_tensor<TestType>({100, 8, 8});
@@ -194,7 +194,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8Batched)
 TYPED_TEST(InvSolverTestFloatTypes, Inv256x256)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   //int dim_size = 8;
   auto A = make_tensor<TestType>({256, 256});

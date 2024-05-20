@@ -201,8 +201,8 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
  * @param mult Product of sizes of all but first dimension
  */
 template <class Op>
-__global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> sizes, index_t mult) {
-  std::array<index_t, Op::Rank()> indices;
+__global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()> sizes, index_t mult) {
+  cuda::std::array<index_t, Op::Rank()> indices;
 
   // This kernel is currently only used for ranks > 4. We assume the rank is
   // at least one in the following accesses into sizes and indices
@@ -224,12 +224,12 @@ __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> size
     indices[Op::Rank()-1] = x_abs / mult;
 
     if constexpr (std::is_pointer_v<Op>) {
-      mapply([&](auto... args){
+      cuda::std::apply([&](auto... args){
         (*op)(args...);
       }, indices);
     }
     else {
-      mapply([&](auto... args){
+      cuda::std::apply([&](auto... args){
         op(args...);
       }, indices);
     }      

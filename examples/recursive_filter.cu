@@ -79,8 +79,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<InType, 1> solView({numSamples});
 
   // Create views into data objects
-  auto rCoeffs = std::array<FilterType, 2>{0.4f, -0.1f};
-  auto nrCoeffs = std::array<FilterType, 2>{2.0f, 1.0f};
+  auto rCoeffs = cuda::std::array<FilterType, 2>{0.4f, -0.1f};
+  auto nrCoeffs = cuda::std::array<FilterType, 2>{2.0f, 1.0f};
 
   // initialize input data
   for (index_t b = 0; b < batches; b++) {

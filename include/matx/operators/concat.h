@@ -49,7 +49,7 @@ namespace matx
     template <typename... Ts>
       class ConcatOp : public BaseOp<ConcatOp<Ts...>>
     {
-      using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
+      using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
       using first_value_type = typename first_type::scalar_type;
 
       static constexpr int RANK = first_type::Rank();
@@ -91,7 +91,7 @@ namespace matx
       }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(std::array<index_t,RANK> &indices) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::array<index_t,RANK> &indices) const {
 
           if constexpr ( I == N ) {
             // This should never happen
@@ -104,7 +104,7 @@ namespace matx
             // If in range of this operator
             if(idx < size) {
               // evaluate operator
-              return mapply(op, indices);
+              return cuda::std::apply(op, indices);
             } else {
               // otherwise remove this operator and recurse
               indices[axis_] -= size;
@@ -114,13 +114,13 @@ namespace matx
         }
       
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(std::array<index_t,RANK> &indices) {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(cuda::std::array<index_t,RANK> &indices) {
 
           if constexpr ( I == N ) {
             // This should never happen
             // returning this to satisfy lvalue requirements
             auto &op = cuda::std::get<I-1>(ops_);
-            return mapply(op, indices);
+            return cuda::std::apply(op, indices);
           } else {
             auto &op = cuda::std::get<I>(ops_);
             auto idx = indices[axis_];
@@ -128,7 +128,7 @@ namespace matx
             // If in range of this operator
             if(idx < size) {
               // evaluate operator
-              return mapply(op, indices);
+              return cuda::std::apply(op, indices);
             } else {
               // otherwise remove this operator and recurse
               indices[axis_] -= size;
@@ -140,14 +140,14 @@ namespace matx
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
         {
-          std::array<index_t, sizeof...(Is)> indices = {{is...}};
+          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<0, sizeof...(Ts)>(indices);
         }
       
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
-          std::array<index_t, sizeof...(Is)> indices = {{is...}};
+          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<0, sizeof...(Ts)>(indices);
         }
 

@@ -114,7 +114,7 @@ private:
  * Converts elements in a POD container to a hash value
  */
 template <typename T, int len>
-inline size_t PodArrayToHash(std::array<T, len> c)
+inline size_t PodArrayToHash(cuda::std::array<T, len> c)
 {
   size_t hash = 0;
   for (auto &el : c) {

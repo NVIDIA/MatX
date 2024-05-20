@@ -39,8 +39,8 @@
 using namespace matx;
 
 template <typename T> struct ViewTestsData {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;  
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;  
   tensor_t<GTestType, 0> t0{{}};
   tensor_t<GTestType, 1> t1{{10}};
   tensor_t<GTestType, 2> t2{{20, 10}};
@@ -420,7 +420,7 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = std::tuple_element_t<0, TypeParam>;
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
     // example-begin random-test-1
     index_t count = 50;
@@ -472,7 +472,7 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 TYPED_TEST(ViewTestsComplex, RealComplexView)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   tensor_t<TestType, 1> tc({10});
   auto tr = tc.RealView();

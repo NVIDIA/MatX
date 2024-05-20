@@ -202,7 +202,7 @@ public:
    *   A randomTensorView_t with given parameters
    */
   template <std::size_t RANK>
-  inline auto GetTensorView(const std::array<index_t, RANK> &shape, Distribution_t dist,
+  inline auto GetTensorView(const cuda::std::array<index_t, RANK> &shape, Distribution_t dist,
                             T alpha = 1, T beta = 0)
 {
   return randomTensorView_t<T, static_cast<int>(RANK)>(shape, states_, dist, alpha, beta);
@@ -247,8 +247,8 @@ public:
  */
 template <typename T, int RANK> class randomTensorView_t {
 private:
-  std::array<index_t, RANK> shape_;
-  std::array<index_t, RANK> strides_;
+  cuda::std::array<index_t, RANK> shape_;
+  cuda::std::array<index_t, RANK> strides_;
   curandStatePhilox4_32_10_t *states_;
   Distribution_t dist_;
   T alpha_, beta_;
@@ -306,13 +306,13 @@ public:
    * @return Value at index
    */
   template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
-  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...>) const {
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
     return 0;
   }
 
   template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...> tup) const {
-    return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*Stride(I);
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
+    return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*Stride(I);
   }
 
   /**
@@ -329,7 +329,7 @@ public:
       get_random(val, &states_[0], dist_);
     }
     else {
-      get_random(val, &states_[GetValC<0, Is...>(std::make_tuple(indices...))], dist_);
+      get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], dist_);
     }
 
     return alpha_ * val + beta_;
@@ -380,10 +380,10 @@ public:
     class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
       private:
         using inner_t = typename inner_op_type_t<T>::type;
-        static constexpr int RANK = std::tuple_size<ShapeType>{};
+        static constexpr int RANK = cuda::std::tuple_size<ShapeType>{};
         Distribution_t dist_;
-        std::array<index_t, RANK> shape_;
-        std::array<index_t, RANK> strides_;
+        cuda::std::array<index_t, RANK> shape_;
+        cuda::std::array<index_t, RANK> strides_;
         index_t total_size_;
         curandStatePhilox4_32_10_t *states_;
         uint64_t seed_;
@@ -484,13 +484,13 @@ public:
       }
 
       template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...>) const {
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
         return 0;
       }
 
       template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const std::tuple<Is...> tup) const {
-        return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*strides_[I];
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
+        return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*strides_[I];
       }
 
       /**
@@ -508,7 +508,7 @@ public:
           get_random(val, &states_[0], dist_);
         }
         else {
-          get_random(val, &states_[GetValC<0, Is...>(std::make_tuple(indices...))], dist_);
+          get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], dist_);
         }
 
         val = alpha_ * val + beta_;

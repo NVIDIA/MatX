@@ -40,8 +40,8 @@ using namespace matx;
 
 template <typename T>
 class ResamplePolyTest : public ::testing::Test {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;  
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;  
 
 protected:
   void SetUp() override
@@ -84,7 +84,7 @@ TYPED_TEST_SUITE(ResamplePolyTestFloatTypes, MatXFloatTypesCUDAExec);
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -149,7 +149,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -210,7 +210,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -262,7 +262,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
 TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -311,7 +311,7 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -386,7 +386,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -429,7 +429,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -478,7 +478,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;
@@ -539,7 +539,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   struct {
     index_t a_len;

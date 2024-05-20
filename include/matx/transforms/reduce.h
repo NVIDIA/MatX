@@ -1041,7 +1041,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
 {
   constexpr uint32_t RANK = OutType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;
-  std::array<index_t, InType::Rank()> indices;
+  cuda::std::array<index_t, InType::Rank()> indices;
   using scalar_type = typename InType::scalar_type;
   using T = typename OutType::scalar_type;
   [[maybe_unused]] bool valid;
@@ -1158,7 +1158,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
     }
 
     if (valid) {
-      out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
+      out  = cuda::std::apply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
     }
   }
 
@@ -1199,7 +1199,7 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
   T in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;
-  std::array<index_t, InType::Rank()> indices;
+  cuda::std::array<index_t, InType::Rank()> indices;
   index_t abs_idx = -1;
   bool valid = false;
 
@@ -1299,8 +1299,8 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
         }
       }
       if (valid) {
-        iout = mapply([&](auto... param) { return idest.GetPointer(param...); }, indices);
-        out  = mapply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
+        iout = cuda::std::apply([&](auto... param) { return idest.GetPointer(param...); }, indices);
+        out  = cuda::std::apply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
       }
     }
   }
@@ -1378,7 +1378,7 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
     }
   }
   dim3 blocks, threads;
-  std::array<index_t, InType::Rank()> sizes;
+  cuda::std::array<index_t, InType::Rank()> sizes;
   for (int i = 0; i < in.Rank(); i++) {
     sizes[i] = in.Size(i);
   }
@@ -1630,7 +1630,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   // Create the shape of the summed tensor based on the permutation params
-  std::array<index_t, InType::Rank() - (int)dims.size()> red_shape{};
+  cuda::std::array<index_t, InType::Rank() - (int)dims.size()> red_shape{};
   #pragma unroll
   for (int r = 0; r < in.Rank() - (int)dims.size(); r++) {
     red_shape[r] = in.Size(perm[r]);
@@ -1638,7 +1638,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 
   // With the sum calculated, we have a tensor that's not compatible in sizes with the new one for dividing.
   // We need to clone the summed tensor on the appropriate dims for the final divide.
-  std::array<index_t, InType::Rank()> clone_dims;
+  cuda::std::array<index_t, InType::Rank()> clone_dims;
   int axis_ptr = 0;
   #pragma unroll
   for (int r = 0; r < InType::Rank(); r++) {
@@ -2553,7 +2553,7 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
   mean_impl(mean_tns, in, exec);
 
   // need to clone along right most dims
-  std::array<index_t, InType::Rank()> cdims;
+  cuda::std::array<index_t, InType::Rank()> cdims;
   for(int i = 0; i < OutType::Rank(); i++) {
     cdims[i] = matxKeepDim;
   }

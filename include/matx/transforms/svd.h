@@ -133,7 +133,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   xSliceE[RANK-1] = matxDropDim;
 
   //one per batch dim
-  std::array<index_t, RANK-2> sumsShape;
+  cuda::std::array<index_t, RANK-2> sumsShape;
   for(int i=0;i<RANK-2;i++) {
     sumsShape[i] = AShape[i];
   }
@@ -152,7 +152,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   // for each singular value
   for(int i = 0; i < k; i++) {
 
-    std::array<index_t, SType::Rank()> sShapeB, sShapeE;
+    cuda::std::array<index_t, SType::Rank()> sShapeB, sShapeE;
 
     sShapeB.fill(0);
     sShapeE.fill(matxEnd);
@@ -193,7 +193,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
 #endif
 
         const int CRANK = s.Rank()+1;  // adding one more dim to s
-        std::array<index_t, CRANK> sCloneShape;
+        cuda::std::array<index_t, CRANK> sCloneShape;
         sCloneShape.fill(matxKeepDim);
         sCloneShape[CRANK-1] = d;  // last dim is cloned d ways
 
@@ -202,8 +202,8 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
     }
 
     // slice out current singular vectors and singular value we are working on
-    std::array<index_t, RANK> umShapeB, umShapeE;
-    std::array<index_t, RANK> vmShapeB, vmShapeE;
+    cuda::std::array<index_t, RANK> umShapeB, umShapeE;
+    cuda::std::array<index_t, RANK> vmShapeB, vmShapeE;
 
     umShapeB.fill(0);
     vmShapeB.fill(0);
@@ -253,7 +253,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       // normalize v
 
       const int CRANK = s.Rank()+1;  // adding one more dim to s
-      std::array<index_t, CRANK> sCloneShape;
+      cuda::std::array<index_t, CRANK> sCloneShape;
       sCloneShape.fill(matxKeepDim);
       sCloneShape[CRANK-1] = n;  // last dim is cloned n ways
 
@@ -278,7 +278,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       (s = sqrt(s)).run(stream);
       // normalize u
       const int CRANK = s.Rank()+1;  // adding one more dim to s
-      std::array<index_t, CRANK> sCloneShape;
+      cuda::std::array<index_t, CRANK> sCloneShape;
       sCloneShape.fill(matxKeepDim);
       sCloneShape[CRANK-1] = m;  // last dim is cloned m ways
 
@@ -292,7 +292,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       matmul_impl(uv, um, vm, stream);
 
       const int CRANK = s.Rank()+ 2;  // adding one more dim to s
-      std::array<index_t, CRANK> sCloneShape;
+      cuda::std::array<index_t, CRANK> sCloneShape;
       sCloneShape.fill(matxKeepDim);
       sCloneShape[CRANK-2] = m;  // second to last dim is cloned m ways
       sCloneShape[CRANK-1] = n;  // last dim is cloned n ways
@@ -323,7 +323,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
   RShape[RANK-1] = d;
   RShape[RANK-2] = d;  
 
-  std::array<index_t,RANK-2> l2NormShape;
+  cuda::std::array<index_t,RANK-2> l2NormShape;
   for(int i=0;i<RANK-2;i++) {
     l2NormShape[i] = A.Size(i);
   }
@@ -336,7 +336,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
   auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto l2Norm = make_tensor<float>(l2NormShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream); 
-  return std::tuple(AT, Q, Qold, R, Z, l2Norm, converged);
+  return cuda::std::tuple(AT, Q, Qold, R, Z, l2Norm, converged);
 }
 
 /**

@@ -53,7 +53,7 @@ namespace matx
         T2 m_;
         T3 in_;
 
-        std::array<int,2> axis_;
+        cuda::std::array<int,2> axis_;
 
         template<class TypeParam>
           static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ TypeParam legendre(int n, int m, TypeParam x) {
@@ -94,16 +94,16 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
-        __MATX_INLINE__ LegendreOp(T1 n, T2 m, const T3 in, std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
+        __MATX_INLINE__ LegendreOp(T1 n, T2 m, const T3 in, cuda::std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
           static_assert(get_rank<T1>() <= 1, "legendre op:  n must be a scalar, rank 0 or 1 operator");
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(Is... indices) const 
           {
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T3::Rank()> xinds;
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T3::Rank()> xinds;
             
             int axis1 = axis_[0];
             int axis2 = axis_[1];
@@ -128,7 +128,7 @@ namespace matx
               }
             }
 
-            auto x = mapply(in_, xinds);
+            auto x = cuda::std::apply(in_, xinds);
 
             scalar_type ret;
 
@@ -248,7 +248,7 @@ namespace matx
    *   New operator with Rank+1 and size of last dimension = order.
    */
   template <typename T1, typename T2, typename T3>
-    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, std::array<int, 2> axis)
+    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, cuda::std::array<int, 2> axis)
     {
       return detail::LegendreOp<T1,T2,T3>(n, m, in, axis);
     };

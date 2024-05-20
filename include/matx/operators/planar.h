@@ -63,7 +63,7 @@ namespace matx
           auto tup = cuda::std::make_tuple(indices...);
           if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
             cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
-            return mapply(op_, tup).imag();
+            return cuda::std::apply(op_, tup).imag();
           }
 
           return op_(indices...).real();      
@@ -76,7 +76,7 @@ namespace matx
           auto tup = cuda::std::make_tuple(indices...);
           if (cuda::std::get<rank_idx>(tup) >= op_.Size(rank_idx)) {      
             cuda::std::get<rank_idx>(tup) -= op_.Size(rank_idx);    
-            return mapply(op_, tup).imag();
+            return cuda::std::apply(op_, tup).imag();
           }
 
           return op_(indices...).real();

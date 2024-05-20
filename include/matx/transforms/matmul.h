@@ -806,9 +806,9 @@ private:
 
     // Prep for batch looping
     using shape_type = typename TensorTypeA::desc_type::shape_type;
-    [[maybe_unused]] std::array<shape_type, TensorTypeA::Rank()> a_idx{0};
-    [[maybe_unused]] std::array<shape_type, TensorTypeB::Rank()> b_idx{0};
-    [[maybe_unused]] std::array<shape_type, TensorTypeC::Rank()> c_idx{0};
+    [[maybe_unused]] cuda::std::array<shape_type, TensorTypeA::Rank()> a_idx{0};
+    [[maybe_unused]] cuda::std::array<shape_type, TensorTypeB::Rank()> b_idx{0};
+    [[maybe_unused]] cuda::std::array<shape_type, TensorTypeC::Rank()> c_idx{0};
     [[maybe_unused]] auto a_shape = a.Shape();
     [[maybe_unused]] size_t total_iter = 1;
 
@@ -855,9 +855,9 @@ private:
         for (size_t iter = 0; iter < total_iter; iter++) {
 
           // Get pointers into A/B/C for this round
-          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
-          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
-          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
+          auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
+          auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
+          auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
           [[maybe_unused]] auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
                   Adesc, (void *)bp, Bdesc, &sbeta,
@@ -945,9 +945,9 @@ private:
 #if MATX_ENABLE_CUTLASS
         for (size_t iter = 0; iter < total_iter; iter++) {
           // Get pointers into A/B/C for this round
-          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
-          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
-          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
+          auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
+          auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
 
           typename CutlassGemm::Arguments args(
               {static_cast<int>(params_.m), static_cast<int>(params_.n),

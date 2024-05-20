@@ -43,8 +43,8 @@ template <typename T> class CovarianceTest : public ::testing::Test {
 protected:
   const index_t cov_dim1 = 4;
   const index_t cov_dim2 = 3;
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 
   void SetUp() override
   {
@@ -93,7 +93,7 @@ TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
 TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->RunTVGenerator("cov");
   this->pb->NumpyToTensorView(this->av, "a");
 

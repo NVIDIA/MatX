@@ -196,7 +196,7 @@ As mentioned in the descriptor section, any type that conforms to the shape sema
 
 .. code-block:: cpp
 
-    std::array<int, 3> = {10, 20, 30};
+    cuda::std::array<int, 3> = {10, 20, 30};
     auto t = make_tensor<float>(array);
 
 Creating From A Descriptor

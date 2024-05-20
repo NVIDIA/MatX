@@ -42,7 +42,7 @@ namespace matx
         // dummy type to signal this is a matxop
         using matxop = bool;
         using scalar_type = typename Generator1D::scalar_type;
-        static constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
+        static constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
 
         __MATX_INLINE__ std::string str() const { return "gen1d"; }
 

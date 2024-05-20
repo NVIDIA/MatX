@@ -74,10 +74,10 @@ namespace matx
           static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
           // convert variadic type to tuple so we can read/update
-          std::array<index_t, Rank()> ind{indices...};
+          cuda::std::array<index_t, Rank()> ind{indices...};
           if ((ind[dim_] % n_) == 0) {
             ind[dim_] /= n_;
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
           return static_cast<typename decltype(op_)::scalar_type>(0);

@@ -69,7 +69,7 @@ namespace matx
         }
       }
 
-      __MATX_INLINE__ RepMatOp(T1 op, const std::array<index_t, DIM> reps) : op_(op)
+      __MATX_INLINE__ RepMatOp(T1 op, const cuda::std::array<index_t, DIM> reps) : op_(op)
       {
         for (int dim = 0; dim < DIM; dim++)
         {
@@ -103,13 +103,13 @@ namespace matx
           else {
             auto tup = cuda::std::make_tuple(indices...);
             UpdateIndex(tup);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
 
           if constexpr (Rank() != 0) {
             auto tup = cuda::std::make_tuple(indices...);
             UpdateIndex(tup);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
           else {
             return op_();
@@ -125,13 +125,13 @@ namespace matx
           else {
             auto tup = cuda::std::make_tuple(indices...);
             UpdateIndex(tup);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
 
           if constexpr (Rank() != 0) {
             auto tup = cuda::std::make_tuple(indices...);
             UpdateIndex(tup);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
           else {
             return op_();

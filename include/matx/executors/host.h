@@ -32,6 +32,7 @@
 
 #pragma once
 #include <type_traits>
+#include <cuda/std/array>
 
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
@@ -44,7 +45,7 @@ static constexpr int MAX_CPUS = 1024;
 struct cpu_set_t {
   using set_type = uint64_t;
 
-  std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
+  cuda::std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
 };
 
 struct HostExecParams {
@@ -87,7 +88,7 @@ class HostExecutor {
           index_t size = TotalSize(op);
           for (index_t i = 0; i < size; i++) {
             auto idx = GetIdxFromAbs(op, i);
-            std::apply([&](auto... args) {
+            cuda::std::apply([&](auto... args) {
               return op(args...);
             }, idx);        
           }      

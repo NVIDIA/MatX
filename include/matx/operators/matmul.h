@@ -50,7 +50,7 @@ namespace matx
         float beta_;
         PermDims perm_; 
         static constexpr int out_rank = std::max(OpA::Rank(), OpB::Rank());
-        std::array<index_t, out_rank> out_dims_;
+        cuda::std::array<index_t, out_rank> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, out_rank> tmp_out_;
 
       public:
@@ -108,10 +108,10 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
           }
           else {
-            matmul_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
           }
         }
 
@@ -130,7 +130,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

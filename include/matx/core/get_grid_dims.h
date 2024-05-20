@@ -37,7 +37,7 @@ namespace matx {
 namespace detail {
 
 template <int RANK>
-inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const std::array<index_t, RANK> &sizes,
+inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes,
                           int max_cta_size = 1024)
 {
   bool stride = false;

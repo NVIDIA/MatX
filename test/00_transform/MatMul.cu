@@ -42,8 +42,8 @@ using namespace matx;
  * the moment */
 template <typename T> class MatMulTest : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
   void SetUp() override
   {
     CheckTestTensorCoreTypeSupport<GTestType>();
@@ -100,7 +100,7 @@ using float_to_complex_t = typename float_to_complex<T>::type;
 TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -126,7 +126,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 TYPED_TEST(MatMulTestFloatTypes, SmallRectATranspose)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -153,7 +153,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectATranspose)
 TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -180,7 +180,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
 TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -205,7 +205,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
 TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -238,7 +238,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
 TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 8;
   constexpr index_t n = 16;
@@ -265,7 +265,7 @@ TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
 TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 4;
   constexpr index_t k = 4;
   constexpr index_t n = 4;
@@ -291,7 +291,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
 TYPED_TEST(MatMulTestFloatTypes, MediumRect)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 128;
   constexpr index_t k = 256;
   constexpr index_t n = 512;
@@ -318,7 +318,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRect)
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   // example-begin matmul-test-4
   constexpr index_t batches = 5;
   constexpr index_t m = 128;
@@ -347,7 +347,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideA)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   constexpr index_t batches = 2;
   constexpr index_t m = 3;
@@ -387,7 +387,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideA)
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideB)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   constexpr index_t batches = 2;
   constexpr index_t m = 3;
@@ -428,7 +428,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideB)
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   // example-begin matmul-test-5
   constexpr index_t batches = 16;
   constexpr index_t m = 128;
@@ -463,7 +463,7 @@ TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
 {
   // a -> complex, b -> real, c -> complex
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   constexpr index_t m = 4;
   constexpr index_t k = 8;
@@ -490,7 +490,7 @@ TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
 TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   // constexpr index_t batches = 5;
   // constexpr index_t m = 128;
   // constexpr index_t k = 256;
@@ -516,7 +516,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
 TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
    
   constexpr index_t m = 16;
   constexpr index_t k = 32;
@@ -535,7 +535,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
   
   { // identity permute
     const int axis[2] = {1, 2};
-    std::array<int, 3> perm({0, 1, 2});
+    cuda::std::array<int, 3> perm({0, 1, 2});
 
     auto ai = make_tensor<TestType>({b, m, k});
     auto bi = make_tensor<TestType>({b, k, n});
@@ -560,7 +560,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
   { // transposing inner dims
     // example-begin matmul-test-6  
     const int axis[2] = {2, 1};
-    std::array<int, 3> perm({0, 2, 1});
+    cuda::std::array<int, 3> perm({0, 2, 1});
 
     auto ai = make_tensor<TestType>({b, k, m});
     auto bi = make_tensor<TestType>({b, n, k});
@@ -588,7 +588,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
   
   { // first and last
     const int axis[2] = {0 ,2};
-    std::array<int, 3> perm({1, 0, 2});
+    cuda::std::array<int, 3> perm({1, 0, 2});
 
     tensor_t<TestType, 3> ai{{m, b, k}};
     tensor_t<TestType, 3> bi{{k, b, n}};
@@ -614,7 +614,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
  
   {  // affine not supported
     const int axis[2] = {0, 1};
-    std::array<int, 3> perm({2, 0, 1});
+    cuda::std::array<int, 3> perm({2, 0, 1});
 
     tensor_t<TestType, 3> ai{{m, k, b}};
     tensor_t<TestType, 3> bi{{k, n, b}};
@@ -644,7 +644,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
 TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
    
   constexpr index_t m = 16;
   constexpr index_t k = 32;
@@ -680,7 +680,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
 TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulBroadcast)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   constexpr index_t n = 16;
   constexpr index_t b = 8;
@@ -741,7 +741,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulBroadcast)
 TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 128;
   constexpr index_t k = 256;
   constexpr index_t n = 1;
@@ -805,7 +805,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVec)
 TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   constexpr index_t m = 128;
   constexpr index_t k = 256;
   constexpr index_t n = 1;
@@ -840,7 +840,7 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
 TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   // Test that the second-to-last dimension of A can be 1 (i.e. A can be a row
   // vector). In the case of matvec, this means that A*b is effectively a dot product.
   constexpr index_t m = 1;
@@ -879,7 +879,7 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
 TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   [[maybe_unused]] constexpr index_t an = 10;
   [[maybe_unused]] constexpr index_t bn = 4;
   [[maybe_unused]] constexpr index_t batches = 5;

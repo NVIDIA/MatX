@@ -39,8 +39,8 @@
 
 template <typename T> class MultiChannelRadarPipeline : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
   void SetUp() override
   {
     assert(numSamples > waveformLength);
@@ -77,7 +77,7 @@ TYPED_TEST_SUITE(MultiChannelRadarPipelineTypes, MatXComplexNonHalfTypesCUDAExec
 TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
@@ -114,7 +114,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
 TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
@@ -145,7 +145,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
 TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto p = RadarPipeline<TestType>(this->numPulses, this->numSamples,
                                     this->waveformLength, this->numChannels, 0);
@@ -168,7 +168,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
 TYPED_TEST(MultiChannelRadarPipelineTypes, CFARDetection)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const int fft_size = 256;
   const int cfarMaskX = 13;
   const int cfarMaskY = 5;

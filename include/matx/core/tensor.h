@@ -114,7 +114,7 @@ public:
    *
    * @param rhs Object to copy from
    */
-  __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
+  __MATX_DEVICE__ __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
       { }
 
@@ -235,7 +235,7 @@ public:
   __MATX_INLINE__ tensor_t(const std::initializer_list<detail::no_size_t> /* unused */) :
     // The ctor argument is unused, but matches {} for rank-0 tensors. We do
     // not use [[maybe_unused]] due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429 in gcc < 9.3
-    detail::tensor_impl_t<T, RANK, Desc>(std::array<index_t, 0>{}),
+    detail::tensor_impl_t<T, RANK, Desc>(cuda::std::array<index_t, 0>{}),
     storage_{typename Storage::container{sizeof(T)}}
   {
     this->SetLocalData(storage_.data());
@@ -715,7 +715,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     // Change this to not rely on index_t
-    std::array<index_t, NRANK> tshape;
+    cuda::std::array<index_t, NRANK> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin());
 
     [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
@@ -796,7 +796,7 @@ public:
 
     using Type = typename U::value_type;
     Type *data = reinterpret_cast<Type *>(this->ldata_);
-    std::array<typename Desc::stride_type, RANK> strides;
+    cuda::std::array<typename Desc::stride_type, RANK> strides;
 
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
@@ -841,7 +841,7 @@ public:
 
     using Type = typename U::value_type;
     Type *data = reinterpret_cast<Type *>(this->ldata_) + 1;
-    std::array<stride_type, RANK> strides;
+    cuda::std::array<stride_type, RANK> strides;
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->Stride(i);
@@ -873,13 +873,13 @@ public:
    * @returns tensor view of only imaginary-valued components
    *
    */
-  __MATX_INLINE__ auto Permute(const std::array<int32_t, RANK> &dims) const
+  __MATX_INLINE__ auto Permute(const cuda::std::array<int32_t, RANK> &dims) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
-    std::array<shape_type, RANK> n;
-    std::array<stride_type, RANK> s;
+    cuda::std::array<shape_type, RANK> n;
+    cuda::std::array<stride_type, RANK> s;
     [[maybe_unused]] bool done[RANK] = {0};
 
 #pragma unroll
@@ -1068,15 +1068,15 @@ public:
    */
   template <int N>
   __MATX_INLINE__ auto
-  OverlapView(const std::array<typename Desc::shape_type, N> &windows,
-              const std::array<typename Desc::stride_type, N> &strides) const
+  OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
+              const cuda::std::array<typename Desc::stride_type, N> &strides) const
   {
     static_assert(RANK == 1, "Overlapped views only supported on 1D tensors.");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    std::array<typename Desc::shape_type, RANK+1> n;
-    std::array<typename Desc::stride_type, RANK+1> s;
+    cuda::std::array<typename Desc::shape_type, RANK+1> n;
+    cuda::std::array<typename Desc::stride_type, RANK+1> s;
 
     // This only works for 1D tensors going to 2D at the moment. Generalize to
     // higher dims later
@@ -1129,12 +1129,12 @@ public:
    *
    */
   template <int N>
-  __MATX_INLINE__ auto Clone(const std::array<index_t, N> &clones) const
+  __MATX_INLINE__ auto Clone(const cuda::std::array<index_t, N> &clones) const
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    std::array<index_t, N> n;
-    std::array<typename Desc::stride_type, N> s;
+    cuda::std::array<index_t, N> n;
+    cuda::std::array<typename Desc::stride_type, N> s;
 
     int d = 0;
 
@@ -1451,16 +1451,16 @@ public:
    *
    */
   template <int N = RANK>
-  __MATX_INLINE__ auto Slice([[maybe_unused]] const std::array<typename Desc::shape_type, RANK> &firsts,
-                             [[maybe_unused]] const std::array<typename Desc::shape_type, RANK> &ends,
-                             [[maybe_unused]] const std::array<typename Desc::stride_type, RANK> &strides) const
+  __MATX_INLINE__ auto Slice([[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &firsts,
+                             [[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &ends,
+                             [[maybe_unused]] const cuda::std::array<typename Desc::stride_type, RANK> &strides) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    std::array<typename Desc::shape_type, N> n = {};
-    std::array<typename Desc::stride_type, N> s = {};
+    cuda::std::array<typename Desc::shape_type, N> n = {};
+    cuda::std::array<typename Desc::stride_type, N> s = {};
 
     T *data = this->ldata_;
     int d = 0;
@@ -1558,14 +1558,14 @@ public:
    *
    */
   template <int N = RANK>
-  __MATX_INLINE__ auto Slice(const std::array<typename Desc::shape_type, RANK> &firsts,
-                             const std::array<typename Desc::shape_type, RANK> &ends) const
+  __MATX_INLINE__ auto Slice(const cuda::std::array<typename Desc::shape_type, RANK> &firsts,
+                             const cuda::std::array<typename Desc::shape_type, RANK> &ends) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    const std::array<typename Desc::stride_type, RANK> strides = {-1};
+    const cuda::std::array<typename Desc::stride_type, RANK> strides = {-1};
 
     return Slice<N>(firsts, ends, strides);
   }
@@ -1732,9 +1732,9 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     auto s = this->Slice(start, end);
-    std::array<index_t, NRANK> arr = {0};
-    auto tup = std::tuple_cat(arr);
-    std::apply(
+    cuda::std::array<index_t, NRANK> arr = {0};
+    auto tup = cuda::std::tuple_cat(arr);
+    cuda::std::apply(
       [&](auto&&... args) {
         detail::InternalPrint(s, args...);
       }, tup);
@@ -1765,9 +1765,9 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto s = this->Slice(start, end, strides);
-    std::array<index_t, NRANK> arr = {0};
-    auto tup = std::tuple_cat(arr);
-    std::apply(
+    cuda::std::array<index_t, NRANK> arr = {0};
+    auto tup = cuda::std::tuple_cat(arr);
+    cuda::std::apply(
       [&](auto&&... args) {
         detail::InternalPrint(s, args...);
       }, tup);

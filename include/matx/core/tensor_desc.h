@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include <array>
+#include <cuda/std/array>
 #include <type_traits>
 #include "matx/core/error.h"
 
@@ -144,8 +144,8 @@ public:
   template <int M = RANK>
   __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const index_t (&shape)[M])
   {
-    // Construct a new std::array. Slower, but saves duplication
-    std::array<index_t, M> tshape;
+    // Construct a new cuda::std::array. Slower, but saves duplication
+    cuda::std::array<index_t, M> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin());    
     InitFromShape(std::move(tshape));
   }  
@@ -349,8 +349,8 @@ private:
 template <index_t I, index_t... Is> 
 class static_tensor_desc_t {
 public:
-  using shape_container = std::array<index_t, sizeof...(Is) + 1>;  ///< Type trait of shape type
-  using stride_container = std::array<index_t, sizeof...(Is) + 1>; ///< Type trait of stride type
+  using shape_container = cuda::std::array<index_t, sizeof...(Is) + 1>;  ///< Type trait of shape type
+  using stride_container = cuda::std::array<index_t, sizeof...(Is) + 1>; ///< Type trait of stride type
   using shape_type  = index_t; ///< Type trait of shape container
   using stride_type = index_t; ///< Type trait of stride container
   using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
@@ -417,11 +417,11 @@ public:
 
 private:
   static constexpr auto make_shape(){
-      return std::array{I, Is...};
+      return cuda::std::array{I, Is...};
   }    
 
   static constexpr auto make_strides(){
-      std::array<index_t, 1 + sizeof...(Is)> m{};
+      cuda::std::array<index_t, 1 + sizeof...(Is)> m{};
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
         for (int i = m.size()-2; i >= 0; i--) {
@@ -444,7 +444,7 @@ private:
  */
 template <typename ShapeContainer, typename StrideContainer, int RANK>
 using tensor_desc_cr_ds_t =
-    tensor_desc_t<std::array<ShapeContainer, RANK>, std::array<StrideContainer, RANK>,
+    tensor_desc_t<cuda::std::array<ShapeContainer, RANK>, cuda::std::array<StrideContainer, RANK>,
                   RANK>;
 
 /**

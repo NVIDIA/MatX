@@ -75,7 +75,7 @@ namespace matx
           cuda::std::get<Rank() - 2>(tup1) = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
           cuda::std::get<Rank() - 1>(tup1) = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
 
-          return mapply(op2_, tup2) * mapply(op1_, tup1);
+          return cuda::std::apply(op2_, tup2) * cuda::std::apply(op1_, tup1);
         }
 
         template <typename... Is>
@@ -89,7 +89,7 @@ namespace matx
           cuda::std::get<Rank() - 2>(tup1) = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
           cuda::std::get<Rank() - 1>(tup1) = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
 
-          return mapply(op2_, tup2) * mapply(op1_, tup1);
+          return cuda::std::apply(op2_, tup2) * cuda::std::apply(op1_, tup1);
         }
 
         template <typename ShapeType, typename Executor>

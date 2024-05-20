@@ -64,9 +64,9 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find(). ie: (mtie(O, num_found) = find(A, sel))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find(). ie: (mtie(O, num_found) = find(A, sel))");     
 
-        find_impl(std::get<0>(out), std::get<1>(out), a_, sel_, ex);
+        find_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, sel_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

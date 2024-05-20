@@ -89,7 +89,7 @@ namespace matx
            std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto linspace(ShapeType &&s, T first, T last)
              {
-               constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                auto count =  *(s.begin() + Dim);
                detail::LinspaceOp<T> l(first, last, count);

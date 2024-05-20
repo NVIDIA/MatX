@@ -40,8 +40,8 @@ using namespace matx;
 
 
 template <typename T> struct CUBTestsData {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
   GExecType exec{};   
 
   tensor_t<GTestType, 0> t0{{}};
@@ -122,7 +122,7 @@ TEST(TensorStats, Hist)
   // example-end hist-test-1
   cudaStreamSynchronize(0);
 
-  std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
+  cuda::std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
   for (index_t i = 0; i < outv.Lsize(); i++) {
     ASSERT_NEAR(outv(i), sol[i], 0.001);
   }
@@ -134,7 +134,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   for (index_t i = 0; i < this->t1.Lsize(); i++) {
     this->t1(i) = static_cast<TestType>((2 * (i % 2) - 1) * i);
@@ -181,7 +181,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
  
 
   for (index_t i = 0; i < this->t1.Lsize(); i++) {

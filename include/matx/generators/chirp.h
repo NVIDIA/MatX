@@ -226,7 +226,7 @@ namespace matx
   template <typename TimeType, typename FreqType>
     inline auto chirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {
-      std::array<index_t, 1> shape = {num};
+      cuda::std::array<index_t, 1> shape = {num};
       auto space = linspace<0>(std::move(shape), (TimeType)0, last);
       return chirp(space, f0, t1, f1, method);
     }
@@ -263,7 +263,7 @@ namespace matx
   template <typename TimeType, typename FreqType>
     inline auto cchirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {
-      std::array<index_t, 1> shape = {num};
+      cuda::std::array<index_t, 1> shape = {num};
       auto space = linspace<0>(std::move(shape), (TimeType)0, last);
       return cchirp(space, f0, t1, f1, method);
     }

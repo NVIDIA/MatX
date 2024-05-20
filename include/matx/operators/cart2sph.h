@@ -65,7 +65,7 @@ namespace matx
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             auto x = get_value(x_, indices...);
             auto y = get_value(y_, indices...);
@@ -152,7 +152,7 @@ namespace matx
   template <typename T1, typename T2, typename T3>
     auto __MATX_INLINE__ cart2sph(T1 x, T2 y, T3 z)
     {
-      return std::tuple{ 
+      return cuda::std::tuple{ 
         detail::Cart2SphOp<T1, T2, T3, 0>(x, y, z),
         detail::Cart2SphOp<T1, T2, T3, 1>(x, y, z),
         detail::Cart2SphOp<T1, T2, T3, 2>(x, y, z)};

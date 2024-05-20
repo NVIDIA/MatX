@@ -462,13 +462,13 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
   }
   else {
     using shape_type = typename InTensorType::desc_type::shape_type;
-    std::array<shape_type, InTensorType::Rank()> idx{0};
+    cuda::std::array<shape_type, InTensorType::Rank()> idx{0};
     auto i_shape = i.Shape();
     // Get total number of batches
     size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 1), 1, std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
-      auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
-      auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
+      auto ip = cuda::std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
+      auto op = cuda::std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
       this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 
       // Update all but the last 2 indices
@@ -607,13 +607,13 @@ private:
     else  {
       using shape_type = typename InTensorType::desc_type::shape_type;
       int batch_offset = 3;
-      std::array<shape_type, InTensorType::Rank()> idx{0};
+      cuda::std::array<shape_type, InTensorType::Rank()> idx{0};
       auto i_shape = i.Shape();
       // Get total number of batches
       size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
       for (size_t iter = 0; iter < total_iter; iter++) {
-        auto ip = std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
-        auto op = std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
+        auto ip = cuda::std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
+        auto op = cuda::std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
 
         this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 

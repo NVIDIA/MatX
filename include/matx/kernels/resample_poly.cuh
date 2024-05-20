@@ -147,7 +147,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     if (last_filter_ind < 0) {
         for (index_t out_ind = phase_ind + tid * up; out_ind < output_len; out_ind += THREADS * up) {
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&output](auto &&...args) {
+            cuda::std::apply([&output](auto &&...args) {
                 output.operator()(args...) = 0;
             }, bdims);
         }
@@ -218,14 +218,14 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         input_t in_val;
         for (index_t j = 0; j < n; j++) {
             bdims[Rank - 1] = x_ind++;
-            detail::mapply([&in_val, &input](auto &&...args) {
+            cuda::std::apply([&in_val, &input](auto &&...args) {
                 in_val = input.operator()(args...);
             }, bdims);
             accum += s_filter[h_ind++] * in_val;
         }
 
         bdims[Rank - 1] = out_ind;
-        detail::mapply([&accum, &output](auto &&...args) {
+        cuda::std::apply([&accum, &output](auto &&...args) {
             output.operator()(args...) = accum;
         }, bdims);
     }
@@ -317,7 +317,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             input_t in_val;
             for (index_t i = x_start; i <= x_end; i++) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * s_filter[h_ind];
@@ -326,7 +326,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
 
             accum *= scale;
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&accum, &output](auto &&...args) {
+            cuda::std::apply([&accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, bdims);
         }
@@ -346,7 +346,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             input_t in_val;
             for (index_t i = x_start; i <= x_end; i++) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * filter.operator()(h_ind);
@@ -355,7 +355,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
 
             accum *= scale;
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&accum, &output](auto &&...args) {
+            cuda::std::apply([&accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, bdims);
         }
@@ -424,7 +424,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * s_filter[h_ind];
@@ -441,7 +441,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             }
             if (lane_id == 0) {
                 bdims[Rank - 1] = out_ind;
-                detail::mapply([&accum, &output](auto &&...args) {
+                cuda::std::apply([&accum, &output](auto &&...args) {
                     output.operator()(args...) = accum;
                 }, bdims);
             }
@@ -463,7 +463,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * filter.operator()(h_ind);
@@ -480,7 +480,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             }
             if (lane_id == 0) {
                 bdims[Rank - 1] = out_ind;
-                detail::mapply([&accum, &output](auto &&...args) {
+                cuda::std::apply([&accum, &output](auto &&...args) {
                     output.operator()(args...) = accum;
                 }, bdims);
             }

@@ -90,7 +90,7 @@ namespace matx
             detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
           }
           else {
-            std::array<index_t, Op::Rank()> sizes;
+            cuda::std::array<index_t, Op::Rank()> sizes;
             for (int i = 0; i < Op::Rank(); i++) {
               sizes[i] = op.Size(i);
             }        

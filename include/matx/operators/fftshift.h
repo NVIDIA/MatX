@@ -60,7 +60,7 @@ namespace matx
         {
           auto tup = cuda::std::make_tuple(indices...);
           cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
-          return mapply(op_, tup);
+          return cuda::std::apply(op_, tup);
         }
 
         template <typename... Is>
@@ -68,7 +68,7 @@ namespace matx
         {
           auto tup = cuda::std::make_tuple(indices...);
           cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
-          return mapply(op_, tup);
+          return cuda::std::apply(op_, tup);
         }
 
 
@@ -140,7 +140,7 @@ namespace matx
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-2>(tup) = (cuda::std::get<Rank()-2>(tup) + (Size(Rank()-2) + 1) / 2) % Size(Rank()-2);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -210,7 +210,7 @@ namespace matx
           {
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1)) / 2) % Size(Rank()-1);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           } 
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -281,7 +281,7 @@ namespace matx
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-2>(tup) = (cuda::std::get<Rank()-2>(tup) + (Size(Rank()-2)) / 2) % Size(Rank()-2);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1)) / 2) % Size(Rank()-1);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

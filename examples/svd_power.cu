@@ -90,7 +90,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (A = random<float>({m, n}, NORMAL)).run(stream);
 
 #endif
-  std::array<index_t, U.Rank()> Dshape;
+  cuda::std::array<index_t, U.Rank()> Dshape;
   Dshape.fill(matxKeepDim);
   Dshape[U.Rank()-2] = m;
   // cloning D across

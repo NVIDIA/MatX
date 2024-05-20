@@ -51,7 +51,7 @@ namespace detail {
       index_t m = A.Size(RANK-2);
       index_t n = A.Size(RANK-1);
 
-      std::array<index_t, RANK-1> uShape;
+      cuda::std::array<index_t, RANK-1> uShape;
       for(int i = 0; i < RANK-2; i++) {
         uShape[i] = A.Size(i);
       }
@@ -64,7 +64,7 @@ namespace detail {
       auto wwt = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
       auto u = make_tensor<ATypeS>(uShape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-      return std::make_tuple(Qin, wwt, u);
+      return cuda::std::make_tuple(Qin, wwt, u);
     }
 
   template<typename QType, typename RType, typename AType, typename WType>
@@ -87,9 +87,9 @@ namespace detail {
       index_t k = std::min(m,n);
       if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
 
-      auto Qin = std::get<0>(workspace);
-      auto wwt  = std::get<1>(workspace);
-      auto u = std::get<2>(workspace);
+      auto Qin = cuda::std::get<0>(workspace);
+      auto wwt  = cuda::std::get<1>(workspace);
+      auto u = cuda::std::get<2>(workspace);
 
       static_assert(decltype(Qin)::Rank() == QType::Rank());
       static_assert(decltype(wwt)::Rank() == QType::Rank());
@@ -110,13 +110,13 @@ namespace detail {
       (R = A).run(stream);
 
       // we will slice X directly from R.
-      std::array<index_t, RANK> xSliceB, xSliceE;   
+      cuda::std::array<index_t, RANK> xSliceB, xSliceE;   
       xSliceB.fill(0); xSliceE.fill(matxEnd);
       xSliceE[RANK-1] = matxDropDim; // drop last dim to make a vector
 
 
       // v is of size m x 1.  Instead of allocating additional memory we will just reuse a row of Qin
-      std::array<index_t, RANK> vSliceB, vSliceE;   
+      cuda::std::array<index_t, RANK> vSliceB, vSliceE;   
       vSliceB.fill(0); vSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
       vSliceE[RANK-2] = matxDropDim; 
@@ -125,7 +125,7 @@ namespace detail {
 
 
       // N is of size 1.  Instead of allocating additional memory we will just reuse an entry of Qin
-      std::array<index_t, RANK> nSliceB, nSliceE;   
+      cuda::std::array<index_t, RANK> nSliceB, nSliceE;   
       nSliceB.fill(0); nSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
       nSliceE[RANK-2] = matxDropDim; 
@@ -134,7 +134,7 @@ namespace detail {
       auto N = slice<RANK-2>(wwt, nSliceB, nSliceE);
 
       // N cloned with RANK-2 of size m.
-      std::array<index_t, RANK-1> ncShape;
+      cuda::std::array<index_t, RANK-1> ncShape;
       ncShape.fill(matxKeepDim);
       ncShape[RANK-2] = m;
       auto nc = clone<RANK-1>(N,ncShape);

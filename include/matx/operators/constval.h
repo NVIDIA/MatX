@@ -37,7 +37,7 @@ namespace matx
 {
   namespace detail {
     template <typename T, typename ShapeType> class ConstVal : public BaseOp<ConstVal<T,ShapeType>> {
-      static constexpr int RANK = std::tuple_size<typename remove_cvref<ShapeType>::type>::value;
+      static constexpr int RANK = cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value;
 
       private:
       ShapeType s_;

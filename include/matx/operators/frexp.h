@@ -144,7 +144,7 @@ namespace detail {
 
 template<typename OpA>
 __MATX_INLINE__ auto frexp(const OpA &a) {
-  return std::tuple{
+  return cuda::std::tuple{
           detail::FrexpOp<OpA, 0>(a),
           detail::FrexpOp<OpA, 1>(a)
   };
@@ -152,7 +152,7 @@ __MATX_INLINE__ auto frexp(const OpA &a) {
 
 template<typename OpA>
 __MATX_INLINE__ auto frexpc(const OpA &a) {
-  return std::tuple{
+  return cuda::std::tuple{
           detail::FrexpOp<OpA, 0>(a),
           detail::FrexpOp<OpA, 1>(a),
           detail::FrexpOp<OpA, 2>(a),

@@ -47,7 +47,7 @@ namespace detail {
   {
     private:
       OpA a_;
-      std::array<index_t, OpA::Rank()> out_dims_;
+      cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;      
 
     public:
@@ -70,7 +70,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        cumsum_impl(std::get<0>(out), a_, ex);
+        cumsum_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -89,7 +89,7 @@ namespace detail {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>

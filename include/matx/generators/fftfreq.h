@@ -76,7 +76,7 @@ namespace matx
     inline auto fftfreq(index_t n, float d = 1.0)
     {
       detail::FFTFreqOp<T> l(n, d);
-      std::array<index_t, 1> s{n};
+      cuda::std::array<index_t, 1> s{n};
       return detail::matxGenerator1D_t<detail::FFTFreqOp<T>, 0, decltype(s)>(std::move(s), l);
     }
 } // end namespace matx

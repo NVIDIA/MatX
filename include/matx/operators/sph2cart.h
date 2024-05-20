@@ -153,7 +153,7 @@ namespace matx
   template <typename T1, typename T2, typename T3>
     auto __MATX_INLINE__ sph2cart(T1 theta, T2 phi, T3 r)
     {
-      return std::tuple{ 
+      return cuda::std::tuple{ 
         detail::Sph2CartOp<T1,T2,T3,0>(theta, phi, r),
         detail::Sph2CartOp<T1,T2,T3,1>(theta, phi, r),
         detail::Sph2CartOp<T1,T2,T3,2>(theta, phi, r)};

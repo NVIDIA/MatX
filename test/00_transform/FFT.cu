@@ -41,8 +41,8 @@ using namespace matx;
 template <typename T> class FFTTest : public ::testing::Test {
 
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
   GExecType exec{};   
   void SetUp() override
   {
@@ -84,7 +84,7 @@ TYPED_TEST_SUITE(FFTTestComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllE
 TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_1d", {fft_dim, fft_dim});
@@ -107,7 +107,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
 TYPED_TEST(FFTTestComplexTypes, FFT1DFWD1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_1d_fwd", {fft_dim, fft_dim});
@@ -130,7 +130,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1DFWD1024C2C)
 TYPED_TEST(FFTTestComplexTypes, FFT1DORTHO1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_1d_ortho", {fft_dim, fft_dim});
@@ -153,7 +153,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1DORTHO1024C2C)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   const int d1 = 8;
   const int d2 = 512;
@@ -272,7 +272,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 ; 
   const int d1 = 128;
   const int d2 = 256;
@@ -413,7 +413,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_1d", {fft_dim, fft_dim});
@@ -431,7 +431,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
 TYPED_TEST(FFTTestComplexTypes, IFFT1DORTHO1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_1d_ortho", {fft_dim, fft_dim});
@@ -449,7 +449,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1DORTHO1024C2C)
 TYPED_TEST(FFTTestComplexTypes, IFFT1DFWD1024C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_1d_fwd", {fft_dim, fft_dim});
@@ -467,7 +467,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1DFWD1024C2C)
 TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_1d", {fft_dim, fft_dim * 2});
@@ -488,7 +488,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
 TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 4;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_1d_batched", {fft_dim+1, fft_dim+2, fft_dim*2});
@@ -514,7 +514,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_1d", {fft_dim, fft_dim * 2});
@@ -533,7 +533,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024R2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   const index_t fft_dim = 1024;
   using rtype = typename TestType::value_type;
@@ -554,7 +554,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024R2C)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadR2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>; 
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>; 
 
   const index_t fft_dim = 4;
   using rtype = typename TestType::value_type;
@@ -575,7 +575,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadR2C)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ComplexType = TestType;
   using RealType = typename TestType::value_type;
 
@@ -634,7 +634,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadBatchedR2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 4;
   using rtype = typename TestType::value_type;
   this->pb->template InitAndRunTVGenerator<rtype>(
@@ -654,7 +654,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadBatchedR2C)
 TYPED_TEST(FFTTestComplexTypes, FFT2D16C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 16;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_2d", {fft_dim, fft_dim});
@@ -673,7 +673,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16C2C)
 TYPED_TEST(FFTTestComplexTypes, FFT2D16x32C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim[] = {16, 32};
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "fft_2d", {fft_dim[0], fft_dim[1]});
@@ -692,7 +692,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16x32C2C)
 TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedC2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t batch_size = 10;
   const index_t fft_dim = 16;
   this->pb->template InitAndRunTVGenerator<TestType>(
@@ -713,7 +713,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedC2C)
 TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedStridedC2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t batch_size = 10;
   const index_t fft_dim = 16;
   this->pb->template InitAndRunTVGenerator<TestType>(
@@ -735,7 +735,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedStridedC2C)
 TYPED_TEST(FFTTestComplexTypes, IFFT2D16C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 16;
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_2d", {fft_dim, fft_dim});
@@ -754,7 +754,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16C2C)
 TYPED_TEST(FFTTestComplexTypes, IFFT2D16x32C2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim[] = {16, 32};
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "fft_operators", "ifft_2d", {fft_dim[0], fft_dim[1]});
@@ -773,7 +773,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16x32C2C)
 TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16R2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 16;
   using rtype = typename TestType::value_type;
   this->pb->template InitAndRunTVGenerator<rtype>(
@@ -793,7 +793,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16R2C)
 TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16x32R2C)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim[] = {16, 32};
   using rtype = typename TestType::value_type;
   this->pb->template InitAndRunTVGenerator<rtype>(
@@ -813,7 +813,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16x32R2C)
 TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16C2R)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim = 16;
   using rtype = typename TestType::value_type;
   this->pb->template InitAndRunTVGenerator<TestType>(
@@ -833,7 +833,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16C2R)
 TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16x32C2R)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const index_t fft_dim[] = {16, 32};
   using rtype = typename TestType::value_type;
   this->pb->template InitAndRunTVGenerator<TestType>(
@@ -853,7 +853,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16x32C2R)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024C2CShort)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(
@@ -873,7 +873,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024C2CShort)
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, IFFT1D1024C2CShort)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
  
   const index_t fft_dim = 1024;
   this->pb->template InitAndRunTVGenerator<TestType>(

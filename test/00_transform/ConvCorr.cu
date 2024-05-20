@@ -62,8 +62,8 @@ constexpr index_t c_len = a_len + b_len - 1;
 
 template <typename T>
 class CorrelationConvolutionTest : public ::testing::Test {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 protected:
   void SetUp() override
   {
@@ -94,8 +94,8 @@ protected:
 template <typename T>
 class CorrelationConvolution2DTest : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 
   void SetUp() override
   {
@@ -126,8 +126,8 @@ protected:
 template <typename T>
 class CorrelationConvolutionLargeTest : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 
   void SetUp() override
   {
@@ -184,7 +184,7 @@ TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatNonHalfTypesCU
 TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len, b_len});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -202,7 +202,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
 TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, FFT1DConvolutionLarge)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len, b_len});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -221,7 +221,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, FFT1DConvolutionLarge)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -235,7 +235,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -251,7 +251,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullEven
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -267,7 +267,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, Direct1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -281,7 +281,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, Direct1DConvolutionSameE
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -295,7 +295,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameEven
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -311,7 +311,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -325,7 +325,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -339,7 +339,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidEve
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -353,7 +353,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidEven)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});  
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -367,7 +367,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});  
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -383,7 +383,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullOdd)
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -397,7 +397,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullOdd)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});   
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -411,7 +411,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});   
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -425,7 +425,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameOdd)
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -439,7 +439,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameOdd)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});   
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -453,7 +453,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_odd});   
   this->pb->RunTVGenerator("conv");   
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -467,7 +467,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidOdd
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_odd, b_len1_odd});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -481,7 +481,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidOdd)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -495,7 +495,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});
   this->pb->RunTVGenerator("conv");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -509,7 +509,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSwap)
 TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv2d_operators", {a_len0, a_len1, b_len0_even, b_len1_even});
   this->pb->RunTVGenerator("conv2d");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -523,7 +523,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSwap)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});  
   this->pb->RunTVGenerator("corr");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -540,7 +540,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
 TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DCorrelation)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});  
   this->pb->RunTVGenerator("corr");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -555,7 +555,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DCorrelation)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len0, b_len0_even});  
   this->pb->RunTVGenerator("corr_swap");
   this->pb->NumpyToTensorView(this->av, "a_op");
@@ -569,7 +569,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   const int d1 = 8;
   const int d2 = 512;
   const int d3 = 1024;
@@ -676,7 +676,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
 TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 #if 1  // currently doesn't work because Conv2D requires rank2 filter.
   const int d1 = 8;
   const int d2 = 512;

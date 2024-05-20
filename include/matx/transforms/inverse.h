@@ -130,13 +130,13 @@ public:
       else {
         using shape_type = typename TensorTypeA::desc_type::shape_type;
         int batch_offset = 2;
-        std::array<shape_type, TensorTypeA::Rank()> idx{0};
+        cuda::std::array<shape_type, TensorTypeA::Rank()> idx{0};
         auto a_shape = a.Shape();
         // Get total number of batches
         size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - batch_offset, 1, std::multiplies<shape_type>());
         for (size_t iter = 0; iter < total_iter; iter++) {
-          auto ip = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto op = std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
+          auto ip = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto op = cuda::std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
 
           in_pointers.push_back(ip);
           out_pointers.push_back(op);

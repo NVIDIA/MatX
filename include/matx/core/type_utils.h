@@ -126,7 +126,7 @@ struct is_matx_op_impl<T, std::void_t<typename T::matxop>> : std::true_type {
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_matx_op()
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
 {
   return detail::is_matx_op_impl<typename remove_cvref<T>::type>::value;
 }
@@ -246,7 +246,7 @@ template< class T >
 inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
 
 template <typename> struct is_tuple: std::false_type {};
-template <typename ...T> struct is_tuple<std::tuple<T...>>: std::true_type {};
+template <typename ...T> struct is_tuple<cuda::std::tuple<T...>>: std::true_type {};
 
 template <typename T>
 inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_set_op_impl<T>, 
@@ -732,14 +732,14 @@ using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
 
 
 template <class T, std::size_t N, std::size_t... I>
-constexpr std::array<std::remove_cv_t<T>, N>
+constexpr cuda::std::array<std::remove_cv_t<T>, N>
     to_array_impl(T (&a)[N], std::index_sequence<I...>)
 {
     return { {a[I]...} };
 }
 
 template <class T, std::size_t N>
-constexpr std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
+constexpr cuda::std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
 {
     return to_array_impl(a, std::make_index_sequence<N>{});
 }
@@ -822,8 +822,10 @@ template <typename T> using value_promote_t = promote_half_t<value_type_t<T>>;
 
 template <typename> struct is_std_tuple: std::false_type {};
 template <typename ...T> struct is_std_tuple<std::tuple<T...>>: std::true_type {};
+template <typename ...T> struct is_std_tuple<cuda::std::tuple<T...>>: std::true_type {};
 
 template<typename T> struct is_std_array : std::false_type {};
+template<typename T, size_t N> struct is_std_array<cuda::std::array<T, N>> : std::true_type {};
 template<typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
 
@@ -832,7 +834,7 @@ template <typename T> inline constexpr bool is_std_array_v = detail::is_std_arra
 // Get the n-th element from a parameter pack
 template <int I, class... Ts>
 __MATX_DEVICE__ __MATX_HOST__ decltype(auto) pp_get(Ts&&... ts) {
-  return std::get<I>(std::forward_as_tuple(ts...));
+  return cuda::std::get<I>(cuda::std::forward_as_tuple(ts...));
 }
 
 template <std::size_t ... Is>
@@ -864,7 +866,7 @@ __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, s
 
 template <typename... T, std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
 constexpr bool TensorTypesMatch() {
-  using first_type = std::tuple_element_t<0, std::tuple<T...>>;
+  using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<T...>>;
   return ((std::is_same_v<typename first_type::scalar_type, typename T::scalar_type>) && ...);
 }
 
@@ -877,7 +879,7 @@ struct no_size_t{}; // Used to create 0D tensors
 
 template <typename T1, typename T2>
 struct permute_rank {
-  static const int rank = T1::Rank() - std::tuple_size_v<T2>;
+  static const int rank = T1::Rank() - cuda::std::tuple_size_v<T2>;
 };
 
 template <typename T1>

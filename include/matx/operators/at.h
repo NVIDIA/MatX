@@ -46,7 +46,7 @@ namespace matx
     {
       private:
         Op op_;
-        std::array<index_t, sizeof...(Is)> idx_;
+        cuda::std::array<index_t, sizeof...(Is)> idx_;
 
       public:
         using matxop = bool;
@@ -58,7 +58,7 @@ namespace matx
         template <typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          return mapply(op_, idx_);
+          return cuda::std::apply(op_, idx_);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

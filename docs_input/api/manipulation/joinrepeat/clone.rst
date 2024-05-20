@@ -6,7 +6,7 @@ clone
 Clone one or more dimensions of an operator to a higher rank
 
 .. doxygenfunction:: clone(Op t, const index_t (&shape)[Rank])
-.. doxygenfunction:: clone(Op t, const std::array<index_t, Rank> &shape)
+.. doxygenfunction:: clone(Op t, const cuda::std::array<index_t, Rank> &shape)
 
 Examples
 ~~~~~~~~

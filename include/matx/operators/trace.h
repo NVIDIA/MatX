@@ -66,7 +66,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        trace_impl(std::get<0>(out), a_, ex);
+        trace_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -88,7 +88,7 @@ namespace detail {
           make_tensor(tmp_out_, MATX_HOST_MEMORY);          
         }
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>

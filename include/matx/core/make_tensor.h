@@ -111,7 +111,7 @@ auto make_tensor_p( const index_t (&shape)[RANK],
 /**
  * Create a tensor from a conforming container type
  *
- * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * Conforming containers have sequential iterators defined (both const and non-const). cuda::std::array
  * and std::vector meet this criteria.
  *
  * @param shape Shape of tensor
@@ -130,7 +130,7 @@ auto make_tensor( ShapeType &&shape,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   T *ptr;
-  constexpr int rank = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  constexpr int rank = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<rank> desc{std::move(shape)};
 
   size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
@@ -140,7 +140,7 @@ auto make_tensor( ShapeType &&shape,
   basic_storage<decltype(rp)> s{std::move(rp)};
 
   return tensor_t<T,
-    std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
+    cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
     decltype(s),
     decltype(desc)>{std::move(s), std::move(desc)};
 }
@@ -148,7 +148,7 @@ auto make_tensor( ShapeType &&shape,
 /**
  * Create a tensor from a conforming container type
  *
- * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * Conforming containers have sequential iterators defined (both const and non-const). cuda::std::array
  * and std::vector meet this criteria.
  *
  * @param tensor Tensor object to store newly-created tensor into
@@ -173,7 +173,7 @@ auto make_tensor( TensorType &tensor,
 /**
  * Create a tensor from a conforming container type
  *
- * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * Conforming containers have sequential iterators defined (both const and non-const). cuda::std::array
  * and std::vector meet this criteria.  Caller is responsible for deleting tensor.
  *
  * @param shape  Shape of tensor
@@ -191,7 +191,7 @@ auto make_tensor_p( ShapeType &&shape,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   T *ptr;
-  DefaultDescriptor<static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value)> desc{std::move(shape)};
+  DefaultDescriptor<static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value)> desc{std::move(shape)};
 
   size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
   matxAlloc((void**)&ptr, size, space, stream);
@@ -199,7 +199,7 @@ auto make_tensor_p( ShapeType &&shape,
   raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
   basic_storage<decltype(rp)> s{std::move(rp)};
   return new tensor_t<T,
-  std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
+  cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
   decltype(s),
   decltype(desc)>{std::move(s), std::move(desc)};
 }
@@ -207,7 +207,7 @@ auto make_tensor_p( ShapeType &&shape,
 /**
  * Create a tensor from a conforming container type
  *
- * Conforming containers have sequential iterators defined (both const and non-const). std::array
+ * Conforming containers have sequential iterators defined (both const and non-const). cuda::std::array
  * and std::vector meet this criteria.  Caller is responsible for deleting tensor.
  *
  * @param tensor Tensor object to store newly-created tensor into
@@ -242,7 +242,7 @@ template <typename T>
 auto make_tensor( [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
-  std::array<index_t, 0> shape;
+  cuda::std::array<index_t, 0> shape;
 
   return make_tensor<T, decltype(shape)>(std::move(shape), space, stream);
 }
@@ -279,7 +279,7 @@ auto make_tensor_p( [[maybe_unused]] const std::initializer_list<detail::no_size
                     matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                     cudaStream_t stream = 0) {
 
-  std::array<index_t, 0> shape;
+  cuda::std::array<index_t, 0> shape;
   return make_tensor_p<T, decltype(shape)>(std::move(shape), space, stream);
 }
 
@@ -349,7 +349,7 @@ auto make_tensor( T *data,
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
@@ -396,7 +396,7 @@ template <typename T>
 auto make_tensor( T *ptr,
                   [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
                   bool owning = false) {
-  std::array<index_t, 0> shape;
+  cuda::std::array<index_t, 0> shape;
   return make_tensor<T, decltype(shape)>(ptr, std::move(shape), owning);
 }
 
@@ -440,7 +440,7 @@ auto make_tensor_p( T *const data,
                     bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
   raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
@@ -465,7 +465,7 @@ auto make_tensor( Storage &&s,
                   ShapeType &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  constexpr int RANK = static_cast<int>(std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
   using T = typename Storage::T;

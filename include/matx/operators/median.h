@@ -48,7 +48,7 @@ namespace detail {
   {
     private:
       OpA a_;
-      std::array<index_t, ORank> out_dims_;
+      cuda::std::array<index_t, ORank> out_dims_;
       mutable matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;      
 
     public:
@@ -71,7 +71,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        median_impl(std::get<0>(out), a_, ex);
+        median_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -93,7 +93,7 @@ namespace detail {
           make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);          
         }
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>

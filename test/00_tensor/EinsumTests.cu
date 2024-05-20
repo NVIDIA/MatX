@@ -100,8 +100,8 @@ TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypesCUDAExec);
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};    
 
@@ -131,8 +131,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -155,8 +155,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -186,8 +186,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -216,8 +216,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -247,8 +247,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
 
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -278,8 +278,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};  
 

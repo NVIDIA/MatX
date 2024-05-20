@@ -120,7 +120,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             const int niter = static_cast<int>(j_start - first_ind + 1);
             input_t in_val;
             for (int i = 0; i < niter; i++) {
-                detail::mapply([&in_val, &input](auto &&...args) {                    
+                cuda::std::apply([&in_val, &input](auto &&...args) {                    
                     in_val = input.operator()(args...);
                 }, indims);
                 accum += (*h) * in_val;
@@ -128,7 +128,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 h++;
             }
             outdims[OutElemRank] = t;
-            detail::mapply([accum, &output](auto &&...args) {
+            cuda::std::apply([accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, outdims);
         }
@@ -158,7 +158,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             output_t accum {};
             input_t in_val;
             for (index_t i = 0; i < niter; i++) {
-                detail::mapply([&in_val, &input](auto &&...args) {                    
+                cuda::std::apply([&in_val, &input](auto &&...args) {                    
                     in_val = input.operator()(args...);
                 }, indims);
                 const filter_t h_val = filter.operator()(h_ind);
@@ -167,7 +167,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 indims[InRank-1] -= num_channels;
             }
             outdims[OutElemRank] = t;
-            detail::mapply([accum, &output](auto &&...args) {
+            cuda::std::apply([accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, outdims);
         }
@@ -238,7 +238,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         const index_t input_ind = out_sample_ind * num_channels + chan;
         if (input_ind >= 0 && input_ind < input_len) {
             indims[InRank-1] = input_ind;
-            detail::mapply([smem_input, smem_ind, &input](auto &&...args) {
+            cuda::std::apply([smem_input, smem_ind, &input](auto &&...args) {
                 smem_input[smem_ind] = input.operator()(args...);
             }, indims);
         } else {
@@ -262,7 +262,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;
             const uint32_t smem_ind = cached_input_ind_tail * num_channels + chan;
             if (indims[InRank-1] < input_len) {
-                detail::mapply([smem_input, smem_ind, &input](auto &&...args) {
+                cuda::std::apply([smem_input, smem_ind, &input](auto &&...args) {
                     smem_input[smem_ind] = input.operator()(args...);
                 }, indims);
             } else {
@@ -307,7 +307,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
                 h -= num_channels;
             }
 
-            detail::mapply([accum, &output](auto &&...args) {
+            cuda::std::apply([accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, outdims);
         }
@@ -381,7 +381,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
             for (int chan = 0; chan < NUM_CHAN; chan++) {
                 const filter_t h_val = (h_ind < filter_full_len) ? filter.operator()(h_ind) : static_cast<filter_t>(0);
                 if (indims[InRank-1] < input_len) {
-                    detail::mapply([&accum, chan, h_val, &input](auto &&...args) {                    
+                    cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
                         accum[chan] += h_val * input.operator()(args...);
                     }, indims);
                 }
@@ -395,7 +395,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
         for (index_t i = 0; i < niter-1; i++) {
             for (int chan = 0; chan < NUM_CHAN; chan++) {
                 const filter_t h_val = filter.operator()(h_ind);
-                detail::mapply([&accum, chan, h_val, &input](auto &&...args) {                    
+                cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
                     accum[chan] += h_val * input.operator()(args...);
                 }, indims);
                 h_ind++;
@@ -411,7 +411,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                 }
                 // const filter_t h_val = (h_ind < filter_full_len) ? filter.operator()(h_ind) : static_cast<filter_t>(0);
                 const filter_t h_val = filter.operator()(h_ind);
-                detail::mapply([&accum, chan, h_val, &input](auto &&...args) {                    
+                cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
                     accum[chan] += h_val * input.operator()(args...);
                 }, indims);
                 h_ind++;
@@ -430,7 +430,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                     dft += accum[j] * smem_eij[chan][j];
                 }
                 outdims[ChannelRank] = chan;
-                detail::mapply([dft, &output](auto &&...args) {
+                cuda::std::apply([dft, &output](auto &&...args) {
                     output.operator()(args...) = dft;
                 }, outdims);            
             }
@@ -444,7 +444,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                         dft += accum[j] * smem_eij[0][j];
                     }
                     outdims[ChannelRank] = 0;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = dft;
                     }, outdims);
                 }
@@ -455,7 +455,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                         dft += accum[j] * smem_eij[mid-1][j];
                     }
                     outdims[ChannelRank] = mid-1;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = dft;
                     }, outdims);
                 }
@@ -466,11 +466,11 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                         dft += accum[j] * smem_eij[chan][j];
                     }
                     outdims[ChannelRank] = chan;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = dft;
                     }, outdims);
                     outdims[ChannelRank] = NUM_CHAN - chan;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = conj(dft);
                     }, outdims);
                 }
@@ -482,7 +482,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                         dft += accum[j] * smem_eij[0][j];
                     }
                     outdims[ChannelRank] = 0;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = dft;
                     }, outdims);
                 }
@@ -493,11 +493,11 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                         dft += accum[j] * smem_eij[chan][j];
                     }
                     outdims[ChannelRank] = chan;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = dft;
                     }, outdims);
                     outdims[ChannelRank] = NUM_CHAN - chan;
-                    detail::mapply([dft, &output](auto &&...args) {
+                    cuda::std::apply([dft, &output](auto &&...args) {
                         output.operator()(args...) = conj(dft);
                     }, outdims);
                 }                
@@ -535,28 +535,28 @@ __global__ void ChannelizePoly1DUnpackDFT(DataType inout)
     if (num_channels % 2 == 0) {
         for (index_t i = 1; i < mid-1; i++) {
             dims[ChannelRank] = i;
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 val = inout.operator()(args...);
             }, dims);
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 inout.operator()(args...) = conj(val);
             }, dims);
             dims[ChannelRank] = num_channels - i;
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 inout.operator()(args...) = val;
             }, dims);            
         }
     } else {
         for (index_t i = 1; i < mid; i++) {
             dims[ChannelRank] = i;
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 val = inout.operator()(args...);
             }, dims);
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 inout.operator()(args...) = conj(val);
             }, dims);
             dims[ChannelRank] = num_channels - i;
-            detail::mapply([&val, &inout](auto &&...args) {                    
+            cuda::std::apply([&val, &inout](auto &&...args) {                    
                 inout.operator()(args...) = val;
             }, dims);            
         }

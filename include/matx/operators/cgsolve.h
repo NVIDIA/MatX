@@ -48,7 +48,7 @@ namespace matx
         OpB b_;
         double tol_;
         int max_iters_;
-        std::array<index_t, 2> out_dims_;
+        cuda::std::array<index_t, 2> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, 2> tmp_out_;
 
       public:
@@ -88,7 +88,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           static_assert(is_cuda_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
-          cgsolve_impl(std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
+          cgsolve_impl(cuda::std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
@@ -106,7 +106,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

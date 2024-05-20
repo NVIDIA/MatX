@@ -381,7 +381,7 @@ public:
 
     assert(info.ndim == RANK);
 
-    std::array<matx::index_t, RANK> shape;
+    cuda::std::array<matx::index_t, RANK> shape;
     std::copy_n(info.shape.begin(), RANK, std::begin(shape));
 
     auto ten =  make_tensor<T> (shape);

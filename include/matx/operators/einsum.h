@@ -48,7 +48,7 @@ namespace detail {
   class EinsumOp : public BaseOp<EinsumOp<OpA...>>
   {
     private:
-      std::tuple<OpA...> a_;
+      cuda::std::tuple<OpA...> a_;
       std::string subscripts_;
 
     public:
@@ -58,7 +58,7 @@ namespace detail {
       using einsum_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "einsum()"; }
-      __MATX_INLINE__ EinsumOp(const std::string &subscripts, OpA... ops) : subscripts_(subscripts), a_(std::make_tuple(ops...)) { };
+      __MATX_INLINE__ EinsumOp(const std::string &subscripts, OpA... ops) : subscripts_(subscripts), a_(cuda::std::make_tuple(ops...)) { };
 
       // This should never be called
       template <typename... Is>
@@ -68,8 +68,8 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
 
-        std::apply([&](auto... args) {
-          ::matx::cutensor::einsum_impl(std::get<0>(out), subscripts_, ex.getStream(), args...);
+        cuda::std::apply([&](auto... args) {
+          ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex.getStream(), args...);
         }, a_);
       }
 

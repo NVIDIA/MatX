@@ -39,8 +39,8 @@
 using namespace matx;
 
 template <typename T> struct TensorCreationTestsData {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;     
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;     
   tensor_t<GTestType, 0> t0{{}};
   tensor_t<GTestType, 1> t1{{10}};
   tensor_t<GTestType, 2> t2{{20, 10}};
@@ -93,8 +93,8 @@ TYPED_TEST_SUITE(TensorCreationTestsAll, MatXAllTypesAllExecs);
 
 TYPED_TEST(TensorCreationTestsAll, MakeShape)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};  
   auto mt2 = make_tensor<TestType>({2, 2});

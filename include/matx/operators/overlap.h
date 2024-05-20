@@ -51,9 +51,9 @@ namespace matx
 
       private:
         typename base_type<T>::type op_;
-        std::array<int32_t, DIM> dims_;
-        std::array<shape_type, DIM+1> n_;
-        std::array<shape_type, DIM+1> s_;
+        cuda::std::array<int32_t, DIM> dims_;
+        cuda::std::array<shape_type, DIM+1> n_;
+        cuda::std::array<shape_type, DIM+1> s_;
 
       public:
         using matxop = bool;
@@ -62,8 +62,8 @@ namespace matx
         static_assert(DIM == 1, "overlap() only supports input rank 1 currently");
 
         __MATX_INLINE__ std::string str() const { return "overlap(" + op_.str() + ")"; }
-        __MATX_INLINE__ OverlapOp(T op, const std::array<shape_type, DIM> &windows,
-                                      const std::array<shape_type, DIM> &strides) : op_(op) {
+        __MATX_INLINE__ OverlapOp(T op, const cuda::std::array<shape_type, DIM> &windows,
+                                      const cuda::std::array<shape_type, DIM> &strides) : op_(op) {
 
           // This only works for 1D tensors going to 2D at the moment. Generalize to
           // higher dims later
@@ -166,8 +166,8 @@ namespace matx
    */
   template <typename OpType, int N>
   __MATX_INLINE__ auto overlap( const OpType &op,
-      const std::array<index_t, N> &windows,
-      const std::array<index_t, N> &strides)
+      const cuda::std::array<index_t, N> &windows,
+      const cuda::std::array<index_t, N> &strides)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template OverlapView<N>(windows, strides);

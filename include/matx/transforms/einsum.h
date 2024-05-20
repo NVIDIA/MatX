@@ -55,13 +55,13 @@ namespace cutensor {
  */
 template <typename... InT>
 struct EinsumParams_t {
-  using first_type = std::tuple_element_t<0, std::tuple<InT...>>;
+  using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<InT...>>;
   using first_value_type = typename first_type::value_type;
 
-  std::array<std::vector<int32_t>, sizeof...(InT) + 1> modes_;
-  std::array<std::vector<int64_t>, sizeof...(InT) + 1> extents_;
-  std::array<std::vector<int64_t>, sizeof...(InT) + 1> strides_;
-  std::array<int32_t, sizeof...(InT)> nmodes_;
+  cuda::std::array<std::vector<int32_t>, sizeof...(InT) + 1> modes_;
+  cuda::std::array<std::vector<int64_t>, sizeof...(InT) + 1> extents_;
+  cuda::std::array<std::vector<int64_t>, sizeof...(InT) + 1> strides_;
+  cuda::std::array<int32_t, sizeof...(InT)> nmodes_;
   uint32_t alignment_out_;
   uint32_t alignments_in_[sizeof...(InT)];
   int64_t num_slices_;
@@ -74,7 +74,7 @@ struct EinsumParams_t {
 template <typename OutputTensor, typename... InT>
 class matxEinsumHandle_t {
 public:
-  using first_type = std::tuple_element_t<0, std::tuple<InT...>>;
+  using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<InT...>>;
   using first_value_type = typename first_type::value_type;
 
   //static_assert(TensorTypesMatch<InT...>(), "All tensor data types in contraction must match");

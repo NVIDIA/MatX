@@ -72,23 +72,23 @@ template <> auto inline GenerateData<cuda::std::complex<double>>()
   return cuda::std::complex<double>(1.5, -2.5);
 }
 
-using ExecutorTypesAll = std::tuple<matx::cudaExecutor, matx::HostExecutor>;
-using ExecutorTypesCUDAOnly = std::tuple<matx::cudaExecutor>;
+using ExecutorTypesAll = cuda::std::tuple<matx::cudaExecutor, matx::HostExecutor>;
+using ExecutorTypesCUDAOnly = cuda::std::tuple<matx::cudaExecutor>;
 
 
 /* Taken from https://stackoverflow.com/questions/70404549/cartesian-product-of-stdtuple */
 template<typename T1, typename T2>
 class TypedCartesianProduct {
   template<typename T, typename... Ts>
-  static auto innerHelper(T&&, std::tuple<Ts...>&&) 
+  static auto innerHelper(T&&, cuda::std::tuple<Ts...>&&) 
   -> decltype(
-       std::make_tuple(
-         std::make_tuple(std::declval<T>(), std::declval<Ts>())...));
+       cuda::std::make_tuple(
+         cuda::std::make_tuple(std::declval<T>(), std::declval<Ts>())...));
 
   template <typename... Ts, typename T>
-  static auto outerHelper(std::tuple<Ts...>&&, T&&) 
+  static auto outerHelper(cuda::std::tuple<Ts...>&&, T&&) 
   -> decltype(
-       std::tuple_cat(innerHelper(std::declval<Ts>(), std::declval<T>())...));
+       cuda::std::tuple_cat(innerHelper(std::declval<Ts>(), std::declval<T>())...));
 
  public:
   using type = decltype(outerHelper(std::declval<T1>(), std::declval<T2>()));
@@ -99,39 +99,39 @@ template <typename Tuple>
 struct TupleToTypes {};
 
 template <typename... T>
-struct TupleToTypes<std::tuple<T...>>
+struct TupleToTypes<cuda::std::tuple<T...>>
 {
   using type = ::Types<T...>;
 };
 
 // Groups of types used for a specific test
-using MatXFloatNonComplexNonHalfTuple        = std::tuple<float, double>;
-using MatXNumericNonHalfTuple                = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double,
+using MatXFloatNonComplexNonHalfTuple        = cuda::std::tuple<float, double>;
+using MatXNumericNonHalfTuple                = cuda::std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double,
                                                           cuda::std::complex<float>, cuda::std::complex<double>>;
-using MatXFloatNonHalfTuple                  = std::tuple<float, double, cuda::std::complex<float>, cuda::std::complex<double>>;
-using MatXComplexNonHalfTuple                = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
-using MatXNumericNonComplexTuple             = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
-using MatXComplexTuple                       = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>,
+using MatXFloatNonHalfTuple                  = cuda::std::tuple<float, double, cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXComplexNonHalfTuple                = cuda::std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
+using MatXNumericNonComplexTuple             = cuda::std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
+using MatXComplexTuple                       = cuda::std::tuple<cuda::std::complex<float>, cuda::std::complex<double>,
                                                           matx::matxFp16Complex, matx::matxBf16Complex>;
                                                           
-using MatXAllTuple                           = std::tuple<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
+using MatXAllTuple                           = cuda::std::tuple<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
                                                       int64_t, float, double, cuda::std::complex<float>,
                                                       cuda::std::complex<double>, matx::matxFp16Complex,
                                                       matx::matxBf16Complex>;
-using MatXFloatTuple                         = std::tuple< matx::matxFp16, matx::matxBf16, float, double,
+using MatXFloatTuple                         = cuda::std::tuple< matx::matxFp16, matx::matxBf16, float, double,
                                                            cuda::std::complex<float>, cuda::std::complex<double>,
                                                            matx::matxFp16Complex, matx::matxBf16Complex>;    
 
-using MatXNumericTuple                       = std::tuple<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
+using MatXNumericTuple                       = cuda::std::tuple<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
                                               int64_t, float, double, cuda::std::complex<float>,
                                               cuda::std::complex<double>, matx::matxFp16Complex,
                                               matx::matxBf16Complex>;     
-using MatXIntegralTuple                      = std::tuple<uint32_t, int32_t, uint64_t, int64_t>;                                                                                                                                                         
+using MatXIntegralTuple                      = cuda::std::tuple<uint32_t, int32_t, uint64_t, int64_t>;                                                                                                                                                         
 
-using MatXFloatNonComplexTuple               = std::tuple<matx::matxFp16, matx::matxBf16, float, double>;                     
-using MatXFloatHalfTuple                     = std::tuple<matx::matxFp16, matx::matxBf16>;                                           
-using MatXBooleanTuple                       = std::tuple<bool>;  
-using MatXDoubleOnlyTuple                    = std::tuple<double>; 
+using MatXFloatNonComplexTuple               = cuda::std::tuple<matx::matxFp16, matx::matxBf16, float, double>;                     
+using MatXFloatHalfTuple                     = cuda::std::tuple<matx::matxFp16, matx::matxBf16>;                                           
+using MatXBooleanTuple                       = cuda::std::tuple<bool>;  
+using MatXDoubleOnlyTuple                    = cuda::std::tuple<double>; 
 
 // CUDA-only types
 using MatXAllTypesCUDAExec                    = TupleToTypes<TypedCartesianProduct<MatXAllTuple, ExecutorTypesCUDAOnly>::type>::type;

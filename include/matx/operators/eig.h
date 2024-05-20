@@ -67,9 +67,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "eig () only supports the CUDA executor currently");
-        static_assert(std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
-        eig_impl(std::get<0>(out), std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
+        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

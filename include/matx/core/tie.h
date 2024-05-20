@@ -38,7 +38,7 @@
 
 namespace matx {
 
-/* mtie exists because we can't overload std::tuple's operator= for operator assignments in
+/* mtie exists because we can't overload cuda::std::tuple's operator= for operator assignments in
    a multiple return set statement. */
 template <typename... Ts>
 struct mtie : public BaseOp<mtie<Ts...>>{
@@ -52,13 +52,13 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   __MATX_INLINE__ const std::string str() const {
     if constexpr (sizeof...(Ts) == 2) {
-      return get_type_str(std::get<0>(ts_)) + "=" + get_type_str(std::get<1>(ts_));
+      return get_type_str(cuda::std::get<0>(ts_)) + "=" + get_type_str(cuda::std::get<1>(ts_));
     }
     else {
       // Figure this out for proper LHS
       return "";
       // std::string lhs = "(";
-      // mapply([&](auto... args) {
+      // cuda::std::apply([&](auto... args) {
       //   lhs += ((get_type_str(args) + ","), ...);
       // }, ts_);
 
@@ -72,14 +72,14 @@ struct mtie : public BaseOp<mtie<Ts...>>{
   template <typename RHS, std::enable_if_t<is_matx_transform_op<RHS>(), bool> = true>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(RHS &&rhs)
   {
-    return mapply([&](auto... args) {
+    return cuda::std::apply([&](auto... args) {
       return mtie<Ts..., RHS>{args..., rhs};
     }, ts_);
   }
 
   template <int n>
   auto get() {
-    return std::get<n>(ts_);
+    return cuda::std::get<n>(ts_);
   }
 
   static __MATX_INLINE__ constexpr int32_t Rank()
@@ -94,10 +94,10 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {
-    std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
+    cuda::std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
   }
 
-  std::tuple<Ts...> ts_;
+  cuda::std::tuple<Ts...> ts_;
 };
 
 

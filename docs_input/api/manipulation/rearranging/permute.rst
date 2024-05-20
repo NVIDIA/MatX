@@ -6,7 +6,7 @@ permute
 Permute the dimensions of an operator
 
 .. doxygenfunction:: permute(const T &op, const int32_t (&dims)[T::Rank()])
-.. doxygenfunction:: permute(const T &op, const std::array<int32_t, T::Rank()> &dims)
+.. doxygenfunction:: permute(const T &op, const cuda::std::array<int32_t, T::Rank()> &dims)
 
 Examples
 ~~~~~~~~
