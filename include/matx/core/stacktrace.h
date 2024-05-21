@@ -47,23 +47,25 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <array>
 
 namespace matx {
 namespace detail{
 
+static constexpr int MAX_FRAMES = 63;
+
 /** Print a demangled stack backtrace of the caller function to FILE* out. */
-static inline void printStackTrace(std::ostream &eout = std::cerr,
-                                   unsigned int max_frames = 63)
+static inline void printStackTrace(std::ostream &eout = std::cerr)
 {
 #ifdef _WIN32
   // TODO add code for windows stack trace
 #else
   std::stringstream out;
   // storage array for stack trace address data
-  void *addrlist[max_frames + 1];
+  std::array<void *, MAX_FRAMES + 1> addrlist;
   // retrieve current stack addresses
   int addrlen =
-      backtrace(addrlist, static_cast<int>(sizeof(addrlist) / sizeof(void *)));
+      backtrace(reinterpret_cast<void **>(&addrlist), static_cast<int>(addrlist.size()));
 
   if (addrlen == 0) {
     out << "  <empty, possibly corrupt>\n";
@@ -72,7 +74,7 @@ static inline void printStackTrace(std::ostream &eout = std::cerr,
 
   // resolve addresses into strings containing "filename(function+address)",
   // this array must be free()-ed
-  char **symbollist = backtrace_symbols(addrlist, addrlen);
+  char **symbollist = backtrace_symbols(reinterpret_cast<void *const *>(&addrlist), addrlen);
   // allocate string which will be filled with the demangled function name
   size_t funcnamesize = 256;
   char *funcname = (char *)malloc(funcnamesize);
