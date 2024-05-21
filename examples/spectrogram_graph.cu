@@ -124,7 +124,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (fftStackedMatrix = conj(fftStackedMatrix) * fftStackedMatrix)
         .run(stream);
     // Get real part and transpose
-    auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
+    [[maybe_unused]] auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
 
     // Spectral time axis
     (s_time = linspace<0>(s_time_shape, static_cast<float>(nperseg) / 2.0f,

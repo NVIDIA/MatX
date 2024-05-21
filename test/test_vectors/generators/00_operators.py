@@ -61,7 +61,7 @@ class window:
         self.hanning = np.hanning(self.win_size)
         self.blackman = np.blackman(self.win_size)
         self.bartlett = np.bartlett(self.win_size)
-        self.flattop = ss.flattop(self.win_size)
+        self.flattop = ss.windows.flattop(self.win_size)
 
         return {
             'hamming': self.hamming,

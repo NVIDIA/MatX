@@ -109,7 +109,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   dim3 grid(num_batches, 1, 1);
   // comp_unit is either a thread or a warp, depending on the kernel. It is the size of the computational
   // unit that collectively computes a single output value.
-  auto compute_elems_per_comp_unit = [&grid, DESIRED_MIN_GRID_SIZE](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
+  auto compute_elems_per_comp_unit = [&grid](index_t max_outlen_per_cta, int cta_comp_unit_count) -> index_t {
     const int start_batch_size = grid.x * grid.y;
     const index_t desired_extra_batches = (DESIRED_MIN_GRID_SIZE + start_batch_size - 1) /
       start_batch_size;
@@ -169,21 +169,6 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 
 } // end namespace detail
 
-// Simple gcd implementation using the Euclidean algorithm.
-// If large number support is needed, or if this function becomes performance
-// sensitive, then this implementation may be insufficient. Typically, up/down
-// factors for resampling will be known in a signal processing pipeline and
-// thus the user would already supply co-prime up/down factors. In that case,
-// b will be 0 below after one iteration and this implementation quickly identifies
-// the factors as co-prime.
-static index_t gcd(index_t a, index_t b) {
-  while (b != 0) {
-    const index_t t = b;
-    b = a % b;
-    a = t;
-  }
-  return a;
-};
 
 /**
  * @brief 1D polyphase resampler
@@ -220,7 +205,7 @@ inline void resample_poly_impl(OutType &out, const InType &in, const FilterType 
   [[maybe_unused]] const index_t outlen = up_size / down + ((up_size % down) ? 1 : 0);
   MATX_ASSERT_STR(out.Size(RANK-1) == outlen, matxInvalidDim, "resample_poly: output size mismatch");
 
-  const index_t g = gcd(up, down);
+  const index_t g = std::gcd(up, down);
   up /= g;
   down /= g;
 

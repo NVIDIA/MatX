@@ -56,8 +56,8 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "polyval()"; }
         __MATX_INLINE__ PolyvalOp(const Op &op, const Coeffs &coeffs) : op_(op), coeffs_(coeffs) {
-          MATX_STATIC_ASSERT_STR(coeffs.Rank() == 1, matxInvalidDim, "Coefficient must be rank 1");
-          MATX_STATIC_ASSERT_STR(op.Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
+          MATX_STATIC_ASSERT_STR(Coeffs::Rank() == 1, matxInvalidDim, "Coefficient must be rank 1");
+          MATX_STATIC_ASSERT_STR(Op::Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(index_t idx) const

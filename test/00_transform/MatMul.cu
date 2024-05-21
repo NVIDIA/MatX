@@ -55,7 +55,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   float thresh = 0.01f;

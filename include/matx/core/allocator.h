@@ -91,11 +91,10 @@ struct MemTracker {
   }
 
   void update_stream(void *ptr, cudaStream_t stream) {
-    std::unique_lock lck(memory_mtx);
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
     if (iter == allocationMap.end()) {
       MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
-      return;
     }
 
     iter->second.stream = stream;
@@ -105,7 +104,7 @@ struct MemTracker {
   auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    std::unique_lock lck(memory_mtx);
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
 
     if (iter == allocationMap.end()) {
@@ -114,8 +113,9 @@ struct MemTracker {
       // and a deallocation occurs in a different one than it was allocated. Allow the user to ignore
       // these cases if they know the issue.
       MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
+  #else
+      return;      
   #endif    
-      return;
     }
 
     size_t bytes = iter->second.size;
@@ -194,14 +194,13 @@ struct MemTracker {
       break;
     case MATX_INVALID_MEMORY:
       MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
-      break;
     };
 
     if (*ptr == nullptr) {
       MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
     }
 
-    std::unique_lock lck(memory_mtx);
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     matxMemoryStats.currentBytesAllocated += bytes;
     matxMemoryStats.totalBytesAllocated += bytes;
     matxMemoryStats.maxBytesAllocated = std::max(
@@ -214,7 +213,7 @@ struct MemTracker {
       return false;
     }
 
-    std::unique_lock lck(memory_mtx);
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
 
     return iter != allocationMap.end();    
@@ -225,7 +224,7 @@ struct MemTracker {
       return MATX_INVALID_MEMORY;
     }
 
-    std::unique_lock lck(memory_mtx);
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
 
     if (iter != allocationMap.end()) {

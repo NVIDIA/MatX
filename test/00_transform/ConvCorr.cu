@@ -77,7 +77,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 1> av{{a_len0}};
@@ -109,7 +109,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 2> av{{a_len0,a_len1}};
@@ -141,7 +141,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 1> av{{a_len}};

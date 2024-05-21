@@ -132,7 +132,7 @@ __MATX_INLINE__ matxCache_t &InitCache() {
 
 __attribute__ ((visibility ("default")))
 __MATX_INLINE__ matxCache_t &GetCache() {
-  const auto &tracker = GetAllocMap();
+  [[maybe_unused]] const auto &tracker = GetAllocMap();
   return InitCache();
 }
 

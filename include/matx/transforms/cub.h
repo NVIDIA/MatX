@@ -1711,7 +1711,7 @@ template <typename SelectType, typename CountTensor, typename OutputTensor, type
 void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
@@ -1783,7 +1783,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
 void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] HostExecutor exec)
 {
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   if (a.Size(a.Rank() - 1) == 0) {
@@ -1834,7 +1834,7 @@ template <typename SelectType, typename CountTensor, typename OutputTensor, type
 void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
@@ -1904,7 +1904,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
 void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, [[maybe_unused]] HostExecutor exec)
 {
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   if (a.Size(a.Rank() - 1) == 0) {
@@ -1949,7 +1949,7 @@ template <typename CountTensor, typename OutputTensor, typename InputOperator>
 void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,  cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
@@ -2020,7 +2020,7 @@ template <typename CountTensor, typename OutputTensor, typename InputOperator>
 void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, [[maybe_unused]] HostExecutor exec)
 {
 #ifdef __CUDACC__
-  static_assert(num_found.Rank() == 0, "Num found output tensor rank must be 0");
+  static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   if (a.Size(a.Rank() - 1) == 0) {

@@ -1401,20 +1401,19 @@ public:
                  m < ((((vals.begin() + i)->begin() + j)->begin() + k)->begin() + l)
                          ->size();
                  m++) {
-              typename T::value_type real =
-                  (((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
-                    l)
-                       ->begin() +
-                   m)
-                      ->real();
-              typename T::value_type imag =
-                  (((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
-                    l)
-                       ->begin() +
-                   m + 1)
-                      ->real();
-              this->operator()(i, j, k, l) = {real, imag};
-              m++;
+                        typename T::value_type real =
+                            (((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
+                              l)
+                                ->begin() +
+                            m)
+                                ->real();
+                        typename T::value_type imag =
+                            (((((vals.begin() + i)->begin() + j)->begin() + k)->begin() +
+                              l)
+                                ->begin() +
+                            m + 1)
+                                ->real();
+                        this->operator()(i, j, k, l) = {real, imag};
             }
           }
         }

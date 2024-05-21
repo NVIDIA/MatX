@@ -4,7 +4,9 @@ Random Number Generation
 ########################
 
 MatX provides the capability to generate random numbers on the host and device using the ``random()`` operator. ``random()`` 
-uses cuRAND on the device to generate random numbers from device code. 
+uses cuRAND on the device to generate random numbers from device code.
+
+Currently `random` only works on 32 and 64-bit floating point types for both real and complex.
 
 .. note::
     randomGenerator_t has been deprecated after release 0.5.0. Please use the ``random()`` operator instead

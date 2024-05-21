@@ -110,10 +110,8 @@ constexpr bool CompatibleGemmTypes() {
               (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, float>);
     }
   }
-  else {
-    // For now return true for other providers until we support more
-    return true;
-  }
+
+  return true;
 }
 
 /**
@@ -860,7 +858,7 @@ private:
           auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
           auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
           auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
-          auto res = cublasLtMatmul(
+          [[maybe_unused]] auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
                   Adesc, (void *)bp, Bdesc, &sbeta,
                   (void *)cp, Cdesc, (void *)cp,

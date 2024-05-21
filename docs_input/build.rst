@@ -19,7 +19,7 @@ the CPM_ documentation or the documentation for each package for more informatio
 
 System Requirements
 -------------------
-MatX requires **CUDA 11.4** or higher, and **g++ 9.3** or higher for the host compiler. Clang may work as well, but it's currently 
+MatX requires **CUDA 11.5** or higher, and **g++ 9.3+** or **clang 17+** for the host compiler. Clang may work as well, but it's currently 
 untested. Other requirements for optional components are listed below.
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
@@ -31,7 +31,7 @@ Required Third-party Dependencies
 - `fmt <https://github.com/fmtlib/fmt>`_ (CPM dependency)
 - `nloghmann::json <https://github.com/nlohmann/json>`_ (CPM dependency)
 - `rapids-cmake <https://github.com/rapidsai/rapids-cmake>`_ (* Included in the project source and does not require a separate download)
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.2.0+
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.4.0+
 
 
 Optional Third-party Dependencies

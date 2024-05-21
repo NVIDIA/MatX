@@ -37,7 +37,7 @@ class simple_radar_pipeline:
         waveform = matx_common.randn_ndarray((waveform_length,), self.dtype)
         res['waveform'] = waveform.copy()
 
-        window = signal.hamming(waveform_length)
+        window = signal.windows.hamming(waveform_length)
         waveform_windowed = waveform * window
         res['waveform_windowed'] = waveform_windowed.copy()
 
@@ -73,7 +73,7 @@ class simple_radar_pipeline:
         num_pulses = x_conv2.shape[0]
 
         window = np.transpose(np.repeat(np.expand_dims(
-            signal.hamming(num_pulses), 0), num_compressed_range_bins, axis=0))
+            signal.windows.hamming(num_pulses), 0), num_compressed_range_bins, axis=0))
 
         X_window = np.fft.fft(np.multiply(x_conv2, window), NDfft, 0)
 

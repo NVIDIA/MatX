@@ -54,16 +54,16 @@ enum matx_nvxtLogLevels
 };
 
 
-const int32_t NVTX_BLACK  = 0x000000;
-const int32_t NVTX_RED    = 0xFF0000;
-const int32_t NVTX_GREEN  = 0x00FF00;
-const int32_t NVTX_BLUE   = 0x0000FF;
-const int32_t NVTX_ORANGE = 0xFFA500;
-const int32_t NVTX_PURPLE = 0x800080;
-const int32_t NVTX_YELLOW = 0xFFFF00;
-const int32_t NVTX_TEAL   = 0x008080;
-const int32_t NVTX_PINK   = 0xFFC0CB;
-const int32_t NVTX_WHITE  = 0xFFFFFF;
+const uint32_t NVTX_BLACK  = 0x000000;
+const uint32_t NVTX_RED    = 0xFF0000;
+const uint32_t NVTX_GREEN  = 0x00FF00;
+const uint32_t NVTX_BLUE   = 0x0000FF;
+const uint32_t NVTX_ORANGE = 0xFFA500;
+const uint32_t NVTX_PURPLE = 0x800080;
+const uint32_t NVTX_YELLOW = 0xFFFF00;
+const uint32_t NVTX_TEAL   = 0x008080;
+const uint32_t NVTX_PINK   = 0xFFC0CB;
+const uint32_t NVTX_WHITE  = 0xFFFFFF;
 
 static const int32_t nunNvtxColors = 10;
 static uint32_t numNvtxTrackedRanges = 0;
@@ -72,7 +72,7 @@ static uint32_t numNvtxTrackedRanges = 0;
  * @brief automatic NVTX Colors
  *
  */
-static const int32_t nvtxColors[nunNvtxColors] = {
+static const uint32_t nvtxColors[nunNvtxColors] = {
                                              NVTX_BLACK,
                                              NVTX_RED,
                                              NVTX_GREEN,
@@ -177,7 +177,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static int getNVTX_Range_ID( )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
     
   int newID = ++numNvtxTrackedRanges;
   auto foundIter = nvtx_eventMap.find( newID );
@@ -200,7 +200,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void setNVTXLogLevel( matx_nvxtLogLevels newNVTXLevel)
 {
-  std::unique_lock lck(nvtx_memory_mtx);  
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);  
   globalNvtxLevel = newNVTXLevel;
 }
 
@@ -212,7 +212,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void registerEvent( int registerId, nvtxRangeId_t eventId )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
 
   std::pair< int, nvtxRangeId_t > newPair( registerId, eventId );
   nvtx_eventMap.insert(newPair);
@@ -227,7 +227,7 @@ inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_AP
 ////////////////////////////////////////////////////////////////////////////////
 [[maybe_unused]] static void endEvent( int id )
 {
-  std::unique_lock lck(nvtx_memory_mtx);
+  [[maybe_unused]] std::unique_lock lck(nvtx_memory_mtx);
 
   auto foundIter = nvtx_eventMap.find( id );
 
@@ -269,8 +269,8 @@ class NvtxEvent
     {
       return;
     }
-  
-    int32_t curColor = nvtxColors[ curColorIdx % nunNvtxColors];
+    
+    uint32_t curColor = nvtxColors[ curColorIdx % nunNvtxColors];
     curColorIdx++;
 
     nvtxEventAttributes_t eventAttrib;
@@ -351,7 +351,7 @@ class NvtxEvent
 {
   int newID = matx::getNVTX_Range_ID();
   
-  matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( functionName, message, nvtxLevel, newID );
+  [[maybe_unused]] matx::NvtxEvent MATX_UNIQUE_NAME(nvtxFlag_)( functionName, message, nvtxLevel, newID );
   
   return newID;
   

@@ -642,14 +642,6 @@ class tensor_impl_t {
       else {
         return 0;
       }
-
-      // nvcc bug workaround
-      if constexpr (!(I < sizeof...(Is))) {
-        return 0;
-      }
-      else {
-        return GetVal<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
-      }
     }
 
     template <int I = 0, typename ...Is>
@@ -659,14 +651,7 @@ class tensor_impl_t {
       }
       else {
         return 0;
-      }    
-
-      if constexpr (!(I < sizeof...(Is))) {
-        return 0;
-      }
-      else {
-        return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
-      }            
+      }             
     }    
 
     /**

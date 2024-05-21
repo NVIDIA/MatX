@@ -1378,12 +1378,12 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
     }
   }
   dim3 blocks, threads;
-  std::array<index_t, in.Rank()> sizes;
+  std::array<index_t, InType::Rank()> sizes;
   for (int i = 0; i < in.Rank(); i++) {
     sizes[i] = in.Size(i);
   }
 
-  detail::get_grid_dims<in.Rank()>(blocks, threads, sizes);
+  detail::get_grid_dims<InType::Rank()>(blocks, threads, sizes);
 
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
@@ -1630,7 +1630,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
 
   // Create the shape of the summed tensor based on the permutation params
-  std::array<index_t, in.Rank() - (int)dims.size()> red_shape{};
+  std::array<index_t, InType::Rank() - (int)dims.size()> red_shape{};
   #pragma unroll
   for (int r = 0; r < in.Rank() - (int)dims.size(); r++) {
     red_shape[r] = in.Size(perm[r]);

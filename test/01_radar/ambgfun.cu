@@ -50,7 +50,7 @@ protected:
     pb->NumpyToTensorView(xv, "x");
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
 
   index_t sig_size = 16;
   tensor_t<complex, 1> xv{{sig_size}};
