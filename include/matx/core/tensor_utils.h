@@ -186,13 +186,6 @@ namespace detail {
     else {
       return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
-
-    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
-            return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
-    }
-    else {
-      return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
-    }
   }
 
   template <class Func, class Tuple>
@@ -208,17 +201,6 @@ namespace detail {
           std::forward<Func>(f), std::forward<Tuple>(t),
           std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
-
-    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-    else {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
   }
 
   template <class Func, class Tuple>
@@ -233,17 +215,6 @@ namespace detail {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
           make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-
-    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-    else {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
   }
 
@@ -332,20 +303,6 @@ namespace detail {
         return i(args...);
       }, sliced_tup);
     }
-
-    if constexpr (!(T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank)) {
-      // Construct an integer sequence of the length of the tuple, but only using the last indices
-      using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
-      auto tup = cuda::std::make_tuple(indices...);
-      auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
-      return mapply([&](auto... args) {
-        return i(args...);
-      }, sliced_tup);
-    }
-    else
-    {
-      return i(indices...);
-    }
   }
 
 
@@ -359,15 +316,6 @@ namespace detail {
     else
     {
       return i;
-    }
-
-    if constexpr (!is_matx_op<T>())
-    {
-      return i;
-    }
-    else
-    {
-      return get_matx_value(i, indices...);
     }
   }
 

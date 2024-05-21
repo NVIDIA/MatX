@@ -1466,7 +1466,7 @@ public:
     int d = 0;
     bool def_stride = (strides[0] == -1);
 
-    int end_count = 0;
+    [[maybe_unused]] int end_count = 0;
     for (int i = 0; i < RANK; i++) {
       if (ends[i] == matxDropDim) {
         end_count++;

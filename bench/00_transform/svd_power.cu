@@ -102,7 +102,7 @@ void svdbpi_batch(nvbench::state &state,
 
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
-   [&U, &S, &VT, &A, &iterations, &r](nvbench::launch &launch) {
+   [&U, &S, &VT, &A, &iterations](nvbench::launch &launch) {
       (mtie(U, S, VT) = svdbpi(A, iterations)).run(cudaExecutor{launch.get_stream()}); });
   MATX_NVTX_END_RANGE( 1 )
 }
