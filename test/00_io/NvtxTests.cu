@@ -164,9 +164,14 @@ TEST_F(NvtxIOTests, testNvtxMacros)
   MATX_NVTX_END_RANGE(range3Id)
   MATX_NVTX_END_RANGE(range4Id)
   MATX_NVTX_END_RANGE(117)
-  
+
+#ifdef MATX_NVTX_FLAGS  
   ASSERT_NE(range3Id, 0);
   ASSERT_NE(range4Id, 0);
+#else
+  ASSERT_EQ(range3Id, 0);
+  ASSERT_EQ(range4Id, 0);  
+#endif  
   
   MATX_EXIT_HANDLER();
 }
