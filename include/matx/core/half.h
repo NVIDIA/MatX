@@ -102,16 +102,6 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   }
 
   /**
-   * @brief Double casting operator
-   * 
-   * @return double of value
-   */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator double() const
-  {
-    return static_cast<double>(x);
-  }
-
-  /**
    * @brief Default copy assignment operator
    * 
    * @param rhs Value to copy
