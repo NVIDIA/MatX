@@ -4111,7 +4111,7 @@ TEST(OperatorTests, Cast)
   ASSERT_EQ(c64().imag(), 0.0);
 
   (c32 = as_complex_float(s64)).run();
-  (c64 = as_complex_float(s64)).run();
+  (c64 = as_complex_double(s64)).run();
   cudaStreamSynchronize(0);
 
   ASSERT_EQ(c32().real(), 5.0f);
