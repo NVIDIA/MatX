@@ -8,7 +8,7 @@ features include:
 * Near-native performance for GPU kernels while using a syntax similar to Python or MATLAB
 * Easy frontend API to many popular CUDA libraries
 * Header-only without need for compilation
-* Single data type used across entire API
+* Single tensor type used across entire API
 * Intuitive error messages
 
 To start building tests, examples, and benchmarks, visit the :ref:`building` guide. This page also lists the 
