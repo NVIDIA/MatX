@@ -4094,6 +4094,31 @@ TEST(OperatorTests, Cast)
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
   }  
 
+  auto c32 = make_tensor<cuda::std::complex<float>>({});
+  auto c64 = make_tensor<cuda::std::complex<double>>({});
+  auto s32 = make_tensor<float>({});
+  auto s64 = make_tensor<double>({});
+  s32.SetVals({3.0f});
+  s64.SetVals({5.0});
+
+  (c32 = as_complex_float(s32)).run();
+  (c64 = as_complex_double(s32)).run();
+  cudaStreamSynchronize(0);
+
+  ASSERT_EQ(c32().real(), 3.0f);
+  ASSERT_EQ(c32().imag(), 0.0f);
+  ASSERT_EQ(c64().real(), 3.0);
+  ASSERT_EQ(c64().imag(), 0.0);
+
+  (c32 = as_complex_float(s64)).run();
+  (c64 = as_complex_double(s64)).run();
+  cudaStreamSynchronize(0);
+
+  ASSERT_EQ(c32().real(), 5.0f);
+  ASSERT_EQ(c32().imag(), 0.0f);
+  ASSERT_EQ(c64().real(), 5.0);
+  ASSERT_EQ(c64().imag(), 0.0);
+
   MATX_EXIT_HANDLER();
 }
 
