@@ -42,6 +42,8 @@ namespace matx
   template<typename T> __MATX_INLINE__ std::string as_type_str() { return "as_type"; }
   template<> __MATX_INLINE__ std::string as_type_str<float>() { return "as_float"; }
   template<> __MATX_INLINE__ std::string as_type_str<double>() { return "as_double"; }
+  template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<double>>() { return "cuda::std::complex<double>"; }
+  template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<float>>() { return "cuda::std::complex<float>"; }
   template<> __MATX_INLINE__ std::string as_type_str<int32_t>() { return "as_int32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<uint32_t>() { return "as_uint32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<int16_t>() { return "as_int16_t"; }
@@ -156,6 +158,19 @@ namespace matx
     };   
 
   /**
+   * @brief Helper function to cast an input operator to a cuda::std::complex<float>
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to cuda::std::complex<float>
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_complex_float(T t)
+    {
+      return as_type<cuda::std::complex<float>>(t);
+    };
+
+  /**
    * @brief Helper function to cast an input operator to an double
    * 
    * @tparam T Input type
@@ -167,6 +182,19 @@ namespace matx
     {
       return as_type<double>(t);
     };   
+
+  /**
+   * @brief Helper function to cast an input operator to a cuda::std::complex<double>
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to cuda::std::complex<double>
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_complex_double(T t)
+    {
+      return as_type<cuda::std::complex<double>>(t);
+    };
 
   /**
    * @brief Helper function to cast an input operator to an uint32_t
