@@ -224,10 +224,14 @@ __global__ void matxOpTDKernel(Op op, const std::array<index_t, Op::Rank()> size
     indices[Op::Rank()-1] = x_abs / mult;
 
     if constexpr (std::is_pointer_v<Op>) {
-      (*op)(indices); 
+      mapply([&](auto... args){
+        (*op)(args...);
+      }, indices);
     }
     else {
-      op(indices);
+      mapply([&](auto... args){
+        op(args...);
+      }, indices);
     }      
   }
 }
