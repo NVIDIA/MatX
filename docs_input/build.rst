@@ -124,7 +124,7 @@ documentation:
 
 **Breate**: 4.31.0
 
-**Doxygen**: 1.9.1
+**Doxygen**: 1.11.0
 
 **Sphinx**: 4.3.1
 
