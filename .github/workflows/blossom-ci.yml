@@ -17,6 +17,10 @@ name: Blossom-CI
 on:
   issue_comment:
     types: [created]
+  pull_request:
+    types: [closed]
+    branches:
+      - main    
   workflow_dispatch:
       inputs:
           platform:
