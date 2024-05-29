@@ -17,9 +17,6 @@ name: Blossom-CI
 on:
   issue_comment:
     types: [created]
-  push:
-    branches:
-      - main
   workflow_dispatch:
       inputs:
           platform:
@@ -37,9 +34,8 @@ jobs:
       
     # This job only runs for pull request comments
     if: |
-         (contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor)) && 
-         github.event.comment.body == '/blossom-ci' ||
-         (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.ref == 'refs/heads/main')) || github.event_name == 'push'
+         contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor)) && 
+         github.event.comment.body == '/blossom-ci'
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
