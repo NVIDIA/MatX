@@ -98,11 +98,7 @@ namespace matx
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
 
             if constexpr (Op::Rank() == 1) {
-              if(stride) {
-                detail::matxOpT1StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else {
-                detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              }
+              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {
