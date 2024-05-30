@@ -186,6 +186,8 @@ class channelize_poly_operators:
             'filter_random': matx_common.randn_ndarray((filter_len,), dtype=dtype),
             'num_channels': num_channels,
         }
+        # In some cases we test with real filters and complex inputs
+        self.res['filter_random_real'] = np.real(self.res['filter_random'])
 
         channelize_poly_operators.np_random_state = np.random.get_state()
 
@@ -203,6 +205,7 @@ class channelize_poly_operators:
         x_pad_len = x_len_per_channel * num_channels
         num_batches = x.size // x.shape[-1]
         out = np.zeros((num_batches, num_channels, x_len_per_channel), dtype=np.complex128)
+        out_hreal = np.zeros((num_batches, num_channels, x_len_per_channel), dtype=np.complex128)
         xr = np.reshape(x, (num_batches, x.shape[-1]))
         for batch_ind in range(num_batches):
             xpad = xr[batch_ind, :]
@@ -224,7 +227,9 @@ class channelize_poly_operators:
                 buf[:, 0] = xf[:, i]
                 for j in range(num_channels):
                     out[batch_ind, j, i] = scale * np.dot(np.squeeze(buf[j,:]), np.squeeze(h[j,:]))
+                    out_hreal[batch_ind, j, i] = scale * np.dot(np.squeeze(buf[j,:]), np.squeeze(np.real(h[j,:])))
             out[batch_ind,:,:] = ifft(out[batch_ind,:,:], axis=0)
+            out_hreal[batch_ind,:,:] = ifft(out_hreal[batch_ind,:,:], axis=0)
         if num_batches > 1:
             s = list(x.shape)
             s[-1] = num_channels
@@ -233,9 +238,12 @@ class channelize_poly_operators:
             perm[-2] = len(x.shape)
             perm[-1] = len(x.shape)-1
             out = np.transpose(np.reshape(out, s), axes=perm)
+            out_hreal = np.transpose(np.reshape(out_hreal, s), axes=perm)
         else:
             out = np.transpose(np.reshape(out, out.shape[1:]), axes=[1,0])
+            out_hreal = np.transpose(np.reshape(out_hreal, out_hreal.shape[1:]), axes=[1,0])
         self.res['b_random'] = out
+        self.res['b_random_hreal'] = out_hreal
         return self.res
 
 class fft_operators:

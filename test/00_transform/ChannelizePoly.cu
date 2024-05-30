@@ -63,7 +63,7 @@ protected:
   void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
-  double thresh;;
+  double thresh;
 };
 
 template <typename TensorType>
@@ -182,6 +182,78 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     cudaStreamSynchronize(stream);
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Mixed type tests verify that mixing float and double for the input and filter behaves
+// as expected (e.g., that the output is the complex version of the higher precision).
+TYPED_TEST(ChannelizePolyTestDoubleType, MixedPrecision)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaStream_t stream = 0;
+
+  const index_t a_len = 2500;
+  const index_t f_len = 170;
+  const index_t num_channels = 10;
+  const index_t decimation_factor = num_channels;
+  const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
+  const double mixed_thresh = 1e-5;
+
+  this->pb->template InitAndRunTVGenerator<double>(
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+  auto a64 = make_tensor<double>({a_len});
+  auto f64 = make_tensor<double>({f_len});
+  this->pb->NumpyToTensorView(a64, "a");
+  this->pb->NumpyToTensorView(f64, "filter_random");
+
+  // Double precision input, single precision filter
+  {
+    auto f32 = make_tensor<float>({f_len});
+    (f32 = as_float(f64)).run(this->exec);
+    auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+    (b = channelize_poly(a64, f32, num_channels, decimation_factor)).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", mixed_thresh);
+  }
+
+  // Single precision input, double precision filter
+  {
+    auto a32 = make_tensor<float>({a_len});
+    (a32 = as_float(a64)).run(this->exec);
+    auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+    (b = channelize_poly(a32, f64, num_channels, decimation_factor)).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", mixed_thresh);
+  }
+
+  this->pb->template InitAndRunTVGenerator<cuda::std::complex<double>>(
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+  auto ac64 = make_tensor<cuda::std::complex<double>>({a_len});
+  this->pb->NumpyToTensorView(ac64, "a");
+  this->pb->NumpyToTensorView(f64, "filter_random_real");
+
+  // Double precision complex input, single precision filter
+  {
+    auto f32 = make_tensor<float>({f_len});
+    (f32 = as_float(f64)).run(this->exec);
+    auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+    (b = channelize_poly(ac64, f32, num_channels, decimation_factor)).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random_hreal", mixed_thresh);
+  }
+
+  // Single precision complex input, double precision filter
+  {
+    auto ac32 = make_tensor<cuda::std::complex<float>>({a_len});
+    (ac32 = as_complex_float(ac64)).run(this->exec);
+
+    auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+    (b = channelize_poly(ac32, f64, num_channels, decimation_factor)).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random_hreal", mixed_thresh);
   }
 
   MATX_EXIT_HANDLER();

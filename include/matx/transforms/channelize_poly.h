@@ -233,6 +233,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
                    index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using input_t = typename InType::scalar_type;
+  using filter_t = typename FilterType::scalar_type;
   using output_t = typename OutType::scalar_type;
 
   constexpr int IN_RANK = InType::Rank();
@@ -266,7 +267,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   MATX_ASSERT_STR(out.Size(OUT_RANK-2) == num_elem_per_channel, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-2 mismatch");
 
-  if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t>) {
+  // If neither the input nor the filter is complex, then the filtered samples will be real-valued
+  // and we will use an R2C transform. Otherwise, we will use a C2C transform.
+  if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t> && ! is_complex_v<filter_t> && ! is_complex_half_v<filter_t>) {
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan(out, in, f, stream);
     } else {
@@ -289,11 +292,12 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       // slice to create a tensor view of only [0, num_channels-1]. This guarantees that we
       // always stride by an even number of elements from one batch to the next while exposing
       // a tensor view of appropriate dimensions.
+      using post_filter_t = typename inner_op_type_t<output_t>::type;
       auto fft_in_slice = [&out, &start_dims, &stop_dims, num_channels, stream]() -> auto {
         auto fft_in_shape = out.Shape();
         if (out.IsContiguous()) {
           fft_in_shape[OUT_RANK-1] *= 2;
-          auto fft_in = make_tensor<input_t>(reinterpret_cast<input_t*>(out.Data()), fft_in_shape);
+          auto fft_in = make_tensor<post_filter_t>(reinterpret_cast<post_filter_t*>(out.Data()), fft_in_shape);
           stop_dims[OUT_RANK-1] = num_channels;
           return slice<OUT_RANK>(fft_in, start_dims, stop_dims);
         } else {
@@ -301,7 +305,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
             fft_in_shape[OUT_RANK-1]++;
             stop_dims[OUT_RANK-1] = num_channels;
           }
-          auto tmp = make_tensor<input_t>(fft_in_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+          auto tmp = make_tensor<post_filter_t>(fft_in_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
           return slice<OUT_RANK>(tmp, start_dims, stop_dims);
         }
       }();
