@@ -43,7 +43,13 @@ namespace detail {
   class ChannelizePolyOp : public BaseOp<ChannelizePolyOp<OpA, FilterType>>
   {
     private:
-      using out_t = complex_from_scalar_t<typename OpA::scalar_type>;
+      // Channelizer outputs are complex-valued due to the IFFT that is applied
+      // to the filtered per-channel values. The output type is the higher of
+      // the precisions of the input and filter. For example, if the input has
+      // type cuda::std::complex<float> and the filter has type double, out_t
+      // will be cuda::std::complex<double>.
+      using out_t = cuda::std::common_type_t<
+        complex_from_scalar_t<typename OpA::scalar_type>, complex_from_scalar_t<typename FilterType::scalar_type>>;
       OpA a_;
       FilterType f_;
       index_t num_channels_;
