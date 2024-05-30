@@ -455,6 +455,60 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = std::tuple_element_t<0, TypeParam>;
+
+  {
+    auto ta = make_tensor<TestType>({70000 * 1024, 1});
+    auto tb = make_tensor<TestType>({70000 * 1024, 1});
+    auto tc = make_tensor<TestType>({70000 * 1024, 1});
+
+    (ta = 1, tb = 2).run();
+    (tc = ta + tb).run();
+
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < tc.Size(0); i++) {
+      ASSERT_EQ(tc(i, 0), 3);
+    }    
+  }
+
+  {
+    auto ta = make_tensor<TestType>({70000 * 1024, 1, 1});
+    auto tb = make_tensor<TestType>({70000 * 1024, 1, 1});
+    auto tc = make_tensor<TestType>({70000 * 1024, 1, 1});
+
+    (ta = 1, tb = 2).run();
+    (tc = ta + tb).run();
+
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < tc.Size(0); i++) {
+      ASSERT_EQ(tc(i, 0, 0), 3);
+    }    
+  }
+
+  {
+    auto ta = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
+    auto tb = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
+    auto tc = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
+
+    (ta = 1, tb = 2).run();
+    (tc = ta + tb).run();
+
+    cudaStreamSynchronize(0);
+
+    for (index_t i = 0; i < tc.Size(0); i++) {
+      ASSERT_EQ(tc(i, 0, 0, 0), 3);
+    }    
+  }  
+
+  MATX_EXIT_HANDLER();
+}
+
 
 TYPED_TEST(BasicTensorTestsAll, Print)
 {
