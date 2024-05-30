@@ -3,7 +3,7 @@
 [![GitHub Releases](https://img.shields.io/github/v/release/NVIDIA/MatX)](https://github.com/NVIDIA/MatX/releases/)
 [![GitHub License](https://img.shields.io/badge/license-BSD-green)](https://github.com/NVIDIA/MatX/blob/main/LICENSE)
 [![GitHub Documentation](https://img.shields.io/badge/wiki-documentation-forestgreen)](https://nvidia.github.io/MatX)
-[![Coverage Status](https://coveralls.io/repos/github/NVIDIA/MatX/badge.svg?branch=nvcpp_fix)](https://coveralls.io/github/NVIDIA/MatX?branch=nvcpp_fix)
+[![Coverage Status](https://coveralls.io/repos/github/NVIDIA/MatX/badge.svg?branch=nvcpp_fix)](https://coveralls.io/github/NVIDIA/MatX?branch=main)
 
 **MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs. Near-native performance can be achieved while using a simple syntax common in higher-level languages such as Python or MATLAB.
 
