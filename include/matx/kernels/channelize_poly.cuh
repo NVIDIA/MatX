@@ -80,7 +80,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 
     constexpr index_t ELEMS_PER_BLOCK = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
     const index_t first_out_elem = elem_block * CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
-    const index_t last_out_elem = std::min(
+    const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
     if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
@@ -103,7 +103,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 
     if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            const index_t first_ind = std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
+            const index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
             output_t accum {};
             const filter_t *h = smem_filter;
             // index_t in MatX should be signed (32 or 64 bit), so j-- below will not underflow
@@ -134,7 +134,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         }
     } else {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            index_t first_ind = std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
+            index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
             // If we use the last filter tap for this phase (which is the first index because
             // the filter is flipped), then it may be a padded zero. If so, increment first_ind
             // by 1 to avoid using the zero. This prevents a bounds-check in the inner loop.
@@ -227,7 +227,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     const uint32_t smem_input_height = filter_phase_len + by - 1;
 
     const index_t start_elem = blockIdx.x * elems_per_channel_per_cta;
-    const index_t last_elem = std::min(output_len_per_channel-1, (blockIdx.x+1) * elems_per_channel_per_cta - 1);
+    const index_t last_elem = cuda::std::min(output_len_per_channel-1, (blockIdx.x+1) * elems_per_channel_per_cta - 1);
     auto indims = BlockToIdx(input, blockIdx.z, 1);
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = chan;
@@ -256,7 +256,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         __syncthreads();
 
         // Load next elems_per_channel_per_cta elements for each channel
-        const index_t next_last_elem = std::min(next_start_elem + by - 1, last_elem);
+        const index_t next_last_elem = cuda::std::min(next_start_elem + by - 1, last_elem);
         const uint32_t out_samples_this_iter = static_cast<uint32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;
@@ -286,7 +286,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         if (outdims[OutElemRank] <= last_elem) {
             const filter_t *h = h_start;
             output_t accum { 0 };
-            const int first_end = std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
+            const int first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
             // The footprint of samples involved in the convolution may wrap from the end
             // to the beginning of smem_input. The prologue below handles the samples from
             // the current tail to the end of smem_input and the epilogue starts back at the
@@ -342,7 +342,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
 
     constexpr index_t ELEMS_PER_BLOCK = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
     const index_t first_out_elem = elem_block * CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
-    const index_t last_out_elem = std::min(
+    const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
     // Pre-compute the DFT complex exponentials and store in shared memory
@@ -371,7 +371,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
         for (int i = 0; i < NUM_CHAN; i++) {
             accum[i] = static_cast<output_t>(0);
         }
-        index_t first_ind = std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
+        index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
         indims[InRank-1] = t * NUM_CHAN + NUM_CHAN - 1;
         index_t j_start = t;
         index_t h_ind { 0 };

@@ -2117,12 +2117,12 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::max_element(lin, lin + TotalSize(in)) - lin;
+      *lout = cuda::std::max_element(lin, lin + TotalSize(in)) - lin;
     }
     else {
       auto els = lend[0] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
+        lout[b] = cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
     }
   };
@@ -2264,12 +2264,12 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::min_element(lin, lin + TotalSize(in)) - lin;
+      *lout = cuda::std::min_element(lin, lin + TotalSize(in)) - lin;
     }
     else {
       auto els = lend[1] - lbegin[0];
       for (index_t b = 0; b < els; b++) {
-        lout[b] = std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
+        lout[b] = cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
     }
   };

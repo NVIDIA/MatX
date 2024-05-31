@@ -88,7 +88,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
 
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
-  auto d = std::min(n,m); // dim for AAT or ATA
+  auto d = cuda::std::min(n,m); // dim for AAT or ATA
   
   // if sentinal found get all singularvalues
   if( k == -1 ) k = (int) d;
@@ -309,7 +309,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
 
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
-  auto d = std::min(n,m); // dim for AAT or ATA
+  auto d = cuda::std::min(n,m); // dim for AAT or ATA
 
   auto ATShape = A.Shape();
   ATShape[RANK-2] = d;
@@ -383,7 +383,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
-  auto d = std::min(n,m); // dim for AAT or ATA
+  auto d = cuda::std::min(n,m); // dim for AAT or ATA
 
   // assert batch sizes are the same
   for(int i = 0 ; i < RANK-2; i++) {

@@ -23,7 +23,7 @@
 
 #define COMPLEX_TYPE cuComplex
 
-// std::max/min isn't working on template value parameters
+// cuda::std::max/min isn't working on template value parameters
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 

@@ -49,7 +49,7 @@ namespace matx
         float alpha_;
         float beta_;
         PermDims perm_; 
-        static constexpr int out_rank = std::max(OpA::Rank(), OpB::Rank());
+        static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, out_rank> tmp_out_;
 

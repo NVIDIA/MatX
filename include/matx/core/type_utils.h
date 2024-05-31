@@ -801,9 +801,20 @@ struct complex_type_of
 };
 
 template <class C>
+struct cuda_complex_type_of
+    : identity<cuda::std::complex<std::conditional_t<is_complex_half_v<C>, float,
+                                               typename C::value_type>>> {
+};
+
+template <class C>
 using matx_convert_complex_type =
     typename std::conditional_t<!is_complex_v<C>, identity<C>,
                                 complex_type_of<C>>::type;
+
+template <class C>
+using matx_convert_cuda_complex_type =
+    typename std::conditional_t<!is_complex_v<C>, identity<C>,
+                                cuda_complex_type_of<C>>::type;                                
 
 
 template <class T, class = void> struct value_type {

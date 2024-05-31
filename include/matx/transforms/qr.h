@@ -84,7 +84,7 @@ namespace detail {
 
       index_t m = A.Size(RANK-2);
       index_t n = A.Size(RANK-1);
-      index_t k = std::min(m,n);
+      index_t k = cuda::std::min(m,n);
       if(m<=n) k--;  // these matrices have one less update since the diagonal ends on the bottom of the matrix
 
       auto Qin = cuda::std::get<0>(workspace);

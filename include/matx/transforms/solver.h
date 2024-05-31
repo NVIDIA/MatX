@@ -1288,7 +1288,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
     s[i] = a_new.Size(i);
   }
 
-  s[RANK - 2] = std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
+  s[RANK - 2] = cuda::std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
 
   auto piv = make_tensor<int64_t>(s, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);

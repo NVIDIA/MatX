@@ -46,7 +46,7 @@ namespace matx
       private:
         using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
               typename OpA::scalar_type, typename OpB::scalar_type>;
-        constexpr static int max_rank = std::max(OpA::Rank(), OpB::Rank());
+        constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         OpA a_;
         OpB b_;
         matxConvCorrMode_t mode_;
@@ -73,8 +73,8 @@ namespace matx
             for (int r = 0; r < Rank(); r++) {
               const int axis = perm[r];
               if (axis == Rank() - 1) {
-                const auto max_axis = std::max(a_.Size(r), b_.Size(r));
-                const auto min_axis = std::min(a_.Size(r), b_.Size(r));
+                const auto max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
+                const auto min_axis = cuda::std::min(a_.Size(r), b_.Size(r));
               
                 if (mode_ == MATX_C_MODE_FULL) {
                   out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
@@ -103,8 +103,8 @@ namespace matx
               }
             }
 
-            const auto max_axis = std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
-            const auto min_axis = std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            const auto max_axis = cuda::std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            const auto min_axis = cuda::std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
             if (mode_ == MATX_C_MODE_FULL) {
               out_dims_[max_rank-1] = max_axis + min_axis - 1;
             }

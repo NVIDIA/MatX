@@ -84,7 +84,7 @@ namespace matx
             return op_.Size(dim);
           }
           else {
-            return std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+            return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
           }
         }
 

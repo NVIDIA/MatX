@@ -48,7 +48,7 @@ namespace matx
         OpB b_;
         float alpha_;
         float beta_;
-        static constexpr int RANK = std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
+        static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
         cuda::std::array<index_t, RANK> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, RANK> tmp_out_;
 

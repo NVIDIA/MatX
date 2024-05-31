@@ -99,7 +99,7 @@ namespace matx
 
     for (int i = 1; i < op.Rank(); i++)
     {
-      maxSize = std::max(op.Size(i), maxSize);
+      maxSize = cuda::std::max(op.Size(i), maxSize);
     }
 
     return maxSize;

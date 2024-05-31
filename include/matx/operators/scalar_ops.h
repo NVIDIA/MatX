@@ -33,6 +33,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cuda/std/cmath>
 
 namespace matx {
 namespace detail {
@@ -207,7 +208,7 @@ MATX_UNARY_OP_GEN(norm, Norm);
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sin(T v1)
 {
   if constexpr (is_matx_type_v<T>) {
-    return sin(v1);
+    return matx::sin(v1);
   }
   else {
     return cuda::std::sin(v1);
@@ -222,7 +223,7 @@ template <typename T> using SinOp = UnOp<T, SinF<T>>;
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_cos(T v1)
 {
   if constexpr (is_matx_type_v<T>) {
-    return cos(v1);
+    return matx::cos(v1);
   }
   else {
     return cuda::std::cos(v1);
@@ -555,7 +556,7 @@ template <typename T1, typename T2> struct MaximumF {
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
-    return std::max(v1, v2);
+    return cuda::std::max(v1, v2);
   }
 };
 template <typename T1, typename T2> using MaximumOp = BinOp<T1, T2, MaximumF<T1, T2>>;
@@ -565,7 +566,7 @@ template <typename T1, typename T2> struct MinimumF {
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
-    return std::min(v1, v2);
+    return cuda::std::min(v1, v2);
   }
 };
 template <typename T1, typename T2> using MinimumOp = BinOp<T1, T2, MinimumF<T1, T2>>;

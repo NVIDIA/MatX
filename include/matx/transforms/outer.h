@@ -87,7 +87,7 @@ __MATX_INLINE__ void outer_impl(TensorTypeC C, const TensorTypeA A,
   ac.fill(matxKeepDim);
   bc.fill(matxKeepDim);
 
-  for (int r = 0; r < std::min(A.Rank(), B.Rank()) - 1; r++) {
+  for (int r = 0; r < cuda::std::min(A.Rank(), B.Rank()) - 1; r++) {
     MATX_ASSERT_STR(A.Size(r) == B.Size(r), matxInvalidSize, "A and B tensors must match batch sizes");
   }
 

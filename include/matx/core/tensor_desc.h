@@ -373,7 +373,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Size of dimension
    */
-  static constexpr auto Size(int dim) { return shape_[dim]; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) { return shape_[dim]; }
 
   /**
    * @brief Get stride of dimension
@@ -381,7 +381,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Stride of dimension
    */  
-  static constexpr auto Stride(int dim) { return stride_[dim]; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(int dim) { return stride_[dim]; }
 
   /**
    * @brief Return strides contaienr of descriptor
