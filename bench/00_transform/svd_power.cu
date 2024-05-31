@@ -17,6 +17,7 @@ void svdpi_batch(nvbench::state &state,
 
   cudaStream_t stream = 0;
   state.set_cuda_stream(nvbench::make_cuda_stream_view(stream));
+  cudaExecutor exec{stream};
 
   int batch = state.get_int64("batch");
   int m = state.get_int64("rows");
@@ -30,22 +31,17 @@ void svdpi_batch(nvbench::state &state,
 
   int iterations = 10;
 
-  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
-  
-  A.PrefetchDevice(stream);
-  U.PrefetchDevice(stream);
-  S.PrefetchDevice(stream);
-  VT.PrefetchDevice(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
-  (U = 0).run(stream);
-  (S = 0).run(stream);
-  (VT = 0).run(stream);
+  (U = 0).run(exec);
+  (S = 0).run(exec);
+  (VT = 0).run(exec);
   auto x0 = random<float>({batch, r}, NORMAL);
 
   // warm up
   nvtxRangePushA("Warmup");
-  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(stream);
-  cudaDeviceSynchronize();
+  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(exec);
+  exec.sync();
   nvtxRangePop();
 
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
@@ -70,6 +66,7 @@ void svdbpi_batch(nvbench::state &state,
 
   cudaStream_t stream = 0;
   state.set_cuda_stream(nvbench::make_cuda_stream_view(stream));
+  cudaExecutor exec{stream};
 
   int batch = state.get_int64("batch");
   int m = state.get_int64("rows");
@@ -83,21 +80,16 @@ void svdbpi_batch(nvbench::state &state,
 
   int iterations = 10;
   
-  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
-  
-  A.PrefetchDevice(stream);
-  U.PrefetchDevice(stream);
-  S.PrefetchDevice(stream);
-  VT.PrefetchDevice(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
-  (U = 0).run(stream);
-  (S = 0).run(stream);
-  (VT = 0).run(stream);
+  (U = 0).run(exec);
+  (S = 0).run(exec);
+  (VT = 0).run(exec);
 
   // warm up
   nvtxRangePushA("Warmup");
-  (mtie(U, S, VT) = svdbpi(A, iterations)).run(stream);
-  cudaDeviceSynchronize();
+  (mtie(U, S, VT) = svdbpi(A, iterations)).run(exec);
+  exec.sync();
   nvtxRangePop();
 
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )

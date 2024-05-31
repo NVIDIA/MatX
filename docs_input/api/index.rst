@@ -17,6 +17,7 @@ API Reference
    casting/index.rst
    window/index.rst
    signalimage/index.rst
+   synchronization/index.rst
    polynomials/index.rst
    random/random.rst
    dft/index.rst

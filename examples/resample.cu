@@ -53,6 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  cudaExecutor exec{stream};
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -63,31 +64,31 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<complex, 1> sigViewComplex({num_samp / 2 + 1});
   tensor_t<float, 1> resampView({num_samp_resamp});
 
-  (sigView = random<float>({num_samp}, NORMAL)).run(stream);
+  (sigView = random<float>({num_samp}, NORMAL)).run(exec);
 
-  (sigViewComplex = fft(sigView)).run(stream);
+  (sigViewComplex = fft(sigView)).run(exec);
 
   // Slice
   auto sliceView = sigViewComplex.Slice({0}, {nyq});
 
   // Inverse Transform - FFT size based on output
-  (resampView = ifft(sliceView)).run(stream);
+  (resampView = ifft(sliceView)).run(exec);
 
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     // Launch 1D FFT
-    (sigViewComplex = fft(sigView)).run(stream);
+    (sigViewComplex = fft(sigView)).run(exec);
 
     // Slice
     auto sv = sigViewComplex.Slice({0}, {nyq});
 
     // Inverse Transform - FFT size based on output
-    (resampView = ifft(sv)).run(stream);
+    (resampView = ifft(sv)).run(exec);
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Resample Kernel Time = %.2fms per iteration\n",

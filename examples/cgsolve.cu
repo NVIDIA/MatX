@@ -54,6 +54,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto norm = make_tensor<TypeParam, 1>({BATCH});
   auto maxn = make_tensor<TypeParam>({});
 
+  cudaExecutor exec{};
 
   // Simple Poisson matrix
   for(int b = 0; b < BATCH; b++) {
@@ -72,19 +73,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       }
     }
   }
-  A.PrefetchDevice(0);
-  B.PrefetchDevice(0);
-  X.PrefetchDevice(0);
 
-  (X = TypeParam(1)).run();
+  (X = TypeParam(1)).run(exec);
 
-  (X = cgsolve(A, B, .0001, max_iters)).run();
+  (X = cgsolve(A, B, .0001, max_iters)).run(exec);
+  // example-begin sync-test-1
+  (Bout = matvec(A, X)).run(exec);
+  (norm = sum((Bout-B)*(Bout-B))).run(exec);
+  (maxn = matx::max(sqrt(norm))).run(exec);
 
-  (Bout = matvec(A, X)).run();
-  (norm = sum((Bout-B)*(Bout-B))).run();
-  (maxn = matx::max(sqrt(norm))).run();
-
-  cudaDeviceSynchronize();
+  exec.sync();
+  // example-end sync-test-1
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));
 
   CUDA_CHECK_LAST_ERROR();

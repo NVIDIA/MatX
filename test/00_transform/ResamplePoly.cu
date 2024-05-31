@@ -128,7 +128,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     (b = resample_poly(a, f, up, down)).run(this->exec);
     // example-end resample_poly-test-1
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
 
@@ -136,7 +136,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     // so we can inverse-scale the output to compare against the golden outputs.
     (b = resample_poly(static_cast<TestType>(4.0) * a, f, up, down)).run(this->exec);
     (b = b * static_cast<TestType>(0.25)).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }
@@ -190,7 +190,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
     this->pb->NumpyToTensorView(f, "filter_random");
     (b = resample_poly(a, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
 
@@ -198,7 +198,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
     // so we can inverse-scale the output to compare against the golden outputs.
     (b = resample_poly(static_cast<TestType>(4.0) * a, f, up, down)).run(this->exec);
     (b = b * static_cast<TestType>(0.25)).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }
@@ -244,11 +244,11 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, DefaultFilter)
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_default");
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     (b = resample_poly(a, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_default", this->thresh);
   }
@@ -296,11 +296,11 @@ TYPED_TEST(ResamplePolyTestFloatTypes, DefaultFilter)
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_default");
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     (b = resample_poly(a, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_default", this->thresh);
   }
@@ -344,7 +344,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     this->pb->NumpyToTensorView(f, "filter_random");
     (b = resample_poly(ac, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     // Verify that the 4D tensor was handled in a batched fashion
     for (int ia = 0; ia < nA; ia++) {
@@ -361,11 +361,11 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     (full = ac).run(this->exec);
     (b = 0).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     (b = resample_poly(ac, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     // Verify that the 4D tensor was handled in a batched fashion
     for (int ia = 0; ia < nA; ia++) {
@@ -377,7 +377,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
       }
     }
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
   }
 
   MATX_EXIT_HANDLER();
@@ -399,7 +399,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
 
   auto zero = make_tensor<TestType>({1});
   (zero = 0).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
@@ -413,7 +413,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
     this->pb->NumpyToTensorView(a, "a");
     (b = resample_poly(a, zero, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     // The output should equal the input because up == down.
     for (index_t k = 0; k < a_len; k++) {
@@ -442,7 +442,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
 
   auto seven = make_tensor<TestType>({1});
   (seven = 7).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
@@ -457,7 +457,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
     this->pb->NumpyToTensorView(a, "a");
     (b = resample_poly(a, seven, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     for (index_t j = 0; j < b_len; j++) {
       double aj, bj;
@@ -501,7 +501,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
     // The resample kernel scales the filter by up, so we use 1/up to get an
     // effective filter of 1.
     (f = 1.0/static_cast<double>(up)).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     auto a = make_tensor<TestType>({a_len});
     const index_t b_len = a_len * up;
@@ -509,7 +509,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
     this->pb->NumpyToTensorView(a, "a");
     (b = resample_poly(a, f, up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     // Since the filter is single tapped and == 1, we should get the sequence
     // [a_0, 0, ..., 0, a_1, 0, ...] with up-1 zeros between successive values
@@ -569,11 +569,11 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     (b = resample_poly(shift<0>(shift<0>(a, 8), -8), shift<0>(shift<0>(f, 3), -3), up, down)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }

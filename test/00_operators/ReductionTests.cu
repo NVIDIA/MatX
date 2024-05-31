@@ -203,7 +203,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     // Reduce a 3D tensor into a 2D by taking the sum of the last dimension
     (b = sum(a, {2})).run(exec);
     // example-end sum-test-2
-    cudaStreamSynchronize(0);
+    exec.sync();
     for(int i = 0 ; i < x ; i++) {
       for(int j = 0; j < y ; j++) {
         ASSERT_TRUE( MatXUtils::MatXTypeCompare(b(i,j), (TestType)z));
@@ -223,22 +223,22 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     // Reduce a 4D tensor into a 0D by taking the sum of all elements
     (t0 = sum(t4)).run(exec);
     // example-end sum-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     ASSERT_TRUE(MatXUtils::MatXTypeCompare(
         t0(), (TestType)(t4.Size(0) * t4.Size(1) * t4.Size(2) * t4.Size(3))));
 
      (t0 = sum(t3)).run(exec);
-     cudaStreamSynchronize(0);
+     exec.sync();
      ASSERT_TRUE(MatXUtils::MatXTypeCompare(
          t0(), (TestType)(t3.Size(0) * t3.Size(1) * t3.Size(2))));
 
      (t0 = sum(t2)).run(exec);
-     cudaStreamSynchronize(0);
+     exec.sync();
      ASSERT_TRUE(
          MatXUtils::MatXTypeCompare(t0(), (TestType)(t2.Size(0) * t2.Size(1))));
 
      (t0 = sum(t1)).run(exec);
-     cudaStreamSynchronize(0);
+     exec.sync();
      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(t1.Size(0))));
   }
   {
@@ -250,21 +250,21 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 
     (t1 = sum(t4, {1, 2, 3})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i), (TestType)(t4.Size(1) * t4.Size(2) * t4.Size(3))));
     }
 
     (t1 = sum(t3, {1, 2})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(
           t1(i), (TestType)(t3.Size(1) * t3.Size(2))));
     }
 
     (t1 = sum(t2, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(t2.Size(1))));
     }
@@ -285,7 +285,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     auto t3 = ones<TestType>({3, 4, 5});
 
     (t2 = sum(t4, {2, 3})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -294,7 +294,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     }
 
     (t2 = sum(t3, {2})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         ASSERT_TRUE(
@@ -371,7 +371,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2a = sum(permute(t4,{2,3,0,1}))).run(exec);
     (t2b = sum(t4, {0,1})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -384,7 +384,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2a = mean(permute(t4,{2,3,0,1}))).run(exec);
     (t2b = mean(t4, {0,1})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -398,7 +398,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     median(t2a, permute(t4,{2,3,0,1}), exec);
     median(t2b, t4, {0,1}, exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -413,7 +413,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2a = prod(permute(t4,{2,3,0,1}))).run(exec);
     (t2b = prod(t4, {0,1})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -431,7 +431,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2b = max(t4, {0,1})).run(exec);
     // example-end max-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -449,7 +449,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2b = min(t4, {0,1})).run(exec);
     // example-end min-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -467,7 +467,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (mtie(t2b, t2bi) = argmax(t4, {0,1})).run(exec);
     // example-end argmax-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -487,7 +487,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (mtie(t2b, t2bi) = argmin(t4, {0,1})).run(exec);
     // example-end argmin-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -507,7 +507,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2b = any(t4, {0,1})).run(exec);
     // example-end any-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -525,7 +525,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2b = all(t4, {0,1})).run(exec);
     // example-end all-test-2
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -539,7 +539,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2a = var(permute(t4,{2,3,0,1}))).run(exec);
     (t2b = var(t4, {0,1})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -553,7 +553,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     (t2a = stdd(permute(t4,{2,3,0,1}))).run(exec);
     (t2b = stdd(t4, {0,1})).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
@@ -585,7 +585,7 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
     (t2 = zeros<TestType>(t2.Shape())).run(exec);
     (t3 = zeros<TestType>(t3.Shape())).run(exec);
     (t4 = zeros<TestType>(t4.Shape())).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     t1(5) = 5;
     t3(1, 1, 1) = 6;
@@ -595,19 +595,19 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
     // convertible to "true"
     (t0 = any(t4)).run(exec);
     // example-end any-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
     (t0 = any(t3)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = any(t2)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
     (t0 = any(t1)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
   }
 
@@ -631,13 +631,13 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, AllClose)
   (B = ones<TestType>(B.Shape())).run(exec);
   allclose(C, A, B, 1e-5, 1e-8, exec);
   // example-end allclose-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   ASSERT_EQ(C(), 1);
 
   B(1,1,1) = 2;
   allclose(C, A, B, 1e-5, 1e-8, exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   ASSERT_EQ(C(), 0);
 
@@ -661,11 +661,11 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
     tensor_t<TestType, 3> t3({30, 40, 50});
     tensor_t<TestType, 4> t4({30, 40, 50, 60});
 
-    (t1 = ones<TestType>(t1.Shape())).run();
-    (t2 = ones<TestType>(t2.Shape())).run();
-    (t3 = ones<TestType>(t3.Shape())).run();
-    (t4 = ones<TestType>(t4.Shape())).run();
-    cudaStreamSynchronize(0);
+    (t1 = ones<TestType>(t1.Shape())).run(exec);
+    (t2 = ones<TestType>(t2.Shape())).run(exec);
+    (t3 = ones<TestType>(t3.Shape())).run(exec);
+    (t4 = ones<TestType>(t4.Shape())).run(exec);
+    exec.sync();
 
     t1(5) = 0;
     t3(1, 1, 1) = 0;
@@ -675,19 +675,19 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
     // convert to "true", or "false" otherwise
     (t0 = all(t4)).run(exec);
     // example-end all-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = all(t3)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
 
     (t0 = all(t2)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = all(t1)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
   }
 
@@ -718,51 +718,51 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Percentile)
     // Find the 50th percentile value in `t1e` using linear interpolation between midpoints
     (t0 = percentile(t1e, 50, PercentileMethod::LINEAR)).run(exec);
     // example-end percentile-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_linear50", 0.01);
 
     (t0 = percentile(t1e, 80, PercentileMethod::LINEAR)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_linear80", 0.01);
 
     (t0 = percentile(t1e, 50, PercentileMethod::LOWER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_lower50", 0.01);
 
     (t0 = percentile(t1e, 80, PercentileMethod::LOWER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_lower80", 0.01);
 
     (t0 = percentile(t1e, 50, PercentileMethod::HIGHER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_higher50", 0.01);
 
     (t0 = percentile(t1e, 80, PercentileMethod::HIGHER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1e_higher80", 0.01);
 
     (t0 = percentile(t1o, 50, PercentileMethod::LINEAR)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_linear50", 0.01);
 
     (t0 = percentile(t1o, 80, PercentileMethod::LINEAR)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_linear80", 0.01);
 
     (t0 = percentile(t1o, 50, PercentileMethod::LOWER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_lower50", 0.01);
 
     (t0 = percentile(t1o, 80, PercentileMethod::LOWER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_lower80", 0.01);
 
     (t0 = percentile(t1o, 50, PercentileMethod::HIGHER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_higher50", 0.01);
 
     (t0 = percentile(t1o, 80, PercentileMethod::HIGHER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     MATX_TEST_ASSERT_COMPARE(pb, t0, "t1o_higher80", 0.01);    
   }
 
@@ -794,20 +794,20 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
     // Compute media over all elements in "t1e" and store result in "t0"
     (t0 = median(t1e)).run(exec);
     // example-end median-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(4.5f)));
 
     (t0 = median(t1o)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(5)));
 
     (t1out = median(t2e, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(2.5f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(2.5f)));
 
     (t1out = median(t2o, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(3.0f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(3.0f)));
   }
@@ -824,10 +824,12 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, MinMaxNegative)
     auto t = matx::make_tensor<TestType, 1>({3});
     t.SetVals({-3, -1, -7});
 
+    ExecType exec{};
+
     matx::tensor_t<TestType, 0> max_val{{}};
     matx::tensor_t<matx::index_t, 0> max_idx{{}};
-    (mtie(max_val, max_idx) = matx::argmax(t)).run(ExecType{});
-    cudaStreamSynchronize(0);
+    (mtie(max_val, max_idx) = matx::argmax(t)).run(exec);
+    exec.sync();
     ASSERT_EQ(max_val(), -1);
     ASSERT_EQ(max_idx(), 1);
   }
@@ -853,7 +855,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
     // Reduce all inputs in "t1o" into "t0" by the maximum of all elements
     (t0 = max(t1o)).run(exec);
     // example-end max-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));    
   }
 
@@ -878,7 +880,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
     // Reduce all inputs in "t1o" into "t0" by the minimum of all elements
     (t0 = min(t1o)).run(exec);
     // example-end min-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1))); 
   }
 
@@ -903,7 +905,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
 
     (mtie(t0, t0i) = argmax(t1o)).run(exec);
     // example-end argmax-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TestType)(10)));    
 
@@ -913,7 +915,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});    
         
     (mtie(t1o_small, t1i_small) = argmax(t2o, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(5)));
@@ -942,7 +944,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
 
     (mtie(t0, t0i) = argmin(t1o)).run(exec);
     // example-end argmin-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TestType)(0)));    
 
@@ -952,7 +954,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});
 
     (mtie(t1o_small, t1i_small) = argmin(t2o, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(1)));
@@ -982,19 +984,19 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     // Compute the mean over all dimensions in "t4" and store the result in "t0"
     (t0 = mean(t4)).run(exec);
     // example-end mean-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = mean(t3)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = mean(t2)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
     (t0 = mean(t1)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
   }
   {
@@ -1005,19 +1007,19 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t2 = ones<TestType>({30, 40});
 
     (t1 = mean(t4, {1, 2, 3})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
     }
 
     (t1 = mean(t3, {1, 2})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
     }
 
     (t1 = mean(t2, {1})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t1.Size(0); i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(1)));
     }
@@ -1030,7 +1032,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     auto t3 = ones<TestType>({30, 40, 50});
 
     (t2 = mean(t4, {2, 3})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(1)));
@@ -1038,7 +1040,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
     }
 
     (t2 = mean(t3, {2})).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(1)));
@@ -1085,11 +1087,11 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Prod)
     // Compute the product of all elements in "t2" and store into "t0"
     (t0 = prod(t2)).run(exec);
     // example-end prod-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t2p));
 
     (t0 = prod(t1)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), t1p));
   }
 
@@ -1104,6 +1106,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Find)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
+    ExecType exec{};
+
     tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<TestType, 1> t1o{{100}};
@@ -1116,9 +1120,9 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Find)
     // example-begin find-test-1
     // Find values greater than 0.5
     TestType thresh = (TestType)0.5;
-    (mtie(t1o, num_found) = find(t1, GT{thresh})).run(ExecType{});
+    (mtie(t1o, num_found) = find(t1, GT{thresh})).run(exec);
     // example-end find-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     int output_found = 0;
     for (int i = 0; i < t1.Size(0); i++) {
@@ -1143,6 +1147,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdx)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
+    ExecType exec{};
+
     tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<int, 1> t1o{{100}};
@@ -1155,9 +1161,9 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdx)
     // example-begin find_idx-test-1
     // Find indices with values greater than 0.5
     TestType thresh = (TestType)0.5;
-    (mtie(t1o, num_found) = find_idx(t1, GT{thresh})).run(ExecType{});
+    (mtie(t1o, num_found) = find_idx(t1, GT{thresh})).run(exec);
     // example-end find_idx-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     int output_found = 0;
     for (int i = 0; i < t1.Size(0); i++) {
@@ -1187,7 +1193,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
     tensor_t<TestType, 1> t1o_2{{100}};
     TestType thresh = (TestType)0.5;
 
-    auto executor = ExecType{};
+    ExecType exec{};
 
     for (int i = 0; i < t1.Size(0); i++) {
       t1(i) = static_cast<detail::value_promote_t<TestType>>((float)rand() /
@@ -1196,19 +1202,19 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
 
     // Find indices with values greater than 0.5
     // example-begin select-test-1
-    (mtie(t1o_idx, num_found) = find_idx(t1, GT{thresh})).run(executor);
+    (mtie(t1o_idx, num_found) = find_idx(t1, GT{thresh})).run(exec);
 
     // Since we use the output on the host in select() we need to synchronize first
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     auto t1o_slice = t1o.Slice({0}, {num_found()});
     auto t1o_idx_slice = t1o_idx.Slice({0}, {num_found()});
-    (t1o_slice = select(t1o_slice, t1o_idx_slice)).run(executor);
+    (t1o_slice = select(t1o_slice, t1o_idx_slice)).run(exec);
 
     // Compare to simply finding the values
-    (mtie(t1o_2, num_found2) = find(t1, GT{thresh})).run(executor);
+    (mtie(t1o_2, num_found2) = find(t1, GT{thresh})).run(exec);
     // example-end select-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     ASSERT_EQ(num_found(), num_found2());
     
@@ -1227,6 +1233,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
     using TestType = std::tuple_element_t<0, TypeParam>;
     using ExecType = std::tuple_element_t<1, TypeParam>;
 
+    ExecType exec{};
+
     tensor_t<int, 0> num_found{{}};
     tensor_t<TestType, 1> t1{{100}};
     tensor_t<TestType, 1> t1o{{100}};
@@ -1236,9 +1244,9 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
     }
 
     // example-begin unique-test-1
-    (mtie(t1o, num_found) = unique(t1)).run(ExecType{});
+    (mtie(t1o, num_found) = unique(t1)).run(exec);
     // example-end unique-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (int i = 0; i < 10; i++) {
       ASSERT_NEAR(t1o(i), i, 0.01);
@@ -1270,7 +1278,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
   (t0 = trace(t2)).run(exec);
   // example-end trace-test-1
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   ASSERT_EQ(t0(), count);
   MATX_EXIT_HANDLER();

@@ -76,7 +76,7 @@ TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
 
   (this->detv = det(this->Atv)).run(this->exec);
   (this->Av = transpose(this->Atv)).run(this->exec); // Transpose back to row-major
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->detv, "det", 0.1);
 

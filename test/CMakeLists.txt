@@ -38,7 +38,7 @@ set (test_sources
     main.cu
 )
 
-# Some of <00_io> tests need csv files and the binary 'test.mat' which all
+# Some of <00_io> tests need csv files and binaries which all
 # are located under 'CMAKE_SOURCE_DIR/test/00_io'. When calling the test
 # executable <matx_test> from its location in 'CMAKE_BINARY_DIR/test' the
 # search paths according <FileIOTests.cu> are
@@ -56,6 +56,10 @@ file(COPY
 )
 file(COPY
 	${CMAKE_SOURCE_DIR}/test/00_io/test.mat
+	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
+)
+file(COPY
+	${CMAKE_SOURCE_DIR}/test/00_io/test.npy
 	DESTINATION ${CMAKE_BINARY_DIR}/test/00_io
 )
 

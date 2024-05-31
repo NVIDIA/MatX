@@ -73,6 +73,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
+  cudaExecutor exec{};
 
   index_t signal_size = 1ULL << 16;
   index_t filter_size = 16;
@@ -113,39 +114,34 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-  // Prefetch the data we just created
-  sig_time.PrefetchDevice(0);
-  filt_time.PrefetchDevice(0);  
-
-
   // Perform the FFT in-place on both signal and filter
   for (int i = 0; i < iterations; i++) {
     if (i == 1) {
       cudaEventRecord(start, stream);
     }    
-    (sig_freq = fft(sig_time, filtered_size)).run(stream);
-    (filt_freq = fft(filt_time, filtered_size)).run(stream);
+    (sig_freq = fft(sig_time, filtered_size)).run(exec);
+    (filt_freq = fft(filt_time, filtered_size)).run(exec);
 
-    (sig_freq = sig_freq * filt_freq).run(stream);
+    (sig_freq = sig_freq * filt_freq).run(exec);
 
     // IFFT in-place
-    (sig_freq = ifft(sig_freq)).run(stream);
+    (sig_freq = ifft(sig_freq)).run(exec);
     
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&separate_ms, start, stop);   
 
   for (int i = 0; i < iterations; i++) {
     if (i == 1) {
       cudaEventRecord(start, stream);
     }
-    (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(stream);
+    (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(exec);
   }
   
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&fused_ms, start, stop);  
 
   printf("FFT runtimes for separate = %.2f ms, fused = %.2f ms\n", separate_ms/(iterations-1), fused_ms/(iterations-1));
@@ -154,9 +150,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.
   auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
-  (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
  
   // Compare signals
   for (index_t b = 0; b < batches; b++) {

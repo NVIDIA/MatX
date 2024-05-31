@@ -1,3 +1,4 @@
 .vscode
+.cache
 build*
 *.pyc

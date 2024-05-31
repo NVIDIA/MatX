@@ -53,6 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  cudaExecutor exec{stream};
 
   cudaEvent_t start, stop;
 
@@ -85,20 +86,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     filterView(f) = filterView(f-1) * 0.99f;
   }
 
-  inView.PrefetchDevice(stream);
-  filterView.PrefetchDevice(stream);
-
   // Measure recursive runtime
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < iterations; i++) {
-    (outView = conv1d(inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
+    (outView = conv1d(inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
   }
   
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
   time_ms /= static_cast<float>(iterations);
 
@@ -120,9 +118,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //     {(uint32_t) 10e3 + filter_dim_2d - 1, (uint32_t) 10e3 + filter_dim_2d -
   //     1});
   // auto out2DView = out2DData.View();
-  // filter2DData.PrefetchDevice(stream);
-  // in2DData.PrefetchDevice(stream);
-  // out2DData.PrefetchDevice(stream);
 
   // Measure recursive runtime
   // cudaEventRecord(start, stream);
@@ -136,7 +131,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // }
 
   // cudaEventRecord(stop, stream);
-  // cudaStreamSynchronize(stream);
+  // exec.sync();
   // cudaEventElapsedTime(&time_ms, start, stop);
   // time_ms /= static_cast<float>(iterations);
 

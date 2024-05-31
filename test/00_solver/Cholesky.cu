@@ -83,7 +83,7 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
     // example-begin chol-test-1
     (Bv = chol(Bv, CUBLAS_FILL_MODE_LOWER)).run(exec);
     // example-end chol-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
     // and destroys the upper triangular portion.
@@ -130,10 +130,10 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
     this->pb->NumpyToTensorView(Cv, "B");
     this->pb->NumpyToTensorView(Lv, "L");
     (Bslice = Cv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     (Bslice = chol(Bslice, CUBLAS_FILL_MODE_LOWER)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
     // and destroys the upper triangular portion.

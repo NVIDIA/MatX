@@ -77,7 +77,7 @@ TYPED_TEST(LUSolverTestNonComplexFloatTypes, LUBasic)
   // example-begin lu-test-1
   (mtie(this->Av, this->PivV) =  lu(this->Av)).run(this->exec);
   // example-end lu-test-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // The upper and lower triangle components are saved in Av. Python saves them
   // as separate matrices with the diagonal of the lower matrix set to 0

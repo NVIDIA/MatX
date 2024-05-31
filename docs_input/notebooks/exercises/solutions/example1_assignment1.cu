@@ -49,8 +49,6 @@ int main() {
         {17, 18, 19, 20}});
   /*** End editing ***/
 
-  t2.PrefetchDevice(0);
-
   int count = 1;
   for (int row = 0; row < t2.Size(0); row++) {
     for (int col = 0; col < t2.Size(1); col++) {

@@ -45,6 +45,8 @@ int main() {
   auto B = make_tensor<float>({2, 3});
   auto V = make_tensor<float>({3});
 
+  cudaExecutor exec{};
+
   /****************************************************************************************************
    * Initialize tensor A with increasing values from 0.5 to 3.0 in steps of 0.4,
    *and tensor V from -1 to -3 in steps of -1.
@@ -83,7 +85,7 @@ int main() {
 
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   step = 0.5;
   for (int row = 0; row < A.Size(0); row++) {
@@ -111,7 +113,7 @@ int main() {
   /// auto tvs = ;
   /*** End editing. ***/
 
-  // cudaStreamSynchronize(0);
+  // exec.sync();
 
   // step = 0.5;
   // for (int row = 0; row < A.Size(0); row++) {
@@ -137,7 +139,7 @@ int main() {
 
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int row = 0; row < B.Size(0); row++) {
     for (int col = 0; col < B.Size(1); col++) {

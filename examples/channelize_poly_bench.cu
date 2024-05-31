@@ -73,6 +73,7 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+  cudaExecutor exec{};
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     for (matx::index_t num_channels = channel_start; num_channels <= channel_stop; num_channels++) {
@@ -88,18 +89,18 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       const matx::index_t decimation_factor = num_channels;
 
       for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
-        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(stream);
+        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
       }
 
-      cudaStreamSynchronize(stream);
+      exec.sync();
 
       float elapsed_ms = 0.0f;
       cudaEventRecord(start, stream);
       for (int k = 0; k < NUM_ITERATIONS; k++) {
-        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(stream);
+        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
       }
       cudaEventRecord(stop, stream);
-      cudaStreamSynchronize(stream);
+      exec.sync();
       CUDA_CHECK_LAST_ERROR();
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 

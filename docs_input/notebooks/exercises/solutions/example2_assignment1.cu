@@ -41,6 +41,8 @@ int main() {
   tensor_t<float, 2> B(shape);
   tensor_t<float, 1> V({3});
 
+  cudaExecutor exec{};
+
   /****************************************************************************************************
    * Initialize tensor A with increasing values from 0.5 to 3.0 in steps of 0.5,
    *and tensor V from -1 to -3 in steps of -1.
@@ -78,10 +80,10 @@ int main() {
   /****************************************************************************************************
    * Add 5.0 to all elements of A and store the results back in A
    ****************************************************************************************************/
-  (A = A + 5.0).run();
+  (A = A + 5.0).run(exec);
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   step = 0.5;
   for (int row = 0; row < A.Size(0); row++) {
@@ -107,10 +109,10 @@ int main() {
    *
    ****************************************************************************************************/
   auto tvs = V.Clone<2>({A.Size(0), matxKeepDim});
-  (A = A - tvs).run();
+  (A = A - tvs).run(exec);
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   step = 0.5;
   for (int row = 0; row < A.Size(0); row++) {
@@ -134,10 +136,10 @@ int main() {
    *
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/api/tensorops.html#_CPPv4N4matx3powE2Op2Op
    ****************************************************************************************************/
-  (B = (pow(A, 2) * 2) - V).run();
+  (B = (pow(A, 2) * 2) - V).run(exec);
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int row = 0; row < B.Size(0); row++) {
     for (int col = 0; col < B.Size(1); col++) {

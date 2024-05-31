@@ -63,11 +63,17 @@ namespace matx
        */
       cudaExecutor() : stream_(0) {}
 
-      /*
-       * @breif Returns stream associated with executor
-       */
+      /**
+       * @brief Returns stream associated with executor
+      */
       auto getStream() const { return stream_; }
 
+      /**
+       * @brief Synchronize the cuda executor's stream
+       * 
+       */
+      void sync() { cudaStreamSynchronize(stream_); }
+      
       /**
        * Execute an operator on a device
        * 

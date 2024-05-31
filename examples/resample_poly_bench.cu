@@ -123,6 +123,8 @@ void ResamplePolyBench()
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+  cudaExecutor exec{stream};
+
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
       const matx::index_t num_batches = test_cases[i].num_batches;
       const matx::index_t input_len = test_cases[i].input_len;
@@ -139,24 +141,24 @@ void ResamplePolyBench()
       auto filter = matx::make_tensor<InType, 1>({filter_len}, MATX_DEVICE_MEMORY);
       auto output = matx::make_tensor<InType, 2>({num_batches, output_len}, MATX_DEVICE_MEMORY);
 
-      (input = static_cast<InType>(1.0)).run(stream);
-      (filter = static_cast<InType>(1.0)).run(stream);
+      (input = static_cast<InType>(1.0)).run(exec);
+      (filter = static_cast<InType>(1.0)).run(exec);
 
-      cudaStreamSynchronize(stream);
+      exec.sync();
 
       for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
-        (output = matx::resample_poly(input, filter, up, down)).run(stream);
+        (output = matx::resample_poly(input, filter, up, down)).run(exec);
       }
 
-      cudaStreamSynchronize(stream);
+      exec.sync();
 
       float elapsed_ms = 0.0f;
       cudaEventRecord(start, stream);
       for (int k = 0; k < NUM_ITERATIONS; k++) {
-        (output = matx::resample_poly(input, filter, up, down)).run(stream);
+        (output = matx::resample_poly(input, filter, up, down)).run(exec);
       }
       cudaEventRecord(stop, stream);
-      cudaStreamSynchronize(stream);
+      exec.sync();
       CUDA_CHECK_LAST_ERROR();
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 

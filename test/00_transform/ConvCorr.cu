@@ -593,7 +593,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out2 = conv1d(in1, in2, {2}, MATX_C_MODE_SAME)).run(this->exec);
   // example-end conv1d-test-2
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -608,7 +608,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out2 = conv1d(in1, in2, {1}, MATX_C_MODE_SAME)).run(this->exec);
   // example-end conv1d-test-3
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -621,7 +621,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out1.Permute({1,2,0}) = conv1d(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME)).run(this->exec);
   (out2 = conv1d(in1, in2, {0}, MATX_C_MODE_SAME)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -634,7 +634,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out1 = corr(in1, in2, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
   (out2 = corr(in1, in2, {2}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -647,7 +647,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out1.Permute({0,2,1}) = corr(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
   (out2 = corr(in1, in2, {1}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -660,7 +660,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   (out1.Permute({1,2,0}) = corr(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
   (out2 = corr(in1, in2, {0}, MATX_C_MODE_SAME, MATX_C_METHOD_DIRECT)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -699,7 +699,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
   (out1 = conv2d(in1, in2, MATX_C_MODE_SAME)).run(this->exec);
   (out2 = conv2d(in1, in2, {1, 2}, MATX_C_MODE_SAME)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -712,7 +712,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
   (out1.Permute({0,2,1}) = conv2d(in1.Permute({0,2,1}), in2.Permute({0,2,1}), MATX_C_MODE_SAME)).run(this->exec);
   (out2 = conv2d(in1, in2, {2, 1}, MATX_C_MODE_SAME)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -725,7 +725,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
   (out1.Permute({1,2,0}) = conv2d(in1.Permute({1,2,0}), in2.Permute({1,2,0}), MATX_C_MODE_SAME)).run(this->exec);
   (out2 = conv2d(in1, in2, {2, 0}, MATX_C_MODE_SAME)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {

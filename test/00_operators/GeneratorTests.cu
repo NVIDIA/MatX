@@ -161,7 +161,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
     // Assign the diagonal elements of `tc` to `td`.
     (td = diag(tc)).run(exec);
     // example-end diag-op-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 10; j++) {
@@ -177,11 +177,11 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
     {
       auto delta = make_tensor<TestType>({1});
       delta(0) = static_cast<TestType>(1.0);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       (td = 0).run(exec);
       (td = diag(conv1d(tc, delta, MATX_C_MODE_SAME))).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 10; j++) {
@@ -209,7 +209,7 @@ TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
   (td = alternate(10)).run(exec);
   // example-end alternate-gen-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int i = 0; i < 10; i++) {
     MATX_ASSERT_EQ(td(i), (TestType)-2* (TestType)(i&1) + (TestType)1)
@@ -235,7 +235,7 @@ TEST(OperatorTests, Kron)
 
   (ov = kron(eye({4, 4}), bv)).run(exec);
   // example-end kron-gen-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, ov, "square", 0);
 
   tensor_t<dtype, 2> av({2, 3});
@@ -246,7 +246,7 @@ TEST(OperatorTests, Kron)
   // Explicit shape specified in ones()
   (ov2 = kron(av, ones({2, 2}))).run(exec);
   // example-end ones-gen-test-2  
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, ov2, "rect", 0);
 
   MATX_EXIT_HANDLER();
@@ -277,7 +277,7 @@ TEST(OperatorTests, MeshGrid)
   (yv = yy).run(exec);
   // example-end meshgrid-gen-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, xv, "X", 0);
   MATX_TEST_ASSERT_COMPARE(pb, yv, "Y", 0);
 
@@ -303,18 +303,18 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
   // Generate FFT frequencies using the length of the "t1" tensor and assign to t1
   (t1 = fftfreq(t1.Size(0))).run(exec);
   // example-end fftfreq-gen-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F1", 0.1);
 
   (t2 = fftfreq(t2.Size(0))).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, t2, "F2", 0.1);
 
   // example-begin fftfreq-gen-test-2
   // Generate FFT frequencies using the length of the "t1" tensor and a sample spacing of 0.5 and assign to t1
   (t1 = fftfreq(t1.Size(0), 0.5)).run(exec);
   // example-end fftfreq-gen-test-2
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);  
 
   MATX_EXIT_HANDLER();
@@ -336,7 +336,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
   (t1 = zeros()).run(exec);
   // example-end zeros-gen-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     if constexpr (IsHalfType<TestType>()) {
@@ -362,7 +362,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 
   (t1 = ones()).run(exec);
   // example-end ones-gen-test-1    
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     if constexpr (IsHalfType<TestType>()) {
@@ -390,7 +390,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
   // Generate a sequence of 100 numbers starting at 1 and spaced by 1
   (t1 = range<0>(t1.Shape(), 1, 1)).run(exec);
   // example-end range-gen-test-1  
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   TestType one = 1;
   TestType two = 1;
@@ -403,7 +403,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 
   {
     (t1 = t1 * t1).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType it = static_cast<detail::value_promote_t<TestType>>(i);
@@ -413,7 +413,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 
   {
     (t1 = t1 * two).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType it = static_cast<detail::value_promote_t<TestType>>(i);
@@ -424,7 +424,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 
   {
     (t1 = three * t1).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType it = static_cast<detail::value_promote_t<TestType>>(i);
@@ -451,7 +451,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   // with `count` points in between
   (t1 = linspace<0>(t1.Shape(), (TestType)1, (TestType)100)).run(exec);
   // example-end linspace-gen-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), i + 1));
@@ -459,7 +459,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
   {
     (t1 = t1 + t1).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (i + 1) + (i + 1)));
@@ -468,7 +468,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
   {
     (t1 = (TestType)1 + t1).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       EXPECT_TRUE(
@@ -478,7 +478,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
   {
     (t1 = t1 + (TestType)2).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (i + 1) + (i + 1) + 1 + 2));
@@ -506,7 +506,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
   (t1 = logspace<0>(s, start, stop)).run(exec);
   // example-end logspace-gen-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   // Use doubles for verification since half operators have no equivalent host
   // types
@@ -563,7 +563,7 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   TestType one = 1.0f;
   TestType zero = 0.0f;
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -626,7 +626,7 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 
   TestType zero = 0.0f;
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {

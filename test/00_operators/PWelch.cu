@@ -100,33 +100,35 @@ void helper(PWelchComplexExponentialTest& test)
 
   auto Pxx  = make_tensor<typename TypeParam::value_type>({test.params.nfft});
 
+  cudaExecutor exec{};
+
   if (test.params.window_name == "none")
   {
-    (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft)).run();
+    (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft)).run(exec);
   }
   else
   {
     auto w = make_tensor<typename TypeParam::value_type>({test.params.nperseg});
     if (test.params.window_name == "boxcar")
     {
-      (w = ones<typename TypeParam::value_type>({test.params.nperseg})).run();
+      (w = ones<typename TypeParam::value_type>({test.params.nperseg})).run(exec);
     }
     else if (test.params.window_name == "hann")
     {
-      (w = hanning<0,1,typename TypeParam::value_type>({test.params.nperseg})).run();
+      (w = hanning<0,1,typename TypeParam::value_type>({test.params.nperseg})).run(exec);
     }
     else if (test.params.window_name == "flattop")
     {
-      (w = flattop<0,1,typename TypeParam::value_type>({test.params.nperseg})).run();
+      (w = flattop<0,1,typename TypeParam::value_type>({test.params.nperseg})).run(exec);
     }
     else
     {
       ASSERT_TRUE(false) << "Unknown window parameter name " + test.params.window_name;
     }
-    (Pxx = pwelch(x, w, test.params.nperseg, test.params.noverlap, test.params.nfft)).run();
+    (Pxx = pwelch(x, w, test.params.nperseg, test.params.noverlap, test.params.nfft)).run(exec);
   }
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(test.pb, Pxx, "Pxx_out", test.thresh);
   MATX_EXIT_HANDLER();
@@ -154,13 +156,14 @@ TEST(PWelchOpTest, xin_complex_float)
   index_t noverlap = 0;
   index_t nfft = 8;
   auto x = ones<cuda::std::complex<float>>({signal_size});
+  cudaExecutor exec{};
   // example-begin pwelch-test-1
   auto Pxx  = make_tensor<float>({nfft});
   auto w = ones<float>({nperseg});
-  (Pxx = pwelch(x, w, nperseg, noverlap, nfft)).run();
+  (Pxx = pwelch(x, w, nperseg, noverlap, nfft)).run(exec);
   // example-end pwelch-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   EXPECT_NEAR(Pxx(0), 64, thresh);
   for (index_t k=1; k<nfft; k++)

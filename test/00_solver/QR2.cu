@@ -51,6 +51,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   using SType = typename inner_op_type_t<AType>::type;
   
   cudaStream_t stream = 0;
+  cudaExecutor exec{stream};
 
   std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
   std::array<index_t, RANK> Qshape = Ashape;
@@ -69,14 +70,10 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   auto Q = make_tensor<AType>(Qshape);
   auto R = make_tensor<AType>(Rshape);
   
-  (A = random<float>(Ashape, NORMAL)).run(stream);
-  
-  A.PrefetchDevice(stream);
-  Q.PrefetchDevice(stream);
-  R.PrefetchDevice(stream);
+  (A = random<float>(Ashape, NORMAL)).run(exec);
   
   // example-begin qr-test-1
-  (mtie(Q, R) = qr(A)).run(stream);
+  (mtie(Q, R) = qr(A)).run(exec);
   // example-end qr-test-1
 
   auto mdiffQTQ = make_tensor<SType>({});
@@ -85,7 +82,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   {
     // QTQ == Identity
     auto QTQ = make_tensor<AType>(Qshape);
-    (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(stream);
+    (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(exec);
     auto e = eye<SType>({m, m});
 
     auto eShape = Qshape;
@@ -93,19 +90,19 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
     eShape[RANK-2] = matxKeepDim;
     auto I = clone<RANK>(e, eShape);
   
-    (mdiffQTQ = max(abs(QTQ-I))).run(stream);
+    (mdiffQTQ = max(abs(QTQ-I))).run(exec);
 
   }
 
   {
     // Q*R == A
     auto QR = make_tensor<AType>(Ashape);
-    (QR = matmul(Q, R)).run(stream);
+    (QR = matmul(Q, R)).run(exec);
     
-    (mdiffQR = max(abs(A-QR))).run(stream);
+    (mdiffQR = max(abs(A-QR))).run(exec);
   }
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   ASSERT_NEAR( mdiffQTQ(), SType(0), .00001);
   ASSERT_NEAR( mdiffQR(), SType(0), .00001);
