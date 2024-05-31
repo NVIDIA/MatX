@@ -13,6 +13,7 @@ template <typename ValueType>
 void conv1d_direct_4d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto out = make_tensor<ValueType>({4, 2, 14, 288 + 4096 + 133 - 1});
   auto at = make_tensor<ValueType>({ 4, 2, 14, 133});
   auto bt = make_tensor<ValueType>({ 4, 2, 14, 288 + 4096});
@@ -21,7 +22,7 @@ void conv1d_direct_4d_batch(nvbench::state &state,
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
+  exec.sync();
   MATX_NVTX_START_RANGE( "Exec", matx_nvxtLogLevels::MATX_NVTX_LOG_ALL, 1 )
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
@@ -35,7 +36,7 @@ template <typename ValueType>
 void conv1d_direct_2d_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
-
+  cudaExecutor exec{0};
 
   auto out = make_tensor<ValueType>({4 * 2* 14, 288 + 4096 + 133 - 1});
   auto at = make_tensor<ValueType>({ 4 * 2* 14, 133});
@@ -45,7 +46,7 @@ void conv1d_direct_2d_batch(nvbench::state &state,
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
@@ -56,6 +57,7 @@ template <typename ValueType>
 void conv1d_direct_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
   auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
   auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
@@ -64,9 +66,9 @@ void conv1d_direct_large(nvbench::state &state,
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
 
-  (out = conv1d(at, bt, MATX_C_MODE_FULL)).run();
+  (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(exec);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });
@@ -79,17 +81,18 @@ template <typename ValueType>
 void conv1d_fft_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
   auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
   auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
 
-  (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run();
+  (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run(exec);
 
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run(cudaExecutor(launch.get_stream())); });
@@ -103,6 +106,7 @@ template <typename ValueType>
 void conv2d_direct_batch(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto at = make_tensor<ValueType>({256, 1024, 1024});
   auto bt = make_tensor<ValueType>({256, 16, 16});
   auto out = make_tensor<ValueType>({256, 
@@ -113,7 +117,7 @@ void conv2d_direct_batch(nvbench::state &state,
   at.PrefetchDevice(0);
   bt.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec(
       [&out, &at, &bt](nvbench::launch &launch) { (out = conv2d(at, bt, MATX_C_MODE_FULL)).run(cudaExecutor(launch.get_stream())); });

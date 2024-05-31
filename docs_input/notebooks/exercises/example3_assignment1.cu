@@ -45,6 +45,8 @@ int main() {
   auto A = make_tensor<complex>({2, 3});
   auto B = make_tensor<complex>({2, 3});
 
+  cudaExecutor exec{};
+
   /****************************************************************************************************
    * Use the random number generator with a seed of 12345 to generate
    * normally-distributed numbers in the tensor A. Next, take the FFT across
@@ -63,7 +65,7 @@ int main() {
        {{0.5646, 0.8638}, {1.6400, 0.3494}, {-0.5709, 0.5919}}});
   A.print();
   B.print();
-  cudaStreamSynchronize(0);
+  exec.sync();
   for (int row = 0; row < A.Size(0); row++) {
     for (int col = 0; col < A.Size(1); col++) {
       if (fabs(A(row, col).real() - B(row, col).real()) > 0.001) {
@@ -101,7 +103,7 @@ int main() {
   /*** End editing ***/
 
   // Verify init is correct
-  cudaStreamSynchronize(0);
+  exec.sync();
   if (fabs(redv() - 1.0) > 0.001) {
     printf("Mismatch on final reduction. Expected=1.0, actual = %f\n", redv());
     exit(-1);

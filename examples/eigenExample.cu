@@ -47,6 +47,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   int dimX = 3;
   int dimY = 3;
 
+  matx::cudaExecutor exec{};
 
   ///////////////////////////////////////////////////////////////////////////////
   //////////////               Eigen Test Data Setup               //////////////
@@ -91,10 +92,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #else
   std::cout <<"!!!!!!!!! Eigen NOT USED in Test !!!!!!!!!" << std ::endl;
   // provide data in tensors if eigen is not used
-  (aTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run();
-  (bTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run();
-  (complexTensor = matx::random<cuda::std::complex<double>>({2, 2}, matx::UNIFORM)).run();
-  (matTensor10x10 = matx::random<double>({10, 10}, matx::UNIFORM)).run();
+  (aTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run(exec);
+  (bTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run(exec);
+  (complexTensor = matx::random<cuda::std::complex<double>>({2, 2}, matx::UNIFORM)).run(exec);
+  (matTensor10x10 = matx::random<double>({10, 10}, matx::UNIFORM)).run(exec);
 
 #endif
 
@@ -110,16 +111,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaMemcpy(complexTensor.Data(), complexMatrix.data(), sizeof(std::complex<double>)*2*2, cudaMemcpyHostToDevice);
   cudaMemcpy(matTensor10x10.Data(), matrix10x10.data(), sizeof(float)*10*10, cudaMemcpyHostToDevice);
 
-  (aTensor = matx::transpose(aTensor)).run();
-  // (bTensor = matx::transpose(bTensor)).run(); // do not need to transpose because b has the same layout
-  (complexTensor = matx::transpose(complexTensor)).run();
-  (matTensor10x10 = matx::transpose(matTensor10x10)).run();
+  (aTensor = matx::transpose(aTensor)).run(exec);
+  // (bTensor = matx::transpose(bTensor)).run(exec); // do not need to transpose because b has the same layout
+  (complexTensor = matx::transpose(complexTensor)).run(exec);
+  (matTensor10x10 = matx::transpose(matTensor10x10)).run(exec);
 #endif
 
   tensor1D(0) = 1;
   tensor1D(1) = 2;
   tensor1D(2) = 3;
-  cudaDeviceSynchronize();
+  exec.sync();
 
   // slower alternative of copying per-element
   // for(int curX=0; curX<dimX; curX++)
@@ -351,8 +352,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Invert Matrix ===================" << std::endl;
 #ifdef USE_EIGEN
-  // Eigen::MatrixXd inverseMatrix = a.inverse();                                              // current bug where .run() in inverse is ambiguous, so cannot be used with MatX
-  // std::cout << "Inverse of the Real Part:\n" << inverseMatrix << std::endl; // current bug where .run() in inverse is ambiguous, so cannot be used with MatX
+  // Eigen::MatrixXd inverseMatrix = a.inverse();                                              // current bug where .run(exec) in inverse is ambiguous, so cannot be used with MatX
+  // std::cout << "Inverse of the Real Part:\n" << inverseMatrix << std::endl; // current bug where .run(exec) in inverse is ambiguous, so cannot be used with MatX
 #endif  
 
   auto invTensor = matx::inv(aTensor);

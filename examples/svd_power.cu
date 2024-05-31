@@ -47,6 +47,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using SType = float;
 
   cudaStream_t stream = 0;
+  cudaExecutor exec{stream};
 
   int m = 5;
   int n = 4;
@@ -70,7 +71,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VTV = make_tensor<AType>({batch, k, k});
   auto x0 = random<float>({batch, d}, NORMAL);
     
-  (A = random<float>({batch, m, n}, NORMAL)).run(stream);
+  (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
 #else
   auto A = make_tensor<AType>({m, n});
@@ -87,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VTV = make_tensor<AType>({k, k});
   auto x0 = random<float>({d}, NORMAL);
   
-  (A = random<float>({m, n}, NORMAL)).run(stream);
+  (A = random<float>({m, n}, NORMAL)).run(exec);
 
 #endif
   std::array<index_t, U.Rank()> Dshape;
@@ -103,18 +104,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     printf("iterations: %d\n", iterations);
 
-    A.PrefetchDevice(stream);
-    U.PrefetchDevice(stream);
-    S.PrefetchDevice(stream);
-    VT.PrefetchDevice(stream);
+    (U = 0).run(exec);
+    (S = 0).run(exec);
+    (VT = 0).run(exec);
 
-    (U = 0).run(stream);
-    (S = 0).run(stream);
-    (VT = 0).run(stream);
+    (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(exec);
 
-    (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(stream);
-
-    cudaDeviceSynchronize();
+    exec.sync();
     printf("svdpi:\n");
 
     printf("S\n");
@@ -126,29 +122,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose_matrix(U)))).run(stream);
+      (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
       print(UUT);
     }
 
     printf("UTU:\n");
-    (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
+    (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(stream);
+      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
       print(VVT);
     }
 
     printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
 
     print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-    (UD = U * D).run(stream);
+    (UD = U * D).run(exec);
 
-    (UDVT = matmul(UD, VT)).run(stream);
+    (UDVT = matmul(UD, VT)).run(exec);
 
     printf("A\n");
     print(A);
@@ -156,7 +152,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("UDVT\n");
     print(UDVT);
 
-    (A = A - UDVT).run(stream);
+    (A = A - UDVT).run(exec);
 
     printf("A-UDVT\n");
     print(A);
@@ -165,13 +161,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Same as above but with svdbpi
   {
 
-    (U = 0).run(stream);
-    (S = 0).run(stream);
-    (VT = 0).run(stream);
+    (U = 0).run(exec);
+    (S = 0).run(exec);
+    (VT = 0).run(exec);
     // TODO add k
-    (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(stream);
+    (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(exec);
 
-    cudaDeviceSynchronize();
+    exec.sync();
     printf("svdbpi:\n");
 
     printf("S\n");
@@ -183,29 +179,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     if( m <=  n) {
       printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose_matrix(U)))).run(stream);
+      (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
       print(UUT);
     }
 
     printf("UTU:\n");
-    (UTU = matmul(conj(transpose_matrix(U)), U)).run(stream);
+    (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
     print(UTU);
 
     if( n >= m) {
       printf("VVT:\n");
-      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(stream);
+      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
       print(VVT);
     }
 
     printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(stream); // works on r x r
+    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
 
     print(VTV);
 
     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-    (UD = U * D).run(stream);
+    (UD = U * D).run(exec);
 
-    (UDVT = matmul(UD, VT)).run(stream);
+    (UDVT = matmul(UD, VT)).run(exec);
 
     printf("A\n");
     print(A);
@@ -213,7 +209,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("UDVT\n");
     print(UDVT);
 
-    (A = A - UDVT).run(stream);
+    (A = A - UDVT).run(exec);
 
     printf("A-UDVT\n");
     print(A);

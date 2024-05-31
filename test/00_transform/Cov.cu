@@ -82,7 +82,7 @@ TYPED_TEST(CovarianceTestFloatTypes, SmallCov)
   // example-begin cov-test-1
   (this->cv = cov(this->av)).run(this->exec);
   // example-end cov-test-1
-  cudaDeviceSynchronize();
+  this->exec.sync();
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "c_cov", this->thresh);
   MATX_EXIT_HANDLER();
 }
@@ -107,7 +107,7 @@ TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
   (batched_in = clone<5>(this->av, {m, n, k, matxKeepDim, matxKeepDim})).run(this->exec);
 
   (batched_out = cov(batched_in)).run(this->exec);
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   for (int im = 0; im < m; im++) {
     for (int in = 0; in < n; in++) {

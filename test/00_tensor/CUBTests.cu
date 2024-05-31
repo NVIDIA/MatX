@@ -117,10 +117,12 @@ TEST(TensorStats, Hist)
 
   inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
 
+  cudaExecutor exec{};
+
   // example-begin hist-test-1
-  (outv = hist(inv, 0.0f, 12.0f)).run();;
+  (outv = hist(inv, 0.0f, 12.0f)).run(exec);
   // example-end hist-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   std::array<int, levels - 1> sol = {1, 5, 0, 3, 0, 0};
   for (index_t i = 0; i < outv.Lsize(); i++) {
@@ -147,7 +149,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
   // Compute the cumulative sum/exclusive scan across "t1"
   (tmpv = cumsum(this->t1)).run(this->exec);
   // example-end cumsum-test-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   TestType ttl = 0;
   for (index_t i = 0; i < tmpv.Lsize(); i++) {
@@ -165,7 +167,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
   }
 
   (tmpv2 = cumsum(this->t2)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
     ttl = 0;
     for (index_t j = 0; j < tmpv2.Size(1); j++) {
@@ -194,7 +196,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
   // Ascending sort of 1D input
   (tmpv = matx::sort(this->t1, SORT_DIR_ASC)).run(this->exec);
   // example-end sort-test-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
     ASSERT_TRUE(tmpv(i) > tmpv(i - 1));
@@ -204,7 +206,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
   // Descending sort of 1D input
   (tmpv = matx::sort(this->t1, SORT_DIR_DESC)).run(this->exec);
   // example-end sort-test-2
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 1; i < tmpv.Lsize(); i++) {
     ASSERT_TRUE(tmpv(i) < tmpv(i - 1));
@@ -220,7 +222,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
   }
 
   (tmpv2 = matx::sort(this->t2, SORT_DIR_ASC)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
     for (index_t j = 1; j < tmpv2.Size(1); j++) {
@@ -230,7 +232,7 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 
   // Descending
   (tmpv2 = matx::sort(this->t2, SORT_DIR_DESC)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < tmpv2.Size(0); i++) {
     for (index_t j = 1; j < tmpv2.Size(1); j++) {

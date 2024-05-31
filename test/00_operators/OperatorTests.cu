@@ -292,11 +292,11 @@ TYPED_TEST(OperatorTestsFloatAllExecs, IsClose)
   auto B = make_tensor<TestType>({5, 5, 5});
   auto C = make_tensor<int>({5, 5, 5});
 
-  (A = ones<TestType>(A.Shape())).run();
-  (B = ones<TestType>(B.Shape())).run();
-  (C = isclose(A, B)).run();
+  (A = ones<TestType>(A.Shape())).run(exec);
+  (B = ones<TestType>(B.Shape())).run(exec);
+  (C = isclose(A, B)).run(exec);
   // example-end isclose-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for(int i=0; i < A.Size(0); i++) {
     for(int j=0; j < A.Size(1); j++) {
@@ -307,8 +307,8 @@ TYPED_TEST(OperatorTestsFloatAllExecs, IsClose)
   }
 
   B(1,1,1) = 2;
-  (C = isclose(A, B)).run();
-  cudaStreamSynchronize(0);
+  (C = isclose(A, B)).run(exec);
+  exec.sync();
 
   for(int i=0; i < A.Size(0); i++) {
     for(int j=0; j < A.Size(1); j++) {
@@ -349,7 +349,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   (tofrac = ofrac, toint = oint).run(exec);
   // example-end frexp-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   int texp;  
   for (int i = 0; i < tiv0.Size(0); i++) {
@@ -396,7 +396,7 @@ TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, Frexpc)
     toint_imag = oint_imag).run(exec);
   // example-end frexpc-test-1
 
-  cudaStreamSynchronize(0);
+  exec.sync();
   int texp_real, texp_imag;  
   for (int i = 0; i < tiv0.Size(0); i++) {
     if constexpr (std::is_same_v<TypeParam, cuda::std::complex<float>>) {
@@ -438,7 +438,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, FMod)
   tiv1() = (TestType)3.1;
   (tov0 = fmod(tiv0, tiv1)).run(exec);
   // example-end fmod-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TestType)5.0, (TestType)3.1)));
 
   MATX_EXIT_HANDLER();
@@ -460,73 +460,73 @@ TYPED_TEST(OperatorTestsFloatAllExecs, TrigFuncs)
   // example-begin sin-test-1
   (tov0 = sin(tiv0)).run(exec);
   // example-end sin-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sin(c)));
 
   // example-begin cos-test-1
   (tov0 = cos(tiv0)).run(exec);
   // example-end cos-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cos(c)));
 
   // example-begin tan-test-1
   (tov0 = tan(tiv0)).run(exec);
   // example-end tan-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tan(c)));
 
   // example-begin asin-test-1
   (tov0 = asin(tiv0)).run(exec);
   // example-end asin-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asin(c)));
 
   // example-begin acos-test-1
   (tov0 = acos(tiv0)).run(exec);
   // example-end acos-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acos(c)));
 
   // example-begin atan-test-1
   (tov0 = atan(tiv0)).run(exec);
   // example-end atan-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atan(c)));
 
   // example-begin sinh-test-1
   (tov0 = sinh(tiv0)).run(exec);
   // example-end sinh-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sinh(c)));
 
   // example-begin cosh-test-1
   (tov0 = cosh(tiv0)).run(exec);
   // example-end cosh-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_cosh(c)));
 
   // example-begin tanh-test-1
   (tov0 = tanh(tiv0)).run(exec);
   // example-end tanh-test-1  
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_tanh(c)));
 
   // example-begin asinh-test-1
   (tov0 = asinh(tiv0)).run(exec);
   // example-end asinh-test-1  
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_asinh(c)));
 
   // example-begin acosh-test-1
   (tov0 = acosh(tiv0)).run(exec);
   // example-end acosh-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_acosh(c)));
 
   // example-begin atanh-test-1
   (tov0 = atanh(tiv0)).run(exec);
   // example-end atanh-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_atanh(c)));
 
   MATX_EXIT_HANDLER();
@@ -549,7 +549,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, AngleOp)
   // example-begin angle-test-1
   (tov0 = angle(tiv0)).run(exec);
   // example-end angle-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
 
   MATX_EXIT_HANDLER();
@@ -590,7 +590,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
 
     (tov = op).run(exec);
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -625,7 +625,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
 
     (tov = op).run(exec);
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -660,7 +660,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
 
     (tov = op).run(exec);
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -697,7 +697,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
 
     (tov = op).run(exec);
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -734,7 +734,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
     }
 
     (tov = op).run(exec);
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -759,11 +759,11 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 
     delta(0,0) = static_cast<typename inner_op_type_t<TestType>::type>(1.0);
 
-    cudaDeviceSynchronize();
+    exec.sync();
 
     (tov = clone<3>(conv2d(tiv, delta, MATX_C_MODE_SAME), {N, matxKeepDim, matxKeepDim})).run(exec);
 
-    cudaDeviceSynchronize();
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -797,12 +797,12 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
   // `t1(3)` after execution
   (t0 = at(t1, 3)).run(exec);
   // example-end at-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   ASSERT_EQ(t0(), t1(3));
 
   (t0 = at(t2, 1, 4)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   ASSERT_EQ(t0(), t2(1, 4));  
 
@@ -810,7 +810,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
     using ComplexType = detail::complex_from_scalar_t<TestType>;
     auto c0 = make_tensor<ComplexType>({});
     (c0 = at(fft(t1), 0)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     // The first component of the FFT output (DC) is the sum of all elements, so
     // 10+20+...+100 = 550. The imaginary component should be 0.
@@ -869,7 +869,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   (t2 = linspace<1>(t2.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t3 = linspace<2>(t3.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t4 = linspace<3>(t4.Shape(), (inner_type)0, (inner_type)10)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   // Slice with different start and end points in each dimension
   auto t2t = slice(t2, {1, 2}, {3, 5});
@@ -916,7 +916,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   // Test SliceOp applied to a transform, using transpose() as an example transform
   auto t2trans = make_tensor<TestType>({3, 2});
   (t2trans = slice(transpose(t2), {2, 1}, {5, 3})).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   ASSERT_EQ(t2trans.Size(0), 3);
   ASSERT_EQ(t2trans.Size(1), 2);
@@ -932,7 +932,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   auto t2s = slice(t2, {t2.Size(0) - 4, t2.Size(1) - 5}, {matxEnd, matxEnd});
 
   // example-end slice-test-4
-  cudaStreamSynchronize(0);
+  exec.sync();
   ASSERT_EQ(t2sn.Size(0), t2s.Size(0));
   ASSERT_EQ(t2sn.Size(1), t2s.Size(1));
   for (index_t i = 0; i < t2sn.Size(0); i++) {
@@ -956,7 +956,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceAndReduceOp)
   tensor_t<TestType, 3> t3t{{30, 20, 10}};
   (t2t = linspace<1>(t2t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
   (t3t = linspace<2>(t3t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   {
     index_t j = 0;
@@ -1074,7 +1074,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1100,7 +1100,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1121,7 +1121,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1142,7 +1142,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1167,7 +1167,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1192,7 +1192,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -1238,7 +1238,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     // Remap 2D operator "tiv" by selecting elements from dimension 0 stored in "idx"
     (tov = remap<0>(tiv, idx)).run(exec);
     // example-end remap-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1247,7 +1247,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
     
     (tov = remap<1>(tiv, idx)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1259,7 +1259,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     // Remap 2D operator "tiv" by selecting elements from dimensions 0 and 1 stored in "idx"
     (tov = remap<0,1>(tiv, idx, idx)).run(exec);
     // example-end remap-test-2
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1279,9 +1279,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
 
     (tov = (TestType)0).run(exec);
 
-    (remap<0>(tov, idx) = tiv).run();
+    (remap<0>(tov, idx) = tiv).run(exec);
     
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1291,7 +1291,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     
     (tov = (TestType)0).run(exec);
     (remap<1>(tov, idx) = tiv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1301,7 +1301,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     
     (tov = (TestType)0).run(exec);
     (remap<0,1>(tov, idx, idx) = tiv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
     
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1320,7 +1320,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
 
     (tov = remap<0>(tiv, idx)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1329,7 +1329,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
     
     (tov = remap<1>(tiv, idx)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1338,7 +1338,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
     
     (tov = remap<0,1>(tiv, idx, idx)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1357,7 +1357,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
 
     (remap<0>(tov, idx) = tiv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1366,7 +1366,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
     
     (remap<1>(tov, idx) = tiv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1375,7 +1375,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
     
     (remap<0,1>(tov, idx, idx) = tiv).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for( int i = 0; i < N ; i++) {
       for( int j = 0; j < N ; j++) {
@@ -1396,7 +1396,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({M, N});
 
       (tov = remap<0>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
@@ -1409,7 +1409,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({N, M});
 
       (tov = remap<1>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
@@ -1422,7 +1422,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({M, M});
 
       (tov = remap<0,1>(tiv, idx, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < M ; j++) {
@@ -1444,7 +1444,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({M, N});
 
       (tov = remap<0>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
@@ -1457,7 +1457,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({N, M});
 
       (tov = remap<1>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
@@ -1479,7 +1479,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({M, N});
 
       (tov = remap<0>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < N ; j++) {
@@ -1492,7 +1492,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({N, M});
 
       (tov = remap<1>(tiv, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < N ; i++) {
         for( int j = 0; j < M ; j++) {
@@ -1505,7 +1505,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
       auto tov = make_tensor<TestType>({M, M});
 
       (tov = remap<0,1>(tiv, idx, idx)).run(exec);
-      cudaStreamSynchronize(0);
+      exec.sync();
 
       for( int i = 0; i < M ; i++) {
         for( int j = 0; j < M ; j++) {
@@ -1526,32 +1526,26 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
 
   ExecType exec{};
 
-  auto sync = []() constexpr {
-    if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
-      cudaDeviceSynchronize();
-    }
-  };
-
   const int N = 16;
 
   // 1D source tensor cases
   {
     auto from = make_tensor<int>({N});
     (from = range<0>({N}, 0, 1)).run(exec);
-    sync();
+    exec.sync();
     auto ind = make_tensor<int>({});
     auto r = remap<0>(from, ind);
     auto to = make_tensor<int>({1});
 
     ind() = N/2;
     (to = r).run(exec);
-    sync();
+    exec.sync();
 
     ASSERT_EQ(to(0), N/2);
 
     ind() = N/4;
     (to = r).run(exec);
-    sync();
+    exec.sync();
 
     ASSERT_EQ(to(0), N/4);
   }
@@ -1560,7 +1554,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
   {
     auto from = make_tensor<int>({N,N});
     (from = ones()).run(exec);
-    sync();
+    exec.sync();
 
     auto i0 = make_tensor<int>({});
     auto i1 = make_tensor<int>({});
@@ -1575,7 +1569,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
     from(0,N/2) = 3;
     (to0 = r0).run(exec);
     (to1 = r1).run(exec);
-    sync();
+    exec.sync();
 
     ASSERT_EQ(to0(0,0), 2);
     ASSERT_EQ(to0(0,1), 1);
@@ -1589,7 +1583,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
     // Select a single entry from the 2D input tensor
     auto entry = make_tensor<int>({1,1});
     (entry = remap<0,1>(from, i0, i1)).run(exec);
-    sync();
+    exec.sync();
 
     ASSERT_EQ(entry(0,0), 11);
   }
@@ -1613,13 +1607,13 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, RealImagOp)
   // example-begin real-test-1
   (tov0 = real(tiv0)).run(exec);
   // example-end real-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.real()));  
 
   // example-begin imag-test-1
   (tov0 = imag(tiv0)).run(exec);
   // example-end imag-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c.imag()));   
 
   MATX_EXIT_HANDLER();
@@ -1646,19 +1640,19 @@ TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
   // example-begin IFELSE-test-1
   IFELSE(tiv0 == d, tov0 = z, tov0 = d).run(exec);
   // example-end IFELSE-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
   IFELSE(tiv0 == d, tov0 = tiv0, tov0 = d).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), tiv0()));
 
   IFELSE(tiv0 != d, tov0 = d, tov0 = z).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
   (tov0 = c, tov00 = c).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  
 
@@ -1674,20 +1668,14 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
 
   ExecType exec{};
 
-  auto sync = []() constexpr {
-    if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
-      cudaDeviceSynchronize();
-    }
-  };
-
   if constexpr (std::is_same_v<TestType, cuda::std::complex<float>> &&
     std::is_same_v<ExecType,cudaExecutor>) {
     // example-begin abs2-test-1
     auto x = make_tensor<cuda::std::complex<float>>({});
     auto y = make_tensor<float>({});
     x() = { 1.5f, 2.5f };
-    (y = abs2(x)).run();
-    cudaDeviceSynchronize();
+    (y = abs2(x)).run(exec);
+    exec.sync();
     ASSERT_NEAR(y(), 1.5f*1.5f+2.5f*2.5f, 1.0e-6);
     // example-end abs2-test-1
   }
@@ -1697,12 +1685,12 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
   if constexpr (is_complex_v<TestType>) {
     x() = TestType{2.0, 2.0};
     (y = abs2(x)).run(exec);
-    sync();
+    exec.sync();
     ASSERT_NEAR(y(), 8.0, 1.0e-6);
   } else {
     x() = 2.0;
     (y = abs2(x)).run(exec);
-    sync();
+    exec.sync();
     ASSERT_NEAR(y(), 4.0, 1.0e-6);
 
     // Test with higher rank tensor
@@ -1717,7 +1705,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
     }
 
     (y3 = abs2(x3)).run(exec);
-    sync();
+    exec.sync();
 
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
@@ -1748,7 +1736,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncsR2C)
   // example-begin expj-test-1
   (tov0 = expj(tiv0)).run(exec);
   // example-end expj-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(
       tov0(),
@@ -1773,43 +1761,43 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
   // example-begin log10-test-1
   (tov0 = log10(tiv0)).run(exec);
   // example-end log10-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log10(c)));
 
   // example-begin log-test-1
   (tov0 = log(tiv0)).run(exec);
   // example-end log-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log(c)));
 
   // example-begin log2-test-1
   (tov0 = log2(tiv0)).run(exec);
   // example-end log2-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_log2(c)));
 
   // example-begin floor-test-1
   (tov0 = floor(tiv0)).run(exec);
   // example-end floor-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_floor(c)));
 
   // example-begin ceil-test-1
   (tov0 = ceil(tiv0)).run(exec);
   // example-end ceil-test-1  
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_ceil(c)));
 
   // example-begin round-test-1
   (tov0 = round(tiv0)).run(exec);
   // example-end round-test-1  
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_round(c)));
 
   // example-begin sqrt-test-1
   (tov0 = sqrt(tiv0)).run(exec);
   // example-end sqrt-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sqrt(c)));      
 
   MATX_EXIT_HANDLER();
@@ -1827,14 +1815,14 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
   auto a = make_tensor<TestType>({1,2,3,4,5});
   auto b = make_tensor<TestType>({1,2,3,4,5});
   (a = ones<TestType>(a.Shape())).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
   (b = ones<TestType>(b.Shape())).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
   (a = a + b).run(exec);
 
   auto t0 = make_tensor<TestType>({});
   (t0 = sum(a)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   ASSERT_EQ(t0(), static_cast<TestType>(2 * a.TotalSize()));
   MATX_EXIT_HANDLER();
 }
@@ -1857,13 +1845,13 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
   // example-begin max-el-test-1
   (tov0 = max(tiv0, d)).run(exec);
   // example-end max-el-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::max(c, d)));
 
   // example-begin min-el-test-1
   (tov0 = min(tiv0, d)).run(exec);
   // example-end min-el-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), std::min(c, d)));
 
   // These operators convert type T into bool
@@ -1872,37 +1860,37 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
   // example-begin lt-test-1
   (tob = tiv0 < d).run(exec);
   // example-end lt-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c < d));
 
   // example-begin gt-test-1
   (tob = tiv0 > d).run(exec);
   // example-end gt-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c > d));
 
   // example-begin lte-test-1
   (tob = tiv0 <= d).run(exec);
   // example-end lte-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c <= d));
 
   // example-begin gte-test-1
   (tob = tiv0 >= d).run(exec);
   // example-end gte-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c >= d));
 
   // example-begin eq-test-1
   (tob = tiv0 == d).run(exec);
   // example-end eq-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c == d));
 
   // example-begin neq-test-1
   (tob = tiv0 != d).run(exec);
   // example-end neq-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), c != d));
 
   MATX_EXIT_HANDLER();
@@ -1924,7 +1912,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncDivComplex)
   tiv0() = c;
 
   (tov0 = s / tiv0).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), s / tiv0()));
 
   MATX_EXIT_HANDLER();  
@@ -1947,50 +1935,50 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   // example-begin add-test-1
   (tov0 = tiv0 + tiv0).run(exec);
   // example-end add-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c + c));
 
   // example-begin sub-test-1
   (tov0 = tiv0 - tiv0).run(exec);
   // example-end sub-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c - c));
 
   // example-begin mul-test-1
   (tov0 = tiv0 * tiv0).run(exec);
   // example-end mul-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c * c));
 
   // example-begin div-test-1
   (tov0 = tiv0 / tiv0).run(exec);
   // example-end div-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
   // example-begin neg-test-1
   (tov0 = -tiv0).run(exec);
   // example-end neg-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
 
   // example-begin IF-test-1
   IF(tiv0 == tiv0, tov0 = c).run(exec);
   // example-end IF-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
   TestType p = 2.0f;
   // example-begin pow-test-1
   (tov0 = as_type<TestType>(pow(tiv0, p))).run(exec);
   // example-end pow-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
   TestType three = 3.0f;
 
-  (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run();
-  cudaStreamSynchronize(0);
+  (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run(exec);
+  exec.sync();
 
   TestType res;
   res = c * c * (c + c) / c + three;
@@ -2005,9 +1993,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   }
   auto tob = make_tensor<bool>({});
   // example-begin nan-test-1
-  (tob = matx::isnan(nan)).run(); 
+  (tob = matx::isnan(nan)).run(exec); 
   // example-end nan-test-1
-  cudaDeviceSynchronize();  
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), std::is_floating_point_v<conversionType> ? true : false));
 
   auto notnanorinf = make_tensor<TestType>({});
@@ -2016,8 +2004,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   } else {
     notnanorinf() = 0;
   }  
-  (tob = matx::isnan(notnanorinf)).run();
-  cudaDeviceSynchronize();  
+  (tob = matx::isnan(notnanorinf)).run(exec);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), false));
 
   auto inf = make_tensor<TestType>({});
@@ -2028,13 +2016,13 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
     inf() = std::numeric_limits<conversionType>::infinity();
   }  
   // example-begin inf-test-1
-  (tob = matx::isinf(inf)).run(); 
+  (tob = matx::isinf(inf)).run(exec); 
   // example-end inf-test-1
-  cudaDeviceSynchronize();  
+  exec.sync(); 
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), std::is_floating_point_v<conversionType> ? true : false));
 
-  (tob = matx::isinf(notnanorinf)).run();
-  cudaDeviceSynchronize();  
+  (tob = matx::isinf(notnanorinf)).run(exec);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tob(), false));
 
   MATX_EXIT_HANDLER();
@@ -2058,7 +2046,7 @@ TYPED_TEST(OperatorTestsIntegralAllExecs, OperatorFuncs)
   // example-begin mod-test-1
   (tov0 = tiv0 % mod).run(exec);
   // example-end mod-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c % mod));
 
   MATX_EXIT_HANDLER();
@@ -2082,37 +2070,37 @@ TYPED_TEST(OperatorTestsBooleanAllExecs, OperatorFuncs)
   // example-begin land-test-1
   (tov0 = tiv0 && d).run(exec);
   // example-end land-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c && d));
 
   // example-begin lor-test-1
   (tov0 = tiv0 || d).run(exec);
   // example-end lor-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c || d));
 
   // example-begin lnot-test-1
   (tov0 = !tiv0).run(exec);
   // example-end lnot-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), !c));
 
   // example-begin xor-test-1
   (tov0 = tiv0 ^ d).run(exec);
   // example-end xor-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c ^ d));
 
   // example-begin or-test-1
   (tov0 = tiv0 | d).run(exec);
   // example-end or-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c | d));
 
   // example-begin and-test-1
   (tov0 = tiv0 & d).run(exec);
   // example-end and-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c & d));    
 
   MATX_EXIT_HANDLER();
@@ -2136,13 +2124,13 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
   // example-begin exp-test-1
   (tov0 = exp(tiv0)).run(exec);
   // example-end exp-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
 
   // example-begin conj-test-1
   (tov0 = conj(tiv0)).run(exec);
   // example-end conj-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
   // abs and norm take a complex and output a floating point value
@@ -2150,13 +2138,13 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
   // example-begin norm-test-1
   (tdd0 = norm(tiv0)).run(exec);
   // example-end norm-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
 
   // example-begin abs-test-1
   (tdd0 = abs(tiv0)).run(exec);
   // example-end abs-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_abs(c)));
 
   MATX_EXIT_HANDLER();
@@ -2184,7 +2172,7 @@ TYPED_TEST(OperatorTestsAllExecs, Flatten)
   auto t1 = make_tensor<TestType>({t2.Size(0)*t2.Size(1)});
   (t1 = flatten(t2)).run(exec);
   // example-end flatten-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   
   for (index_t i = 0; i < t2.Size(0)*t2.Size(1); i++) {
     ASSERT_EQ(t1(i), val);
@@ -2215,7 +2203,7 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
   {
     (c = a + b).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
@@ -2227,7 +2215,7 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
   {
     (c = a * b).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
@@ -2238,7 +2226,7 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
 
   {
     (c = a * b + a).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
@@ -2250,7 +2238,7 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
   {
 
     (c = a * b + a * (TestType)4.0f).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = static_cast<detail::value_promote_t<TestType>>(i);
@@ -2285,7 +2273,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
   {
     (c = a + b).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = (TestType)i;
@@ -2295,7 +2283,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
 
   {
     (c = a * b).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = (TestType)i;
@@ -2306,7 +2294,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
 
   {
     (c = a * b + a).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = (TestType)i;
@@ -2318,7 +2306,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
   {
 
     (c = a * b + a * (TestType)2.0f).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       TestType tcnt = (TestType)i;
@@ -2356,7 +2344,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   }
 
   (dview = dview * fview).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
@@ -2373,7 +2361,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   }
 
   (dview = dview / fview).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
@@ -2393,7 +2381,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   
 
   (dview = dview + fview).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
@@ -2410,7 +2398,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   }
 
   (dview = dview - fview).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
@@ -2427,7 +2415,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   }
 
   (dview = fview - dview).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_EQ(static_cast<detail::value_promote_t<TestType>>(dview(i).real()),
@@ -2458,12 +2446,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
     }
   }
 
-  t2.PrefetchDevice(0);
-  t2t.PrefetchDevice(0);
   matx::copy(t2t, t2, exec);
 
-  t2t.PrefetchHost(0);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -2472,11 +2457,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
     }
   }
 
-  t2t.PrefetchDevice(0);
   (t2t = transpose(t2)).run(exec);
 
-  t2t.PrefetchHost(0);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -2509,7 +2492,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, NonSquareTranspose)
   }
 
   (t2t = transpose(t2)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
@@ -2544,8 +2527,11 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
   }
 
   (t3t = transpose_matrix(t3)).run(exec);
-  cudaError_t error = cudaStreamSynchronize(0);
-  ASSERT_EQ(error, cudaSuccess);
+  exec.sync();
+
+  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+    ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+  }
 
   for (index_t i = 0; i < num_rows; i++) {
     for (index_t j = 0; j < num_cols; j++) {
@@ -2587,9 +2573,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, TransposeVsTransposeMatrix)
   (t3t = transpose(t3)).run(exec);
   (t3tm = transpose_matrix(t3)).run(exec);
 
-  if constexpr (is_cuda_executor_v<ExecType>) {
-    cudaError_t error = cudaStreamSynchronize(0);
-    ASSERT_EQ(error, cudaSuccess);
+  exec.sync();
+  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+    ASSERT_EQ(cudaGetLastError(), cudaSuccess);
   }
 
   for (index_t i = 0; i < m; i++) {
@@ -2646,9 +2632,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, CloneAndAdd)
   auto vah = clone<4>(velAccelHypoth,
       {numBeams, matxKeepDim, matxKeepDim, matxKeepDim});
 
-  (beamwiseRangeDoppler = smx + vah).run();
+  (beamwiseRangeDoppler = smx + vah).run(exec);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
   for (index_t i = 0; i < numBeams; i++) {
     for (index_t j = 0; j < numPulses; j++) {
       for (index_t k = 0; k < numPairs; k++) {
@@ -2813,7 +2799,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, Overlap)
   ASSERT_EQ(b4out.Size(0), 4);
   ASSERT_EQ(b4out.Size(1), 3);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
   for (index_t i = 0; i < b4.Size(0); i++) {
     for (index_t j = 0; j < b4.Size(1); j++) {
       ASSERT_EQ(b4out(i, j), b4(i, j));
@@ -2853,7 +2839,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
     }
 
     (t4o = t4i * t0).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
   
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2871,7 +2857,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
       }
     }
     (t4o = t0 * t4i).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < t4o.Size(0); i++) {
       for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2909,8 +2895,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t1).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t1).run(exec);
+  //   exec.sync();
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2928,8 +2914,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t1 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t1 * t4i).run(exec);
+  //   exec.sync();
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2970,8 +2956,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t2).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t2).run(exec);
+  //   exec.sync();
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -2989,8 +2975,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t2 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t2 * t4i).run(exec);
+  //   exec.sync();
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -3033,8 +3019,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i * t3).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i * t3).run(exec);
+  //   exec.sync()
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -3052,8 +3038,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t3 * t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t3 * t4i).run(exec);
+  //   exec.sync()
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -3111,8 +3097,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t4i + t3 + t2 + t1 + t0).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t4i + t3 + t2 + t1 + t0).run(exec);
+  //   exec.sync()
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -3133,8 +3119,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   //     }
   //   }
 
-  //   (t4o = t0 + t1 + t2 + t3 + t4i).run();
-  //   cudaStreamSynchronize(0);
+  //   (t4o = t0 + t1 + t2 + t3 + t4i).run(exec);
+  //   exec.sync();
 
   //   for (index_t i = 0; i < t4o.Size(0); i++) {
   //     for (index_t j = 0; j < t4o.Size(1); j++) {
@@ -3179,7 +3165,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   // Concatenate "t11" and "t12" into a new 1D tensor
   (t1o = concat(0, t11, t12)).run(exec);
   // example-end concat-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
     if (i < t11.Size(0)) {
@@ -3198,7 +3184,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     (t1o = 0).run(exec);
     (t1o = concat(0, conv1d(t11, delta, MATX_C_MODE_SAME), conv1d(t12, delta, MATX_C_MODE_SAME))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (i = 0; i < t11.Size(0) + t12.Size(0); i++) {
       if (i < t11.Size(0)) {
@@ -3230,7 +3216,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
                {10,11,12}});
 
   (t2o1 = concat(0, t21, t22)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (i = 0; i < t21.Size(0) + t22.Size(0); i++) {
     for (j = 0; j < t21.Size(1); j++) {
@@ -3244,7 +3230,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   }
 
   (t2o2 = concat(1, t21, t23)).run(exec); 
-  cudaStreamSynchronize(0);
+  exec.sync();
   
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
     for (i = 0; i < t21.Size(0); i++) {
@@ -3261,7 +3247,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
 
   // Concatenating 3 tensors
   (t1o1 = concat(0, t11, t11, t11)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (i = 0; i < t1o1.Size(0); i++) {
     ASSERT_EQ(t1o1(i), t11(i % t11.Size(0)));
@@ -3285,7 +3271,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     auto tempConcat2 = matx::concat(0, c, d);
     (result = matx::concat(0, tempConcat1, tempConcat2 )).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
     for (int cnt = 0; cnt < result.Size(0); cnt++) {
       ASSERT_EQ(result(cnt), cnt + 1);
     }    
@@ -3310,7 +3296,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Stack)
   auto cop = concat(0, t1a, t1b, t1c);
   
   (cop = (TestType)2).run(exec);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   {
     // example-begin stack-test-1
@@ -3362,7 +3348,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, HermitianTranspose)
   // example-begin hermitianT-test-1
   (t2s = hermitianT(t2)).run(exec);
   // example-end hermitianT-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
@@ -3397,7 +3383,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, PlanarTransform)
   }
 
   (t2p = planar(t2)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
@@ -3434,7 +3420,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, InterleavedTransform)
   }
 
   (t2 = interleaved(t2p)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
@@ -3474,7 +3460,7 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   ASSERT_TRUE(repop.Size(1) == same_reps * t2.Size(1));
 
   (t2s = repop).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
     for (index_t j = 0; j < count1 * same_reps; j++) {
@@ -3491,7 +3477,7 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   ASSERT_TRUE(rrepop.Size(1) == same_reps * 2 * t2.Size(1));
 
   (t2r = rrepop).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (index_t i = 0; i < count0 * same_reps; i++) {
     for (index_t j = 0; j < count1 * same_reps * 2; j++) {
@@ -3550,9 +3536,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, PolyVal)
   pb->NumpyToTensorView(c, "c");
 
   // example-begin polyval-test-1
-  (out = polyval(x, c)).run();
+  (out = polyval(x, c)).run(exec);
   // example-end polyval-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, out, "out", 0.01);
 
   MATX_EXIT_HANDLER();
@@ -3576,14 +3562,15 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Upsample)
     (t1 = static_cast<TestType>(1)).run(exec);
     auto us_op = upsample(t1, 0, n);
     // example-end upsample-test-1
+    exec.sync();
 
     ASSERT_TRUE(us_op.Size(0) == t1.Size(0) * n);
     for (index_t i = 0; i < us_op.Size(0); i++) {
       if ((i % n) == 0) {
-        MatXUtils::MatXTypeCompare(us_op(i), t1(i / n));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(us_op(i), t1(i / n)));
       }
       else {
-        MatXUtils::MatXTypeCompare(us_op(i), static_cast<TestType>(0));
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(us_op(i), static_cast<TestType>(0)));
       }
     }
   }
@@ -3607,10 +3594,11 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
     (t1 = static_cast<TestType>(1)).run(exec);
     auto ds_op = downsample(t1, 0, n);
     // example-end downsample-test-1
+    exec.sync();
 
     ASSERT_TRUE(ds_op.Size(0) == t1.Size(0) / n);
     for (index_t i = 0; i < ds_op.Size(0); i++) {
-      MatXUtils::MatXTypeCompare(ds_op(i), t1(i * n));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(ds_op(i), t1(i * n)));
     }
   }
 
@@ -3623,7 +3611,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
 
     ASSERT_TRUE(ds_op.Size(0) == t1.Size(0) / n + 1);
     for (index_t i = 0; i < ds_op.Size(0); i++) {
-      MatXUtils::MatXTypeCompare(ds_op(i), t1(i * n));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(ds_op(i), t1(i * n)));
     }
   }  
 
@@ -3653,7 +3641,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
 
   for (int i = 0; i < N1; i++) { t1(i) = static_cast<TestType>(i+1); }
   for (int i = 0; i < N2; i++) { t2(i) = static_cast<TestType>(i+1); }
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   const std::array<ComplexType, N1> T1_expected = {{
     { 15.0, 0.0 }, { -2.5, static_cast<TestType>(3.4409548) }, { -2.5, static_cast<TestType>(0.81229924) },
@@ -3672,7 +3660,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   (T1 = r2c(fft(t1), N1)).run(exec);
   (T2 = r2c(fft(t2), N2)).run(exec);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int i = 0; i < N1; i++) {
     ASSERT_NEAR(T1(i).real(), T1_expected[i].real(), thresh);
@@ -3688,7 +3676,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   (T1 = r2c(fft(t1, N1), N1)).run(exec);
   (T2 = r2c(fft(t2, N2), N2)).run(exec);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int i = 0; i < N1; i++) {
     ASSERT_NEAR(T1(i).real(), T1_expected[i].real(), thresh);
@@ -3706,7 +3694,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   (T1 = ifft(r2c(fft(t1), N1))).run(exec);
   (T2 = ifft(r2c(fft(t2), N2))).run(exec);
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int i = 0; i < N1; i++) {
     ASSERT_NEAR(T1(i).real(), t1(i), thresh);
@@ -3725,8 +3713,15 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
 {
   MATX_ENTER_HANDLER();
   using TestType = std::tuple_element_t<0, TypeParam>;
+  using ExecType = std::tuple_element_t<1, TypeParam>;  
   using inner_type = typename inner_op_type_t<TestType>::type;
   using complex_type = detail::complex_from_scalar_t<inner_type>;
+
+  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+    GTEST_SKIP();
+  }  
+  
+  ExecType exec{};
 
   [[maybe_unused]] const inner_type thresh = static_cast<inner_type>(1.0e-6);
 
@@ -3750,12 +3745,12 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
     for (int i = 0; i < N1; i++) { t3(i) = t3_vals[i]; };
     for (int i = 0; i < N2; i++) { t4(i) = t4_vals[i]; };
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
-    (T3 = fftshift1D(fft(t3))).run();
-    (T4 = fftshift1D(fft(t4))).run();
+    (T3 = fftshift1D(fft(t3))).run(exec);
+    (T4 = fftshift1D(fft(t4))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     const std::array<complex_type, N1> T3_expected = {{
       { -1.5, static_cast<inner_type>(-0.8660254) }, { 6.0, 0.0 }, { -1.5, static_cast<inner_type>(0.8660254) }
@@ -3774,10 +3769,10 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
       ASSERT_NEAR(T4(i).imag(), T4_expected[i].imag(), thresh);
     }
 
-    (T3 = ifftshift1D(fft(t3))).run();
-    (T4 = ifftshift1D(fft(t4))).run();
+    (T3 = ifftshift1D(fft(t3))).run(exec);
+    (T4 = ifftshift1D(fft(t4))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     const std::array<complex_type, N1> T3_ifftshift_expected = {{
       { -1.5, static_cast<inner_type>(0.8660254) }, { -1.5, static_cast<inner_type>(-0.8660254) }, { 6.0, 0.0 }
@@ -3803,14 +3798,14 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
     auto x = make_tensor<complex_type>({N,N});
     auto X = make_tensor<complex_type>({N,N});
 
-    (x = 0).run();
+    (x = static_cast<TestType>(0)).run(exec);
 
-    (X = fftshift2D(fft2(x))).run();
-    (X = fftshift2D(ifft2(x))).run();
-    (X = ifftshift2D(fft2(x))).run();
-    (X = ifftshift2D(ifft2(x))).run();
+    (X = fftshift2D(fft2(x))).run(exec);
+    (X = fftshift2D(ifft2(x))).run(exec);
+    (X = ifftshift2D(fft2(x))).run(exec);
+    (X = ifftshift2D(ifft2(x))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
   }
 
   MATX_EXIT_HANDLER();
@@ -3844,7 +3839,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
     // Shift the first dimension of "t2" by -5 so the 5th element of "t2" is the first element of "t2s"
     (t2s = shift<0>(t2, -5)).run(exec);
     // example-end shift-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3856,7 +3851,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
   
   {
     (t2s = shift<0>(t2, t0)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3868,7 +3863,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
 
   {
     (t2s = shift<1>(t2, -5)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3880,7 +3875,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
 
   {
     (t2s = shift<1,0>(t2, -5, -6)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3894,7 +3889,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
     // example-begin fftshift2D-test-1
     (t2s = fftshift2D(t2)).run(exec);
     // example-end fftshift2D-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3909,7 +3904,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
     // example-begin ifftshift2D-test-1
     (t2s = ifftshift2D(t2)).run(exec);
     // example-end ifftshift2D-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3923,7 +3918,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
   // Right shifts
   {
     (t2s = shift<0>(t2, 5)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3935,7 +3930,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
 
   {
     (t2s = shift<1>(t2, 5)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3948,7 +3943,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
   // Large shifts
   {
     (t2s = shift<0>(t2, -t2.Size(0) * 4)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3961,8 +3956,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
     // Shift 4 times the size back, minus one. This should be equivalent to
     // simply shifting by -1
     (t2s = shift<0>(t2, -t2.Size(0) * 4 - 1)).run(exec);
-    (t2s2 = shift<0>(t2, -1)).run();
-    cudaStreamSynchronize(0);
+    (t2s2 = shift<0>(t2, -1)).run(exec);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -3999,7 +3994,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
     // Reverse the values of t2 along dimension 0
     (t2r = reverse<0>(t2)).run(exec);
     // example-end reverse-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -4011,7 +4006,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
 
   {
     (t2r = reverse<1>(t2)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -4023,7 +4018,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
 
   {
     (t2r = reverse<0,1>(t2)).run(exec);
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -4038,7 +4033,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
     // example-begin flipud-test-1
     (t2r = flipud(t2)).run(exec);
     // example-end flipud-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -4052,7 +4047,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
     // example-begin fliplr-test-1
     (t2r = fliplr(t2)).run(exec);
     // example-end fliplr-test-1
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for (index_t i = 0; i < count0; i++) {
       for (index_t j = 0; j < count1; j++) {
@@ -4073,22 +4068,24 @@ TEST(OperatorTests, Cast)
   auto t2 = make_tensor<int8_t>({count0});
   auto to = make_tensor<float>({count0});
 
+  cudaExecutor exec{};
+
   t.SetVals({126, 126, 126, 126});
   t2.SetVals({126, 126, 126, 126});
   
   // example-begin as_type-test-1
-  (to = as_type<int8_t>(t + t2)).run();
+  (to = as_type<int8_t>(t + t2)).run(exec);
   // example-end as_type-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (int i = 0; i < t.Size(0); i++) {
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
   }
 
   // example-begin as_int8-test-1
-  (to = as_int8(t + t2)).run();
+  (to = as_int8(t + t2)).run(exec);
   // example-end as_int8-test-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   
   for (int i = 0; i < t.Size(0); i++) {
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
@@ -4155,7 +4152,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
     (out = legendre(n, m, x)).run(exec);
     // example-end legendre-test-1
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int j = 0; j < order; j++) {
       for(int p = 0; p < order; p++) {
@@ -4179,7 +4176,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 
     (out = lcollapse<2>(legendre(order, m, x))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int i = 0 ; i < size; i++) {
       for(int p = 0; p < order; p++) {
@@ -4200,7 +4197,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 
     (out = lcollapse<3>(legendre(order, order,  x))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int i = 0 ; i < size; i++) {
       if constexpr (is_matx_half_v<TestType>) {
@@ -4220,7 +4217,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 
     (out = lcollapse<3>(legendre(order, m,  x))).run(exec);
 
-    cudaStreamSynchronize(0);
+    exec.sync();
 
     for(int i = 0 ; i < size; i++) {
       if constexpr (is_matx_half_v<TestType>) {
@@ -4237,6 +4234,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 TEST(OperatorTestsAdvanced, AdvancedRemapOp)
 {
   typedef cuda::std::complex<float> complex;
+  cudaExecutor exec{};
   MATX_ENTER_HANDLER();
 
   int I = 4;
@@ -4275,7 +4273,7 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
     }
   }
 
-  (B = 0).run();
+  (B = 0).run(exec);
 
   auto rop = remap<1>(A, idx);
   auto lop = lcollapse<3>(rop);
@@ -4284,9 +4282,9 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   ASSERT_EQ(lop.Size(1) , A.Size(3));
   ASSERT_EQ(lop.Size(0) , I * M * K);
 
-  (B = lop).run();
+  (B = lop).run(exec);
 
-  cudaDeviceSynchronize();  
+  exec.sync(); 
 
   for (int i = 0; i < I; i++) {
     for (int m = 0; m < M; m++) {
@@ -4337,17 +4335,8 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
       }
     }
   }
-  
-  A.PrefetchDevice(0);
-  B.PrefetchDevice(0);
-  C.PrefetchDevice(0);
-  D.PrefetchDevice(0);
-  O1.PrefetchDevice(0);
-  O2.PrefetchDevice(0);
-  O3.PrefetchDevice(0);
-  O4.PrefetchDevice(0);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   auto o1op = lcollapse<3>(remap<1>(O1, idx));
   auto o2op = lcollapse<3>(remap<1>(O2, idx));
@@ -4357,27 +4346,27 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
   auto rcop = lcollapse<3>(remap<1>(cop, idx));
 
-  (O1 = 1).run();
-  (O2 = 2).run();
-  (O3 = 3).run();
-  (O4 = 4).run();
+  (O1 = 1).run(exec);
+  (O2 = 2).run(exec);
+  (O3 = 3).run(exec);
+  (O4 = 4).run(exec);
   
-  (B = lop).run();
-  (D = rcop).run();
+  (B = lop).run(exec);
+  (D = rcop).run(exec);
 
   // two operators as input
-  (o1op = conv1d(lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  (o1op = conv1d(lop, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
   // one tensor and one operators as input
-  (o2op = conv1d(B, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  (o2op = conv1d(B, rcop, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
   
   // one tensor and one operators as input
-  (o3op = conv1d(lop, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  (o3op = conv1d(lop, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
   
   //two tensors as input
-  (o4op = conv1d(B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run();
+  (o4op = conv1d(B, D, matx::matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   for (int i = 0; i < o1op.Size(0); i++) {
     for (int l = 0; l < o1op.Size(1); l++) {

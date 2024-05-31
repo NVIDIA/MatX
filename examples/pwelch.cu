@@ -62,20 +62,21 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
+  cudaExecutor exec{stream};
 
   // Create input signal as a complex exponential
   auto sample_index_range = range<0>({signal_size},0.f,1.f);
   auto phase = 2.f * static_cast<float>(M_PI) * ftone * sample_index_range / static_cast<float>(nfft);
   auto tmp_x = expj(phase);
   auto x = make_tensor<complex>({signal_size});
-  (x = tmp_x).run(stream); // pre-compute x, tmp_x is otherwise lazily evaluated
+  (x = tmp_x).run(exec); // pre-compute x, tmp_x is otherwise lazily evaluated
 
   // Create output tensor
   auto Pxx  = make_tensor<typename complex::value_type>({nfft});
 
   // Run one time to pre-cache the FFT plan
-  (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(stream);
-  cudaStreamSynchronize(stream);
+  (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(exec);
+  exec.sync();
 
   // Start the timing
   cudaEventRecord(start, stream);
@@ -85,11 +86,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   for (int iteration = 0; iteration < num_iterations; iteration++) {
     // Use the PWelch operator
-    (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(stream);
+    (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(exec);
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&exec_time_ms, start, stop);
 
   printf("Output Pxx:\n");

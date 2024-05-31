@@ -24,6 +24,7 @@ void sort1d(
            nvbench::type_list<ValueType>
            )
 {
+  cudaExecutor exec{0};
   const int dataSize = static_cast<int>(state.get_int64("Tensor Size"));
 
   auto sortedData = matx::make_tensor<ValueType>({dataSize});
@@ -31,7 +32,7 @@ void sort1d(
 
   sortedData.PrefetchDevice(0);
   randomData.PrefetchDevice(0);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   (randomData = random<float>(sortedData.Shape(), NORMAL)).run();
 

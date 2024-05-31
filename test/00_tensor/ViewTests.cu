@@ -430,7 +430,7 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
     (t3f = (TestType)-1000000).run(this->exec);
     (t3f = random<TestType>({count, count, count}, UNIFORM)).run(this->exec);
     // example-end random-test-1    
-    cudaDeviceSynchronize();
+    this->exec.sync();
 
     TestType total = 0;
     for (index_t i = 0; i < count; i++) {
@@ -449,7 +449,7 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 
     (t3f = (TestType)-1000000).run(this->exec);
     (t3f = random<TestType>({count, count, count}, NORMAL)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
 
     total = 0;
 

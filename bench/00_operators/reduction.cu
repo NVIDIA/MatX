@@ -127,6 +127,7 @@ void reduce_4d(
            nvbench::type_list<ValueType>
            )
 {
+  cudaExecutor exec{0};
   const int size0 = static_cast<int>(state.get_int64("Size0"));
   const int size1 = static_cast<int>(state.get_int64("Size1"));
   const int size2 = static_cast<int>(state.get_int64("Size2"));
@@ -138,8 +139,8 @@ void reduce_4d(
   t1.PrefetchDevice(0);
   t4.PrefetchDevice(0);
 
-  (t4 = random<float>(t4.Shape(), UNIFORM)).run();
-  cudaDeviceSynchronize();
+  (t4 = random<float>(t4.Shape(), UNIFORM)).run(exec);
+  exec.sync();
 
   state.exec([&t4, &t1](nvbench::launch &launch) { 
     (t1 = matx::sum(t4, {1, 2, 3})).run((cudaStream_t)launch.get_stream()); });

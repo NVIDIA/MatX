@@ -41,6 +41,8 @@ int main() {
   tensor_t<complex, 2> A(shape);
   tensor_t<complex, 2> B(shape);
 
+  cudaExecutor exec{};
+
   /****************************************************************************************************
    * Use the random number generator with a seed of 12345 to generate
    * normally-distributed numbers in the tensor A. Next, take the FFT across
@@ -51,7 +53,7 @@ int main() {
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/quickstart.html#random-numbers
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/api/random.html
    ****************************************************************************************************/
-  (A = random<float>(A.Shape(), NORMAL, 12345)).run();
+  (A = random<float>(A.Shape(), NORMAL, 12345)).run(exec);
 
   auto At = A.Permute({1, 0});
   fft(At, At);
@@ -62,7 +64,7 @@ int main() {
        {{0.5646, 0.8638}, {1.6400, 0.3494}, {-0.5709, 0.5919}}});
   print(A);
   print(B);
-  cudaStreamSynchronize(0);
+  exec.sync();
   for (int row = 0; row < A.Size(0); row++) {
     for (int col = 0; col < A.Size(1); col++) {
       if (fabs(A(row, col).real() - B(row, col).real()) > 0.001) {
@@ -95,15 +97,15 @@ int main() {
   // Create and initialize 3D tensor
   auto dv = make_tensor<float>({10, 5, 15});
 
-  (dv = random<float>(dv.Shape(), NORMAL)).run();
+  (dv = random<float>(dv.Shape(), NORMAL)).run(exec);
 
   tensor_t<float, 0> redv;
   max(redv, dv, 0);
-  (dv = dv / redv).run();
+  (dv = dv / redv).run(exec);
   max(redv, dv, 0);
   /*** End editing ***/
 
-  cudaStreamSynchronize(0);
+  exec.sync();
   // Verify init is correct
   if (fabs(redv() - 1.0) > 0.001) {
     printf("Mismatch on final reduction. Expected=1.0, actual = %f\n", redv());

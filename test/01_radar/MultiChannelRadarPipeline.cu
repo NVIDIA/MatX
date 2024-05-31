@@ -93,14 +93,10 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
   // Copy the replicated data into the actual data pointer
   matx::copy(d, x_clone, 0);
 
-  d.PrefetchDevice(0);
-
   auto wfd = p.GetwaveformView();
   auto wf = wfd.Slice({0}, {this->waveformLength});
 
   this->pb->NumpyToTensorView(wf, "waveform");
-
-  wfd.PrefetchDevice(0);
 
   p.PulseCompression();
 
@@ -154,8 +150,6 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
   auto v = in.Slice({0, 0, 0}, {this->numChannels, this->numPulses - 2,
                                  this->numCompressedSamples});
   this->pb->NumpyToTensorView(v, "x_conv2");
-
-  in.PrefetchHost(0);
 
   p.DopplerProcessing();
 

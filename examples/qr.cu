@@ -45,6 +45,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   using AType = cuda::std::complex<float>;
   
   cudaStream_t stream = 0;
+  cudaExecutor exec{stream};
   int batch = 1; 
 
   int m = 4;
@@ -56,10 +57,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Q = make_tensor<AType>({batch, m, m});
   auto R = make_tensor<AType>({batch, m, n});
 
-  (A = random<float>(A.Shape(), NORMAL)).run(stream);
+  (A = random<float>(A.Shape(), NORMAL)).run(exec);
 
 #if 0
-  cudaDeviceSynchronize();
+  exec.sync();
   A(0,0,0) = 10000; A(0,0,1) = 10001;
   A(0,1,0) = 10001; A(0,1,1) = 10002;
   A(0,2,0) = 10002; A(0,2,1) = 10003;
@@ -67,15 +68,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   A(0,4,0) = 10004; A(0,4,1) = 10005;
 #endif
 
-  A.PrefetchDevice(stream);
-  Q.PrefetchDevice(stream);
-  R.PrefetchDevice(stream);
+  (mtie(Q, R) = qr(A)).run(exec);
 
-  (mtie(Q, R) = qr(A)).run(stream);
-
-  (QR = matmul(Q, R)).run(stream);
-  (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(stream);
-  cudaDeviceSynchronize();
+  (QR = matmul(Q, R)).run(exec);
+  (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(exec);
+  exec.sync();
   
   printf("Q:\n"); print(Q);
   printf("R:\n"); print(R);

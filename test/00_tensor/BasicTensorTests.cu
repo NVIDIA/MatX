@@ -242,7 +242,7 @@ TYPED_TEST(BasicTensorTestsAll, AssignmentOps)
 
   (t2c = this->t2).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), t2c(i,j));
@@ -250,7 +250,7 @@ TYPED_TEST(BasicTensorTestsAll, AssignmentOps)
   }
 
   (this->t2 = t2c = t2c2).run(this->exec);
-  cudaStreamSynchronize(0);  
+  this->exec.sync();  
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), t2c2(i,j));
@@ -277,7 +277,7 @@ TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
   }  
 
   (this->t2 += t2c).run(this->exec);
-  cudaStreamSynchronize(0);  
+  this->exec.sync();  
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), t2c(i,j) + t2c(i,j));
@@ -285,7 +285,7 @@ TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
   }
 
   (this->t2 -= t2c).run(this->exec);
-  cudaStreamSynchronize(0);  
+  this->exec.sync();  
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), t2c(i,j));
@@ -293,7 +293,7 @@ TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
   }  
 
   (this->t2 *= t2c).run(this->exec);
-  cudaStreamSynchronize(0);  
+  this->exec.sync();  
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), static_cast<TestType>(1));
@@ -301,8 +301,8 @@ TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
   }
 
   (t2c = this->t2).run(this->exec);
-  (this->t2 /= static_cast<TestType>(1)).run();
-  cudaStreamSynchronize(0);  
+  (this->t2 /= static_cast<TestType>(1)).run(this->exec);
+  this->exec.sync();  
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(t2c(i,j) , this->t2(i,j));
@@ -328,7 +328,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   }
 
   (this->t2 |= t2c).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), 3);
@@ -336,7 +336,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   }
 
   (this->t2 &= t2c).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), 2);
@@ -344,7 +344,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   }       
 
   (this->t2 ^= t2c).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
       ASSERT_EQ(this->t2(i,j), 0);

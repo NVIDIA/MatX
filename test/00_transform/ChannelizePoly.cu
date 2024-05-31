@@ -149,8 +149,6 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     { 1000000, 40*16, 40 }
   };
 
-  cudaStream_t stream = 0;
-
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
     const index_t a_len = test_cases[i].a_len;
     const index_t f_len = test_cases[i].f_len;
@@ -172,14 +170,14 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
     // example-end channelize_poly-test-1
 
-    cudaStreamSynchronize(stream);
+    this->exec.sync();
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
 
     // Now test with a multiplicative operator on the input. The channelizer is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
     (b = channelize_poly(static_cast<TestType>(4.0) * a, f, num_channels, decimation_factor)).run(this->exec);
     (b = b * static_cast<TestType>(0.25)).run(this->exec);
-    cudaStreamSynchronize(stream);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }
@@ -233,7 +231,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     this->pb->NumpyToTensorView(f, "filter_random");
     (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
 
@@ -241,7 +239,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     // so we can inverse-scale the output to compare against the golden outputs.
     (b = channelize_poly(static_cast<TestType>(4.0) * a, f, num_channels, decimation_factor)).run(this->exec);
     (b = b * static_cast<TestType>(0.25)).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }
@@ -277,12 +275,12 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
   this->pb->NumpyToTensorView(a, "a");
   for (auto i = 0; i < num_channels; i++) { f(i) = 1; }
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   const index_t decimation_factor = num_channels;
   (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (auto k = 0; k < b_elem_per_channel; k++) {
     // Explicit DFT in the channel dimension. The complex exponential sign here is opposite
@@ -315,8 +313,6 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
   using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
-  cudaStream_t stream = 0;
-
   const index_t a_len = 2500;
   [[maybe_unused]] const index_t f_len = 90;
   const index_t num_channels = 10;
@@ -331,13 +327,13 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(f, "filter_random");
 
-  cudaStreamSynchronize(stream);
+  this->exec.sync();
 
   const index_t decimation_factor = num_channels;
   auto b = permute(bp, {1, 0});
   (b = channelize_poly(shift<0>(shift<0>(a, 8), -8), f, num_channels, decimation_factor)).run(this->exec);
 
-  cudaStreamSynchronize(stream);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
 
@@ -610,12 +606,12 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
   cudaMemcpyAsync(a.Data(), input.data(), signal_len * sizeof(TestType), cudaMemcpyHostToDevice, stream);
   cudaMemcpyAsync(f.Data(), filter.data(), filter_len * sizeof(TestType), cudaMemcpyHostToDevice, stream);
 
-  cudaStreamSynchronize(stream);
+  this->exec.sync();
 
   const index_t decimation_factor = num_channels;
   (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
-  cudaStreamSynchronize(stream);
+  this->exec.sync();
 
   for (auto chan = 0; chan < num_channels; chan++) {
     for (auto k = 0; k < b_elem_per_channel; k++) {

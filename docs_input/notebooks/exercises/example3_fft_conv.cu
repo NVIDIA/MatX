@@ -37,7 +37,8 @@ using namespace matx;
 int main() {
 
   using complex = cuda::std::complex<float>;
-
+  cudaExecutor exec{};
+  
   index_t signal_size = 16;
   index_t filter_size = 3;
   index_t filtered_size = signal_size + filter_size - 1;
@@ -73,7 +74,7 @@ int main() {
   // TODO: Perform a time-domain convolution
   
 
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   // Compare signals
   for (index_t i = 0; i < filtered_size; i++) {
