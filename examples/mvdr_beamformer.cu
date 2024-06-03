@@ -53,6 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  cudaExecutor exec{stream};
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -76,16 +77,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-  mvdr.Prefetch(stream);
-
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < num_iterations; i++) {
-    mvdr.Run(stream);
+    mvdr.Run(exec);
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("MVDR Kernel Time = %.2fms per iteration\n", time_ms / num_iterations);

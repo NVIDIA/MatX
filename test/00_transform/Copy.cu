@@ -54,12 +54,6 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
 
   ExecType exec{};
 
-  auto sync = []() constexpr {
-    if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
-      cudaDeviceSynchronize();
-    }
-  };
-
   const int SZ = 5;
   TestType DEFAULT, TEST_VAL;
   if constexpr (std::is_same_v<TestType, bool>) {
@@ -81,13 +75,13 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
       auto in = make_tensor<TestType>(dims); \
       auto out = make_tensor<TestType>(dims); \
       (in = DEFAULT).run(exec); \
-      sync(); \
+      exec.sync(); \
       cuda::std::array<index_t, N> inds; \
       inds.fill(SZ/2); \
       in(inds) = TEST_VAL; \
-      sync(); \
+      exec.sync(); \
       matx::copy(out, in, exec); \
-      sync(); \
+      exec.sync(); \
       ASSERT_EQ(in(inds), out(inds)); \
       ASSERT_EQ(out(inds), TEST_VAL); \
       inds.fill(0); \
@@ -109,9 +103,9 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
     auto in = make_tensor<TestType>({});
     auto out = make_tensor<TestType>({});
     in() = TEST_VAL;
-    sync();
+    exec.sync();
     matx::copy(out, in, exec);
-    sync();
+    exec.sync();
     ASSERT_EQ(in(), out());
     ASSERT_EQ(out(), TEST_VAL);
   }
@@ -121,11 +115,11 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
     auto in = make_tensor<TestType>({SZ, SZ, SZ});
     auto out = make_tensor<TestType>({SZ});
     (in = DEFAULT).run(exec);
-    sync();
+    exec.sync();
     in(0, SZ/2, 0) = TEST_VAL;
-    sync();
+    exec.sync();
     matx::copy(out, slice<1>(in, {0,0,0}, {matxDropDim,matxEnd,matxDropDim}), exec);
-    sync();
+    exec.sync();
     ASSERT_EQ(out.Rank(), 1);
     ASSERT_EQ(out.Size(0), SZ);
     ASSERT_EQ(out(SZ/2), TEST_VAL);
@@ -148,12 +142,6 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
 
   ExecType exec{};
 
-  auto sync = []() constexpr {
-    if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
-      cudaDeviceSynchronize();
-    }
-  };
-
   const int SZ = 5;
   TestType DEFAULT, TEST_VAL;
   if constexpr (std::is_same_v<TestType, bool>) {
@@ -174,13 +162,13 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
       dims.fill(SZ); \
       auto in = make_tensor<TestType>(dims); \
       (in = DEFAULT).run(exec); \
-      sync(); \
+      exec.sync(); \
       cuda::std::array<index_t, N> inds; \
       inds.fill(SZ/2); \
       in(inds) = TEST_VAL; \
-      sync(); \
+      exec.sync(); \
       auto out = matx::copy(in, exec); \
-      sync(); \
+      exec.sync(); \
       ASSERT_EQ(in(inds), out(inds)); \
       ASSERT_EQ(out(inds), TEST_VAL); \
       inds.fill(0); \
@@ -201,9 +189,9 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
   {
     auto in = make_tensor<TestType>({});
     in() = TEST_VAL;
-    sync();
+    exec.sync();
     auto out = matx::copy(in, exec);
-    sync();
+    exec.sync();
     ASSERT_EQ(in(), out());
     ASSERT_EQ(out(), TEST_VAL);
   }
@@ -212,11 +200,11 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
   {
     auto in = make_tensor<TestType>({SZ, SZ, SZ});
     (in = DEFAULT).run(exec);
-    sync();
+    exec.sync();
     in(0, SZ/2, 0) = TEST_VAL;
-    sync();
+    exec.sync();
     auto out = matx::copy(slice<1>(in, {0,0,0}, {matxDropDim,matxEnd,matxDropDim}), exec);
-    sync();
+    exec.sync();
     ASSERT_EQ(out.Rank(), 1);
     ASSERT_EQ(out.Size(0), SZ);
     ASSERT_EQ(out(SZ/2), TEST_VAL);

@@ -57,8 +57,6 @@ int main() {
   // t2 = ;
   /*** End editing ***/
 
-  t2.PrefetchDevice(0);
-
   /****************************************************************************************************
    * Get a slice of the second and third rows with all columns
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/quickstart.html#slicing-and-dicing

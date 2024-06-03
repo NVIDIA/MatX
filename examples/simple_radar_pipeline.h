@@ -135,7 +135,7 @@ public:
   RadarPipeline(const index_t _numPulses, const index_t _numSamples,
                 index_t _wfLen, index_t _numChannels, cudaStream_t _stream)
       : numPulses(_numPulses), numSamples(_numSamples), waveformLength(_wfLen),
-        numChannels(_numChannels), stream(_stream)
+        numChannels(_numChannels), stream(_stream), exec(_stream)
   {
     numSamplesRnd = 1;
     while (numSamplesRnd < numSamples) {
@@ -202,7 +202,7 @@ public:
 
     // Pre-process CFAR convolution
     (normT = conv2d(ones({numChannels, numPulsesRnd, numCompressedSamples}),
-           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
+           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
     cancelMask.PrefetchDevice(stream);
     ba.PrefetchDevice(stream);
@@ -214,6 +214,14 @@ public:
     inputView.PrefetchDevice(stream);
     tpcView.PrefetchDevice(stream);
     xPow.PrefetchDevice(stream);
+  }
+
+  /**
+   * @brief Sync the pipeline using the underlying executor
+   * 
+   */
+  void sync() {
+    exec.sync();
   }
 
   /**
@@ -242,19 +250,19 @@ public:
     // Apply a Hamming window to the waveform to suppress sidelobes. Other
     // windows could be used as well (e.g., Taylor windows). Ultimately, it is
     // just an element-wise weighting by a pre-computed window function.
-    (waveformPart = waveformPart * hamming<0>({waveformLength})).run(stream);
+    (waveformPart = waveformPart * hamming<0>({waveformLength})).run(exec);
 
     // compute L2 norm
-    (norms = sum(norm(waveformPart))).run(stream);
-    (norms = sqrt(norms)).run(stream);
+    (norms = sum(norm(waveformPart))).run(exec);
+    (norms = sqrt(norms)).run(exec);
 
-    (waveformPart = waveformPart / norms).run(stream);
-    (waveformFull = fft(waveformPart, numSamplesRnd)).run(stream);
-    (waveformFull = conj(waveformFull)).run(stream);
+    (waveformPart = waveformPart / norms).run(exec);
+    (waveformFull = fft(waveformPart, numSamplesRnd)).run(exec);
+    (waveformFull = conj(waveformFull)).run(exec);
 
-    (x = fft(x)).run(stream);
-    (x = x * waveformT).run(stream);
-    (x = ifft(x)).run(stream);
+    (x = fft(x)).run(exec);
+    (x = x * waveformT).run(exec);
+    (x = ifft(x)).run(exec);
   }
 
 
@@ -281,7 +289,7 @@ public:
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
     auto xo = tpcView.Permute({0, 2, 1}).Slice(
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    (xo = conv1d(x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME)).run(stream);
+    (xo = conv1d(x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME)).run(exec);
   }
 
   /**
@@ -309,8 +317,8 @@ public:
 
     (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask.Size(0) - 1),
                           numCompressedSamples}))
-        .run(stream);
-    (xf = fft(xf)).run(stream);
+        .run(exec);
+    (xf = fft(xf)).run(exec);
   }
 
   /**
@@ -350,11 +358,11 @@ public:
    */
   void CFARDetections()
   {
-    (xPow = norm(tpcView)).run(stream);
+    (xPow = norm(tpcView)).run(exec);
 
     // Estimate the background average power in each cell
     // background_averages = conv2(Xpow, mask, 'same') ./ norm;
-    (ba = conv2d(xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(stream);
+    (ba = conv2d(xPow, cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
     // Computing number of cells contributing to each cell.
     // This can be done with a convolution of the cfarMask with
@@ -367,7 +375,7 @@ public:
     auto baTrim = ba.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
                             {numChannels, numPulsesRnd + cfarMaskY / 2,
                              numCompressedSamples + cfarMaskX / 2});
-    (baTrim = baTrim / normTrim).run(stream);
+    (baTrim = baTrim / normTrim).run(exec);
 
     // The scalar alpha is used as a multiplier on the background averages
     // to achieve a constant false alarm rate (under certain assumptions);
@@ -384,9 +392,9 @@ public:
     // efficient as it can avoid repeated loads.
 #if 0
     IFELSE(xPow > normTrim*(pow(pfa, -1.0f/normTrim) - 1.0f)*baTrim,
-                dets = 1, dets = 0).run(stream);
+                dets = 1, dets = 0).run(exec);
 #else
-    calcDets(dets, xPow, baTrim, normTrim, pfa).run(stream);
+    calcDets(dets, xPow, baTrim, normTrim, pfa).run(exec);
 #endif
   }
 
@@ -457,4 +465,5 @@ private:
   tensor_t<typename ComplexType::value_type, 2> cfarMaskView;
 
   cudaStream_t stream;
+  cudaExecutor exec;
 };

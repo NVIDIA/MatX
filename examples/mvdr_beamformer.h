@@ -99,32 +99,33 @@ public:
   /**
    *  Run the entire beamformer
    * 
-   *  @param stream CUDA stream
+   *  @param exec CUDA executor
    */
-  void Run(cudaStream_t stream)
+  void Run(cudaExecutor exec)
   {
-    (vhView = hermitianT(vView)).run(stream);
+    cudaStream_t stream = exec.getStream();
+    (vhView = hermitianT(vView)).run(exec);
 
-    (cbfView = matmul(vhView, inVecView)).run(stream);
+    (cbfView = matmul(vhView, inVecView)).run(exec);
 
     matx::copy(ivsView, inVecView.Slice({0, 0}, {matxEnd, snap_len_}), stream);
 
-    (ivshView = hermitianT(ivsView)).run(stream);
+    (ivshView = hermitianT(ivsView)).run(exec);
 
-    (covMatView = matmul(ivsView, ivshView)).run(stream);
+    (covMatView = matmul(ivsView, ivshView)).run(exec);
 
     (covMatView = (covMatView * (1.0f / static_cast<float>(snap_len_))) +
                    eye<complex>() * load_coeff_)
-        .run(stream);
+        .run(exec);
     inv_impl(invCovMatView, covMatView, stream);
 
     // Find A and B to solve xA=B. Matlab uses A/B to solve for x, which is the
     // same as x = BA^-1
-    (abfBView = matmul(invCovMatView, vView)).run(stream);
-    (abfAView = matmul(vhView, abfBView)).run(stream);
+    (abfBView = matmul(invCovMatView, vView)).run(exec);
+    (abfAView = matmul(vhView, abfBView)).run(exec);
 
     inv_impl(abfAInvView, abfAView, stream);
-    (abfWeightsView = matmul(abfBView, abfAInvView)).run(stream);
+    (abfWeightsView = matmul(abfBView, abfAInvView)).run(exec);
   }
 
   /**

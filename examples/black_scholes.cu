@@ -93,7 +93,7 @@ void compute_black_scholes_matx(tensor_t<T1,1>& K,
                                 tensor_t<T1,1>& r, 
                                 tensor_t<T1,1>& T, 
                                 tensor_t<T1,1>& output, 
-                                cudaStream_t& stream)
+                                cudaExecutor& exec)
 {
     auto VsqrtT = V * sqrt(T);
     auto d1 = (log(S / K) + (r + 0.5 * V * V) * T) / VsqrtT ;
@@ -102,7 +102,7 @@ void compute_black_scholes_matx(tensor_t<T1,1>& K,
     auto cdf_d2 = normcdf(d2);
     auto expRT = exp(-1 * r * T); 
 
-    (output = S * cdf_d1 - K * expRT * cdf_d2).run(stream);
+    (output = S * cdf_d1 - K * expRT * cdf_d2).run(exec);
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
@@ -124,9 +124,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  cudaExecutor exec{stream};
 
-  // Prefetch all data
-  compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, stream);  
+  compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);  
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -135,10 +135,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
   // Time non-operator version
   for (uint32_t i = 0; i < num_iterations; i++) {
-    compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, stream);
+    compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);
   }
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Time without custom operator = %.2fms per iteration\n",
@@ -147,10 +147,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
   // Time non-operator version
   for (uint32_t i = 0; i < num_iterations; i++) {
-    BlackScholes(output_tensor, K_tensor, V_tensor, S_tensor, r_tensor, T_tensor).run(stream);
+    BlackScholes(output_tensor, K_tensor, V_tensor, S_tensor, r_tensor, T_tensor).run(exec);
   }
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Time with custom operator = %.2fms per iteration\n",

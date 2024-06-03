@@ -71,10 +71,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     MATX_NVTX_START_RANGE("Pipeline Initialize", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1)
     printf("Initializing data structures for stream %d...\n", s);
     pipelines[s] = new RadarPipeline(numPulses, numSamples, waveformLength, numChannels, streams[s]);
-    pipelines[s]->GetInputView().PrefetchDevice(streams[s]);
     MATX_NVTX_END_RANGE(1)
 
-    cudaStreamSynchronize(streams[s]);    
+    pipelines[s]->sync();  
   }
 
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
@@ -129,7 +128,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   for (int s = 0; s < num_streams; s++) {
     cudaEventRecord(stops[s], streams[s]);
-    cudaStreamSynchronize(streams[s]);
+    pipelines[s]->sync();
   }
   MATX_NVTX_END_RANGE(2)
   

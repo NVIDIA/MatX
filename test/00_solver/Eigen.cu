@@ -94,7 +94,7 @@ TYPED_TEST(EigenSolverTestNonComplexFloatTypes, EigenBasic)
     // Compute A*v
 
     (this->Gtv = matmul(this->Bv, this->Wv)).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
     // Compare
     for (index_t j = 0; j < dim_size; j++) {
       ASSERT_NEAR(this->Gtv(j, 0), this->Lvv(j, 0), 0.001);

@@ -49,6 +49,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
+  cudaExecutor exec{};
+
   using ValueType = double;
 
   int l = 3;
@@ -76,9 +78,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Y = make_tensor<ValueType>(Ym.Shape());
   auto Z = make_tensor<ValueType>(Zm.Shape());
 
-  (X = Xm, Y = Ym, Z=Zm).run();
+  (X = Xm, Y = Ym, Z=Zm).run(exec);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
 #if MATX_ENABLE_VIZ
   matx::viz::surf(X, Y, Z, "test-viz.html");

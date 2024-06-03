@@ -48,9 +48,9 @@ TEST(Radar, MVDRBeamformer)
   index_t data_len = 1000;
   index_t snap_len = 2 * num_el;
 
-  auto mvdr = MVDRBeamformer(num_beams, num_el, data_len, snap_len);
+  cudaExecutor exec{};
 
-  mvdr.Prefetch(0);
+  auto mvdr = MVDRBeamformer(num_beams, num_el, data_len, snap_len);
 
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->InitAndRunTVGenerator<complex>("mvdr_beamformer", "mvdr_beamformer",
@@ -64,8 +64,8 @@ TEST(Radar, MVDRBeamformer)
   pb->NumpyToTensorView(in_vec, "in_vec");
   pb->NumpyToTensorView(v, "v");
 
-  mvdr.Run(0);
-  cudaStreamSynchronize(0);
+  mvdr.Run(exec);
+  exec.sync();
 
   auto cbf = mvdr.GetCBFView();
 

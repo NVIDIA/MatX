@@ -10,6 +10,7 @@ template <typename ValueType>
 void vector_add(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
+  cudaExecutor exec{0};
   const int x_len = static_cast<int>(state.get_int64("Vector size"));
 
   state.add_element_count(x_len, "NumElements");
@@ -19,9 +20,9 @@ void vector_add(nvbench::state &state, nvbench::type_list<ValueType>)
 
   tensor_t<ValueType, 1> xv{{x_len}};
   tensor_t<ValueType, 1> xv2{{x_len}};
-  xv.PrefetchDevice(0);
-  (xv = xv + xv2).run();
-  cudaDeviceSynchronize();
+
+  (xv = xv + xv2).run(exec);
+  exec.sync();
 
   state.exec( 
     [&xv, &xv2](nvbench::launch &launch) {
@@ -38,6 +39,7 @@ using permute_types = nvbench::type_list<float, double, cuda::std::complex<float
 template <typename ValueType>
 void permute(nvbench::state &state, nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto x = make_tensor<ValueType>({1000,200,6,300});
   auto y = make_tensor<ValueType>({300,1000,6,200});
 
@@ -46,7 +48,7 @@ void permute(nvbench::state &state, nvbench::type_list<ValueType>)
   state.add_global_memory_writes<ValueType>(x.TotalSize());    
 
   x.PrefetchDevice(0);
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec( 
     [&x, &y](nvbench::launch &launch) {
@@ -61,17 +63,18 @@ using random_types = nvbench::type_list<float, double, cuda::std::complex<float>
 template <typename ValueType>
 void random(nvbench::state &state, nvbench::type_list<ValueType>)
 {
+  cudaExecutor exec{0};
   auto x = make_tensor<ValueType>({1966800});
   auto y = make_tensor<ValueType>({1966800});
   x.PrefetchDevice(0);
   y.PrefetchDevice(0);
 
-  (y = random<float>(x.Shape(), NORMAL)).run();
+  (y = random<float>(x.Shape(), NORMAL)).run(exec);
 
   state.add_element_count(x.TotalSize(), "NumElements");
   state.add_global_memory_writes<ValueType>(x.TotalSize());    
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   state.exec( 
     [&x, &y](nvbench::launch &launch) {
@@ -98,6 +101,7 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
   int n = 600;
   ValueType dx = M_PI/n;
   
+  cudaExecutor exec{};
   auto col = range<0>({n+1},ValueType(0), ValueType(dx));
   auto az = range<0>({2*n+1}, ValueType(0), ValueType(dx));
 
@@ -122,8 +126,8 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
   auto Y = make_tensor<ValueType>(Ym.Shape());
   auto Z = make_tensor<ValueType>(Zm.Shape());
 
-  cudaDeviceSynchronize();
-
+  exec.sync();
+  
   state.add_element_count(n+1, "Elements");
 
   state.exec( 

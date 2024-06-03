@@ -82,7 +82,7 @@ TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
   // solve, then transpose again to compare to Python
   (mtie(this->Av, this->TauV) = cusolver_qr(this->Av)).run(this->exec);
   // example-end cusolver_qr-test-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // For now we're only verifying R. Q is a bit more complex to compute since
   // cuSolver/BLAS don't return Q, and instead return Householder reflections

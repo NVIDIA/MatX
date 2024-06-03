@@ -63,6 +63,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
+  cudaExecutor exec{stream};
 
   cudaEvent_t start, stop;
 
@@ -109,23 +110,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-  inView.PrefetchDevice(stream);
-  outView.PrefetchDevice(stream);
-
   // Measure recursive runtime
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventRecord(start, stream);
 
   for (uint32_t i = 0; i < iterations; i++) {
     // example-begin filter-example-1
     // Perform an IIR filter on "inView" with rCoeffs and nrCoeffs recursive/non-recursive
     // coefficients, respectively
-    (outView = filter(inView, rCoeffs, nrCoeffs)).run(stream);
+    (outView = filter(inView, rCoeffs, nrCoeffs)).run(exec);
     // example-end filter-example-1
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
   time_ms /= static_cast<float>(iterations);
 

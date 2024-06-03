@@ -77,7 +77,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
   // Perform an inverse on matrix "A" and store the output in "Ainv"
   (Ainv = inv(A)).run(this->exec);
   // example-end inv-test-1  
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {
@@ -108,7 +108,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
   (Ainv = inv(A)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t b = 0; b < A.Size(0); b++) {
     for (index_t i = 0; i < A.Size(1); i++) {
@@ -141,7 +141,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8)
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
   (Ainv = inv(A)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {
@@ -172,7 +172,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8Batched)
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
   (Ainv = inv(A)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t b = 0; b < A.Size(0); b++) {
     for (index_t i = 0; i < A.Size(1); i++) {
@@ -206,7 +206,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv256x256)
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
   (Ainv = inv(A)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {

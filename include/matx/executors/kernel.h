@@ -62,19 +62,6 @@ __global__ void matxOpT1Kernel(Op op, index_t size0) {
   }
 }
 
-template <class Op>
-__global__ void matxOpT1StrideKernel(Op op, index_t size0) {
-  for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x; 
-      idx < size0;
-      idx += blockDim.x * gridDim.x) {
-    if constexpr (std::is_pointer_v<Op>) {
-      (*op)(idx); 
-    }
-    else {
-      op(idx);
-    }
-  }
-}
 
 template <class Op>
 __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {

@@ -153,7 +153,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
 
   (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   // Read "myvar" from mat file
   io::write_mat(t, "test_write.mat", "myvar");
@@ -182,7 +182,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
 
   (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   // Read "myvar" from mat file
   io::write_mat(t, "test_write.mat", "myvar");
@@ -213,7 +213,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
 
   (t = random<float>(t.Shape(), UNIFORM)).run(this->exec);
 
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   // Read "myvar" from mat file
   io::write_mat(t, "test_write.mat", "myvar");

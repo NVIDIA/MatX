@@ -369,9 +369,9 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideA)
   (b = b0).run();
 
   // Perform a batched gemm with "batches" GEMMs
-  (c = matmul(a0, b)).run();
+  (c = matmul(a0, b)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (int i = 0; i < c.Size(0); i++) {
     for (int j = 0; j < c.Size(1); j++) {
@@ -409,9 +409,9 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideB)
   (a = a0).run();
 
   // Perform a batched gemm with "batches" GEMMs
-  (c = matmul(a, b0)).run();
+  (c = matmul(a, b0)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (int i = 0; i < c.Size(0); i++) {
     for (int j = 0; j < c.Size(1); j++) {
@@ -545,14 +545,14 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     auto bp = permute(bi, perm);
     auto cp = permute(ci, perm);
 
-    (ap = a3).run();
-    (bp = b3).run();
+    (ap = a3).run(this->exec);
+    (bp = b3).run(this->exec);
 
     (ci = matmul(ai, bi, axis)).run();
     
-    (c3 = cp).run();
+    (c3 = cp).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
   }
@@ -571,17 +571,17 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     auto cp = permute(ci, perm);
 
     // copy data into permuted inputs
-    (ap = a3).run();
-    (bp = b3).run();
+    (ap = a3).run(this->exec);
+    (bp = b3).run(this->exec);
 
     // Perform a GEMM with the last two dimensions permuted
-    (ci = matmul(ai, bi, axis)).run();
+    (ci = matmul(ai, bi, axis)).run(this->exec);
     // example-end matmul-test-6    
     
     // copy result from permuted output
-    (c3 = cp).run();
+    (c3 = cp).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
   }
@@ -599,15 +599,15 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     auto cp = permute(ci, perm);
 
     // copy data into permuted inputs
-    (ap = a3).run();
-    (bp = b3).run();
+    (ap = a3).run(this->exec);
+    (bp = b3).run(this->exec);
 
-    (ci = matmul(ai, bi, axis)).run();
+    (ci = matmul(ai, bi, axis)).run(this->exec);
     
     // copy result from permuted output
-    (c3 = cp).run();
+    (c3 = cp).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
   }
@@ -625,15 +625,15 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     auto cp = permute(ci, perm);
 
     // copy data into permuted inputs
-    (ap = a3).run();
-    (bp = b3).run();
+    (ap = a3).run(this->exec);
+    (bp = b3).run(this->exec);
 
-    (ci = matmul(ai, bi, axis)).run();
+    (ci = matmul(ai, bi, axis)).run(this->exec);
     
     // copy result from permuted output
-    (c3 = cp).run();
+    (c3 = cp).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
   }
@@ -701,7 +701,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulBroadcast)
   // Broadcast eye2, scaling each entry in a5 by 2
   (c5 = matmul(eye2, a5)).run(this->exec);
 
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   for (index_t i0 = 0; i0 < x; i0++)
     for (index_t i1 = 0; i1 < y; i1++)
@@ -720,7 +720,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulBroadcast)
   // Broadcast eye2, scaling each entry in a5 by 2
   (c5 = matmul(a5, eye2)).run(this->exec);
 
-  cudaDeviceSynchronize();
+  this->exec.sync();
 
   for (index_t i0 = 0; i0 < x; i0++)
     for (index_t i1 = 0; i1 < y; i1++)
@@ -828,9 +828,9 @@ TYPED_TEST(MatMulTestFloatTypes, MediumMatVecBatch)
 
   tensor_t<TestType, 2> bv{{blocks, k}};
   tensor_t<TestType, 2> cv{{blocks, m}};
-  (bv = bs).run();
-  (cv = cs).run();
-  (cv = matvec(a, bv)).run();
+  (bv = bs).run(this->exec);
+  (cv = cs).run(this->exec);
+  (cv = matvec(a, bv)).run(this->exec);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -859,15 +859,15 @@ TYPED_TEST(MatMulTestFloatTypes, MatVecRowVector)
 
   auto cs = slice<2>(c, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
   auto bs = slice<2>(b, {0,0,0}, {matxEnd, matxEnd, matxDropDim});
-  (cs = matvec(a, bs)).run();
+  (cs = matvec(a, bs)).run(this->exec);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   tensor_t<TestType, 2> bv{{blocks, k}};
   tensor_t<TestType, 2> cv{{blocks, m}};
-  (bv = bs).run();
-  (cv = cs).run();
-  (cv = matvec(a, bv)).run();
+  (bv = bs).run(this->exec);
+  (cv = cs).run(this->exec);
+  (cv = matvec(a, bv)).run(this->exec);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
@@ -894,10 +894,10 @@ TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
   this->pb->NumpyToTensorView(b, "b");
 
   // example-begin outer-test-1
-  (c = outer(a, b)).run();
+  (c = outer(a, b)).run(this->exec);
   // example-end outer-test-1
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   auto ba = make_tensor<TestType>({batches, an});
@@ -906,9 +906,9 @@ TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
   this->pb->NumpyToTensorView(bb, "bb");
 
   auto bc = make_tensor<TestType>({batches, an, bn});  
-  (bc = outer(ba, bb)).run();
+  (bc = outer(ba, bb)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   MATX_TEST_ASSERT_COMPARE(this->pb, bc, "bc", this->thresh);
 
   MATX_EXIT_HANDLER();

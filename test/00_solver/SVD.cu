@@ -94,7 +94,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
   // example-end svd-test-1
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // Since SVD produces a solution that's not necessarily unique, we cannot
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
@@ -105,14 +105,14 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 
   // Zero out s
   (Sav = zeros<typename inner_op_type_t<TestType>::type>({m, n})).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // Construct S matrix since it's just a vector from cuSolver
   for (index_t i = 0; i < n; i++) {
     Sav(i, i) = Sv(i);
   }
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   (SSolav = 0).run(this->exec);
   if constexpr (is_complex_v<TestType>) {
@@ -124,7 +124,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 
   (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
   (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t i = 0; i < Av.Size(0); i++) {
     for (index_t j = 0; j < Av.Size(1); j++) {
@@ -175,7 +175,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   auto Atv2 = Atv.View({batches, m, n});
   (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // Since SVD produces a solution that's not necessarily unique, we cannot
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
@@ -186,7 +186,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   // Zero out s
   (Sav = zeros<typename inner_op_type_t<TestType>::type>({batches, m, n})).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   // Construct S matrix since it's just a vector from cuSolver
   for (index_t b = 0; b < batches; b++) {
@@ -195,7 +195,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
     }
   }
 
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   (SSolav = 0).run(this->exec);
   if constexpr (is_complex_v<TestType>) {
@@ -207,7 +207,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
   (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for (index_t b = 0; b < batches; b++) {
     for (index_t i = 0; i < Av.Size(0); i++) {
@@ -313,7 +313,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (mdiffV = max(VTVd)).run(exec);
   (mdiffA = max(Ad)).run(exec);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
 #if 0
   printf("A\n"); print(A);
@@ -363,7 +363,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
 
   cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
   index_t mm = Ashape[RANK-2];
   index_t nn = Ashape[RANK-1];
@@ -445,7 +445,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (mdiffV = max(VTVd)).run(exec);
   (mdiffA = max(Ad)).run(exec);
 
-  cudaDeviceSynchronize();
+  exec.sync();
 
 #if 0
   printf("A\n"); print(A);
@@ -467,7 +467,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   ASSERT_NEAR( mdiffV(), SType(0), .1);
   ASSERT_NEAR( mdiffA(), SType(0), .00001);
   
-  cudaDeviceSynchronize();
+  exec.sync();
 }
 
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBPI)

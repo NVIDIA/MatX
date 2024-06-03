@@ -121,7 +121,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   // Perform a 3D tensor contraction
   (c2 = cutensor::einsum("ijk,jil->kl", a, b)).run(exec);
   // example-end einsum-contraction-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
 
   MATX_EXIT_HANDLER();
@@ -146,7 +146,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
   // Perform a dot product of b1 with itself and store in a1
   (c0 = cutensor::einsum("i,i->", a1, b1)).run(exec);
   // example-end einsum-dot-1
-  cudaStreamSynchronize(0);
+  exec.sync();
   MATX_ASSERT_EQ(c0(), 4 * a1.Size(0));
 
   MATX_EXIT_HANDLER();
@@ -173,7 +173,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
   (c2 = cutensor::einsum("mk,kn->mn", a2, b2)).run(exec);
   (c22 = matmul(a2, b2)).run(exec);
   // example-end einsum-gemm-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (auto i = 0; i < c2.Size(0); i++) {
     for (auto j = 0; j < c2.Size(1); j++) {
@@ -203,7 +203,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
   (c2 = cutensor::einsum("mk,kn->nm", a2, b2)).run(exec);
   // example-end einsum-gemm-2
   (c22 = matmul(a2, b2)).run(exec);
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   auto c22t = c22.Permute({1,0}); // Permute to match cutensor
 
@@ -232,7 +232,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
   (b = cutensor::einsum("ijkl->jlki", a)).run(exec);
   (b2 = a.Permute({1,3,2,0})).run(exec);
   // example-end einsum-permute-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   for (auto i = 0; i < b.Size(0); i++) {
     for (auto j = 0; j < b.Size(1); j++) {
@@ -264,7 +264,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Sum)
   (b = matx::cutensor::einsum("ij->j", a)).run(exec);
   // example-end einsum-sum-1
     
-  cudaStreamSynchronize(0);
+  exec.sync();
   for (auto i = 0; i < a.Size(1); i++) {
     TestType s = 0;
     for (auto j = 0; j < a.Size(0); j++) {
@@ -294,7 +294,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
   (c0_1 = trace(a2)).run(exec);
 
   // example-end einsum-trace-1
-  cudaStreamSynchronize(0);
+  exec.sync();
 
   MATX_ASSERT_EQ(c0_0(), c0_1());
   MATX_ASSERT_EQ(c0_0(), 10);

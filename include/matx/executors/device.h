@@ -63,11 +63,17 @@ namespace matx
        */
       cudaExecutor() : stream_(0) {}
 
-      /*
-       * @breif Returns stream associated with executor
-       */
+      /**
+       * @brief Returns stream associated with executor
+      */
       auto getStream() const { return stream_; }
 
+      /**
+       * @brief Synchronize the cuda executor's stream
+       * 
+       */
+      void sync() { cudaStreamSynchronize(stream_); }
+      
       /**
        * Execute an operator on a device
        * 
@@ -98,11 +104,7 @@ namespace matx
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
 
             if constexpr (Op::Rank() == 1) {
-              if(stride) {
-                detail::matxOpT1StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else {
-                detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              }
+              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {

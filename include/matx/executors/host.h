@@ -73,6 +73,12 @@ class HostExecutor {
     HostExecutor(const HostExecParams &params = HostExecParams{}) : params_(params) {}
 
     /**
+     * @brief Synchronize the host executor's threads. Currently a noop as the executor is single-threaded.
+     * 
+     */
+    void sync() {}
+
+    /**
      * @brief Execute an operator
      * 
      * @tparam Op Operator type

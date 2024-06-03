@@ -65,6 +65,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+  cudaExecutor exec{stream};
+
   float fs = 10000;
   constexpr index_t N = 100000;
   float amp = static_cast<float>(2 * sqrt(2));
@@ -92,17 +94,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
   (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
-      .run(stream);
+      .run(exec);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
-  (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(stream);
+  (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(exec);
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
-  (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(stream);
+  (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(exec);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(stream);
+  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(exec);
   // noise *= np.exp(-time/5)
-  (noise = noise * exp(-1.0f * time / 5.0f)).run(stream);
+  (noise = noise * exp(-1.0f * time / 5.0f)).run(exec);
   // x = carrier + noise
-  (x = carrier + noise).run(stream);
+  (x = carrier + noise).run(exec);
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     if (i == 2) { // Start timer on third loop to allow generation of plot
@@ -112,15 +114,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     // DFT Sample Frequencies (rfftfreq)
     (freqs = (1.0 / (static_cast<float>(nfft) * 1 / fs)) *
                linspace<0>(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
-        .run(stream);
+        .run(exec);
 
     // Create overlapping matrix of segments.
     auto stackedMatrix = overlap(x, {nperseg}, {nstep});
     // FFT along rows
-    (fftStackedMatrix = fft(stackedMatrix)).run(stream);
+    (fftStackedMatrix = fft(stackedMatrix)).run(exec);
     // Absolute value
     (fftStackedMatrix = conj(fftStackedMatrix) * fftStackedMatrix)
-        .run(stream);
+        .run(exec);
     // Get real part and transpose
     auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
 
@@ -128,7 +130,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (s_time = linspace<0>(s_time_shape, static_cast<float>(nperseg) / 2.0f,
                            static_cast<float>(N - nperseg) / 2.0f + 1) /
                 fs)
-        .run(stream);
+        .run(exec);
 
     if (i == 1) {
 #if MATX_ENABLE_VIZ
@@ -142,7 +144,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
 
   cudaEventRecord(stop, stream);
-  cudaStreamSynchronize(stream);
+  exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Spectrogram Time Without Graphs = %.2fus per iteration\n",

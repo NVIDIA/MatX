@@ -98,7 +98,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024C2C)
   // type of the tensors and output size.
   (avo = fft(av)).run(this->exec);
   // example-end fft-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -121,7 +121,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1DFWD1024C2C)
   // type of the tensors and output size.
   (avo = fft(av, fft_dim, FFTNorm::FORWARD)).run(this->exec);
   // example-end fft-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -144,7 +144,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1DORTHO1024C2C)
   // type of the tensors and output size.
   (avo = fft(av, fft_dim, FFTNorm::ORTHO)).run(this->exec);
   // example-end fft-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -178,7 +178,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
   (out2 = fft(in, {2})).run(this->exec);
 
   // example-end fft-2
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -195,7 +195,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
   (out2 = fft(in, {1})).run(this->exec);  
 
   // example-end fft-3
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -211,7 +211,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
   (out1 = ifft(in)).run(this->exec);
   (out2 = ifft(in, {2})).run(this->exec);    
   // example-end ifft-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -227,7 +227,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
   (out1.Permute({0,2,1}) = ifft(in.Permute({0,2,1}))).run(this->exec);
   (out2 = ifft(in, {1})).run(this->exec);    
   // example-end ifft-2
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -242,7 +242,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
     (out1.Permute({0,2,1}) = fft(permute(in1, {0,2,1}))).run(this->exec);
     (out2 = fft(in1, {1})).run(this->exec);
 
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     for(int i = 0; i < d1; i++) {
       for(int j = 0; j < d2; j++) {
@@ -255,7 +255,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
 
     (out1.Permute({1,2,0}) = ifft(permute(in1, {1,2,0}))).run(this->exec);
     (out2 = ifft(in1, {0})).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     for(int i = 0; i < d1; i++) {
       for(int j = 0; j < d2; j++) {
@@ -296,7 +296,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   (out1 = fft2(in)).run(this->exec);
   (out2 = fft2(in, {1,2})).run(this->exec);
   // example-end fft2-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -312,7 +312,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   (out1.Permute({1,2,0}) = fft2(in.Permute({1,2,0}))).run(this->exec);
   (out2 = fft2(in, {2,0})).run(this->exec);
   // example-end fft2-2
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -324,7 +324,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 
   (out1.Permute({1,0,2}) = fft2(in.Permute({1,0,2}))).run(this->exec);
   (out2 = fft2(in, {0,2})).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -340,7 +340,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   (out1 = ifft2(in)).run(this->exec);
   (out2 = ifft2(in, {1,2})).run(this->exec);
   // example-end ifft2-1
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -356,7 +356,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   (out1.Permute({1,2,0}) = ifft2(in.Permute({1,2,0}))).run(this->exec);
   (out2 = ifft2(in, {2,0})).run(this->exec);
   // example-end ifft2-2
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -368,7 +368,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 
   (out1.Permute({1,0,2}) = ifft2(in.Permute({1,0,2}))).run(this->exec);
   (out2 = ifft2(in, {0,2})).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
   
   for(int i = 0; i < d1; i++) {
     for(int j = 0; j < d2; j++) {
@@ -383,7 +383,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 
     (out1.Permute({1,0,2}) = fft2(permute(in1, {1,0,2}))).run(this->exec);
     (out2 = fft2(in1, {0,2})).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     for(int i = 0; i < d1; i++) {
       for(int j = 0; j < d2; j++) {
@@ -396,7 +396,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 
     (out1.Permute({1,0,2}) = ifft2(permute(in1, {1,0,2}))).run(this->exec);
     (out2 = ifft2(in1, {0,2})).run(this->exec);
-    cudaStreamSynchronize(0);
+    this->exec.sync();
 
     for(int i = 0; i < d1; i++) {
       for(int j = 0; j < d2; j++) {
@@ -422,7 +422,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -440,7 +440,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1DORTHO1024C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft(av, fft_dim, FFTNorm::ORTHO)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -458,7 +458,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1DFWD1024C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft(av, fft_dim, FFTNorm::FORWARD)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -479,7 +479,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadC2C)
   // Specify the FFT size as bigger than av. Thus, av will be zero-padded to the appropriate size
   (avo = fft(av, fft_dim * 2)).run(this->exec);
   // example-end fft-4
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -497,7 +497,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft(av, fft_dim*2)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
 
@@ -505,7 +505,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadBatchedC2C)
   // Perform an FFT but force the size to be fft_dim * 2 instead of the output size
   (avo = fft(av, fft_dim * 2)).run(this->exec); // Force the FFT size
   // example-end fft-5
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);  
   MATX_EXIT_HANDLER();
@@ -524,7 +524,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
 
   // Specify the IFFT size as bigger than av. Thus, av will be zero-padded to the appropriate size
   (avo = ifft(av, fft_dim * 2)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -545,7 +545,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024R2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -566,7 +566,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadR2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft(av, fft_dim*2)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -588,28 +588,28 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
     auto t2 = make_tensor<ComplexType>({2*N});
     // We do not implicitly zero-pad to a larger transform size
     (t2 = fft(tc)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
   }, matx::detail::matxException);
 
   // C2C, output size smaller than input size
   ASSERT_THROW({
     auto t2 = make_tensor<ComplexType>({(N/2)+1});
     (t2 = fft(tc)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
   }, matx::detail::matxException);
 
   // R2C, output size smaller than N/2 + 1
   ASSERT_THROW({
     auto t2 = make_tensor<ComplexType>({N/2});
     (t2 = fft(tr)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
   }, matx::detail::matxException);
 
   // R2C, output size larger than N/2 + 1
   ASSERT_THROW({
     auto t2 = make_tensor<ComplexType>({N/2+2});
     (t2 = fft(tr)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
   }, matx::detail::matxException);
 
   // C2R, output size smaller than N
@@ -617,7 +617,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
     auto tcs = slice(tc, {0}, {N/2+1});
     auto t2 = make_tensor<RealType>({N-1});
     (t2 = fft(tcs)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
   }, matx::detail::matxException);
 
   // C2R, output size too large
@@ -625,7 +625,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
     auto tcs = slice(tc, {0}, {N/2+1});
     auto t2 = make_tensor<RealType>({N+2});
     (t2 = fft(tcs)).run(this->exec);
-    cudaDeviceSynchronize();
+    this->exec.sync();
  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
@@ -645,7 +645,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadBatchedR2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft(av, fft_dim*2)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -664,7 +664,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -683,7 +683,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16x32C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -704,7 +704,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedC2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -726,7 +726,7 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16BatchedStridedC2C)
 
   const int32_t axes[] = {0, 2};
   (avo = fft2(av, axes)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -745,7 +745,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -764,7 +764,7 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16x32C2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -784,7 +784,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16R2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -804,7 +804,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16x32R2C)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -824,7 +824,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16C2R)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -844,7 +844,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16x32C2R)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft2(av)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -864,7 +864,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024C2CShort)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = fft(av, fft_dim - 16)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
@@ -883,7 +883,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, IFFT1D1024C2CShort)
   this->pb->NumpyToTensorView(av, "a_in");
 
   (avo = ifft(av, fft_dim - 16)).run(this->exec);
-  cudaStreamSynchronize(0);
+  this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
   MATX_EXIT_HANDLER();
