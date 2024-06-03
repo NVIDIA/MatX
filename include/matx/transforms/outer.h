@@ -49,7 +49,7 @@ namespace matx {
  * @tparam TensorTypeB
  *    Data type of B tensor or operator
  * @tparam PROV
- *    Provider type chosen from MatXMatMulProvider_t type
+ *    Provider type chosen from MatMulCUDAProvider_t type
  *
  * @param C
  *   C output tensor or operator
@@ -57,18 +57,18 @@ namespace matx {
  *   A input tensor or operator
  * @param B
  *   B input tensor or operator
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  * @param alpha
  *   Scalar multiplier to apply to operator A
  * @param beta
  *   Scalar multiplier to apply to operator C on input
  */
-template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, typename Executor,
+          MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 __MATX_INLINE__ void outer_impl(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B,
-            cudaStream_t stream = 0,
+            const Executor &exec,
             float alpha = 1.0, float beta = 0.0)
 {
   MATX_STATIC_ASSERT_STR(TensorTypeA::Rank() == TensorTypeB::Rank(), matxInvalidDim, "outer: A and B ranks must match");
@@ -97,7 +97,11 @@ __MATX_INLINE__ void outer_impl(TensorTypeC C, const TensorTypeA A,
   auto act = clone<TensorTypeA::Rank() + 1>(A, ac);
   auto bct = clone<TensorTypeB::Rank() + 1>(B, bc);
 
-  matmul_impl<decltype(C), decltype(act), decltype(bct), PROV>(C, act, bct, stream, alpha, beta);
+  if constexpr (is_cuda_executor_v<Executor>) {
+    matmul_impl<decltype(C), decltype(act), decltype(bct), PROV>(C, act, bct, exec, alpha, beta);
+  } else {
+    matmul_impl<decltype(C), decltype(act), decltype(bct)>(C, act, bct, exec, alpha, beta);
+  }
 }
 
 };

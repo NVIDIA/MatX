@@ -47,6 +47,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/transforms/matmul/matmul_common.h"
 
 namespace matx {
 
@@ -61,7 +62,7 @@ typedef enum {
   PROVIDER_TYPE_AUTO,         ///< Automatically select
 
   PROVIDER_TYPE_SENTINEL ///< Sentinel value. Do not use
-} MatXMatMulProvider_t;
+} MatMulCUDAProvider_t;
 
 
 namespace detail {
@@ -70,15 +71,8 @@ typedef enum {
   MEM_ORDER_COL_MAJOR = 1,
 } MemOrder_t;
 
-union MatMulScaleType_t {
-  float f32;
-  double f64;
-  float cf32[2];
-  double cf64[2];
-};
-
-template <typename OpA, typename OpB, typename OpC, MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-constexpr bool CompatibleGemmTypes() {
+template <typename OpA, typename OpB, typename OpC, MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+constexpr bool CompatibleGemmCUDATypes() {
   if constexpr (!std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
                 !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type> &&
                 !std::is_same_v<typename OpA::scalar_type, typename OpC::scalar_type>) {
@@ -115,10 +109,10 @@ constexpr bool CompatibleGemmTypes() {
 }
 
 /**
- * Parameters needed to execute a GEMM. For the most part, these are very
+ * Parameters needed to execute a CUDA GEMM. For the most part, these are very
  * similar to that of a standard GEMM call
  */
-struct MatMulParams_t {
+struct MatMulCUDAParams_t {
   index_t a_rows = 0;
   index_t a_cols = 0;
   index_t b_rows = 0;
@@ -136,7 +130,7 @@ struct MatMulParams_t {
   index_t astride; // batch stride
   index_t bstride; // batch stride
   index_t cstride; // batch stride
-  MatXMatMulProvider_t prov;
+  MatMulCUDAProvider_t prov;
   cudaStream_t stream;
   MatXDataType_t dtype;
   cublasOperation_t opA;
@@ -144,8 +138,8 @@ struct MatMulParams_t {
 };
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
-class matxMatMulHandle_t {
+          MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+class MatMulCUDAHandle_t {
 public:
   using T1 = typename TensorTypeC::scalar_type;
   using T2 = typename TensorTypeA::scalar_type;
@@ -160,7 +154,7 @@ public:
    * Construct a GEMM handle
    *
    * Creates a GEMM handle for the view shapes and provider type given. The view
-   * shapres are used to create the underlying metadata used for the GEMM, so a
+   * shapes are used to create the underlying metadata used for the GEMM, so a
    * handle should only be used for views of identical sizes. The provider
    * chooses the underlying library used to perform the GEMM. Certain providers
    * have more features than others and may perform differently than others. At
@@ -175,7 +169,7 @@ public:
    * @tparam T3
    *    Type of B matrix
    * @tparam PROV
-   *    Provider type chosen from MatXMatMulProvider_t type
+   *    Provider type chosen from MatMulCUDAProvider_t type
    *
    * @param c
    *   C matrix view
@@ -185,7 +179,7 @@ public:
    *   B matrix view
    *
    */
-  matxMatMulHandle_t(TensorTypeC &c, const TensorTypeA &a,
+  MatMulCUDAHandle_t(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -264,7 +258,7 @@ public:
     }
   }
 
-  static detail::MatMulParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
+  static detail::MatMulCUDAParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
     /* If a user passes in a tensor where the last two dimensions are transposed we retain
@@ -275,7 +269,7 @@ public:
        as input to the GEMM, the data is no longer transposed in memory and we simply use
        the same memory layout as a non-transposed real matrix would use.
     */
-    detail::MatMulParams_t params;
+    detail::MatMulCUDAParams_t params;
     params.dtype = TypeToInt<T1>();
     params.prov = PROV;
     params.rank = c.Rank();
@@ -355,7 +349,7 @@ public:
         params.k =
             static_cast<int>(a.Size(TensorTypeA::Rank() - 2)); // Gemm Problem dimensions
         params.lda = static_cast<int>(b.Stride(TensorTypeB::Rank() - 1));
-        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1));
+        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1)); 
         params.ldc = static_cast<int>(c.Stride(RANK - 1));
       }
     }
@@ -391,7 +385,6 @@ public:
         // matrix had more than 1 row.
         if (params.opB == CUBLAS_OP_T) {
           params.ldb = b.Stride(TensorTypeB::Rank() - 1);
-          params.ldb = (params.ldb == 0) ? b.Size(TensorTypeB::Rank() - 2) : params.ldb;
         }
         else {
           params.ldb = b.Stride(TensorTypeB::Rank() - 2);
@@ -400,7 +393,6 @@ public:
 
         if (params.opA == CUBLAS_OP_T) {
           params.lda = a.Stride(TensorTypeA::Rank() - 1);
-          params.lda = (params.lda == 0) ? a.Size(TensorTypeA::Rank() - 2) : params.lda;
         }
         else {
           params.lda = a.Stride(TensorTypeA::Rank() - 2);
@@ -445,7 +437,7 @@ public:
    * created
    *
    */
-  ~matxMatMulHandle_t()
+  ~MatMulCUDAHandle_t()
   {
     matxFree(workspace);
 
@@ -484,10 +476,6 @@ public:
  * @note views being passed to matxGemm must not be permuted and must have a
  * contigous stride currently.
  *
- * @tparam T1
- *   Type of beta
- * @tparam T2
- *   Type of alpha
  * @param c
  *   Output tensor C
  * @param a
@@ -534,7 +522,7 @@ private:
   void *b_hp = nullptr;
   size_t workspaceSize = 0;
   void *workspace = nullptr;
-  detail::MatMulParams_t params_;
+  detail::MatMulCUDAParams_t params_;
 
   void ConfigureCublasLt()
   {
@@ -1077,8 +1065,8 @@ private:
  * doesn't need to be perfect, but fast enough to not slow down lookups, and
  * different enough so the common GEMM parameters change
  */
-struct MatMulParamsKeyHash {
-  std::size_t operator()(const MatMulParams_t &k) const noexcept
+struct MatMulCUDAParamsKeyHash {
+  std::size_t operator()(const MatMulCUDAParams_t &k) const noexcept
   {
     return std::hash<uint64_t>()(k.m) + std::hash<uint64_t>()(k.n) +
            std::hash<uint64_t>()(k.k) + std::hash<uint64_t>()(k.batch) +
@@ -1091,8 +1079,8 @@ struct MatMulParamsKeyHash {
  * Test GEMM parameters for equality. Unlike the hash, all parameters must
  * match.
  */
-struct MatMulParamsKeyEq {
-  bool operator()(const MatMulParams_t &l, const MatMulParams_t &t) const
+struct MatMulCUDAParamsKeyEq {
+  bool operator()(const MatMulCUDAParams_t &l, const MatMulCUDAParams_t &t) const
       noexcept
   {
     return l.m == t.m && l.n == t.n && l.k == t.k && l.a_rows == t.a_rows &&
@@ -1107,7 +1095,7 @@ struct MatMulParamsKeyEq {
   }
 };
 
-using gemm_cache_t = std::unordered_map<MatMulParams_t, std::any,  MatMulParamsKeyHash, MatMulParamsKeyEq>;
+using gemm_cuda_cache_t = std::unordered_map<MatMulCUDAParams_t, std::any,  MatMulCUDAParamsKeyHash, MatMulCUDAParamsKeyEq>;
 
 }
 
@@ -1155,7 +1143,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
  * @tparam TensorTypeB
  *    Data type of B tensor or operator
  * @tparam PROV
- *    Provider type chosen from MatXMatMulProvider_t type
+ *    Provider type chosen from MatMulCUDAProvider_t type
  *
  * @param C
  *   C A Tensor or Operator
@@ -1163,20 +1151,21 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
  *   A A Tensor or Operator
  * @param B
  *   B A Tensor or Operator
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  * @param alpha
  *   Scalar multiplier to apply to operator A
  * @param beta
  *   Scalar multiplier to apply to operator C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 void matmul_impl(TensorTypeC C, const TensorTypeA A,
-            const TensorTypeB B, cudaStream_t stream = 0,
+            const TensorTypeB B, const cudaExecutor &exec,
             float alpha = 1.0, float beta = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const auto stream = exec.getStream();
 
   constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::scalar_type>;
 
@@ -1190,9 +1179,8 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
   auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
 
-  static_assert(detail::CompatibleGemmTypes<decltype(A_), decltype(B_), TensorTypeC, PROV>(),
+  static_assert(detail::CompatibleGemmCUDATypes<decltype(A_), decltype(B_), TensorTypeC, PROV>(),
       "Combination of A/B/C types are not supported");
-
 
   // CublasLt does not support operators and certain transpose modes.
   // Grab a suppported tensor here and copy in if necessary.
@@ -1222,18 +1210,18 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   // the rightmost stride is !=1 or this function will be an infinite recursion.
   if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) > 1 ) {  // column major check
     // Column major
-    matmul_impl(transpose_matrix(c), transpose_matrix(b), transpose_matrix(a), stream, alpha, beta);
+    matmul_impl(transpose_matrix(c), transpose_matrix(b), transpose_matrix(a), exec, alpha, beta);
   } else
 #endif
   {
     // Get parameters required by these tensors
     auto params =
-      detail::matxMatMulHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
+      detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
     params.stream = stream;
 
-    using cache_val_type = detail::matxMatMulHandle_t<ctype, atype, btype, PROV>;
-    detail::GetCache().LookupAndExec<detail::gemm_cache_t>(
-      detail::GetCacheIdFromType<detail::gemm_cache_t>(),
+    using cache_val_type = detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>;
+    detail::GetCache().LookupAndExec<detail::gemm_cuda_cache_t>(
+      detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>(),
       params,
       [&]() {
         return std::make_shared<cache_val_type>(c, a, b);

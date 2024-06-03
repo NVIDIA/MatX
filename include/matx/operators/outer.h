@@ -98,8 +98,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          static_assert(is_cuda_executor_v<Executor>, "outer() only supports the CUDA executor currently");
-          outer_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+          outer_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
         }
 
         template <typename ShapeType, typename Executor>

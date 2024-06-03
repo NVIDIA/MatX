@@ -127,7 +127,7 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, V) = svdpi(A))");
 
-        svdpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, x_, iterations_, ex.getStream(), k_);
+        svdpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, x_, iterations_, ex, k_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -204,7 +204,7 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, V) = svdbpi(A))");
 
-        svdbpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, max_iters_, tol_, ex.getStream());
+        svdbpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, max_iters_, tol_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

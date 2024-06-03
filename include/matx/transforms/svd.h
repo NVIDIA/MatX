@@ -69,14 +69,15 @@ namespace matx {
  *   Random tensor of size batches x min(n,m) is suggested.
  * @param iterations
  *   The number of power iterations to perform for each singular value.  
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  * @param k
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
 template<typename UType, typename SType, typename VTType, typename AType, typename X0Type>
-void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  cudaStream_t stream, index_t k=-1) {
+void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterations,  const cudaExecutor &exec, index_t k=-1) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  const auto stream = exec.getStream();
 
   static_assert(UType::Rank() == AType::Rank());
   static_assert(VTType::Rank() == AType::Rank());
@@ -171,16 +172,16 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       if ( ufirst ) {
         // compute A*AT
         // use conj transpose for complex
-        matmul_impl(AT, Ap, conj(transpose_matrix(Ap)), stream);
+        matmul_impl(AT, Ap, conj(transpose_matrix(Ap)), exec);
       } else { // !ufirst
         // use conj transpose for complex
-        matmul_impl(AT, conj(transpose_matrix(Ap)), Ap, stream);
+        matmul_impl(AT, conj(transpose_matrix(Ap)), Ap, exec);
       } // end ufirst
 
       // for each fixed point iteration
       for(int it = 0; it < iterations; it++) {
 
-        matmul_impl(xm, AT, xm, stream);
+        matmul_impl(xm, AT, xm, exec);
 
         // normalize x at each iteration to avoid instability
         // first compute sum of squares, norm will work for complex and real
@@ -236,7 +237,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       // compute v
       // for complex we need the conj transpose of Ap
       // example-begin transpose_matrix-test-1
-      matmul_impl(transpose_matrix(vm), conj(transpose_matrix(Ap)), um, stream);    // (n x 1) = (n x m) ( (m x 1)
+      matmul_impl(transpose_matrix(vm), conj(transpose_matrix(Ap)), um, exec);    // (n x 1) = (n x m) ( (m x 1)
       // example-end transpose_matrix-test-1
 
       // compute singular value as L2 norm of v
@@ -265,7 +266,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       (v = conj(x)).run(stream);
 
       // compute u, undo conj
-      matmul_impl(um, Ap, conj(transpose_matrix(vm)), stream);    // (m x 1) = (m x n) ( (n x 1)
+      matmul_impl(um, Ap, conj(transpose_matrix(vm)), exec);    // (m x 1) = (m x n) ( (n x 1)
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
@@ -289,7 +290,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
     if(i < k - 1) {
 
       // vm is already conj for complex so no need to conj here
-      matmul_impl(uv, um, vm, stream);
+      matmul_impl(uv, um, vm, exec);
 
       const int CRANK = s.Rank()+ 2;  // adding one more dim to s
       cuda::std::array<index_t, CRANK> sCloneShape;
@@ -367,12 +368,13 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
  *   The approximate maximum number of QR iterations to perform. 
  * @param tol
  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template<typename UType, typename SType, typename VTType, typename AType>
-inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_iters, float tol,  cudaStream_t stream) {
+inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_iters, float tol,  const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
+  const auto stream = exec.getStream();
 
   static_assert(UType::Rank() == AType::Rank());
   static_assert(VTType::Rank() == AType::Rank());
@@ -411,9 +413,9 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
   // create spd matrix
   if ( m >= n ) {
-    matmul_impl(AT, conj(transpose_matrix(A)), A, stream);
+    matmul_impl(AT, conj(transpose_matrix(A)), A, exec);
   } else {
-    matmul_impl(AT, A, conj(transpose_matrix(A)), stream);
+    matmul_impl(AT, A, conj(transpose_matrix(A)), exec);
   }
 
   auto e2 = eye({d,d});
@@ -429,11 +431,11 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
     // double pump this iteration so we get Qold and Q for tolerance checking.
     // We might take an extra iteration but it will overheads associated with checking concergence.
-    matmul_impl(Z, AT, Q, stream);
-    qr_internal(Qold, R, Z, qr_workspace, stream);
+    matmul_impl(Z, AT, Q, exec);
+    qr_internal(Qold, R, Z, qr_workspace, exec);
 
-    matmul_impl(Z, AT, Qold, stream);
-    qr_internal(Q, R, Z, qr_workspace, stream);
+    matmul_impl(Z, AT, Qold, exec);
+    qr_internal(Q, R, Z, qr_workspace, exec);
 
     if(tol!=0.0f) {
 
@@ -470,7 +472,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
   if( m >= n ) {
     (VT = conj(transpose_matrix(Q))).run(stream);
-    matmul_impl(U, A, Q, stream);
+    matmul_impl(U, A, Q, exec);
 
     auto DShape = U.Shape();
     DShape.fill(matxKeepDim);
@@ -483,7 +485,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
   } else {
     (U = Q).run(stream);
-    matmul_impl(VT, conj(transpose_matrix(Q)), A, stream);
+    matmul_impl(VT, conj(transpose_matrix(Q)), A, exec);
 
     auto DShape = VT.Shape();
     DShape.fill(matxKeepDim);

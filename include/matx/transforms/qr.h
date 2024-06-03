@@ -68,8 +68,9 @@ namespace detail {
     }
 
   template<typename QType, typename RType, typename AType, typename WType>
-    inline void qr_internal(QType &Q, RType &R, const AType &A, WType workspace, cudaStream_t stream) {
+    inline void qr_internal(QType &Q, RType &R, const AType &A, WType workspace, const cudaExecutor &exec) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+      const auto stream = exec.getStream();
 
       static_assert(AType::Rank() >= 2);
       static_assert(QType::Rank() == AType::Rank());
@@ -179,7 +180,7 @@ namespace detail {
         (wwt = outer(w, conj(w))).run(stream);
 
         (Qin = Q).run(stream);  // save input 
-        matmul_impl(Q, Qin, wwt, stream, -2, 1);
+        matmul_impl(Q, Qin, wwt, exec, -2, 1);
 
       }
     }
@@ -201,11 +202,12 @@ namespace detail {
  *   R output tensor or operator.
  * @param A
  *   Input tensor or operator for tensor A input.
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template<typename QType, typename RType, typename AType>
-inline void qr_impl(QType &Q, RType &R, const AType &A, cudaStream_t stream) {
+inline void qr_impl(QType &Q, RType &R, const AType &A, const cudaExecutor &exec) {
+  const auto stream = exec.getStream();
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static_assert(AType::Rank() >= 2);
@@ -216,7 +218,7 @@ inline void qr_impl(QType &Q, RType &R, const AType &A, cudaStream_t stream) {
   MATX_ASSERT_STR(AType::Rank() == RType::Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
   auto workspace = qr_internal_workspace(A, stream);
-  qr_internal(Q,R,A,workspace,stream);
+  qr_internal(Q,R,A,workspace,exec);
 }
 
 } // end namespace matx

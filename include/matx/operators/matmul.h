@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/matmul.h"
+#include "matx/transforms/matmul/matmul_cuda.h"
+#ifdef MATX_EN_CPU_MATMUL
+  #include "matx/transforms/matmul/matmul_cblas.h"
+#endif
 
 namespace matx
 {
@@ -108,12 +111,11 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_cuda_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
           }
           else {
-            matmul_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
           }
         }
 

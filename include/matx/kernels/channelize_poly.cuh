@@ -256,7 +256,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         __syncthreads();
 
         // Load next elems_per_channel_per_cta elements for each channel
-        const index_t next_last_elem = cuda::std::min(next_start_elem + by - 1, last_elem);
+        const index_t next_last_elem = cuda::std::min(next_start_elem + static_cast<index_t>(by) - 1, last_elem);
         const uint32_t out_samples_this_iter = static_cast<uint32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;

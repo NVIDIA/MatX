@@ -39,7 +39,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
-#include "matx/transforms/matmul.h"
+#include "matx/transforms/matmul/matmul_cuda.h"
 #include "matx/transforms/transpose.h"
 
 namespace matx {
@@ -137,16 +137,18 @@ public:
  *   Output covariance matrix
  * @param a
  *   Input tensor A
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  *
  */
   inline void Exec(TensorTypeC &c, const TensorTypeA &a,
-                   cudaStream_t stream)
+                   const cudaExecutor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    const auto stream = exec.getStream();
+
     // Calculate a matrix of means
-    matmul_impl(means, onesM, a, stream,
+    matmul_impl(means, onesM, a, exec,
                  1.0f / static_cast<float>(a.Size(RANK - 2)));
 
     // Subtract the means from the observations to get the deviations
@@ -165,7 +167,7 @@ public:
     }
 
     // Multiply by itself and scale by N-1 for the final covariance
-    matmul_impl(c, devsT, devs, stream,
+    matmul_impl(c, devsT, devs, exec,
                 1.0f / static_cast<float>(a.Size(RANK - 2) - 1));
   }
 
@@ -224,14 +226,16 @@ using cov_cache_t = std::unordered_map<CovParams_t, std::any, CovParamsKeyHash, 
  *   Covariance matrix output view
  * @param a
  *   Covariance matrix input view
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  */
 template <typename TensorTypeC, typename TensorTypeA>
 void cov_impl(TensorTypeC &c, const TensorTypeA &a,
-         cudaStream_t stream = 0)
+         const cudaExecutor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const auto stream = exec.getStream();
+  
   // Get parameters required by these tensors
   auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a, stream);
 
@@ -243,7 +247,7 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
       return std::make_shared<cache_val_type>(c, a);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(c, a, stream);
+      ctype->Exec(c, a, exec);
     }
   );
 }
