@@ -3783,7 +3783,7 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1 TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   
   using inner_type = typename inner_op_type_t<TestType>::type;
   using complex_type = detail::complex_from_scalar_t<inner_type>;
