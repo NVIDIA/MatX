@@ -29,17 +29,15 @@
 # // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # /////////////////////////////////////////////////////////////////////////////////
-function(find_and_configure_pybind11 VERSION)
+function(find_and_configure_pybind11)
     CPMFindPackage(NAME pybind11
-        VERSION         ${VERSION}
         GIT_REPOSITORY  https://github.com/pybind/pybind11.git
-        GIT_TAG         v${VERSION}
-        GIT_SHALLOW     TRUE)
+        GIT_TAG         a5b9e50)
   
     if(pybind11_FOUND)
         set(pybind11_FOUND TRUE PARENT_SCOPE)    
     endif()
 endfunction()
 
-set(CUDA_MATX_MIN_VERSION_pybind11 2.12.0)
+set(CUDA_MATX_MIN_VERSION_pybind11)
 find_and_configure_pybind11(${CUDA_MATX_MIN_VERSION_pybind11})
