@@ -337,7 +337,7 @@ class NvtxEvent
     
   }
 
-  nvtxRangeId_t  rangeId_;    // id of the nvtxRange 
+  nvtxRangeId_t  rangeId_ = 0;    // id of the nvtxRange 
   int            userHandle_; // user provided handle to this event
   bool           persistent_; // if the nvtx range lives beyond the life of the NvtxEvent Class's scope
 };
