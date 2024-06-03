@@ -148,26 +148,6 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
   }
 
   /**
-   * @brief std::complex<float> cast operator
-   * 
-   * @return std::complex<float> value
-   */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator std::complex<float>()
-  {
-    return {x, y};
-  }
-
-  /**
-   * @brief std::complex<double> cast operator
-   * 
-   * @return std::complex<double> value
-   */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator std::complex<double>()
-  {
-    return {x, y};
-  }
-
-  /**
    * @brief Copy assignment operator
    * 
    * @tparam X Type of complex to copy from

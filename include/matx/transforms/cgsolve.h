@@ -90,7 +90,7 @@ namespace matx
       auto r1 = r0;
       
       // Drop last dim of X
-      std::array<index_t, SRANK> scalar_shape;
+      cuda::std::array<index_t, SRANK> scalar_shape;
       for(int i = 0 ; i < SRANK; i++) {
         scalar_shape[i] = X.Size(i);
       }
@@ -109,7 +109,7 @@ namespace matx
       
       // batched scalars will need to be cloned back to vector to make math work below
       // auto cloning clones along the left most dims and we need right most
-      std::array<index_t, VRANK> clone_shape;
+      cuda::std::array<index_t, VRANK> clone_shape;
       for(int i = 0 ; i < SRANK; i++) {
         clone_shape[i] = matxKeepDim;
       }

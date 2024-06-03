@@ -91,15 +91,15 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};
 
   auto pb = std::make_unique<detail::MatXPybind>();
   const index_t win_size = 100;
   pb->InitAndRunTVGenerator<TestType>("00_operators", "window", "run",
                                        {win_size});
-  std::array<index_t, 1> shape({win_size});
+  cuda::std::array<index_t, 1> shape({win_size});
   auto ov = make_tensor<TestType>(shape);
 
   // example-begin hanning-gen-test-1
@@ -138,8 +138,8 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
 
 TYPED_TEST(BasicGeneratorTestsAll, Diag)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};
 
   MATX_ENTER_HANDLER();
@@ -198,8 +198,8 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};  
 
   // example-begin alternate-gen-test-1
@@ -287,8 +287,8 @@ TEST(OperatorTests, MeshGrid)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};
 
   auto pb = std::make_unique<detail::MatXPybind>();
@@ -324,13 +324,13 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};    
   // example-begin zeros-gen-test-1    
   index_t count = 100;
 
-  std::array<index_t, 1> s({count});
+  cuda::std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
   (t1 = zeros()).run(exec);
@@ -352,12 +352,12 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 TYPED_TEST(BasicGeneratorTestsAll, Ones)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};    
   // example-begin ones-gen-test-1    
   index_t count = 100;
-  std::array<index_t, 1> s({count});
+  cuda::std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
   (t1 = ones()).run(exec);
@@ -379,8 +379,8 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
 
   // example-begin range-gen-test-1
@@ -439,8 +439,8 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
 
   // example-begin linspace-gen-test-1
@@ -491,8 +491,8 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
 
   // example-begin logspace-gen-test-1
@@ -539,8 +539,8 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
 
   // example-begin eye-gen-test-1
@@ -603,8 +603,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};     
   index_t count = 10;
   TestType c = GenerateData<TestType>();
@@ -666,8 +666,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
     
   index_t count = 1500;

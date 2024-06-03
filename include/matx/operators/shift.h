@@ -84,7 +84,7 @@ namespace matx
 
             cuda::std::get<DIM>(tup) = shift;
 
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }    
 
         template <typename... Is>
@@ -100,7 +100,7 @@ namespace matx
 
             cuda::std::get<DIM>(tup) = shift;
 
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
 
         template <typename ShapeType, typename Executor>

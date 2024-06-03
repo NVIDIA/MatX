@@ -52,7 +52,7 @@ namespace matx
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;
-        std::array<index_t, OpA::Rank()> out_dims_;
+        cuda::std::array<index_t, OpA::Rank()> out_dims_;
         mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
                                           typename OpA::scalar_type, 
                                           typename scalar_to_complex<typename OpA::scalar_type>::ctype>, OpA::Rank()> tmp_out_;
@@ -98,7 +98,7 @@ namespace matx
               }
             }
           }
-          else {
+          else { 
             if constexpr (!is_complex_v<typename OpA::scalar_type>) { // C2C uses the same input/output size. R2C is N/2+1
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
@@ -144,18 +144,18 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) {
-              fft_impl(std::get<0>(out), a_, fft_size_, norm_, ex);
+              fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
-              ifft_impl(std::get<0>(out), a_, fft_size_, norm_, ex);
+              ifft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
           }
           else {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+              fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
             else {
-              ifft_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+              ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
           }
         }
@@ -174,7 +174,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
           }          
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>
@@ -298,7 +298,7 @@ namespace matx
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;
-        std::array<index_t, OpA::Rank()> out_dims_;
+        cuda::std::array<index_t, OpA::Rank()> out_dims_;
         mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>,
                                           typename OpA::scalar_type, 
                                           typename scalar_to_complex<OpA>::ctype>, OpA::Rank()> tmp_out_;
@@ -351,18 +351,18 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft2_impl(std::get<0>(out), a_, norm_, ex);
+              fft2_impl(cuda::std::get<0>(out), a_, norm_, ex);
             }
             else {
-              ifft2_impl(std::get<0>(out), a_, norm_, ex);
+              ifft2_impl(cuda::std::get<0>(out), a_, norm_, ex);
             }
           }
           else {
             if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
+              fft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
             else {
-              ifft2_impl(permute(std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
+              ifft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
           }
         }
@@ -381,7 +381,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
           }          
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
     };    
   }

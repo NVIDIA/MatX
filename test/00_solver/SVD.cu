@@ -42,8 +42,8 @@ constexpr index_t n = 50;
 
 template <typename T> class SVDSolverTest : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;     
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;     
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
@@ -65,8 +65,8 @@ TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes,
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;      
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
 
   using scalar_type = typename inner_op_type_t<TestType>::type;
   tensor_t<TestType, 2> Av{{m, n}};
@@ -144,8 +144,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;      
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
 
   constexpr index_t batches = 10;
 
@@ -231,7 +231,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   using AType = TypeParam;
   using SType = typename inner_op_type_t<AType>::type;
 
-  std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+  cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
   index_t mm = Ashape[RANK-2];
   index_t nn = Ashape[RANK-1];
@@ -243,7 +243,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   auto VTshape = Ashape;
   VTshape[RANK-2] = r;
 
-  std::array<index_t, RANK-1> Sshape;
+  cuda::std::array<index_t, RANK-1> Sshape;
   for(index_t i = 0; i < RANK-2; i++) {
     Sshape[i] = Ashape[i];
   }
@@ -283,7 +283,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (UTU = matmul(conj(transpose_matrix(U)) , U)).run(exec);
   (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
-  std::array<index_t, RANK> Dshape;
+  cuda::std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
   Dshape[RANK-2] = mm;
 
@@ -339,7 +339,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDPI)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
     
   svdpi_test<TestType>({4,4}, this->exec);
   svdpi_test<TestType>({4,16}, this->exec);
@@ -361,7 +361,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   using AType = TypeParam;
   using SType = typename inner_op_type_t<AType>::type;
 
-  std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+  cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
   exec.sync();
 
@@ -375,7 +375,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   auto VTshape = Ashape;
   VTshape[RANK-2] = r;
 
-  std::array<index_t, RANK-1> Sshape;
+  cuda::std::array<index_t, RANK-1> Sshape;
   for(index_t i = 0; i < RANK-2; i++) {
     Sshape[i] = Ashape[i];
   }
@@ -415,7 +415,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
   (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
-  std::array<index_t, RANK> Dshape;
+  cuda::std::array<index_t, RANK> Dshape;
   Dshape.fill(matxKeepDim);
   Dshape[RANK-2] = mm;
 
@@ -473,7 +473,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBPI)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
 
   svdbpi_test<TestType>({4,4}, this->exec);
   svdbpi_test<TestType>({4,16}, this->exec);

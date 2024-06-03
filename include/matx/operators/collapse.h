@@ -73,8 +73,8 @@ namespace matx
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             // indices coming in
-            std::array<index_t, Rank()> in{indices...};  // index coming in
-            std::array<index_t, T1::Rank()> out;         // index going out
+            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+            cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
             for(int i = 1; i < Rank(); i++) {
@@ -91,15 +91,15 @@ namespace matx
               ind /= op_.Size(d);
             }
 
-            return mapply(op_, out);
+            return cuda::std::apply(op_, out);
           }    
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
           {
             // indices coming in
-            std::array<index_t, Rank()> in{indices...};  // index coming in
-            std::array<index_t, T1::Rank()> out;         // index going out
+            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+            cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
             for(int i = 1; i < Rank(); i++) {
@@ -116,7 +116,7 @@ namespace matx
               ind /= op_.Size(d);
             }
 
-            return mapply(op_, out);
+            return cuda::std::apply(op_, out);
           }    
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -222,8 +222,8 @@ namespace matx
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             // indices coming in
-            std::array<index_t, Rank()> in{indices...};  // index coming in
-            std::array<index_t, T1::Rank()> out;         // index going out
+            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+            cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
             for(int i = 0 ; i < Rank() - 1; i++) {
@@ -240,15 +240,15 @@ namespace matx
               ind /= op_.Size(d);
             }
 
-            return mapply(op_, out);
+            return cuda::std::apply(op_, out);
           }    
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             // indices coming in
-            std::array<index_t, Rank()> in{indices...};  // index coming in
-            std::array<index_t, T1::Rank()> out;         // index going out
+            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+            cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
             for(int i = 0 ; i < Rank() - 1; i++) {
@@ -265,7 +265,7 @@ namespace matx
               ind /= op_.Size(d);
             }
 
-            return mapply(op_, out);
+            return cuda::std::apply(op_, out);
           }    
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

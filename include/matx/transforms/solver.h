@@ -93,12 +93,12 @@ public:
     else {
       using shape_type = typename TensorType::desc_type::shape_type;
       int batch_offset = 2;
-      std::array<shape_type, TensorType::Rank()> idx{0};
+      cuda::std::array<shape_type, TensorType::Rank()> idx{0};
       auto a_shape = a.Shape();
       // Get total number of batches
       size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
       for (size_t iter = 0; iter < total_iter; iter++) {
-        auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+        auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
         batch_a_ptrs.push_back(ap);
 
         // Update all but the last 2 indices
@@ -1281,14 +1281,14 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   }
 
   // Get parameters required by these tensors
-  std::array<index_t, RANK - 1> s;
+  cuda::std::array<index_t, RANK - 1> s;
 
   // Set batching dimensions of piv
   for (int i = 0; i < RANK - 2; i++) {
     s[i] = a_new.Size(i);
   }
 
-  s[RANK - 2] = std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
+  s[RANK - 2] = cuda::std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
 
   auto piv = make_tensor<int64_t>(s, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);

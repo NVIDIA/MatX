@@ -40,8 +40,8 @@ using namespace matx;
 
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;     
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;     
 
   void SetUp() override
   {
@@ -88,8 +88,8 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   tensor_t<TestType, 2> Avs{{10, 2}};
 
   this->pb->NumpyToTensorView(this->Av, this->small_csv.c_str());
@@ -105,8 +105,8 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   auto t = make_tensor<TestType>({1,10});
 
   // example-begin read_mat-test-1
@@ -122,8 +122,8 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   auto t = make_tensor<TestType>({2,3});
   auto t2 = make_tensor<TestType>({2,3});
   t.SetVals({{1,2,3},{4,5,6}});
@@ -146,7 +146,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({2,3,1,2,3});
   auto t2 = make_tensor<TestType>({2,3,1,2,3});
@@ -175,7 +175,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteRank5GetShape)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({2,3,1,2,3});
   tensor_t<TestType,5> t2;
@@ -206,7 +206,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({2,3,1,2,3});
   tensor_t<TestType,5> t2;
@@ -236,7 +236,7 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({2, 3});
 
@@ -258,7 +258,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYWrite)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({2, 3});
   auto t2 = make_tensor<TestType>({2, 3});

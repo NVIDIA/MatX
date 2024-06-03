@@ -48,7 +48,7 @@ namespace matx
     template <typename... Ts>
       class StackOp : public BaseOp<StackOp<Ts...>>
     {
-      using first_type = std::tuple_element_t<0, std::tuple<Ts...>>;
+      using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
       using first_value_type = typename first_type::scalar_type;
 
       static constexpr int RANK = first_type::Rank();
@@ -85,7 +85,7 @@ namespace matx
       }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, std::array<index_t,RANK> &indices) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
 
           if constexpr ( I == N ) {
             // This should never happen
@@ -97,18 +97,18 @@ namespace matx
             } else {
               // this is the correct operator, return it's value
               auto &op = cuda::std::get<I>(ops_);
-              return mapply(op, indices);
+              return cuda::std::apply(op, indices);
             }
           }
         }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, std::array<index_t,RANK> &indices) {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
 
           if constexpr ( I == N ) {
             // This should never happen
             auto &op = cuda::std::get<I-1>(ops_);
-            return mapply(op, indices);
+            return cuda::std::apply(op, indices);
 
           } else {
             if ( I < oidx ) {
@@ -117,7 +117,7 @@ namespace matx
             } else {
               // this is the correct operator, return it's value
               auto &op = cuda::std::get<I>(ops_);
-              return mapply(op, indices);
+              return cuda::std::apply(op, indices);
             }
           }
         }
@@ -125,8 +125,8 @@ namespace matx
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
         {
-          std::array<index_t, RANK + 1> indices = {{is...}};
-          std::array<index_t, RANK> indices_o;
+          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+          cuda::std::array<index_t, RANK> indices_o;
 
           // operator index
           index_t oidx = indices[axis_];
@@ -146,8 +146,8 @@ namespace matx
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
-          std::array<index_t, RANK + 1> indices = {{is...}};
-          std::array<index_t, RANK> indices_o;
+          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+          cuda::std::array<index_t, RANK> indices_o;
 
           // operator index
           index_t oidx = indices[axis_];

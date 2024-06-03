@@ -43,6 +43,8 @@
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
+#include <cuda/std/__algorithm>
+#include <cuda/std/__algorithm>
 
 #pragma once
 
@@ -203,7 +205,7 @@ struct MemTracker {
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     matxMemoryStats.currentBytesAllocated += bytes;
     matxMemoryStats.totalBytesAllocated += bytes;
-    matxMemoryStats.maxBytesAllocated = std::max(
+    matxMemoryStats.maxBytesAllocated = cuda::std::max(
         matxMemoryStats.maxBytesAllocated, matxMemoryStats.currentBytesAllocated);
     allocationMap[*ptr] = {bytes, space, stream};
   }

@@ -59,7 +59,7 @@ namespace matx
   private:
     typename base_type<I1>::type in1_;
     typename base_type<Op>::type op_;
-    std::array<index_t, detail::get_rank<I1>()> size_;
+    cuda::std::array<index_t, detail::get_rank<I1>()> size_;
 
   public:
     // dummy type to signal this is a matxop
@@ -79,9 +79,9 @@ namespace matx
       }
     }
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
-      return mapply([&](auto &&...args)  {
+      return cuda::std::apply([&](auto &&...args)  {
           return this->operator()(args...);
         }, idx);      
     }  

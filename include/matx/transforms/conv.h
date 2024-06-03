@@ -179,7 +179,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   unsigned int num_blocks = (unsigned int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
 
   // number below was chosen arbitrarily.  Cannot be more than 65536.
-  num_blocks = std::min(num_blocks, 10000U);
+  num_blocks = cuda::std::min(num_blocks, 10000U);
 
   unsigned int grid_size = static_cast<unsigned int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
@@ -238,13 +238,13 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
   static_assert(In1Type::Rank() == In2Type::Rank());
 
   if (mode == MATX_C_MODE_SAME) {
-    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) == std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)), matxInvalidSize,
+    MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) == cuda::std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)), matxInvalidSize,
       "Output size for SAME mode convolution must match largest input size");
   }
 
   if (mode == MATX_C_MODE_VALID) {
     MATX_ASSERT_STR(o.Size(OutputType::Rank() - 1) ==
-      std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) - std::min(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) + 1, matxInvalidSize,
+      cuda::std::max(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) - cuda::std::min(i1.Size(i1.Rank()-1), i2.Size(i2.Rank()-1)) + 1, matxInvalidSize,
       "Output size for VALID mode convolution must be N - L + 1");
   }
 

@@ -46,13 +46,13 @@ namespace matx
       private:
         using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
               typename OpA::scalar_type, typename OpB::scalar_type>;
-        constexpr static int max_rank = std::max(OpA::Rank(), OpB::Rank());
+        constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         OpA a_;
         OpB b_;
         matxConvCorrMode_t mode_;
         matxConvCorrMethod_t method_;
         PermDims perm_;
-        std::array<index_t, max_rank> out_dims_;
+        cuda::std::array<index_t, max_rank> out_dims_;
         mutable matx::tensor_t<out_t, max_rank> tmp_out_;
 
         static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
@@ -82,8 +82,8 @@ namespace matx
             for (int r = 0; r < Rank(); r++) {
               const int axis = perm[r];
               if (axis == Rank() - 1) {
-                max_axis = std::max(a_.Size(r), b_.Size(r));
-                min_axis = std::min(a_.Size(r), b_.Size(r));
+                max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
+                min_axis = cuda::std::min(a_.Size(r), b_.Size(r));
 
                 if (mode_ == MATX_C_MODE_FULL) {
                   out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
@@ -112,8 +112,8 @@ namespace matx
               }
             }
 
-            max_axis = std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
-            min_axis = std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            max_axis = cuda::std::max(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
+            min_axis = cuda::std::min(a_.Size(OpA::Rank()-1), b_.Size(OpB::Rank()-1));
 
             if (mode_ == MATX_C_MODE_FULL) {
               out_dims_[max_rank-1] = max_axis + min_axis - 1;
@@ -149,13 +149,13 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "conv1d() only supports the CUDA executor currently");
-          MATX_STATIC_ASSERT_STR((Rank() == std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
+          MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            conv1d_impl(permute(std::get<0>(out), perm_), a_, b_, mode_, method_, ex.getStream());
+            conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex.getStream());
           }
           else {
-            conv1d_impl(std::get<0>(out), a_, b_, mode_, method_, ex.getStream());
+            conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex.getStream());
           }
         }
 
@@ -174,7 +174,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
     };
   }
@@ -231,12 +231,12 @@ namespace detail {
     private:
       using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
             typename OpA::scalar_type, typename OpB::scalar_type>;
-      constexpr static int max_rank = std::max(OpA::Rank(), OpB::Rank());
+      constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
       OpA a_;
       OpB b_;
       matxConvCorrMode_t mode_;
       PermDims perm_;
-      std::array<index_t, max_rank> out_dims_;
+      cuda::std::array<index_t, max_rank> out_dims_;
       mutable matx::tensor_t<out_t, max_rank> tmp_out_;
 
     public:
@@ -257,8 +257,8 @@ namespace detail {
           for (int r = 0; r < Rank(); r++) {
             const int axis = perm[r];
             if (axis >= Rank() - 2) {
-              const auto max_axis = std::max(a_.Size(r), b_.Size(r));
-              const auto min_axis = std::min(a_.Size(r), b_.Size(r));          
+              const auto max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
+              const auto min_axis = cuda::std::min(a_.Size(r), b_.Size(r));          
               if (mode_ == MATX_C_MODE_FULL) {
                 out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
               }
@@ -287,8 +287,8 @@ namespace detail {
           }
 
           for (int r = max_rank - 2; r < max_rank; r++) {
-            const auto max_axis = std::max(a_.Size(r), b_.Size(r));
-            const auto min_axis = std::min(a_.Size(r), b_.Size(r));
+            const auto max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
+            const auto min_axis = cuda::std::min(a_.Size(r), b_.Size(r));
             if (mode_ == MATX_C_MODE_FULL) {
               out_dims_[r] = max_axis + min_axis - 1;
             }
@@ -322,10 +322,10 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
 
         if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-          conv2d_impl(permute(std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
+          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
         }
         else {
-          conv2d_impl(std::get<0>(out), a_, b_, mode_, ex.getStream());
+          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex.getStream());
         }
       }
 
@@ -344,7 +344,7 @@ namespace detail {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
     };
   }

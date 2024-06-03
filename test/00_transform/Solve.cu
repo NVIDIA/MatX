@@ -48,8 +48,8 @@ TYPED_TEST_SUITE(SolveTestsFloatNonComplexNonHalf, MatXFloatNonComplexNonHalfTyp
 TYPED_TEST(SolveTestsFloatNonComplexNonHalf, CGSolve)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};
 
   int gN = 4;

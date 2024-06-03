@@ -147,7 +147,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     if (last_filter_ind < 0) {
         for (index_t out_ind = phase_ind + tid * up; out_ind < output_len; out_ind += THREADS * up) {
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&output](auto &&...args) {
+            cuda::std::apply([&output](auto &&...args) {
                 output.operator()(args...) = 0;
             }, bdims);
         }
@@ -189,7 +189,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     const index_t max_input_ind = input_len - 1;
 
     const index_t start_ind = phase_ind + up * (tid  + elem_block * elems_per_thread * THREADS);
-    const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
+    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
     for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS * up) {
         // out_ind is the index in the output array and up_ind = out_ind * down is the
         // corresponding index in the upsampled array
@@ -203,9 +203,9 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         // of valid samples before input_ind. In the case that the filter is not
         // long enough to include input_ind, last_filter_ind is left_filter_ind - up
         // and thus left_h_ind and prologue are both -1.
-        const index_t prologue = std::min(input_ind, left_h_ind);
+        const index_t prologue = cuda::std::min(input_ind, left_h_ind);
         // epilogue is the number of valid samples after input_ind.
-        const index_t epilogue = std::min(max_input_ind - input_ind, max_h_epilogue);
+        const index_t epilogue = cuda::std::min(max_input_ind - input_ind, max_h_epilogue);
         // n is the number of valid samples. If input_ind is not valid because it
         // precedes the reach of the filter, then prologue = -1 and n is just the
         // epilogue.
@@ -218,14 +218,14 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         input_t in_val;
         for (index_t j = 0; j < n; j++) {
             bdims[Rank - 1] = x_ind++;
-            detail::mapply([&in_val, &input](auto &&...args) {
+            cuda::std::apply([&in_val, &input](auto &&...args) {
                 in_val = input.operator()(args...);
             }, bdims);
             accum += s_filter[h_ind++] * in_val;
         }
 
         bdims[Rank - 1] = out_ind;
-        detail::mapply([&accum, &output](auto &&...args) {
+        cuda::std::apply([&accum, &output](auto &&...args) {
             output.operator()(args...) = accum;
         }, bdims);
     }
@@ -302,12 +302,12 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     // whether or not the filter has been loaded to shared memory.
     const index_t filter_central_tap = (filter_len-1)/2;
     const index_t start_ind = elem_block * elems_per_thread * THREADS + tid;
-    const index_t last_ind = std::min(output_len - 1, start_ind + (elems_per_thread-1) * THREADS);
+    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + (elems_per_thread-1) * THREADS);
     if (load_filter_to_smem) {
         for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
             const index_t up_ind = out_ind * down;
-            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
-            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t up_start = cuda::std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = cuda::std::min(max_input_ind * up, up_ind + filter_len_half);
             const index_t x_start = (up_start + up - 1) / up;
             index_t x_end = up_end / up;
             // Since the filter is in shared memory, we can narrow the index type to 32 bits
@@ -317,7 +317,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             input_t in_val;
             for (index_t i = x_start; i <= x_end; i++) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * s_filter[h_ind];
@@ -326,15 +326,15 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
 
             accum *= scale;
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&accum, &output](auto &&...args) {
+            cuda::std::apply([&accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, bdims);
         }
     } else {
         for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
             const index_t up_ind = out_ind * down;
-            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
-            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t up_start = cuda::std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = cuda::std::min(max_input_ind * up, up_ind + filter_len_half);
             const index_t x_start = (up_start + up - 1) / up;
             index_t x_end = up_end / up;
             index_t h_ind = filter_central_tap + (up_ind - up*x_start);            
@@ -346,7 +346,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             input_t in_val;
             for (index_t i = x_start; i <= x_end; i++) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * filter.operator()(h_ind);
@@ -355,7 +355,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
 
             accum *= scale;
             bdims[Rank - 1] = out_ind;
-            detail::mapply([&accum, &output](auto &&...args) {
+            cuda::std::apply([&accum, &output](auto &&...args) {
                 output.operator()(args...) = accum;
             }, bdims);
         }
@@ -409,12 +409,12 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
     const index_t filter_len_half = filter_len/2;
     const index_t filter_central_tap = (filter_len-1)/2;
     const index_t start_ind = elem_block * elems_per_warp * NUM_WARPS;
-    const index_t last_ind = std::min(output_len - 1, start_ind + elems_per_warp * NUM_WARPS - 1);
+    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + elems_per_warp * NUM_WARPS - 1);
     if (load_filter_to_smem) {
         for (index_t out_ind = start_ind+warp_id; out_ind <= last_ind; out_ind += NUM_WARPS) {
             const index_t up_ind = out_ind * down;
-            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
-            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t up_start = cuda::std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = cuda::std::min(max_input_ind * up, up_ind + filter_len_half);
             const index_t x_start = (up_start + up - 1) / up;
             index_t x_end = up_end / up;
             // Since the filter is in shared memory, we can narrow the index type to 32 bits
@@ -424,7 +424,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * s_filter[h_ind];
@@ -441,7 +441,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             }
             if (lane_id == 0) {
                 bdims[Rank - 1] = out_ind;
-                detail::mapply([&accum, &output](auto &&...args) {
+                cuda::std::apply([&accum, &output](auto &&...args) {
                     output.operator()(args...) = accum;
                 }, bdims);
             }
@@ -449,8 +449,8 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
     } else {
         for (index_t out_ind = start_ind+warp_id; out_ind <= last_ind; out_ind += NUM_WARPS) {
             const index_t up_ind = out_ind * down;
-            const index_t up_start = std::max(static_cast<index_t>(0), up_ind - filter_len_half);
-            const index_t up_end = std::min(max_input_ind * up, up_ind + filter_len_half);
+            const index_t up_start = cuda::std::max(static_cast<index_t>(0), up_ind - filter_len_half);
+            const index_t up_end = cuda::std::min(max_input_ind * up, up_ind + filter_len_half);
             const index_t x_start = (up_start + up - 1) / up;
             index_t x_end = up_end / up;
             index_t h_ind = filter_central_tap + (up_ind - up*x_start);            
@@ -463,7 +463,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
                 bdims[Rank - 1] = i;
-                detail::mapply([&in_val, &input](auto &&...args) {
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, bdims);
                 accum += in_val * filter.operator()(h_ind);
@@ -480,7 +480,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             }
             if (lane_id == 0) {
                 bdims[Rank - 1] = out_ind;
-                detail::mapply([&accum, &output](auto &&...args) {
+                cuda::std::apply([&accum, &output](auto &&...args) {
                     output.operator()(args...) = accum;
                 }, bdims);
             }

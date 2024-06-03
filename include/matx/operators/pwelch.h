@@ -50,7 +50,7 @@ namespace matx
         index_t nperseg_;
         index_t noverlap_;
         index_t nfft_;
-        std::array<index_t, 1> out_dims_;
+        cuda::std::array<index_t, 1> out_dims_;
         mutable matx::tensor_t<typename OpX::scalar_type::value_type, 1> tmp_out_;
 
       public:
@@ -91,7 +91,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           static_assert(is_cuda_executor_v<Executor>, "pwelch() only supports the CUDA executor currently");
-          pwelch_impl(std::get<0>(out), x_, w_, nperseg_, noverlap_, nfft_, ex.getStream());
+          pwelch_impl(cuda::std::get<0>(out), x_, w_, nperseg_, noverlap_, nfft_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
@@ -109,7 +109,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

@@ -41,8 +41,8 @@ using namespace matx;
 
 template <typename T>
 class ChannelizePolyTest : public ::testing::Test {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 protected:
   void SetUp() override
   {
@@ -121,7 +121,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   struct {
@@ -262,7 +262,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   constexpr int BATCH_DIMS = 2;
@@ -270,7 +270,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     index_t a_len;
     index_t f_len;
     index_t num_channels;
-    std::array<index_t, BATCH_DIMS> batch_dims;
+    cuda::std::array<index_t, BATCH_DIMS> batch_dims;
   } test_cases[] = {
     { 2500, 170, 10, { 2, 3 } },
     { 2500, 187, 11, { 11, 14 } },
@@ -289,10 +289,10 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     sizes.insert(sizes.end(), test_cases[i].batch_dims.begin(), test_cases[i].batch_dims.end());
     this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "channelize_poly_operators", "channelize", sizes);
-    const std::array<index_t, BATCH_DIMS+1> a_dims = {
+    const cuda::std::array<index_t, BATCH_DIMS+1> a_dims = {
       test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], a_len
     };
-    const std::array<index_t, BATCH_DIMS+2> b_dims = {
+    const cuda::std::array<index_t, BATCH_DIMS+2> b_dims = {
       test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], b_len_per_channel, num_channels
     };
     auto a = make_tensor<TestType>(a_dims);
@@ -327,7 +327,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
@@ -381,7 +381,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
@@ -420,7 +420,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 

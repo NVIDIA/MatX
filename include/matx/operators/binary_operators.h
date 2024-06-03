@@ -128,7 +128,7 @@ namespace matx
       template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
-        return mapply([&](auto &&...args)  {
+        return cuda::std::apply([&](auto &&...args)  {
             return this->operator()(args...);
           }, idx);      
       }        

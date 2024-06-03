@@ -209,7 +209,7 @@ class tensor_impl_t {
      *   Data type
      */
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
-    __MATX_INLINE__ tensor_impl_t(T *const ldata,
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc)
         : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
     {
@@ -620,7 +620,7 @@ class tensor_impl_t {
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
-      return ldata_ + GetValC<0, Is...>(std::make_tuple(indices...));
+      return ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
     }    
 
     /**
@@ -635,9 +635,9 @@ class tensor_impl_t {
     }
 
     template <int I = 0, typename ...Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] std::tuple<Is...> tup)  {
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
-        return GetVal<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+        return GetVal<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
       }
       else {
         return 0;
@@ -645,9 +645,9 @@ class tensor_impl_t {
     }
 
     template <int I = 0, typename ...Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const std::tuple<Is...> tup) const {
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
-        return GetValC<I+1, Is...>(tup) + std::get<I>(tup)*this->desc_.Stride(I);
+        return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
       }
       else {
         return 0;
@@ -670,7 +670,7 @@ class tensor_impl_t {
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
 #endif
-      return *(ldata_ + GetValC<0, Is...>(std::make_tuple(indices...)));
+      return *(ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
     }
 
     /**
@@ -690,7 +690,7 @@ class tensor_impl_t {
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
 #endif      
-      return *(ldata_ + GetVal<0, Is...>(std::make_tuple(indices...)));
+      return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
     }    
 
     /**
@@ -699,9 +699,9 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const std::array<index_t, RANK> &idx) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
-      return std::apply([&](auto &&...args) -> T {
+      return cuda::std::apply([&](auto &&...args) -> T {
           return this->operator()(args...);
         }, idx);      
     }  
@@ -712,9 +712,9 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const std::array<index_t, RANK> &idx) noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
-      return std::apply([&](auto &&...args) -> T& {
+      return cuda::std::apply([&](auto &&...args) -> T& {
           return this->operator()(args...);
         }, idx);      
     }      
@@ -727,7 +727,7 @@ class tensor_impl_t {
      *
      */
     // template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const std::array<index_t, RANK> &idx) noexcept
+    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     // {
     //   if constexpr (RANK == 1) {
     //     return this->operator()(idx[0]);

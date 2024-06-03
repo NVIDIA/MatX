@@ -60,11 +60,11 @@ TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   ExecType exec;
 
-  const std::array dims {
+  const cuda::std::array dims {
     16,
     50,
     100,
@@ -109,11 +109,11 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;     
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   ExecType exec;  
 
-  const std::array dims {
+  const cuda::std::array dims {
     50,
     100,
     130,

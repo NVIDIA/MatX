@@ -242,7 +242,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
 
     (amf_tmp_v = (float)nfreq * abs(ifftshift1D(fullfft_y))).run(stream);
 
-    std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
+    cuda::std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
     auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
     matx::copy(amf, amfv.RealView(), stream);
   }
@@ -257,7 +257,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
     auto fullfft_x = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_x = 0).run(stream);
 
-    std::array<index_t, 1> xnd_size = {x_normdiv_v.Size(0)};
+    cuda::std::array<index_t, 1> xnd_size = {x_normdiv_v.Size(0)};
     auto partfft_x = make_tensor(fullfft_x.GetStorage(), xnd_size);
 
     AmbgDoppX(partfft_x, x_normdiv_v, fs, cut_val).run(stream);
@@ -271,7 +271,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
 
     (amf_tmp_v = abs(fftshift1D(fullfft_y))).run(stream);
 
-    std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
+    cuda::std::array<index_t, 2> amfv_size = {1, amf.Size(1)};
     auto amfv = make_tensor(amf_tmp_v.GetStorage(), amfv_size);
     matx::copy(amf, amfv.RealView(), stream);
   }

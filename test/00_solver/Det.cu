@@ -41,8 +41,8 @@ using namespace matx;
 constexpr int m = 15;
 
 template <typename T> class DetSolverTest : public ::testing::Test {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
 protected:
   void SetUp() override
   {

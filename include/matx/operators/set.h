@@ -135,22 +135,10 @@ public:
       out_(args...) = r;
       return r;
     }
-
-    if constexpr (!(is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, args...))>)) {
-      auto r = detail::get_value(op_, args...);
-      out_(args...) = r;
-      return r;
-    }
-    else {
-      auto r = static_cast<float>(detail::get_value(op_, args...));
-      out_(args...) = r;
-      return r;
-    }
   }
-  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(std::array<shape_type, T::Rank()> idx) const noexcept
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<shape_type, T::Rank()> idx) const noexcept
   {
-    auto res = mapply([&](auto &&...args)  {
+    auto res = cuda::std::apply([&](auto &&...args)  {
         return _internal_mapply(args...);
       }, idx
     );

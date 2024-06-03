@@ -99,7 +99,7 @@ namespace matx
 
     for (int i = 1; i < op.Rank(); i++)
     {
-      maxSize = std::max(op.Size(i), maxSize);
+      maxSize = cuda::std::max(op.Size(i), maxSize);
     }
 
     return maxSize;
@@ -112,7 +112,7 @@ namespace detail {
    *
    * @param op Operator
    * @param abs Absolute index
-   * @return std::array of indices
+   * @return cuda::std::array of indices
    */
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
@@ -120,7 +120,7 @@ namespace detail {
     using l_shape_type = index_t;
     constexpr int RANK = Op::Rank();
 
-    std::array<l_shape_type, RANK> indices;
+    cuda::std::array<l_shape_type, RANK> indices;
 
     for (int idx = 0; idx < RANK; idx++) {
       if (idx == RANK-1) {
@@ -148,14 +148,14 @@ namespace detail {
    * @param op Operator
    * @param abs Absolute index
    * @param nb_dims Non-batched dims
-   * @return std::array of indices
+   * @return cuda::std::array of indices
    */
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
     using l_stride_type = index_t;
     using l_shape_type = index_t;
     constexpr int RANK = op.Rank();
-    std::array<l_shape_type, RANK> indices{0};
+    cuda::std::array<l_shape_type, RANK> indices{0};
 
     for (int idx = 0; idx < RANK - nb_dims; idx++) {
       if (idx == RANK-nb_dims-1) {
@@ -176,50 +176,8 @@ namespace detail {
     return indices;
   }
 
-  // Work around cuda::std::apply not working
-  template <typename Func, typename Tuple, size_t... S>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
-
-    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
-      return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
-    }
-    else {
-      return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
-    }
-  }
-
-  template <class Func, class Tuple>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t)
-  {
-    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-    else {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-  }
-
-  template <class Func, class Tuple>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t)
-  {
-    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-    else {
-      return apply_impl(
-          std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
-    }
-  }
-
   template <typename T0, typename T1, typename... Tn>
-  constexpr auto matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
+  constexpr auto  __MATX_HOST__ __MATX_DEVICE__ matx_max(T0 &&t0, T1 &&t1, Tn &&... tn)
   {
 
     if constexpr (sizeof...(tn) == 0) {
@@ -299,7 +257,7 @@ namespace detail {
       using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
       auto tup = cuda::std::make_tuple(indices...);
       auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
-      return mapply([&](auto... args) {
+      return cuda::std::apply([&](auto... args) {
         return i(args...);
       }, sliced_tup);
     }
@@ -389,7 +347,7 @@ namespace detail {
   }
 
   template <typename T, typename I, int32_t R>
-  void UpdateIndices(const T& op, std::array<I, R> &idx, int res) {
+  void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
     for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
       idx[r]++;
       if (idx[r] == op.Size(r)) {
@@ -1100,9 +1058,9 @@ void fprint(FILE* fp, const Op &op, Args... dims)
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
 void fprint(FILE* fp, const Op &op, Args... dims) {
-  std::array<int, Op::Rank()> arr = {0};
-  auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { fprint(fp, op, args...); }, tp);
+  cuda::std::array<int, Op::Rank()> arr = {0};
+  auto tp = cuda::std::tuple_cat(arr);
+  cuda::std::apply([&](auto &&...args) { fprint(fp, op, args...); }, tp);
 }
 
 // Complete hide this version from doxygen, otherwise we get
@@ -1127,9 +1085,9 @@ void fprint(FILE* fp, const Op &op, Args... dims) {
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
 void print(const Op &op, [[maybe_unused]] Args... dims) {
-  std::array<int, Op::Rank()> arr = {0};
-  auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, tp);
+  cuda::std::array<int, Op::Rank()> arr = {0};
+  auto tp = cuda::std::tuple_cat(arr);
+  cuda::std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, tp);
 }
 
 /**

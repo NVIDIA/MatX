@@ -173,10 +173,10 @@ namespace matx
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
           if constexpr (T::Rank() == 0) {
-            return std::array<index_t, 0> {};
+            return cuda::std::array<index_t, 0> {};
           }
           else {
-            std::array<index_t, T::Rank()> sizes_;
+            cuda::std::array<index_t, T::Rank()> sizes_;
 
             for(int i = 0 ; i < T::Rank(); i++) {
               sizes_[i] = static_cast<const T*>(this)->Size(i);
@@ -213,7 +213,7 @@ namespace matx
     public:
       using matxop = bool;  ///< Type trait to indicate this is an operator
       using value_type = T; ///< Type trait of operator type
-      std::array<index_t, RankOp::Rank()> size_; ///< Size of each dimension
+      cuda::std::array<index_t, RankOp::Rank()> size_; ///< Size of each dimension
 
       BaseOpCustom() = delete;
 
@@ -222,7 +222,7 @@ namespace matx
        * 
        * @param size Size of each dimension
        */
-      __MATX_INLINE__ BaseOpCustom(const std::array<index_t, RankOp::Rank()> &size) :
+      __MATX_INLINE__ BaseOpCustom(const cuda::std::array<index_t, RankOp::Rank()> &size) :
         size_(size) {}
 
       /**

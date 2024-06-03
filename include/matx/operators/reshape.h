@@ -81,8 +81,8 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          std::array<index_t, Rank()> inds{indices...};
-          std::array<index_t, T::Rank()> ninds;
+          cuda::std::array<index_t, Rank()> inds{indices...};
+          cuda::std::array<index_t, T::Rank()> ninds;
 
           index_t idx = 0;
           index_t stride = 1;
@@ -101,14 +101,14 @@ namespace matx
             idx /= op_.Size(i);
           }
 
-          return mapply(op_, ninds);
+          return cuda::std::apply(op_, ninds);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          std::array<index_t, Rank()> inds{indices...};
-          std::array<index_t, T::Rank()> ninds;
+          cuda::std::array<index_t, Rank()> inds{indices...};
+          cuda::std::array<index_t, T::Rank()> ninds;
 
           index_t idx = 0;
           index_t stride = 1;
@@ -127,7 +127,7 @@ namespace matx
             idx /= op_.Size(i);
           }
 
-          return mapply(op_, ninds);
+          return cuda::std::apply(op_, ninds);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

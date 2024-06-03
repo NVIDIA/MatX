@@ -44,8 +44,8 @@ namespace matx
     {
       private:
         mutable typename base_type<T>::type op_;
-        std::array<index_t, CRank> sizes_;         // size of each dimension after cloning
-        std::array<index_t, T::Rank()> dims_;      // gather map for computing operator() indices
+        cuda::std::array<index_t, CRank> sizes_;         // size of each dimension after cloning
+        cuda::std::array<index_t, T::Rank()> dims_;      // gather map for computing operator() indices
       public:
         using matxop = bool;
 
@@ -53,7 +53,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ CloneOp(T op, std::array<index_t, CRank> shape) : op_(op) {
+        __MATX_INLINE__ CloneOp(T op, cuda::std::array<index_t, CRank> shape) : op_(op) {
           // create gather list
           int d = 0;
           for(int i = 0; i < Rank(); i++) {
@@ -80,8 +80,8 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
-          std::array<index_t, Rank()> sind{indices...};
-          std::array<index_t, T::Rank()> gind;
+          cuda::std::array<index_t, Rank()> sind{indices...};
+          cuda::std::array<index_t, T::Rank()> gind;
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {
@@ -89,7 +89,7 @@ namespace matx
             gind[i] = sind[idx];
           }
 
-          return mapply(op_, gind);
+          return cuda::std::apply(op_, gind);
         }
 
         template <typename... Is>
@@ -97,8 +97,8 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
-          std::array<index_t, Rank()> sind{indices...};
-          std::array<index_t, T::Rank()> gind;
+          cuda::std::array<index_t, Rank()> sind{indices...};
+          cuda::std::array<index_t, T::Rank()> gind;
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {
@@ -106,7 +106,7 @@ namespace matx
             gind[i] = sind[idx];
           }
 
-          return mapply(op_, gind);
+          return cuda::std::apply(op_, gind);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -148,7 +148,7 @@ namespace matx
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>
-    auto __MATX_INLINE__ clone(Op t, const std::array<index_t, Rank> &shape)
+    auto __MATX_INLINE__ clone(Op t, const cuda::std::array<index_t, Rank> &shape)
     {
       if constexpr (is_tensor_view_v<Op>) {
         return t.template Clone<static_cast<int>(Rank)>(shape);

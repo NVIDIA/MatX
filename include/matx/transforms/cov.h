@@ -97,7 +97,7 @@ public:
     make_tensor(devs, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
     // Transposed view of deviations
-    std::array<index_t, RANK> tmp;
+    cuda::std::array<index_t, RANK> tmp;
     for (int i = 0; i < RANK-2; i++) {
       tmp[i] = a.Size(i);
     }

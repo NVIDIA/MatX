@@ -43,7 +43,7 @@ namespace matx
       class MeshGridOp : public BaseOp<MeshGridOp<T1, RANK, AXIS>> {
         private:
           T1 t1_;
-          std::array<index_t, RANK> shape_;
+          cuda::std::array<index_t, RANK> shape_;
 
         public:
           using matxop = bool;
@@ -52,7 +52,7 @@ namespace matx
 
           __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 
-          __MATX_INLINE__ MeshGridOp(T1 t1, std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
+          __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
             static_assert(shape.size() == RANK );
             static_assert(is_matx_op<T1>());
           }
@@ -60,7 +60,7 @@ namespace matx
           template <typename... Is>
             __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
 
-              std::array<index_t, Rank()> inds{indices...};
+              cuda::std::array<index_t, Rank()> inds{indices...};
               // get index for the axis
               auto ind = inds[AXIS];
               // look up value for the axis
@@ -96,7 +96,7 @@ namespace matx
         auto constexpr RANK = (int)sizeof...(Ts);
 
         // construct shape from size of each rank1 tensor
-        std::array<index_t, RANK> shape{ts.Size(0)...};
+        cuda::std::array<index_t, RANK> shape{ts.Size(0)...};
 
         // Python XY indexing is reverse from natural tensor indexing.  We permute here to match
         int perm[RANK];
@@ -105,7 +105,7 @@ namespace matx
         }
 
         // return one meshgrid operator per rank
-        return std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape}, perm)...};
+        return cuda::std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape}, perm)...};
       }
 
   } // end namespace detail

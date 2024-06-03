@@ -67,10 +67,10 @@ namespace matx
             static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer index than rank of operator");
             static_assert(RANK > 1, "Cannot make get diagonals from 0D tensor");
 
-            using tt = std::tuple_element_t<0, std::tuple<Is...>>;
+            using tt = cuda::std::tuple_element_t<0, cuda::std::tuple<Is...>>;
             auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
             cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...);
-            return mapply(op_, tup);
+            return cuda::std::apply(op_, tup);
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -84,7 +84,7 @@ namespace matx
             return op_.Size(dim);
           }
           else {
-            return std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+            return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
           }
         }
 

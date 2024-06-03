@@ -49,7 +49,7 @@ namespace matx
         PermDims perm_;
         ReductionOp reduction_op_;
         bool init_;
-        std::array<index_t, ORank> out_dims_;
+        cuda::std::array<index_t, ORank> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, ORank> tmp_out_;
 
       public:
@@ -89,10 +89,10 @@ namespace matx
           static_assert(is_cuda_executor_v<Executor>, "reduce() only supports the CUDA executor currently");
 
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            reduce_impl(std::get<0>(out), a_, perm_, reduction_op_, ex.getStream(), init_);
+            reduce_impl(cuda::std::get<0>(out), a_, perm_, reduction_op_, ex.getStream(), init_);
           }
           else {
-            reduce_impl(std::get<0>(out), a_, ex.getStream());
+            reduce_impl(cuda::std::get<0>(out), a_, ex.getStream());
           }
         }
 
@@ -107,7 +107,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

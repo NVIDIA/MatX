@@ -41,8 +41,8 @@
 using namespace matx;
 
 template <typename TensorType> struct VizTestsData {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
   tensor_t<GTestType, 0> t0{{}};
   tensor_t<GTestType, 1> t1{{10}};
   tensor_t<GTestType, 2> t2{{20, 10}};
@@ -107,7 +107,7 @@ TYPED_TEST(VizTestsNumericNonComplex, Line)
 TYPED_TEST(VizTestsNumericNonComplex, Scatter)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
    
   this->t1.SetVals({1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
   tensor_t<TestType, 1> t1y({10});
@@ -122,7 +122,7 @@ TYPED_TEST(VizTestsNumericNonComplex, Scatter)
 TYPED_TEST(VizTestsNumericNonComplex, Bar)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   this->t1.SetVals({0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
   tensor_t<TestType, 1> t1y({10});

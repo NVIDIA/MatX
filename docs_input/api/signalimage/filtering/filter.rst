@@ -10,7 +10,7 @@ used for IIR filters, but it will call the appropriate functions for FIR if the 
 .. note::
    This function is currently is not supported with host-based executors (CPU)
 
-.. doxygenfunction:: matx::filter(const OpA &a, const std::array<FilterType, NR> h_rec, const std::array<FilterType, NNR> h_nonrec)
+.. doxygenfunction:: matx::filter(const OpA &a, const cuda::std::array<FilterType, NR> h_rec, const cuda::std::array<FilterType, NNR> h_nonrec)
 
 Examples
 ~~~~~~~~

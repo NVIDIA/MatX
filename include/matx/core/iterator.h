@@ -76,7 +76,7 @@ struct RandomOperatorIterator {
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
-      return detail::mapply([&](auto &&...args) {
+      return cuda::std::apply([&](auto &&...args) {
           return static_cast<value_type>(t_.operator()(args...));
         }, arrs);     
     }
@@ -199,7 +199,7 @@ struct RandomOperatorOutputIterator {
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
 
-      return std::apply([&](auto &&...args) -> reference {
+      return cuda::std::apply([&](auto &&...args) -> reference {
           return (reference)(t_.operator()(args...));
         }, arrs);    
     }

@@ -122,8 +122,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, VarianceStd)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};  
 
@@ -155,8 +155,8 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -183,8 +183,8 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
 TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -312,8 +312,8 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
 TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};  
 
@@ -346,8 +346,8 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -567,8 +567,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 
 TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -617,8 +617,8 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, AllClose)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{}; 
 
@@ -648,8 +648,8 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -697,8 +697,8 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
 
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Percentile)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   auto pb = std::make_unique<detail::MatXPybind>();
   const index_t dsize = 6;
@@ -772,8 +772,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Percentile)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -818,8 +818,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, MinMaxNegative)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   {
     auto t = matx::make_tensor<TestType, 1>({3});
     t.SetVals({-3, -1, -7});
@@ -840,8 +840,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, MinMaxNegative)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   {
     ExecType exec{};
@@ -865,8 +865,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Max)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   {
     ExecType exec{};
@@ -890,8 +890,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   {
     ExecType exec{};
@@ -929,8 +929,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   {
     ExecType exec{};
@@ -968,8 +968,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -1053,8 +1053,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Mean)
 
 TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Prod)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec;
 
@@ -1062,8 +1062,8 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Prod)
   {
     auto t0 = make_tensor<TestType>({});
 
-    std::array<index_t, 2> s2{3, 4};
-    std::array<index_t, 1> s1{3};
+    cuda::std::array<index_t, 2> s2{3, 4};
+    cuda::std::array<index_t, 1> s1{3};
     auto t1 = make_tensor<TestType>(s1);
     auto t2 = make_tensor<TestType>(s2);
 
@@ -1103,8 +1103,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Find)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = std::tuple_element_t<0, TypeParam>;
-    using ExecType = std::tuple_element_t<1, TypeParam>;
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+    using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
     ExecType exec{};
 
@@ -1144,8 +1144,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdx)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = std::tuple_element_t<0, TypeParam>;
-    using ExecType = std::tuple_element_t<1, TypeParam>;
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+    using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
     ExecType exec{};
 
@@ -1183,8 +1183,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = std::tuple_element_t<0, TypeParam>;
-    using ExecType = std::tuple_element_t<1, TypeParam>;
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+    using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
     tensor_t<int, 0> num_found{{}}, num_found2{{}};
     tensor_t<TestType, 1> t1{{100}};
@@ -1230,8 +1230,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = std::tuple_element_t<0, TypeParam>;
-    using ExecType = std::tuple_element_t<1, TypeParam>;
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+    using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
     ExecType exec{};
 
@@ -1261,8 +1261,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Unique)
 
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
 {
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec;
     

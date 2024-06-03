@@ -72,7 +72,7 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> ind{indices...};
 
             // remap current index for dim
             if constexpr (IdxType::Rank() == 0) {
@@ -81,7 +81,7 @@ namespace matx
               ind[DIM] = idx_(ind[DIM]);
             }
             //return op_(ind);
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         template <typename... Is>
@@ -91,7 +91,7 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> ind{indices...};
 
             // remap current index for dim
             if constexpr (IdxType::Rank() == 0) {
@@ -100,7 +100,7 @@ namespace matx
               ind[DIM] = idx_(ind[DIM]);
             }
             //return op_(ind);
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

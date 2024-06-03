@@ -49,8 +49,8 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -70,13 +70,13 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
   // and we verify that the copy has the same pattern.
   #define TEST_NUM_DIMS(N) \
     do { \
-      std::array<index_t, N> dims; \
+      cuda::std::array<index_t, N> dims; \
       dims.fill(SZ); \
       auto in = make_tensor<TestType>(dims); \
       auto out = make_tensor<TestType>(dims); \
       (in = DEFAULT).run(exec); \
       exec.sync(); \
-      std::array<index_t, N> inds; \
+      cuda::std::array<index_t, N> inds; \
       inds.fill(SZ/2); \
       in(inds) = TEST_VAL; \
       exec.sync(); \
@@ -137,8 +137,8 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
-  using ExecType = std::tuple_element_t<1, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
 
@@ -158,12 +158,12 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
   // and we verify that the copy has the same pattern.
   #define TEST_NUM_DIMS(N) \
     do { \
-      std::array<index_t, N> dims; \
+      cuda::std::array<index_t, N> dims; \
       dims.fill(SZ); \
       auto in = make_tensor<TestType>(dims); \
       (in = DEFAULT).run(exec); \
       exec.sync(); \
-      std::array<index_t, N> inds; \
+      cuda::std::array<index_t, N> inds; \
       inds.fill(SZ/2); \
       in(inds) = TEST_VAL; \
       exec.sync(); \

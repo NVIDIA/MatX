@@ -67,7 +67,7 @@ namespace matx
             auto stl = cuda::std::get<Rank()-2>(tup);
             cuda::std::get<Rank()-2>(tup) = cuda::std::get<Rank()-1>(tup);
             cuda::std::get<Rank()-1>(tup) = stl;      
-            return conj(mapply(op_, tup));
+            return conj(cuda::std::apply(op_, tup));
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -80,7 +80,7 @@ __MATX_INLINE__ void matvec_impl(TensorTypeC C, const TensorTypeA A,
   MATX_ASSERT_STR(B.Size(TensorTypeB::Rank()-1) == A.Size(TensorTypeA::Rank()-1), matxInvalidDim, "matvec: B last size must match A last size");
 
   // need to clone c and b 1 along inner dim to use cublas
-  std::array<index_t, TensorTypeC::Rank()+1> shape;
+  cuda::std::array<index_t, TensorTypeC::Rank()+1> shape;
   for(int i = 0; i < TensorTypeC::Rank(); i++) {
     shape[i] = matxKeepDim;
   }

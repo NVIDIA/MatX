@@ -255,13 +255,13 @@ public:
       total_per_batch *= a.Size(i);
     }
 
-    std::array<shape_type, InputOperator::Rank()> idx{0};
+    cuda::std::array<shape_type, InputOperator::Rank()> idx{0};
 
     if constexpr (is_tensor_view_v<InputOperator>) {
       if (a.IsContiguous()) {
         for (size_t iter = 0; iter < total_iter; iter++) {
-          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(ap, aop);
 
@@ -272,7 +272,7 @@ public:
       else {
         const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         for (size_t iter = 0; iter < total_iter; iter++) {
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(RandomOperatorIterator{base, offset}, aop);
           offset += total_per_batch;
@@ -283,7 +283,7 @@ public:
     }
     else {
       for (size_t iter = 0; iter < total_iter; iter++) {
-        auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+        auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
         f(RandomOperatorIterator{a, offset}, aop);
         offset += total_per_batch;
@@ -493,7 +493,7 @@ public:
         total_iter *= a.Size(i);
       }
 
-      std::array<shape_type, InputOperator::Rank()> idx{0};
+      cuda::std::array<shape_type, InputOperator::Rank()> idx{0};
 
       if (dir == SORT_DIR_ASC)
       {
@@ -504,8 +504,8 @@ public:
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
-          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(ap, aop);
 
@@ -522,8 +522,8 @@ public:
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
-          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(ap, aop);
 
@@ -640,7 +640,7 @@ inline void ExecSort(OutputTensor &a_out,
         total_iter *= a.Size(i);
       }
 
-      std::array<shape_type, InputOperator::Rank()> idx{0};
+      cuda::std::array<shape_type, InputOperator::Rank()> idx{0};
 
       if (dir == SORT_DIR_ASC)
       {
@@ -652,8 +652,8 @@ inline void ExecSort(OutputTensor &a_out,
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
-          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(ap, aop);
 
@@ -670,8 +670,8 @@ inline void ExecSort(OutputTensor &a_out,
 
         for (size_t iter = 0; iter < total_iter; iter++)
         {
-          auto ap = std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
+          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
           f(ap, aop);
 

@@ -46,7 +46,7 @@ namespace matx
       private:
         OpA a_;
         PermDims perm_;
-        std::array<index_t, OpA::Rank()> out_dims_;
+        cuda::std::array<index_t, OpA::Rank()> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
       public:
@@ -86,10 +86,10 @@ namespace matx
           static_assert(is_cuda_executor_v<Executor>, "softmax() only supports the CUDA executor currently");
 
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            softmax_impl(std::get<0>(out), a_, perm_, ex.getStream());
+            softmax_impl(cuda::std::get<0>(out), a_, perm_, ex.getStream());
           }
           else {
-            softmax_impl(std::get<0>(out), a_, ex.getStream());
+            softmax_impl(cuda::std::get<0>(out), a_, ex.getStream());
           }
         }
 
@@ -104,7 +104,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

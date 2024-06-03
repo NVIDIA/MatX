@@ -78,9 +78,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   constexpr uint32_t num_iterations = 20;
   float time_ms;
 
-  std::array<index_t, 1> num_samps{N};
-  std::array<index_t, 1> half_win{nfft / 2 + 1};
-  std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
+  cuda::std::array<index_t, 1> num_samps{N};
+  cuda::std::array<index_t, 1> half_win{nfft / 2 + 1};
+  cuda::std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
 
   tensor_t<float, 1> time({N});
   tensor_t<float, 1> modulation({N});

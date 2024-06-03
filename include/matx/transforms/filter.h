@@ -33,7 +33,7 @@
 #pragma once
 
 #include <any>
-#include <array>
+#include <cuda/std/array>
 #include <cstdio>
 #include <stdint.h>
 #include <type_traits>
@@ -389,8 +389,8 @@ using filter_cache_t = std::unordered_map<FilterParams_t, std::any, FilterParams
 template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
 auto matxMakeFilter(OutType &o, const InType &i,
-                           const std::array<FilterType, NR> &h_rec,
-                           const std::array<FilterType, NNR> &h_nonrec)
+                           const cuda::std::array<FilterType, NR> &h_rec,
+                           const cuda::std::array<FilterType, NNR> &h_nonrec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -455,8 +455,8 @@ auto matxMakeFilter(OutType &o, const InType &i,
 template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
 void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
-            [[maybe_unused]] const std::array<FilterType, NR> h_rec,
-            [[maybe_unused]] const std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] cudaStream_t stream = 0)
+            [[maybe_unused]] const cuda::std::array<FilterType, NR> h_rec,
+            [[maybe_unused]] const cuda::std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 

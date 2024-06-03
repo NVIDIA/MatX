@@ -39,8 +39,8 @@
 using namespace matx;
 
 template <typename T> struct BasicTensorTestsData {
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;    
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;    
   tensor_t<GTestType, 0> t0{{}};
   tensor_t<GTestType, 1> t1{{10}};
   tensor_t<GTestType, 2> t2{{20, 10}};
@@ -133,7 +133,7 @@ TYPED_TEST(BasicTensorTestsAll, Swap)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>; 
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>; 
 
   tensor_t<TestType, 2> tmp{{10,4}};
   tensor_t<TestType, 2> tmp2{{100,40}};
@@ -167,7 +167,7 @@ TYPED_TEST(BasicTensorTestsAll, RefCnt)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   tensor_t<TestType, 2> tmp{{10,4}};
   ASSERT_EQ(tmp.GetRefCount(), 1);
@@ -228,7 +228,7 @@ TYPED_TEST(BasicTensorTestsAll, ViewSize)
 TYPED_TEST(BasicTensorTestsAll, AssignmentOps)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;   
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;   
 
   tensor_t<TestType, 2> t2c{{20, 10}};
   tensor_t<TestType, 2> t2c2{{20, 10}};    
@@ -264,7 +264,7 @@ TYPED_TEST(BasicTensorTestsAll, AssignmentOps)
 TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   tensor_t<TestType, 2> t2c{{20, 10}};
   tensor_t<TestType, 2> t2c2{{20, 10}};    
@@ -315,7 +315,7 @@ TYPED_TEST(BasicTensorTestsNumeric, AssignmentOps)
 TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
  
   tensor_t<TestType, 2> t2c{{20, 10}};
   tensor_t<TestType, 2> t2c2{{20, 10}};
@@ -358,7 +358,7 @@ TYPED_TEST(BasicTensorTestsIntegral, Swizzle)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;    
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;    
 
   ASSERT_EQ(this->t2.Size(0), this->t2s.Size(1));
   ASSERT_EQ(this->t2.Size(1), this->t2s.Size(0));
@@ -434,7 +434,7 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   tensor_t<TestType, 1> t1v_small{{4}};
   t1v_small.SetVals({1, 2, 3, 4});
@@ -513,7 +513,7 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
 TYPED_TEST(BasicTensorTestsAll, Print)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({3});
   (t = ones()).run(this->exec);
@@ -525,7 +525,7 @@ TYPED_TEST(BasicTensorTestsAll, Print)
 TYPED_TEST(BasicTensorTestsAll, DevicePrint)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>; 
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>; 
 
   auto t = make_tensor<TestType>({3}, MATX_DEVICE_MEMORY);
   (t = ones()).run(this->exec);
@@ -538,7 +538,7 @@ TYPED_TEST(BasicTensorTestsAll, DLPack)
 {
   MATX_ENTER_HANDLER();
 
-  using TestType = std::tuple_element_t<0, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
 
   auto t = make_tensor<TestType>({5,10,20});
   auto dl = t.GetDLPackTensor();

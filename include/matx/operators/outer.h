@@ -48,8 +48,8 @@ namespace matx
         OpB b_;
         float alpha_;
         float beta_;
-        static constexpr int RANK = std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
-        std::array<index_t, RANK> out_dims_;
+        static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
+        cuda::std::array<index_t, RANK> out_dims_;
         mutable matx::tensor_t<typename OpA::scalar_type, RANK> tmp_out_;
 
       public:
@@ -98,7 +98,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           static_assert(is_cuda_executor_v<Executor>, "outer() only supports the CUDA executor currently");
-          outer_impl(std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+          outer_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
         }
 
         template <typename ShapeType, typename Executor>
@@ -116,7 +116,7 @@ namespace matx
             make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
           }
 
-          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>

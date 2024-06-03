@@ -50,7 +50,7 @@ namespace matx
 
       private:
         typename base_type<T>::type op_;
-        std::array<int32_t, T::Rank()> dims_;
+        cuda::std::array<int32_t, T::Rank()> dims_;
 
       public:
         using matxop = bool;
@@ -65,7 +65,7 @@ namespace matx
 
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
 
-	      __MATX_INLINE__ PermuteOp(T op, const std::array<int32_t, T::Rank()> &dims) : op_(op) {
+	      __MATX_INLINE__ PermuteOp(T op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
             
           for(int32_t i = 0; i < Rank(); i++) {
             [[maybe_unused]] int32_t dim = dims[i];
@@ -83,8 +83,8 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int32_t i = 0; i < Rank(); i++) {	  
@@ -93,7 +93,7 @@ namespace matx
             }
 
             //return op_(ind);
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         template <typename... Is>
@@ -103,15 +103,15 @@ namespace matx
             //          static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int i = 0; i < Rank(); i++) {	  
               ind[dims_[i]] = inds[i];
             }
 
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
@@ -160,7 +160,7 @@ namespace matx
    */
   template <typename T>
     __MATX_INLINE__ auto permute( const T &op, 
-        const std::array<int32_t, T::Rank()> &dims) {
+        const cuda::std::array<int32_t, T::Rank()> &dims) {
       if constexpr (is_tensor_view_v<T>) {
         return op.Permute(dims);
       } else {

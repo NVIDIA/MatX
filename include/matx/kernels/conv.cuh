@@ -72,7 +72,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // load filter
   for (uint32_t idx = threadIdx.x;  idx < filter_len; idx += THREADS) {
     bdims[Rank - 1] = idx;
-    detail::mapply([&, d_filter](auto &&...args) {
+    cuda::std::apply([&, d_filter](auto &&...args) {
         s_filter[idx] = d_filter.operator()(args...);
         }, bdims);
   }
@@ -102,7 +102,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
       if( gidx >= 0 && gidx < signal_len) { 
         bdims[Rank - 1] = gidx;
-        detail::mapply([&val, d_in](auto &&...args) {
+        cuda::std::apply([&val, d_in](auto &&...args) {
             val = d_in.operator()(args...);
             }, bdims);
       }
@@ -179,7 +179,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
       if(idx >= start && idx <= stop) {
         bdims[Rank - 1] = gidx; 
-        detail::mapply([&](auto &&...args) {
+        cuda::std::apply([&](auto &&...args) {
             d_out.operator()(args...) = oval[i];
             }, bdims);        
       }
@@ -299,7 +299,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                   bdims[Rank - 2] = k;
                   bdims[Rank - 1] = l;
                   // load filter value
-                  detail::mapply([&](auto &&...args) { val = d_in2.operator()(args...); }, bdims);
+                  cuda::std::apply([&](auto &&...args) { val = d_in2.operator()(args...); }, bdims);
                 }
                 // store in shared
                 s_filter(ii, jj) = val;
@@ -319,7 +319,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                   // Signal Dims
                   bdims[Rank - 2] = y;
                   bdims[Rank - 1] = x;
-                  detail::mapply([&](auto &&...args) { val = d_in1.operator()(args...); }, bdims);
+                  cuda::std::apply([&](auto &&...args) { val = d_in1.operator()(args...); }, bdims);
                 }
                 
                 // store in shared
@@ -395,7 +395,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
           if(i + u < oN && j < oM) {
             bdims[Rank - 2] = i + u;
             bdims[Rank - 1] = j;
-            detail::mapply([&](auto &&...args) { d_out.operator()(args...) = sum[u]; }, bdims);        
+            cuda::std::apply([&](auto &&...args) { d_out.operator()(args...) = sum[u]; }, bdims);        
           }
         }
 

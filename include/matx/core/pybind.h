@@ -381,7 +381,7 @@ public:
 
     assert(info.ndim == RANK);
 
-    std::array<matx::index_t, RANK> shape;
+    cuda::std::array<matx::index_t, RANK> shape;
     std::copy_n(info.shape.begin(), RANK, std::begin(shape));
 
     auto ten =  make_tensor<T> (shape);
@@ -437,12 +437,14 @@ public:
   }
 
   template <typename TensorType,
-            typename CT = matx_convert_complex_type<typename TensorType::scalar_type>>
+            typename CT = matx_convert_cuda_complex_type<typename TensorType::scalar_type>>
   std::optional<TestFailResult<CT>>
   CompareOutput(const TensorType &ten,
                 const std::string fname, double thresh, bool debug = false)
   {
-    using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
+    using raw_type = typename TensorType::scalar_type;    
+    using ntype = matx_convert_complex_type<raw_type>;
+    using ctype = matx_convert_cuda_complex_type<raw_type>;
     auto resobj = res_dict[fname.c_str()];
     auto ften = pybind11::array_t<ntype>(resobj);
     constexpr int RANK = TensorType::Rank();
@@ -453,7 +455,7 @@ public:
       auto file_val = ften.at();
       auto ten_val = ConvertComplex(ten());
       if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-        return TestFailResult<ntype>{Index2Str(0), "0", ten_val, file_val,
+        return TestFailResult<ctype>{Index2Str(0), "0", ten_val, file_val,
                                      thresh};
       }
     }
@@ -468,7 +470,7 @@ public:
                     auto file_val = ften.at(s1, s2, s3, s4);
                     auto ten_val = ConvertComplex(ten(s1, s2, s3, s4));
                     if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                      return TestFailResult<ntype>{Index2Str(s1, s2, s3, s4),
+                      return TestFailResult<ctype>{Index2Str(s1, s2, s3, s4),
                                                    fname, ten_val, file_val,
                                                    thresh};
                     }
@@ -478,7 +480,7 @@ public:
                   auto file_val = ften.at(s1, s2, s3);
                   auto ten_val = ConvertComplex(ten(s1, s2, s3));
                   if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                    return TestFailResult<ntype>{Index2Str(s1, s2, s3), fname,
+                    return TestFailResult<ctype>{Index2Str(s1, s2, s3), fname,
                                                  ten_val, file_val, thresh};
                   }
                 }
@@ -488,7 +490,7 @@ public:
               auto file_val = ften.at(s1, s2);
               auto ten_val = ConvertComplex(ten(s1, s2));
               if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                return TestFailResult<ntype>{Index2Str(s1, s2), fname, ten_val,
+                return TestFailResult<ctype>{Index2Str(s1, s2), fname, ten_val,
                                              file_val, thresh};
               }
             }
@@ -498,7 +500,7 @@ public:
           auto file_val = ften.at(s1);
           auto ten_val = ConvertComplex(ten(s1));
           if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-            return TestFailResult<ntype>{Index2Str(s1), fname, ten_val,
+            return TestFailResult<ctype>{Index2Str(s1), fname, ten_val,
                                          file_val, thresh};
           }
         }

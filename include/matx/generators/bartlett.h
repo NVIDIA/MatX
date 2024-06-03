@@ -76,7 +76,7 @@ namespace matx
            std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto bartlett(ShapeType &&s)
              {
-               constexpr int RANK = std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                detail::Bartlett<T> h( *(s.begin() + Dim));
                return detail::matxGenerator1D_t<detail::Bartlett<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);

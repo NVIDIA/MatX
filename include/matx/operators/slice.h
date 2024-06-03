@@ -51,10 +51,10 @@ namespace matx
 
       private:
         typename base_type<T>::type op_;
-        std::array<shape_type, DIM> sizes_;
-        std::array<int32_t, DIM> dims_;
-        std::array<shape_type, T::Rank()> starts_;
-        std::array<shape_type, T::Rank()> strides_;
+        cuda::std::array<shape_type, DIM> sizes_;
+        cuda::std::array<int32_t, DIM> dims_;
+        cuda::std::array<shape_type, T::Rank()> starts_;
+        cuda::std::array<shape_type, T::Rank()> strides_;
 
       public:
         using matxop = bool;
@@ -65,9 +65,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "slice(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ SliceOp(T op, const std::array<shape_type, T::Rank()> &starts,
-                                      const std::array<shape_type, T::Rank()> &ends,
-                                      const std::array<shape_type, T::Rank()> &strides) : op_(op) {
+        __MATX_INLINE__ SliceOp(T op, const cuda::std::array<shape_type, T::Rank()> &starts,
+                                      const cuda::std::array<shape_type, T::Rank()> &ends,
+                                      const cuda::std::array<shape_type, T::Rank()> &strides) : op_(op) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
             shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
@@ -108,8 +108,8 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<index_t, Rank()> inds{indices...};
-            std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int32_t i = 0; i < T::Rank(); i++) {
@@ -122,7 +122,7 @@ namespace matx
             }
 
             //return op_(ind);
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         template <typename... Is>
@@ -132,8 +132,8 @@ namespace matx
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
-            std::array<shape_type, Rank()> inds{indices...};
-            std::array<shape_type, T::Rank()> ind{indices...};
+            cuda::std::array<shape_type, Rank()> inds{indices...};
+            cuda::std::array<shape_type, T::Rank()> ind{indices...};
 
 #pragma unroll 
             for(int i = 0; i < T::Rank(); i++) {
@@ -146,7 +146,7 @@ namespace matx
             }
 
             //return op_(ind);
-            return mapply(op_, ind);
+            return cuda::std::apply(op_, ind);
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -202,9 +202,9 @@ namespace matx
    */
   template <typename OpType>
   __MATX_INLINE__ auto slice( const OpType &op, 
-      const std::array<index_t, OpType::Rank()> &starts,
-      const std::array<index_t, OpType::Rank()> &ends,
-      const std::array<index_t, OpType::Rank()> &strides)
+      const cuda::std::array<index_t, OpType::Rank()> &starts,
+      const cuda::std::array<index_t, OpType::Rank()> &ends,
+      const cuda::std::array<index_t, OpType::Rank()> &strides)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.Slice(starts, ends, strides);
@@ -240,10 +240,10 @@ namespace matx
    */
   template <typename OpType>
   __MATX_INLINE__ auto slice( const OpType &op, 
-      const std::array<index_t, OpType::Rank()> &starts,
-      const std::array<index_t, OpType::Rank()> &ends)
+      const cuda::std::array<index_t, OpType::Rank()> &starts,
+      const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
-    std::array<index_t, OpType::Rank()> strides;
+    cuda::std::array<index_t, OpType::Rank()> strides;
     strides.fill(1);
 
     return slice(op, starts, ends, strides);
@@ -277,9 +277,9 @@ namespace matx
    */
   template <int N, typename OpType>
     __MATX_INLINE__ auto slice( const OpType op, 
-      const std::array<index_t, OpType::Rank()> &starts,
-      const std::array<index_t, OpType::Rank()> &ends,
-      const std::array<index_t, OpType::Rank()> &strides)
+      const cuda::std::array<index_t, OpType::Rank()> &starts,
+      const cuda::std::array<index_t, OpType::Rank()> &ends,
+      const cuda::std::array<index_t, OpType::Rank()> &strides)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template Slice<N>(starts, ends, strides);
@@ -318,10 +318,10 @@ namespace matx
    */
   template <int N, typename OpType>
   __MATX_INLINE__ auto slice (const OpType opIn, 
-      const std::array<index_t, OpType::Rank()> &starts,
-      const std::array<index_t, OpType::Rank()> &ends)
+      const cuda::std::array<index_t, OpType::Rank()> &starts,
+      const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
-    std::array<index_t, OpType::Rank()> strides;
+    cuda::std::array<index_t, OpType::Rank()> strides;
     strides.fill(1);
     return slice<N,OpType>(opIn, starts, ends, strides);
   }

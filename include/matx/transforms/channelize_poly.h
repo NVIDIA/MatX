@@ -97,7 +97,7 @@ inline size_t matxChannelizePoly1DInternal_SmemSizeBytes(const OutType &o, const
 
   size_t smem_size = sizeof(filter_t)*(num_channels)*(filter_phase_len) +
     sizeof(input_t)*(num_channels)*(filter_phase_len + MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER - 1);
-  const size_t max_sizeof = std::max(sizeof(filter_t), sizeof(input_t));
+  const size_t max_sizeof = cuda::std::max(sizeof(filter_t), sizeof(input_t));
   if (smem_size % max_sizeof) {
     smem_size += max_sizeof - (smem_size % max_sizeof);
   }

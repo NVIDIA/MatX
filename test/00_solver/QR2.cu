@@ -53,9 +53,9 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
   cudaStream_t stream = 0;
   cudaExecutor exec{stream};
 
-  std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
-  std::array<index_t, RANK> Qshape = Ashape;
-  std::array<index_t, RANK> Rshape = Ashape;
+  cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+  cuda::std::array<index_t, RANK> Qshape = Ashape;
+  cuda::std::array<index_t, RANK> Rshape = Ashape;
 
   index_t m = Ashape[RANK-2];
   index_t n = Ashape[RANK-1];
@@ -111,7 +111,7 @@ void qr_test( const index_t (&AshapeA)[RANK]) {
 TYPED_TEST(QR2SolverTestNonHalfTypes, QR2)
 {
   MATX_ENTER_HANDLER();
-  using TestType = std::tuple_element_t<0, TypeParam>;  
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
   
   qr_test<TestType>({4,4});
   qr_test<TestType>({4,16});

@@ -55,7 +55,7 @@ namespace matx
     private:
       typename detail::base_type<T1>::type cond_;
       typename detail::base_type<T2>::type op_;
-      std::array<index_t, detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
+      cuda::std::array<index_t, detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:
       using scalar_type = void; ///< Scalar type for type extraction

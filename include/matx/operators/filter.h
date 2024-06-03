@@ -47,9 +47,9 @@ namespace detail {
   {
     private:
       OpA a_;
-      std::array<FilterType, NR> h_rec_;
-      std::array<FilterType, NNR> h_nonrec_;
-      std::array<index_t, OpA::Rank()> out_dims_;
+      cuda::std::array<FilterType, NR> h_rec_;
+      cuda::std::array<FilterType, NNR> h_nonrec_;
+      cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
     public:
@@ -61,8 +61,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { 
         return "filter(" + get_type_str(a_) + ")";
       }
-      __MATX_INLINE__ FilterOp(OpA a, const std::array<FilterType, NR> h_rec,
-            const std::array<FilterType, NNR> h_nonrec) : a_(a), h_rec_(h_rec), h_nonrec_(h_nonrec) { 
+      __MATX_INLINE__ FilterOp(OpA a, const cuda::std::array<FilterType, NR> h_rec,
+            const cuda::std::array<FilterType, NNR> h_nonrec) : a_(a), h_rec_(h_rec), h_nonrec_(h_nonrec) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }              
@@ -78,7 +78,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
 
-        filter_impl(std::get<0>(out), a_, h_rec_, h_nonrec_, ex.getStream());
+        filter_impl(cuda::std::get<0>(out), a_, h_rec_, h_nonrec_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -97,7 +97,7 @@ namespace detail {
           make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         }
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
     
       template <typename ShapeType, typename Executor>
@@ -151,8 +151,8 @@ namespace detail {
  **/
   template <typename OpA, size_t NR, size_t NNR, typename FilterType>
   __MATX_INLINE__ auto filter(const OpA &a, 
-            const std::array<FilterType, NR> h_rec,
-            const std::array<FilterType, NNR> h_nonrec) {
+            const cuda::std::array<FilterType, NR> h_rec,
+            const cuda::std::array<FilterType, NNR> h_nonrec) {
     return detail::FilterOp(a, h_rec, h_nonrec);
   }
 

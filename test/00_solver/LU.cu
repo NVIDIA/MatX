@@ -42,8 +42,8 @@ constexpr int n = 50;
 
 template <typename T> class LUSolverTest : public ::testing::Test {
 protected:
-  using GTestType = std::tuple_element_t<0, T>;
-  using GExecType = std::tuple_element_t<1, T>;   
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;   
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();

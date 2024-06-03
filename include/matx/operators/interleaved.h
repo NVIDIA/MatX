@@ -68,7 +68,7 @@ namespace matx
           auto tup = cuda::std::make_tuple(indices...);
           cuda::std::get<rank_idx>(tup) += op_.Size(rank_idx) / 2;
 
-          auto imag = mapply(op_, tup);
+          auto imag = cuda::std::apply(op_, tup);
           return complex_type{real, imag};
         }
 
@@ -81,7 +81,7 @@ namespace matx
           auto tup = cuda::std::make_tuple(indices...);
           cuda::std::get<rank_idx>(tup) += op_.Size(rank_idx) / 2;
 
-          auto imag = mapply(op_, tup);
+          auto imag = cuda::std::apply(op_, tup);
           return complex_type{real, imag};
         }
 
