@@ -496,10 +496,7 @@ template <typename T1, typename T2> struct FModF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "%" + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
-    return _internal_fmod(v1, v2); 
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};    
+    return _internal_fmod(v1, v2);  
   }
 };
 template <typename T1, typename T2> using FModOp = BinOp<T1, T2, FModF<T1, T2>>;
@@ -520,10 +517,7 @@ template <typename T1, typename T2> struct Atan2F {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "%" + str2 + ")"; }
 
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
-    return _internal_atan2(v1, v2); 
-
-    // Unreachable, but required by the compiler
-    return typename std::invoke_result_t<decltype(op), T1, T2>{0};    
+    return _internal_atan2(v1, v2);  
   }
 };
 template <typename T1, typename T2> using Atan2Op = BinOp<T1, T2, Atan2F<T1, T2>>;
@@ -649,8 +643,6 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isnan(T v1)
   } else {
     return cuda::std::isnan(static_cast<castType>(v1));
   }
-
-  return false;  
 }
 template <typename T>
 struct IsNan {
@@ -675,9 +667,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isinf(T v1)
     return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
   } else {
     return cuda::std::isinf(static_cast<castType>(v1));
-  }
-
-  return false;  
+  } 
 }
 template <typename T>
 struct IsInf {

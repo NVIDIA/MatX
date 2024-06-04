@@ -87,7 +87,7 @@ NVBENCH_BENCH_TYPES(random, NVBENCH_TYPE_AXES(random_types));
 template<typename T> T factorial(int N) {
   T prod = 1;
   for(int i=2; i<=N; i++) {
-    prod = prod * i;
+    prod = prod * static_cast<T>(i);
   }
   return prod;
 }
@@ -99,7 +99,7 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
   int l = 5;
   int m = 4;
   int n = 600;
-  ValueType dx = M_PI/n;
+  ValueType dx = static_cast<ValueType>(M_PI/n);
   
   cudaExecutor exec{};
   auto col = range<0>({n+1},ValueType(0), ValueType(dx));
@@ -109,11 +109,11 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
 
   auto Plm = lcollapse<3>(legendre(l, m, cos(theta)));
 
-  ValueType a = (2*l+1)*factorial<ValueType>(l-m);
-  ValueType b = 4*M_PI*factorial<ValueType>(l+m);
+  ValueType a = static_cast<ValueType>(2*l+1)*factorial<ValueType>(l-m);
+  ValueType b = static_cast<ValueType>(4*M_PI)*factorial<ValueType>(l+m);
   ValueType C = cuda::std::sqrt(a/b);
 
-  auto Ylm = C * Plm * exp(cuda::std::complex<ValueType>(0,1)*(m*phi));
+  auto Ylm = C * Plm * exp(cuda::std::complex<ValueType>(0,1)*(static_cast<ValueType>(m)*phi));
   auto [ Xm, Ym, Zm ] = sph2cart(phi, ValueType(M_PI)/2 - theta, abs(real(Ylm)));
 
   // Work around C++17 restriction, structured bindings cannot be captured
