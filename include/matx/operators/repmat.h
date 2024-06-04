@@ -105,15 +105,6 @@ namespace matx
             UpdateIndex(tup);
             return cuda::std::apply(op_, tup);
           }
-
-          if constexpr (Rank() != 0) {
-            auto tup = cuda::std::make_tuple(indices...);
-            UpdateIndex(tup);
-            return cuda::std::apply(op_, tup);
-          }
-          else {
-            return op_();
-          }
         }
 
         template <typename... Is>
@@ -126,15 +117,6 @@ namespace matx
             auto tup = cuda::std::make_tuple(indices...);
             UpdateIndex(tup);
             return cuda::std::apply(op_, tup);
-          }
-
-          if constexpr (Rank() != 0) {
-            auto tup = cuda::std::make_tuple(indices...);
-            UpdateIndex(tup);
-            return cuda::std::apply(op_, tup);
-          }
-          else {
-            return op_();
           }
         }
 

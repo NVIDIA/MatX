@@ -19,9 +19,9 @@ void qr_batch(nvbench::state &state,
   state.set_cuda_stream(nvbench::make_cuda_stream_view(stream));
   cudaExecutor exec{stream};
 
-  int batch = state.get_int64("batch");
-  int m = state.get_int64("rows");
-  int n = state.get_int64("cols");
+  int64_t batch = state.get_int64("batch");
+  int64_t m = state.get_int64("rows");
+  int64_t n = state.get_int64("cols");
 
   auto A = make_tensor<AType>({batch, m, n});
   auto Q = make_tensor<AType>({batch, m, m});

@@ -74,15 +74,6 @@ namespace matx
             cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
             return cuda::std::apply(op_, tup);
           }
-
-          if constexpr (Rank() != 0) {
-            auto tup = cuda::std::make_tuple(indices...);
-            cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
-            return cuda::std::apply(op_, tup);
-          } 
-          else {
-            return op_();
-          }
         }
 
         template <typename... Is>
@@ -95,15 +86,6 @@ namespace matx
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
             return cuda::std::apply(op_, tup);
-          }
-
-          if constexpr (Rank() != 0) {
-            auto tup = cuda::std::make_tuple(indices...);
-            cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
-            return cuda::std::apply(op_, tup);
-          } 
-          else {
-            return op_();
           }
         }
 

@@ -130,9 +130,9 @@ void conv2d_direct_batch(nvbench::state &state,
   flops.set_string("description", "Trillions of operations per second");
 
   if constexpr (is_complex_v<ValueType>) {
-    flops.set_float64("value", (double)2 * out.Size(2) * out.Size(1) * out.Size(0) * bt.Size(2) * bt.Size(1) * 4 / seconds / 1e12);
+    flops.set_float64("value", static_cast<double>(2 * out.Size(2) * out.Size(1) * out.Size(0) * bt.Size(2) * bt.Size(1) * 4) / seconds / 1e12);
   } else {
-    flops.set_float64("value", (double)2 * out.Size(2) * out.Size(1) * out.Size(0) * bt.Size(2) * bt.Size(1) / seconds / 1e12);
+    flops.set_float64("value", static_cast<double>(2 * out.Size(2) * out.Size(1) * out.Size(0) * bt.Size(2) * bt.Size(1)) / seconds / 1e12);
   }
 }
 NVBENCH_BENCH_TYPES(conv2d_direct_batch, NVBENCH_TYPE_AXES(conv_types));

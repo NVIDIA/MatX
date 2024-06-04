@@ -60,13 +60,6 @@ namespace matx
           else {
             return first_ + T(static_cast<T>(idx) * step_);
           }
-
-          if constexpr (!is_matx_half_v<T>) {
-            return first_ + T(static_cast<T>(idx) * step_);
-          }
-          else {
-            return first_ + T(static_cast<T>((float)idx) * step_);
-          }
         }
     };
   }
