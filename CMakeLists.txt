@@ -123,8 +123,10 @@ target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
-if (NOT CMAKE_BUILD_TYPE OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -g -lineinfo)
+
+# Hack because CMake doesn't have short circult evaluation
+if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -lineinfo)
 endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
