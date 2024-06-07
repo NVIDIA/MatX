@@ -9,36 +9,6 @@ else()
   set(NOT_SUBPROJECT OFF)
 endif()
 
-# Command line options
-option(MATX_BUILD_EXAMPLES "Build examples" OFF)
-option(MATX_BUILD_TESTS "Build unit tests" OFF)
-option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
-option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
-option(MATX_BUILD_DOCS "Build documentation" OFF)
-option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
-option(MATX_MULTI_GPU "Multi-GPU support" OFF)
-option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
-#option(MATX_EN_CUTLASS OFF)
-option(MATX_EN_CUTENSOR OFF)
-option(MATX_EN_FILEIO OFF)
-option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
-option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
-option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
-
-set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
-
-set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
-set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
-set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
-
-# Enable compile_commands.json
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-if (MATX_BUILD_DOCS)
-    project(MATX_DOCS VERSION ${MATX_VERSION})
-    add_subdirectory(docs_input)
-endif()
-
 # CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
 # function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
 # their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
@@ -75,6 +45,36 @@ endif()
 message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 
 rapids_cmake_write_version_file(include/version_config.h)
+
+# Command line options
+option(MATX_BUILD_EXAMPLES "Build examples" OFF)
+option(MATX_BUILD_TESTS "Build unit tests" OFF)
+option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
+option(MATX_BUILD_DOCS "Build documentation" OFF)
+option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
+option(MATX_MULTI_GPU "Multi-GPU support" OFF)
+option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
+#option(MATX_EN_CUTLASS OFF)
+option(MATX_EN_CUTENSOR OFF)
+option(MATX_EN_FILEIO OFF)
+option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
+option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
+option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
+
+set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
+
+set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
+set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
+set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
+
+# Enable compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if (MATX_BUILD_DOCS)
+    project(MATX_DOCS VERSION ${MATX_VERSION})
+    add_subdirectory(docs_input)
+endif()
 
 # MatX requires C++17 to build. Enforce on all libraries pulled in as well
 set(CMAKE_CXX_STANDARD 17)
@@ -135,10 +135,10 @@ if (NOT ${IS_NVCPP} GREATER -1)
         -Wextra
         -Wcast-align
         -Wunused
-        -Wshadow    
+        -Wshadow
         -Wno-unknown-pragmas
         -Wnon-virtual-dtor)
-        
+
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(WARN_FLAGS ${WARN_FLAGS}
             -Wconversion
@@ -147,7 +147,7 @@ if (NOT ${IS_NVCPP} GREATER -1)
             -Wduplicated-branches
             -Wlogical-op
             -Wnull-dereference)
-    endif()        
+    endif()
 endif()
 
 
