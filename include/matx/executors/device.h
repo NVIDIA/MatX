@@ -90,6 +90,17 @@ namespace matx
           MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
+          LDS_Width width = LDS_Width::DATA_ALIGN;
+          if constexpr(has_matx_width<Op>()) {
+            width = op.GetMaxWidth();
+          }
+
+          // Arbitrary number that's roughly close to the number of cores on a standard GPU. This will prevent launching a 
+          // vector kernel when the amount of work is very small.
+          if (TotalSize(op) < 1024) {
+            width = LDS_Width::DATA_ALIGN;
+          }
+
           if constexpr (Op::Rank() == 0) {
             threads = 1;
             blocks = 1;
@@ -101,10 +112,24 @@ namespace matx
               sizes[i] = op.Size(i);
             }        
 
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, width, 256);
 
             if constexpr (Op::Rank() == 1) {
-              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              switch (width) {
+                case LDS_Width::DATA_ALIGN: [[fall_through]]
+                case LDS_Width::FOUR_BYTES:
+                  detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                case LDS_Width::EIGHT_BYTES:
+                  detail::matxOpT1Kernel8B<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                case LDS_Width::SIXTEEN_BYTES:
+                  detail::matxOpT1Kernel16B<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                default:
+                  MATX_ASSERT_STR(false, matxInvalidParameter, "Failed to get load/store width for kernel");
+                  break;                                        
+              }
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {

@@ -115,6 +115,7 @@ namespace matx {
     return shape;
   }
 
+
   namespace detail {
     // Used inside of transforms to allocate temporary output
     template <typename TensorType, typename Executor, typename ShapeType> 
@@ -130,5 +131,47 @@ namespace matx {
         make_tensor(tensor, *ptr, shape);        
       }  
     }  
+  }
+
+  enum class LDS_Width : uint8_t {
+    DATA_ALIGN = 0,
+    FOUR_BYTES = 1,
+    EIGHT_BYTES = 2,
+    SIXTEEN_BYTES = 3,
+  };
+
+  template <typename Op1, typename Op2>
+  __MATX_HOST__ __MATX_INLINE__ LDS_Width MinCompatibleWidth(const Op1 &a, const Op2 &b) {
+    LDS_Width in1;
+    LDS_Width in2;
+    if constexpr(has_matx_width<Op1>()) {
+      in1 = a.GetMaxWidth();
+    }
+    else {
+      in1 = FOUR_BYTES;
+    }
+
+    if constexpr(has_matx_width<Op2>()) {
+      in2 = b.GetMaxWidth();
+    }
+    else {
+      in2 = FOUR_BYTES;
+    }
+
+    return static_cast<LDS_Width>(cuda::std::min(static_cast<int>(in1), static_cast<int>(in2)));
+  }
+
+  template <typename T>
+  uint16_t ILPFactor(LDS_Width width) {
+    switch (width) {
+      case: LDS_Width::EIGHT_BYTES:
+        return 8 / sizeof(T);
+      case: LDS_Width::SIXTEEN_BYTES:
+        return 16 / sizeof(T);
+      case: LDS_Width::DATA_ALIGN: [[fall_through]]
+      case: LDS_Width::FOUR_BYTES: [[fall_through]]
+      default:
+        return 1;             
+    }
   }
 }; 

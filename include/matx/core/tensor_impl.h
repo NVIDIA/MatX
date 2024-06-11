@@ -79,6 +79,7 @@ class tensor_impl_t {
     using stride_type = typename Desc::stride_type;
     using matxoplvalue = bool;
     using self_type = tensor_impl_t<T, RANK, Desc>;
+    using matx_width = bool; ///< Signal we can do vector types from this operator
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -841,6 +842,23 @@ class tensor_impl_t {
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept 
     {
+    }
+
+    LDS_Width GetMaxWidth() const {
+      if (IsContiguous()) {
+        if (((16 / sizeof(T)) == 0) && 
+            ((Bytes() % 16) == 0)   && 
+            (static_cast<uintptr_t>(ldata_) % 16) == 0) {
+          return LDS_Width::SIXTEEN_BYTES;
+        }
+        if (((8 / sizeof(T)) == 0) && 
+            ((Bytes() % 8) == 0)   && 
+            (static_cast<uintptr_t>(ldata_) % 8) == 0) {
+          return LDS_Width::EIGHT_BYTES;
+        }
+      }
+
+      return LDS_Width::DATA_ALIGN;
     }
 
 

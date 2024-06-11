@@ -110,6 +110,21 @@ template <typename T> constexpr bool is_mtie()
   return detail::is_mtie_impl<typename remove_cvref<T>::type>::value;
 }
 
+namespace detail {
+template <typename T, typename = void>
+struct has_matx_width : std::false_type {
+};
+
+template <typename T>
+struct has_matx_width<T, std::void_t<typename T::matx_width>> : std::true_type {
+};
+}
+
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool has_matx_width()
+{
+  return detail::has_matx_width<typename remove_cvref<T>::type>::value;
+}
+
 
 namespace detail {
 template <typename T, typename = void>

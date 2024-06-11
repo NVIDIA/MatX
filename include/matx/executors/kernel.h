@@ -62,6 +62,32 @@ __global__ void matxOpT1Kernel(Op op, index_t size0) {
   }
 }
 
+template <class Op>
+__global__ void matxOpT1Kernel8B(Op op, index_t size0) {
+  index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (idx < size0) {
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idx); 
+    }
+    else {
+      op(idx);
+    }
+  }
+}
+
+template <class Op>
+__global__ void matxOpT1Kernel16B(Op op, index_t size0) {
+  index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (idx < size0) {
+    if constexpr (std::is_pointer_v<Op>) {
+      (*op)(idx); 
+    }
+    else {
+      op(idx);
+    }
+  }
+}
+
 
 template <class Op>
 __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {

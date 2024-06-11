@@ -72,6 +72,7 @@ public:
   using tensor_type = T;
   using op_type = Op;
   using matx_setop = bool;
+  using matx_width = bool; ///< Signal we can do vector types from this operator
 
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
@@ -167,6 +168,10 @@ public:
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   }
+
+  LDS_Width GetMaxWidth() const {
+    return MinCompatibleWidth(out_, op_);
+  }  
 
   /**
    * Get the rank of the operator
