@@ -134,7 +134,7 @@ namespace matx
         };
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           using inner_type = typename inner_op_type_t<NewType>::type;
           return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
