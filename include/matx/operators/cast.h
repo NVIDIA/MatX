@@ -126,10 +126,8 @@ namespace matx
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + real_op_.str() + "," + imag_op_.str() + ")"; }
         __MATX_INLINE__ ComplexCastOp(T1 real_op, T2 imag_op) : real_op_(real_op), imag_op_(imag_op) {
           static_assert(detail::get_rank<T1>() == detail::get_rank<T2>(), "rank of real and imaginary operators must match");
-          for (auto i = 0; i < detail::get_rank<T1>(); i++) {
-            if (real_op_.Size(i) != imag_op_.Size(i)) {
-              MATX_THROW(matxInvalidSize, "ComplexCastOp: sizes of input operators must match in all dimensions");
-            }
+          if (real_op_.Shape() != imag_op_.Shape()) {
+            MATX_THROW(matxInvalidSize, "ComplexCastOp: sizes of input operators must match in all dimensions");
           }
         };
 
