@@ -98,7 +98,7 @@ namespace matx
             return scalar_type(-9999);
             // returning this to satisfy lvalue requirements
           } else {
-            auto &op = cuda::std::get<I>(ops_);
+            const auto &op = cuda::std::get<I>(ops_);
             auto idx = indices[axis_];
             auto size = op.Size(axis_);
             // If in range of this operator
@@ -114,7 +114,7 @@ namespace matx
         }
       
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(cuda::std::array<index_t,RANK> &indices) {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
 
           if constexpr ( I == N ) {
             // This should never happen

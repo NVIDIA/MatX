@@ -127,6 +127,8 @@ using MatXNumericTuple                       = cuda::std::tuple<matx::matxFp16, 
                                               cuda::std::complex<double>, matx::matxFp16Complex,
                                               matx::matxBf16Complex>;     
 using MatXIntegralTuple                      = cuda::std::tuple<uint32_t, int32_t, uint64_t, int64_t>;                                                                                                                                                         
+using MatXCastToFloatTuple                   = cuda::std::tuple<int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
+                                              matx::matxFp16, matx::matxBf16, float, double>;
 
 using MatXFloatNonComplexTuple               = cuda::std::tuple<matx::matxFp16, matx::matxBf16, float, double>;                     
 using MatXFloatHalfTuple                     = cuda::std::tuple<matx::matxFp16, matx::matxBf16>;                                           
@@ -163,3 +165,4 @@ using MatXTypesFloatAllExecs                  = TupleToTypes<TypedCartesianProdu
 using MatXTypesNumericAllExecs                = TupleToTypes<TypedCartesianProduct<MatXNumericTuple, ExecutorTypesAll>::type>::type;
 using MatXTypesIntegralAllExecs               = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAll>::type>::type;
 using MatXTypesBooleanAllExecs                = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAll>::type>::type;
+using MatXTypesCastToFloatAllExecs            = TupleToTypes<TypedCartesianProduct<MatXCastToFloatTuple, ExecutorTypesAll>::type>::type;

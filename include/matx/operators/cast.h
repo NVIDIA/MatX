@@ -108,8 +108,78 @@ namespace matx
           return op_.Size(dim);
         }
     };
-  }   
 
+    template <typename T1, typename T2, typename NewType>
+      class ComplexCastOp : public BaseOp<ComplexCastOp<T1, T2, NewType>>
+    {
+      private:
+        typename base_type<T1>::type real_op_;
+        typename base_type<T2>::type imag_op_;
+
+      public:
+        using matxop = bool;
+        using scalar_type = NewType;
+        static_assert(!is_complex_v<T1> && !is_complex_half_v<T1>, "T1 input operator cannot be complex");
+        static_assert(!is_complex_v<T2> && !is_complex_half_v<T2>, "T2 input operator cannot be complex");
+        static_assert(is_complex_v<NewType> || is_complex_half_v<NewType>, "ComplexCastOp output type should be complex");
+
+	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + real_op_.str() + "," + imag_op_.str() + ")"; }
+        __MATX_INLINE__ ComplexCastOp(T1 real_op, T2 imag_op) : real_op_(real_op), imag_op_(imag_op) {
+          static_assert(detail::get_rank<T1>() == detail::get_rank<T2>(), "rank of real and imaginary operators must match");
+          if (real_op_.Shape() != imag_op_.Shape()) {
+            MATX_THROW(matxInvalidSize, "ComplexCastOp: sizes of input operators must match in all dimensions");
+          }
+        };
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        {
+          using inner_type = typename inner_op_type_t<NewType>::type;
+          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          using inner_type = typename inner_op_type_t<NewType>::type;
+          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            real_op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<T2>()) {
+            imag_op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<T1>()) {
+            real_op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+          if constexpr (is_matx_op<T2>()) {
+            imag_op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+        {
+          // ctor static_assert verifies that detail::get_rank<T>() == detail::get_rank<U>()
+          return detail::get_rank<T1>();
+        }
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        {
+          // ctor verifies that per dimensions sizes of real_op_ and imag_op_ match
+          return real_op_.Size(dim);
+        }
+    };
+  }
 
   /**
    * @brief Helper function to cast an input operator to a different type
@@ -130,6 +200,21 @@ namespace matx
       }
     };   
 
+  /**
+   * @brief Helper function to cast a pair of input operators to a complex type.
+   *
+   * @tparam T1 Input type for the real components of the complex type
+   * @tparam T2 Input type for the imaginary components of the complex type
+   * @tparam NewType Casted type (must be complex)
+   * @param t1 Input operator of type T1
+   * @param t2 Input operator of type T2
+   * @return Operator output casted to NewType (must be complex)
+   */
+  template <typename NewType, typename T1, typename T2>
+    auto __MATX_INLINE__ as_complex_type(T1 t1, T2 t2)
+    {
+      return detail::ComplexCastOp<T1, T2, NewType>(t1, t2);
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int
@@ -168,6 +253,36 @@ namespace matx
     auto __MATX_INLINE__ as_complex_float(T t)
     {
       return as_type<cuda::std::complex<float>>(t);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to a cuda::std::complex<float>
+   *
+   * @tparam T1 Input type for real components of the complex output type
+   * @tparam T2 Input type for imaginary components of the complex output type
+   * @param t1 Input operator for real components of the complex output type
+   * @param t2 Input operator for imaginary components of the complex output type
+   * @return Operator output casted to cuda::std::complex<float>
+   */
+  template <typename T1, typename T2>
+    auto __MATX_INLINE__ as_complex_float(T1 t1, T2 t2)
+    {
+      return as_complex_type<cuda::std::complex<float>>(t1, t2);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to a cuda::std::complex<double>
+   *
+   * @tparam T1 Input type for real components of the complex output type
+   * @tparam T2 Input type for imaginary components of the complex output type
+   * @param t1 Input operator for real components of the complex output type
+   * @param t2 Input operator for imaginary components of the complex output type
+   * @return Operator output casted to cuda::std::complex<double>
+   */
+  template <typename T1, typename T2>
+    auto __MATX_INLINE__ as_complex_double(T1 t1, T2 t2)
+    {
+      return as_complex_type<cuda::std::complex<double>>(t1, t2);
     };
 
   /**

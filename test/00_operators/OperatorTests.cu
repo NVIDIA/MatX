@@ -117,6 +117,9 @@ template <typename TensorType>
 class OperatorTestsBooleanAllExecs : public ::testing::Test {
 };
 
+template <typename TensorType>
+class OperatorTestsCastToFloatAllExecs : public ::testing::Test {
+};
 
 TYPED_TEST_SUITE(OperatorTestsFloatNonHalf,
   MatXFloatNonHalfTypesAllExecs);  
@@ -135,6 +138,7 @@ TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXAllTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecs);
 TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
 TYPED_TEST_SUITE(OperatorTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
+TYPED_TEST_SUITE(OperatorTestsCastToFloatAllExecs, MatXTypesCastToFloatAllExecs);
 
 TYPED_TEST(OperatorTestsAllExecs, BaseOp)
 {
@@ -3679,6 +3683,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
     (t1 = static_cast<TestType>(1)).run(exec);
     auto ds_op = downsample(t1, 0, n);
 
+    exec.sync();
+
     ASSERT_TRUE(ds_op.Size(0) == t1.Size(0) / n + 1);
     for (index_t i = 0; i < ds_op.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(ds_op(i), t1(i * n)));
@@ -4162,30 +4168,149 @@ TEST(OperatorTests, Cast)
     ASSERT_EQ(to(i), -4); // -4 from 126 + 126 wrap-around
   }  
 
+  // example-begin as_complex_float-test-1
   auto c32 = make_tensor<cuda::std::complex<float>>({});
+  auto s64 = make_tensor<double>({});
+  s64.SetVals({5.0});
+  (c32 = as_complex_float(s64)).run();
+  // c32() will be (5.0f, 0.0f)
+  // example-end as_complex_float-test-1
+
+  // example-begin as_complex_double-test-1
   auto c64 = make_tensor<cuda::std::complex<double>>({});
   auto s32 = make_tensor<float>({});
-  auto s64 = make_tensor<double>({});
   s32.SetVals({3.0f});
-  s64.SetVals({5.0});
-
-  (c32 = as_complex_float(s32)).run();
   (c64 = as_complex_double(s32)).run();
-  cudaStreamSynchronize(0);
+  // c64() will be (3.0, 0.0)
+  // example-end as_complex_double-test-1
 
-  ASSERT_EQ(c32().real(), 3.0f);
-  ASSERT_EQ(c32().imag(), 0.0f);
-  ASSERT_EQ(c64().real(), 3.0);
-  ASSERT_EQ(c64().imag(), 0.0);
-
-  (c32 = as_complex_float(s64)).run();
-  (c64 = as_complex_double(s64)).run();
   cudaStreamSynchronize(0);
 
   ASSERT_EQ(c32().real(), 5.0f);
   ASSERT_EQ(c32().imag(), 0.0f);
+  ASSERT_EQ(c64().real(), 3.0);
+  ASSERT_EQ(c64().imag(), 0.0);
+
+  (c32 = as_complex_float(s32)).run();
+  (c64 = as_complex_double(s64)).run();
+  cudaStreamSynchronize(0);
+
+  ASSERT_EQ(c32().real(), 3.0f);
+  ASSERT_EQ(c32().imag(), 0.0f);
   ASSERT_EQ(c64().real(), 5.0);
   ASSERT_EQ(c64().imag(), 0.0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, ComplexCastExceptions)
+{
+  MATX_ENTER_HANDLER();
+  index_t count0 = 4;
+  auto t = make_tensor<int8_t>({count0});
+  auto t2 = make_tensor<int8_t>({count0});
+  auto to = make_tensor<float>({count0});
+
+  cudaExecutor exec{};
+
+  const int N = 3;
+  cuda::std::array<long long, N> real_dims, imag_dims;
+  real_dims.fill(5);
+  imag_dims.fill(5);
+
+  auto out = make_tensor<cuda::std::complex<float>>(real_dims);
+  auto test_code = [&real_dims, &imag_dims]() {
+      auto re = make_tensor<float>(real_dims);
+      auto im = make_tensor<float>(imag_dims);
+      [[maybe_unused]] auto op = as_complex_float(re, im);
+  };
+
+  for (int i = 0; i < N; i++) {
+    real_dims[i] = 6;
+    ASSERT_THROW({ test_code(); }, matx::detail::matxException);
+    real_dims[i] = 5;
+
+    imag_dims[i] = 6;
+    ASSERT_THROW({ test_code(); }, matx::detail::matxException);
+    imag_dims[i] = 5;
+  }
+
+  ASSERT_NO_THROW({ test_code(); });
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsCastToFloatAllExecs, ComplexCast)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // 0D tensor tests
+  {
+    // example-begin as_complex_double-test-2
+    auto c64 = make_tensor<cuda::std::complex<double>>({});
+    auto in_real = make_tensor<TestType>({});
+    auto in_imag = make_tensor<TestType>({});
+    in_real.SetVals({3});
+    in_imag.SetVals({5});
+    (c64 = as_complex_double(in_real, in_imag)).run(exec);
+    // c64() will be (3.0, 5.0)
+    // example-end as_complex_double-test-2
+    exec.sync();
+
+    ASSERT_EQ(c64().real(), 3.0);
+    ASSERT_EQ(c64().imag(), 5.0);
+  }
+  {
+    // example-begin as_complex_float-test-2
+    auto c32 = make_tensor<cuda::std::complex<float>>({});
+    auto in_real = make_tensor<TestType>({});
+    auto in_imag = make_tensor<TestType>({});
+    in_real.SetVals({3});
+    in_imag.SetVals({5});
+    (c32 = as_complex_float(in_real, in_imag)).run(exec);
+    // c32() will be (3.0f, 5.0f)
+    // example-end as_complex_float-test-2
+    exec.sync();
+
+    ASSERT_EQ(c32().real(), 3.0f);
+    ASSERT_EQ(c32().imag(), 5.0f);
+  }
+
+  // 2D tensor tests
+  {
+    const int N = 4;
+    auto c32 = make_tensor<cuda::std::complex<float>>({N,N});
+    auto c64 = make_tensor<cuda::std::complex<double>>({N,N});
+    auto in_real = make_tensor<TestType>({N,N});
+    auto in_imag = make_tensor<TestType>({N,N});
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        in_real(i,j) = static_cast<TestType>(4);
+        in_imag(i,j) = static_cast<TestType>(6);
+      }
+    }
+
+    exec.sync();
+
+    (c32 = as_complex_float(in_real, in_imag)).run(exec);
+    (c64 = as_complex_double(in_real, in_imag)).run(exec);
+
+    exec.sync();
+
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        ASSERT_EQ(c32(i,j).real(), 4.0f);
+        ASSERT_EQ(c32(i,j).imag(), 6.0f);
+        ASSERT_EQ(c64(i,j).real(), 4.0);
+        ASSERT_EQ(c64(i,j).imag(), 6.0);
+      }
+    }
+  }
 
   MATX_EXIT_HANDLER();
 }
