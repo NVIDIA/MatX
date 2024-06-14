@@ -212,6 +212,6 @@ namespace matx
       auto first = detail::pp_get<0>(ts...);
 
       MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than or equal to the the rank of the operators");
-      return detail::StackOp<Ts...>{axis, ts...};
+      return detail::StackOp<typename detail::base_type<Ts>::type...>{axis, ts...};
     }  
 } // end namespace matx
