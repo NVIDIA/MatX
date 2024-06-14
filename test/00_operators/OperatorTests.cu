@@ -2207,13 +2207,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_conj(c)));
 
-  // abs and norm take a complex and output a floating point value
+  // abs takes a complex and output a floating point value
   auto tdd0 = make_tensor<typename TestType::value_type>({});
-  // example-begin norm-test-1
-  (tdd0 = norm(tiv0)).run(exec);
-  // example-end norm-test-1
-  exec.sync();
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tdd0(), detail::_internal_norm(c)));
 
   // example-begin abs-test-1
   (tdd0 = abs(tiv0)).run(exec);

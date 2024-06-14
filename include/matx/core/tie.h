@@ -94,6 +94,11 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {
+    // Run the PreRun on the inner type to avoid allocation but allow transforms using MatX operators
+    // to do any setup needed
+    if constexpr (sizeof...(Ts) == 2) {
+      cuda::std::get<sizeof...(Ts) - 1>(ts_).InnerPreRun(NoShape{}, std::forward<Executor>(ex));
+    }
     cuda::std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
   }
 

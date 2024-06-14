@@ -740,14 +740,14 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T atan2(const T &x, const T &y)
 }
 
 /**
- * @brief Norm operator
+ * @brief Squared absolute value operator
  * 
  * @tparam T Underlying type
  * @param x Value of input
  * @return Result of operation 
  */
 template <typename T>
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T norm(const matxHalfComplex<T> &x)
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T abs2(const matxHalfComplex<T> &x)
 {
   if (isinf(x.real()))
     return static_cast<T>(cuda::std::abs(static_cast<float>(x.real())));

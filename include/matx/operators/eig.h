@@ -49,7 +49,6 @@ namespace detail {
       OpA a_;
       cusolverEigMode_t jobz_;
       cublasFillMode_t uplo_;
-      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
 
     public:
       using matxop = bool;

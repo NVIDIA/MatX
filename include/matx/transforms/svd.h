@@ -185,10 +185,10 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
         // normalize x at each iteration to avoid instability
         // first compute sum of squares, norm will work for complex and real
 #if 0
-        sum(s, norm(x), stream);
+        sum(s, abs2(x), stream);
 #else
         //WAR cub not supporting strided output
-        (sums = sum(norm(x))).run(stream);
+        (sums = sum(abs2(x))).run(stream);
         (s = sums).run(stream);
 #endif
 
@@ -242,10 +242,10 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
-      sum(s, norm(v), stream);
+      sum(s, abs2(v), stream);
 #else
       //WAR cub not supporting strided output
-      (sums = sum(norm(v))).run(stream);
+      (sums = sum(abs2(v))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);
@@ -269,10 +269,10 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
       // compute singular value as L2 norm of v
       // first compute sum of squares, norm will work for complex and real
 #if 0
-      sum(s, norm(u), stream);
+      sum(s, abs2(u), stream);
 #else
       //WAR cub not supporting strided output
-      (sums = sum(norm(u))).run(stream);
+      (sums = sum(abs2(u))).run(stream);
       (s = sums).run(stream);;
 #endif
       (s = sqrt(s)).run(stream);
@@ -445,7 +445,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
       //compute L2(Q-Qold)
       // sqrt folded into next operation
-      (l2Norm = sum(norm(Q-Qold))).run(stream);  
+      (l2Norm = sum(abs2(Q-Qold))).run(stream);  
 
       // compute if all batches have converged
       if constexpr (RANK > 2) {

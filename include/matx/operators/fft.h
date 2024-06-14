@@ -53,9 +53,12 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
+        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
                                           typename OpA::scalar_type, 
-                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>, OpA::Rank()> tmp_out_;
+                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
+        // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
+        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
+        mutable ttype *ptr;                                           
 
       public:
         using matxop = bool;
@@ -161,18 +164,19 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }
+          }         
+        }      
 
-          if constexpr (is_cuda_executor_v<Executor>) {
-            make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-          }
-          else if constexpr (is_host_executor_v<Executor>) {
-            make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
-          }          
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -299,9 +303,12 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        mutable matx::tensor_t<std::conditional_t<is_complex_v<typename OpA::scalar_type>,
+        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
                                           typename OpA::scalar_type, 
-                                          typename scalar_to_complex<OpA>::ctype>, OpA::Rank()> tmp_out_;
+                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
+        // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
+        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_; 
+        mutable ttype *ptr;                                                
 
       public:
         using matxop = bool;
@@ -368,18 +375,19 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }
+          }         
+        }      
 
-          if constexpr (is_cuda_executor_v<Executor>) {
-            make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-          }
-          else if constexpr (is_host_executor_v<Executor>) {
-            make_tensor(tmp_out_, out_dims_, MATX_HOST_MALLOC_MEMORY);
-          }          
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);          
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }

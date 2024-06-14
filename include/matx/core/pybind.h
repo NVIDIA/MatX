@@ -336,35 +336,40 @@ public:
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype>(np_ten);
 
-    for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
-      if constexpr (RANK > 1) {
-        for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
-          if constexpr (RANK > 2) {
-            for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
-              if constexpr (RANK > 3) {
-                for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                  if constexpr (RANK > 4) {
-                    for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
-                      ten(s1, s2, s3, s4, s5) = ConvertComplex(ften.at(s1, s2, s3, s4, s5));
+    if constexpr (RANK == 0) {
+      ten() = ConvertComplex(ften.at());
+    }
+    else {
+      for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
+        if constexpr (RANK > 1) {
+          for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
+            if constexpr (RANK > 2) {
+              for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
+                if constexpr (RANK > 3) {
+                  for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
+                    if constexpr (RANK > 4) {
+                      for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
+                        ten(s1, s2, s3, s4, s5) = ConvertComplex(ften.at(s1, s2, s3, s4, s5));
+                      }
+                    }
+                    else {
+                      ten(s1, s2, s3, s4) = ConvertComplex(ften.at(s1, s2, s3, s4));
                     }
                   }
-                  else {
-                    ten(s1, s2, s3, s4) = ConvertComplex(ften.at(s1, s2, s3, s4));
-                  }
+                }
+                else {
+                  ten(s1, s2, s3) = ConvertComplex(ften.at(s1, s2, s3));
                 }
               }
-              else {
-                ten(s1, s2, s3) = ConvertComplex(ften.at(s1, s2, s3));
-              }
+            }
+            else {
+              ten(s1, s2) = ConvertComplex(ften.at(s1, s2));
             }
           }
-          else {
-            ten(s1, s2) = ConvertComplex(ften.at(s1, s2));
-          }
         }
-      }
-      else {
-        ten(s1) = ConvertComplex(ften.at(s1));
+        else {
+          ten(s1) = ConvertComplex(ften.at(s1));
+        }
       }
     }
   }

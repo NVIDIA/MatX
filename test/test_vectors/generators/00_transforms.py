@@ -392,3 +392,37 @@ class outer_operators:
             self.res['bc'][b] = np.outer(self.res['ba'][b], self.res['bb'][b])
             
         return self.res
+
+class norm_operators:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)
+
+    def vector_l2(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'in_v': seq,
+            'out_v': np.linalg.norm(seq, 2)
+        }
+    
+    def vector_l1(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'in_v': seq,
+            'out_v': np.linalg.norm(seq, 1)
+        }
+    
+    def matrix_frob(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        return {
+            'in_m': seq,
+            'out_m': np.linalg.norm(seq, 'fro')
+        }
+    
+    def matrix_l1(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        return {
+            'in_m': seq,
+            'out_m': np.linalg.norm(seq, 1)
+        }       

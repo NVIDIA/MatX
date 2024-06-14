@@ -79,6 +79,12 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        // Maybe do something here later if we take operators as input        
+      }         
+
+      template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         MATX_ASSERT_STR(false, matxNotSupported, "einsum() must only be called with a single assignment since it has multiple return types");

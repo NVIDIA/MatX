@@ -42,7 +42,7 @@ namespace matx {
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
     if constexpr (remove_cvref_t<decltype(out)>::Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
-        if constexpr(ConvertType) {
+        if constexpr(ConvertType) {   
           return func(  in, 
                         reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type> *>(out.Data()), 
                         bi, 
@@ -64,7 +64,7 @@ namespace matx {
 
   template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
-    typename detail::base_type_t<InputOp> in_base = in;
+    typename detail::base_type_t<InputOp> in_base = in;    
     if constexpr (in_base.Rank() < 2 && is_tensor_view_v<InputOp>) {
       if (in_base.IsContiguous()) {
         if constexpr (ConvertType) {
@@ -89,8 +89,6 @@ namespace matx {
     auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - 
                                                                                       remove_cvref_t<decltype(out)>::Rank()>(in_base));
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-
-  
     return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
   } 
 
@@ -115,5 +113,22 @@ namespace matx {
     }
 
     return shape;
+  }
+
+  namespace detail {
+    // Used inside of transforms to allocate temporary output
+    template <typename TensorType, typename Executor, typename ShapeType> 
+    __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::scalar_type **ptr) {
+      const auto ttl_size = std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
+                                  std::multiplies<index_t>()) * sizeof(*ptr);      
+      if constexpr (is_cuda_executor_v<Executor>) {
+        matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+        make_tensor(tensor, *ptr, shape);
+      }
+      else {        
+        matxAlloc((void**)ptr, ttl_size, MATX_HOST_MEMORY);
+        make_tensor(tensor, *ptr, shape);        
+      }  
+    }  
   }
 }; 
