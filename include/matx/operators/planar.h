@@ -56,7 +56,7 @@ namespace matx
           static_assert(Rank() > 0);
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
@@ -69,7 +69,7 @@ namespace matx
           return op_(indices...).real();      
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);

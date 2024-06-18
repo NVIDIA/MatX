@@ -31,17 +31,18 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include <numeric>
+#include <cuda/std/__algorithm>
 
 namespace matx {
 namespace detail {
 
 template <int RANK>
-inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, LDS_Width width, 
+inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, uint8_t ilp_factor, 
                           int max_cta_size = 1024)
 {
   bool stride = false;
-  const auto ilp_factor = ILPFactor(width);
   [[maybe_unused]] int nt = 1;
   threads.x = 1;
   threads.y = 1;

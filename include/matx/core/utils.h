@@ -206,5 +206,6 @@ auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
   return getPermuteDims<RANK>(detail::to_array(dims));
 }
 
+
 };
 };

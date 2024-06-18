@@ -64,7 +64,7 @@ namespace matx
         ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           [[maybe_unused]] auto theta = get_value(theta_, indices...);

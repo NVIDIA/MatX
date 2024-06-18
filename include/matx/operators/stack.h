@@ -122,7 +122,7 @@ namespace matx
           }
         }
 
-      template <typename... Is>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
         {
           cuda::std::array<index_t, RANK + 1> indices = {{is...}};
@@ -143,7 +143,7 @@ namespace matx
           return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
         }
 
-      template <typename... Is>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
           cuda::std::array<index_t, RANK + 1> indices = {{is...}};

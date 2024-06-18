@@ -44,7 +44,6 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include <cuda/std/__algorithm>
-#include <cuda/std/__algorithm>
 
 #pragma once
 

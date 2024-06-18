@@ -42,6 +42,7 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
 //#include "matx_exec_kernel.h"
+#include "matx/core/vector.h"
 #include "iterator.h"
 #include "matx/core/make_tensor.h"
 
@@ -628,6 +629,7 @@ class tensor_impl_t {
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
+      // Leave this non-vectorized for now since it's used only in transforms
       return ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
     }    
 
@@ -659,26 +661,7 @@ class tensor_impl_t {
       }
       else {
         return 0;
-      }             
-    }    
-
-    /**
-     * operator() getter
-     *
-     * @param indices
-     *   Indices of tensor
-     *
-     * @returns value at given index
-     *
-     */
-    template <int M = RANK, typename... Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
-    {
-      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
-#ifndef NDEBUG
-      assert(ldata_ != nullptr);
-#endif
-      return *(ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+      }
     }
 
     /**
@@ -690,15 +673,36 @@ class tensor_impl_t {
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is, 
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
+    {
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif
+      using vec_type = Vector<T, static_cast<size_t>(InWidth)>;
+      return *(reinterpret_cast<vec_type*>(ldata_) + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+    }
+
+    /**
+     * operator() getter
+     *
+     * @param indices
+     *   Indices of tensor
+     *
+     * @returns value at given index
+     *
+     */
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is, 
       std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
-      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
-#endif      
-      return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+#endif
+      using vec_type = Vector<T, static_cast<size_t>(InWidth)>;
+      return *(reinterpret_cast<vec_type*>(ldata_) + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
     }    
 
     /**
@@ -707,10 +711,11 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
+     template <VecWidth InWidth, VecWidth OutWidth>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()(args...);
+          return this->operator()<InWidth, OutWidth>(args...);
         }, idx);      
     }  
 
@@ -720,10 +725,11 @@ class tensor_impl_t {
      * @returns value in tensor
      *
      */
+     template <VecWidth InWidth, VecWidth OutWidth>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()(args...);
+          return this->operator()<InWidth, OutWidth>(args...);
         }, idx);      
     }      
 
@@ -844,21 +850,23 @@ class tensor_impl_t {
     {
     }
 
-    LDS_Width GetMaxWidth() const {
+    VecWidth GetMaxWidth() const {
       if (IsContiguous()) {
-        if (((16 / sizeof(T)) == 0) && 
-            ((Bytes() % 16) == 0)   && 
-            (static_cast<uintptr_t>(ldata_) % 16) == 0) {
-          return LDS_Width::SIXTEEN_BYTES;
+        uint32_t width = 4;
+        while (width > 1) {
+          if ((((sizeof(T) * width) / sizeof(T)) == 0) && 
+              ((Bytes() % (sizeof(T) * width)) == 0)   && 
+              (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width)) == 0) {
+            break;
+          }    
+          
+          width /= 2;
         }
-        if (((8 / sizeof(T)) == 0) && 
-            ((Bytes() % 8) == 0)   && 
-            (static_cast<uintptr_t>(ldata_) % 8) == 0) {
-          return LDS_Width::EIGHT_BYTES;
-        }
+
+        return static_cast<VecWidth>(width);
       }
 
-      return LDS_Width::DATA_ALIGN;
+      return VecWidth::ONE;
     }
 
 

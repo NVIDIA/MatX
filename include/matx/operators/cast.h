@@ -71,13 +71,13 @@ namespace matx
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(T op) : op_(op){};  
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
           return static_cast<NewType>(op_(indices...));     
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           return static_cast<NewType>(op_(indices...));
@@ -131,14 +131,14 @@ namespace matx
           }
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           using inner_type = typename inner_op_type_t<NewType>::type;
           return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           using inner_type = typename inner_op_type_t<NewType>::type;

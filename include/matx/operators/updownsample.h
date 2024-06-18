@@ -67,7 +67,7 @@ namespace matx
         __MATX_INLINE__ UpsampleOp(const T &op, int32_t dim, index_t n) : op_(op), dim_(dim), n_(n) {
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           static_assert(sizeof...(Is)==Rank());

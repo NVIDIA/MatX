@@ -64,7 +64,7 @@ namespace matx
         static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
       }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           auto tup1 = cuda::std::make_tuple(indices...);
@@ -78,7 +78,7 @@ namespace matx
           return cuda::std::apply(op2_, tup2) * cuda::std::apply(op1_, tup1);
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           auto tup1 = cuda::std::make_tuple(indices...);

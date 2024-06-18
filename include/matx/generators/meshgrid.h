@@ -57,7 +57,7 @@ namespace matx
             static_assert(is_matx_op<T1>());
           }
 
-          template <typename... Is>
+          template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
             __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
 
               cuda::std::array<index_t, Rank()> inds{indices...};

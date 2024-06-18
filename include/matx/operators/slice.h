@@ -101,7 +101,7 @@ namespace matx
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is)==Rank());
@@ -125,7 +125,7 @@ namespace matx
             return cuda::std::apply(op_, ind);
           }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
           {
             static_assert(sizeof...(Is)==Rank());

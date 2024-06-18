@@ -78,7 +78,7 @@ namespace matx
           MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
           cuda::std::array<index_t, Rank()> inds{indices...};
@@ -104,7 +104,7 @@ namespace matx
           return cuda::std::apply(op_, ninds);
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           cuda::std::array<index_t, Rank()> inds{indices...};

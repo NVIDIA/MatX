@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/error.h"
+#include "matx/core/type_utils.h"
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>
@@ -321,7 +322,7 @@ public:
    * @tparam Is Index type
    * @param indices Index values
    */
-  template <typename... Is>
+  template <matx::detail::VecWidth InWidth, matx::detail::VecWidth OutWidth, typename... Is>
   inline __MATX_DEVICE__ T operator()(Is... indices) const
   {
     T val;
@@ -499,7 +500,7 @@ public:
        * @tparam Is Index type
        * @param indices Index values
        */
-      template <typename... Is>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()([[maybe_unused]] Is... indices) const
       {
         T val;

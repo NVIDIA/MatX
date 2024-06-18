@@ -63,7 +63,7 @@ namespace matx
         __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
 
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
           if constexpr (Rank() == 0) {
@@ -76,7 +76,7 @@ namespace matx
           }
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           if constexpr (Rank() == 0) {

@@ -55,7 +55,7 @@ namespace matx
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
           auto tup = cuda::std::make_tuple(indices...);
@@ -63,14 +63,13 @@ namespace matx
           return cuda::std::apply(op_, tup);
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           auto tup = cuda::std::make_tuple(indices...);
           cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
           return cuda::std::apply(op_, tup);
         }
-
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -134,7 +133,7 @@ namespace matx
           static_assert(Rank() >= 2, "2D FFT shift must have a rank 2 operator or higher");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
@@ -205,7 +204,7 @@ namespace matx
           static_assert(Rank() >= 1, "1D IFFT shift must have a rank 1 operator or higher");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);
@@ -275,7 +274,7 @@ namespace matx
           static_assert(Rank() >= 2, "2D IFFT shift must have a rank 2 operator or higher");
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);

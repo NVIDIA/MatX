@@ -245,11 +245,11 @@ namespace detail {
    * @param indices indices
    * @return Value after broadcasting
    */
-  template <class T, typename... Is>
+  template <VecWidth InWidth, VecWidth OutWidth, class T, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(const T &i, Is... indices)
   {
     if constexpr (T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank) {
-      return i(indices...);
+      return i.template operator()<InWidth, OutWidth>(indices...);
     }
     else
     {
@@ -258,18 +258,18 @@ namespace detail {
       auto tup = cuda::std::make_tuple(indices...);
       auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
       return cuda::std::apply([&](auto... args) {
-        return i(args...);
+        return i.template operator()<InWidth, OutWidth>(args...);
       }, sliced_tup);
     }
   }
 
 
-  template <class T, typename... Is>
+  template <VecWidth InWidth, VecWidth OutWidth, class T, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(const T &i, Is... indices)
   {
     if constexpr (is_matx_op<T>())
     {
-      return get_matx_value(i, indices...);
+      return get_matx_value<InWidth, OutWidth>(i, indices...);
     }
     else
     {

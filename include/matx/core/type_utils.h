@@ -43,7 +43,6 @@
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
-#include "matx/executors/device.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -61,6 +60,14 @@ enum class MemoryLayout {
   MEMORY_LAYOUT_ROW_MAJOR,
   MEMORY_LAYOUT_COL_MAJOR,
 };
+
+namespace detail {
+enum class VecWidth : uint8_t {
+  ONE = 1,
+  TWO = 2,
+  FOUR = 4, // Leave these values to match the words to make casting easier
+};
+}
 
 struct NoShape{};
 
@@ -267,6 +274,9 @@ template <typename T>
 inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_set_op_impl<T>, 
                                                detail::is_matx_transform_set_op_impl<T>>;
                                                //detail::is_matx_tensor_set_op_impl<T>>; // Can be tuple also
+
+class cudaExecutor;
+class HostExecutor;
 
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};

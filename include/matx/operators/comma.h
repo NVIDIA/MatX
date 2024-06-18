@@ -60,7 +60,7 @@ namespace matx
 
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
-          template <typename... Is>
+          template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
             auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
               op1_(indices...);
               return op2_(indices...);

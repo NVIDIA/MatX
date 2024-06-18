@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include <numeric>
 #include <cuda/std/array>
 #include <type_traits>
 #include "matx/core/error.h"

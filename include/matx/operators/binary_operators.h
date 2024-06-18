@@ -103,10 +103,15 @@ namespace matx
         using matxop = bool;
         using scalar_type = typename Op::scalar_type;
         using self_type = matxBinaryOp<I1, I2, Op>;
+        using matx_width = bool; ///< Signal we can do vector types from this operator
 
       __MATX_INLINE__ const std::string str() const {
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
+
+      VecWidth GetMaxWidth() const {
+        return MinCompatibleWidth(in1_, in2_);
+      }        
 
         __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
       {
@@ -117,19 +122,23 @@ namespace matx
         }
       }
 
-      template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        auto i1 = get_value(in1_, indices...);
-        auto i2 = get_value(in2_, indices...);
-        return op_(i1, i2);
+        auto i1 = get_value<InWidth, OutWidth>(in1_, indices...);
+        auto i2 = get_value<InWidth, OutWidth>(in2_, indices...);
+std::string a = (typename decltype(i1)::scalar_type){};
+        using i1_scalar_type = typename decltype(i1)::scalar_type;
+        using i2_scalar_type = typename decltype(i2)::scalar_type;
+
+        return op_.template operator()<InWidth, OutWidth, i1_scalar_type, i2_scalar_type>(i1, i2);
       }
 
-      template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <VecWidth InWidth, VecWidth OutWidth, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()(args...);
+            return this->operator()<InWidth, OutWidth>(args...);
           }, idx);      
       }        
 

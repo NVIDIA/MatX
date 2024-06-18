@@ -61,7 +61,7 @@ namespace matx
  
         __MATX_INLINE__ DiagOp(T1 op) : op_(op) {}
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer index than rank of operator");
@@ -73,36 +73,36 @@ namespace matx
             return cuda::std::apply(op_, tup);
           }
 
-        static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-        {
-          return RANK - 1;
-        }
+          static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+          {
+            return RANK - 1;
+          }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
-        {
-          if (dim < RANK - 2) {
-            return op_.Size(dim);
+          constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+          {
+            if (dim < RANK - 2) {
+              return op_.Size(dim);
+            }
+            else {
+              return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+            }
           }
-          else {
-            return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
-          }
-        }
 
-        template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
-        {
-          if constexpr (is_matx_op<T1>()) {
-            op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+          {
+            if constexpr (is_matx_op<T1>()) {
+              op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
           }
-        }
 
-        template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
-        {
-          if constexpr (is_matx_op<T1>()) {
-            op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          template <typename ShapeType, typename Executor>
+          __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+          {
+            if constexpr (is_matx_op<T1>()) {
+              op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            }
           }
-        }
     };
   }
 

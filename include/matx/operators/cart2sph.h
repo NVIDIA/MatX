@@ -64,7 +64,7 @@ namespace matx
         ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
           {
             auto x = get_value(x_, indices...);

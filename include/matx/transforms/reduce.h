@@ -1383,7 +1383,7 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
     sizes[i] = in.Size(i);
   }
 
-  detail::get_grid_dims<InType::Rank()>(blocks, threads, sizes);
+  detail::get_grid_dims<InType::Rank()>(blocks, threads, sizes, 1);
 
   if (init) {
     (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);

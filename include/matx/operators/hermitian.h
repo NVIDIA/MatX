@@ -60,7 +60,7 @@ namespace matx
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
             auto tup = cuda::std::make_tuple(indices...);

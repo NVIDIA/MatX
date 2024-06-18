@@ -105,7 +105,7 @@ namespace matx
        * @tparam Is Index types
        * @param indices Index values
        */
-      template <typename... Is>
+      template <matx::detail::VecWidth InWidth, matx::detail::VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
           if (get_value(cond_, indices...)) {
             get_value(op1_, indices...);
