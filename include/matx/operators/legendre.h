@@ -103,7 +103,7 @@ namespace matx
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(Is... indices) const 
           {
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T3::Rank()> xinds;
+            cuda::std::array<index_t, T3::Rank()> xinds{};
             
             int axis1 = axis_[0];
             int axis2 = axis_[1];

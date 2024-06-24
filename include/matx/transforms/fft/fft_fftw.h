@@ -44,7 +44,12 @@
 #ifdef MATX_EN_NVPL
 #include <nvpl_fftw.h>
 #endif
-
+#ifdef MATX_EN_X86_FFTW
+#include <fftw3.h>
+#endif
+#ifdef MATX_EN_OMP
+#include <omp.h>
+#endif
 #include <cstdio>
 #include <functional>
 #include <optional>
@@ -130,6 +135,8 @@ struct FftFFTWparams_t {
       }
 
       params.batch = (RANK == 2) ? 1 : static_cast<int>(TotalSize(i) / ((i.Size(RANK - 1) * i.Size(RANK - 2))));
+      params.inembed[0] = static_cast<int>(i.Size(RANK-2));
+      params.onembed[0] = static_cast<int>(o.Size(RANK-2));
       params.inembed[1] = static_cast<int>(i.Size(RANK-1));
       params.onembed[1] = static_cast<int>(o.Size(RANK-1));
       params.istride = static_cast<int>(i.Stride(RANK-1));
@@ -212,6 +219,17 @@ struct FftFFTWparams_t {
     } else {
 
       bool supported = true;
+      // only a subset of strides are supported per fftw indexing scheme.
+      if constexpr (RANK >= 2) {
+        if (in.Stride(RANK - 2) != in.Stride(RANK - 1) * in.Size(RANK - 1)) {
+          supported = false;
+        }
+      }
+      if constexpr (RANK > 2) {
+        if (in.Stride(RANK - 3) != in.Size(RANK - 2) * in.Stride(RANK - 2)) {
+          supported = false;
+        }
+      }
 
       // If there are any unsupported layouts for fftw add them here
       if (supported) {
@@ -249,11 +267,12 @@ struct FftFFTWparams_t {
     }
   }
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft_exec([[maybe_unused]] OutputTensor &o, 
                                 [[maybe_unused]] const InputTensor &i, 
                                 [[maybe_unused]] const FftFFTWparams_t &params, 
-                                [[maybe_unused]] detail::FFTDirection dir) {
+                                [[maybe_unused]] detail::FFTDirection dir,
+                                [[maybe_unused]] const HostExecutor<MODE> &exec) {
     [[maybe_unused]] static constexpr bool fp32 = std::is_same_v<typename inner_op_type_t<typename OutputTensor::scalar_type>::type, float>;
 
 #if MATX_EN_CPU_FFT
@@ -262,6 +281,10 @@ struct FftFFTWparams_t {
     auto exec_plans = [&](typename OutputTensor::value_type *out_ptr, 
                           typename InputTensor::value_type *in_ptr) {
       if constexpr (fp32) {
+        int ret = fftwf_init_threads();
+        MATX_ASSERT_STR(ret != 0, matxAssertError, "fftwf_init_threads() failed");
+
+        fftwf_plan_with_nthreads(exec.GetNumThreads());
         fftwf_plan plan{};
         if constexpr (DeduceFFTTransformType<OutputTensor, InputTensor>() == FFTType::C2C) {
           plan  = fftwf_plan_many_dft( params.fft_rank, 
@@ -306,12 +329,18 @@ struct FftFFTWparams_t {
                                       params.odist,  
                                       FFTW_ESTIMATE);
         }
+        MATX_ASSERT_STR(plan != nullptr, matxAssertError, "fftwf plan creation failed");
 
         fftwf_execute(plan);
         fftwf_destroy_plan(plan);
-        fftwf_cleanup();         
+        fftwf_cleanup_threads();
+        fftwf_cleanup();
       }
       else {
+        int ret = fftw_init_threads();
+        MATX_ASSERT_STR(ret != 0, matxAssertError, "fftw_init_threads() failed");
+
+        fftw_plan_with_nthreads(exec.GetNumThreads());
         fftw_plan plan{};
         if constexpr (DeduceFFTTransformType<OutputTensor, InputTensor>() == FFTType::Z2Z) {
           plan  = fftw_plan_many_dft( params.fft_rank, 
@@ -356,10 +385,12 @@ struct FftFFTWparams_t {
                                       params.odist,  
                                       FFTW_ESTIMATE);
         } 
-        
+        MATX_ASSERT_STR(plan != nullptr, matxAssertError, "fftw plan creation failed");
+
         fftw_execute(plan);
         fftw_destroy_plan(plan);
-        fftw_cleanup();           
+        fftw_cleanup_threads();
+        fftw_cleanup();
       }
     };
 
@@ -367,22 +398,21 @@ struct FftFFTWparams_t {
 #endif
   }
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft1d_dispatch(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor &exec)
+          uint64_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    MATX_ASSERT_STR(exec.GetNumThreads() == 1, matxInvalidParameter, "Only single-threaded host FFT supported");
     MATX_ASSERT_STR(TotalSize(i) < std::numeric_limits<int>::max(), matxInvalidSize, "Dimensions too large for host FFT currently");
 
     // converts operators to tensors
     auto out = getFFTW1DSupportedTensor(o);
     auto in_t = getFFTW1DSupportedTensor(i); 
-    
+
     if(!in_t.isSameView(i)) {
       (in_t = i).run(exec);
     }
@@ -392,7 +422,7 @@ struct FftFFTWparams_t {
     // Get parameters required by these tensors
     auto params = GetFFTParams(out, in, 1);
 
-    fft_exec(o, in, params, dir);
+    fft_exec(out, in, params, dir, exec);
 
     if(!out.isSameView(o)) {
       (o = out).run(exec);
@@ -423,17 +453,15 @@ struct FftFFTWparams_t {
   }
 
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft2d_dispatch(OutputTensor o, const InputTensor i,
-          detail::FFTDirection dir, FFTNorm norm, const HostExecutor &exec)
+          detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
     MATX_ASSERT_STR(TotalSize(i) < std::numeric_limits<int>::max(), matxInvalidSize, "Dimensions too large for host FFT currently");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    MATX_ASSERT_STR(exec.GetNumThreads() == 1, matxInvalidParameter, "Only single-threaded host FFT supported");
 
     // converts operators to tensors
     auto out = getFFTW2DSupportedTensor(o);
@@ -446,7 +474,7 @@ struct FftFFTWparams_t {
     // Get parameters required by these tensors
     auto params = GetFFTParams(out, in, 2);
 
-    fft_exec(o, in, params, dir);
+    fft_exec(out, in, params, dir, exec);
 
     if(!out.isSameView(o)) {
       (o = out).run(exec);
@@ -477,9 +505,9 @@ struct FftFFTWparams_t {
   }  
 
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor &exec)
+          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
@@ -495,9 +523,9 @@ struct FftFFTWparams_t {
   }
 
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor &exec)
+          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
@@ -514,9 +542,9 @@ struct FftFFTWparams_t {
 
 
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm, 
-            const HostExecutor &exec)
+            const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");
@@ -532,9 +560,9 @@ struct FftFFTWparams_t {
     fft2d_dispatch(o, i, FFTDirection::FORWARD, norm, exec);
   }
 
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm, 
-            const HostExecutor &exec)
+            const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  

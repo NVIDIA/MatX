@@ -36,7 +36,9 @@
 
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
-
+#ifdef MATX_EN_OMP
+#include <omp.h>
+#endif
 namespace matx 
 {
 
@@ -48,9 +50,15 @@ struct cpu_set_t {
   cuda::std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
 };
 
+enum class ThreadsMode {
+  SINGLE,
+  SELECT,
+  ALL,
+};
+
 struct HostExecParams {
   HostExecParams(int threads = 1) : threads_(threads) {}
-  HostExecParams(cpu_set_t cpu_set) : cpu_set_(cpu_set) {
+  HostExecParams(cpu_set_t cpu_set) : cpu_set_(cpu_set), threads_(1) {
     MATX_ASSERT_STR(false, matxNotSupported, "CPU affinity not supported yet");
   }
 
@@ -62,18 +70,42 @@ struct HostExecParams {
 };
 
 /**
- * @brief Executor for running an operator on a single host thread
+ * @brief Executor for running an operator on a single or multi-threaded host
+ * 
+ * @tparam MODE Threading policy
  * 
  */
+template <ThreadsMode MODE = ThreadsMode::SINGLE>
 class HostExecutor {
   public:
     using matx_cpu = bool; ///< Type trait indicating this is a CPU executor
     using matx_executor = bool; ///< Type trait indicating this is an executor
 
-    HostExecutor(const HostExecParams &params = HostExecParams{}) : params_(params) {}
+    HostExecutor() {
+      int n_threads = 1;
+      if constexpr (MODE == ThreadsMode::SINGLE) {
+        n_threads = 1;
+      }
+      else if constexpr (MODE == ThreadsMode::ALL) {
+#if MATX_EN_OMP
+        n_threads = omp_get_num_procs();
+#endif
+      }
+      params_ = HostExecParams(n_threads);
+
+#if MATX_EN_OMP
+      omp_set_num_threads(params_.GetNumThreads());
+#endif
+    }
+
+    HostExecutor(const HostExecParams &params) : params_(params) {
+#if MATX_EN_OMP
+      omp_set_num_threads(params_.GetNumThreads());
+#endif
+    }
 
     /**
-     * @brief Synchronize the host executor's threads. Currently a noop as the executor is single-threaded.
+     * @brief Synchronize the host executor's threads.
      * 
      */
     void sync() {}
@@ -86,12 +118,23 @@ class HostExecutor {
      */
     template <typename Op>
     void Exec(Op &op) const noexcept {
-      if (params_.GetNumThreads() == 1) {
-        if constexpr (Op::Rank() == 0) {
-          op();
-        }
-        else {
-          index_t size = TotalSize(op);
+      if constexpr (Op::Rank() == 0) {
+        op();
+      } 
+      else {
+        index_t size = TotalSize(op);
+  #ifdef MATX_EN_OMP
+        if (params_.GetNumThreads() > 1) {
+          #pragma omp parallel for num_threads(params_.GetNumThreads())
+          for (index_t i = 0; i < size; i++) {
+            auto idx = GetIdxFromAbs(op, i);
+            cuda::std::apply([&](auto... args) {
+              return op(args...);
+            }, idx);        
+          }
+        } else
+  #endif
+        { 
           for (index_t i = 0; i < size; i++) {
             auto idx = GetIdxFromAbs(op, i);
             cuda::std::apply([&](auto... args) {
@@ -107,5 +150,9 @@ class HostExecutor {
     private:
       HostExecParams params_;
 };
+
+using SingleThreadedHostExecutor = HostExecutor<ThreadsMode::SINGLE>;
+using SelectThreadsHostExecutor  = HostExecutor<ThreadsMode::SELECT>;
+using AllThreadsHostExecutor     = HostExecutor<ThreadsMode::ALL>;
 
 }

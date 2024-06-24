@@ -256,7 +256,7 @@ inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_s
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};
 template <> struct is_executor<cudaExecutor> : std::true_type {};
-template <> struct is_executor<HostExecutor> : std::true_type {};
+template <ThreadsMode MODE> struct is_executor<HostExecutor<MODE>> : std::true_type {};
 }
 
 /**
@@ -286,17 +286,27 @@ inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename rem
 
 namespace detail {
 template<typename T> struct is_host_executor : std::false_type {};
-template<> struct is_host_executor<matx::HostExecutor> : std::true_type {};
+template<ThreadsMode MODE> struct is_host_executor<matx::HostExecutor<MODE>> : std::true_type {};
+
+template<typename T> struct is_select_threads_host_executor : std::false_type {};
+template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecutor> : std::true_type {};
 }
 
 /**
- * @brief Determine if a type is a single-threaded host executor executor
+ * @brief Determine if a type is a host executor
  * 
  * @tparam T Type to test
  */
 template <typename T> 
 inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref_t<T>>::value;
 
+/**
+ * @brief Determine if a type is a select threads host executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+inline constexpr bool is_select_threads_host_executor_v = detail::is_select_threads_host_executor<remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void>
