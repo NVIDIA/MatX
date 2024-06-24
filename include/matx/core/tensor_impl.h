@@ -617,6 +617,14 @@ class tensor_impl_t {
     __MATX_INLINE__ auto Shape() const noexcept { return this->desc_.Shape(); }
 
     /**
+     * Get the strides the tensor from the underlying data
+     *
+     * @return
+     *    A shape of the data with the appropriate strides set
+     */
+    __MATX_INLINE__ auto Strides() const noexcept { return this->desc_.Strides(); }    
+
+    /**
      * Set the size of a dimension
      *
      * @return
