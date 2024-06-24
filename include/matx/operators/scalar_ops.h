@@ -374,13 +374,14 @@ template <typename T1S, typename T2S> struct AddF {
         }
       }   
       else {     
-        return v1 + v2;
+        using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 1>;
+        return res_type{v1.data[0] + v2.data[0]};
       }
     }
     else if constexpr (InWidth == VecWidth::TWO) {
       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 2>;
       return res_type{ v1.data[0] + v2.data[0], 
-                                    v1.data[1] + v2.data[1]};
+                       v1.data[1] + v2.data[1]};
     }
     else if constexpr (InWidth == VecWidth::FOUR) {
       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 4>;
