@@ -113,7 +113,7 @@ public:
     return op<InWidth, OutWidth, T1S, T2S>(v1, v2);
   }
 
-  using scalar_type = std::invoke_result_t<decltype(op<matx::detail::VecWidth::ONE, matx::detail::VecWidth::ONE, T1, T2>), T1, T2>;
+  using scalar_type = std::invoke_result_t<decltype(op<matx::detail::VecWidth::ONE, matx::detail::VecWidth::ONE, Vector<T1, 1>, Vector<T2, 1>>), Vector<T1, 1>, Vector<T2, 1>>;
 };
 
 

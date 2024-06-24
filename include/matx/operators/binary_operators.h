@@ -127,7 +127,7 @@ namespace matx
       {
         auto i1 = get_value<InWidth, OutWidth>(in1_, indices...);
         auto i2 = get_value<InWidth, OutWidth>(in2_, indices...);
- std::string a =  i1+ 3;
+
 //         using i1_scalar_type = typename decltype(i1)::scalar_type;
 //         using i2_scalar_type = typename decltype(i2)::scalar_type;
 

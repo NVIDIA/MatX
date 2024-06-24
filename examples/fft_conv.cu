@@ -76,7 +76,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     auto t1 = make_tensor<float>({10000000});
     auto t2 = make_tensor<float>({10000000});
     auto t3 = make_tensor<float>({10000000});
-    (t2 = t1 + t2).run();
+    t1.Data()[0] = 1.f;
+    t2.Data()[0] = 1.f;
+    cudaDeviceSynchronize();
+    (t3 = t1 + t2).run();
+    cudaDeviceSynchronize();
+    printf("%f %f\n", t3.Data()[0], t3.Data()[1]);
   }
   // using complex = cuda::std::complex<float>;
   // cudaExecutor exec{};
