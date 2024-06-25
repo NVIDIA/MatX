@@ -57,6 +57,7 @@ namespace matx
         using scalar_type = typename T::scalar_type;
         using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>; 
         using index_type = typename IdxType::scalar_type;
+        using self_type = RemapOp<DIM, T, IdxType>;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
         static_assert(IdxType::Rank() <= 1, "RemapOp: Rank of index operator must be 0 or 1");
         static_assert(DIM<T::Rank(), "RemapOp: DIM must be less than Rank of tensor");
@@ -134,7 +135,13 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        } 
+
+        ~RemapOp() = default;
+        RemapOp(const RemapOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }                      
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

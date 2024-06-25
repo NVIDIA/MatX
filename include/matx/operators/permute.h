@@ -47,6 +47,7 @@ namespace matx
     {
       public: 
         using scalar_type = typename T::scalar_type;
+        using self_type = PermuteOp<T>;
 
       private:
         typename base_type<T>::type op_;
@@ -133,7 +134,13 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }   
+
+        ~PermuteOp() = default;
+        PermuteOp(const PermuteOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }                      
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

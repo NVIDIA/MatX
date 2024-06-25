@@ -57,6 +57,7 @@ namespace detail {
       using matx_transform_op = bool;
       using matxoplvalue = bool;
       using transpose_xform_op = bool;
+      using self_type = TransposeMatrixOp<OpA>;
 
       __MATX_INLINE__ std::string str() const { return "transpose_matrix(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ TransposeMatrixOp(OpA a) : a_(a) {
@@ -120,6 +121,12 @@ namespace detail {
       {
         return out_dims_[dim];
       }
+
+      ~TransposeMatrixOp() = default;
+      TransposeMatrixOp(const TransposeMatrixOp &rhs) = default;
+      __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+        return set(*this, rhs); 
+      }       
 
       template<typename R> 
       __MATX_INLINE__ auto operator=(const R &rhs) { 

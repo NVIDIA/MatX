@@ -61,6 +61,7 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
         using scalar_type = typename T1::scalar_type;
+        using self_type = ShiftOp<DIM, T1, T2>;
 
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }
 
@@ -130,6 +131,12 @@ namespace matx
           index_t size2 = detail::get_expanded_size<Rank()>(shift_, dim);
           return detail::matx_max(size1,size2);
         }
+
+        ~ShiftOp() = default;
+        ShiftOp(const ShiftOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }            
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

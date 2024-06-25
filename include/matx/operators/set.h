@@ -68,7 +68,6 @@ private:
 public:
   // Type specifier for reflection on class
   using scalar_type = typename T::scalar_type;
-  using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>;
   using tensor_type = T;
   using op_type = Op;
   using matx_setop = bool;
@@ -136,7 +135,9 @@ public:
       return r;
     }
   }
-  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<shape_type, T::Rank()> idx) const noexcept
+
+  template <typename ShapeType>
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
         return _internal_mapply(args...);

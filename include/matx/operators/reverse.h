@@ -57,6 +57,7 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
         using scalar_type = typename T1::scalar_type;
+        using self_type = ReverseOp<DIM, T1>;
 
         __MATX_INLINE__ std::string str() const { return "reverse(" + op_.str() + ")"; }
 
@@ -112,7 +113,13 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }   
+
+        ~ReverseOp() = default;
+        ReverseOp(const ReverseOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }                       
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

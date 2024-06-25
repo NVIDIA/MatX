@@ -1589,6 +1589,44 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
   }
 
+  {
+    // Remap as both LHS and RHS
+    auto in = make_tensor<TestType>({4,4,4});
+    auto out = make_tensor<TestType>({4,4,4});
+    TestType c = GenerateData<TestType>();
+    for (int i = 0; i < in.Size(0); i++){
+      for (int j = 0; j < in.Size(1); j++){
+        for (int k = 0; k < in.Size(2); k++){
+          in(i,j,k) = c;
+        }
+      }
+    }
+
+    auto map1 = matx::make_tensor<int>({2});
+    auto map2 = matx::make_tensor<int>({2});
+    map1(0) = 1;
+    map1(1) = 2;
+    map2(0) = 0;
+    map2(1) = 1;
+
+    (out = static_cast<TestType>(0)).run(exec);
+    (matx::remap<2>(out, map2) = matx::remap<2>(in, map1)).run(exec);
+    exec.sync();
+
+    for (int i = 0; i < in.Size(0); i++){
+      for (int j = 0; j < in.Size(1); j++){
+        for (int k = 0; k < in.Size(2); k++){
+          if (k > 1) {
+            ASSERT_EQ(out(i,j,k), (TestType)0);
+          }
+          else {
+            ASSERT_EQ(out(i,j,k), in(i,j,k));
+          }
+        }
+      }
+    } 
+  }
+
   MATX_EXIT_HANDLER();
 }
 

@@ -50,6 +50,7 @@ namespace matx
     {
       using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
       using first_value_type = typename first_type::scalar_type;
+      using self_type = StackOp<Ts...>;
 
       static constexpr int RANK = first_type::Rank();
 
@@ -180,6 +181,12 @@ namespace matx
           return cuda::std::get<0>(ops_).Size(dim-1);
         }
       }
+
+      ~StackOp() = default;
+      StackOp(const StackOp &rhs) = default;
+      __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+        return set(*this, rhs); 
+      }       
 
       template<typename R> 
       __MATX_INLINE__ auto operator=(const R &rhs) { 
