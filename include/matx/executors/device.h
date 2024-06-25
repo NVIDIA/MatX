@@ -93,8 +93,11 @@ namespace matx
 
           detail::VecWidth width = detail::VecWidth::ONE;
           if constexpr(has_matx_width<Op>()) {
+            printf("width2 %d\n", (int)width);
             width = op.GetMaxWidth();
           }
+
+          printf("width %d\n", (int)width);
 
           if constexpr (Op::Rank() == 0) {
             threads = 1;
@@ -115,7 +118,7 @@ namespace matx
 
             const auto ilp  = static_cast<uint8_t>(width);
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, ilp, 256);
-
+printf("%d %d %d %d %d\n", blocks.x, blocks.y, threads.x, threads.y, ilp);
             if constexpr (Op::Rank() == 1) {
               switch (width) {
                 case detail::VecWidth::ONE:

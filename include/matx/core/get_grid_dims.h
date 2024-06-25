@@ -57,7 +57,8 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    int rnd_threads = ilp_factor * threads.x;
+    blocks.x = static_cast<int>((sizes[0] + rnd_threads - 1) / rnd_threads);
     blocks.y = 1;
     blocks.z = 1;  
   }

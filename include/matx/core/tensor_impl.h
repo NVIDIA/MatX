@@ -854,7 +854,7 @@ class tensor_impl_t {
       if (IsContiguous()) {
         uint32_t width = 4;
         while (width > 1) {
-          if ((((sizeof(T) * width) / sizeof(T)) == 0) && 
+          if ((((sizeof(T) * width) % sizeof(T)) == 0) && 
               ((Bytes() % (sizeof(T) * width)) == 0)   && 
               (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width)) == 0) {
             break;

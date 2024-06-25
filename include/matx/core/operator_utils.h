@@ -138,6 +138,7 @@ namespace matx {
       VecWidth in2;
       if constexpr(has_matx_width<Op1>()) {
         in1 = a.GetMaxWidth();
+        printf("11 %d \n", (int)in1);
       }
       else {
         in1 = VecWidth::ONE;
@@ -145,6 +146,7 @@ namespace matx {
 
       if constexpr(has_matx_width<Op2>()) {
         in2 = b.GetMaxWidth();
+        printf("22 %d \n", (int)in2); 
       }
       else {
         in2 = VecWidth::ONE;

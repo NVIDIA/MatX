@@ -76,12 +76,25 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     auto t1 = make_tensor<float>({10000000});
     auto t2 = make_tensor<float>({10000000});
     auto t3 = make_tensor<float>({10000000});
+    float separate_ms = 0.f;
     t1.Data()[0] = 1.f;
     t2.Data()[0] = 1.f;
     cudaDeviceSynchronize();
-    (t3 = t1 + t2).run();
-    cudaDeviceSynchronize();
-    printf("%f %f\n", t3.Data()[0], t3.Data()[1]);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);  
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);      
+  
+    (t3 = t1 + t2).run(stream);
+    cudaEventRecord(start, stream);   
+    // for (int i = 0; i < 10000; i++)
+    //   (t3 = t1 + t2).run(stream);
+
+      cudaEventRecord(stop, stream);      
+    cudaStreamSynchronize(stream);
+    cudaEventElapsedTime(&separate_ms, start, stop);   
+    printf("%f %f %f\n", t3.Data()[0], t3.Data()[1], separate_ms/10000);
   }
   // using complex = cuda::std::complex<float>;
   // cudaExecutor exec{};
