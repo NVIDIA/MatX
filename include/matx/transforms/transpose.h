@@ -102,9 +102,9 @@ namespace matx
 #endif    
     };
   
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
     __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in, HostExecutor exec)
+        const InputTensor &in, HostExecutor<MODE> &exec)
     {
       static_assert(InputTensor::Rank() >= 2, "transpose_matrix operator must be on rank 2 or greater");
 

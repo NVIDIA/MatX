@@ -3780,7 +3780,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
+TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

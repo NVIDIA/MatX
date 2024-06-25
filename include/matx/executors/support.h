@@ -40,11 +40,11 @@ namespace matx {
   namespace detail {
 
 // FFT
-#if defined(MATX_EN_NVPL)
+#if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     #define MATX_EN_CPU_FFT 1
 #else
     #define MATX_EN_CPU_FFT 0
-#endif  
+#endif
 
 template <typename Exec>
 constexpr bool CheckFFTSupport() {
