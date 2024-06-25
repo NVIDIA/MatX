@@ -374,21 +374,85 @@ template <typename T1S, typename T2S> struct AddF {
         }
       }   
       else {     
-        using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 1>;
-        return res_type{v1.data[0] + v2.data[0]};
+        if constexpr (is_vector_v<T1>) {
+          if constexpr (is_vector_v<T2>) {
+            using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 1>;
+            return res_type{  v1.data[0] + v2.data[0]};
+          }
+          else {
+            using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 1>;
+            return res_type{  v1.data[0] + v2};          
+          }
+        }
+        else {
+          if constexpr (is_vector_v<T2>) {
+            using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 1>;
+            return res_type{  v1 + v2.data[0]};
+          }
+          else {
+            using res_type = matx::detail::Vector<decltype(v1 + v2), 1>;
+            return res_type{v1 + v2};          
+          }        
+        }
       }
     }
     else if constexpr (InWidth == VecWidth::TWO) {
-      using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 2>;
-      return res_type{ v1.data[0] + v2.data[0], 
-                       v1.data[1] + v2.data[1]};
+      if constexpr (is_vector_v<T1>) {
+        if constexpr (is_vector_v<T2>) {
+          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 2>;
+          return res_type{  v1.data[0] + v2.data[0], 
+                            v1.data[1] + v2.data[1]};
+        }
+        else {
+          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 2>;
+          return res_type{  v1.data[0] + v2, 
+                            v1.data[1] + v2};          
+        }
+      }
+      else {
+        if constexpr (is_vector_v<T2>) {
+          using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 2>;
+          return res_type{  v1 + v2.data[0], 
+                            v1 + v2.data[1]};
+        }
+        else {
+          using res_type = matx::detail::Vector<decltype(v1 + v2), 2>;
+          const auto val = v1 + v2;
+          return res_type{val, val};          
+        }        
+      }
     }
     else if constexpr (InWidth == VecWidth::FOUR) {
-      using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 4>;
-      return res_type{  v1.data[0] + v2.data[0], 
-                        v1.data[1] + v2.data[1],
-                        v1.data[2] + v2.data[2], 
-                        v1.data[3] + v2.data[3]};
+      if constexpr (is_vector_v<T1>) {
+        if constexpr (is_vector_v<T2>) {
+          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 4>;
+          return res_type{  v1.data[0] + v2.data[0], 
+                            v1.data[1] + v2.data[1],
+                            v1.data[2] + v2.data[2], 
+                            v1.data[3] + v2.data[3]};
+        }
+        else {
+          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 4>;
+          return res_type{  v1.data[0] + v2, 
+                            v1.data[1] + v2,
+                            v1.data[2] + v2, 
+                            v1.data[3] + v2};          
+        }
+      }
+      else {
+        if constexpr (is_vector_v<T2>) {
+          using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 4>;
+          return res_type{  v1 + v2.data[0], 
+                            v1 + v2.data[1],
+                            v1 + v2.data[2], 
+                            v1 + v2.data[3]};
+        }
+        else {
+          using res_type = matx::detail::Vector<decltype(v1 + v2), 4>;
+          const auto val = v1 + v2;
+          return res_type{val, val, val, val};          
+        }        
+      }
     }
   }
 };
