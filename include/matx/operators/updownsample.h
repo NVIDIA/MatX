@@ -54,6 +54,7 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
         using scalar_type = typename T::scalar_type;
+        using self_type = UpsampleOp<T>;
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -109,6 +110,12 @@ namespace matx
           }
         }
 
+        ~UpsampleOp() = default;
+        UpsampleOp(const UpsampleOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        } 
+        
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*this, rhs); }
     };
   }
