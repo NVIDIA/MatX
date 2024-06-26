@@ -67,6 +67,8 @@ enum class VecWidth : uint8_t {
   TWO = 2,
   FOUR = 4, // Leave these values to match the words to make casting easier
 };
+
+static inline constexpr VecWidth MAX_VECWIDTH_VAL = VecWidth::FOUR;
 }
 
 struct NoShape{};

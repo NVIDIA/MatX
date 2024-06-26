@@ -73,15 +73,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   {
-    auto t1 = make_tensor<float>({10000000});
-    auto t2 = make_tensor<float>({10000000});
-    auto t3 = make_tensor<float>({10000000});
+    auto t1 = make_tensor<matxBf16Complex>({100000000});
+    auto t2 = make_tensor<float>({100000000});
+    auto t3 = make_tensor<matxBf16Complex>({100000000});
     float separate_ms = 0.f;
     for (int i = 0; i < 10e6; i++){
-      t1.Data()[i] = 1.f;
+      t1.Data()[i] = {1.f, 1.f};
       t2.Data()[i] = 1.f;
     }
-    printf("%f %f %f\n", t1.Data()[0], t2.Data()[1], separate_ms/10000);
+    printf("%f %f %f\n", t1.Data()[0].real(), t2.Data()[1], separate_ms/10000);
     cudaDeviceSynchronize();
   cudaStream_t stream;
   cudaStreamCreate(&stream);  
@@ -90,7 +90,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&stop);      
   
     //(t3 = t1 + conj(t2)).run(stream);
-    (t3 = t1 + 5.f).run(stream);
+    (t3 = 5.f + t1).run(stream);
     cudaEventRecord(start, stream);   
     // for (int i = 0; i < 10000; i++)
     //   (t3 = t1 + t2).run(stream);
@@ -99,9 +99,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     cudaStreamSynchronize(stream);
 
     cudaEventElapsedTime(&separate_ms, start, stop);   
-    printf("%f %f %f\n", t3.Data()[0], t3.Data()[1], separate_ms/10000);
+//    printf("%f %f %f\n", t3.Data()[0], t3.Data()[1], separate_ms/10000);
+printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000);
     for (int i = 0; i < 10e6; i++){
-      if (t3.Data()[i] != 2.f) printf("Error at %d:%f\n", i, t3.Data()[i]);
+      if (t3.Data()[i].real() != 6.f || t3.Data()[i].imag() != 1.f) printf("Error at %d:%f %f\n", i, t3.Data()[i].real(), t3.Data()[i].imag());
       return 0;
     }    
   }

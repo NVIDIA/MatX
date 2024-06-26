@@ -93,8 +93,8 @@ namespace matx
 
           detail::VecWidth width = detail::VecWidth::ONE;
           if constexpr(has_matx_width<Op>()) {
-            printf("width2 %d\n", (int)width);
             width = op.GetMaxWidth();
+            printf("width2 %d\n", (int)width);            
           }
 
           printf("width %d\n", (int)width);

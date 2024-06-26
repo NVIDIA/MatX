@@ -345,115 +345,204 @@ template<typename T> using SubNegOp = UnOp<T,SubNegF<T> >;
 
 // Binary Operators
 
+template <matx::detail::VecWidth InWidth, typename BinOpFunc, typename T1, typename T2>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto BinVecFunc(const BinOpFunc &func, const T1 &v1, const T2 &v2) {
+  if constexpr (InWidth == VecWidth::ONE) {
+    if constexpr (is_vector_v<T1>) {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2.data[0])), 1>;
+        return res_type{func(v1.data[0], v2.data[0])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2)), 1>;
+        return res_type{func(v1.data[0], v2)};          
+      }
+    }
+    else {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2.data[0])), 1>;
+        return res_type{func(v1, v2.data[0])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2)), 1>;
+        return res_type{func(v1, v2)};          
+      }        
+    }    
+  }
+  else if constexpr (InWidth == VecWidth::TWO) {
+    if constexpr (is_vector_v<T1>) {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2.data[0])), 2>;
+        return res_type{  func(v1.data[0], v2.data[0]), 
+                          func(v1.data[1], v2.data[1])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2)), 2>;
+        return res_type{  func(v1.data[0], v2), 
+                          func(v1.data[1], v2)};          
+      }
+    }
+    else {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2.data[0])), 2>;
+        return res_type{  func(v1, v2.data[0]), 
+                          func(v1, v2.data[1])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2)), 2>;
+        const auto val = func(v1, v2);
+        return res_type{val, val};          
+      }        
+    }
+  }
+  else if constexpr (InWidth == VecWidth::FOUR) {
+    if constexpr (is_vector_v<T1>) {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2.data[0])), 4>;
+        return res_type{  func(v1.data[0], v2.data[0]), 
+                          func(v1.data[1], v2.data[1]),
+                          func(v1.data[2], v2.data[2]), 
+                          func(v1.data[3], v2.data[3])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1.data[0], v2)), 4>;
+        return res_type{  func(v1.data[0], v2), 
+                          func(v1.data[1], v2),
+                          func(v1.data[2], v2), 
+                          func(v1.data[3], v2)};          
+      }
+    }
+    else {
+      if constexpr (is_vector_v<T2>) {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2.data[0])), 4>;
+        return res_type{  func(v1, v2.data[0]), 
+                          func(v1, v2.data[1]),
+                          func(v1, v2.data[2]), 
+                          func(v1, v2.data[3])};
+      }
+      else {
+        using res_type = matx::detail::Vector<decltype(func(v1, v2)), 4>;
+        const auto val = func(v1, v2);
+        return res_type{val, val, val, val};          
+      }        
+    }
+  }  
+}
+
 template <typename T1S, typename T2S> struct AddF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "+" + str2 + ")"; }
 
   template <matx::detail::VecWidth InWidth, matx::detail::VecWidth OutWidth, typename T1, typename T2>
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2)
   {
-    if constexpr (InWidth == VecWidth::ONE) {
-      if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
-        if constexpr (is_complex_half_v<T1>) {
-          return (T1){v1.real() + static_cast<typename T1::value_type>(
-                                      static_cast<float>(v2)),
-                      v1.imag() };
-        }
-        else {
-          return (T1){v1.real() + static_cast<typename T1::value_type>(v2),
-                      v1.imag() };
-        }
-      }
-      else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
-        if constexpr (is_complex_half_v<T2>) {
-          return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1)) + v2.real(),
-                      v2.imag() };
-        }
-        else {
-          return (T2){static_cast<typename T2::value_type>(v1) + v2.real(),
-                      v2.imag() };
-        }
-      }   
-      else {     
-        if constexpr (is_vector_v<T1>) {
-          if constexpr (is_vector_v<T2>) {
-            using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 1>;
-            return res_type{  v1.data[0] + v2.data[0]};
-          }
-          else {
-            using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 1>;
-            return res_type{  v1.data[0] + v2};          
-          }
-        }
-        else {
-          if constexpr (is_vector_v<T2>) {
-            using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 1>;
-            return res_type{  v1 + v2.data[0]};
-          }
-          else {
-            using res_type = matx::detail::Vector<decltype(v1 + v2), 1>;
-            return res_type{v1 + v2};          
-          }        
-        }
-      }
-    }
-    else if constexpr (InWidth == VecWidth::TWO) {
-      if constexpr (is_vector_v<T1>) {
-        if constexpr (is_vector_v<T2>) {
-          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 2>;
-          return res_type{  v1.data[0] + v2.data[0], 
-                            v1.data[1] + v2.data[1]};
-        }
-        else {
-          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 2>;
-          return res_type{  v1.data[0] + v2, 
-                            v1.data[1] + v2};          
-        }
-      }
-      else {
-        if constexpr (is_vector_v<T2>) {
-          using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 2>;
-          return res_type{  v1 + v2.data[0], 
-                            v1 + v2.data[1]};
-        }
-        else {
-          using res_type = matx::detail::Vector<decltype(v1 + v2), 2>;
-          const auto val = v1 + v2;
-          return res_type{val, val};          
-        }        
-      }
-    }
-    else if constexpr (InWidth == VecWidth::FOUR) {
-      if constexpr (is_vector_v<T1>) {
-        if constexpr (is_vector_v<T2>) {
-          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 4>;
-          return res_type{  v1.data[0] + v2.data[0], 
-                            v1.data[1] + v2.data[1],
-                            v1.data[2] + v2.data[2], 
-                            v1.data[3] + v2.data[3]};
-        }
-        else {
-          using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 4>;
-          return res_type{  v1.data[0] + v2, 
-                            v1.data[1] + v2,
-                            v1.data[2] + v2, 
-                            v1.data[3] + v2};          
-        }
-      }
-      else {
-        if constexpr (is_vector_v<T2>) {
-          using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 4>;
-          return res_type{  v1 + v2.data[0], 
-                            v1 + v2.data[1],
-                            v1 + v2.data[2], 
-                            v1 + v2.data[3]};
-        }
-        else {
-          using res_type = matx::detail::Vector<decltype(v1 + v2), 4>;
-          const auto val = v1 + v2;
-          return res_type{val, val, val, val};          
-        }        
-      }
-    }
+    const auto func = [&](auto p1, auto p2) {
+      return p1 + p2;
+    };
+
+    return BinVecFunc<InWidth>(func, v1, v2);
+    // if constexpr (InWidth == VecWidth::ONE) {
+    //   if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
+    //     if constexpr (is_complex_half_v<T1>) {
+    //       return (T1){v1.real() + static_cast<typename T1::value_type>(
+    //                                   static_cast<float>(v2)),
+    //                   v1.imag() };
+    //     }
+    //     else {
+    //       return (T1){v1.real() + static_cast<typename T1::value_type>(v2),
+    //                   v1.imag() };
+    //     }
+    //   }
+    //   else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
+    //     if constexpr (is_complex_half_v<T2>) {
+    //       return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1)) + v2.real(),
+    //                   v2.imag() };
+    //     }
+    //     else {
+    //       return (T2){static_cast<typename T2::value_type>(v1) + v2.real(),
+    //                   v2.imag() };
+    //     }
+    //   }   
+    //   else {     
+    //     if constexpr (is_vector_v<T1>) {
+    //       if constexpr (is_vector_v<T2>) {
+    //         using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 1>;
+    //         return res_type{  v1.data[0] + v2.data[0]};
+    //       }
+    //       else {
+    //         using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 1>;
+    //         return res_type{  v1.data[0] + v2};          
+    //       }
+    //     }
+    //     else {
+    //       if constexpr (is_vector_v<T2>) {
+    //         using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 1>;
+    //         return res_type{  v1 + v2.data[0]};
+    //       }
+    //       else {
+    //         using res_type = matx::detail::Vector<decltype(v1 + v2), 1>;
+    //         return res_type{v1 + v2};          
+    //       }        
+    //     }
+    //   }
+    // }
+    // else if constexpr (InWidth == VecWidth::TWO) {
+    //   if constexpr (is_vector_v<T1>) {
+    //     if constexpr (is_vector_v<T2>) {
+    //       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 2>;
+    //       return res_type{  v1.data[0] + v2.data[0], 
+    //                         v1.data[1] + v2.data[1]};
+    //     }
+    //     else {
+    //       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 2>;
+    //       return res_type{  v1.data[0] + v2, 
+    //                         v1.data[1] + v2};          
+    //     }
+    //   }
+    //   else {
+    //     if constexpr (is_vector_v<T2>) {
+    //       using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 2>;
+    //       return res_type{  v1 + v2.data[0], 
+    //                         v1 + v2.data[1]};
+    //     }
+    //     else {
+    //       using res_type = matx::detail::Vector<decltype(v1 + v2), 2>;
+    //       const auto val = v1 + v2;
+    //       return res_type{val, val};          
+    //     }        
+    //   }
+    // }
+    // else if constexpr (InWidth == VecWidth::FOUR) {
+    //   if constexpr (is_vector_v<T1>) {
+    //     if constexpr (is_vector_v<T2>) {
+    //       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2.data[0]), 4>;
+    //       return res_type{  v1.data[0] + v2.data[0], 
+    //                         v1.data[1] + v2.data[1],
+    //                         v1.data[2] + v2.data[2], 
+    //                         v1.data[3] + v2.data[3]};
+    //     }
+    //     else {
+    //       using res_type = matx::detail::Vector<decltype(v1.data[0] + v2), 4>;
+    //       return res_type{  v1.data[0] + v2, 
+    //                         v1.data[1] + v2,
+    //                         v1.data[2] + v2, 
+    //                         v1.data[3] + v2};          
+    //     }
+    //   }
+    //   else {
+    //     if constexpr (is_vector_v<T2>) {
+    //       using res_type = matx::detail::Vector<decltype(v1 + v2.data[0]), 4>;
+    //       return res_type{  v1 + v2.data[0], 
+    //                         v1 + v2.data[1],
+    //                         v1 + v2.data[2], 
+    //                         v1 + v2.data[3]};
+    //     }
+    //     else {
+    //       using res_type = matx::detail::Vector<decltype(v1 + v2), 4>;
+    //       const auto val = v1 + v2;
+    //       return res_type{val, val, val, val};          
+    //     }        
+    //   }
+    // }
   }
 };
 template <typename T1, typename T2> using AddOp = BinOp<T1, T2, AddF<T1, T2>>;

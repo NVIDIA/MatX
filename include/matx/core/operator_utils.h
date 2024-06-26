@@ -136,10 +136,15 @@ namespace matx {
     __MATX_HOST__ __MATX_INLINE__ VecWidth MinCompatibleWidth(const Op1 &a, const Op2 &b) {
       VecWidth in1;
       VecWidth in2;
+
       if constexpr(has_matx_width<Op1>()) {
         in1 = a.GetMaxWidth();
         printf("11 %d \n", (int)in1);
       }
+      else if constexpr (!is_matx_op<Op1>()) {
+        printf("MAX1\n");
+        in1 = MAX_VECWIDTH_VAL;
+      } 
       else {
         in1 = VecWidth::ONE;
       }
@@ -148,6 +153,10 @@ namespace matx {
         in2 = b.GetMaxWidth();
         printf("22 %d \n", (int)in2); 
       }
+      else if constexpr (!is_matx_op<Op2>()) {
+        printf("MAX2\n");
+        in2 = MAX_VECWIDTH_VAL;
+      }       
       else {
         in2 = VecWidth::ONE;
       }
