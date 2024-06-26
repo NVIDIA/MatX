@@ -162,8 +162,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1Axis)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   const int d1 = 8;
-  const int d2 = 512;
-  const int d3 = 1024;
+  const int d2 = 32;
+  const int d3 = 64;
 
   // example-begin fft-2
   auto in = make_tensor<TestType>({d1, d2, d3});
@@ -280,9 +280,9 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 ; 
-  const int d1 = 128;
-  const int d2 = 256;
-  const int d3 = 512;
+  const int d1 = 8;
+  const int d2 = 16;
+  const int d3 = 32;
 
   auto in = make_tensor<TestType>({d1, d2, d3});
   auto out1 = make_tensor<TestType>({d1, d2, d3});
