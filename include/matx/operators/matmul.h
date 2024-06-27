@@ -51,7 +51,8 @@ namespace matx
         PermDims perm_; 
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
+        // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
+        mutable detail::tensor_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
 
       public:
