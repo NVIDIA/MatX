@@ -35,6 +35,9 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+// cuPy has an issue in 13.2 where certain statements below give incorrect errors. Disable for now
+#undef CUPY_INSTALLED
+
 using namespace matx;
 using complex = cuda::std::complex<float>;
 
