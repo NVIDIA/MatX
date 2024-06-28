@@ -35,9 +35,6 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
-// cuPy has an issue in 13.2 where certain statements below give incorrect errors. Disable for now
-#undef CUPY_INSTALLED
-
 using namespace matx;
 using complex = cuda::std::complex<float>;
 
@@ -60,11 +57,11 @@ protected:
   std::unique_ptr<detail::MatXPybind> pb;
 };
 
-#ifdef CUPY_INSTALLED
-TEST_F(RadarAmbiguityFunction, Cut2D)
-#else
+//#ifdef CUPY_INSTALLED
+//TEST_F(RadarAmbiguityFunction, Cut2D)
+//#else
 TEST_F(RadarAmbiguityFunction, DISABLED_Cut2D)
-#endif
+//#endif
 {
   MATX_ENTER_HANDLER();
 
@@ -78,11 +75,11 @@ TEST_F(RadarAmbiguityFunction, DISABLED_Cut2D)
   MATX_EXIT_HANDLER();
 }
 
-#ifdef CUPY_INSTALLED
-TEST_F(RadarAmbiguityFunction, CutDelay)
-#else
+//#ifdef CUPY_INSTALLED
+//TEST_F(RadarAmbiguityFunction, CutDelay)
+//#else
 TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
-#endif
+//#endif
 {
   MATX_ENTER_HANDLER();
 
@@ -99,11 +96,11 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
   MATX_EXIT_HANDLER();
 }
 
-#ifdef CUPY_INSTALLED
-TEST_F(RadarAmbiguityFunction, CutDoppler)
-#else
+//#ifdef CUPY_INSTALLED
+//TEST_F(RadarAmbiguityFunction, CutDoppler)
+//#else
 TEST_F(RadarAmbiguityFunction, DISABLED_CutDoppler)
-#endif
+//#endif
 {
   MATX_ENTER_HANDLER();
 
