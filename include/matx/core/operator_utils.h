@@ -120,7 +120,7 @@ namespace matx {
     template <typename TensorType, typename Executor, typename ShapeType> 
     __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::scalar_type **ptr) {
       const auto ttl_size = std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
-                                  std::multiplies<index_t>()) * sizeof(*ptr);      
+                                  std::multiplies<index_t>()) * sizeof(typename TensorType::scalar_type);      
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         make_tensor(tensor, *ptr, shape);
