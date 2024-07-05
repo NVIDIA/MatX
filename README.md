@@ -17,7 +17,7 @@ and MatX version are shown below:
 * MatX: **2.54ms** (A100)
 
 While the code complexity and length are roughly the same, the MatX version shows a **2100x** over the Numpy version, and over **4x** faster than
-the CuPy version on the same GPU. 
+the CuPy version on the same GPU.
 
 Key features include:
 
@@ -56,18 +56,18 @@ MatX is using features in C++17 and the latest CUDA compilers and libraries. For
 
 MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
-The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments) 
+The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments)
 and pay attention to the [required versions of the dependencies](https://nvidia.github.io/MatX/build.html#required-third-party-dependencies).
 
-**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator on CPU, please report it in the issues above. 
+**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator on CPU, please report it in the issues above.
 
 
 ## Installation
-MatX is a header-only library that does not require compiling for using in your applications. However, building unit tests, benchmarks, 
+MatX is a header-only library that does not require compiling for using in your applications. However, building unit tests, benchmarks,
 or examples must be compiled. CPM is used as a package manager for CMake to download and configure any dependencies. If MatX is to
 be used in an air-gapped environment, CPM [can be configured](https://github.com/cpm-cmake/CPM.cmake#cpm_source_cache) to search locally for files.
 Depending on what options are enabled, compiling could take very long without parallelism enabled. Using the ``-j`` flag on ``make`` is
-suggested with the highest number your system will accommodate. 
+suggested with the highest number your system will accommodate.
 
 ### Building MatX
 To build all components, issue the standard cmake build commands in a cloned repo:
@@ -103,8 +103,8 @@ make -j
 
 ### Integrating MatX With Your Own Projects
 MatX uses CMake as a first-class build generator, and therefore provides the proper config files to include into your own project. There are
-typically two ways to do this: 
-1. Adding MatX as a subdirectory 
+typically two ways to do this:
+1. Adding MatX as a subdirectory
 2. Installing MatX to the system
 
 #### MatX as a Subdirectory
@@ -153,7 +153,7 @@ doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, f
 MatX uses semantic versioning and reserve the right to introduce breaking API changes on major releases.
 
 ### Supported Data Types
-MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below. 
+MatX supports all types that use standard C++ operators for math (+, -, etc). Unit tests are run against all common types shown below.
 
 * Integer: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`
 * Floating Point: `matxFp16` (fp16), `matxBf16` (bfloat16), `float`, `double`
@@ -202,7 +202,7 @@ We provide a variety of training materials and examples to quickly learn the Mat
     * New operators: abs2(), outer(), isnan(), isinf()
     * Many more unit tests for CPU tests
 - Bug fixes for matmul on Hopper, 2D FFTs, and more
-  
+
 **v0.7.0**:
 - *Features*
     * Automatic documentation generation
@@ -212,10 +212,10 @@ We provide a variety of training materials and examples to quickly learn the Mat
     * Optimized polyphase resampler
     * Negative slice indexing
 - Many new bug fixes and error checking
-  
+
 **v0.6.0**:
 - Breaking changes
-    * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`. 
+    * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`.
 - *Features*
     * Polyphase channelizer
     * Many new operators, including upsample, downsample, pwelch, overlap, at, etc

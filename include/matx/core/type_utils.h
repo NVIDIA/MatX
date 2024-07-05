@@ -63,6 +63,7 @@ enum class MemoryLayout {
 
 namespace detail {
 enum class VecWidth : uint8_t {
+  SCALAR = 0,
   ONE = 1,
   TWO = 2,
   FOUR = 4, // Leave these values to match the words to make casting easier
@@ -80,7 +81,7 @@ struct is_noshape : std::integral_constant<bool, std::is_same_v<NoShape, T>> {};
 
 /**
  * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -90,13 +91,13 @@ inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
 
 /**
  * @brief Removes cv and reference qualifiers on a type
- * 
+ *
  * @tparam T Type to remove qualifiers
  */
 template< class T >
 struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
-};  
+};
 
 template <typename T>
 using remove_cvref_t = typename remove_cvref<T>::type;
@@ -147,7 +148,7 @@ struct is_matx_op_impl<T, std::void_t<typename T::matxop>> : std::true_type {
 
 /**
  * @brief Determine if a type is a MatX operator
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
@@ -187,7 +188,7 @@ struct is_matx_transform_op_impl<T, std::void_t<typename remove_cvref_t<T>::matx
 
 /**
  * @brief Determine if a type is a MatX transform operator
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T> constexpr bool is_matx_transform_op()
@@ -219,7 +220,7 @@ struct is_matx_set_op_impl<T, std::void_t<typename T::matx_setop>> : std::true_t
 
 /**
  * @brief Determine if a type is a MatX set operator
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T> constexpr bool is_matx_set_op()
@@ -243,7 +244,7 @@ struct is_matx_op_lvalue_impl<T, std::void_t<typename T::matxoplvalue>> : std::t
 
 /**
  * @brief Determine if a type is a left hand side operator
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T> constexpr bool is_matx_op_lvalue()
@@ -263,7 +264,7 @@ struct is_tensor_view<T, std::void_t<typename T::tensor_view>>
 
 /**
  * @brief Determine if a type is a MatX tensor view type
- * 
+ *
  * @tparam T Type to test
  */
 template< class T >
@@ -273,7 +274,7 @@ template <typename> struct is_tuple: std::false_type {};
 template <typename ...T> struct is_tuple<cuda::std::tuple<T...>>: std::true_type {};
 
 template <typename T>
-inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_set_op_impl<T>, 
+inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_set_op_impl<T>,
                                                detail::is_matx_transform_set_op_impl<T>>;
                                                //detail::is_matx_tensor_set_op_impl<T>>; // Can be tuple also
 
@@ -288,10 +289,10 @@ template <> struct is_executor<HostExecutor> : std::true_type {};
 
 /**
  * @brief Determine if a type is a MatX executor
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 constexpr bool is_executor_t()
 {
   return detail::is_executor<typename remove_cvref<T>::type>::value;
@@ -305,10 +306,10 @@ template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
 
 /**
  * @brief Determine if a type is a device executor
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
 
 namespace detail {
@@ -318,10 +319,10 @@ template<> struct is_host_executor<matx::HostExecutor> : std::true_type {};
 
 /**
  * @brief Determine if a type is a single-threaded host executor executor
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref_t<T>>::value;
 
 
@@ -337,7 +338,7 @@ struct is_matx_reduction_impl<T, std::void_t<typename T::matx_reduce>>
 
 /**
  * @brief Determine if a type is a MatX reduction
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -355,7 +356,7 @@ struct is_matx_idx_reduction_impl<T, std::void_t<typename T::matx_reduce_index>>
 
 /**
  * @brief Determine if a type is a MatX index reduction type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -373,7 +374,7 @@ struct is_matx_no_cub_reduction_impl<T, std::void_t<typename T::matx_no_cub_redu
 
 /**
  * @brief Determine if a type is not allowed to use CUB for reductions
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -387,7 +388,7 @@ template<typename T> struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {}
 
 /**
  * @brief Determine if a type is a smart pointer (unique or shared)
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T> inline constexpr bool is_smart_ptr_v = detail::is_smart_ptr<T>::value;
@@ -402,7 +403,7 @@ struct is_cuda_complex<cuda::std::complex<T>> : std::true_type {
 
 /**
  * @brief Determine if a type is a cuda::std::complex variant
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -430,7 +431,7 @@ template <> struct is_complex<matxBf16Complex> : std::true_type {
 
 /**
  * @brief Determine if a type is a complex type (any type supported)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_complex_v = detail::is_complex<remove_cvref_t<T>>::value;
@@ -464,7 +465,7 @@ struct inner_op_type_t {
 };
 
 template <typename T>
-struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> { 
+struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> {
   using type = typename T::value_type;
 };
 
@@ -477,7 +478,7 @@ template <> struct is_bf16_type<matxBf16> : std::true_type {};
 
 /**
  * @brief Determine if a type is a BF16 type
- * 
+ *
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_bf16_type_v = detail::is_bf16_type<T>::value;
@@ -491,7 +492,7 @@ template <> struct is_fp16_type<matxFp16> : std::true_type {};
 
 /**
  * @brief Determine if a type is an FF16 type
- * 
+ *
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_fp16_type_v = detail::is_fp16_type<T>::value;
@@ -509,7 +510,7 @@ struct is_matx_shape<T, std::void_t<typename T::matx_shape>>
 
 /**
  * @brief Determine if a type is a MatX shape type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -528,7 +529,7 @@ struct is_matx_storage<T, std::void_t<typename T::matx_storage>>
 
 /**
  * @brief Determine if a type is a MatX storage type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -546,7 +547,7 @@ struct is_matx_storage_container<T, std::void_t<typename T::matx_storage_contain
 
 /**
  * @brief Determine if a type is a MatX storage container
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -565,7 +566,7 @@ struct is_matx_descriptor<T, std::void_t<typename T::matx_descriptor>>
 
 /**
  * @brief Determine if a type is a MatX descriptor
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -583,7 +584,7 @@ struct is_matx_static_descriptor<T, std::void_t<typename T::matx_static_descript
 
 /**
  * @brief Determine if a type is a MatX static descriptor
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -602,7 +603,7 @@ struct has_shape_type<T, std::void_t<typename T::shape_type>>
 
 /**
  * @brief Determine if a type has a shape_type attribute
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -622,7 +623,7 @@ struct is_complex_half
 
 /**
  * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -630,7 +631,7 @@ inline constexpr bool is_complex_half_v = detail::is_complex_half<T>::value;
 
 /**
  * @brief Tests if a type is a half precision floating point
- * 
+ *
  * @tparam T Type to test
  * @return True if half precision floating point
  */
@@ -649,7 +650,7 @@ struct is_matx_half
 }
 /**
  * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -665,7 +666,7 @@ struct is_half
 }
 /**
  * @brief Determine if a type is half precision (either __half or __nv_bfloat16)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_half_v = detail::is_half<T>::value;
@@ -683,7 +684,7 @@ struct is_matx_type
 
 /**
  * @brief Determine if a type is a MatX custom type (half precision wrappers)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -702,7 +703,7 @@ struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
 
 /**
  * @brief Extract the scalar_type type
- * 
+ *
  * @tparam T Type to extract from
  */
 template <typename T>
@@ -710,7 +711,7 @@ using extract_scalar_type_t = typename detail::extract_scalar_type_impl<T>::scal
 
 /**
  * @brief Promote half precision floating point value to fp32, or leave untouched if not half
- * 
+ *
  * @tparam T Type to convert
  */
 template <typename T>
@@ -719,41 +720,41 @@ using promote_half_t = typename std::conditional_t<is_half_v<T> || is_matx_half_
 
 
 namespace detail {
-  
-template <typename T> 
+
+template <typename T>
 struct convert_matx_type {
   using type = T;
 };
 
-template <> 
+template <>
 struct convert_matx_type<matxFp16> {
   using type = __half;
 };
 
-template <> 
+template <>
 struct convert_matx_type<matxBf16> {
   using type = __nv_bfloat16;
 };
 
-template <typename T> 
+template <typename T>
 using convert_matx_type_t = typename convert_matx_type<T>::type;
 
-template <typename T> 
+template <typename T>
 struct convert_half_to_matx_half {
   using type = T;
 };
 
-template <> 
+template <>
 struct convert_half_to_matx_half<__half> {
   using type = matxFp16;
 };
 
-template <> 
+template <>
 struct convert_half_to_matx_half<__nv_bfloat16> {
   using type = matxBf16;
 };
 
-template <typename T> 
+template <typename T>
 using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
 
 
@@ -774,29 +775,29 @@ constexpr cuda::std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
-template <typename T, typename = void> 
+template <typename T, typename = void>
 struct base_type {
   using type = T;
 };
 
-template <typename T> 
+template <typename T>
 struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
   using type = tensor_impl_t<typename T::scalar_type, T::Rank(), typename T::desc_type>;
 };
 
 template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
 
-template <typename T, typename = void> 
+template <typename T, typename = void>
 struct complex_from_scalar {
   using type = T;
 };
 
-template <typename T> 
+template <typename T>
 struct complex_from_scalar<T, typename std::enable_if_t<std::is_same_v<float, T> || std::is_same_v<double, T>>> {
   using type = cuda::std::complex<T>;
 };
 
-template <typename T> 
+template <typename T>
 struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_half_v<T> > > {
   using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
 };
@@ -804,12 +805,12 @@ struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_
 template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
 
 
-template <typename T, typename = void> 
+template <typename T, typename = void>
 struct exec_type {
   using type = T;
 };
 
-template <typename T> 
+template <typename T>
 struct exec_type<T, typename std::enable_if_t<std::is_same_v<T, int>>> {
   using type = cudaExecutor;
 };
@@ -841,7 +842,7 @@ using matx_convert_complex_type =
 template <class C>
 using matx_convert_cuda_complex_type =
     typename std::conditional_t<!is_complex_v<C>, identity<C>,
-                                cuda_complex_type_of<C>>::type;                                
+                                cuda_complex_type_of<C>>::type;
 
 
 template <class T, class = void> struct value_type {
@@ -923,7 +924,7 @@ struct permute_rank {
 template <typename T1>
 struct permute_rank<T1, no_permute_t> {
   static const int rank = 0;
-};  
+};
 
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes

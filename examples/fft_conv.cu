@@ -64,7 +64,7 @@ using namespace matx;
  * For smaller signal sizes, the FFT convolution typically performs worse since
  * there is some buffer and 3 FFT operations (2 for FFT of signal and filter,
  * and 1 IFFT after the multiply) that causes the setup time to dominate.
- * 
+ *
  * Note that the conv1d() operator has a mode to perform FFT-based convolution
  * automatically.
  *
@@ -74,37 +74,37 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   MATX_ENTER_HANDLER();
   {
     auto t1 = make_tensor<matxBf16Complex>({100000000});
-    auto t2 = make_tensor<float>({100000000});
+    auto t2 = make_tensor<matxBf16Complex>({100000000});
     auto t3 = make_tensor<matxBf16Complex>({100000000});
     float separate_ms = 0.f;
     for (int i = 0; i < 10e6; i++){
       t1.Data()[i] = {1.f, 1.f};
-      t2.Data()[i] = 1.f;
+      t2.Data()[i] = {1.f, 1.f};
     }
-    printf("%f %f %f\n", t1.Data()[0].real(), t2.Data()[1], separate_ms/10000);
+    printf("%f %f %f\n", (double)t1.Data()[0].real(), (double)t2.Data()[1].real(), separate_ms/10000);
     cudaDeviceSynchronize();
   cudaStream_t stream;
-  cudaStreamCreate(&stream);  
+  cudaStreamCreate(&stream);
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
-  cudaEventCreate(&stop);      
-  
+  cudaEventCreate(&stop);
+
     //(t3 = t1 + conj(t2)).run(stream);
-    (t3 = 5.f + t1).run(stream);
-    cudaEventRecord(start, stream);   
+    (t3 = t2 + t1 - t1).run(stream);
+    cudaEventRecord(start, stream);
     // for (int i = 0; i < 10000; i++)
     //   (t3 = t1 + t2).run(stream);
 
-      cudaEventRecord(stop, stream);      
+      cudaEventRecord(stop, stream);
     cudaStreamSynchronize(stream);
 
-    cudaEventElapsedTime(&separate_ms, start, stop);   
+    cudaEventElapsedTime(&separate_ms, start, stop);
 //    printf("%f %f %f\n", t3.Data()[0], t3.Data()[1], separate_ms/10000);
-printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000);
+printf("%f %f %f\n", (double)t3.Data()[0].real(), (double)t3.Data()[1].imag(), separate_ms/10000);
     for (int i = 0; i < 10e6; i++){
-      if (t3.Data()[i].real() != 6.f || t3.Data()[i].imag() != 1.f) printf("Error at %d:%f %f\n", i, t3.Data()[i].real(), t3.Data()[i].imag());
+      if (t3.Data()[i].real() != 3.f || t3.Data()[i].imag() != 3.f) printf("Error at %d:%f %f\n", i, (double)t3.Data()[i].real(), (double)t3.Data()[i].imag());
       return 0;
-    }    
+    }
   }
   // using complex = cuda::std::complex<float>;
   // cudaExecutor exec{};
@@ -117,10 +117,10 @@ printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000
   // float fused_ms;
   // constexpr int iterations = 100;
   // cudaStream_t stream;
-  // cudaStreamCreate(&stream);  
+  // cudaStreamCreate(&stream);
   // cudaEvent_t start, stop;
   // cudaEventCreate(&start);
-  // cudaEventCreate(&stop);  
+  // cudaEventCreate(&stop);
 
   // // Create time domain buffers
   // auto sig_time  = make_tensor<complex>({batches, signal_size});
@@ -152,7 +152,7 @@ printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000
   // for (int i = 0; i < iterations; i++) {
   //   if (i == 1) {
   //     cudaEventRecord(start, stream);
-  //   }    
+  //   }
   //   (sig_freq = fft(sig_time, filtered_size)).run(exec);
   //   (filt_freq = fft(filt_time, filtered_size)).run(exec);
 
@@ -160,12 +160,12 @@ printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000
 
   //   // IFFT in-place
   //   (sig_freq = ifft(sig_freq)).run(exec);
-    
+
   // }
 
   // cudaEventRecord(stop, stream);
   // exec.sync();
-  // cudaEventElapsedTime(&separate_ms, start, stop);   
+  // cudaEventElapsedTime(&separate_ms, start, stop);
 
   // for (int i = 0; i < iterations; i++) {
   //   if (i == 1) {
@@ -173,10 +173,10 @@ printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000
   //   }
   //   (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(exec);
   // }
-  
+
   // cudaEventRecord(stop, stream);
   // exec.sync();
-  // cudaEventElapsedTime(&fused_ms, start, stop);  
+  // cudaEventElapsedTime(&fused_ms, start, stop);
 
   // printf("FFT runtimes for separate = %.2f ms, fused = %.2f ms\n", separate_ms/(iterations-1), fused_ms/(iterations-1));
 
@@ -187,7 +187,7 @@ printf("%f %f %f\n", t3.Data()[0].real(), t3.Data()[1].imag(), separate_ms/10000
   // (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
   // exec.sync();
- 
+
   // // Compare signals
   // for (index_t b = 0; b < batches; b++) {
   //   for (index_t i = 0; i < filtered_size; i++) {
