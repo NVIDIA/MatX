@@ -3736,7 +3736,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   using ComplexType = detail::complex_from_scalar_t<TestType>;
 
   // r2c requires FFT support, so we need to check the executor here
-  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
     GTEST_SKIP();
   }  
 
@@ -3827,9 +3827,9 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
   using inner_type = typename inner_op_type_t<TestType>::type;
   using complex_type = detail::complex_from_scalar_t<inner_type>;
 
-  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
     GTEST_SKIP();
-  }  
+  }
   
   ExecType exec{};
 

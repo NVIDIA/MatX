@@ -46,10 +46,10 @@
 namespace matx {
 namespace detail {
 
-template <typename OutputType, typename InType, typename FilterType>
+template <typename OutputType, typename InType, typename FilterType, typename Executor>
 inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
                                      const FilterType &filter, matxConvCorrMode_t mode,
-                                     cudaStream_t stream)
+                                     const Executor &exec)
 {
   const index_t padded_size = i.Size(InType::Rank() - 1) + filter.Size(InType::Rank() - 1) - 1;
   auto in_shape_padded = Shape(i);
@@ -61,10 +61,18 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
   std::fill(std::begin(slice_start), std::end(slice_start), 0);
   std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);
+  
+  auto allocate_tensor = [&](auto shape) {
+    if constexpr (is_cuda_executor_v<Executor>) {
+      return make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(shape, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    } else {
+      return make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(shape, MATX_HOST_MALLOC_MEMORY);
+    }
+  };
 
-  auto s1 = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto s2 = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto sifft = make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto s1 = allocate_tensor(in_shape_padded);
+  auto s2 = allocate_tensor(in_shape_padded);
+  auto sifft = allocate_tensor(in_shape_padded);
 
   if constexpr (! is_complex_v<typename InType::scalar_type>) {
     slice_end[InType::Rank() - 1] = padded_size/2 + 1;
@@ -74,8 +82,8 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
     slice_end[FilterType::Rank() - 1] = padded_size/2 + 1;
   }
   auto s2s = slice(s2, slice_start, slice_end);
-  (s1s = fft(i, padded_size)).run(stream);
-  (s2s = fft(filter, padded_size)).run(stream);
+  (s1s = fft(i, padded_size)).run(exec);
+  (s2s = fft(filter, padded_size)).run(exec);
 
   // If this is real-valued input we need to accomodate cuFFT's output of N/2+1 complex
   // samples and use r2c to convert back to N.
@@ -83,18 +91,18 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
     slice_end[InType::Rank() - 1] = padded_size / 2 + 1;
     if constexpr (!is_complex_v<typename FilterType::scalar_type>) {
       (sifft = r2c(slice(s1, slice_start, slice_end) * slice(s2, slice_start, slice_end), padded_size)).
-            run(stream);
+            run(exec);
     }
     else {
-      (sifft = r2c(slice(s1, slice_start, slice_end), padded_size) * s2).run(stream);
+      (sifft = r2c(slice(s1, slice_start, slice_end), padded_size) * s2).run(exec);
     }
   }
   else {
     if constexpr (!is_complex_v<typename FilterType::scalar_type>) {
-      (sifft = s1 * r2c(slice(s2, slice_start, slice_end), padded_size)).run(stream);
+      (sifft = s1 * r2c(slice(s2, slice_start, slice_end), padded_size)).run(exec);
     }
     else {
-      (sifft = s1 * s2).run(stream);
+      (sifft = s1 * s2).run(exec);
     }
   }
 
@@ -105,14 +113,14 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   // Write directly to output in FULL mode.
   if (mode == MATX_C_MODE_FULL) {
     if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
-      (o = ifft(sifft)).run(stream);
+      (o = ifft(sifft)).run(exec);
     }
     else {
-      (o = real(ifft(sifft))).run(stream);
+      (o = real(ifft(sifft))).run(exec);
     }
   }
   else if (mode == MATX_C_MODE_SAME) {
-    (sifft = ifft(sifft)).run(stream);
+    (sifft = ifft(sifft)).run(exec);
     if (filter_size & 1) {
       slice_start[InType::Rank() - 1] = (filter_size - 1) / 2;
     }
@@ -123,22 +131,22 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
     slice_end[InType::Rank() - 1] = padded_size - filter_size / 2;
 
     if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
-      (o = slice(sifft, slice_start, slice_end)).run();
+      (o = slice(sifft, slice_start, slice_end)).run(exec);
     }
     else {
-      (o = slice(real(sifft), slice_start, slice_end)).run();
+      (o = slice(real(sifft), slice_start, slice_end)).run(exec);
     }
   }
   else if (mode == MATX_C_MODE_VALID) {
-    (sifft = ifft(sifft)).run(stream);
+    (sifft = ifft(sifft)).run(exec);
     slice_start[InType::Rank() - 1] = filter_size - 1;
     slice_end[InType::Rank() - 1]   = padded_size - filter_size + 1;
 
     if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
-      (o = slice(sifft, slice_start, slice_end)).run();
+      (o = slice(sifft, slice_start, slice_end)).run(exec);
     }
     else {
-      (o = slice(real(sifft), slice_start, slice_end)).run();
+      (o = slice(real(sifft), slice_start, slice_end)).run(exec);
     }
   }
 }
@@ -147,7 +155,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 template <typename OutputType, typename InType, typename FilterType>
 inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
                                      const FilterType &filter, matxConvCorrMode_t mode,
-                                     cudaStream_t stream)
+                                     const cudaExecutor &exec)
 {
   MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
 
@@ -158,6 +166,8 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  const auto stream = exec.getStream();
 
   using strip_input_t = typename InType::scalar_type;
   using strip_filter_t = typename FilterType::scalar_type;
@@ -229,9 +239,9 @@ void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
 }
 } // end namespace detail
 
-template <typename OutputType, typename In1Type, typename In2Type>
+template <typename OutputType, typename In1Type, typename In2Type, typename Executor>
 inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, matxConvCorrMethod_t method, cudaStream_t stream)
+                   matxConvCorrMode_t mode, matxConvCorrMethod_t method, const Executor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -256,18 +266,26 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
 
   if (i1.Size(Rank-1) < i2.Size(Rank-1)) {
     if (method == MATX_C_METHOD_DIRECT) {
-      detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, stream);
+      if constexpr (detail::CheckDirect1DConvSupport<Executor>()) {
+        detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, exec);
+      } else {
+        MATX_THROW(matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
+      }
     }
     else {
-      detail::matxFFTConv1DInternal(o_base, i2, i1, mode, stream);
+      detail::matxFFTConv1DInternal(o_base, i2, i1, mode, exec);
     }
   }
   else {
     if (method == MATX_C_METHOD_DIRECT) {
-      detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, stream);
+      if constexpr (detail::CheckDirect1DConvSupport<Executor>()) {
+        detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, exec);
+      } else {
+        MATX_THROW(matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
+      }
     }
     else {
-      detail::matxFFTConv1DInternal(o_base, i1, i2, mode, stream);
+      detail::matxFFTConv1DInternal(o_base, i1, i2, mode, exec);
     }
   }
 }
@@ -284,11 +302,11 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
  * @param i2 Second input operator
  * @param mode Convolution mode
  * @param method Convolution method
- * @param stream CUDA stream
+ * @param exec Executor
  */
-template <typename OutputType, typename In1Type, typename In2Type>
+template <typename OutputType, typename In1Type, typename In2Type, typename Executor>
 inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
-                   matxConvCorrMode_t mode, matxConvCorrMethod_t method, cudaStream_t stream = 0) {
+                   matxConvCorrMode_t mode, matxConvCorrMethod_t method, const Executor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   if constexpr ( In1Type::Rank() >  In2Type::Rank() ) {
@@ -317,7 +335,7 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
 
     static_assert(In1Type::Rank() == decltype(ci2)::Rank());
 
-    conv1d_impl_internal(o, i1, ci2, mode, method, stream);
+    conv1d_impl_internal(o, i1, ci2, mode, method, exec);
 
   }  else if constexpr ( In2Type::Rank() >  In1Type::Rank()) {
     // broadcast i1 path.  clone i1 across batches
@@ -344,12 +362,12 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
 
     static_assert(ci1.Rank() == i2.Rank());
 
-    conv1d_impl_internal(o, ci1, i2, mode, method, stream);
+    conv1d_impl_internal(o, ci1, i2, mode, method, exec);
 
   } else {
     static_assert(In1Type::Rank() == In2Type::Rank());
     // batched pass outer dims must match
-    conv1d_impl_internal(o, i1, i2, mode, method, stream);
+    conv1d_impl_internal(o, i1, i2, mode, method, exec);
   }
 }
 

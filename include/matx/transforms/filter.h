@@ -155,7 +155,7 @@ public:
     }
   }
 
-  void Exec(OutType &o, const InType &i, cudaStream_t stream)
+  void Exec(OutType &o, const InType &i, const cudaExecutor &exec)
   {
 #ifndef __CUDACC__
     MATX_THROW(matxNotSupported, "convolution not supported on host");
@@ -172,7 +172,7 @@ public:
       // Fix this to support different R/N types later
       RecursiveFilter<num_recursive, num_non_recursive,
                       OutType, InType, FilterType>
-          <<<grid, BLOCK_SIZE_RECURSIVE, 0, stream>>>(
+          <<<grid, BLOCK_SIZE_RECURSIVE, 0, exec.getStream()>>>(
               o, i, d_nrec, d_corr, d_full_carries, d_part_carries, sig_len,
               d_status, d_last_carries);
     }
@@ -180,7 +180,7 @@ public:
       // Just call the convolution kernel directly if they
       // don't require recursive coefficients. Default to SAME. Do we want to
       // use SAME here or give them an option? IIR doesn't have the same concept
-      conv1d_impl(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, matxConvCorrMethod_t::MATX_C_METHOD_DIRECT, stream);
+      conv1d_impl(o, i, h_nonr_copy, matxConvCorrMode_t::MATX_C_MODE_SAME, matxConvCorrMethod_t::MATX_C_METHOD_DIRECT, exec);
     }
 #endif
   }
@@ -447,8 +447,8 @@ auto matxMakeFilter(OutType &o, const InType &i,
  *   Vector of recursive coefficients
  * @param h_nonrec
  *   Vector of non-recursive coefficients
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA Executor
  *
  **/
 // TODO: Update later once we support compile-time shapes
@@ -456,7 +456,7 @@ template <size_t NR, size_t NNR, typename OutType, typename InType,
           typename FilterType>
 void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
             [[maybe_unused]] const cuda::std::array<FilterType, NR> h_rec,
-            [[maybe_unused]] const cuda::std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] cudaStream_t stream = 0)
+            [[maybe_unused]] const cuda::std::array<FilterType, NNR> h_nonrec, [[maybe_unused]] const cudaExecutor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -484,7 +484,7 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
       return matxMakeFilter(o, i, h_rec, h_nonrec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(o, i, stream);
+      ctype->Exec(o, i, exec);
     }
   );
 }
