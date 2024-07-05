@@ -32,6 +32,7 @@
 
 #pragma once
 
+#if MATX_EN_CPU_FFT
 #include "matx/core/cache.h"
 #include "matx/core/error.h"
 #include "matx/core/make_tensor.h"
@@ -560,7 +561,6 @@ private:
                                 [[maybe_unused]] const FftFFTWParams_t &params, 
                                 [[maybe_unused]] detail::FFTDirection dir,
                                 [[maybe_unused]] const HostExecutor<MODE> &exec) {
-  #if MATX_EN_CPU_FFT
     using cache_val_type = detail::matxFFTWPlan_t<OutputTensor, InputTensor>;
     detail::GetCache().LookupAndExec<detail::fft_fftw_cache_t>(
       detail::GetCacheIdFromType<detail::fft_fftw_cache_t>(),
@@ -572,7 +572,6 @@ private:
         ctype->Exec(o, i);
       }
     );
-  #endif
   }
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
@@ -760,3 +759,4 @@ private:
 
 
 }; // end namespace matx
+#endif
