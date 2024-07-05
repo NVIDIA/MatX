@@ -473,12 +473,27 @@ template <> struct is_fp16_type<matxFp16> : std::true_type {};
 }
 
 /**
- * @brief Determine if a type is an FF16 type
+ * @brief Determine if a type is an FP16 type
  * 
  * @tparam T Type to test
  */
 template <class T> inline constexpr bool is_fp16_type_v = detail::is_fp16_type<T>::value;
 
+/**
+ * @brief Determine if the inner type is an FP32 type
+ * 
+ * @tparam T Type to test
+ */
+template<typename T>
+inline constexpr bool is_fp32_inner_type_v = std::is_same_v<typename inner_op_type_t<T>::type, float>;
+
+/**
+ * @brief Determine if the inner type is an FP64 type
+ * 
+ * @tparam T Type to test
+ */
+template<typename T>
+inline constexpr bool is_fp64_inner_type_v = std::is_same_v<typename inner_op_type_t<T>::type, double>;
 
 namespace detail {
 template <typename T, typename = void>
