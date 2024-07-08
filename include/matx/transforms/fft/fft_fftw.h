@@ -32,7 +32,6 @@
 
 #pragma once
 
-#if MATX_EN_CPU_FFT
 #include "matx/core/cache.h"
 #include "matx/core/error.h"
 #include "matx/core/make_tensor.h"
@@ -258,7 +257,7 @@ struct FftFFTWParamsKeyEq {
 
 using fft_fftw_cache_t = std::unordered_map<FftFFTWParams_t, std::any, FftFFTWParamsKeyHash, FftFFTWParamsKeyEq>;
 
-
+#if MATX_EN_CPU_FFT
 /**
  * Class to manage FFTW initialization and cleanup for single and
  * double precision transforms.
@@ -330,7 +329,7 @@ public:
     auto fft_dir = (params_.dir == detail::FFTDirection::FORWARD) ? FFTW_FORWARD : FFTW_BACKWARD;
     auto in_ptr = i.Data();
     auto out_ptr = o.Data();
-    
+
     if constexpr (is_fp32_) {
       FFTWPlanManager::InitFFTWF();
       fftwf_plan_with_nthreads(exec.GetNumThreads());
@@ -496,6 +495,7 @@ private:
   FftFFTWParams_t params_;
   plan_type plan_;
 };
+#endif
 
   template <typename TensorOp>
   __MATX_INLINE__ auto getFFTW1DSupportedTensor( const TensorOp &in) {
@@ -561,6 +561,7 @@ private:
                                 [[maybe_unused]] const FftFFTWParams_t &params, 
                                 [[maybe_unused]] detail::FFTDirection dir,
                                 [[maybe_unused]] const HostExecutor<MODE> &exec) {
+#if MATX_EN_CPU_FFT                                  
     using cache_val_type = detail::matxFFTWPlan_t<OutputTensor, InputTensor>;
     detail::GetCache().LookupAndExec<detail::fft_fftw_cache_t>(
       detail::GetCacheIdFromType<detail::fft_fftw_cache_t>(),
@@ -572,6 +573,7 @@ private:
         ctype->Exec(o, i);
       }
     );
+#endif
   }
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
@@ -759,4 +761,3 @@ private:
 
 
 }; // end namespace matx
-#endif
