@@ -176,8 +176,8 @@ class CorrelationConvolutionComplexTypes
 };
 
 TYPED_TEST_SUITE(CorrelationConvolutionTestFloatTypes, MatXFloatTypesCUDAExec);
-TYPED_TEST_SUITE(CorrelationConvolutionTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
-TYPED_TEST_SUITE(CorrelationConvolutionLargeTestFloatTypes, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(CorrelationConvolutionTestNonHalfFloatTypes, MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(CorrelationConvolutionLargeTestFloatTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 
 // Real/real direct 1D convolution Large
@@ -185,17 +185,21 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len, b_len});
-  this->pb->RunTVGenerator("conv");
-  this->pb->NumpyToTensorView(this->av, "a_op");
-  this->pb->NumpyToTensorView(this->bv, "b_op");
-  // example-begin conv1d-test-1
-  // 1D convolution in FULL mode where every output is stored
-  (this->cv = conv1d(this->av, this->bv, MATX_C_MODE_FULL)).run(this->exec);
-  // example-end conv1d-test-1
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckDirect1DConvSupport<ExecType>()) {
+    GTEST_SKIP();
+  } else {
+    this->pb->template InitTVGenerator<TestType>("00_transforms", "conv_operators", {a_len, b_len});
+    this->pb->RunTVGenerator("conv");
+    this->pb->NumpyToTensorView(this->av, "a_op");
+    this->pb->NumpyToTensorView(this->bv, "b_op");
+    // example-begin conv1d-test-1
+    // 1D convolution in FULL mode where every output is stored
+    (this->cv = conv1d(this->av, this->bv, MATX_C_MODE_FULL)).run(this->exec);
+    // example-end conv1d-test-1
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
-
+    MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
@@ -212,7 +216,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, FFT1DConvolutionLarge)
   (this->cv = conv1d(this->av, this->bv, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run(this->exec);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->cv, "conv_full", this->thresh);
-
+  
   MATX_EXIT_HANDLER();
 }
 
@@ -264,7 +268,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
 
 
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, Direct1DConvolutionSameEven)
+TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

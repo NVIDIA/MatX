@@ -56,17 +56,17 @@ namespace matx {
  * @param i2 Second input operator
  * @param mode Mode of correlation
  * @param method Method for correlation
- * @param stream CUDA stream
+ * @param exec Executor
  */
-template <typename OutputTensor, typename In1Type, typename In2Type>
+template <typename OutputTensor, typename In1Type, typename In2Type, typename Executor>
 __MATX_INLINE__ void corr_impl(OutputTensor o, const In1Type i1, const In2Type i2,
           matxConvCorrMode_t mode, matxConvCorrMethod_t method,
-          cudaStream_t stream = 0)
+          const Executor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
   auto i2r = reverse<In2Type::Rank()-1>(conj(i2));
-  conv1d_impl(o, i1, i2r, mode, method, stream);
+  conv1d_impl(o, i1, i2r, mode, method, exec);
 }
 
 

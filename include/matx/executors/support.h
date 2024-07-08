@@ -46,10 +46,24 @@ namespace matx {
     #define MATX_EN_CPU_FFT 0
 #endif
 
-template <typename Exec>
+template <typename Exec, typename T>
 constexpr bool CheckFFTSupport() {
   if constexpr (is_host_executor_v<Exec>) {
-    return MATX_EN_CPU_FFT;
+    if constexpr (is_complex_half_v<T>) {
+      return false;
+    } else {
+      return MATX_EN_CPU_FFT;
+    }
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool CheckDirect1DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return false;
   }
   else {
     return true;
