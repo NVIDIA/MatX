@@ -251,7 +251,7 @@ public:
   }
 
   using scalar_type = std::invoke_result_t<
-    decltype(op<matx::detail::VecWidth::ONE, matx::detail::VecWidth::ONE, T1>),  T1>;
+    decltype(op<matx::detail::VecWidth::SCALAR, matx::detail::VecWidth::SCALAR, T1>),  T1>;
 };
 
 template <typename T1, typename T2, typename F> class BinOp {
@@ -274,7 +274,7 @@ public:
 
   // Get type that our operator would return
   using scalar_type = std::invoke_result_t<
-    decltype(op<matx::detail::VecWidth::ONE, matx::detail::VecWidth::ONE, T1, T2>),  T1, T2>;
+    decltype(op<matx::detail::VecWidth::SCALAR, matx::detail::VecWidth::SCALAR, T1, T2>),  T1, T2>;
 };
 
 

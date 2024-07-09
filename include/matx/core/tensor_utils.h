@@ -40,6 +40,8 @@
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
 
+#include "matx/core/vector.h"
+
 
 namespace matx
 {
@@ -271,9 +273,14 @@ namespace detail {
     {
       return get_matx_value<InWidth, OutWidth>(i, indices...);
     }
-    else
-    {
+    else if constexpr (is_vector_v<T>) {
+      // using t_strip = remove_cvref<decltype(i)>;
+      // std::string a = remove_cvref<decltype(i)>();
+      // t_strip v = i;
       return i;
+    }
+    else {
+      return detail::Vector<T, static_cast<size_t>(InWidth)>(static_cast<std::remove_cv_t<T>>(i));
     }
   }
 
@@ -1093,14 +1100,14 @@ void print(const Op &op, [[maybe_unused]] Args... dims) {
 /**
  * @brief Print a tensor's all values to stdout
  *
- * This form of `print()` is a specialization for 0D tensors. 
+ * This form of `print()` is a specialization for 0D tensors.
  *
  * @tparam Op Operator input type
  * @param op Operator input
  */
-template <typename Op, 
+template <typename Op,
          std::enable_if_t<(Op::Rank() == 0), bool> = true>
-void print(const Op &op) 
+void print(const Op &op)
 {
   fprint(stdout, op);
 }

@@ -28,7 +28,7 @@ typedef enum {
   MATX_C_METHOD_FFT
 } matxConvCorrMethod_t;
 
-#ifdef __CUDACC__ 
+#ifdef __CUDACC__
 template <int THREADS, int EPT, typename OutType, typename InType, typename FilterType>
 __launch_bounds__(THREADS)
 __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
@@ -37,11 +37,11 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 {
 
   /* strategy:
-     1 thread per EPT outputs.  
+     1 thread per EPT outputs.
      Each block produces EPT * THREADS outputs
      Full convolution is computed and results are windowed down based on the request
      Filter is fully loaded into shared memory
-     Chunk of signal is loaded into shared memory with filter_len pandding on the negative side.  
+     Chunk of signal is loaded into shared memory with filter_len pandding on the negative side.
      If out of range then we pad with zeros.
      */
   static_assert(InType::Rank() == FilterType::Rank());
@@ -93,14 +93,14 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       __syncthreads();
 
     // load signal,  pad extra elements with zeros
-    for (int32_t lidx = threadIdx.x, gidx  = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x;  
-        gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ; 
+    for (int32_t lidx = threadIdx.x, gidx  = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x;
+        gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ;
         gidx += THREADS, lidx += THREADS) {
 
       // some elements may be out of range.  We set their values to 0.
       intype_strip val(0);
 
-      if( gidx >= 0 && gidx < signal_len) { 
+      if( gidx >= 0 && gidx < signal_len) {
         bdims[Rank - 1] = gidx;
         cuda::std::apply([&val, d_in](auto &&...args) {
             val = d_in.operator()(args...);
@@ -113,8 +113,8 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     // wait for signal to load
     __syncthreads();
 
-    // register array for output data  
-    outtype_strip oval[EPT] = {0}; 
+    // register array for output data
+    outtype_strip oval[EPT] = {0};
 
     // Below will use pointer modification instead of offsets to change IMADS into IADS.  IMADS go through FMA pipe.
 
@@ -178,10 +178,10 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       int32_t gidx = idx - start;
 
       if(idx >= start && idx <= stop) {
-        bdims[Rank - 1] = gidx; 
+        bdims[Rank - 1] = gidx;
         cuda::std::apply([&](auto &&...args) {
             d_out.operator()(args...) = oval[i];
-            }, bdims);        
+            }, bdims);
       }
     }
   } // end chunk loop
@@ -205,12 +205,12 @@ struct ShmBuffer2D {
 
   __MATX_INLINE__  __MATX_DEVICE__ __MATX_HOST__ T &operator()(index_t y, index_t x) noexcept {
     return *(ptr + y * X_LEN + x);
-  }  
+  }
 
   T *ptr;
 };
 
-template <typename OutType, typename InType1, typename InType2, 
+template <typename OutType, typename InType1, typename InType2,
   int BLOCK_DIM_X,      // blockDim.x
   int BLOCK_DIM_Y,      // blockDim.y
   int FILTER_SHARED_CHUNK_X, // Filter shared memory tile in X
@@ -313,7 +313,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                 // compute filter index
                 index_t y = bi + nStart + ii - dy;
                 index_t x = bj + mStart + jj - dx;
-                
+
                 // if signal in range
                 if( x >= 0 && x < i1M && y >=0 && y < i1N) {
                   // Signal Dims
@@ -321,7 +321,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                   bdims[Rank - 1] = x;
                   cuda::std::apply([&](auto &&...args) { val = d_in1.operator()(args...); }, bdims);
                 }
-                
+
                 // store in shared
                 s_signal(ii,jj) = val;
               }
@@ -336,7 +336,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
             for (int mm = 0; mm < FILTER_SHARED_CHUNK_X; mm+=FILTER_REG_CHUNK_X) {
 #pragma unroll
               for (int nn = 0; nn < FILTER_SHARED_CHUNK_Y; nn+=FILTER_REG_CHUNK_Y) {
-            
+
 
                 // Copy chunk from shared memory in to registers
 #pragma unroll
@@ -348,19 +348,19 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                 }
 
 
-                // convolution loop:  convolve filter and signal.  
+                // convolution loop:  convolve filter and signal.
                 // Keep signal in registers as much as possible by shifting.
 #pragma unroll
                 for (int m = 0; m < FILTER_REG_CHUNK_X; m++) {
-              
+
 #pragma unroll
                   for (int n = 0; n < FILTER_REG_CHUNK_Y; n++) {
-                
+
                     in2type i2 = r_filter[n][m];
 
                     // if FILTER_REG_CHUNK_X > 1 then we need to reload i1 every m loop
-                    if( nn == 0 ||  
-                        (FILTER_REG_CHUNK_X > 1 && n == 0)) { 
+                    if( nn == 0 ||
+                        (FILTER_REG_CHUNK_X > 1 && n == 0)) {
                     // load ILPY signal points
 #pragma unroll
                       for(int u = 0; u < ILPY; u++) {
@@ -395,7 +395,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
           if(i + u < oN && j < oM) {
             bdims[Rank - 2] = i + u;
             bdims[Rank - 1] = j;
-            cuda::std::apply([&](auto &&...args) { d_out.operator()(args...) = sum[u]; }, bdims);        
+            cuda::std::apply([&](auto &&...args) { d_out.operator()(args...) = sum[u]; }, bdims);
           }
         }
 

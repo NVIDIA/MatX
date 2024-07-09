@@ -54,7 +54,7 @@ namespace matx
 {
   /**
    * @brief Utility operator for multiplying scalars by a complex value
-   * 
+   *
    * @tparam T Complex type
    * @tparam S Scalar type
    * @param n Scalar value
@@ -72,7 +72,7 @@ namespace matx
 
   /**
    * @brief Utility operator for multiplying scalars by a complex value
-   * 
+   *
    * @tparam T Complex type
    * @tparam S Scalar type
    * @param n Scalar value
@@ -111,7 +111,7 @@ namespace matx
 
       VecWidth GetMaxWidth() const {
         return MinCompatibleWidth(in1_, in2_);
-      }        
+      }
 
         __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
       {
@@ -127,7 +127,7 @@ namespace matx
       {
         auto i1 = get_value<InWidth, OutWidth>(in1_, indices...);
         auto i2 = get_value<InWidth, OutWidth>(in2_, indices...);
-
+//std::string a = i2;
 //         using i1_scalar_type = typename decltype(i1)::scalar_type;
 //         using i2_scalar_type = typename decltype(i2)::scalar_type;
 
@@ -139,8 +139,8 @@ namespace matx
       {
         return cuda::std::apply([&](auto &&...args)  {
             return this->operator()<InWidth, OutWidth>(args...);
-          }, idx);      
-      }        
+          }, idx);
+      }
 
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -168,7 +168,7 @@ namespace matx
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<I1>()) {
           in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -177,7 +177,7 @@ namespace matx
         if constexpr (is_matx_op<I2>()) {
           in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }      
+      }
     };
   }
 
@@ -362,7 +362,7 @@ namespace matx
    * @param t2
    *   RHS tensor or operator input
    */
-  Op operator|(Op t, Op t2) {}  
+  Op operator|(Op t, Op t2) {}
 
   /**
    * Compute t ^ t2 (bitwise XOR) of two operators or tensors
@@ -371,7 +371,7 @@ namespace matx
    * @param t2
    *   RHS tensor or operator input
    */
-  Op operator^(Op t, Op t2) {}    
+  Op operator^(Op t, Op t2) {}
 
   /**
    * Compute the arctangent of two inputs
@@ -380,7 +380,7 @@ namespace matx
    * @param t2
    *   Y value of input
    */
-  Op atan2(Op t, Op t2) {}  
+  Op atan2(Op t, Op t2) {}
 #else
   DEFINE_BINARY_OP(operator+, detail::AddOp);
   DEFINE_BINARY_OP(operator-, detail::SubOp);

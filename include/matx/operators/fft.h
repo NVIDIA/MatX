@@ -38,7 +38,7 @@
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
   #include "matx/transforms/fft/fft_fftw.h"
-#endif  
+#endif
 
 namespace matx
 {
@@ -53,12 +53,13 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-                                          typename OpA::scalar_type, 
+        static_assert(!is_vector_v<typename OpA::scalar_type>);
+        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
+                                          typename OpA::scalar_type,
                                           typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
-        mutable ttype *ptr;                                           
+        mutable ttype *ptr;
 
       public:
         using matxop = bool;
@@ -68,7 +69,7 @@ namespace matx
         using matx_transform_op = bool;
         using fft_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
             return "fft(" + get_type_str(a_) + ")";
           }
@@ -77,7 +78,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFTOp(OpA a, uint64_t size, PermDims perm, FFTType t, FFTNorm norm) : 
+        __MATX_INLINE__ FFTOp(OpA a, uint64_t size, PermDims perm, FFTType t, FFTNorm norm) :
             a_(a), fft_size_(size),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
@@ -101,7 +102,7 @@ namespace matx
               }
             }
           }
-          else { 
+          else {
             if constexpr (!is_complex_v<typename OpA::scalar_type>) { // C2C uses the same input/output size. R2C is N/2+1
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
@@ -131,7 +132,7 @@ namespace matx
         template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_(indices...);
+          return tmp_out_.template operator()<InWidth, OutWidth>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -154,7 +155,7 @@ namespace matx
             }
           }
           else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (std::is_same_v<FFTType, fft_t>) {
               fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
             else {
@@ -168,15 +169,15 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -198,8 +199,8 @@ namespace matx
    * Creates a new FFT plan in the cache if none exists, and uses that to execute
    * the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
-   * prototypes with index_t. 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
+   * prototypes with index_t.
    *
    * @tparam OpA
    *   Input tensor or operator type
@@ -221,8 +222,8 @@ namespace matx
    * Creates a new FFT plan in the cache if none exists, and uses that to execute
    * the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
-   * prototypes with index_t. 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
+   * prototypes with index_t.
    *
    * @tparam OpA
    *   Input tensor or operator type
@@ -238,7 +239,7 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
 
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFTOp(a, fft_size, perm, detail::fft_t{}, norm);
   }
 
@@ -251,9 +252,9 @@ namespace matx
    *
    * @tparam OpA
    *   Input tensor or operator type
-   * 
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
-   * prototypes with index_t. 
+   *
+   * Note: fft_size must be unsigned so that the axis overload does not match both
+   * prototypes with index_t.
    * @param a
    *   input tensor or operator
    * @param fft_size
@@ -272,8 +273,8 @@ namespace matx
    * Creates a new FFT Iplan in the cache if none exists, and uses that to execute
    * the 1D IFFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
-   * prototypes with index_t. 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
+   * prototypes with index_t.
    *
    * @tparam OpA
    *   Input tensor or operator type
@@ -288,9 +289,9 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFTOp(a, fft_size, perm, detail::ifft_t{}, norm);
-  }  
+  }
 
 
   namespace detail {
@@ -303,12 +304,12 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-                                          typename OpA::scalar_type, 
+        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
+                                          typename OpA::scalar_type,
                                           typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_; 
-        mutable ttype *ptr;                                                
+        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
+        mutable ttype *ptr;
 
       public:
         using matxop = bool;
@@ -316,7 +317,7 @@ namespace matx
         using matx_transform_op = bool;
         using fft2_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
             return "fft2(" + get_type_str(a_) + ")";
           }
@@ -339,7 +340,7 @@ namespace matx
               out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
               out_dims_[Rank() - 2] = out_dims_[Rank() - 2] / 2 + 1;
             }
-          }  
+          }
         }
 
         template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -357,7 +358,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (std::is_same_v<FFTType, fft_t>) {
               fft2_impl(cuda::std::get<0>(out), a_, norm_, ex);
             }
             else {
@@ -365,7 +366,7 @@ namespace matx
             }
           }
           else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (std::is_same_v<FFTType, fft_t>) {
               fft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
             else {
@@ -379,19 +380,19 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);          
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
-    };    
+    };
   }
 
 
@@ -433,7 +434,7 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto fft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
 
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFT2Op(a, perm, detail::fft_t{}, norm);
   }
 
@@ -474,8 +475,8 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
-  }  
+  }
 
 }
