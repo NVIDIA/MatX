@@ -54,10 +54,11 @@ namespace detail {
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
       using argmax_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmax(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMaxOp(OpA a) : a_(a) { 
-     
+      __MATX_INLINE__ ArgMaxOp(OpA a) : a_(a) {
+
       };
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -65,7 +66,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmax(). ie: (mtie(O, I) = argmax(A))");   
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmax(). ie: (mtie(O, I) = argmax(A))");
         argmax_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
       }
 

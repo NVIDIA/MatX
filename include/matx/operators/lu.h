@@ -45,13 +45,14 @@ namespace detail {
     private:
       OpA a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
 
     public:
       using matxop = bool;
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using lu_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
       __MATX_INLINE__ LUOp(OpA a) : a_(a) { };
@@ -63,9 +64,9 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "lu() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(O, piv) = lu(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on lu(). ie: (mtie(O, piv) = lu(A))");
 
-        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());        
+        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

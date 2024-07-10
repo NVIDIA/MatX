@@ -149,7 +149,7 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) {
-              printf("RUNNING FFT\n");
+              printf("RUNNING FFT %p %p\n", cuda::std::get<0>(out).Data(), a_.Data());
               fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
@@ -182,11 +182,13 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          if (!init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
-printf("DONE ALLOC\n");
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+  printf("DONE ALLOC\n");
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
 
         template <typename ShapeType, typename Executor>

@@ -54,6 +54,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using find_idx_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find_idx()"; }
       __MATX_INLINE__ FindIdxOp(OpA a, SelectType sel) : a_(a), sel_(sel) { };
@@ -64,7 +65,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find_idx(). ie: (mtie(O, num_found) = find_idx(A, sel))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find_idx(). ie: (mtie(O, num_found) = find_idx(A, sel))");
 
         find_idx_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, sel_, ex);
       }
@@ -97,7 +98,7 @@ namespace detail {
  * function is different from the MatX IF operator in that this performs a reduction on the input, whereas IF
  * is only for element-wise output. Output tensor must be large enough to hold unique entries. To be safe,
  * this can be the same size as the input, but if something is known about the data to indicate not as many
- * entries are needed, the output can be smaller. 
+ * entries are needed, the output can be smaller.
  *
  * @tparam SelectType
  *   Type of select functor

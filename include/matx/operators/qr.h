@@ -51,6 +51,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using qr_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ QROp(OpA a) : a_(a) { };
@@ -61,7 +62,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "svd() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "qr() only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 3 outputs on qr(). ie: (mtie(Q, R) = qr(A))");
 
         qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());
@@ -118,6 +119,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using cusolver_qr_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "cusolver_qr()"; }
       __MATX_INLINE__ CuSolverQROp(OpA a) : a_(a) { };
@@ -129,7 +131,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_cuda_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(A, tau) = eig(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(A, tau) = eig(A))");
 
         cusolver_qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());
       }

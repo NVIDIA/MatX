@@ -54,6 +54,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using find_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find()"; }
       __MATX_INLINE__ FindOp(OpA a, SelectType sel) : a_(a), sel_(sel) { };
@@ -64,7 +65,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find(). ie: (mtie(O, num_found) = find(A, sel))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find(). ie: (mtie(O, num_found) = find(A, sel))");
 
         find_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, sel_, ex);
       }

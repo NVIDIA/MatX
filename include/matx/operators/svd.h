@@ -55,6 +55,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using svd_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SVDOp(OpA a, const char jobu, const char jobvt) : a_(a), jobu_(jobu), jobv_(jobvt) { };
@@ -113,9 +114,10 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using svd_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k) 
+      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k)
       { }
 
       // This should never be called
@@ -164,7 +166,7 @@ namespace detail {
  *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
  *   Random tensor of size batches x min(n,m) is suggested.
  * @param iterations
- *   The number of power iterations to perform for each singular value.  
+ *   The number of power iterations to perform for each singular value.
  * @param k
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
@@ -190,6 +192,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using svd_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SVDBPIOp(const OpA &a, int max_iters, float tol) : a_(a), max_iters_(max_iters), tol_(tol)
@@ -238,7 +241,7 @@ namespace detail {
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
  * @param max_iters
- *   The approximate maximum number of QR iterations to perform. 
+ *   The approximate maximum number of QR iterations to perform.
  * @param tol
  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  */

@@ -55,6 +55,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using eig_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
       __MATX_INLINE__ EigOp(OpA a, cusolverEigMode_t jobz, cublasFillMode_t uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
@@ -66,7 +67,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "eig () only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");
 
         eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
       }
@@ -94,7 +95,7 @@ namespace detail {
 
 template<typename OpA>
 __MATX_INLINE__ auto eig(const OpA &a,
-                          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR, 
+                          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
                           cublasFillMode_t uplo  = CUBLAS_FILL_MODE_UPPER) {
   return detail::EigOp(a, jobz, uplo);
 }

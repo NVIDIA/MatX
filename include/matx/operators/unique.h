@@ -53,6 +53,7 @@ namespace detail {
       using scalar_type = typename OpA::scalar_type;
       using matx_transform_op = bool;
       using unique_xform_op = bool;
+      using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "unique()"; }
       __MATX_INLINE__ UniqueOp(OpA a) : a_(a) { };
@@ -63,7 +64,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on unique(). ie: (mtie(O, num_found) = unique(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on unique(). ie: (mtie(O, num_found) = unique(A))");
 
         unique_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
       }

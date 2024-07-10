@@ -770,7 +770,7 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   // converts operators to tensors
   auto out = getCufft1DSupportedTensor(o, stream);
   auto in_t = getCufft1DSupportedTensor(i, stream);
-printf("before same\n");
+printf("before same %p\n", nullptr);
   if(!in_t.isSameView(i)) {
    (in_t = i).run(stream);
   }

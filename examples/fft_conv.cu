@@ -161,6 +161,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     // IFFT in-place
     (sig_freq = ifft(sig_freq)).run(exec);
+    //break;
   }
 
   cudaEventRecord(stop, stream);
@@ -173,8 +174,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
     printf("LOOP\n");
     (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(exec);
+    //break;
     printf("DONE LOOP\n");
-    //return 0;
+   // return 0;
   }
 
   cudaEventRecord(stop, stream);
@@ -191,12 +193,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.sync();
 
-  {
-    auto t = make_tensor<float>({5000000});
-    auto t2 = make_tensor<float>({5000000});
-    (t = 4.f).run();
-    (t2 = t).run();
-  }
+  // {
+  //   auto t = make_tensor<float>({5000000});
+  //   auto t2 = make_tensor<float>({5000000});
+  //   (t = 4.f).run();
+  //   (t2 = t).run();
+  // }
 
   // Compare signals
   for (index_t b = 0; b < batches; b++) {
