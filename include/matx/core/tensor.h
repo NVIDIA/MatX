@@ -287,7 +287,8 @@ public:
   {
     // In the case where we have a tensor on the LHS and a pure transform
     // on the RHS we skip set() entirely since it's not used
-    if constexpr (is_matx_transform_op<T2>()) {
+    if constexpr (is_matx_multi_return_op<T2>()) {
+      printf("RETURNING MTIE\n");
       return mtie(*this, op);
     }
     else {
@@ -1474,7 +1475,7 @@ public:
       }
     }
 
-    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize, 
+    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
             "Number of matxDropDim specifiers must match the output rank");
 
 #pragma unroll

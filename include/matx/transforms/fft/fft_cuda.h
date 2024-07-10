@@ -730,7 +730,9 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   // TODO should combine this function with above...
   // currently will result in an extra allocation/transfer when using fft_size to grow
   // adjusts size of tensor based on fft_size
+  printf("calling get view\n");
   auto in = detail::GetFFTInputView(out, in_t, fft_size, exec);
+  printf("done calling get view\n");
 
   // Get parameters required by these tensors
   auto params = detail::matxCUDAFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
@@ -768,11 +770,11 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   // converts operators to tensors
   auto out = getCufft1DSupportedTensor(o, stream);
   auto in_t = getCufft1DSupportedTensor(i, stream);
-
+printf("before same\n");
   if(!in_t.isSameView(i)) {
    (in_t = i).run(stream);
   }
-
+printf("after same\n");
   // TODO should combine into function above
   // adjusts size of tensor based on fft_size
   auto in = detail::GetFFTInputView(out, in_t, fft_size, exec);

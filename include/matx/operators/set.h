@@ -151,20 +151,27 @@ public:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
   {
+    // Do not pre-run again on an op that's already been run
+    if constexpr (is_matx_transform_op<Op>()) {
+      if (op_.Initialized()) {
+        return;
+      }
+    }
+
     if constexpr (is_matx_op<T>()) {
       out_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-    }    
+    }
     if constexpr (is_matx_op<Op>()) {
       op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
   {
     if constexpr (is_matx_op<T>()) {
       out_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-    }     
+    }
     if constexpr (is_matx_op<Op>()) {
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -172,7 +179,7 @@ public:
 
   VecWidth GetMaxWidth() const {
     return MinCompatibleWidth(out_, op_);
-  }  
+  }
 
   /**
    * Get the rank of the operator

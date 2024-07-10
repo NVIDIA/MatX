@@ -53,6 +53,7 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
+        mutable bool init_ = false;
         static_assert(!is_vector_v<typename OpA::scalar_type>);
         using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
                                           typename OpA::scalar_type,
@@ -148,9 +149,11 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (std::is_same_v<FFTType, fft_t>) {
+              printf("RUNNING FFT\n");
               fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
+              printf("RUNNING IFFT\n");
               ifft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
           }
@@ -162,7 +165,11 @@ namespace matx
               ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
           }
+
+          init_ = true;
         }
+
+        bool Initialized() const { return init_; }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -178,7 +185,7 @@ namespace matx
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
-
+printf("DONE ALLOC\n");
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 

@@ -196,6 +196,28 @@ template <typename T> constexpr bool is_matx_transform_op()
   return detail::is_matx_transform_op_impl<typename remove_cvref<T>::type>::value;
 }
 
+
+
+namespace detail {
+template <typename T, typename = void>
+struct is_matx_multi_return_op_impl : std::false_type {
+};
+
+template <typename T>
+struct is_matx_multi_return_op_impl<T, std::void_t<typename remove_cvref_t<T>::matx_multi_return_op>> : std::true_type {
+};
+}
+
+/**
+ * @brief Determine if a type is a MatX multi-return operator
+ *
+ * @tparam T Type to test
+ */
+template <typename T> constexpr bool is_matx_multi_return_op()
+{
+  return detail::is_matx_multi_return_op_impl<typename remove_cvref<T>::type>::value;
+}
+
 namespace detail {
 template <typename T, typename = void>
 struct has_matx_op_type : std::false_type {

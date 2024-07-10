@@ -57,14 +57,14 @@ namespace detail {
     FORWARD,
     BACKWARD
   };
-    
+
   template <typename OutputTensor, typename InputTensor, typename Executor>
   __MATX_INLINE__ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                       const InputTensor &i, uint64_t fft_size,
                       [[maybe_unused]] const Executor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     using index_type = typename OutputTensor::shape_type;
     using T1    = typename OutputTensor::scalar_type;
     using T2    = typename InputTensor::scalar_type;
@@ -137,6 +137,7 @@ namespace detail {
         if constexpr (is_cuda_executor_v<Executor>) {
           const auto stream = exec.getStream();
           auto i_new = make_tensor<T2>(shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+printf("fft 2 kernels %lld %lld %lld\n", i_new.Size(0), i_new.Size(1), i.Lsize());
           ends[RANK - 1] = i.Lsize();
           auto i_pad_part_v = i_new.Slice(starts, ends);
 
@@ -153,13 +154,13 @@ namespace detail {
 
           (i_new = static_cast<promote_half_t<T2>>(0)).run(exec);
           matx::copy(i_pad_part_v, i, exec);
-          return i_new;        
+          return i_new;
         }
       }
     }
 
     return i;
-  }  
+  }
 
   template <typename T1T, typename T2T>
   constexpr __MATX_INLINE__ FFTType DeduceFFTTransformType()
@@ -206,7 +207,7 @@ namespace detail {
     }
     //else {
       return FFTType::C2C;
-    //}    
+    //}
   }
 }
 

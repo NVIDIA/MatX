@@ -64,7 +64,7 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
       // return lhs.substr(0, lhs.size() - 1) + ")";
     }
-  }  
+  }
 
   mtie(Ts... ts) : ts_(ts...) {}
 
@@ -90,10 +90,11 @@ struct mtie : public BaseOp<mtie<Ts...>>{
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
   {
     return 0;
-  }  
+  }
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {
+    printf("EXEC\n");
     // Run the PreRun on the inner type to avoid allocation but allow transforms using MatX operators
     // to do any setup needed
     if constexpr (sizeof...(Ts) == 2) {

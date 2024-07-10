@@ -42,9 +42,9 @@ namespace matx
 
   /**
    * @brief Executes operators on the host on a CUDA-enabled device
-   * 
+   *
    * Optionally takes a stream for asynchronous execution
-   * 
+   *
    */
   class cudaExecutor {
     public:
@@ -52,7 +52,7 @@ namespace matx
       using matx_executor = bool; ///< Type trait indicating this is an executor
       /**
        * @brief Construct a new cudaExecutor with a stream
-       * 
+       *
        * @param stream CUDA stream
        */
       cudaExecutor(cudaStream_t stream) : stream_(stream) {}
@@ -60,7 +60,7 @@ namespace matx
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
-       * 
+       *
        */
       cudaExecutor() : stream_(0) {}
 
@@ -71,30 +71,30 @@ namespace matx
 
       /**
        * @brief Synchronize the cuda executor's stream
-       * 
+       *
        */
       void sync() { cudaStreamSynchronize(stream_); }
-      
+
       /**
        * Execute an operator on a device
-       * 
+       *
        * @tparam Op Operator type
        * @param op value
        **/
       template <typename Op>
         void Exec(Op &op) const {
-#ifdef __CUDACC__      
-          dim3 threads, blocks;  
+#ifdef __CUDACC__
+          dim3 threads, blocks;
 
-          // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
+          // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we
           // need to error out and have them break up the statement
-          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
+          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM,
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
           detail::VecWidth width = detail::VecWidth::ONE;
           if constexpr(has_matx_width<Op>()) {
             width = op.GetMaxWidth();
-            printf("width2 %d\n", (int)width);            
+            printf("width2 %d\n", (int)width);
           }
 
           printf("width %d\n", (int)width);
@@ -109,16 +109,16 @@ namespace matx
             for (int i = 0; i < Op::Rank(); i++) {
               sizes[i] = op.Size(i);
             }
-            
-            // Arbitrary number that's roughly close to the number of cores on a standard GPU. This will prevent launching a 
+
+            // Arbitrary number that's roughly close to the number of cores on a standard GPU. This will prevent launching a
             // vector kernel when the amount of work is very small.
             if (TotalSize(op) < 1024) {
               width = detail::VecWidth::ONE;
-            }            
+            }
 
             const auto ilp  = static_cast<uint8_t>(width);
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, ilp, 256);
-printf("%d %d %d %d %d\n", blocks.x, blocks.y, threads.x, threads.y, ilp);
+printf("%d %d %d %d %d width=%d\n", blocks.x, blocks.y, threads.x, threads.y, ilp, (int)width);
             if constexpr (Op::Rank() == 1) {
               switch (width) {
                 case detail::VecWidth::ONE:
@@ -132,7 +132,7 @@ printf("%d %d %d %d %d\n", blocks.x, blocks.y, threads.x, threads.y, ilp);
                   break;
                 default:
                   MATX_ASSERT_STR(false, matxInvalidParameter, "Failed to get load/store width for kernel");
-                  break;                                        
+                  break;
               }
             }
             else if constexpr (Op::Rank() == 2) {
@@ -155,15 +155,15 @@ printf("%d %d %d %d %d\n", blocks.x, blocks.y, threads.x, threads.y, ilp);
               } else {
                 detail::matxOpT4Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
               }
-            }        
+            }
             else {
               index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
               detail::matxOpTDKernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
-            } 
+            }
           }
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
-#endif    
+#endif
         }
 
     private:
