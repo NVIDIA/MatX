@@ -137,10 +137,11 @@ namespace detail {
         if constexpr (is_cuda_executor_v<Executor>) {
           const auto stream = exec.getStream();
           auto i_new = make_tensor<T2>(shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-printf("fft 2 kernels %lld %lld %lld\n", i_new.Size(0), i_new.Size(1), i.Lsize());
+
           ends[RANK - 1] = i.Lsize();
           auto i_pad_part_v = i_new.Slice(starts, ends);
-
+printf("fft 2 kernels %lld %lld %lld %lld i_pad_part_v=%lld %lld strides %lld %lld %lld %lld\n",
+    i_new.Size(0), i_new.Size(1), i.Size(0), i.Size(1), i_pad_part_v.Size(0), i_pad_part_v.Size(1), i.Stride(0), i.Stride(1), i_pad_part_v.Stride(0), i_pad_part_v.Stride(1));
           (i_new = static_cast<promote_half_t<T2>>(0)).run(stream);
           // example-begin copy-test-1
           matx::copy(i_pad_part_v, i, stream);

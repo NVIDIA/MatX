@@ -153,15 +153,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     if (i == 1) {
       cudaEventRecord(start, stream);
     }
-    (sig_freq = fft(sig_time, filtered_size)).run(exec);
+    // (sig_freq = fft(sig_time, filtered_size)).run(exec);
 
-    (filt_freq = fft(filt_time, filtered_size)).run(exec);
+    // (filt_freq = fft(filt_time, filtered_size)).run(exec);
 
-    (sig_freq = sig_freq * filt_freq).run(exec);
+    // (sig_freq = sig_freq * filt_freq).run(exec);
 
-    // IFFT in-place
-    (sig_freq = ifft(sig_freq)).run(exec);
-    //break;
+    // // IFFT in-place
+    // (sig_freq = ifft(sig_freq)).run(exec);
   }
 
   cudaEventRecord(stop, stream);
@@ -176,7 +175,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(exec);
     //break;
     printf("DONE LOOP\n");
-   // return 0;
+
   }
 
   cudaEventRecord(stop, stream);
@@ -193,12 +192,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.sync();
 
-  // {
-  //   auto t = make_tensor<float>({5000000});
-  //   auto t2 = make_tensor<float>({5000000});
-  //   (t = 4.f).run();
-  //   (t2 = t).run();
-  // }
+  {
+    auto t = make_tensor<float>({5000000});
+    auto t2 = make_tensor<float>({5000000});
+    auto t3 = make_tensor<float>({5001, 1022});
+    auto t4 = make_tensor<float>({5001, 1022});
+    (t = 4.f).run();
+    (t2 = t).run();
+    (t3 = t4).run();
+  }
 
   // Compare signals
   for (index_t b = 0; b < batches; b++) {

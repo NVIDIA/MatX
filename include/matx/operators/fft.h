@@ -319,6 +319,7 @@ namespace matx
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr;
+        mutable bool init_ = false;
 
       public:
         using matxop = bool;
@@ -334,6 +335,8 @@ namespace matx
             return "ifft2(" + get_type_str(a_) + ")";
           }
         }
+
+        bool Initialized() const { return init_; }
 
         __MATX_INLINE__ FFT2Op(OpA a, PermDims perm, FFTType t, FFTNorm norm) : a_(a),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
@@ -395,11 +398,13 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          if (!init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
     };
   }

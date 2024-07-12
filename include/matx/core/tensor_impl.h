@@ -917,22 +917,31 @@ class tensor_impl_t {
 
     VecWidth GetMaxWidth() const {
       constexpr int MAX_VEC_WIDTH = 16; // 16B loads and stores
-      if (IsContiguous()) {
+      //if (IsContiguous()) {
         uint32_t width = 4;
         while (width > 1) {
-          if (((sizeof(T) * width) <= MAX_VEC_WIDTH) &&
-              ((Bytes() % (sizeof(T) * width)) == 0)   &&
-              (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width)) == 0) {
-            break;
+          if (((Lsize() % width) == 0) &&
+            (Stride(Rank() - 1) == 1) &&
+            ((sizeof(T) * width) <= MAX_VEC_WIDTH) &&
+            (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width)) == 0) {
+
+            if constexpr (Rank() > 1) {
+              if (((Stride(Rank() - 2) % width) == 0)) {
+                break;
+              }
+            }
+            else {
+              break;
+            }
           }
 
           width /= 2;
         }
 printf("ret %u %zu\n", width, sizeof(T));
         return static_cast<VecWidth>(width);
-      }
-printf("ret 1\n");
-      return VecWidth::ONE;
+//       }
+// printf("ret 1\n");
+//       return VecWidth::ONE;
     }
 
 
