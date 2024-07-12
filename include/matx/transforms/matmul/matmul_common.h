@@ -32,67 +32,18 @@
 
 #pragma once
 
-#include "matx/core/type_utils.h"
-
-// Utility functions to determine what support is available per-executor
-
 namespace matx {
-  namespace detail {
 
-// FFT
-#if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
-    #define MATX_EN_CPU_FFT 1
-#else
-    #define MATX_EN_CPU_FFT 0
-#endif
+namespace detail {
 
-// MatMul
-#if defined(MATX_EN_NVPL)
-    #define MATX_EN_CPU_MATMUL 1
-#else
-    #define MATX_EN_CPU_MATMUL 0
-#endif  
+union MatMulScaleType_t {
+  float f32;
+  double f64;
+  float cf32[2];
+  double cf64[2];
+};
+    
+} // end namespace detail
 
-template <typename Exec, typename T>
-constexpr bool CheckFFTSupport() {
-  if constexpr (is_host_executor_v<Exec>) {
-    if constexpr (is_complex_half_v<T>) {
-      return false;
-    } else {
-      return MATX_EN_CPU_FFT;
-    }
-  }
-  else {
-    return true;
-  }
-}
 
-template <typename Exec>
-constexpr bool CheckDirect1DConvSupport() {
-  if constexpr (is_host_executor_v<Exec>) {
-    return false;
-  }
-  else {
-    return true;
-  }
-}
-
-template <typename Exec, typename T>
-constexpr bool CheckMatMulSupport() {
-  if constexpr (is_host_executor_v<Exec>) {
-    if constexpr (std::is_same_v<T, float> ||
-                  std::is_same_v<T, double> ||
-                  std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>) {
-      return MATX_EN_CPU_MATMUL;
-    } else {
-      return false;
-    }
-  }
-  else {
-    return true;
-  }
-}
-
-}; // detail
-}; // matx
+}; // end namespace matx

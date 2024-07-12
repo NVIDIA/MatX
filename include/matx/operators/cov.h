@@ -85,7 +85,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "cov() only supports the CUDA executor currently");
-          cov_impl(cuda::std::get<0>(out), a_, ex.getStream());
+          cov_impl(cuda::std::get<0>(out), a_, ex);
         }
 
         template <typename ShapeType, typename Executor>

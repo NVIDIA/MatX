@@ -52,7 +52,7 @@ namespace matx {
  * @tparam TensorTypeB
  *    Data type of B tensor or operator
  * @tparam PROV
- *    Provider type chosen from MatXMatMulProvider_t type
+ *    Provider type chosen from MatMulCUDAProvider_t type
  *
  * @param C
  *   C output tensor or operator
@@ -60,18 +60,18 @@ namespace matx {
  *   A input tensor or operator
  * @param B
  *   B input tensor or operator
- * @param stream
- *   CUDA stream
+ * @param exec
+ *   CUDA executor
  * @param alpha
  *   Scalar multiplier to apply to operator A
  * @param beta
  *   Scalar multiplier to apply to operator C on input
  */
-template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, typename Executor,
+          MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 __MATX_INLINE__ void matvec_impl(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B,
-            cudaStream_t stream = 0,
+            const Executor &exec,
             float alpha = 1.0, float beta = 0.0)
 {
   MATX_STATIC_ASSERT(TensorTypeA::Rank() == TensorTypeB::Rank()+1, "matvec: A rank must be one larger than B rank");
@@ -90,7 +90,12 @@ __MATX_INLINE__ void matvec_impl(TensorTypeC C, const TensorTypeA A,
   auto c = clone<TensorTypeC::Rank()+1>(C, shape);
   auto b = clone<TensorTypeB::Rank()+1>(B, shape);
 
-  matmul_impl<decltype(c), decltype(A), decltype(b), PROV>(c, A, b, stream, alpha, beta);
+  if constexpr (is_cuda_executor_v<Executor>) {
+    matmul_impl<decltype(c), decltype(A), decltype(b), PROV>(c, A, b, exec, alpha, beta);
+  }
+  else {
+    matmul_impl<decltype(c), decltype(A), decltype(b)>(c, A, b, exec, alpha, beta);
+  }
 }
 
 };
