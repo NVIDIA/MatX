@@ -64,33 +64,6 @@ namespace detail {
   };                                                                           \
   template <typename T> using OPNAME##Op = UnOp<T, OPNAME##F<T>>;
 
-#define MATX_GLOBAL_UNARY_OP_GEN(FUNC, OPNAME)                                        \
-  template <typename T>                                                        \
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T v1)                \
-  {                                                                            \
-    if constexpr (is_matx_type_v<T>) {                                         \
-      return FUNC(v1);                                                         \
-    }                                                                          \
-    else {                                                                     \
-      return ::FUNC(v1);                                              \
-    }                                                                          \
-    if constexpr (!is_matx_type_v<T>) {                                        \
-      return ::FUNC(v1);                                              \
-    }                                                                          \
-    else {                                                                     \
-      return FUNC(v1);                                                         \
-    }                                                                          \
-  }                                                                            \
-  template <typename T> struct OPNAME##F {                                     \
-    static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
-                                                                               \
-    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)                            \
-    {                                                                          \
-      return _internal_##FUNC(v1);                                             \
-    }                                                                          \
-  };                                                                           \
-  template <typename T> using OPNAME##Op = UnOp<T, OPNAME##F<T>>;
-
 #define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
   template <typename T1, typename T2>                                          \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_##FUNC(T1 v1, T2 v2)        \
@@ -161,7 +134,6 @@ MATX_UNARY_OP_GEN(ceil, Ceil);
 MATX_UNARY_OP_GEN(floor, Floor);
 MATX_UNARY_OP_GEN(round, Round);
 MATX_UNARY_OP_GEN(exp, Exp);
-MATX_GLOBAL_UNARY_OP_GEN(rsqrt, RSqrt);
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_sqrt(T v1)
@@ -182,6 +154,26 @@ template <typename T> struct SqrtF {
 };
 
 template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
+
+template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_rsqrt(T v1)
+{
+  if constexpr (is_matx_type_v<T>){
+    return rsqrt(v1);
+  }
+  else {
+    return ::rsqrt(v1);
+  }
+}
+template <typename T> struct RSqrtF {
+  static __MATX_INLINE__ std::string str() { return "rsqrt"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_rsqrt(v1);
+  }
+};
+
+template <typename T> using RSqrtOp = UnOp<T, RSqrtF<T>>;
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)

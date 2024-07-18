@@ -689,6 +689,41 @@ sqrt(const matxHalf<__nv_bfloat16> &x)
 }
 
 /**
+ * @brief Reciprocal Square root value
+ * 
+ * @tparam T Type of half
+ * @param x Value of half
+ * @return Reciprocal square root of input
+ */
+template <class T>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> rsqrt(const matxHalf<T> &x)
+{
+#ifdef __CUDA_ARCH__
+  return hrsqrt(x.x);
+#else
+  return static_cast<T>(::rsqrt(static_cast<float>(x.x)));
+#endif
+}
+
+/**
+ * @brief Square root value
+ * 
+ * @tparam T Type of half
+ * @param x Value of half
+ * @return Square root of input
+ */
+template <>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<__nv_bfloat16>
+rsqrt(const matxHalf<__nv_bfloat16> &x)
+{
+#if __CUDA_ARCH__ >= 800
+  return hrsqrt(x.x);
+#else
+  return static_cast<__nv_bfloat16>(::rsqrt(static_cast<float>(x.x)));
+#endif
+}
+
+/**
  * @brief Test for infiity
  * 
  * @tparam T Type of half
