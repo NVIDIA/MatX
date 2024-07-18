@@ -31,8 +31,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-// Next line is a workaround for libcuda++ 11.6.0 on CTK 11.4.100+. Remove once libcuda++ is fixed
-#define _LIBCUDACXX_HAS_NO_INT128
 #include <complex>
 #include <cuda/std/complex>
 #include <cuda/std/cmath>
