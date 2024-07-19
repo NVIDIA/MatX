@@ -78,6 +78,26 @@ constexpr bool CheckDirect1DConvSupport() {
 }
 
 template <typename Exec, typename T>
+constexpr bool CheckFFT1DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return CheckFFTSupport<Exec, T>();
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool Check2DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return false;
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec, typename T>
 constexpr bool CheckMatMulSupport() {
   if constexpr (is_host_executor_v<Exec>) {
     if constexpr (std::is_same_v<T, float> ||

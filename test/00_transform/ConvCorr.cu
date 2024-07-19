@@ -60,7 +60,7 @@ constexpr index_t a_len = 8 * 122880 + 2 * 32768;
 constexpr index_t b_len = 209;
 constexpr index_t c_len = a_len + b_len - 1;
 
-template <typename T>
+template <typename T, matxConvCorrMethod_t METHOD = MATX_C_METHOD_DIRECT>
 class CorrelationConvolutionTest : public ::testing::Test {
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
@@ -68,6 +68,7 @@ protected:
   void SetUp() override
   {
     CheckTestTypeSupport<GTestType>();
+    CheckExecSupport();
     pb = std::make_unique<detail::MatXPybind>();
 
     // Half precision needs a bit more tolerance when compared to
@@ -78,6 +79,19 @@ protected:
   }
 
   void TearDown() override { pb.reset(); }
+
+  constexpr void CheckExecSupport() {
+    if constexpr (METHOD == MATX_C_METHOD_FFT) {
+      if constexpr (!detail::CheckFFT1DConvSupport<GExecType, GTestType>()) {
+        GTEST_SKIP();
+      }
+    } else {
+      if constexpr (!detail::CheckDirect1DConvSupport<GExecType>()) {
+        GTEST_SKIP();
+      }
+    }
+  }
+
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 1> av{{a_len0}};
@@ -100,6 +114,11 @@ protected:
   void SetUp() override
   {
     CheckTestTypeSupport<GTestType>();
+
+    if constexpr (!detail::Check2DConvSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
     pb = std::make_unique<detail::MatXPybind>();
 
     // Half precision needs a bit more tolerance when compared to
@@ -123,7 +142,7 @@ protected:
   float thresh = 0.01f;
 };
 
-template <typename T>
+template <typename T, matxConvCorrMethod_t METHOD = MATX_C_METHOD_DIRECT>
 class CorrelationConvolutionLargeTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
@@ -132,6 +151,7 @@ protected:
   void SetUp() override
   {
     CheckTestTypeSupport<GTestType>();
+    CheckExecSupport();
     pb = std::make_unique<detail::MatXPybind>();
 
     // Half precision needs a bit more tolerance when compared to
@@ -142,6 +162,19 @@ protected:
   }
 
   void TearDown() override { pb.reset(); }
+
+  constexpr void CheckExecSupport() {
+    if constexpr (METHOD == MATX_C_METHOD_FFT) {
+      if constexpr (!detail::CheckFFT1DConvSupport<GExecType, GTestType>()) {
+        GTEST_SKIP();
+      }
+    } else {
+      if constexpr (!detail::CheckDirect1DConvSupport<GExecType>()) {
+        GTEST_SKIP();
+      }
+    }
+  }
+
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 1> av{{a_len}};
@@ -151,18 +184,33 @@ protected:
 };
 
 template <typename TensorType>
-class CorrelationConvolutionTestFloatTypes
-    : public CorrelationConvolutionTest<TensorType> {
+class CorrelationConvolutionFFTTestFloatTypes
+    : public CorrelationConvolutionTest<TensorType, MATX_C_METHOD_FFT> {
 };
 
 template <typename TensorType>
-class CorrelationConvolutionTestNonHalfFloatTypes
-    : public CorrelationConvolutionTest<TensorType> {
+class CorrelationConvolutionDirectTestFloatTypes
+    : public CorrelationConvolutionTest<TensorType, MATX_C_METHOD_DIRECT> {
 };
 
 template <typename TensorType>
-class CorrelationConvolutionLargeTestFloatTypes
-    : public CorrelationConvolutionLargeTest<TensorType> {
+class CorrelationConvolutionFFTTestNonHalfFloatTypes
+    : public CorrelationConvolutionTest<TensorType, MATX_C_METHOD_FFT> {
+};
+
+template <typename TensorType>
+class CorrelationConvolutionDirectTestNonHalfFloatTypes
+    : public CorrelationConvolutionTest<TensorType, MATX_C_METHOD_DIRECT> {
+};
+
+template <typename TensorType>
+class CorrelationConvolutionLargeFFTTestFloatTypes
+    : public CorrelationConvolutionLargeTest<TensorType, MATX_C_METHOD_FFT> {
+};
+
+template <typename TensorType>
+class CorrelationConvolutionLargeDirectTestFloatTypes
+    : public CorrelationConvolutionLargeTest<TensorType, MATX_C_METHOD_DIRECT> {
 };
 
 template <typename TensorType>
@@ -175,13 +223,14 @@ class CorrelationConvolutionComplexTypes
     : public CorrelationConvolutionTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(CorrelationConvolutionTestFloatTypes, MatXFloatTypesCUDAExec);
-TYPED_TEST_SUITE(CorrelationConvolutionTestNonHalfFloatTypes, MatXFloatNonHalfTypesAllExecs);
-TYPED_TEST_SUITE(CorrelationConvolutionLargeTestFloatTypes, MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(CorrelationConvolutionDirectTestFloatTypes, MatXFloatTypesCUDAExec);
+TYPED_TEST_SUITE(CorrelationConvolutionFFTTestNonHalfFloatTypes, MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(CorrelationConvolutionLargeDirectTestFloatTypes, MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(CorrelationConvolutionLargeFFTTestFloatTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(CorrelationConvolution2DTestFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 
 // Real/real direct 1D convolution Large
-TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
+TYPED_TEST(CorrelationConvolutionLargeDirectTestFloatTypes, Direct1DConvolutionLarge)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -203,7 +252,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, Direct1DConvolutionLarge)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, FFT1DConvolutionLarge)
+TYPED_TEST(CorrelationConvolutionLargeFFTTestFloatTypes, FFT1DConvolutionLarge)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -222,7 +271,7 @@ TYPED_TEST(CorrelationConvolutionLargeTestFloatTypes, FFT1DConvolutionLarge)
 
 
 // Real/real direct 1D convolution
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -236,7 +285,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullEven)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullEven)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionFullEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -268,7 +317,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullEven)
 
 
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -282,7 +331,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameEven)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameEven)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionSameEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -312,7 +361,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameEven)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -326,7 +375,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidEven)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidEven)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionValidEven)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -354,7 +403,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidEven)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -368,7 +417,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionFullOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionFullOdd)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionFullOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -398,7 +447,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionFullOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionSameOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -412,7 +461,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSameOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSameOdd)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionSameOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -440,7 +489,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSameOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -454,7 +503,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionValidOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionValidOdd)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionValidOdd)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -482,7 +531,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionValidOdd)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -496,7 +545,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DConvolutionSwap)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DConvolutionSwap)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DConvolutionSwap)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -524,7 +573,7 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Direct2DConvolutionSwap)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DCorrelation)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -541,7 +590,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelation)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DCorrelation)
+TYPED_TEST(CorrelationConvolutionFFTTestNonHalfFloatTypes, FFT1DCorrelation)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -556,7 +605,7 @@ TYPED_TEST(CorrelationConvolutionTestNonHalfFloatTypes, FFT1DCorrelation)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Direct1DCorrelationSwap)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -570,7 +619,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Direct1DCorrelationSwap)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
+TYPED_TEST(CorrelationConvolutionDirectTestFloatTypes, Conv1Axis)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -677,7 +726,7 @@ TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv1Axis)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(CorrelationConvolutionTestFloatTypes, Conv2Axis)
+TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Conv2Axis)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
