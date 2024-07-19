@@ -47,7 +47,7 @@ namespace matx {
 #endif
 
 // MatMul
-#if defined(MATX_EN_NVPL)
+#if defined(MATX_EN_NVPL) || defined(MATX_EN_OPENBLAS) || defined(MATX_EN_BLIS)
     #define MATX_EN_CPU_MATMUL 1
 #else
     #define MATX_EN_CPU_MATMUL 0
