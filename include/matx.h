@@ -53,8 +53,10 @@
 #include "matx/operators/operators.h"
 #include "matx/transforms/transforms.h"
 
-using fcomplex = cuda::std::complex<float>;
-using dcomplex = cuda::std::complex<double>;
+namespace matx {
+  using fcomplex = cuda::std::complex<float>;
+  using dcomplex = cuda::std::complex<double>;
+}
 
 #define TEST_VECTOR_PATH "generated/"
 

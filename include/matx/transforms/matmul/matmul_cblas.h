@@ -46,6 +46,18 @@
 #ifdef MATX_EN_NVPL
   #include <nvpl_blas_cblas.h>
   using cblas_int_t = nvpl_int_t;
+#elif defined(MATX_EN_OPENBLAS)
+  #include <cblas.h>
+  using cblas_int_t = blasint;
+#elif defined(MATX_EN_BLIS)
+  #ifdef MATX_BLIS_64_HEADER
+    #include <cblas64.h>
+    #include <blis64.h>
+  #else
+    #include <cblas.h>
+    #include <blis.h>
+  #endif
+  using cblas_int_t = f77_int;
 #endif
 
 namespace matx {
@@ -113,20 +125,20 @@ static MatMulCBLASParams_t GetGemmParams(TensorTypeC &c,
 
   // If we have a 3D or above tensor, the upper dims are batch dimensions.
   if constexpr (RANK >= 3) {
-    params.batch = (c.Size(RANK - 3));
+    params.batch = static_cast<cblas_int_t>(c.Size(RANK - 3));
     if constexpr (TensorTypeA::Rank() == RANK) {
-      params.astride = (a.Stride(TensorTypeA::Rank() - 3));
+      params.astride = static_cast<cblas_int_t>(a.Stride(TensorTypeA::Rank() - 3));
     } else {
       params.astride = 0;
     }
 
     if constexpr (TensorTypeB::Rank() == RANK) {
-      params.bstride = (b.Stride(TensorTypeB::Rank() - 3));
+      params.bstride = static_cast<cblas_int_t>(b.Stride(TensorTypeB::Rank() - 3));
     } else {
       params.bstride = 0;
     }
 
-    params.cstride = (c.Stride(RANK - 3));
+    params.cstride = static_cast<cblas_int_t>(c.Stride(RANK - 3));
   }
 
   // At this point, the transpose mode on C case has already been handled
@@ -147,24 +159,24 @@ static MatMulCBLASParams_t GetGemmParams(TensorTypeC &c,
   // doesn't like even though it's unused. Set it to something that it would be
   // if the matrix had more than 1 row.
   if (params.opB == CblasTrans) {
-    params.ldb = b.Stride(TensorTypeB::Rank() - 1);
+    params.ldb = static_cast<cblas_int_t>(b.Stride(TensorTypeB::Rank() - 1));
   } else {
-    params.ldb = b.Stride(TensorTypeB::Rank() - 2);
-    params.ldb = (params.ldb == 0) ? b.Size(TensorTypeB::Rank() - 1) : params.ldb;
+    params.ldb = static_cast<cblas_int_t>(b.Stride(TensorTypeB::Rank() - 2));
+    params.ldb = (params.ldb == 0) ? static_cast<cblas_int_t>(b.Size(TensorTypeB::Rank() - 1)) : params.ldb;
   }
 
   if (params.opA == CblasTrans) {
-    params.lda = a.Stride(TensorTypeA::Rank() - 1);
+    params.lda = static_cast<cblas_int_t>(a.Stride(TensorTypeA::Rank() - 1));
   } else {
-    params.lda = a.Stride(TensorTypeA::Rank() - 2);
-    params.lda = (params.lda == 0) ? a.Size(TensorTypeA::Rank() - 1) : params.lda;
+    params.lda = static_cast<cblas_int_t>(a.Stride(TensorTypeA::Rank() - 2));
+    params.lda = (params.lda == 0) ? static_cast<cblas_int_t>(a.Size(TensorTypeA::Rank() - 1)) : params.lda;
   }
 
-  params.ldc = c.Stride(RANK - 2);
+  params.ldc = static_cast<cblas_int_t>(c.Stride(RANK - 2));
 
-  params.m = a.Size(TensorTypeA::Rank() - 2);
-  params.n = b.Size(TensorTypeB::Rank() - 1);
-  params.k = a.Size(TensorTypeA::Rank() - 1);
+  params.m = static_cast<cblas_int_t>(a.Size(TensorTypeA::Rank() - 2));
+  params.n = static_cast<cblas_int_t>(b.Size(TensorTypeB::Rank() - 1));
+  params.k = static_cast<cblas_int_t>(a.Size(TensorTypeA::Rank() - 1));
 
   return params;
 }
@@ -228,7 +240,6 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static constexpr int RANK = TensorTypeC::Rank();
-  static constexpr int GROUP_COUNT = 1;
   using scalar_type = typename TensorTypeC::scalar_type;
 
   // Prep for batch looping
@@ -238,11 +249,11 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
   [[maybe_unused]] cuda::std::array<shape_type, TensorTypeC::Rank()> c_idx{0};
   [[maybe_unused]] size_t total_iter = 1;
 
-  if constexpr (RANK > 2) {
+  if constexpr (RANK > 3) {
     // Get total number of batches
     auto c_shape = c.Shape();
     total_iter = std::accumulate(c_shape.begin(),
-                                 c_shape.begin() + TensorTypeC::Rank() - 2, 1,
+                                 c_shape.begin() + TensorTypeC::Rank() - 3, 1,
                                  std::multiplies<shape_type>());
   }
 
@@ -259,53 +270,126 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
     sbeta = beta;
   }
 
-  std::vector<const scalar_type*> a_array(total_iter);
-  std::vector<const scalar_type*> b_array(total_iter);
-  std::vector<scalar_type*> c_array(total_iter);
+#ifdef MATX_EN_NVPL
+  if constexpr (RANK <= 3) {
+    auto a_ptr = a.Data();
+    auto b_ptr = b.Data();
+    auto c_ptr = c.Data();
 
+    if constexpr (std::is_same_v<scalar_type, float>) {
+      cblas_sgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                params.m, params.n, params.k, salpha,
+                                a_ptr, params.lda, params.astride,
+                                b_ptr, params.ldb, params.bstride, sbeta,
+                                c_ptr, params.ldc, params.cstride, params.batch);
+    } else if constexpr (std::is_same_v<scalar_type, double>) {
+      cblas_dgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                params.m, params.n, params.k, salpha,
+                                a_ptr, params.lda, params.astride,
+                                b_ptr, params.ldb, params.bstride, sbeta,
+                                c_ptr, params.ldc, params.cstride, params.batch);
+    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+      cblas_cgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                params.m, params.n, params.k, (void *)&salpha,
+                                (void *)a_ptr, params.lda, params.astride,
+                                (void *)b_ptr, params.ldb, params.bstride, (void *)&sbeta,
+                                (void *)c_ptr, params.ldc, params.cstride, params.batch);
+    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+      cblas_zgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                params.m, params.n, params.k, (void *)&salpha,
+                                (void *)a_ptr, params.lda, params.astride,
+                                (void *)b_ptr, params.ldb, params.bstride, (void *)&sbeta,
+                                (void *)c_ptr, params.ldc, params.cstride, params.batch);
+    }
+  } else {
+    for (size_t iter = 0; iter < total_iter; iter++) {
+
+      // Get pointers into A/B/C for this round
+      auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, a_idx);
+      auto bp = cuda::std::apply([&b](auto... param) { return b.GetPointer(param...); }, b_idx);
+      auto cp = cuda::std::apply([&c](auto... param) { return c.GetPointer(param...); }, c_idx);
+
+      if constexpr (std::is_same_v<scalar_type, float>) {
+        cblas_sgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                  params.m, params.n, params.k, salpha,
+                                  ap, params.lda, params.astride,
+                                  bp, params.ldb, params.bstride, sbeta,
+                                  cp, params.ldc, params.cstride, params.batch);
+      } else if constexpr (std::is_same_v<scalar_type, double>) {
+        cblas_dgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                  params.m, params.n, params.k, salpha,
+                                  ap, params.lda, params.astride,
+                                  bp, params.ldb, params.bstride, sbeta,
+                                  cp, params.ldc, params.cstride, params.batch);
+      } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+        cblas_cgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                  params.m, params.n, params.k, (void *)&salpha,
+                                  (void *)ap, params.lda, params.astride,
+                                  (void *)bp, params.ldb, params.bstride, (void *)&sbeta,
+                                  (void *)cp, params.ldc, params.cstride, params.batch);
+      } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+        cblas_zgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
+                                  params.m, params.n, params.k, (void *)&salpha,
+                                  (void *)ap, params.lda, params.astride,
+                                  (void *)bp, params.ldb, params.bstride, (void *)&sbeta,
+                                  (void *)cp, params.ldc, params.cstride, params.batch);
+      }
+
+      // Update all but the last 3 indices
+      UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, a_idx, 3);
+      UpdateIndices<TensorTypeB, shape_type, TensorTypeB::Rank()>(b, b_idx, 3);
+      UpdateIndices<TensorTypeC, shape_type, TensorTypeC::Rank()>(c, c_idx, 3);
+    }
+  }
+#else
+  // The batch api is a new addition to BLIS and OpenBLAS, so it may not be present.
+  // Thus, we default to the standard gemm api and loop over anything above the 2nd dimension.
+
+  #ifdef MATX_EN_OPENBLAS
+  openblas_set_num_threads(exec.GetNumThreads());
+  #elif defined(MATX_EN_BLIS)
+  bli_thread_set_num_threads(exec.GetNumThreads());
+  #endif
+  
+  total_iter *= params.batch;
   for (size_t iter = 0; iter < total_iter; iter++) {
     // Get pointers into A/B/C for this round
     auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, a_idx);
     auto bp = cuda::std::apply([&b](auto... param) { return b.GetPointer(param...); }, b_idx);
     auto cp = cuda::std::apply([&c](auto... param) { return c.GetPointer(param...); }, c_idx);
 
-    a_array[iter] = ap;
-    b_array[iter] = bp;
-    c_array[iter] = cp;
+    if constexpr (std::is_same_v<scalar_type, float>) {
+      cblas_sgemm(CblasRowMajor, params.opA, params.opB,
+                  params.m, params.n, params.k, salpha,
+                  ap, params.lda,
+                  bp, params.ldb, sbeta,
+                  cp, params.ldc);
+    } else if constexpr (std::is_same_v<scalar_type, double>) {
+      cblas_dgemm(CblasRowMajor, params.opA, params.opB,
+                  params.m, params.n, params.k, salpha,
+                  ap, params.lda,
+                  bp, params.ldb, sbeta,
+                  cp, params.ldc);
+    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+      cblas_cgemm(CblasRowMajor, params.opA, params.opB,
+                  params.m, params.n, params.k, (void *)&salpha,
+                  (const void **)ap, params.lda,
+                  (const void **)bp, params.ldb, (void *)&sbeta,
+                  (void **)cp, params.ldc);
+    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+      cblas_zgemm(CblasRowMajor, params.opA, params.opB,
+                  params.m, params.n, params.k, (void *)&salpha,
+                  (const void **)ap, params.lda,
+                  (const void **)bp, params.ldb, (void *)&sbeta,
+                  (void **)cp, params.ldc);
+    }
 
     // Update all but the last 2 indices
     UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, a_idx, 2);
     UpdateIndices<TensorTypeB, shape_type, TensorTypeB::Rank()>(b, b_idx, 2);
     UpdateIndices<TensorTypeC, shape_type, TensorTypeC::Rank()>(c, c_idx, 2);
   }
-
-  cblas_int_t group_size = static_cast<cblas_int_t>(total_iter);
-
-  if constexpr (std::is_same_v<scalar_type, float>) {
-    cblas_sgemm_batch(CblasRowMajor, &params.opA, &params.opB,
-                      &params.m, &params.n, &params.k, &salpha,
-                      a_array.data(), &params.lda,
-                      b_array.data(), &params.ldb, &sbeta,
-                      c_array.data(), &params.ldc, GROUP_COUNT, &group_size);
-  } else if constexpr (std::is_same_v<scalar_type, double>) {
-    cblas_dgemm_batch(CblasRowMajor, &params.opA, &params.opB,
-                      &params.m, &params.n, &params.k, &salpha,
-                      a_array.data(), &params.lda,
-                      b_array.data(), &params.ldb, &sbeta,
-                      c_array.data(), &params.ldc, GROUP_COUNT, &group_size);
-  } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
-    cblas_cgemm_batch(CblasRowMajor, &params.opA, &params.opB,
-                      &params.m, &params.n, &params.k, (void *)&salpha,
-                      (const void **)a_array.data(), &params.lda,
-                      (const void **)b_array.data(), &params.ldb, (void *)&sbeta,
-                      (void **)c_array.data(), &params.ldc, GROUP_COUNT, &group_size);
-  } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
-    cblas_zgemm_batch(CblasRowMajor, &params.opA, &params.opB,
-                      &params.m, &params.n, &params.k, (void *)&salpha,
-                      (const void **)a_array.data(), &params.lda,
-                      (const void **)b_array.data(), &params.ldb, (void *)&sbeta,
-                      (void **)c_array.data(), &params.ldc, GROUP_COUNT, &group_size);
-  }
+#endif
 }
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, ThreadsMode MODE>
