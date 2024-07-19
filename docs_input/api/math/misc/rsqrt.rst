@@ -1,7 +1,7 @@
 .. _rsqrt_func:
 
 rsqrt
-====
+=====
 
 Reciprocal square root
 
