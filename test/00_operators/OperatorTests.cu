@@ -1916,7 +1916,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
   (tov0 = rsqrt(tiv0)).run(exec);
   // example-end rsqrt-test-1
   exec.sync();
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_rqrt(c)));   
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_rsqrt(c)));   
 
   MATX_EXIT_HANDLER();
 }
