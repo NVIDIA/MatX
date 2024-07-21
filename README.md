@@ -107,7 +107,7 @@ typically two ways to do this:
 1. Adding MatX as a subdirectory 
 2. Installing MatX to the system
 
-#### MatX as a Subdirectory
+#### 1. MatX as a Subdirectory
 Adding the subdirectory is useful if you include the MatX
 source into the directory structure of your project. Using this method, you can simply add the MatX directory:
 
@@ -117,7 +117,7 @@ add_subdirectory(path/to/matx)
 
 An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory.
 
-#### MatX Installed to the System
+#### 2. MatX Installed to the System
 The other option is to install MatX and use the configuration file provided after building. This is typically done in a way similar to what is
 shown below:
 
@@ -136,7 +136,12 @@ find_package(matx CONFIG REQUIRED)
 ```
 
 #### MatX CMake Targets
-Once either of the two methods above are done, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``.
+**Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``, e.g:
+
+```
+target_link_libraries(MyProject matx::matx)
+```
+
 MatX may add other optional targets in the future inside the matx:: namespace as well.
 
 
