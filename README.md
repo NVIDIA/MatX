@@ -136,7 +136,12 @@ find_package(matx CONFIG REQUIRED)
 ```
 
 #### MatX CMake Targets
-**Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``.
+**Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``, e.g:
+
+```
+target_link_libraries(MyProject matx::matx)
+```
+
 MatX may add other optional targets in the future inside the matx:: namespace as well.
 
 
