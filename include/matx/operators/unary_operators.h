@@ -66,6 +66,7 @@ namespace matx
     using matxop = bool;
     using scalar_type = typename Op::scalar_type;
     using self_type = matxUnaryOp<I1, Op>;
+    using matx_width = bool; ///< Signal we can do vector types from this operator
 
     __MATX_INLINE__ const std::string str() const {
       return op_.str() + "(" + get_type_str(in1_) + ")";
@@ -79,18 +80,23 @@ namespace matx
       }
     }
 
+    VecWidth GetMaxWidth() const {
+      return GetOpWidth(in1_);
+    }
+
+    template <VecWidth InWidth, VecWidth OutWidth>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args)  {
-          return this->operator()(args...);
-        }, idx);      
-    }  
+          return this->operator()<InWidth, OutWidth>(args...);
+        }, idx);
+    }
 
-    template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value(in1_, indices...);
-      return op_(i1);
+      auto i1 = get_value<InWidth, OutWidth>(in1_, indices...);
+      return op_.template operator()<InWidth, OutWidth>(i1);
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -110,7 +116,7 @@ namespace matx
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept  
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
       in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -330,28 +336,28 @@ namespace matx
  * @param t
  *   Input operator
  */
-  Op real(Op t) {}  
+  Op real(Op t) {}
 
  /**
  * Return imaginary components of an operator
  * @param t
  *   Input operator
  */
-  Op imag(Op t) {}  
+  Op imag(Op t) {}
 
  /**
  * Returns a truth value if operator value is NaN
  * @param t
  *   Input operator
  */
-  Op isnan(Op t) {}  
+  Op isnan(Op t) {}
 
  /**
  * Returns a truth value if operator value is infinite
   * @param x
  *   Input operator
  */
-  Op isinf( Op x) {}  
+  Op isinf( Op x) {}
 
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
@@ -366,8 +372,8 @@ namespace matx
   DEFINE_UNARY_OP(conj, detail::ConjOp);
 #else
   // implementing without a macro so we can optimize conj(real)
-  template <typename I1,                        
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  template <typename I1,
+            typename = typename std::enable_if_t<is_matx_op<I1>()>>
   [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
     using I1Type = extract_scalar_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
@@ -403,8 +409,8 @@ namespace matx
   DEFINE_UNARY_OP(real, detail::RealOp);
 #else
   // implementing without a macro so we can optimize away real on a real operator
-  template <typename I1,                        
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  template <typename I1,
+            typename = typename std::enable_if_t<is_matx_op<I1>()>>
   [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
     using I1Type = extract_scalar_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
@@ -417,7 +423,7 @@ namespace matx
     }
   }
 #endif
-  DEFINE_UNARY_OP(imag, detail::ImagOp);  
+  DEFINE_UNARY_OP(imag, detail::ImagOp);
   DEFINE_UNARY_OP(operator-, detail::SubNegOp );
   DEFINE_UNARY_OP(isnan, detail::IsNanOp);
   DEFINE_UNARY_OP(isinf, detail::IsInfOp);

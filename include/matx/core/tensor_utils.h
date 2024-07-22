@@ -280,7 +280,9 @@ namespace detail {
       return i;
     }
     else {
-      return detail::Vector<T, static_cast<size_t>(InWidth)>(static_cast<std::remove_cv_t<T>>(i));
+      auto v = detail::Vector<T, static_cast<size_t>(InWidth)>{};
+      v.Fill(static_cast<std::remove_cv_t<T>>(i));
+      return v;
     }
   }
 

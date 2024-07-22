@@ -27,7 +27,7 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -42,55 +42,55 @@ namespace matx {
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
     if constexpr (remove_cvref_t<decltype(out)>::Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
-        if constexpr(ConvertType) {   
-          return func(  in, 
-                        reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type> *>(out.Data()), 
-                        bi, 
+        if constexpr(ConvertType) {
+          return func(  in,
+                        reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::scalar_type> *>(out.Data()),
+                        bi,
                         ei);
         }
         else {
-          return func(  in, 
-                        reinterpret_cast<typename remove_cvref_t<OutputOp>::scalar_type *>(out.Data()), 
-                        bi, 
+          return func(  in,
+                        reinterpret_cast<typename remove_cvref_t<OutputOp>::scalar_type *>(out.Data()),
+                        bi,
                         ei);
         }
       }
     }
-    
+
     detail::base_type_t<OutputOp> out_base = out;
     auto iter = RandomOperatorOutputIterator<decltype(out_base), ConvertType>{out_base};
     return func(in, iter, bi, ei);
-  }  
+  }
 
   template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
-    typename detail::base_type_t<InputOp> in_base = in;    
+    typename detail::base_type_t<InputOp> in_base = in;
     if constexpr (in_base.Rank() < 2 && is_tensor_view_v<InputOp>) {
       if (in_base.IsContiguous()) {
         if constexpr (ConvertType) {
-          return ReduceOutput<ConvertType>( std::forward<Func>(func), 
-                                            std::forward<OutputOp>(out), 
-                                            reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::scalar_type> *>(in_base.Data()), 
-                                            BeginOffset{in_base}, 
+          return ReduceOutput<ConvertType>( std::forward<Func>(func),
+                                            std::forward<OutputOp>(out),
+                                            reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::scalar_type> *>(in_base.Data()),
+                                            BeginOffset{in_base},
                                             EndOffset{in_base});
         }
         else {
-          return ReduceOutput<ConvertType>( std::forward<Func>(func), 
-                                            std::forward<OutputOp>(out), 
-                                            reinterpret_cast<typename remove_cvref_t<InputOp>::scalar_type *>(in_base.Data()), 
-                                            BeginOffset{in_base}, 
+          return ReduceOutput<ConvertType>( std::forward<Func>(func),
+                                            std::forward<OutputOp>(out),
+                                            reinterpret_cast<typename remove_cvref_t<InputOp>::scalar_type *>(in_base.Data()),
+                                            BeginOffset{in_base},
                                             EndOffset{in_base});
         }
       }
     }
 
     // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
-    // then collapse the left size by the output rank to get the batch dimensions  
-    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - 
+    // then collapse the left size by the output rank to get the batch dimensions
+    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() -
                                                                                       remove_cvref_t<decltype(out)>::Rank()>(in_base));
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-    return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
-  } 
+    return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});
+  }
 
   template <typename Func, typename OutputOp, typename InputOp>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInputNoConvert(Func &&func, OutputOp &&out, InputOp &&in) {
@@ -118,51 +118,40 @@ namespace matx {
 
   namespace detail {
     // Used inside of transforms to allocate temporary output
-    template <typename TensorType, typename Executor, typename ShapeType> 
+    template <typename TensorType, typename Executor, typename ShapeType>
     __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::scalar_type **ptr) {
       const auto ttl_size = std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
-                                  std::multiplies<index_t>()) * sizeof(*ptr);      
+                                  std::multiplies<index_t>()) * sizeof(*ptr);
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         make_tensor(tensor, *ptr, shape);
       }
-      else {        
+      else {
         matxAlloc((void**)ptr, ttl_size, MATX_HOST_MEMORY);
-        make_tensor(tensor, *ptr, shape);        
-      }  
-    }  
+        make_tensor(tensor, *ptr, shape);
+      }
+    }
+
+    template <typename Op>
+    __MATX_HOST__ __MATX_INLINE__ VecWidth GetOpWidth(const Op &op) {
+      if constexpr(has_matx_width<Op>()) {
+        return op.GetMaxWidth();
+      }
+      else if constexpr (!is_matx_op<Op>()) {
+        return MAX_VECWIDTH_VAL;
+      }
+      else {
+        return VecWidth::ONE;
+      }
+    }
 
     template <typename Op1, typename Op2>
     __MATX_HOST__ __MATX_INLINE__ VecWidth MinCompatibleWidth(const Op1 &a, const Op2 &b) {
-      VecWidth in1;
-      VecWidth in2;
-
-      if constexpr(has_matx_width<Op1>()) {
-        in1 = a.GetMaxWidth();
-        printf("11 %d \n", (int)in1);
-      }
-      else if constexpr (!is_matx_op<Op1>()) {
-        printf("MAX1\n");
-        in1 = MAX_VECWIDTH_VAL;
-      } 
-      else {
-        in1 = VecWidth::ONE;
-      }
-
-      if constexpr(has_matx_width<Op2>()) {
-        in2 = b.GetMaxWidth();
-        printf("22 %d \n", (int)in2); 
-      }
-      else if constexpr (!is_matx_op<Op2>()) {
-        printf("MAX2\n");
-        in2 = MAX_VECWIDTH_VAL;
-      }       
-      else {
-        in2 = VecWidth::ONE;
-      }
+      VecWidth in1 = GetOpWidth(a);
+      VecWidth in2 = GetOpWidth(b);
 
       return static_cast<VecWidth>(cuda::std::min(static_cast<int>(in1), static_cast<int>(in2)));
     }
   }
 
-}; 
+};
