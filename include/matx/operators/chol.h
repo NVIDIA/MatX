@@ -46,6 +46,7 @@ namespace detail {
       OpA a_;
       cublasFillMode_t uplo_;
       mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -56,6 +57,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "chol()"; }
       __MATX_INLINE__ CholOp(OpA a, cublasFillMode_t uplo) : a_(a), uplo_(uplo) { };
 
+      bool Initialized() const { return init_; }
+
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
@@ -64,7 +67,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "chol() only supports the CUDA executor currently");
 
-        chol_impl(cuda::std::get<0>(out),  a_, ex.getStream(), uplo_);  
+        chol_impl(cuda::std::get<0>(out),  a_, ex.getStream(), uplo_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -77,22 +80,24 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }             
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+        if (init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
-        }
+          if constexpr (is_cuda_executor_v<Executor>) {
+            make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+          }
+          else {
+            make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
+          }
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -101,7 +106,7 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }        
+      }
 
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions

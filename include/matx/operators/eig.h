@@ -49,6 +49,7 @@ namespace detail {
       OpA a_;
       cusolverEigMode_t jobz_;
       cublasFillMode_t uplo_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -59,6 +60,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
       __MATX_INLINE__ EigOp(OpA a, cusolverEigMode_t jobz, cublasFillMode_t uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>

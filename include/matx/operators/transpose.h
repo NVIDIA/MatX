@@ -49,11 +49,12 @@ namespace detail {
       OpA a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
       using scalar_type = typename OpA::scalar_type;
-      using shape_type = std::conditional_t<has_shape_type_v<OpA>, typename OpA::shape_type, index_t>; 
+      using shape_type = std::conditional_t<has_shape_type_v<OpA>, typename OpA::shape_type, index_t>;
       using matx_transform_op = bool;
       using matxoplvalue = bool;
       using transpose_xform_op = bool;
@@ -67,8 +68,10 @@ namespace detail {
           else {
             out_dims_[r] = a_.Size(r);
           }
-        }        
+        }
       }
+
+      bool Initialized() const { return init_; }
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -78,7 +81,7 @@ namespace detail {
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)  {
         return tmp_out_(indices...);
-      }      
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -94,18 +97,20 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
+        if (!init_) {
+          if constexpr (is_matx_op<OpA>()) {
+            a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);
-        }
+          if constexpr (is_cuda_executor_v<Executor>) {
+            make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+          }
+          else {
+            make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);
+          }
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -121,13 +126,13 @@ namespace detail {
         return out_dims_[dim];
       }
 
-      template<typename R> 
-      __MATX_INLINE__ auto operator=(const R &rhs) { 
+      template<typename R>
+      __MATX_INLINE__ auto operator=(const R &rhs) {
         if constexpr (is_matx_transform_op<R>()) {
           return mtie(*this, rhs);
         }
-        else {          
-          return set(*this, rhs); 
+        else {
+          return set(*this, rhs);
         }
       }
 
@@ -140,7 +145,7 @@ namespace detail {
  *
  * The each dimension must appear in the dims array once.
 
-  * This operator can appear as an rvalue or lvalue. 
+  * This operator can appear as an rvalue or lvalue.
   *
   * @tparam T Input operator/tensor type
   * @param op Input operator
@@ -148,7 +153,7 @@ namespace detail {
   */
   template <typename T>
   __MATX_INLINE__ auto transpose(const T op) {
-  
+
     static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
     int32_t dims[T::Rank()];
     for (int r = 0; r < T::Rank(); r++) {
@@ -164,7 +169,7 @@ namespace detail {
    *
    * The each dimension must appear in the dims array once.
 
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam T Input operator/tensor type
    * @param op Input operator
@@ -175,13 +180,13 @@ namespace detail {
     static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
 
     int32_t dims[T::Rank()];
-    for(int i = 0; i < T::Rank(); i++) 
+    for(int i = 0; i < T::Rank(); i++)
       dims[i] = i;
     int32_t dim1 = T::Rank() - 1;
     int32_t dim2 = T::Rank() - 2;
 
     std::swap(dims[dim1],dims[dim2]);
     return permute(op, detail::to_array(dims));
-  }  
+  }
 
 }

@@ -180,11 +180,13 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          if (init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
     };
   }
@@ -249,6 +251,7 @@ namespace detail {
       cuda::std::array<index_t, max_rank> out_dims_;
       mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
       mutable out_t *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -259,6 +262,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const {
         return "conv2d(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
       }
+
+      bool Initialized() const { return init_; }
 
       __MATX_INLINE__ Conv2DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, PermDims perm) :
             a_(A), b_(B), mode_(mode), perm_(perm) {
@@ -355,11 +360,13 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
     };
   }

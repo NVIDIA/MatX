@@ -46,6 +46,7 @@ namespace detail {
       OpA a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -56,6 +57,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
       __MATX_INLINE__ LUOp(OpA a) : a_(a) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>

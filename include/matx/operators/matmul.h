@@ -48,11 +48,12 @@ namespace matx
         OpB b_;
         float alpha_;
         float beta_;
-        PermDims perm_; 
+        PermDims perm_;
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+        mutable bool init_ = false;
 
       public:
         using matxop = bool;
@@ -60,11 +61,13 @@ namespace matx
         using matx_transform_op = bool;
         using matmul_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
             return "matmul(" + get_type_str(a_) + "," + get_type_str(b_) + ")";
         }
 
-        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta, PermDims perm) : 
+        bool Initialized() const { return init_; }
+
+        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta, PermDims perm) :
               a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
@@ -94,7 +97,7 @@ namespace matx
         {
           return tmp_out_(indices...);
         }
-   
+
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -121,21 +124,23 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }     
+          }
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }           
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          if (!init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -216,5 +221,5 @@ namespace matx
     auto in2 = permute(B, perm);
 
     return detail::MatMulOp(in1, in2, alpha, beta, perm);
-  }  
+  }
 }

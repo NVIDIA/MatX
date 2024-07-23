@@ -61,6 +61,17 @@ enum class MemoryLayout {
   MEMORY_LAYOUT_COL_MAJOR,
 };
 
+/* Special values used to indicate properties of tensors */
+enum {
+  matxKeepDim     = std::numeric_limits<index_t>::max(),
+  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
+  matxEnd         = std::numeric_limits<index_t>::max() - 2,
+  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
+
+  // If adding a new marker adjust this to the last element above
+  matxIdxSentinel = matxKeepStride - 1,
+};
+
 namespace detail {
 enum class VecWidth : uint8_t {
   SCALAR = 0,

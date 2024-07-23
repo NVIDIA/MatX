@@ -51,7 +51,8 @@ namespace matx
         bool init_;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+        mutable bool init_ = false;
 
       public:
         using matxop = bool;
@@ -59,22 +60,28 @@ namespace matx
         using matx_transform_op = bool;
         using reduce_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           return "reduce(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ ReduceOp(const OpA &A, PermDims perm, ReductionOp rop, bool init) : 
+        bool Initialized() const { return init_; }
+
+        __MATX_INLINE__ ReduceOp(const OpA &A, PermDims perm, ReductionOp rop, bool init) :
               a_(A), perm_(perm), reduction_op_(rop), init_(init) {
           for (int r = 0; r < ORank; r++) {
             out_dims_[r] = a_.Size(r);
           }
         }
 
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+          return tmp_out_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...);
+        };
+
         template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
-        {
-          return tmp_out_(indices...);
-        }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+          return tmp_out_.template operator()<InWidth, OutWidth>(indices...);
+        };
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -102,17 +109,19 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }           
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));           
+          if (!init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -121,7 +130,7 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }
     };
   }
 
@@ -138,7 +147,7 @@ namespace matx
  *   Reduction operator type
  *
  * @param in
- *   Input data to compute the reduce 
+ *   Input data to compute the reduce
  * @param op
  *   Reduction operator
  * @param init
@@ -147,8 +156,8 @@ namespace matx
 template <typename InType, typename ReduceOp>
 __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
 {
-  return detail::ReduceOp(in, detail::no_permute_t{}, op, init);     
-}  
+  return detail::ReduceOp(in, detail::no_permute_t{}, op, init);
+}
 
 
 
@@ -163,7 +172,7 @@ __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
  * anything higher, the reduction is performed across the number of ranks below
  * the input tensor that the output tensor is. For example, if the input tensor
  * is a 4D tensor and the reduction is on a single axis, the reduction is performed
- * across the innermost dimension of the input. 
+ * across the innermost dimension of the input.
  *
  * @tparam InType
  *   Input data type
@@ -173,7 +182,7 @@ __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
  *   Reduction operator type
  *
  * @param in
- *   Input data to compute the reduce 
+ *   Input data to compute the reduce
  * @param dims
  *   C-style array containing the dimensions to sum over
  * @param op
@@ -185,7 +194,7 @@ template <typename InType, int D, typename ReduceOp>
 __MATX_INLINE__ auto reduce(const InType &in, const int (&dims)[D], ReduceOp op, bool init = true)
 {
   MATX_NVTX_START("reduce(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   static_assert(D < InType::Rank(), "reduce dimensions must be <= Rank of input");
 
   return detail::ReduceOp(in, detail::to_array(dims), op, init);

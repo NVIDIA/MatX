@@ -38,11 +38,11 @@
 namespace matx {
 /**
  * @brief Iterator around operators for libraries that can take iterators as input (CUB).
- * 
+ *
  * @tparam T Data type
  * @tparam RANK Rank of tensor
  * @tparam Desc Descriptor for tensor
- * 
+ *
  */
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorIterator {
@@ -66,21 +66,21 @@ struct RandomOperatorIterator {
 
   /**
    * @brief Dereference value at a pre-computed offset
-   * 
-   * @return Value at offset 
+   *
+   * @return Value at offset
    */
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator*() const
   {
     if constexpr (OperatorType::Rank() == 0) {
-      return static_cast<value_type>(t_.operator()());
+      return static_cast<value_type>(t_.template operator()<detail::VecWidth::SCALAR, detail::VecWidth::SCALAR>());
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
       return cuda::std::apply([&](auto &&...args) {
-          return static_cast<value_type>(t_.operator()(args...));
-        }, arrs);     
+          return static_cast<value_type>(t_.template operator()<detail::VecWidth::SCALAR, detail::VecWidth::SCALAR>(args...));
+        }, arrs);
     }
-  }  
+  }
 
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator=(const self_type &rhs)
   {
@@ -89,7 +89,7 @@ struct RandomOperatorIterator {
     }
     offset_ = rhs.offset_;
     return *this;
-  }  
+  }
 
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
@@ -100,25 +100,25 @@ struct RandomOperatorIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator[](difference_type offset) const
   {
     return *self_type{t_, offset_ + offset};
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
   {
       self_type retval = *this;
       offset_++;
       return retval;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
   {
       offset_++;
       return *this;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ difference_type offset()
   {
       return offset_;
-  }    
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
   {
@@ -130,7 +130,7 @@ struct RandomOperatorIterator {
   {
       offset_ -= offset;
       return *this;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator!=(const self_type &a, const self_type &b)
   {
@@ -140,7 +140,7 @@ struct RandomOperatorIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator==(const self_type &a, const self_type &b)
   {
     return a.offset_ == b.offset_;
-  }  
+  }
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
     return OperatorType::Rank();
@@ -149,27 +149,27 @@ struct RandomOperatorIterator {
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
   {
     return t_.Size(dim);
-  }  
+  }
 
   typename detail::base_type_t<OperatorType> t_;
-  stride_type offset_;  
+  stride_type offset_;
 };
 
 template <typename OperatorType, bool ConvertType = true>
 __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorIterator<OperatorType, ConvertType> &a, const RandomOperatorIterator<OperatorType, ConvertType> &b)
 {
   return a.offset_ - b.offset_;
-}    
+}
 
 
 
 /**
  * @brief Iterator around operators for libraries that can take iterators as output (CUB).
- * 
+ *
  * @tparam T Data type
  * @tparam RANK Rank of tensor
  * @tparam Desc Descriptor for tensor
- * 
+ *
  */
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorOutputIterator {
@@ -201,33 +201,33 @@ struct RandomOperatorOutputIterator {
 
       return cuda::std::apply([&](auto &&...args) -> reference {
           return (reference)(t_.operator()(args...));
-        }, arrs);    
+        }, arrs);
     }
-  }  
+  }
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
   {
     return self_type{t_, offset_ + offset};
   }
-  
 
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) 
+
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset)
   {
     return *self_type{t_, offset_ + offset};
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  self_type operator++(int)
   {
       self_type retval = *this;
       offset_++;
       return retval;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator++()
   {
       offset_++;
       return *this;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
   {
@@ -252,7 +252,7 @@ struct RandomOperatorOutputIterator {
   {
       offset_ -= offset;
       return *this;
-  }  
+  }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator--() {
     --offset_;
@@ -267,7 +267,7 @@ struct RandomOperatorOutputIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator==(const self_type &a, const self_type &b)
   {
     return a.offset_ == b.offset_;
-  }    
+  }
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
     return OperatorType::Rank();
@@ -276,10 +276,10 @@ struct RandomOperatorOutputIterator {
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
   {
     return t_.Size(dim);
-  }    
+  }
 
   typename detail::base_type_t<OperatorType> t_;
-  stride_type offset_;  
+  stride_type offset_;
 };
 
 
@@ -388,7 +388,7 @@ template <typename OperatorType>
 __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOperatorOutputIterator<OperatorType> &a, const RandomOperatorOutputIterator<OperatorType> &b)
 {
   return a.offset_ - b.offset_;
-}    
+}
 
 
 template <typename Op>

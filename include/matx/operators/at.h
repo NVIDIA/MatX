@@ -38,7 +38,7 @@ namespace matx
 {
 
   /**
-   * Returns the current tensor index for the given dimension.
+   * Returns the value at an offset in an operator in a lazy manner
    */
   namespace detail {
     template <typename Op, typename... Is>

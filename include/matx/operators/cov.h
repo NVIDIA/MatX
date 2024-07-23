@@ -47,7 +47,8 @@ namespace matx
         OpA a_;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+        mutable bool init_ = false;
 
       public:
         using matxop = bool;
@@ -55,13 +56,15 @@ namespace matx
         using matx_transform_op = bool;
         using cov_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           return "cov(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ CovOp(const OpA &A) : 
+        bool Initialized() const { return init_; }
+
+        __MATX_INLINE__ CovOp(const OpA &A) :
               a_(A) {
-          
+
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }
@@ -93,17 +96,19 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));      
+          if (!init_) {
+            InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+            detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+            Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -112,7 +117,7 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
     };
   }
 
@@ -136,7 +141,7 @@ namespace matx
     __MATX_INLINE__ auto cov(AType a)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
     return detail::CovOp(a);
   }
 

@@ -50,18 +50,18 @@ namespace matx
         static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+        mutable bool init_ = false;
 
       public:
         using matxop = bool;
         using scalar_type = out_type;
         using matx_transform_op = bool;
         using norm_xform_op = bool;
-        using matx_inner_op_impl = bool; // Indicates this operator uses matx operators for its implementation
 
-      __MATX_INLINE__ std::string str() const { 
+      __MATX_INLINE__ std::string str() const {
         if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
-          return "vector_norm()"; 
+          return "vector_norm()";
         }
         else {
           return "matrix_norm";
@@ -77,6 +77,8 @@ namespace matx
           out_dims_[r] = a_.Size(r);
         }
       }
+
+      bool Initialized() const { return init_; }
 
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -99,16 +101,18 @@ namespace matx
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      } 
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-        Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -151,7 +155,7 @@ namespace matx
    *
    * @tparam Op Type of input values to evaluate
    * @param op Input values to evaluate
-   * @param dims Dimensions to perform norm over   
+   * @param dims Dimensions to perform norm over
    * @param order Order of norm
    * @return norm operator
    */
@@ -187,7 +191,7 @@ namespace matx
    *
    * @tparam Op Type of input values to evaluate
    * @param op Input values to evaluate
-   * @param dims Dimensions to perform norm over   
+   * @param dims Dimensions to perform norm over
    * @param order Order of norm
    * @return norm operator
    */
@@ -197,5 +201,5 @@ namespace matx
     auto perm = detail::getPermuteDims<Op::Rank()>(dims);
     auto permop = permute(op, perm);
     return detail::NormOp<Op, detail::NormTypeMatrix>(permop, order);
-  }  
+  }
 } // end namespace matx

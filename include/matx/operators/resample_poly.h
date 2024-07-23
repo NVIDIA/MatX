@@ -46,26 +46,27 @@ namespace detail {
   class ResamplePolyOp : public BaseOp<ResamplePolyOp<OpA, FilterType>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-            typename FilterType::scalar_type, typename FilterType::scalar_type>;          
+      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
+            typename FilterType::scalar_type, typename FilterType::scalar_type>;
       OpA a_;
       FilterType f_;
       index_t up_;
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
-      mutable out_t *ptr;       
+      mutable out_t *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
       using matx_transform_op = bool;
       using resample_poly_xform_op = bool;
-      using scalar_type = out_t;            
+      using scalar_type = out_t;
 
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
-      __MATX_INLINE__ ResamplePolyOp(OpA a, const FilterType &f, index_t up, index_t down) : 
-          a_(a), f_(f), up_(up), down_(down) 
-      { 
+      __MATX_INLINE__ ResamplePolyOp(OpA a, const FilterType &f, index_t up, index_t down) :
+          a_(a), f_(f), up_(up), down_(down)
+      {
         const index_t up_len = a_.Size(OpA::Rank() - 1) * up_;
         const index_t b_len = up_len / down_ + ((up_len % down_) ? 1 : 0);
 
@@ -75,6 +76,8 @@ namespace detail {
 
         out_dims_[OpA::Rank() - 1] = b_len;
       }
+
+      bool Initialized() const { return init_; }
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
@@ -102,17 +105,19 @@ namespace detail {
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }              
-      } 
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -124,8 +129,8 @@ namespace detail {
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
-      }             
+        }
+      }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
@@ -137,14 +142,14 @@ namespace detail {
 
 /**
  * @brief 1D polyphase resampler
- * 
+ *
  * @tparam InType Type of input
  * @tparam FilterType Type of filter
  * @param in Input operator
  * @param f Filter operator
  * @param up Factor by which to upsample
  * @param down Factor by which to downsample
- * 
+ *
  * @returns Operator representing the filtered inputs
  */
 template <typename InType, typename FilterType>

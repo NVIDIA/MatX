@@ -799,28 +799,46 @@ class tensor_impl_t {
     }
 
 
-    /**
-     * operator() setter with an array index
-     *
-     * @returns value in tensor
-     *
-     */
-    // template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
-    // {
-    //   if constexpr (RANK == 1) {
-    //     return this->operator()(idx[0]);
-    //   }
-    //   else if constexpr (RANK == 2) {
-    //     return this->operator()(idx[0], idx[1]);
-    //   }
-    //   else if constexpr (RANK == 3) {
-    //     return this->operator()(idx[0], idx[1], idx[2]);
-    //   }
-    //   else {
-    //     return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-    //   }
-    // }
+    template <int N>
+    __MATX_INLINE__ auto Clone(const cuda::std::array<index_t, N> &clones) const
+    {
+      MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+      cuda::std::array<index_t, N> n;
+      cuda::std::array<typename Desc::stride_type, N> s;
+
+      int d = 0;
+
+  #pragma unroll
+      for (int i = 0; i < N; i++) {
+        index_t size = clones[i];
+
+        if (size == matxKeepDim) {
+          n[i] = this->desc_.Size(d);
+          if constexpr (RANK == 0) {
+            s[i] = 1;
+          }
+          else {
+            s[i] = this->desc_.Stride(d);
+          }
+          d++;
+        }
+        else {
+          n[i] = size;
+          s[i] = 0;
+        }
+      }
+      MATX_ASSERT_STR(d == RANK, matxInvalidDim,
+                      "Must keep as many dimension as the original tensor has");
+      tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
+      return tensor_impl_t<T, N, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+    }
+
+    template <int N>
+    __MATX_INLINE__ auto Clone(const index_t (&clones)[N]) const
+    {
+      return Clone<N>(detail::to_array(clones));
+    }
 
     /**
      * Get the rank of the tensor
@@ -863,7 +881,7 @@ class tensor_impl_t {
      * @returns Stride of dimension
      *
      */
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(uint32_t dim) const noexcept
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(int32_t dim) const noexcept
     {
       return desc_.Stride(dim);
     }

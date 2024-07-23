@@ -48,6 +48,7 @@ namespace detail {
   {
     private:
       OpA a_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -57,9 +58,9 @@ namespace detail {
       using matx_multi_return_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmax(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMaxOp(OpA a) : a_(a) {
+      __MATX_INLINE__ ArgMaxOp(OpA a) : a_(a) {};
 
-      };
+      bool Initialized() const { return init_; }
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;

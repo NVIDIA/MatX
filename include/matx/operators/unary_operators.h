@@ -84,12 +84,26 @@ namespace matx
       return GetOpWidth(in1_);
     }
 
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
+    {
+      return cuda::std::apply([&](auto &&...args)  {
+          return this->operator()<VecWidth::SCALAR, VecWidth::SCALAR>(args...);
+        }, idx);
+    }
+
     template <VecWidth InWidth, VecWidth OutWidth>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args)  {
           return this->operator()<InWidth, OutWidth>(args...);
         }, idx);
+    }
+
+    template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+    {
+      auto i1 = get_value<VecWidth::SCALAR, VecWidth::SCALAR>(in1_, indices...);
+      return op_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(i1);
     }
 
     template <VecWidth InWidth, VecWidth OutWidth, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>

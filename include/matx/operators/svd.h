@@ -49,6 +49,7 @@ namespace detail {
       OpA a_;
       char jobu_;
       char jobv_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -59,6 +60,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SVDOp(OpA a, const char jobu, const char jobvt) : a_(a), jobu_(jobu), jobv_(jobvt) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -108,6 +111,7 @@ namespace detail {
       OpX x_;
       int iterations_;
       index_t k_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -119,6 +123,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k)
       { }
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -186,6 +192,7 @@ namespace detail {
       OpA a_;
       int max_iters_;
       float tol_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -197,6 +204,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SVDBPIOp(const OpA &a, int max_iters, float tol) : a_(a), max_iters_(max_iters), tol_(tol)
       { }
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>

@@ -50,6 +50,7 @@ namespace detail {
     private:
       cuda::std::tuple<OpA...> a_;
       std::string subscripts_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -60,13 +61,15 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "einsum()"; }
       __MATX_INLINE__ EinsumOp(const std::string &subscripts, OpA... ops) : subscripts_(subscripts), a_(cuda::std::make_tuple(ops...)) { };
 
+      bool Initialized() const { return init_; }
+
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
+        static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");
 
         cuda::std::apply([&](auto... args) {
           ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex.getStream(), args...);
@@ -81,8 +84,8 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
-        // Maybe do something here later if we take operators as input        
-      }         
+        // Maybe do something here later if we take operators as input
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -103,19 +106,19 @@ namespace detail {
 namespace cutensor {
   /**
    * @brief Evaluates the Einstein summation on the operands
-   * 
+   *
    * einsum() is a multi-purpose tool capable of performing various operations on tensors in a compact
    * syntax. A non-exhaustive list of operations are: tensor contractions, GEMMs, dot products, and tranposes.
    * Because einsum is extremely powerful, not all features are supported or tested in MatX yet. Currently only
    * tensor contractions are tested. Other operations may work, but they're not tested yet.
-   * 
+   *
    * MatX uses a syntax very similar to NumPy's einsum syntax:
    * https://numpy.org/doc/stable/reference/generated/numpy.einsum.html
-   * 
+   *
    * Ellipses are not supported yet, but a variadic list of tensors for contraction is supported. The output
    * operator '->' is required in MatX currently, and serves to provide error checking on the output tensor size.
-   *  
-   * 
+   *
+   *
    * @tparam InT Types of input operators
    * @param subscripts String containing Einstein notation of operation to perform
    * @param ops List of input operators

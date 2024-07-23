@@ -48,6 +48,7 @@ namespace detail {
     private:
       OpA a_;
       SelectType sel_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -62,6 +63,8 @@ namespace detail {
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      bool Initialized() const { return init_; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {

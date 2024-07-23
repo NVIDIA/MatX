@@ -237,7 +237,6 @@ namespace detail {
   }
 
 
-
   /**
    * @brief Get the matx value object using broadcasting
    *
@@ -274,10 +273,10 @@ namespace detail {
       return get_matx_value<InWidth, OutWidth>(i, indices...);
     }
     else if constexpr (is_vector_v<T>) {
-      // using t_strip = remove_cvref<decltype(i)>;
-      // std::string a = remove_cvref<decltype(i)>();
-      // t_strip v = i;
       return i;
+    }
+    else if constexpr (std::is_arithmetic_v<T>) {
+      return detail::Vector<T, 1>{i};
     }
     else {
       auto v = detail::Vector<T, static_cast<size_t>(InWidth)>{};

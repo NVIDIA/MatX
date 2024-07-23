@@ -52,19 +52,6 @@
 // forward declare
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
-} // namespace matx
-
-/* Special values used to indicate properties of tensors */
-namespace matx {
-enum {
-  matxKeepDim     = std::numeric_limits<index_t>::max(),
-  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
-  matxEnd         = std::numeric_limits<index_t>::max() - 2,
-  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
-
-  // If adding a new marker adjust this to the last element above
-  matxIdxSentinel = matxKeepStride - 1,
-};
 
 
 /**

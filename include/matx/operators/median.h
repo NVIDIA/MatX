@@ -50,7 +50,8 @@ namespace detail {
       OpA a_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -59,11 +60,13 @@ namespace detail {
       using median_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "median(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ MedianOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ MedianOp(OpA a) : a_(a) {
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
-        }            
+        }
       };
+
+      bool Initialized() const { return init_; }
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -85,17 +88,19 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }         
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));      
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -104,7 +109,7 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }             
+      }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {

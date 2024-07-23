@@ -45,7 +45,8 @@ namespace detail {
     private:
       OpA a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -55,6 +56,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "det()"; }
       __MATX_INLINE__ DetOp(OpA a) : a_(a) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -77,17 +80,19 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }       
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -96,7 +101,7 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }        
+      }
 
       // Size is not relevant in det() since there are multiple return values and it
       // is not allowed to be called in larger expressions

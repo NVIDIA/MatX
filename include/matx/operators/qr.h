@@ -45,6 +45,7 @@ namespace detail {
   {
     private:
       OpA a_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -55,6 +56,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ QROp(OpA a) : a_(a) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
@@ -113,6 +116,7 @@ namespace detail {
     private:
       OpA a_;
       matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
@@ -123,6 +127,8 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "cusolver_qr()"; }
       __MATX_INLINE__ CuSolverQROp(OpA a) : a_(a) { };
+
+      bool Initialized() const { return init_; }
 
       // This should never be called
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>

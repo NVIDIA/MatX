@@ -56,18 +56,19 @@ namespace detail {
       index_t decimation_factor_;
       cuda::std::array<index_t, OpA::Rank() + 1> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank() + 1> tmp_out_;
-      mutable out_t *ptr;       
+      mutable out_t *ptr;
+      mutable bool init_ = false;
 
     public:
       using matxop = bool;
       using matx_transform_op = bool;
       using channelize_poly_xform_op = bool;
-      using scalar_type = out_t;            
+      using scalar_type = out_t;
 
       __MATX_INLINE__ std::string str() const { return "channelize_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ChannelizePolyOp(OpA a, const FilterType &f, index_t num_channels, index_t decimation_factor) :
           a_(a), f_(f), num_channels_(num_channels), decimation_factor_(decimation_factor)
-      { 
+      {
         const index_t b_len = (a_.Size(OpA::Rank() - 1) + num_channels - 1) / num_channels;
 
         for (int r = 0; r < OpA::Rank()-1; r++) {
@@ -77,6 +78,8 @@ namespace detail {
         out_dims_[Rank() - 2] = b_len;
         out_dims_[Rank() - 1] = num_channels;
       }
+
+      bool Initialized() const { return init_; }
 
       template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
@@ -100,21 +103,23 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
+        }
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }           
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));           
+        if (!init_) {
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+          Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -122,12 +127,12 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
+        }
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        } 
-      }        
+        }
+      }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
@@ -139,7 +144,7 @@ namespace detail {
 
 /**
  * @brief 1D polyphase channelizer
- * 
+ *
  * @tparam InType Type of input.
  * @tparam FilterType Type of filter.
  * @param in Input operator that represents the input signal. The last dimension of this tensor
@@ -152,7 +157,7 @@ namespace detail {
  * the maximally decimated, or critically sampled, case. It is also possible for decimation_factor to
  * be less than num_channels, which corresponds to an oversampled case with overlapping channels, but
  * this implementation does not yet support oversampled cases.
- * 
+ *
  * @returns Operator representing the channelized signal. The output tensor rank is one higher than the
  * input tensor rank. The first Rank-2 dimensions are all batch dimensions. The second-to-last dimension
  * is the sample dimension and the last dimension is the channel dimension.
