@@ -47,20 +47,20 @@ namespace detail {
   {
     private:
       OpA a_;
-      typename OpA::scalar_type lower_;
-      typename OpA::scalar_type upper_;
+      typename OpA::value_type lower_;
+      typename OpA::value_type upper_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
       mutable int *ptr;  
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using hist_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "hist()"; }
-      __MATX_INLINE__ HistOp(OpA a, typename OpA::scalar_type lower, typename OpA::scalar_type upper) : a_(a), lower_(lower), upper_(upper) { 
+      __MATX_INLINE__ HistOp(OpA a, typename OpA::value_type lower, typename OpA::value_type upper) : a_(a), lower_(lower), upper_(upper) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }
@@ -138,8 +138,8 @@ namespace detail {
  */
 template <typename InputOperator>
 __MATX_INLINE__ auto hist(const InputOperator &a,
-          const typename InputOperator::scalar_type lower,
-          const typename InputOperator::scalar_type upper) {
+          const typename InputOperator::value_type lower,
+          const typename InputOperator::value_type upper) {
   return detail::HistOp(a, lower, upper);
 }
 

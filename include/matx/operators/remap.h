@@ -54,9 +54,9 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>; 
-        using index_type = typename IdxType::scalar_type;
+        using index_type = typename IdxType::value_type;
         using self_type = RemapOp<DIM, T, IdxType>;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
         static_assert(IdxType::Rank() <= 1, "RemapOp: Rank of index operator must be 0 or 1");

@@ -54,9 +54,9 @@ template <int THREADS, typename OutType, typename InType, typename FilterType>
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     // Opportunistically store the filter taps in shared memory if the static shared memory
     // size is sufficient. Otherwise, we will read directly from global memory on use.
@@ -183,9 +183,9 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 template <typename OutType, typename InType, typename FilterType>
 __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType filter, index_t elems_per_channel_per_cta)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     extern __shared__ uint8_t __attribute((aligned(16))) smem_dyn_align16[];
 
@@ -324,9 +324,9 @@ template <int THREADS, int NUM_CHAN, typename OutType, typename InType, typename
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterType filter)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -525,7 +525,7 @@ __global__ void ChannelizePoly1DUnpackDFT(DataType inout)
     constexpr int Rank = DataType::Rank();
     constexpr int ChannelRank = Rank-1;
     constexpr int ElemRank = Rank-2;
-    using value_t = typename DataType::scalar_type;
+    using value_t = typename DataType::value_type;
 
     const int tid = blockIdx.y * blockDim.x + threadIdx.x;
 

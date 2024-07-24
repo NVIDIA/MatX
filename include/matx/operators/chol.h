@@ -45,11 +45,11 @@ namespace detail {
     private:
       OpA a_;
       cublasFillMode_t uplo_;
-      mutable matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      mutable matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using chol_xform_op = bool;
 

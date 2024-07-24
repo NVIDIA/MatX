@@ -47,12 +47,12 @@ namespace matx
         OpA a_;
         PermDims perm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using softmax_xform_op = bool;
 

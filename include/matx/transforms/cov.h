@@ -57,7 +57,7 @@ struct CovParams_t {
 template <typename TensorTypeC, typename TensorTypeA> class matxCovHandle_t {
 public:
   static constexpr int RANK = TensorTypeA::Rank();
-  using T1 = typename TensorTypeA::scalar_type;
+  using T1 = typename TensorTypeA::value_type;
   /**
    * Construct a handle for computing a covariance matrix
    *

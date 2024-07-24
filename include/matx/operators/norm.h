@@ -44,17 +44,17 @@ namespace matx
     class NormOp : public BaseOp<NormOp<OpA, NormType>>
     {
       private:
-        using out_type = typename inner_op_type_t<typename remove_cvref_t<OpA>::scalar_type>::type;
+        using out_type = typename inner_op_type_t<typename remove_cvref_t<OpA>::value_type>::type;
         OpA a_;
         NormOrder order_;
         static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = out_type;
+        using value_type = out_type;
         using matx_transform_op = bool;
         using norm_xform_op = bool;
         using matx_inner_op_impl = bool; // Indicates this operator uses matx operators for its implementation

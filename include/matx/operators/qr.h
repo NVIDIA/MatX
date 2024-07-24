@@ -48,7 +48,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using qr_xform_op = bool;
 
@@ -111,11 +111,11 @@ namespace detail {
   {
     private:
       OpA a_;
-      matx::tensor_t<typename OpA::scalar_type, OpA::Rank()> tmp_out_;
+      matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using cusolver_qr_xform_op = bool;
 

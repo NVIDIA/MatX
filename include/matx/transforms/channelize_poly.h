@@ -64,8 +64,8 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
   
   index_t filter_len = filter.Size(FilterType::Rank()-1);
 
@@ -86,8 +86,8 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
 template <typename OutType, typename InType, typename FilterType>
 inline size_t matxChannelizePoly1DInternal_SmemSizeBytes(const OutType &o, const InType &, const FilterType &filter)
 {
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
 
   index_t filter_len = filter.Size(FilterType::Rank()-1);
 
@@ -126,8 +126,8 @@ inline void matxChannelizePoly1DInternal_Smem(OutType o, const InType &i, const 
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
 
   index_t filter_len = filter.Size(FilterType::Rank()-1);
 
@@ -154,8 +154,8 @@ inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
   
   index_t filter_len = filter.Size(FilterType::Rank()-1);
 
@@ -232,9 +232,9 @@ template <typename OutType, typename InType, typename FilterType>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
                    index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
-  using output_t = typename OutType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
+  using output_t = typename OutType::value_type;
 
   constexpr int IN_RANK = InType::Rank();
   constexpr int OUT_RANK = OutType::Rank();

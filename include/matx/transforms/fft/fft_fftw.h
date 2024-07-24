@@ -86,8 +86,8 @@ struct FftFFTWParams_t {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     FftFFTWParams_t params;
     constexpr auto RANK = OutTensorType::Rank();   
-    using T1    = typename OutTensorType::scalar_type;
-    using T2    = typename InTensorType::scalar_type;    
+    using T1    = typename OutTensorType::value_type;
+    using T2    = typename InTensorType::value_type;    
 
     params.irank = i.Rank();
     params.orank = o.Rank();
@@ -150,9 +150,9 @@ struct FftFFTWParams_t {
       params.odist = (RANK<=2) ? 1 : (int) static_cast<int>(o.Stride(RANK-3));
     }
 
-    params.is_fp32 = is_fp32_inner_type_v<typename OutTensorType::scalar_type>;
-    if constexpr (std::is_same_v<typename OutTensorType::scalar_type, 
-                                typename InTensorType::scalar_type>) {
+    params.is_fp32 = is_fp32_inner_type_v<typename OutTensorType::value_type>;
+    if constexpr (std::is_same_v<typename OutTensorType::value_type, 
+                                typename InTensorType::value_type>) {
       params.in_place = o.Data() == i.Data();
     } else {
       params.in_place = false;
@@ -318,8 +318,8 @@ private:
  */
 template<typename OutTensorType, typename InTensorType> class matxFFTWPlan_t {
 public:
-  using out_scalar_type = typename OutTensorType::scalar_type;
-  using plan_type = std::conditional_t<is_fp32_inner_type_v<out_scalar_type>, fftwf_plan, fftw_plan>;
+  using out_value_type = typename OutTensorType::value_type;
+  using plan_type = std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
 
   template <ThreadsMode MODE>
   matxFFTWPlan_t(OutTensorType &o, 
@@ -490,7 +490,7 @@ public:
   }
 
 private:
-  static constexpr bool is_fp32_ = is_fp32_inner_type_v<out_scalar_type>;
+  static constexpr bool is_fp32_ = is_fp32_inner_type_v<out_value_type>;
 
   FftFFTWParams_t params_;
   plan_type plan_;
@@ -503,7 +503,7 @@ private:
     constexpr int RANK=TensorOp::Rank();
 
     if constexpr ( !(is_tensor_view_v<TensorOp>)) {
-      return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
+      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
     } else {
 
       bool supported = true;
@@ -523,7 +523,7 @@ private:
       if (supported) {
         return in;
       } else {
-        return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
+        return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
       }
     }
   }
@@ -534,7 +534,7 @@ private:
     constexpr int RANK=TensorOp::Rank();
 
     if constexpr ( !is_tensor_view_v<TensorOp>) {
-      return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
+      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
     } else {
       bool supported = true;
 
@@ -550,7 +550,7 @@ private:
       if (supported) {
         return in;
       } else {
-        return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
+        return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
       }
     }
   }
@@ -606,7 +606,7 @@ private:
       (o = out).run(exec);
     }
 
-    using s_type = typename detail::value_promote_t<typename inner_op_type_t<typename InputTensor::scalar_type>::type>;
+    using s_type = typename detail::value_promote_t<typename inner_op_type_t<typename InputTensor::value_type>::type>;
     s_type factor;
     constexpr s_type s_one = static_cast<s_type>(1.0);
 
@@ -658,7 +658,7 @@ private:
       (o = out).run(exec);
     }
 
-    using s_type = typename detail::value_promote_t<typename inner_op_type_t<typename InputTensor::scalar_type>::type>;
+    using s_type = typename detail::value_promote_t<typename inner_op_type_t<typename InputTensor::value_type>::type>;
     s_type factor;
     constexpr s_type s_one = static_cast<s_type>(1.0);
 
@@ -689,8 +689,8 @@ private:
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
-    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::scalar_type> ||
-                            is_fp64_inner_type_v<typename InputTensor::scalar_type>), matxInvalidType,
+    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
+                            is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
                             "Host FFTs only support single or double precision floats");    
     
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -707,8 +707,8 @@ private:
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
-    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::scalar_type> ||
-                            is_fp64_inner_type_v<typename InputTensor::scalar_type>), matxInvalidType,
+    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
+                            is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
                             "Host FFTs only support single or double precision floats");      
     
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -727,8 +727,8 @@ private:
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");
     MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");      
-    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::scalar_type> ||
-                            is_fp64_inner_type_v<typename InputTensor::scalar_type>), matxInvalidType,
+    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
+                            is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
                             "Host FFTs only support single or double precision floats");     
     
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -745,8 +745,8 @@ private:
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
     MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");      
-    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::scalar_type> ||
-                            is_fp64_inner_type_v<typename InputTensor::scalar_type>), matxInvalidType,
+    MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
+                            is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
                             "Host FFTs only support single or double precision floats");      
     
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)

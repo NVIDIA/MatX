@@ -1042,8 +1042,8 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
   constexpr uint32_t RANK = OutType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;
   cuda::std::array<index_t, InType::Rank()> indices;
-  using scalar_type = typename InType::scalar_type;
-  using T = typename OutType::scalar_type;
+  using value_type = typename InType::value_type;
+  using T = typename OutType::value_type;
   [[maybe_unused]] bool valid;
 
   // This is for 2 stage reduction
@@ -1051,10 +1051,10 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
   // nvcc limitation here.  we have to declare shared memory with the same type
   // across all template functions then recast to the type we want
   extern __shared__ char smemc_[];
-  scalar_type *smem_ = reinterpret_cast<scalar_type *>(smemc_);
+  value_type *smem_ = reinterpret_cast<value_type *>(smemc_);
 
   int s2_size, soff;
-  scalar_type *smem;
+  value_type *smem;
 
   // if blockDim.x > 32 we need a 2 stage reduction
   if (blockDim.x > 32) {
@@ -1194,8 +1194,8 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
 template <typename OutType, typename TensorIndexType, typename InType>
 __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, [[maybe_unused]] index_t mult)
 {
-  using index_type = typename TensorIndexType::scalar_type;
-  using T = typename OutType::scalar_type;
+  using index_type = typename TensorIndexType::value_type;
+  using T = typename OutType::value_type;
   T in_val;
   constexpr uint32_t RANK = TensorIndexType::Rank();
   constexpr uint32_t DRANK = InType::Rank() - RANK;
@@ -1366,8 +1366,8 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using scalar_type = typename InType::scalar_type;
-  using T = typename OutType::scalar_type;
+  using value_type = typename InType::value_type;
+  using T = typename OutType::value_type;
 
   static_assert(OutType::Rank() < InType::Rank());
   static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");
@@ -1391,7 +1391,7 @@ void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest
 
   auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
 
-  detail::matxReduceKernel<<<blocks, threads, sizeof(scalar_type) * 32, stream>>>(
+  detail::matxReduceKernel<<<blocks, threads, sizeof(value_type) * 32, stream>>>(
       dest, in, ReduceOp(), mult);
 
   // If we need the indices too, launch that kernel
@@ -1488,7 +1488,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
 
-  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+  using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
   inner_type scale = 1;
 
   cudaStream_t stream = exec.getStream();
@@ -1535,17 +1535,17 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] 
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
-  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+  using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
   inner_type scale = 1;
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto ts = TotalSize(in);
-      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(ts);
+      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(ts);
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0)) / static_cast<inner_type>(lin.Size(1));
+        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(lin.Size(1));
       }
     }
   };
@@ -1584,8 +1584,8 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in,
 #ifdef __CUDACC__
   MATX_NVTX_START("softmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto tmp_sum = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tmp_max = make_tensor<typename InType::scalar_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_sum = make_tensor<typename InType::value_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_max = make_tensor<typename InType::value_type>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
   max_impl(tmp_max, in, cudaExecutor{stream});
   sum_impl(tmp_sum, exp(in - tmp_max), stream);
   (dest = exp(in - tmp_max) / tmp_sum).run(stream);
@@ -1653,8 +1653,8 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
     }
   }
 
-  auto tmp_sum = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tmp_max = make_tensor<typename InType::scalar_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_sum = make_tensor<typename InType::value_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tmp_max = make_tensor<typename InType::value_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
   max_impl(tmp_max, permute(in, perm), stream);
   sum_impl(tmp_sum, exp(permute(in, perm) - clone<InType::Rank()>(tmp_max, clone_dims)), stream);
 
@@ -1693,7 +1693,7 @@ void __MATX_INLINE__ median_impl(OutType dest,
 #ifdef __CUDACC__
   if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
     MATX_NVTX_START("median_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-    using T = typename OutType::scalar_type;
+    using T = typename OutType::value_type;
     constexpr int RANK_IN = InType::Rank();
     static_assert(RANK_IN <= 2 && (RANK_IN == OutType::Rank() + 1));
 
@@ -1802,7 +1802,7 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto insize = TotalSize(in);
-      auto tin = new typename InType::scalar_type[insize];
+      auto tin = new typename InType::value_type[insize];
       std::partial_sort_copy( lin,
                               lin + insize,
                               tin,
@@ -1818,7 +1818,7 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
     }
     else {
       auto insize = lin.Size(1);
-      auto tin = new typename InType::scalar_type[insize];
+      auto tin = new typename InType::value_type[insize];
       for (index_t b = 0; b < lin.Size(0); b++) {
         std::partial_sort_copy( lin + lbegin[b],
                                 lin + lend[b],
@@ -1893,11 +1893,11 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] H
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::scalar_type>(0));
+      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::value_type>(0));
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        auto f = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::scalar_type>(0));
+        auto f = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0));
         *(lout + b) = f;
       }
     }
@@ -1934,7 +1934,7 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec
   cudaStream_t stream = exec.getStream();
   // example-begin reduce-1
   // Reduce "in" into "dest" using a product operation as the reduction type
-  reduce(dest, in, detail::reduceOpProd<typename OutType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpProd<typename OutType::value_type>(), stream, true);
   // example-end reduce-1
 #endif
 }
@@ -1964,15 +1964,15 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] 
     if constexpr (OutType::Rank() == 0) {
       *lout = std::accumulate(lin,
                               lin + TotalSize(in),
-                              static_cast<typename InType::scalar_type>(1),
-                              std::multiplies<typename InType::scalar_type>());
+                              static_cast<typename InType::value_type>(1),
+                              std::multiplies<typename InType::value_type>());
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
         *(lout + b) = std::accumulate(lin + lbegin[b],
                                       lin + lend[b],
-                                      static_cast<typename InType::scalar_type>(1),
-                                      std::multiplies<typename InType::scalar_type>());
+                                      static_cast<typename InType::value_type>(1),
+                                      std::multiplies<typename InType::value_type>());
       }
     }
   };
@@ -2085,7 +2085,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
   // example-begin reduce-2
   // Reduce "in" into both "dest" and "idest" using a max operation for the reduction. "dest" will contain
   // the reduced values while "idest" will include the indices of the reduced values
-  reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMax<typename OutType::value_type>(), stream, true);
   // example-end reduce-2
 #endif
 }
@@ -2233,7 +2233,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
+  reduce(dest, idest, in, detail::reduceOpMin<typename OutType::value_type>(), stream, true);
 #endif
 }
 
@@ -2308,7 +2308,7 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, cudaExecutor exec 
 #ifdef __CUDACC__
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   cudaStream_t stream = exec.getStream();
-  reduce(dest, in, detail::reduceOpAny<typename OutType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAny<typename OutType::value_type>(), stream, true);
 #endif
 }
 
@@ -2338,13 +2338,13 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] H
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
+      *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
           return vin != 0;
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
+        lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
           return vin != 0;
         });
       }
@@ -2381,7 +2381,7 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, cudaExecutor exec 
 #ifdef __CUDACC__
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   cudaStream_t stream = exec.getStream();
-  reduce(dest, in, detail::reduceOpAll<typename OutType::scalar_type>(), stream, true);
+  reduce(dest, in, detail::reduceOpAll<typename OutType::value_type>(), stream, true);
 #endif
 }
 
@@ -2411,13 +2411,13 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] H
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::scalar_type vin) {
+      *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
           return vin != 0;
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::scalar_type vin) {
+        lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
           return vin != 0;
         });
       }
@@ -2541,7 +2541,7 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
 {
   MATX_NVTX_START("var_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   matxMemorySpace_t space;
-  using inner_type = typename inner_op_type_t<typename InType::scalar_type>::type;
+  using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
 
   if constexpr (is_cuda_executor_v<Executor>) {
     space = MATX_ASYNC_DEVICE_MEMORY;
@@ -2550,7 +2550,7 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
     space = MATX_HOST_MALLOC_MEMORY;
   }
 
-  auto mean_tns = make_tensor<typename InType::scalar_type>(dest.Descriptor(), space);
+  auto mean_tns = make_tensor<typename InType::value_type>(dest.Descriptor(), space);
   mean_impl(mean_tns, in, exec);
 
   // need to clone along right most dims

@@ -66,7 +66,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = NewType;
+        using value_type = NewType;
 
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(T op) : op_(op){};  
@@ -118,7 +118,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = NewType;
+        using value_type = NewType;
         static_assert(!is_complex_v<T1> && !is_complex_half_v<T1>, "T1 input operator cannot be complex");
         static_assert(!is_complex_v<T2> && !is_complex_half_v<T2>, "T2 input operator cannot be complex");
         static_assert(is_complex_v<NewType> || is_complex_half_v<NewType>, "ComplexCastOp output type should be complex");
@@ -192,7 +192,7 @@ namespace matx
   template <typename NewType, typename T>
     auto __MATX_INLINE__ as_type(T t)
     {
-      if constexpr (std::is_same_v<NewType, typename T::scalar_type>) {
+      if constexpr (std::is_same_v<NewType, typename T::value_type>) {
         // optimized path when type is the same to avoid creating unecessary operators
         return t;
       } else {

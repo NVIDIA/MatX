@@ -50,12 +50,12 @@ namespace matx
         AMBGFunCutType_t cut_;
         float cut_val_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::scalar_type, 2> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::scalar_type *ptr;         
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
+        mutable typename remove_cvref_t<OpX>::value_type *ptr;         
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpX::scalar_type;
+        using value_type = typename OpX::value_type;
         using matx_transform_op = bool;
         using ambgfun_xform_op = bool;
 

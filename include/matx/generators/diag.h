@@ -47,7 +47,7 @@ namespace matx
       public:
       // dummy type to signal this is a matxop
       using matxop = bool;
-      using scalar_type = T;
+      using value_type = T;
 
        __MATX_INLINE__ std::string str() const { return "diag"; }
 
@@ -106,7 +106,7 @@ namespace matx
   template <typename T = int, std::enable_if_t<std::is_arithmetic_v<T>, bool> = true>
   inline auto diag(T val)
   {
-    return detail::Diag<T, NoShape>(NoShape{}, T(val));
+    return detail::Diag<T, detail::NoShape>(detail::NoShape{}, T(val));
   }
 
   /**
@@ -197,6 +197,6 @@ namespace matx
   template <typename T = int>
   inline auto eye()
   {
-    return detail::Diag<T, NoShape>(NoShape{}, T(1));
+    return detail::Diag<T, detail::NoShape>(detail::NoShape{}, T(1));
   }
 } // end namespace matx

@@ -50,7 +50,7 @@ namespace matx
       class ConcatOp : public BaseOp<ConcatOp<Ts...>>
     {
       using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
-      using first_value_type = typename first_type::scalar_type;
+      using first_value_type = typename first_type::value_type;
       using self_type = ConcatOp<Ts...>;
 
       static constexpr int RANK = first_type::Rank();
@@ -61,7 +61,7 @@ namespace matx
       using shape_type = index_t;
 
       // Scalar type of operation
-      using scalar_type = first_value_type;
+      using value_type = first_value_type;
 
       template <int I = -1>
         __MATX_INLINE__ std::string get_str() const {
@@ -96,7 +96,7 @@ namespace matx
 
           if constexpr ( I == N ) {
             // This should never happen
-            return scalar_type(-9999);
+            return value_type(-9999);
             // returning this to satisfy lvalue requirements
           } else {
             const auto &op = cuda::std::get<I>(ops_);

@@ -53,9 +53,9 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 #ifdef __CUDACC__  
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
-  using input_t = typename InType::scalar_type;
-  using filter_t = typename FilterType::scalar_type;
-  using output_t = typename OutType::scalar_type;
+  using input_t = typename InType::value_type;
+  using filter_t = typename FilterType::value_type;
+  using output_t = typename OutType::value_type;
   using shape_type = typename OutType::shape_type;
 
   // Even-length filters will be prepended with a single 0 to make them odd-length

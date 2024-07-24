@@ -49,7 +49,7 @@ namespace matx
 
       public:
 
-        using scalar_type = T;
+        using value_type = T;
 
         __MATX_INLINE__ std::string str() const { return "flattop"; }
 

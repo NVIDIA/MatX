@@ -176,7 +176,7 @@ public:
   template <typename TensorType>
   static pybind11::object GetEmptyNumpy(const TensorType &ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     auto np = pybind11::module_::import("numpy");
     pybind11::list dims;
 
@@ -329,7 +329,7 @@ public:
   void NumpyToTensorView(TensorType ten,
                          const pybind11::object &np_ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     constexpr int RANK = TensorType::Rank();
     static_assert(RANK <=5, "NumpyToTensorView only supports max(RANK) = 5 at the moment.");
 
@@ -377,7 +377,7 @@ public:
   template <typename TensorType>
   auto NumpyToTensorView(const pybind11::object &np_ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     constexpr int RANK = TensorType::Rank();
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(np_ten);
@@ -398,7 +398,7 @@ public:
 
   template <typename TensorType>
   auto TensorViewToNumpy(const TensorType &ten) {
-    using tensor_type = typename TensorType::scalar_type;
+    using tensor_type = typename TensorType::value_type;
     using ntype = matx_convert_complex_type<tensor_type>;
     constexpr int RANK = TensorType::Rank();
 
@@ -466,12 +466,12 @@ public:
 
 
   template <typename TensorType,
-            typename CT = matx_convert_cuda_complex_type<typename TensorType::scalar_type>>
+            typename CT = matx_convert_cuda_complex_type<typename TensorType::value_type>>
   std::optional<TestFailResult<CT>>
   CompareOutput(const TensorType &ten,
                 const std::string fname, double thresh, bool debug = false)
   {
-    using raw_type = typename TensorType::scalar_type;    
+    using raw_type = typename TensorType::value_type;    
     using ntype = matx_convert_complex_type<raw_type>;
     using ctype = matx_convert_cuda_complex_type<raw_type>;
     auto resobj = res_dict[fname.c_str()];

@@ -48,7 +48,7 @@ namespace matx
 
       // Create temporary space for fft outputs
       index_t batches = x_with_overlaps.Shape()[0];
-      auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::scalar_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
+      auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::value_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
 
       if constexpr (std::is_same_v<wType, std::nullopt_t>)
       {
@@ -64,7 +64,7 @@ namespace matx
       auto mag_sq_X_with_overlaps = X_with_overlaps.RealView();
 
       // Perform the reduction across 'batches' rows and normalize
-      auto norm_factor = static_cast<typename PxxType::scalar_type>(1.) / static_cast<typename PxxType::scalar_type>(batches);
+      auto norm_factor = static_cast<typename PxxType::value_type>(1.) / static_cast<typename PxxType::value_type>(batches);
       (Pxx = sum(mag_sq_X_with_overlaps, {0}) * norm_factor).run(stream);
     }
 

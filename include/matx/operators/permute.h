@@ -46,7 +46,7 @@ namespace matx
       class PermuteOp : public BaseOp<PermuteOp<T>>
     {
       public: 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         using self_type = PermuteOp<T>;
 
       private:

@@ -78,7 +78,7 @@ namespace matx
       }
 
 #ifdef __CUDACC__  
-      size_t shm = sizeof(typename OutputTensor::scalar_type) * TILE_DIM * (TILE_DIM + 1);
+      size_t shm = sizeof(typename OutputTensor::value_type) * TILE_DIM * (TILE_DIM + 1);
       if constexpr (RANK == 2)
       {
         dim3 block(TILE_DIM, TILE_DIM);

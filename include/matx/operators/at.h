@@ -50,7 +50,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename Op::scalar_type;
+        using value_type = typename Op::value_type;
 
         __MATX_INLINE__ std::string str() const { return "at()"; }
         __MATX_INLINE__ AtOp(Op op, Is... is) : op_(op), idx_{is...} {};

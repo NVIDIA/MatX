@@ -53,7 +53,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = void;
+      using value_type = void;
       using matx_transform_op = bool;
       using einsum_xform_op = bool;
 

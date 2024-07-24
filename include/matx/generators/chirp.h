@@ -48,7 +48,7 @@ namespace matx
   namespace detail {
     template <typename SpaceOp, typename FreqType> 
       class Chirp : public BaseOp<Chirp<SpaceOp, FreqType>> {
-        using space_type = typename SpaceOp::scalar_type;
+        using space_type = typename SpaceOp::value_type;
 
 
         private:
@@ -59,7 +59,7 @@ namespace matx
         ChirpMethod method_;
 
         public:
-        using scalar_type = FreqType;
+        using value_type = FreqType;
         using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "chirp"; }
@@ -90,7 +90,7 @@ namespace matx
 
     template <typename SpaceOp, typename FreqType> 
       class ComplexChirp  : public BaseOp<ComplexChirp<SpaceOp, FreqType>> {
-        using space_type = typename SpaceOp::scalar_type;
+        using space_type = typename SpaceOp::value_type;
 
 
         private:
@@ -101,7 +101,7 @@ namespace matx
         ChirpMethod method_;
 
         public:
-        using scalar_type = cuda::std::complex<FreqType>;
+        using value_type = cuda::std::complex<FreqType>;
         using matxop = bool;
         
 	__MATX_INLINE__ std::string str() const { return "cchirp"; }
@@ -157,7 +157,7 @@ namespace matx
    * @returns The chirp operator
    */
   template <typename SpaceOp, typename FreqType>
-    inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
+    inline auto chirp(SpaceOp t, FreqType f0, typename SpaceOp::value_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {
       MATX_ASSERT_STR(method == ChirpMethod::CHIRP_METHOD_LINEAR, matxInvalidType, "Only linear chirps are supported")
 
@@ -188,7 +188,7 @@ namespace matx
    * @returns The chirp operator
    */
   template <typename SpaceOp, typename FreqType>
-    inline auto cchirp(SpaceOp t, FreqType f0, typename SpaceOp::scalar_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
+    inline auto cchirp(SpaceOp t, FreqType f0, typename SpaceOp::value_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
     {
       MATX_ASSERT_STR(method == ChirpMethod::CHIRP_METHOD_LINEAR, matxInvalidType, "Only linear chirps are supported")
 

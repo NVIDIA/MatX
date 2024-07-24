@@ -50,12 +50,12 @@ namespace detail {
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
     public:
       using matxop = bool;
-      using scalar_type = void;
+      using value_type = void;
       using matx_transform_op = bool;
       using filter_xform_op = bool;
 

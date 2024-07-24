@@ -42,8 +42,8 @@
                                                  is_matx_op<I2>()>>  \
   [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1, I2 i2)                   \
   {                                                                  \
-    using I1Type = extract_scalar_type_t<I1>;                        \
-    using I2Type = extract_scalar_type_t<I2>;                        \
+    using I1Type = extract_value_type_t<I1>;                        \
+    using I2Type = extract_value_type_t<I2>;                        \
     using Op = TENSOR_OP<I1Type, I2Type>;                            \
     const typename detail::base_type<I1>::type &base1 = i1;       \
     const typename detail::base_type<I2>::type &base2 = i2;       \
@@ -101,7 +101,7 @@ namespace matx
       public:
         // dummy type to signal this is a matxop
         using matxop = bool;
-        using scalar_type = typename Op::scalar_type;
+        using value_type = typename Op::value_type;
         using self_type = matxBinaryOp<I1, I2, Op>;
 
       __MATX_INLINE__ const std::string str() const {

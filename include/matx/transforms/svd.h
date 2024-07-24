@@ -83,8 +83,8 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   static_assert(VTType::Rank() == AType::Rank());
   static_assert(SType::Rank() == AType::Rank()-1);
 
-  using ATypeS = typename AType::scalar_type;
-  using STypeS = typename SType::scalar_type;
+  using ATypeS = typename AType::value_type;
+  using STypeS = typename SType::value_type;
   const int RANK = AType::Rank();
 
   auto m = A.Size(RANK-2);  // rows
@@ -305,7 +305,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
 
 template<typename AType>
 inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
-  using ATypeS = typename AType::scalar_type;
+  using ATypeS = typename AType::value_type;
   const int RANK = AType::Rank();
 
   auto m = A.Size(RANK-2);  // rows
@@ -380,7 +380,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
   static_assert(VTType::Rank() == AType::Rank());
   static_assert(SType::Rank() == AType::Rank()-1);
 
-  using STypeS = typename SType::scalar_type;
+  using STypeS = typename SType::value_type;
   const int RANK = AType::Rank();
 
   auto m = A.Size(RANK-2);  // rows

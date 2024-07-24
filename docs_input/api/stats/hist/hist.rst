@@ -5,7 +5,7 @@ hist
 
 Compute a histogram of input `a` with bounds specified by `upper` and `lower`
 
-.. doxygenfunction:: hist(const InputOperator &a, const typename InputOperator::scalar_type lower, const typename InputOperator::scalar_type upper)
+.. doxygenfunction:: hist(const InputOperator &a, const typename InputOperator::value_type lower, const typename InputOperator::value_type upper)
 
 Examples
 ~~~~~~~~

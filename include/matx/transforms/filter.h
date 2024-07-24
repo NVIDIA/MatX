@@ -472,7 +472,7 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
     params.nonrec.push_back(h_nonrec[j]);
   }
 
-  params.dtype = detail::TypeToInt<typename InType::scalar_type>();
+  params.dtype = detail::TypeToInt<typename InType::value_type>();
   params.ftype = detail::TypeToInt<FilterType>(); // Update when we support different types
   params.hash = rhash + nrhash;
 

@@ -46,7 +46,7 @@ namespace matx
       public:
       // dummy type to signal this is a matxop
       using matxop = bool;
-      using scalar_type = T;
+      using value_type = T;
 
       __MATX_INLINE__ std::string str() const { return  "constval"; }
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};

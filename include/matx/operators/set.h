@@ -67,7 +67,7 @@ private:
 
 public:
   // Type specifier for reflection on class
-  using scalar_type = typename T::scalar_type;
+  using value_type = typename T::value_type;
   using tensor_type = T;
   using op_type = Op;
   using matx_setop = bool;

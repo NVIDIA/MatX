@@ -49,7 +49,7 @@ namespace matx
       public:
         using matxop = bool;
 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
 
         __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 

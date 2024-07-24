@@ -73,35 +73,35 @@ typedef enum {
 
 template <typename OpA, typename OpB, typename OpC, MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 constexpr bool CompatibleGemmCUDATypes() {
-  if constexpr (!std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
-                !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type> &&
-                !std::is_same_v<typename OpA::scalar_type, typename OpC::scalar_type>) {
+  if constexpr (!std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                !std::is_same_v<typename OpB::value_type, typename OpC::value_type> &&
+                !std::is_same_v<typename OpA::value_type, typename OpC::value_type>) {
     return false;
   }
 
   if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-    if constexpr (std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
-                  std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type>) {
+    if constexpr (std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                  std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
       // List of accepted types when A/B/C match
-      return  std::is_same_v<typename OpA::scalar_type, matxFp16> ||
-              std::is_same_v<typename OpA::scalar_type, matxBf16> ||
-              std::is_same_v<typename OpA::scalar_type, float> ||
-              std::is_same_v<typename OpA::scalar_type, double> ||
-              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<float>> ||
-              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<double>> ||
-              std::is_same_v<typename OpA::scalar_type, int8_t> ||
-              std::is_same_v<typename OpA::scalar_type, matxFp16Complex> ||
-              std::is_same_v<typename OpA::scalar_type, matxBf16Complex>;
+      return  std::is_same_v<typename OpA::value_type, matxFp16> ||
+              std::is_same_v<typename OpA::value_type, matxBf16> ||
+              std::is_same_v<typename OpA::value_type, float> ||
+              std::is_same_v<typename OpA::value_type, double> ||
+              std::is_same_v<typename OpA::value_type, cuda::std::complex<float>> ||
+              std::is_same_v<typename OpA::value_type, cuda::std::complex<double>> ||
+              std::is_same_v<typename OpA::value_type, int8_t> ||
+              std::is_same_v<typename OpA::value_type, matxFp16Complex> ||
+              std::is_same_v<typename OpA::value_type, matxBf16Complex>;
 
     }
     // Accumulator type different from A/B
-    else if constexpr (  std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> &&
-                        !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type>) {
-      return (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, int32_t>) ||
-              (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, float>) ||
-              (std::is_same_v<typename OpA::scalar_type, matxBf16> && std::is_same_v<typename OpC::scalar_type, float>) ||
-              (std::is_same_v<typename OpA::scalar_type, matxFp16> && std::is_same_v<typename OpC::scalar_type, float>) ||
-              (std::is_same_v<typename OpA::scalar_type, int8_t> && std::is_same_v<typename OpC::scalar_type, float>);
+    else if constexpr (  std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                        !std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
+      return (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, int32_t>) ||
+              (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, float>) ||
+              (std::is_same_v<typename OpA::value_type, matxBf16> && std::is_same_v<typename OpC::value_type, float>) ||
+              (std::is_same_v<typename OpA::value_type, matxFp16> && std::is_same_v<typename OpC::value_type, float>) ||
+              (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, float>);
     }
   }
 
@@ -141,9 +141,9 @@ template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
           MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 class MatMulCUDAHandle_t {
 public:
-  using T1 = typename TensorTypeC::scalar_type;
-  using T2 = typename TensorTypeA::scalar_type;
-  using T3 = typename TensorTypeB::scalar_type;
+  using T1 = typename TensorTypeC::value_type;
+  using T2 = typename TensorTypeA::value_type;
+  using T3 = typename TensorTypeB::value_type;
   static constexpr int RANK = TensorTypeC::Rank();
 
   // We allow a batch stride of 0 on one of the tensors, so only make sure C's rank matches one of them
@@ -355,7 +355,7 @@ public:
     }
     else {
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
+        if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opA = CUBLAS_OP_N;
         } else if ( a.Stride(TensorTypeA::Rank()-1) > 1 // last stride > 1
@@ -365,7 +365,7 @@ public:
           params.opA = CUBLAS_OP_N;
         }
 
-        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opB = CUBLAS_OP_N;
         } else if ( b.Stride(TensorTypeB::Rank()-1) > 1 // last stride > 1
@@ -400,12 +400,12 @@ public:
         }
 
         // for complex half we have copied to planar row-major
-        if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        if (is_complex_half_v<typename TensorTypeB::value_type>) {
           params.ldb = b.Size(TensorTypeB::Rank()-1);
         }
 
         // for complex half we have copied to planar row-major
-        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
           params.lda = a.Size(TensorTypeA::Rank()-1);
         }
 
@@ -1104,7 +1104,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
   constexpr int RANK=Op::Rank();
 
   if constexpr ( !(is_tensor_view_v<Op>)) {
-    return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
     bool supported = true;
 
@@ -1122,7 +1122,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
     if(supported) {
       return in;
     } else {
-      return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
     }
   }
 }
@@ -1167,17 +1167,17 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::scalar_type>;
+  constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::value_type>;
 
   if constexpr (is_c_complex) {
-    constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::scalar_type>;
-    constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::scalar_type>;
+    constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::value_type>;
+    constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::value_type>;
     static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex ");
   }
 
   // promote A and B to the type of C
-  auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
-  auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
+  auto A_ = as_type<typename TensorTypeC::value_type>(A);
+  auto B_ = as_type<typename TensorTypeC::value_type>(B);
 
   static_assert(detail::CompatibleGemmCUDATypes<decltype(A_), decltype(B_), TensorTypeC, PROV>(),
       "Combination of A/B/C types are not supported");

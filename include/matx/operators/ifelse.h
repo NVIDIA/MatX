@@ -60,7 +60,7 @@ namespace matx
       cuda::std::array<index_t, detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:
-      using scalar_type = void; ///< Scalar type for type extraction
+      using value_type = void; ///< Scalar type for type extraction
 
       __MATX_INLINE__ std::string str() const { return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}"; }
 

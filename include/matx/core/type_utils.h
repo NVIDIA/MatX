@@ -62,9 +62,11 @@ enum class MemoryLayout {
   MEMORY_LAYOUT_COL_MAJOR,
 };
 
-struct NoShape{};
 
 namespace detail {
+struct NoShape{};
+struct EmptyOp{};
+
 template <typename T>
 struct is_noshape : std::integral_constant<bool, std::is_same_v<NoShape, T>> {};
 };
@@ -688,23 +690,23 @@ template <class T>
 inline constexpr bool is_matx_type_v = detail::is_matx_type<T>::value;
 
 namespace detail {
-template <typename T, typename = void> struct extract_scalar_type_impl {
-  using scalar_type = T;
+template <typename T, typename = void> struct extract_value_type_impl {
+  using value_type = T;
 };
 
 template <typename T>
-struct extract_scalar_type_impl<T, std::void_t<typename T::scalar_type>> {
-  using scalar_type = typename T::scalar_type;
+struct extract_value_type_impl<T, typename std::enable_if_t<is_matx_op<T>()>> {
+  using value_type = typename T::value_type;
 };
 }
 
 /**
- * @brief Extract the scalar_type type
+ * @brief Extract the value_type type
  * 
  * @tparam T Type to extract from
  */
 template <typename T>
-using extract_scalar_type_t = typename detail::extract_scalar_type_impl<T>::scalar_type;
+using extract_value_type_t = typename detail::extract_value_type_impl<T>::value_type;
 
 /**
  * @brief Promote half precision floating point value to fp32, or leave untouched if not half
@@ -779,7 +781,7 @@ struct base_type {
 
 template <typename T> 
 struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
-  using type = tensor_impl_t<typename T::scalar_type, T::Rank(), typename T::desc_type>;
+  using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type>;
 };
 
 template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
@@ -903,7 +905,7 @@ __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, s
 template <typename... T, std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
 constexpr bool TensorTypesMatch() {
   using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<T...>>;
-  return ((std::is_same_v<typename first_type::scalar_type, typename T::scalar_type>) && ...);
+  return ((std::is_same_v<typename first_type::value_type, typename T::value_type>) && ...);
 }
 
 struct no_permute_t{};

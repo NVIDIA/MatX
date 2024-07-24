@@ -68,14 +68,14 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
 
-  using scalar_type = typename inner_op_type_t<TestType>::type;
+  using value_type = typename inner_op_type_t<TestType>::type;
   tensor_t<TestType, 2> Av{{m, n}};
   tensor_t<TestType, 2> Atv{{n, m}};
-  tensor_t<scalar_type, 1> Sv{{std::min(m, n)}};
+  tensor_t<value_type, 1> Sv{{std::min(m, n)}};
   tensor_t<TestType, 2> Uv{{m, m}};
   tensor_t<TestType, 2> Vv{{n, n}};
 
-  tensor_t<scalar_type, 2> Sav{{m, n}};
+  tensor_t<value_type, 2> Sav{{m, n}};
   tensor_t<TestType, 2> SSolav{{m, n}};
   tensor_t<TestType, 2> Uav{{m, m}};
   tensor_t<TestType, 2> Vav{{n, n}};
@@ -149,18 +149,18 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 
   constexpr index_t batches = 10;
 
-  using scalar_type = typename inner_op_type_t<TestType>::type;
+  using value_type = typename inner_op_type_t<TestType>::type;
   auto Av1 = make_tensor<TestType>({m, n});
   this->pb->NumpyToTensorView(Av1, "A");
   auto Av = make_tensor<TestType>({batches, m, n});
   auto Atv = make_tensor<TestType>({batches, n, m});
   (Av = Av1).run(this->exec);  
 
-  auto Sv = make_tensor<scalar_type>({batches, std::min(m, n)});
+  auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
   auto Uv = make_tensor<TestType>({batches, m, m});
   auto Vv = make_tensor<TestType>({batches, n, n});
 
-  auto Sav = make_tensor<scalar_type>({batches, m, n});
+  auto Sav = make_tensor<value_type>({batches, m, n});
   auto SSolav = make_tensor<TestType>({batches, m, n});
   auto Uav = make_tensor<TestType>({batches, m, m});
   auto Vav = make_tensor<TestType>({batches, n, n});

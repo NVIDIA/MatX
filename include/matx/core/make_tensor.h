@@ -78,7 +78,7 @@ void make_tensor( TensorType &tensor,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, TensorType::Rank()>(shape, space, stream);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(shape, space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -166,7 +166,7 @@ auto make_tensor( TensorType &tensor,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, ShapeType>(std::forward<ShapeType>(shape), space, stream);
+  auto tmp = make_tensor<typename TensorType::value_type, ShapeType>(std::forward<ShapeType>(shape), space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -225,7 +225,7 @@ auto make_tensor_p( TensorType &tensor,
                     cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, typename TensorType::shape_container>(std::forward<typename TensorType::shape_container>(shape), space, stream);
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(std::forward<typename TensorType::shape_container>(shape), space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -261,7 +261,7 @@ template <typename TensorType,
 auto make_tensor( TensorType &tensor,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
-  auto tmp = make_tensor<typename TensorType::scalar_type>({}, space, stream);
+  auto tmp = make_tensor<typename TensorType::value_type>({}, space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -322,12 +322,12 @@ auto make_tensor( T *data,
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::scalar_type *data,
+                  typename TensorType::value_type *data,
                   const index_t (&shape)[TensorType::Rank()],
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, TensorType::Rank()>(data, shape, owning);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, owning);
   tensor.Shallow(tmp);
 }
 
@@ -373,12 +373,12 @@ auto make_tensor( T *data,
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::scalar_type *data,
+                  typename TensorType::value_type *data,
                   typename TensorType::shape_container &&shape,
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), owning);
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), owning);
   tensor.Shallow(tmp);
 }
 
@@ -414,9 +414,9 @@ auto make_tensor( T *ptr,
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::scalar_type *ptr,
+                  typename TensorType::value_type *ptr,
                   bool owning = false) {
-  auto tmp = make_tensor<typename TensorType::scalar_type>(ptr, owning);
+  auto tmp = make_tensor<typename TensorType::value_type>(ptr, owning);
   tensor.Shallow(tmp);
 }
 
@@ -534,12 +534,12 @@ auto make_tensor( T* const data,
 template <typename TensorType,
           std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::scalar_type* const data,
+                  typename TensorType::value_type* const data,
                   typename TensorType::desc_type &&desc,
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, typename TensorType::desc_type>(data, std::forward<typename TensorType::desc_type>(desc), owning);
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::desc_type>(data, std::forward<typename TensorType::desc_type>(desc), owning);
   tensor.Shallow(tmp);
 }
 
@@ -585,7 +585,7 @@ auto make_tensor( TensorType &&tensor,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, typename TensorType::desc_type>(std::forward<typename TensorType::desc_type>(desc), space, stream);
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::desc_type>(std::forward<typename TensorType::desc_type>(desc), space, stream);
   tensor.Shallow(tmp);
 }
 
@@ -633,13 +633,13 @@ auto make_tensor( T *const data,
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::scalar_type *const data,
+                  typename TensorType::value_type *const data,
                   const index_t (&shape)[TensorType::Rank()],
                   const index_t (&strides)[TensorType::Rank()],
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::scalar_type, TensorType::Rank()>(data, shape, strides, owning);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, strides, owning);
   tensor.Shallow(tmp);
 }
 

@@ -47,12 +47,12 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ std::string str() const { return "planar(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ComplexPlanarOp(T1 op) : op_(op) {
-          static_assert(is_complex_v<extract_scalar_type_t<T1>>, "Complex planar op only works on complex types");
+          static_assert(is_complex_v<extract_value_type_t<T1>>, "Complex planar op only works on complex types");
           static_assert(Rank() > 0);
         };
 
@@ -135,7 +135,7 @@ namespace matx
   template <typename T1>
     auto planar(T1 t)
     {
-      static_assert(is_complex_v<extract_scalar_type_t<T1>>, "Input to interleaved operator must be complex-valued");
+      static_assert(is_complex_v<extract_value_type_t<T1>>, "Input to interleaved operator must be complex-valued");
       return detail::ComplexPlanarOp<T1>(t);
     }
 } // end namespace matx

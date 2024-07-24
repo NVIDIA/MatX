@@ -52,7 +52,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ std::string str() const { return "cart2sph(" + get_type_str(x_) + 
           "," + get_type_str(y_) + "," + get_type_str(z_) + ")"; }
