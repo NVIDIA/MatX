@@ -52,7 +52,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         static_assert(IdxType::Rank() == 1, "Rank of index operator must be 1");
 
         __MATX_INLINE__ std::string str() const { return "select(" + op_.str() + ")"; }

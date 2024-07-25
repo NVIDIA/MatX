@@ -60,7 +60,7 @@ namespace matx
       public:
         using matxop = bool;
         using matxoplvalue = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
         using self_type = ShiftOp<DIM, T1, T2>;
 
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }

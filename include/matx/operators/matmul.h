@@ -55,12 +55,12 @@ namespace matx
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
-        mutable matx::tensor_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable matx::tensor_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using matmul_xform_op = bool;
 

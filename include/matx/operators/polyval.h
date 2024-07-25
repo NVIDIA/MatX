@@ -52,7 +52,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename Op::scalar_type;
+        using value_type = typename Op::value_type;
 
         __MATX_INLINE__ std::string str() const { return "polyval()"; }
         __MATX_INLINE__ PolyvalOp(const Op &op, const Coeffs &coeffs) : op_(op), coeffs_(coeffs) {
@@ -60,10 +60,10 @@ namespace matx
           MATX_STATIC_ASSERT_STR(Op::Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(index_t idx) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(index_t idx) const
         {
           // Horner's method for computing polynomial
-          scalar_type ttl{coeffs_(0)};
+          value_type ttl{coeffs_(0)};
           for(int i = 1; i < coeffs_.Size(0); i++) {
               ttl = ttl * op_(idx) + coeffs_(i);
           }

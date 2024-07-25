@@ -50,7 +50,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = index_t;
+        using value_type = index_t;
 
         __MATX_INLINE__ std::string str() const { return "index()"; } 
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  

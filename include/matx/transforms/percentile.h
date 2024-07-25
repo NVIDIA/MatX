@@ -102,7 +102,7 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
 
   if constexpr (OutType::Rank() == 0) {
     auto insize = TotalSize(in);
-    matx::tensor_t<typename InType::scalar_type, 1> sort_out;
+    matx::tensor_t<typename InType::value_type, 1> sort_out;
     if constexpr (is_cuda_executor_v<Executor>) {
       make_tensor(sort_out, {insize}, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     }
@@ -133,7 +133,7 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
           subidx = q/100. * (static_cast<double>(insize) - alpha - beta + 1) + alpha - 1; 
           auto int_val = at(sort_out, static_cast<index_t>(subidx));
           (dest = at(sort_out,  static_cast<index_t>(subidx)) + 
-                                as_type<typename InType::scalar_type>(
+                                as_type<typename InType::value_type>(
                                   (subidx - std::floor(subidx)) * 
                                   as_type<double>(at(sort_out, static_cast<index_t>(subidx + 1)) - int_val)
                                 )
@@ -149,10 +149,10 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
           break;
         }
         case PercentileMethod::MIDPOINT: {
-          (dest = as_type<typename InType::scalar_type>(
+          (dest = as_type<typename InType::value_type>(
                   (at(sort_out, static_cast<index_t>(cuda::std::ceil(base_index))) + 
                    at(sort_out, static_cast<index_t>(cuda::std::ceil(base_index + 1)))) / 
-                   static_cast<typename InType::scalar_type>(2))
+                   static_cast<typename InType::value_type>(2))
           ).run(exec);
           break;
         }

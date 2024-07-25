@@ -87,6 +87,6 @@ namespace matx
   template <typename T = int> 
   inline auto zeros()
   {
-    return zeros<T, NoShape>(NoShape{});
+    return zeros<T, detail::NoShape>(detail::NoShape{});
   }    
 } // end namespace matx

@@ -43,8 +43,7 @@ namespace matx {
 template <typename... Ts>
 struct mtie : public BaseOp<mtie<Ts...>>{
   using mtie_type = bool;
-  using scalar_type = void; // Doesn't matter since it's not used
-  using value_type  = void; // Doesn't matter since it's not used
+  using value_type = void; // Doesn't matter since it's not used
   using shape_type  = index_t;
   using matxoplvalue = bool;
 
@@ -97,7 +96,7 @@ struct mtie : public BaseOp<mtie<Ts...>>{
     // Run the PreRun on the inner type to avoid allocation but allow transforms using MatX operators
     // to do any setup needed
     if constexpr (sizeof...(Ts) == 2) {
-      cuda::std::get<sizeof...(Ts) - 1>(ts_).InnerPreRun(NoShape{}, std::forward<Executor>(ex));
+      cuda::std::get<sizeof...(Ts) - 1>(ts_).InnerPreRun(detail::NoShape{}, std::forward<Executor>(ex));
     }
     cuda::std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
   }

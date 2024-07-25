@@ -67,16 +67,16 @@ namespace detail {
 template <typename OpA, typename OpB, typename OpC>
 constexpr bool CompatibleGemmCBLASTypes() {
   // All 3 should be the same type
-  if constexpr (!std::is_same_v<typename OpA::scalar_type, typename OpB::scalar_type> ||
-                !std::is_same_v<typename OpB::scalar_type, typename OpC::scalar_type>) {
+  if constexpr (!std::is_same_v<typename OpA::value_type, typename OpB::value_type> ||
+                !std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
     return false;
   }
 
   // List of accepted types when A/B/C match
-  return std::is_same_v<typename OpA::scalar_type, float> ||
-         std::is_same_v<typename OpA::scalar_type, double> ||
-         std::is_same_v<typename OpA::scalar_type, cuda::std::complex<float>> ||
-         std::is_same_v<typename OpA::scalar_type, cuda::std::complex<double>>;
+  return std::is_same_v<typename OpA::value_type, float> ||
+         std::is_same_v<typename OpA::value_type, double> ||
+         std::is_same_v<typename OpA::value_type, cuda::std::complex<float>> ||
+         std::is_same_v<typename OpA::value_type, cuda::std::complex<double>>;
 }
 
 #if MATX_EN_CPU_MATMUL
@@ -114,7 +114,7 @@ static MatMulCBLASParams_t GetGemmParams(TensorTypeC &c,
      that the tensors are in column-major ordering.
   */
   MatMulCBLASParams_t params;
-  params.dtype = TypeToInt<typename TensorTypeC::scalar_type>();
+  params.dtype = TypeToInt<typename TensorTypeC::value_type>();
   params.rank = c.Rank();
 
   // Batches
@@ -240,7 +240,7 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   static constexpr int RANK = TensorTypeC::Rank();
-  using scalar_type = typename TensorTypeC::scalar_type;
+  using value_type = typename TensorTypeC::value_type;
 
   // Prep for batch looping
   using shape_type = typename TensorTypeA::desc_type::shape_type;
@@ -257,15 +257,15 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
                                  std::multiplies<shape_type>());
   }
 
-  scalar_type salpha;
-  scalar_type sbeta;
-  if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>> ||
-                std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+  value_type salpha;
+  value_type sbeta;
+  if constexpr (std::is_same_v<value_type, cuda::std::complex<float>> ||
+                std::is_same_v<value_type, cuda::std::complex<double>>) {
     salpha = {alpha, 0};
     sbeta = {beta, 0};
   }
-  else if constexpr (std::is_same_v<scalar_type, float> ||
-                     std::is_same_v<scalar_type, double>) {
+  else if constexpr (std::is_same_v<value_type, float> ||
+                     std::is_same_v<value_type, double>) {
     salpha = alpha;;
     sbeta = beta;
   }
@@ -276,25 +276,25 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
     auto b_ptr = b.Data();
     auto c_ptr = c.Data();
 
-    if constexpr (std::is_same_v<scalar_type, float>) {
+    if constexpr (std::is_same_v<value_type, float>) {
       cblas_sgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                 params.m, params.n, params.k, salpha,
                                 a_ptr, params.lda, params.astride,
                                 b_ptr, params.ldb, params.bstride, sbeta,
                                 c_ptr, params.ldc, params.cstride, params.batch);
-    } else if constexpr (std::is_same_v<scalar_type, double>) {
+    } else if constexpr (std::is_same_v<value_type, double>) {
       cblas_dgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                 params.m, params.n, params.k, salpha,
                                 a_ptr, params.lda, params.astride,
                                 b_ptr, params.ldb, params.bstride, sbeta,
                                 c_ptr, params.ldc, params.cstride, params.batch);
-    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+    } else if constexpr (std::is_same_v<value_type, cuda::std::complex<float>>) {
       cblas_cgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                 params.m, params.n, params.k, (void *)&salpha,
                                 (void *)a_ptr, params.lda, params.astride,
                                 (void *)b_ptr, params.ldb, params.bstride, (void *)&sbeta,
                                 (void *)c_ptr, params.ldc, params.cstride, params.batch);
-    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+    } else if constexpr (std::is_same_v<value_type, cuda::std::complex<double>>) {
       cblas_zgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                 params.m, params.n, params.k, (void *)&salpha,
                                 (void *)a_ptr, params.lda, params.astride,
@@ -309,25 +309,25 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
       auto bp = cuda::std::apply([&b](auto... param) { return b.GetPointer(param...); }, b_idx);
       auto cp = cuda::std::apply([&c](auto... param) { return c.GetPointer(param...); }, c_idx);
 
-      if constexpr (std::is_same_v<scalar_type, float>) {
+      if constexpr (std::is_same_v<value_type, float>) {
         cblas_sgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                   params.m, params.n, params.k, salpha,
                                   ap, params.lda, params.astride,
                                   bp, params.ldb, params.bstride, sbeta,
                                   cp, params.ldc, params.cstride, params.batch);
-      } else if constexpr (std::is_same_v<scalar_type, double>) {
+      } else if constexpr (std::is_same_v<value_type, double>) {
         cblas_dgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                   params.m, params.n, params.k, salpha,
                                   ap, params.lda, params.astride,
                                   bp, params.ldb, params.bstride, sbeta,
                                   cp, params.ldc, params.cstride, params.batch);
-      } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+      } else if constexpr (std::is_same_v<value_type, cuda::std::complex<float>>) {
         cblas_cgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                   params.m, params.n, params.k, (void *)&salpha,
                                   (void *)ap, params.lda, params.astride,
                                   (void *)bp, params.ldb, params.bstride, (void *)&sbeta,
                                   (void *)cp, params.ldc, params.cstride, params.batch);
-      } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+      } else if constexpr (std::is_same_v<value_type, cuda::std::complex<double>>) {
         cblas_zgemm_batch_strided(CblasRowMajor, params.opA, params.opB,
                                   params.m, params.n, params.k, (void *)&salpha,
                                   (void *)ap, params.lda, params.astride,
@@ -358,25 +358,25 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
     auto bp = cuda::std::apply([&b](auto... param) { return b.GetPointer(param...); }, b_idx);
     auto cp = cuda::std::apply([&c](auto... param) { return c.GetPointer(param...); }, c_idx);
 
-    if constexpr (std::is_same_v<scalar_type, float>) {
+    if constexpr (std::is_same_v<value_type, float>) {
       cblas_sgemm(CblasRowMajor, params.opA, params.opB,
                   params.m, params.n, params.k, salpha,
                   ap, params.lda,
                   bp, params.ldb, sbeta,
                   cp, params.ldc);
-    } else if constexpr (std::is_same_v<scalar_type, double>) {
+    } else if constexpr (std::is_same_v<value_type, double>) {
       cblas_dgemm(CblasRowMajor, params.opA, params.opB,
                   params.m, params.n, params.k, salpha,
                   ap, params.lda,
                   bp, params.ldb, sbeta,
                   cp, params.ldc);
-    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<float>>) {
+    } else if constexpr (std::is_same_v<value_type, cuda::std::complex<float>>) {
       cblas_cgemm(CblasRowMajor, params.opA, params.opB,
                   params.m, params.n, params.k, (void *)&salpha,
                   (const void **)ap, params.lda,
                   (const void **)bp, params.ldb, (void *)&sbeta,
                   (void **)cp, params.ldc);
-    } else if constexpr (std::is_same_v<scalar_type, cuda::std::complex<double>>) {
+    } else if constexpr (std::is_same_v<value_type, cuda::std::complex<double>>) {
       cblas_zgemm(CblasRowMajor, params.opA, params.opB,
                   params.m, params.n, params.k, (void *)&salpha,
                   (const void **)ap, params.lda,
@@ -436,7 +436,7 @@ __MATX_INLINE__ auto getCBLASSupportedTensor(const Op &in) {
   constexpr int RANK = Op::Rank();
 
   if constexpr (!(is_tensor_view_v<Op>)) {
-    return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
+    return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
   } else {
     bool supported = true;
 
@@ -453,7 +453,7 @@ __MATX_INLINE__ auto getCBLASSupportedTensor(const Op &in) {
     if (supported) {
       return in;
     } else {
-      return make_tensor<typename Op::scalar_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
     }
   }
 }
@@ -495,17 +495,17 @@ void matmul_impl([[maybe_unused]] TensorTypeC C,
   MATX_ASSERT_STR(MATX_EN_CPU_MATMUL, matxInvalidExecutor, "Trying to run MatMul on host executor but host MatMul support is not configured");
 
 #if MATX_EN_CPU_MATMUL
-  constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::scalar_type>;
+  constexpr auto is_c_complex = is_complex_v<typename TensorTypeC::value_type>;
 
   if constexpr (is_c_complex) {
-    constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::scalar_type>;
-    constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::scalar_type>;
+    constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::value_type>;
+    constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::value_type>;
     MATX_STATIC_ASSERT_STR((is_a_complex || is_b_complex), matxInvalidType, "If C is complex, then either A or B must be complex");
   }
 
   // promote A and B to the type of C
-  auto A_ = as_type<typename TensorTypeC::scalar_type>(A);
-  auto B_ = as_type<typename TensorTypeC::scalar_type>(B);
+  auto A_ = as_type<typename TensorTypeC::value_type>(A);
+  auto B_ = as_type<typename TensorTypeC::value_type>(B);
 
   MATX_STATIC_ASSERT_STR((detail::CompatibleGemmCBLASTypes<decltype(A_), decltype(B_), TensorTypeC>()), matxInvalidType,
       "Combination of A/B/C types are not supported for host MatMul");

@@ -102,6 +102,7 @@
 #include "matx/operators/stack.h"
 #include "matx/operators/stdd.h"
 #include "matx/operators/svd.h"
+#include "matx/operators/toeplitz.h"
 #include "matx/operators/trace.h"
 #include "matx/operators/transpose.h"
 #include "matx/operators/unique.h"

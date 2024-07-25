@@ -47,7 +47,7 @@ namespace matx
       class ReshapeOp : public BaseOp<ReshapeOp<RANK, T, ShapeType>>
     {
       public: 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
 	
       private:
         T op_;

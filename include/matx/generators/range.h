@@ -43,7 +43,7 @@ namespace matx
         T step_;
 
       public:
-        using scalar_type = T;
+        using value_type = T;
 
         Range() = default;
 

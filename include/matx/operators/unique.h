@@ -50,7 +50,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using unique_xform_op = bool;
 

@@ -51,7 +51,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
+      using value_type = typename remove_cvref_t<OpA>::value_type;
       using matx_transform_op = bool;
       using argmax_xform_op = bool;
 

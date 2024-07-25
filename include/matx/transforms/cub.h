@@ -116,8 +116,8 @@ struct EmptyParams_t {};
 template <typename OutputTensor, typename InputOperator, CUBOperation_t op, typename CParams = EmptyParams_t>
 class matxCubPlan_t {
   static constexpr int RANK = OutputTensor::Rank();
-  using T1 = typename InputOperator::scalar_type;
-  using T2 = typename OutputTensor::scalar_type;
+  using T1 = typename InputOperator::value_type;
+  using T2 = typename OutputTensor::value_type;
 
 public:
   /**
@@ -270,7 +270,7 @@ public:
         }
       }
       else {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+        const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         for (size_t iter = 0; iter < total_iter; iter++) {
           auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
 
@@ -319,7 +319,7 @@ public:
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+    const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         if (a.IsContiguous()) {
@@ -375,7 +375,7 @@ public:
 
     if (RANK == 1 || d_temp == nullptr) {
       if constexpr (is_tensor_view_v<InputOperator>) {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+        const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
           cub::DeviceScan::InclusiveSum(d_temp, temp_storage_bytes, a.Data(),
                                         a_out.Data(), static_cast<int>(a.Size(a.Rank()-1)),
@@ -904,7 +904,7 @@ inline void ExecSort(OutputTensor &a_out,
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if constexpr (is_tensor_view_v<InputOperator>) {
-      const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+      const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
       if (a.IsContiguous()) {
         cub::DeviceSelect::If(d_temp,
                               temp_storage_bytes,
@@ -993,7 +993,7 @@ inline void ExecSort(OutputTensor &a_out,
                               stream);
       }
       else {
-        tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+        tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         cub::DeviceSelect::If(d_temp,
                               temp_storage_bytes,
                               cub::CountingInputIterator<index_t>{0},
@@ -1043,7 +1043,7 @@ inline void ExecSort(OutputTensor &a_out,
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
       if constexpr (is_tensor_view_v<InputOperator>) {
-        const tensor_impl_t<typename InputOperator::scalar_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+        const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         if (a.IsContiguous()) {
           cub::DeviceSelect::Unique(d_temp,
                                 temp_storage_bytes,
@@ -1159,13 +1159,13 @@ using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, 
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputOperator, typename ReduceOp>
-void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOperator::scalar_type init,
+void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOperator::value_type init,
           const cudaStream_t stream = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   // Get parameters required by these tensors
-  using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
+  using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::value_type>;
   auto reduce_params = param_type{ReduceOp{}, init};
 
 #ifndef MATX_DISABLE_CUB_CACHE
@@ -1433,7 +1433,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
                               lin  + a.Size(0),
                               lout,
                               lout + a_out.Size(0),
-                              std::greater<typename InputOperator::scalar_type>());
+                              std::greater<typename InputOperator::value_type>());
     }
   }
   else {
@@ -1449,7 +1449,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
                                 lin  + (b+1)*a.Size(1),
                                 lout + b*a.Size(1),
                                 lout + (b+1)*a.Size(1),
-                                std::greater<typename InputOperator::scalar_type>());
+                                std::greater<typename InputOperator::value_type>());
       }
     }
   }
@@ -1565,14 +1565,14 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
  */
 template <typename OutputTensor, typename InputOperator>
 void hist_impl(OutputTensor &a_out, const InputOperator &a,
-          const typename InputOperator::scalar_type lower,
-          const typename InputOperator::scalar_type upper, const cudaStream_t stream = 0)
+          const typename InputOperator::value_type lower,
+          const typename InputOperator::value_type upper, const cudaStream_t stream = 0)
 {
-  static_assert(std::is_same_v<typename OutputTensor::scalar_type, int>, "Output histogram operator must use int type");
+  static_assert(std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  detail::HistEvenParams_t<typename InputOperator::scalar_type> hp{lower, upper};
+  detail::HistEvenParams_t<typename InputOperator::value_type> hp{lower, upper};
 #ifndef MATX_DISABLE_CUB_CACHE
   // Get parameters required by these tensors
   auto params =
@@ -1586,8 +1586,8 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
     auto tmp = new detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_HIST_EVEN,
-                                          detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
-        a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
+                                          detail::HistEvenParams_t<typename InputOperator::value_type>>{
+        a_out, a, detail::HistEvenParams_t<typename InputOperator::value_type>{hp}, stream};
 
     tmp->ExecHistEven(a_out, a, lower, upper, stream);
     detail::cub_cache.Insert(params, static_cast<void *>(tmp));
@@ -1595,7 +1595,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
   else {
     auto sort_type =
         static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator,
-            detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::scalar_type>> *>(
+            detail::CUB_OP_HIST_EVEN, detail::HistEvenParams_t<typename InputOperator::value_type>> *>(
             ret.value());
     sort_type->ExecHistEven(a_out, a, lower, upper, stream);
   }
@@ -1603,8 +1603,8 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
     auto tmp = detail::matxCubPlan_t< OutputTensor,
                                           InputOperator,
                                           detail::CUB_OP_HIST_EVEN,
-                                          detail::HistEvenParams_t<typename InputOperator::scalar_type>>{
-        a_out, a, detail::HistEvenParams_t<typename InputOperator::scalar_type>{hp}, stream};
+                                          detail::HistEvenParams_t<typename InputOperator::value_type>>{
+        a_out, a, detail::HistEvenParams_t<typename InputOperator::value_type>{hp}, stream};
 
     tmp.ExecHistEven(a_out, a, lower, upper, stream);
 #endif
@@ -1957,7 +1957,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
   cudaStream_t stream = exec.getStream();
 
   // Allocate space for sorted input since CUB doesn't do unique over unsorted inputs
-  auto sort_tensor = make_tensor<typename InputOperator::scalar_type>(a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto sort_tensor = make_tensor<typename InputOperator::value_type>(a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   matx::sort_impl(sort_tensor, a, SORT_DIR_ASC, stream);
 

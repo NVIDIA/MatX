@@ -64,9 +64,9 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   
   auto allocate_tensor = [&](auto shape) {
     if constexpr (is_cuda_executor_v<Executor>) {
-      return make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(shape, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+      return make_tensor<complex_from_scalar_t<typename InType::value_type>>(shape, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     } else {
-      return make_tensor<complex_from_scalar_t<typename InType::scalar_type>>(shape, MATX_HOST_MALLOC_MEMORY);
+      return make_tensor<complex_from_scalar_t<typename InType::value_type>>(shape, MATX_HOST_MALLOC_MEMORY);
     }
   };
 
@@ -74,11 +74,11 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   auto s2 = allocate_tensor(in_shape_padded);
   auto sifft = allocate_tensor(in_shape_padded);
 
-  if constexpr (! is_complex_v<typename InType::scalar_type>) {
+  if constexpr (! is_complex_v<typename InType::value_type>) {
     slice_end[InType::Rank() - 1] = padded_size/2 + 1;
   }
   auto s1s = slice(s1, slice_start, slice_end);
-  if constexpr (! is_complex_v<typename FilterType::scalar_type>) {
+  if constexpr (! is_complex_v<typename FilterType::value_type>) {
     slice_end[FilterType::Rank() - 1] = padded_size/2 + 1;
   }
   auto s2s = slice(s2, slice_start, slice_end);
@@ -87,9 +87,9 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
   // If this is real-valued input we need to accomodate cuFFT's output of N/2+1 complex
   // samples and use r2c to convert back to N.
-  if constexpr (!is_complex_v<typename InType::scalar_type>) {
+  if constexpr (!is_complex_v<typename InType::value_type>) {
     slice_end[InType::Rank() - 1] = padded_size / 2 + 1;
-    if constexpr (!is_complex_v<typename FilterType::scalar_type>) {
+    if constexpr (!is_complex_v<typename FilterType::value_type>) {
       (sifft = r2c(slice(s1, slice_start, slice_end) * slice(s2, slice_start, slice_end), padded_size)).
             run(exec);
     }
@@ -98,7 +98,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
     }
   }
   else {
-    if constexpr (!is_complex_v<typename FilterType::scalar_type>) {
+    if constexpr (!is_complex_v<typename FilterType::value_type>) {
       (sifft = s1 * r2c(slice(s2, slice_start, slice_end), padded_size)).run(exec);
     }
     else {
@@ -112,7 +112,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
   // Write directly to output in FULL mode.
   if (mode == MATX_C_MODE_FULL) {
-    if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
+    if constexpr (is_complex_v<typename InType::value_type> || is_complex_v<typename FilterType::value_type>) {
       (o = ifft(sifft)).run(exec);
     }
     else {
@@ -130,7 +130,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
     slice_end[InType::Rank() - 1] = padded_size - filter_size / 2;
 
-    if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
+    if constexpr (is_complex_v<typename InType::value_type> || is_complex_v<typename FilterType::value_type>) {
       (o = slice(sifft, slice_start, slice_end)).run(exec);
     }
     else {
@@ -142,7 +142,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
     slice_start[InType::Rank() - 1] = filter_size - 1;
     slice_end[InType::Rank() - 1]   = padded_size - filter_size + 1;
 
-    if constexpr (is_complex_v<typename InType::scalar_type> || is_complex_v<typename FilterType::scalar_type>) {
+    if constexpr (is_complex_v<typename InType::value_type> || is_complex_v<typename FilterType::value_type>) {
       (o = slice(sifft, slice_start, slice_end)).run(exec);
     }
     else {
@@ -169,8 +169,8 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   const auto stream = exec.getStream();
 
-  using strip_input_t = typename InType::scalar_type;
-  using strip_filter_t = typename FilterType::scalar_type;
+  using strip_input_t = typename InType::value_type;
+  using strip_filter_t = typename FilterType::value_type;
   using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>;
 
   size_t filter_len = filter.Size(filter.Rank()-1);
@@ -259,7 +259,7 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
   }
 
   const int Rank = In1Type::Rank();
-  //detail::tensor_impl_t<typename OutputType::scalar_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
+  //detail::tensor_impl_t<typename OutputType::value_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
   typename detail::base_type<OutputType>::type &o_base = o;
   const typename detail::base_type<In1Type>::type &in1_base = i1;
   const typename detail::base_type<In2Type>::type &in2_base = i2;

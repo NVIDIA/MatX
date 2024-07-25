@@ -66,8 +66,8 @@ namespace detail {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
     using index_type = typename OutputTensor::shape_type;
-    using T1    = typename OutputTensor::scalar_type;
-    using T2    = typename InputTensor::scalar_type;
+    using T1    = typename OutputTensor::value_type;
+    using T2    = typename InputTensor::value_type;
     constexpr int RANK = OutputTensor::Rank();
 
     index_type starts[RANK] = {0};
@@ -164,8 +164,8 @@ namespace detail {
   template <typename T1T, typename T2T>
   constexpr __MATX_INLINE__ FFTType DeduceFFTTransformType()
   {
-    using T1 = typename T1T::scalar_type;
-    using T2 = typename T2T::scalar_type;
+    using T1 = typename T1T::value_type;
+    using T2 = typename T2T::value_type;
 
     // Deduce plan type from view types
     if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {

@@ -51,12 +51,12 @@ namespace matx
         index_t noverlap_;
         index_t nfft_;
         cuda::std::array<index_t, 1> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::scalar_type, 1> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::scalar_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
+        mutable typename remove_cvref_t<OpX>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpX::scalar_type::value_type;
+        using value_type = typename OpX::value_type::value_type;
         using matx_transform_op = bool;
         using pwelch_xform_op = bool;
 

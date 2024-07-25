@@ -53,18 +53,18 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-                                          typename OpA::scalar_type, 
-                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
+        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+                                          typename OpA::value_type, 
+                                          typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr;                                           
 
       public:
         using matxop = bool;
-        using scalar_type = std::conditional_t<is_complex_v<typename OpA::scalar_type>,
-          typename OpA::scalar_type,
-          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
+        using value_type = std::conditional_t<is_complex_v<typename OpA::value_type>,
+          typename OpA::value_type,
+          typename scalar_to_complex<typename OpA::value_type>::ctype>;
         using matx_transform_op = bool;
         using fft_xform_op = bool;
 
@@ -84,7 +84,7 @@ namespace matx
           }
 
           if (fft_size_ != 0) {
-            if constexpr (is_complex_v<typename OpA::scalar_type>) {
+            if constexpr (is_complex_v<typename OpA::value_type>) {
               if constexpr (std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[Rank() - 1] = fft_size_;
               }
@@ -102,7 +102,7 @@ namespace matx
             }
           }
           else { 
-            if constexpr (!is_complex_v<typename OpA::scalar_type>) { // C2C uses the same input/output size. R2C is N/2+1
+            if constexpr (!is_complex_v<typename OpA::value_type>) { // C2C uses the same input/output size. R2C is N/2+1
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
               }
@@ -303,16 +303,16 @@ namespace matx
         FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-                                          typename OpA::scalar_type, 
-                                          typename scalar_to_complex<typename OpA::scalar_type>::ctype>;
+        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+                                          typename OpA::value_type, 
+                                          typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_; 
         mutable ttype *ptr;                                                
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using fft2_xform_op = bool;
 
@@ -330,7 +330,7 @@ namespace matx
             out_dims_[r] = a_.Size(r);
           }
 
-          if constexpr (!is_complex_v<typename OpA::scalar_type>) { // C2C uses the same input/output size. R2C is N/2+1
+          if constexpr (!is_complex_v<typename OpA::value_type>) { // C2C uses the same input/output size. R2C is N/2+1
             if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
               out_dims_[perm_[0]] = out_dims_[perm_[0]] / 2 + 1;
               out_dims_[perm_[1]] = out_dims_[perm_[1]] / 2 + 1;

@@ -42,7 +42,7 @@
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
   [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1)                         \
   {                                                                 \
-    using I1Type = extract_scalar_type_t<I1>;                       \
+    using I1Type = extract_value_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
     const typename detail::base_type<I1>::type &base = i1;          \
     return detail::matxUnaryOp(base, Op());                           \
@@ -64,7 +64,7 @@ namespace matx
   public:
     // dummy type to signal this is a matxop
     using matxop = bool;
-    using scalar_type = typename Op::scalar_type;
+    using value_type = typename Op::value_type;
     using self_type = matxUnaryOp<I1, Op>;
 
     __MATX_INLINE__ const std::string str() const {
@@ -377,7 +377,7 @@ namespace matx
   template <typename I1,                        
             typename = typename std::enable_if_t<is_matx_op<I1>()>> 
   [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
-    using I1Type = extract_scalar_type_t<I1>;
+    using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
       using Op = detail::ConjOp<I1Type>;
       const typename detail::base_type<I1>::type &base = i1;
@@ -414,7 +414,7 @@ namespace matx
   template <typename I1,                        
             typename = typename std::enable_if_t<is_matx_op<I1>()>> 
   [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
-    using I1Type = extract_scalar_type_t<I1>;
+    using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
       using Op = detail::RealOp<I1Type>;
       const typename detail::base_type<I1>::type &base = i1;

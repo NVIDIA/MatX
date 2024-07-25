@@ -73,7 +73,7 @@ template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO =
 class matxInversePlan_t {
   constexpr static int RANK = TensorTypeA::Rank();
   static_assert(RANK == TensorTypeAInv::Rank(), "Input and output tensor ranks must match");
-  using T1 = typename TensorTypeAInv::scalar_type;
+  using T1 = typename TensorTypeAInv::value_type;
 
 public:
   /**

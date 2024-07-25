@@ -71,7 +71,6 @@ class tensor_impl_t {
   public:
     // Type specifier for reflection on class
     using type = T; // TODO is this necessary
-    using scalar_type = T;
     using value_type = T;
     using tensor_view = bool;
     using desc_type = Desc;

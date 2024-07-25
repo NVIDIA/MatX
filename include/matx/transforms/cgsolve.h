@@ -61,7 +61,7 @@ namespace matx
   template <typename XType, typename AType, typename BType>
     __MATX_INLINE__ void cgsolve_impl(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
     {
-      using scalar_type = typename XType::scalar_type;
+      using value_type = typename XType::value_type;
       const int VRANK = XType::Rank();
       const int SRANK = XType::Rank() - 1;
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -82,9 +82,9 @@ namespace matx
       int converged_host = false;
 
       // Construct 3 temporary vectors
-      auto r0 = make_tensor<scalar_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
-      auto p = make_tensor<scalar_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
-      auto Ap = make_tensor<scalar_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto r0 = make_tensor<value_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto p = make_tensor<value_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto Ap = make_tensor<value_type>(X.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
   
       // create aliases to reuse memory
       auto r1 = r0;
@@ -94,13 +94,13 @@ namespace matx
       for(int i = 0 ; i < SRANK; i++) {
         scalar_shape[i] = X.Size(i);
       }
-      scalar_type N = scalar_type(X.Size(SRANK));
+      value_type N = value_type(X.Size(SRANK));
 
       // Construct temporary scalars
-      auto r0r0 = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-      auto r1r1 = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-      auto pAp = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
-      auto norm = make_tensor<scalar_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto r0r0 = make_tensor<value_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto r1r1 = make_tensor<value_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto pAp = make_tensor<value_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+      auto norm = make_tensor<value_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
@@ -152,7 +152,7 @@ namespace matx
         auto updateOp = ( r1 = r0 - (r0r0c/pApc) * Ap,
              X = X + (r0r0c/pApc) * p);
 
-        (IF( pApc != scalar_type(0), updateOp)).run(stream);
+        (IF( pApc != value_type(0), updateOp)).run(stream);
         
         // r1r1 = dot(r1, r1)
         (r1r1 = sum(r1*r1)).run(stream);
@@ -176,7 +176,7 @@ namespace matx
         
         // p = r1 + b * p 
         auto updateP = ( p = r1 + (r1r1c/r0r0c) * p);
-        (IF( pApc != scalar_type(0), updateP)).run(stream);
+        (IF( pApc != value_type(0), updateP)).run(stream);
 
         // Advance residual
         swap(r0r0, r1r1);  

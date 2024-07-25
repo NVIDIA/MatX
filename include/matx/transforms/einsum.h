@@ -119,7 +119,7 @@ public:
                                                 extents[sizeof...(InT)],
                                                 strides[sizeof...(InT)],
                                                 modes[sizeof...(InT)],
-                                                MatXTypeToCudaType<typename OutputTensor::scalar_type>(),
+                                                MatXTypeToCudaType<typename OutputTensor::value_type>(),
                                                 CUTENSORNET_COMPUTE_32F,
                                                 &descNet_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,

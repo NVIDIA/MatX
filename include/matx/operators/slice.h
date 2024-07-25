@@ -46,7 +46,7 @@ namespace matx
       class SliceOp : public BaseOp<SliceOp<DIM, T>>
     {
       public: 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         using shape_type = index_t; 
         using self_type = SliceOp<DIM, T>;
 

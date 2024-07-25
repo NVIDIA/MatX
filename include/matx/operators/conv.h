@@ -44,8 +44,8 @@ namespace matx
     class Conv1DOp : public BaseOp<Conv1DOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-              typename OpA::scalar_type, typename OpB::scalar_type>;
+        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+              typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         OpA a_;
         OpB b_;
@@ -60,7 +60,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = out_t;
+        using value_type = out_t;
         using matx_transform_op = bool;
         using conv_xform_op = bool;
 
@@ -71,7 +71,7 @@ namespace matx
         __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
 
-          MATX_ASSERT_STR((!is_matx_type_v<typename OpA::scalar_type> && !is_matx_type_v<typename OpB::scalar_type>) || 
+          MATX_ASSERT_STR((!is_matx_type_v<typename OpA::value_type> && !is_matx_type_v<typename OpB::value_type>) || 
                           method == MATX_C_METHOD_DIRECT, 
             matxInvalidType, "FFT convolutions do not support half precision float currently");
 
@@ -234,8 +234,8 @@ namespace detail {
   class Conv2DOp : public BaseOp<Conv2DOp<OpA, OpB, PermDims>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-            typename OpA::scalar_type, typename OpB::scalar_type>;
+      using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+            typename OpA::value_type, typename OpB::value_type>;
       constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
       OpA a_;
       OpB b_;
@@ -247,7 +247,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = out_t;
+      using value_type = out_t;
       using matx_transform_op = bool;
       using conv_xform_op = bool;
 

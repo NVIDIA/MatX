@@ -24,7 +24,7 @@ template <typename OutputTensor, typename InputTensor>
 __global__ void transpose_kernel_oop(OutputTensor out,
                                      const InputTensor in)
 {
-  using T = typename OutputTensor::scalar_type;
+  using T = typename OutputTensor::value_type;
   constexpr int RANK = OutputTensor::Rank();
   
   extern __shared__ float
