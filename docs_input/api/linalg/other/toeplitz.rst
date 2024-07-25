@@ -6,7 +6,7 @@ toeplitz
 Generate a toeplitz matrix
 
 `c` represents the first column of the matrix while `r` represents the first row. `c` and `r` must
-have the same first value; if they don't match, the first value from `r` will be used.
+have the same first value; if they don't match, the first value from `c` will be used.
 
 Passing a single array/operator as input is equivalent to passing the conjugate of the same
 input as the second parameter. 
