@@ -117,7 +117,7 @@ public:
 template <typename T1, typename T2, typename T3, typename F> class TerOp {
 public:
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(const T1 &v1, const T2 &v2,
-                                            const T3 &v3) 
+                                            const T3 &v3)
   {
     return F::op(v1, v2, v3);
   }
@@ -162,9 +162,14 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_rsqrt(T v1)
     return rsqrt(v1);
   }
   else {
+#ifdef __CUDACC__
     return ::rsqrt(v1);
+#else
+    return static_cast<T>(1)/cuda::std::sqrt(v1);
+#endif
   }
 }
+
 template <typename T> struct RSqrtF {
   static __MATX_INLINE__ std::string str() { return "rsqrt"; }
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
@@ -349,12 +354,12 @@ struct Angle {
 };
 template <typename T> using AngleOp = UnOp<T, Angle<T>>;
 
-template<typename T> 
+template<typename T>
 struct SubNegF {
   static __MATX_INLINE__ std::string str() { return "-"; }
-  static __MATX_INLINE__ __MATX_HOST__  __MATX_DEVICE__ auto op(T v1) 
-  { 
-    return -v1; 
+  static __MATX_INLINE__ __MATX_HOST__  __MATX_DEVICE__ auto op(T v1)
+  {
+    return -v1;
   }
 };
 template<typename T> using SubNegOp = UnOp<T,SubNegF<T> >;
@@ -502,42 +507,42 @@ template <typename T1, typename T2> struct ModF {
 template <typename T1, typename T2> using ModOp = BinOp<T1, T2, ModF<T1, T2>>;
 
 template <typename T1, typename T2>
-static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_fmod(T1 v1, T2 v2) { 
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_fmod(T1 v1, T2 v2) {
   if constexpr (is_matx_half_v<T1> || is_matx_half_v<T2>) {
     return cuda::std::fmodf(static_cast<float>(v1), static_cast<float>(v2));
   }
   else {
     // We should not have to cast here, but libcudacxx doesn't support the double version
     return cuda::std::fmod(v1, v2);
-  }  
+  }
 }
 
 template <typename T1, typename T2> struct FModF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "%" + str2 + ")"; }
 
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
-    return _internal_fmod(v1, v2);  
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) {
+    return _internal_fmod(v1, v2);
   }
 };
 template <typename T1, typename T2> using FModOp = BinOp<T1, T2, FModF<T1, T2>>;
 
 
 template <typename T1, typename T2>
-static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_atan2(T1 v1, T2 v2) { 
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_atan2(T1 v1, T2 v2) {
   if constexpr (is_matx_half_v<T1> || is_matx_half_v<T2>) {
     return atan2(v1, v2);
   }
   else {
     // We should not have to cast here, but libcudacxx doesn't support the double version
     return cuda::std::atan2(v1, v2);
-  }  
+  }
 }
 
 template <typename T1, typename T2> struct Atan2F {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "%" + str2 + ")"; }
 
-  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) { 
-    return _internal_atan2(v1, v2);  
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T1 v1, T2 v2) {
+    return _internal_atan2(v1, v2);
   }
 };
 template <typename T1, typename T2> using Atan2Op = BinOp<T1, T2, Atan2F<T1, T2>>;
@@ -652,10 +657,10 @@ template <typename T1> using NotOp = UnOp<T1, NotF<T1>>;
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isnan(T v1)
 {
-  using conversionType = typename matx::detail::value_promote_t<T>;  
+  using conversionType = typename matx::detail::value_promote_t<T>;
   if constexpr(!std::is_floating_point_v<conversionType>) {
     return false;
-  } 
+  }
 
   using castType = matx::detail::matx_convert_complex_type<T>;
   if constexpr(is_complex_v<T>) {
@@ -672,22 +677,22 @@ struct IsNan {
     return _internal_isnan(v1);
   }
 };
-template <typename T> using IsNanOp = UnOp<T, IsNan<T>>;   
+template <typename T> using IsNanOp = UnOp<T, IsNan<T>>;
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isinf(T v1)
 {
-  using conversionType = typename matx::detail::value_promote_t<T>;  
+  using conversionType = typename matx::detail::value_promote_t<T>;
   if constexpr(!std::is_floating_point_v<conversionType>) {
     return false;
-  } 
+  }
 
   using castType = matx::detail::matx_convert_complex_type<T>;
   if constexpr(is_complex_v<T>) {
     return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
   } else {
     return cuda::std::isinf(static_cast<castType>(v1));
-  } 
+  }
 }
 template <typename T>
 struct IsInf {
@@ -697,7 +702,7 @@ struct IsInf {
     return _internal_isinf(v1);
   }
 };
-template <typename T> using IsInfOp = UnOp<T, IsInf<T>>;   
+template <typename T> using IsInfOp = UnOp<T, IsInf<T>>;
 
 template <typename T1, typename T2> struct AndF {
   static std::string str(const std::string &str1, const std::string &str2) { return "(" + str1 + "&" + str2 + ")"; }
