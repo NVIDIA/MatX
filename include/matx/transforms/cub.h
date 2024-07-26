@@ -49,6 +49,41 @@
 
 namespace matx {
 
+auto constexpr INVALID = std::numeric_limits<size_t>::max();
+
+struct minmax {
+    __host__ __device__ minmax() : argmin{INVALID}, argmax{INVALID} {};
+    // Conversion from an index -- kind of a hack for the binary operator
+    __host__ __device__ minmax(size_t val) : argmin{val}, argmax{val} {};
+    __host__ __device__ minmax(size_t argmin, size_t argmax) : argmin{argmin}, argmax{argmax} {};
+    size_t argmin;
+    size_t argmax;
+};
+
+template<typename T>
+struct minmaxer {
+    T* data;
+    size_t data_len;
+
+    minmaxer(T* newData)
+    :data(newData)
+    {
+    }
+
+    minmax __device__ operator()(minmax lhs, minmax rhs) {
+        if (lhs.argmin == INVALID) {
+            return rhs;
+        }
+        if (rhs.argmin == INVALID) {
+            return lhs;
+        }
+        size_t argmin = data[lhs.argmin] < data[rhs.argmin] ? lhs.argmin : rhs.argmin;
+        size_t argmax = data[lhs.argmax] > data[rhs.argmax] ? lhs.argmax : rhs.argmax;
+        return minmax{argmin, argmax};
+    }
+};
+
+
 /**
  * @brief Direction for sorting
  *
@@ -1195,6 +1230,63 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
 #endif
 #endif
 }
+
+
+/**
+ * Reduce a tensor using CUB but accessing data through compare operator
+ *
+ * Reduces a tensor using the CUB library for either a 0D or 1D output tensor. There
+ * is an existing reduce() implementation as part of matx_reduce.h, but this function
+ * exists in cases where CUB is more optimal/faster.
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam InputOperator
+ *   Input tensor type
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param init
+ *   Value to initialize the reduction with
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDest, TensorIndexType &maxIdxs, const InType &in, cudaExecutor exec = 0)
+{
+  // Set up CUB stuff
+  int N = in.TotalSize();
+  auto d_in = thrust::counting_iterator<size_t>(0);
+  minmax* d_out;
+  cudaMallocAsync(&d_out, sizeof(minmax));
+  auto min_op = minmaxer{in.Data()};
+  auto init = minmax{INVALID};
+
+  // Determine temporary device storage requirements
+  void     *d_temp_storage = nullptr;
+  size_t   temp_storage_bytes = 0;
+
+  cub::DeviceReduce::Reduce(
+    d_temp_storage, temp_storage_bytes,
+    d_in, d_out, N, min_op, init);
+
+  // Allocate temporary storage
+  cudaMallocAsync(&d_temp_storage, temp_storage_bytes);
+
+  // Run reduction
+  cub::DeviceReduce::Reduce(
+    d_temp_storage, temp_storage_bytes,
+    d_in, d_out, N, min_op, init);
+
+  cudaMemcpy(minIdxs.Data(), &(d_out->argmin), sizeof(size_t), cudaMemcpyDefault);
+  cudaMemcpy(maxIdxs.Data(), &(d_out->argmax), sizeof(size_t), cudaMemcpyDefault);
+    
+  (minDest = in(minIdxs())).run();
+  (maxDest = in(maxIdxs())).run();
+
+}
+
 
 /**
  * Sum a tensor using CUB

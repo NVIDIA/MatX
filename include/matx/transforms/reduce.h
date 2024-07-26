@@ -2281,6 +2281,44 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
   min_impl(dest, in, exec);
 }
 
+/**
+ * Compute reduction of both min and max of a tensor and returns value + index
+ *
+ * Returns 4 tensor with minimums, maximums, and their respective indicies
+ *
+ * @tparam OutType 
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ *
+ * @param minDest
+ *   Destination view of reduction
+ * @param minIdest
+ *   Destination for indices
+* @param maxDest
+ *   Destination view of reduction
+ * @param maxIdest
+ *   Destination for indices* 
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   CUDA executor or stream ID
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argminmax_impl(OutType minDest, TensorIndexType &minIdxs, OutType maxDest, TensorIndexType &maxIdxs, const InType &in, cudaExecutor exec = 0)
+{
+  static_assert(OutType::Rank() == TensorIndexType::Rank());
+#ifdef __CUDACC__
+  MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  // std::cout << " At impl layer" << std::endl;
+  cudaStream_t stream = exec.getStream();
+  cub_reduce_custom(minDest, minIdxs, maxDest, maxIdxs, in, exec);
+
+  
+#endif
+}
 
 
 /**
