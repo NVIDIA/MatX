@@ -2314,7 +2314,7 @@ void __MATX_INLINE__ argminmax_impl(OutType minDest, TensorIndexType &minIdxs, O
   MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   // std::cout << " At impl layer" << std::endl;
   cudaStream_t stream = exec.getStream();
-  cub_reduce_custom(minDest, minIdxs, maxDest, maxIdxs, in, exec);
+  cub_reduce_custom(minDest, minIdxs, maxDest, maxIdxs, in, stream);
 
   
 #endif

@@ -83,6 +83,26 @@ __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
  * @param dist Distribution
  */
 template <typename Gen>
+__inline__ __MATX_DEVICE__ void get_random(uint32_t &val, Gen *state,
+                                      Distribution_t dist)
+{
+  if (dist == UNIFORM) {
+    val = curand_uniform(state);
+  }
+  else {
+    val = curand_normal(state);
+  }
+};
+
+/**
+ * @brief Get a random number
+ *
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ * @param dist Distribution
+ */
+template <typename Gen>
 __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
                                       Distribution_t dist)
 {
@@ -403,6 +423,7 @@ public:
 
         static_assert(std::is_same_v<T, float> || 
                       std::is_same_v<T, double> ||
+                      std::is_same_v<T, uint32_t> ||
                       std::is_same_v<T, cuda::std::complex<float>> ||
                       std::is_same_v<T, cuda::std::complex<double>>);        
 
@@ -518,6 +539,9 @@ public:
           if constexpr (std::is_same_v<T, float>) {
             curandGenerateUniform(gen_, &val, 1);
           }
+          else if constexpr (std::is_same_v<T, uint32_t>) {
+            curandGenerate(gen_, &val, 1);
+          }          
           else if constexpr (std::is_same_v<T, double>) {
             curandGenerateUniformDouble(gen_, &val, 1);
           }

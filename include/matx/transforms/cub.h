@@ -105,6 +105,7 @@ typedef enum {
   CUB_OP_REDUCE_SUM,
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
+  CUB_OP_REDUCE_ARGMINMAX,
   CUB_OP_SELECT,
   CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE
@@ -207,6 +208,10 @@ public:
     }
     else if constexpr (op == CUB_OP_REDUCE_MAX) {
       ExecMax(a_out, a, stream);
+    }
+    else if constexpr (op == CUB_OP_REDUCE_ARGMINMAX) {
+      matxAlloc((void **)&d_minMax, sizeof(minmax), MATX_ASYNC_DEVICE_MEMORY,stream);
+      ExecArgMinMax(a, stream);
     }
     else if constexpr (op == CUB_OP_SELECT) {
       ExecSelect(a_out, a, stream);
@@ -913,6 +918,42 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
+  /**
+   * Execute a max on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecArgMinMax(const InputOperator &in,
+                            const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  
+    // Set up CUB stuff
+    auto d_in = thrust::counting_iterator<size_t>(0);
+    auto min_op = minmaxer{in.Data()};
+    auto init = minmax{INVALID};
+
+    // Run reduction
+    cub::DeviceReduce::Reduce(
+      d_temp, temp_storage_bytes,
+      d_in, d_minMax, in.TotalSize(), min_op, init, stream);
+
+#endif
+  }
+
 
 
   /**
@@ -1110,6 +1151,7 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
+  minmax* d_minMax = nullptr; // used for argMinMax()
 private:
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
@@ -1118,7 +1160,7 @@ private:
   cudaStream_t stream_;
   CParams cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
-  int *d_histogram = nullptr; // Used for hist()
+  int *d_histogram = nullptr; // Used for hist() //I'm not sure this is used anymore?
   size_t temp_storage_bytes = 0;
 };
 
@@ -1253,39 +1295,54 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
  *   CUDA stream
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDest, TensorIndexType &maxIdxs, const InType &in, cudaExecutor exec = 0)
+void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDest, TensorIndexType &maxIdxs, const InType &in, const cudaStream_t stream = 0)
 {
-  // Set up CUB stuff
-  int N = in.TotalSize();
-  auto d_in = thrust::counting_iterator<size_t>(0);
-  minmax* d_out;
-  cudaMallocAsync(&d_out, sizeof(minmax));
-  auto min_op = minmaxer{in.Data()};
-  auto init = minmax{INVALID};
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+//   // Get parameters required by these tensors
+//   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
+//   auto reduce_params = param_type{ReduceOp{}, init};
 
-  // Determine temporary device storage requirements
-  void     *d_temp_storage = nullptr;
-  size_t   temp_storage_bytes = 0;
-
-  cub::DeviceReduce::Reduce(
-    d_temp_storage, temp_storage_bytes,
-    d_in, d_out, N, min_op, init);
-
-  // Allocate temporary storage
-  cudaMallocAsync(&d_temp_storage, temp_storage_bytes);
-
-  // Run reduction
-  cub::DeviceReduce::Reduce(
-    d_temp_storage, temp_storage_bytes,
-    d_in, d_out, N, min_op, init);
-
-  cudaMemcpy(minIdxs.Data(), &(d_out->argmin), sizeof(size_t), cudaMemcpyDefault);
-  cudaMemcpy(maxIdxs.Data(), &(d_out->argmax), sizeof(size_t), cudaMemcpyDefault);
-    
-  (minDest = in(minIdxs())).run();
-  (maxDest = in(maxIdxs())).run();
+#ifndef MATX_DISABLE_CUB_CACHE
+  // Get cache or new plan if it doesn't exist
+  auto params = detail::matxCubPlan_t<OutType,
+                                      InType,
+                                      detail::CUB_OP_REDUCE_ARGMINMAX,
+                                      param_type>::GetCubParams(minDest, in, stream);
+                                      using cache_val_type = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX, {}}>;
+                                      detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+                                                                                            detail::GetCacheIdFromType<detail::cub_cache_t>(),
+                                                                                            params,
+                                                                                            [&]() {
+                                                                                              return std::make_shared<cache_val_type>(minDest, in, {}, stream);
+                                                                                            },
+                                                                                            [&](std::shared_ptr<cache_val_type> ctype) {
+                                                                                              ctype->ExecArgMinMax(in, stream);
+                                                                                            }
+                                                                                          );
 
 }
+#else
+
+  auto tmp = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX>{minDest, in, {}, stream};
+      
+  tmp.ExecArgMinMax(in, stream);   
+
+  cudaMemcpyAsync(minIdxs.Data(), &(tmp.d_minMax->argmin), sizeof(size_t), cudaMemcpyDefault, stream);
+  cudaMemcpyAsync(maxIdxs.Data(), &(tmp.d_minMax->argmax), sizeof(size_t), cudaMemcpyDefault, stream);
+      
+  (minDest = in(minIdxs())).run(stream);
+  (maxDest = in(maxIdxs())).run(stream);  
+    
+#endif
+#endif
+}
+
+
+
+
+
+
 
 
 /**
