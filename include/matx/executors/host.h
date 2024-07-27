@@ -87,19 +87,19 @@ class HostExecutor {
         n_threads = 1;
       }
       else if constexpr (MODE == ThreadsMode::ALL) {
-#if MATX_EN_OMP
+#ifdef MATX_EN_OMP
         n_threads = omp_get_num_procs();
 #endif
       }
       params_ = HostExecParams(n_threads);
 
-#if MATX_EN_OMP
+#ifdef MATX_EN_OMP
       omp_set_num_threads(params_.GetNumThreads());
 #endif
     }
 
     HostExecutor(const HostExecParams &params) : params_(params) {
-#if MATX_EN_OMP
+#ifdef MATX_EN_OMP
       omp_set_num_threads(params_.GetNumThreads());
 #endif
     }

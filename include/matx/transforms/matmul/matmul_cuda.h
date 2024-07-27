@@ -34,7 +34,7 @@
 
 #include <cublasLt.h>
 
-#if MATX_ENABLE_CUTLASS == 1
+#ifdef MATX_ENABLE_CUTLASS
 #include "cutlass/gemm/device/gemm.h"
 #include "cutlass/gemm/device/gemm_batched.h"
 #endif
@@ -183,9 +183,6 @@ public:
                      const TensorTypeB &b)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
-                  "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
 
     static_assert(RANK >= 2);
     MATX_ASSERT(a.Size(TensorTypeA::Rank() - 1) == b.Size(TensorTypeB::Rank() - 2), matxInvalidSize);
@@ -865,7 +862,7 @@ private:
 
     if constexpr (RANK == 2) {
       if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if MATX_ENABLE_CUTLASS
+#ifdef MATX_ENABLE_CUTLASS
         using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
@@ -909,7 +906,7 @@ private:
     }
     else {
       static_assert(RANK > 2);
-#if MATX_ENABLE_CUTLASS
+#ifdef MATX_ENABLE_CUTLASS
       using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
@@ -930,7 +927,7 @@ private:
 
       if constexpr (RANK > 3) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if MATX_ENABLE_CUTLASS
+#ifdef MATX_ENABLE_CUTLASS
         for (size_t iter = 0; iter < total_iter; iter++) {
           // Get pointers into A/B/C for this round
           auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
@@ -1004,7 +1001,7 @@ private:
                                                         beta);
     }
     else if (c.Stride(RANK - 2) <= 1) {
-#if MATX_ENABLE_CUTLASS
+#ifdef MATX_ENABLE_CUTLASS
       MatMulLaunch<OrderA, OrderB, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
 #else
@@ -1204,7 +1201,7 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
     (c = C).run(stream);
   }
 
-#if MATX_ENABLE_CUTLASS != 1
+#ifndef MATX_ENABLE_CUTLASS
   // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
   // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
   // the rightmost stride is !=1 or this function will be an infinite recursion.

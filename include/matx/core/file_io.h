@@ -49,7 +49,7 @@
 
 
 
-#if MATX_ENABLE_FILEIO || DOXYGEN_ONLY
+#if defined(MATX_ENABLE_FILEIO) || defined(DOXYGEN_ONLY)
 
 namespace matx {
 namespace io {

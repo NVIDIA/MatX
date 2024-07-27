@@ -37,19 +37,12 @@
 
 namespace matx {
 
-#ifdef INDEX_64_BIT
-    using index_t = long long int;
-    #define INDEX_T_FMT "lld"
-#endif
-
 #ifdef INDEX_32_BIT
     using index_t = int32_t;
     #define INDEX_T_FMT "d"
-#endif
-
-#if ((defined(INDEX_64_BIT) && defined(INDEX_32_BIT)) ||                       \
-     (!defined(INDEX_64_BIT) && !defined(INDEX_32_BIT)))
-static_assert(false, "Must choose either 64-bit or 32-bit index mode");
+#else    
+    using index_t = long long int;
+    #define INDEX_T_FMT "lld"
 #endif
 
 #ifdef __CUDACC__
