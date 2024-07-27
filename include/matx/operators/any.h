@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <thrust/reduce.h>
+#include <thrust/device_ptr.h>
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
@@ -71,8 +73,17 @@ namespace detail {
       };
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        any_impl(cuda::std::get<0>(out), a_, ex);
+      void Exec(Out &&out, Executor) const {
+        auto output_tensor = cuda::std::get<0>(out);
+        using out_tensor_t = decltype(output_tensor);
+        auto inp_ptr = thrust::device_pointer_cast(a_.Data());
+        auto result_ptr = output_tensor.Data();
+        auto op = detail::reduceOpAny<typename out_tensor_t::value_type>();
+        auto result = thrust::reduce(inp_ptr, 
+          inp_ptr + a_.TotalSize(), 
+          op.Init(), 
+          op);
+        *result_ptr = result;
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
