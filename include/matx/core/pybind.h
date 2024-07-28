@@ -34,7 +34,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/make_tensor.h"
 
-#if MATX_ENABLE_PYBIND11
+#ifdef MATX_ENABLE_PYBIND11
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -93,6 +93,7 @@ public:
         // Interpreter already running
       }
     }
+
     AddPath(std::string(MATX_ROOT) + GENERATORS_PATH);
   }
 

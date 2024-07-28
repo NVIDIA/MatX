@@ -487,12 +487,12 @@ using tensor_desc_cr_disi_dist = tensor_desc_cr_ds_t<index_t, index_t, RANK>;
  *
  * @tparam RANK Rank of shape
  */
-#ifdef INDEX_64_BIT 
-  template <int RANK>
-  using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
-#else
+#ifdef INDEX_32_BIT 
   template <int RANK>
   using DefaultDescriptor = tensor_desc_cr_ds_32_32_t<RANK>;
+#else
+  template <int RANK>
+  using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
 #endif
 
 }; // namespace matx
