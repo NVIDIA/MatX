@@ -71,9 +71,6 @@ using namespace matx;
  */
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
-
-  index_t numSamples = 1;
-
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
   cudaExecutor exec{};
@@ -90,7 +87,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);  
-   // Create data objects
 
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});
