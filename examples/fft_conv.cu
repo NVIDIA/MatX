@@ -87,12 +87,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);  
-  auto stuff = ones<int>({4,4});
-  using some_type = typename detail::base_type_t<decltype(stuff)>;
-  // auto bi = BeginOffset{stuff};
-  // auto ei = EndOffset{stuff};
-  // auto reduced = thrust::reduce(bi, ei);
-  any(stuff).run();
+
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});
   auto filt_time = make_tensor<complex>({batches, filter_size});
