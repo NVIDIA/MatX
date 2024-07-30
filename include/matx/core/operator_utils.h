@@ -42,7 +42,6 @@ namespace matx {
 
   template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
-
     if constexpr (remove_cvref_t<decltype(out)>::Rank() <= 1 && is_tensor_view_v<OutputOp>) {
       if (out.IsContiguous()) {
         if constexpr(ConvertType) {   
@@ -84,17 +83,14 @@ namespace matx {
       }
     }
 
-    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - 
-                                                                                      remove_cvref_t<decltype(out)>::Rank()>(in_base));
+    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - remove_cvref_t<decltype(out)>::Rank()>(in_base));
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-
     return thrust::reduce(iter + *begin, iter + *end, op.Init(), op); 
   }
 
   template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
     typename detail::base_type_t<InputOp> in_base = in;    
-
     if constexpr (in_base.Rank() < 2 && is_tensor_view_v<InputOp>) {
       if (in_base.IsContiguous()) {
         if constexpr (ConvertType) {
@@ -118,7 +114,6 @@ namespace matx {
     auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - 
                                                                                       remove_cvref_t<decltype(out)>::Rank()>(in_base));
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-
     return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
   } 
 

@@ -33,7 +33,6 @@
 #pragma once
 
 #include <thrust/reduce.h>
-#include <thrust/device_ptr.h>
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
@@ -41,7 +40,6 @@
 #include "matx/transforms/reduce.h"
 
 namespace matx {
-
 
 namespace detail {
   template<typename OpA, int ORank>
@@ -69,7 +67,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
         return tmp_out_(indices...);
-      };  
+      };
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor) const {
