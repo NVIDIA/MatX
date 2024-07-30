@@ -34,6 +34,8 @@
 #include <cassert>
 #include <cstdio>
 #include <cuda/std/ccomplex>
+#include <thrust/reduce.h>
+#include <thrust/functional.h> 
 
 using namespace matx;
 
@@ -71,6 +73,13 @@ using namespace matx;
  */
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
+  using T = float;
+  
+  using OutType = float;
+  using InType = float;
+  using FilterType = float;
+  index_t numSamples = 1;
+
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
   cudaExecutor exec{};
@@ -87,6 +96,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);  
+   // Create data objects
+  tensor_t<InType, 2> inView({batches, numSamples});
+  tensor_t<InType, 2> outView({batches, numSamples});
+  tensor_t<InType, 1> solView({numSamples});
 
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});

@@ -43,7 +43,6 @@
 namespace matx {
 
 
-
 namespace detail {
   template<typename OpA, int ORank>
   class AnyOp : public BaseOp<AnyOp<OpA, ORank>>
@@ -70,20 +69,20 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
         return tmp_out_(indices...);
-      };
+      };  
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor) const {
-        auto output_tensor = cuda::std::get<0>(out);
-        using out_tensor_t = decltype(output_tensor);
-        auto inp_ptr = thrust::device_pointer_cast(a_.Data());
-        auto result_ptr = output_tensor.Data();
-        auto op = detail::reduceOpAny<typename out_tensor_t::value_type>();
-        auto result = thrust::reduce(inp_ptr, 
-          inp_ptr + a_.TotalSize(), 
-          op.Init(), 
-          op);
-        *result_ptr = result;
+        auto output_ = cuda::std::get<0>(out);
+        using out_t = decltype(output_);
+        using value_t = typename out_t::value_type;
+        using output_t = typename detail::base_type_t<out_t>;
+
+        output_t out_base = output_;
+        auto op = detail::reduceOpAny<value_t>();
+
+        auto rv = ReduceInputThrust(std::forward<OpA>(a_), std::forward<out_t>(output_), std::forward<decltype(op)>(op));
+        MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in any");
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
