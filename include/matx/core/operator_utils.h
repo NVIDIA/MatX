@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <thrust/reduce.h>
-
 #include "matx/core/iterator.h"
 #include "matx/core/type_utils.h"
 #include "matx/operators/collapse.h"
@@ -64,30 +62,6 @@ namespace matx {
     return func(in, iter, bi, ei);
   }  
 
-  template <typename In, typename Out, typename Op, bool ConvertType = true>
-  __MATX_HOST__ __MATX_INLINE__ auto ReduceInputThrust(In &&in, Out &&out, Op &&op) {
-    typename detail::base_type_t<In> in_base = in;    
-
-    auto begin = BeginOffset{in_base};
-    auto end = EndOffset{in_base};
-
-    if constexpr (in_base.Rank() < 2 && is_tensor_view_v<In>) {
-      using value_t = typename Out::value_type;
-      const auto &iter = matx::RandomOperatorIterator<decltype(in_base), ConvertType>{in_base};
-
-      if (in_base.IsContiguous()) {
-        // the conversion is already handled for us by RandomOperatorIterator
-        thrust::reduce(
-            iter + *begin, iter + *end, op.Init(), op
-        );
-      }
-    }
-
-    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - remove_cvref_t<decltype(out)>::Rank()>(in_base));
-    const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-    return thrust::reduce(iter + *begin, iter + *end, op.Init(), op); 
-  }
-
   template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
     typename detail::base_type_t<InputOp> in_base = in;    
@@ -109,6 +83,7 @@ namespace matx {
         }
       }
     }
+
     // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
     // then collapse the left size by the output rank to get the batch dimensions  
     auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() - 

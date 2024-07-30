@@ -74,12 +74,16 @@ namespace detail {
         auto output_ = cuda::std::get<0>(out);
         using out_t = decltype(output_);
         using value_t = typename out_t::value_type;
-        using output_t = typename detail::base_type_t<out_t>;
-
-        output_t out_base = output_;
         auto op = detail::reduceOpAny<value_t>();
-
-        auto rv = ReduceInputThrust(std::forward<OpA>(a_), std::forward<out_t>(output_), std::forward<decltype(op)>(op));
+        auto fn = [&](auto &&input, 
+          auto &&, 
+          auto &&begin,  
+          auto &&end) { 
+            return thrust::reduce(
+              input + *begin, input + *end, op.Init(), op
+            );
+        };
+        auto rv = ReduceInput(fn, output_, a_);
         MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in any");
       }
 
