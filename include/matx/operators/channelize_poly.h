@@ -49,7 +49,7 @@ namespace detail {
       // type cuda::std::complex<float> and the filter has type double, out_t
       // will be cuda::std::complex<double>.
       using out_t = cuda::std::common_type_t<
-        complex_from_scalar_t<typename OpA::scalar_type>, complex_from_scalar_t<typename FilterType::scalar_type>>;
+        complex_from_scalar_t<typename OpA::value_type>, complex_from_scalar_t<typename FilterType::value_type>>;
       OpA a_;
       FilterType f_;
       index_t num_channels_;
@@ -62,7 +62,7 @@ namespace detail {
       using matxop = bool;
       using matx_transform_op = bool;
       using channelize_poly_xform_op = bool;
-      using scalar_type = out_t;            
+      using value_type = out_t;            
 
       __MATX_INLINE__ std::string str() const { return "channelize_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ChannelizePolyOp(OpA a, const FilterType &f, index_t num_channels, index_t decimation_factor) :

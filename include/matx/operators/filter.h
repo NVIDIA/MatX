@@ -50,12 +50,12 @@ namespace detail {
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
     public:
       using matxop = bool;
-      using scalar_type = void;
+      using value_type = void;
       using matx_transform_op = bool;
       using filter_xform_op = bool;
 
@@ -79,7 +79,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
 
-        filter_impl(cuda::std::get<0>(out), a_, h_rec_, h_nonrec_, ex.getStream());
+        filter_impl(cuda::std::get<0>(out), a_, h_rec_, h_nonrec_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

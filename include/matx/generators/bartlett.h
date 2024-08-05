@@ -42,7 +42,7 @@ namespace matx
         index_t size_;
 
       public:
-        using scalar_type = T;
+        using value_type = T;
         __MATX_INLINE__ std::string str() const { return "bartlett"; }
 
 	inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};

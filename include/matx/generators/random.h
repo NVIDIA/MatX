@@ -275,7 +275,7 @@ private:
 
 public:
   using type = T; ///< Type trait to get type
-  using scalar_type = T; ///< Type trait to get type
+  using value_type = T; ///< Type trait to get type
   // dummy type to signal this is a matxop
   using matxop = bool; ///< Type trait to indicate this is an operator
 
@@ -418,7 +418,7 @@ public:
 
 
       public:
-        using scalar_type = T;
+        using value_type = T;
         using matxop = bool;
 
         static_assert(std::is_same_v<T, float> || 

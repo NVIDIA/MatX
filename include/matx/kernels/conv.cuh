@@ -49,9 +49,9 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   const int Rank = InType::Rank();
 
   extern __shared__ char s_exch1d[]; // Filter + halo
-  using ftype_strip = typename FilterType::scalar_type;
-  using intype_strip = typename InType::scalar_type;
-  using outtype_strip = typename OutType::scalar_type;
+  using ftype_strip = typename FilterType::value_type;
+  using intype_strip = typename InType::value_type;
+  using outtype_strip = typename OutType::value_type;
   uint32_t filter_len = d_filter.Size(Rank-1);
   uint32_t full_len = signal_len + filter_len - 1;
 
@@ -222,9 +222,9 @@ __launch_bounds__(BLOCK_DIM_X * BLOCK_DIM_Y)
 __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                        matxConvCorrMode_t mode, int num_batch)
 {
-  using in1type = typename InType1::scalar_type;
-  using in2type = typename InType2::scalar_type;
-  using outtype = typename OutType::scalar_type;
+  using in1type = typename InType1::value_type;
+  using in2type = typename InType2::value_type;
+  using outtype = typename OutType::value_type;
 
   // length of signal chunk in shared memory
   constexpr int SIGNAL_CHUNK_X = BLOCK_DIM_X + FILTER_SHARED_CHUNK_X;

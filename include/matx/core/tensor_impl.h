@@ -71,7 +71,6 @@ class tensor_impl_t {
   public:
     // Type specifier for reflection on class
     using type = T; // TODO is this necessary
-    using scalar_type = T;
     using value_type = T;
     using tensor_view = bool;
     using desc_type = Desc;
@@ -615,6 +614,14 @@ class tensor_impl_t {
      *    A shape of the data with the appropriate dimensions set
      */
     __MATX_INLINE__ auto Shape() const noexcept { return this->desc_.Shape(); }
+
+    /**
+     * Get the strides the tensor from the underlying data
+     *
+     * @return
+     *    A shape of the data with the appropriate strides set
+     */
+    __MATX_INLINE__ auto Strides() const noexcept { return this->desc_.Strides(); }    
 
     /**
      * Set the size of a dimension

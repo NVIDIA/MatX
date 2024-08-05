@@ -49,7 +49,7 @@
 
 
 
-#if MATX_ENABLE_FILEIO || DOXYGEN_ONLY
+#if defined(MATX_ENABLE_FILEIO) || defined(DOXYGEN_ONLY)
 
 namespace matx {
 namespace io {
@@ -158,7 +158,7 @@ void read_csv(TensorType &t, const std::string fname,
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("genfromtxt")("fname"_a = fname.c_str(), "delimiter"_a = delimiter,
                                    "skip_header"_a = skip_header,
-                                   "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::scalar_type>());
+                                   "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::value_type>());
   pb->NumpyToTensorView(t, obj);
 }
 

@@ -101,7 +101,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   MATX_STATIC_ASSERT(OutputTensor::Rank() == 1, matxInvalidDim);
   index_t N = in.Size(OutputTensor::Rank() - 1);
 
-  tensor_t<cuda::std::complex<typename OutputTensor::scalar_type>, 1> tmp{{N + 1}};
+  tensor_t<cuda::std::complex<typename OutputTensor::value_type>, 1> tmp{{N + 1}};
 
   fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
   auto s = tmp.Slice({0}, {N});

@@ -50,9 +50,9 @@ are necessary
 ## Requirements
 MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
-**Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 11.5-11.8 or CUDA 12.2.1+ with MatX.
+**Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 11.8 or CUDA 12.2.1+ with MatX.
 
-MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.5 and g++9, nvc++ 24.5, or clang 17 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
+MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.8 and g++9, nvc++ 24.5, or clang 17 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
 MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
@@ -107,7 +107,7 @@ typically two ways to do this:
 1. Adding MatX as a subdirectory 
 2. Installing MatX to the system
 
-#### MatX as a Subdirectory
+#### 1. MatX as a Subdirectory
 Adding the subdirectory is useful if you include the MatX
 source into the directory structure of your project. Using this method, you can simply add the MatX directory:
 
@@ -117,7 +117,7 @@ add_subdirectory(path/to/matx)
 
 An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory.
 
-#### MatX Installed to the System
+#### 2. MatX Installed to the System
 The other option is to install MatX and use the configuration file provided after building. This is typically done in a way similar to what is
 shown below:
 
@@ -136,7 +136,12 @@ find_package(matx CONFIG REQUIRED)
 ```
 
 #### MatX CMake Targets
-Once either of the two methods above are done, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``.
+**Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``, e.g:
+
+```
+target_link_libraries(MyProject matx::matx)
+```
+
 MatX may add other optional targets in the future inside the matx:: namespace as well.
 
 

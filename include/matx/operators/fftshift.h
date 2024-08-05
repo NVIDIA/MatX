@@ -47,7 +47,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type; 
+        using value_type = typename T1::value_type; 
 
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
@@ -128,7 +128,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ FFTShift2DOp(T1 op) : op_(op){
           static_assert(Rank() >= 2, "2D FFT shift must have a rank 2 operator or higher");
@@ -199,7 +199,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ IFFTShift1DOp(T1 op) : op_(op) {
           static_assert(Rank() >= 1, "1D IFFT shift must have a rank 1 operator or higher");
@@ -269,7 +269,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ IFFTShift2DOp(T1 op) : op_(op) {
           static_assert(Rank() >= 2, "2D IFFT shift must have a rank 2 operator or higher");

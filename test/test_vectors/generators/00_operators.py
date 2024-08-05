@@ -2,7 +2,9 @@
 
 import numpy as np
 import scipy.signal as ss
+import scipy.linalg as sl
 from typing import Dict, List
+import matx_common
 
 class polyval_operator:
     def __init__(self, dtype: str, size: List[int]):
@@ -103,6 +105,30 @@ class contraction:
             'b_float3d': b1,
             'c_float3d': c1
         }
+
+class toeplitz:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype        
+        pass
+
+    def run(self) -> Dict[str, np.array]:
+        c = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        r = matx_common.randn_ndarray((self.size[1],), self.dtype)
+        r2 = matx_common.randn_ndarray((self.size[2],), self.dtype)
+
+        # The first element in each array must match
+        r[0]  = c[0]
+        r2[0] = c[0]
+
+        return {
+            'c': c,
+            'r': r,
+            'r2': r2,
+            'out1': sl.toeplitz(c),
+            'out2': sl.toeplitz(c, r),
+            'out3': sl.toeplitz(c, r2)
+        }        
 
 class pwelch_operators:
     def __init__(self, dtype: str, cfg: Dict): #PWelchGeneratorCfg):

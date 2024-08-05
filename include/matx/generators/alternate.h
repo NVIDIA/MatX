@@ -43,7 +43,7 @@ namespace matx
         index_t size_;
 
       public:
-        using scalar_type = T;
+        using value_type = T;
         using matxop = bool;        
 
 	      __MATX_INLINE__ std::string str() const { return "alternate"; }

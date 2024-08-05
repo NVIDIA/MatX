@@ -225,11 +225,30 @@ namespace matx
 // This macro asserts compatible dimensions of current class to an operator.
 #define ASSERT_COMPATIBLE_OP_SIZES(op)                               \
   if constexpr (Rank() > 0) {                                        \
+    bool compatible = true;                                          \
     _Pragma("unroll")                                                \
     for (int32_t i = 0; i < Rank(); i++) {                           \
       [[maybe_unused]] index_t size = matx::detail::get_expanded_size<Rank()>(op, i);       \
-      MATX_ASSERT_STR(size == 0 || size == Size(i), matxInvalidSize, "incompatible op sizes:" + str());    \
+      compatible = (size == 0 || size == Size(i));                   \
     }                                                                \
-  } 
+    if (!compatible) { \
+      std::cerr << "Incompatible operator sizes: ("; \
+      for (int32_t i = 0; i < Rank(); i++) { \
+        std::cerr << Size(i); \
+        if (i != Rank() - 1) { \
+          std::cerr << ","; \
+        } \
+      } \
+      std::cerr << ") not compatible with ("; \
+      for (int32_t i = 0; i < Rank(); i++) { \
+        std::cerr << matx::detail::get_expanded_size<Rank()>(op, i); \
+        if (i != Rank() - 1) { \
+          std::cerr << ","; \
+        } \
+      } \
+      std::cerr << ")" << std::endl; \
+      MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
+    }                   \
+  }    
 
 } // end namespace matx

@@ -42,7 +42,7 @@ namespace matx
         Range<T> range_;
 
       public:
-        using scalar_type = T;
+        using value_type = T;
 
         __MATX_INLINE__ std::string str() const { return "logspace"; }
 	

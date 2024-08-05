@@ -34,7 +34,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/make_tensor.h"
 
-#if MATX_ENABLE_PYBIND11
+#ifdef MATX_ENABLE_PYBIND11
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -93,6 +93,7 @@ public:
         // Interpreter already running
       }
     }
+
     AddPath(std::string(MATX_ROOT) + GENERATORS_PATH);
   }
 
@@ -176,7 +177,7 @@ public:
   template <typename TensorType>
   static pybind11::object GetEmptyNumpy(const TensorType &ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     auto np = pybind11::module_::import("numpy");
     pybind11::list dims;
 
@@ -329,7 +330,7 @@ public:
   void NumpyToTensorView(TensorType ten,
                          const pybind11::object &np_ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     constexpr int RANK = TensorType::Rank();
     static_assert(RANK <=5, "NumpyToTensorView only supports max(RANK) = 5 at the moment.");
 
@@ -377,7 +378,7 @@ public:
   template <typename TensorType>
   auto NumpyToTensorView(const pybind11::object &np_ten)
   {
-    using T = typename TensorType::scalar_type;
+    using T = typename TensorType::value_type;
     constexpr int RANK = TensorType::Rank();
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(np_ten);
@@ -397,57 +398,81 @@ public:
   }
 
   template <typename TensorType>
-  auto TensorViewToNumpy(const TensorType &ten)
-  {
+  auto TensorViewToNumpy(const TensorType &ten) {
+    using tensor_type = typename TensorType::value_type;
+    using ntype = matx_convert_complex_type<tensor_type>;
     constexpr int RANK = TensorType::Rank();
-    static_assert(RANK <=5, "TensorViewToNumpy only supports max(RANK) = 5 at the moment.");
 
-    using ntype = matx_convert_complex_type<typename TensorType::scalar_type>;
-    auto ften = pybind11::array_t<ntype>(ten.Shape());
+    // If this is a half-precision type pybind/numpy doesn't support it, so we fall back to the
+    // slow method where we convert everything
+    if constexpr (is_matx_type<tensor_type>()) {
+      auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(ten.Shape());
 
-    for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
-      if constexpr (RANK > 1) {
-        for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
-          if constexpr (RANK > 2) {
-            for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
-              if constexpr (RANK > 3) {
-                for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                  if constexpr (RANK > 4) {
-                    for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
-                      ften.mutable_at(s1, s2, s3, s4, s5) =
-                          ConvertComplex(ten(s1, s2, s3, s4, s5));
+      for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
+        if constexpr (RANK > 1) {
+          for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
+            if constexpr (RANK > 2) {
+              for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
+                if constexpr (RANK > 3) {
+                  for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
+                    if constexpr (RANK > 4) {
+                      for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
+                        ften.mutable_at(s1, s2, s3, s4, s5) =
+                            ConvertComplex(ten(s1, s2, s3, s4, s5));
+                      }
+                    } else {
+                      ften.mutable_at(s1, s2, s3, s4) =
+                          ConvertComplex(ten(s1, s2, s3, s4));
                     }
-                  } else {
-                    ften.mutable_at(s1, s2, s3, s4) =
-                        ConvertComplex(ten(s1, s2, s3, s4));
                   }
                 }
-              }
-              else {
-                ften.mutable_at(s1, s2, s3) = ConvertComplex(ten(s1, s2, s3));
+                else {
+                  ften.mutable_at(s1, s2, s3) = ConvertComplex(ten(s1, s2, s3));
+                }
               }
             }
-          }
-          else {
-            ften.mutable_at(s1, s2) = ConvertComplex(ten(s1, s2));
+            else {
+              ften.mutable_at(s1, s2) = ConvertComplex(ten(s1, s2));
+            }
           }
         }
+        else {
+          ften.mutable_at(s1) = ConvertComplex(ten(s1));
+        }
       }
-      else {
-        ften.mutable_at(s1) = ConvertComplex(ten(s1));
-      }
-    }
 
-    return ften;
+      return ften;      
+    }
+    else {
+      const auto tshape = ten.Shape();
+      const auto tstrides = ten.Strides();
+      std::vector<pybind11::ssize_t> shape{tshape.begin(), tshape.end()};
+      std::vector<pybind11::ssize_t> strides{tstrides.begin(), tstrides.end()};
+      std::for_each(strides.begin(), strides.end(), [](pybind11::ssize_t &x) {
+        x *= sizeof(tensor_type);
+      });      
+
+      auto buf = pybind11::buffer_info(
+          ten.Data(), 
+          sizeof(tensor_type),
+          pybind11::format_descriptor<ntype>::format(),
+          RANK,
+          shape,
+          strides
+      );
+
+      return pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(buf);      
+    }
   }
 
+
   template <typename TensorType,
-            typename CT = matx_convert_cuda_complex_type<typename TensorType::scalar_type>>
+            typename CT = matx_convert_cuda_complex_type<typename TensorType::value_type>>
   std::optional<TestFailResult<CT>>
   CompareOutput(const TensorType &ten,
                 const std::string fname, double thresh, bool debug = false)
   {
-    using raw_type = typename TensorType::scalar_type;    
+    using raw_type = typename TensorType::value_type;    
     using ntype = matx_convert_complex_type<raw_type>;
     using ctype = matx_convert_cuda_complex_type<raw_type>;
     auto resobj = res_dict[fname.c_str()];

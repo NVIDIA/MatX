@@ -75,8 +75,8 @@ struct FftCUDAParams_t {
 template <typename OutTensorType, typename InTensorType> class matxCUDAFFTPlan_t {
 public:
   using index_type = typename OutTensorType::shape_type;
-  using T1    = typename OutTensorType::scalar_type;
-  using T2    = typename InTensorType::scalar_type;
+  using T1    = typename OutTensorType::value_type;
+  using T2    = typename InTensorType::value_type;
   static constexpr auto RANK = OutTensorType::Rank();
   static_assert(OutTensorType::Rank() == InTensorType::Rank(), "Input and output FFT ranks must match");
 
@@ -101,7 +101,7 @@ public:
     cufftSetStream(this->plan_, stream);
 
     // Normalize input if necessary
-    using s_type = typename detail::value_promote_t<typename InTensorType::scalar_type>;
+    using s_type = typename detail::value_promote_t<typename InTensorType::value_type>;
     s_type factor;
     if (params_.fft_rank == 1) {
       factor = static_cast<s_type>(params_.n[0]);
@@ -142,7 +142,7 @@ public:
 
     // cuFFT doesn't scale IFFT the same as MATLAB/Python. Scale it here to
     // match
-    using s_type = typename detail::value_promote_t<typename OutTensorType::scalar_type>;
+    using s_type = typename detail::value_promote_t<typename OutTensorType::value_type>;
     s_type factor;
     if (params_.fft_rank == 1) {
       factor = static_cast<s_type>(params_.n[0]);
@@ -193,7 +193,7 @@ public:
 
         params.batch = 1;
         for (int dim = i.Rank() - 2; dim >= 0; dim--) {
-          if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::scalar_type)) > max_for_fft_workspace) {
+          if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::value_type)) > max_for_fft_workspace) {
             break;
           }
 
@@ -369,8 +369,8 @@ protected:
 template <typename OutTensorType, typename InTensorType = OutTensorType>
 class matxCUDAFFTPlan1D_t : public matxCUDAFFTPlan_t<OutTensorType, InTensorType> {
 public:
-  using T1    = typename OutTensorType::scalar_type;
-  using T2    = typename InTensorType::scalar_type;
+  using T1    = typename OutTensorType::value_type;
+  using T2    = typename InTensorType::value_type;
   static constexpr int RANK = OutTensorType::Rank();
 
 /**
@@ -506,8 +506,8 @@ template <typename OutTensorType, typename InTensorType = OutTensorType>
 class matxCUDAFFTPlan2D_t : public matxCUDAFFTPlan_t<OutTensorType, InTensorType> {
 public:
   static constexpr int RANK = OutTensorType::Rank();
-  using T1    = typename OutTensorType::scalar_type;
-  using T2    = typename InTensorType::scalar_type;
+  using T1    = typename OutTensorType::value_type;
+  using T2    = typename InTensorType::value_type;
 
   /**
    * Construct a 2D FFT plan
@@ -667,7 +667,7 @@ using fft_cuda_cache_t = std::unordered_map<FftCUDAParams_t, std::any, FftCUDAPa
 template <typename TensorOp>
 __MATX_INLINE__ auto getCufft1DSupportedTensor( const TensorOp &in, cudaStream_t stream) {
   if constexpr ( !(is_tensor_view_v<TensorOp>)) {
-    return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
 
     bool supported = true;
@@ -676,7 +676,7 @@ __MATX_INLINE__ auto getCufft1DSupportedTensor( const TensorOp &in, cudaStream_t
     if (supported) {
       return in;
     } else {
-      return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
     }
   }
 }
@@ -687,7 +687,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
   constexpr int IRANK = TensorOp::Rank();
 
   if constexpr ( !is_tensor_view_v<TensorOp>) {
-    return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
     bool supported = true;
 
@@ -703,7 +703,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t
     if (supported) {
       return in;
     } else {
-      return make_tensor<typename TensorOp::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
     }
   }
 }

@@ -842,7 +842,7 @@ namespace detail {
       PrintKernel<<<1, 1>>>(op, dims...);
     }
     else {
-      auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+      auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
       (tmpv = op).run();
       PrintData(fp, tmpv, dims...);
     }
@@ -911,7 +911,7 @@ void PrintData(FILE* fp, const Op &op, Args... dims) {
     }
   }
   else {
-    auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+    auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
     (tmpv = op).run();
     cudaStreamSynchronize(0);
     InternalPrint(fp, tmpv, dims...);
@@ -962,7 +962,7 @@ void PrintData(FILE* fp, const Op &op, Args... dims) {
 //         PrintKernel<<<1, 1>>>(op, dims...);
 //       }
 //       else {
-//         auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+//         auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
 //         (tmpv = op).run();
 //         PrintData(tmpv, dims...);
 //       }
@@ -1004,7 +1004,7 @@ void fprint(FILE* fp, const Op &op, Args... dims)
   // print tensor size info first
   std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
 
-  fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::scalar_type>().c_str(), op.Rank());
+  fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorType<typename Op::value_type>().c_str(), op.Rank());
 
   for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
   {
@@ -1110,7 +1110,7 @@ void print(const Op &op)
 template <typename Op>
 auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
   if constexpr (!is_tensor_view_v<Op>) {
-    return make_tensor<typename remove_cvref<Op>::scalar_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
     return op;
   }

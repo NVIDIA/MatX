@@ -49,12 +49,12 @@ namespace matx
         double tol_;
         int max_iters_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable detail::tensor_impl_t<typename OpA::scalar_type, 2> tmp_out_;
-        mutable typename OpA::scalar_type *ptr;               
+        mutable detail::tensor_impl_t<typename OpA::value_type, 2> tmp_out_;
+        mutable typename OpA::value_type *ptr;               
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using cgsolve_xform_op = bool;
 

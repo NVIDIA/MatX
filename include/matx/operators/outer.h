@@ -50,12 +50,12 @@ namespace matx
         float beta_;
         static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
         cuda::std::array<index_t, RANK> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, RANK> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable matx::tensor_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using outer_xform_op = bool;
 
@@ -98,8 +98,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          static_assert(is_cuda_executor_v<Executor>, "outer() only supports the CUDA executor currently");
-          outer_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+          outer_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
         }
 
         template <typename ShapeType, typename Executor>

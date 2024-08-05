@@ -90,7 +90,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T3::scalar_type;
+        using value_type = typename T3::value_type;
 
         __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
@@ -100,10 +100,10 @@ namespace matx
         }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ scalar_type operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
           {
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T3::Rank()> xinds;
+            cuda::std::array<index_t, T3::Rank()> xinds{};
             
             int axis1 = axis_[0];
             int axis2 = axis_[1];
@@ -130,13 +130,13 @@ namespace matx
 
             auto x = cuda::std::apply(in_, xinds);
 
-            scalar_type ret;
+            value_type ret;
 
             // if we are half precision up cast to float
-            if constexpr (is_complex_half_v<scalar_type>) {
-              ret = static_cast<scalar_type>(legendre(n, m, cuda::std::complex<float>(x)));
-            } else if constexpr (is_matx_half_v<scalar_type>) {
-              ret = static_cast<scalar_type>(legendre(n, m, float(x)));
+            if constexpr (is_complex_half_v<value_type>) {
+              ret = static_cast<value_type>(legendre(n, m, cuda::std::complex<float>(x)));
+            } else if constexpr (is_matx_half_v<value_type>) {
+              ret = static_cast<value_type>(legendre(n, m, float(x)));
             } else {
               ret = legendre(n, m, x);
             }

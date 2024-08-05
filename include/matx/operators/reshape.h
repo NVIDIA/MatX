@@ -47,7 +47,7 @@ namespace matx
       class ReshapeOp : public BaseOp<ReshapeOp<RANK, T, ShapeType>>
     {
       public: 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
 	
       private:
         T op_;
@@ -56,6 +56,7 @@ namespace matx
       public:
         using matxop = bool;
         using matxoplvalue = bool;
+        using self_type = ReshapeOp<RANK, T, ShapeType>;
 
         __MATX_INLINE__ std::string str() const { return "reshape(" + op_.str() + ")"; }
 
@@ -149,7 +150,13 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<S2>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }  
+
+        ~ReshapeOp() = default;
+        ReshapeOp(const ReshapeOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }                      
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

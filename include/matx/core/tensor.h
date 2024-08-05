@@ -87,7 +87,7 @@ class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
 public:
   // Type specifier for reflection on class
   using type = T; ///< Type of traits
-  using scalar_type = T; ///< Type of traits
+  using value_type = T; ///< Type of traits
   // Type specifier for signaling this is a matx operation or tensor view
   using matxop = bool; ///< Indicate this is a MatX operator
   using matxoplvalue = bool; ///< Indicate this is a MatX operator that can be on the lhs of an equation

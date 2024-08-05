@@ -47,8 +47,7 @@ namespace matx {
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorIterator {
   using self_type = RandomOperatorIterator<OperatorType, ConvertType>;
-  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::scalar_type>, typename OperatorType::scalar_type>;
-  using scalar_type = value_type;
+  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
@@ -174,8 +173,7 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOper
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorOutputIterator {
   using self_type = RandomOperatorOutputIterator<OperatorType, ConvertType>;
-  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::scalar_type>, typename OperatorType::scalar_type>;
-  using scalar_type = value_type;
+  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;

@@ -47,8 +47,8 @@ namespace matx
 
         public:
           using matxop = bool;
-          using scalar_type = typename T1::scalar_type;
-          //typedef typename T1::scalar_type scalar_type;
+          using value_type = typename T1::value_type;
+          //typedef typename T1::value_type value_type;
 
           __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 

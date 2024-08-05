@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/matmul.h"
+#include "matx/transforms/matmul/matmul_cuda.h"
+#ifdef MATX_EN_CPU_MATMUL
+  #include "matx/transforms/matmul/matmul_cblas.h"
+#endif
 
 namespace matx
 {
@@ -51,12 +54,13 @@ namespace matx
         PermDims perm_; 
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, out_rank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
+        mutable matx::tensor_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using matmul_xform_op = bool;
 
@@ -107,12 +111,11 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_cuda_executor_v<Executor>, "matmul() only supports the CUDA executor currently");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
           }
           else {
-            matmul_impl(cuda::std::get<0>(out), a_, b_, ex.getStream(), alpha_, beta_);
+            matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
           }
         }
 

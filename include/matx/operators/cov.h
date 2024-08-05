@@ -46,12 +46,12 @@ namespace matx
       private:
         OpA a_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::scalar_type, OpA::Rank()> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::scalar_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
       public:
         using matxop = bool;
-        using scalar_type = typename OpA::scalar_type;
+        using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using cov_xform_op = bool;
 
@@ -85,7 +85,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "cov() only supports the CUDA executor currently");
-          cov_impl(cuda::std::get<0>(out), a_, ex.getStream());
+          cov_impl(cuda::std::get<0>(out), a_, ex);
         }
 
         template <typename ShapeType, typename Executor>

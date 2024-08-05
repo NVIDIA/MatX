@@ -88,7 +88,7 @@ namespace matx
   template <typename T = int> 
   inline auto ones()
   {
-    return ones<T, NoShape>(NoShape{});
+    return ones<T, detail::NoShape>(detail::NoShape{});
   }  
 
 } // end namespace matx

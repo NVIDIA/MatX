@@ -40,16 +40,74 @@ namespace matx {
   namespace detail {
 
 // FFT
-#if defined(MATX_EN_NVPL)
+#if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     #define MATX_EN_CPU_FFT 1
 #else
     #define MATX_EN_CPU_FFT 0
+#endif
+
+// MatMul
+#if defined(MATX_EN_NVPL) || defined(MATX_EN_OPENBLAS) || defined(MATX_EN_BLIS)
+    #define MATX_EN_CPU_MATMUL 1
+#else
+    #define MATX_EN_CPU_MATMUL 0
 #endif  
 
-template <typename Exec>
+template <typename Exec, typename T>
 constexpr bool CheckFFTSupport() {
   if constexpr (is_host_executor_v<Exec>) {
-    return MATX_EN_CPU_FFT;
+    if constexpr (is_complex_half_v<T>) {
+      return false;
+    } else {
+      return MATX_EN_CPU_FFT;
+    }
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool CheckDirect1DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return false;
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec, typename T>
+constexpr bool CheckFFT1DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return CheckFFTSupport<Exec, T>();
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool Check2DConvSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return false;
+  }
+  else {
+    return true;
+  }
+}
+
+template <typename Exec, typename T>
+constexpr bool CheckMatMulSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    if constexpr (std::is_same_v<T, float> ||
+                  std::is_same_v<T, double> ||
+                  std::is_same_v<T, cuda::std::complex<float>> ||
+                  std::is_same_v<T, cuda::std::complex<double>>) {
+      return MATX_EN_CPU_MATMUL;
+    } else {
+      return false;
+    }
   }
   else {
     return true;

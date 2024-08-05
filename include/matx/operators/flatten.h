@@ -48,7 +48,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
 
         __MATX_INLINE__ std::string str() const { return "flatten(" + op1_.str() + ")"; }
  

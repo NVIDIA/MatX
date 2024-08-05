@@ -1589,6 +1589,44 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
     }
   }
 
+  {
+    // Remap as both LHS and RHS
+    auto in = make_tensor<TestType>({4,4,4});
+    auto out = make_tensor<TestType>({4,4,4});
+    TestType c = GenerateData<TestType>();
+    for (int i = 0; i < in.Size(0); i++){
+      for (int j = 0; j < in.Size(1); j++){
+        for (int k = 0; k < in.Size(2); k++){
+          in(i,j,k) = c;
+        }
+      }
+    }
+
+    auto map1 = matx::make_tensor<int>({2});
+    auto map2 = matx::make_tensor<int>({2});
+    map1(0) = 1;
+    map1(1) = 2;
+    map2(0) = 0;
+    map2(1) = 1;
+
+    (out = static_cast<TestType>(0)).run(exec);
+    (matx::remap<2>(out, map2) = matx::remap<2>(in, map1)).run(exec);
+    exec.sync();
+
+    for (int i = 0; i < in.Size(0); i++){
+      for (int j = 0; j < in.Size(1); j++){
+        for (int k = 0; k < in.Size(2); k++){
+          if (k > 1) {
+            ASSERT_EQ(out(i,j,k), (TestType)0);
+          }
+          else {
+            ASSERT_EQ(out(i,j,k), in(i,j,k));
+          }
+        }
+      }
+    } 
+  }
+
   MATX_EXIT_HANDLER();
 }
 
@@ -1874,6 +1912,12 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_sqrt(c)));      
 
+  // example-begin rsqrt-test-1
+  (tov0 = rsqrt(tiv0)).run(exec);
+  // example-end rsqrt-test-1
+  exec.sync();
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_rsqrt(c)));   
+
   MATX_EXIT_HANDLER();
 }
 
@@ -1898,6 +1942,46 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
   (t0 = sum(a)).run(exec);
   exec.sync();
   ASSERT_EQ(t0(), static_cast<TestType>(2 * a.TotalSize()));
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsFloatAllExecs, Toeplitz)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  pb->InitAndRunTVGenerator<TestType>("00_operators", "toeplitz", "run", {5, 5, 6});
+
+  ExecType exec{};
+  auto out1 = make_tensor<TestType>({5, 5});
+  auto out2 = make_tensor<TestType>({5, 5});
+  auto out3 = make_tensor<TestType>({5, 6});
+  auto c = make_tensor<TestType>({5});
+  auto r = make_tensor<TestType>({5});
+  auto r2 = make_tensor<TestType>({6});
+
+  pb->NumpyToTensorView(c, "c");
+  pb->NumpyToTensorView(r, "r");
+  pb->NumpyToTensorView(r2, "r2");
+
+  // example-begin toeplitz-test-1
+  (out1 = toeplitz(c)).run(exec);
+  // example-end toeplitz-test-1
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(pb, out1, "out1", 0.01);
+
+  // example-begin toeplitz-test-2
+  (out2 = toeplitz(c, r)).run(exec);
+  // example-end toeplitz-test-2
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(pb, out2, "out2", 0.01);  
+
+  (out3 = toeplitz(c, r2)).run(exec);
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(pb, out3, "out3", 0.01);  
+
   MATX_EXIT_HANDLER();
 }
 
@@ -3698,7 +3782,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   using ComplexType = detail::complex_from_scalar_t<TestType>;
 
   // r2c requires FFT support, so we need to check the executor here
-  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
     GTEST_SKIP();
   }  
 
@@ -3780,7 +3864,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
+TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -3789,9 +3873,9 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FftShiftWithTransform)
   using inner_type = typename inner_op_type_t<TestType>::type;
   using complex_type = detail::complex_from_scalar_t<inner_type>;
 
-  if constexpr (!detail::CheckFFTSupport<ExecType>()) {
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
     GTEST_SKIP();
-  }  
+  }
   
   ExecType exec{};
 

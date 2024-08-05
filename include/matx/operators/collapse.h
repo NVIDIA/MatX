@@ -48,9 +48,10 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
         using shape_type = index_t;
         using matxoplvalue = bool;
+        using self_type = LCollapseOp<DIM, T1>;
 
         __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 op) : op_(op)
@@ -132,6 +133,12 @@ namespace matx
             return op_.Size(DIM + dim - 1);
         }
 
+        ~LCollapseOp() = default;
+        LCollapseOp(const LCollapseOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }              
+
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 
           if constexpr (is_matx_transform_op<R>()) {
@@ -196,9 +203,10 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = typename T1::scalar_type;
+        using value_type = typename T1::value_type;
         using shape_type = index_t;
         using matxlvalue = bool;
+        using self_type = RCollapseOp<DIM, T1>;
 
         __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
@@ -280,6 +288,12 @@ namespace matx
           else // otherwise return the un-collapsed size from operator
             return op_.Size(dim);
         }
+
+        ~RCollapseOp() = default;
+        RCollapseOp(const RCollapseOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }           
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

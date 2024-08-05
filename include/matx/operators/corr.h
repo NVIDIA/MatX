@@ -44,8 +44,8 @@ namespace matx
     class CorrOp : public BaseOp<CorrOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-              typename OpA::scalar_type, typename OpB::scalar_type>;
+        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+              typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         OpA a_;
         OpB b_;
@@ -58,7 +58,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = out_t;
+        using value_type = out_t;
         using matx_transform_op = bool;
         using conv_xform_op = bool;
 
@@ -135,14 +135,14 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_cuda_executor_v<Executor>, "corr() only supports the CUDA executor currently");
+          MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct corr() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "corr: inputs and outputs must have same rank to use corr with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            corr_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex.getStream());
+            corr_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
           }
           else {
-            corr_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex.getStream());
+            corr_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex);
           }
         }
 

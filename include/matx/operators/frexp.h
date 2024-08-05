@@ -48,12 +48,12 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = typename OpA::scalar_type;
+      using value_type = typename OpA::value_type;
 
       __MATX_INLINE__ std::string str() const { return "frexp()"; }
       __MATX_INLINE__ FrexpOp(OpA a) : a_(a) { 
-        static_assert(std::is_floating_point_v<scalar_type> ||
-                      is_cuda_complex_v<scalar_type>, "frexp() must take a floating point input");
+        static_assert(std::is_floating_point_v<value_type> ||
+                      is_cuda_complex_v<value_type>, "frexp() must take a floating point input");
 
       };
 
@@ -61,8 +61,8 @@ namespace detail {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
         [[maybe_unused]] int rexp;        
-        if constexpr (is_cuda_complex_v<scalar_type>) {
-          if constexpr (std::is_same_v<float, typename scalar_type::value_type>) {
+        if constexpr (is_cuda_complex_v<value_type>) {
+          if constexpr (std::is_same_v<float, typename value_type::value_type>) {
             if constexpr (WHICH == 0) { // real fractional
               const auto frac = cuda::std::frexpf(a_(indices...).real(), &rexp);
               return frac;
@@ -94,7 +94,7 @@ namespace detail {
           }
         }
         else {
-          if constexpr (std::is_same_v<float, scalar_type>) {
+          if constexpr (std::is_same_v<float, value_type>) {
             [[maybe_unused]] const float frac = cuda::std::frexpf(a_(indices...), &rexp);
             if constexpr (WHICH == 0) { // fractional
               return frac;

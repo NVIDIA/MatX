@@ -69,9 +69,9 @@ __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_thread)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     extern __shared__ uint8_t smem_filter[];
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
@@ -232,7 +232,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
 }
 
 template <int THREADS, typename FilterType>
-__device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::scalar_type *s_filter, const FilterType &filter)
+__device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::value_type *s_filter, const FilterType &filter)
 {
     const index_t filter_len = filter.Size(0);
     const int tid = threadIdx.x;
@@ -241,7 +241,7 @@ __device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::scalar_typ
             s_filter[t+1] = filter.operator()(t);
         }
         if (tid == 0) {
-            s_filter[0] = static_cast<typename FilterType::scalar_type>(0);
+            s_filter[0] = static_cast<typename FilterType::value_type>(0);
         }
     } else {
         for (int t = tid; t < filter_len; t += THREADS) {
@@ -256,9 +256,9 @@ __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_thread)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     extern __shared__ uint8_t smem_filter[];
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
@@ -368,9 +368,9 @@ __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_warp)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     auto block = cg::this_thread_block();
     auto tile = cg::tiled_partition<WARP_SIZE>(block);

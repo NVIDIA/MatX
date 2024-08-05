@@ -78,7 +78,7 @@ namespace matx
       }
 
 #ifdef __CUDACC__  
-      size_t shm = sizeof(typename OutputTensor::scalar_type) * TILE_DIM * (TILE_DIM + 1);
+      size_t shm = sizeof(typename OutputTensor::value_type) * TILE_DIM * (TILE_DIM + 1);
       if constexpr (RANK == 2)
       {
         dim3 block(TILE_DIM, TILE_DIM);
@@ -102,9 +102,9 @@ namespace matx
 #endif    
     };
   
-  template <typename OutputTensor, typename InputTensor>
+  template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
     __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in, HostExecutor exec)
+        const InputTensor &in, HostExecutor<MODE> &exec)
     {
       static_assert(InputTensor::Rank() >= 2, "transpose_matrix operator must be on rank 2 or greater");
 

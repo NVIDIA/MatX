@@ -44,8 +44,8 @@ namespace matx
     class Conv1DOp : public BaseOp<Conv1DOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-              typename OpA::scalar_type, typename OpB::scalar_type>;
+        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+              typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         OpA a_;
         OpB b_;
@@ -60,7 +60,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using scalar_type = out_t;
+        using value_type = out_t;
         using matx_transform_op = bool;
         using conv_xform_op = bool;
 
@@ -71,7 +71,7 @@ namespace matx
         __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
 
-          MATX_ASSERT_STR((!is_matx_type_v<typename OpA::scalar_type> && !is_matx_type_v<typename OpB::scalar_type>) || 
+          MATX_ASSERT_STR((!is_matx_type_v<typename OpA::value_type> && !is_matx_type_v<typename OpB::value_type>) || 
                           method == MATX_C_METHOD_DIRECT, 
             matxInvalidType, "FFT convolutions do not support half precision float currently");
 
@@ -149,14 +149,14 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          static_assert(is_cuda_executor_v<Executor>, "conv1d() only supports the CUDA executor currently");
+          MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex.getStream());
+            conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
           }
           else {
-            conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex.getStream());
+            conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex);
           }
         }
 
@@ -234,8 +234,8 @@ namespace detail {
   class Conv2DOp : public BaseOp<Conv2DOp<OpA, OpB, PermDims>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-            typename OpA::scalar_type, typename OpB::scalar_type>;
+      using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+            typename OpA::value_type, typename OpB::value_type>;
       constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
       OpA a_;
       OpB b_;
@@ -247,7 +247,7 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using scalar_type = out_t;
+      using value_type = out_t;
       using matx_transform_op = bool;
       using conv_xform_op = bool;
 

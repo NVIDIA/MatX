@@ -46,8 +46,9 @@ namespace matx
       class SliceOp : public BaseOp<SliceOp<DIM, T>>
     {
       public: 
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         using shape_type = index_t; 
+        using self_type = SliceOp<DIM, T>;
 
       private:
         typename base_type<T>::type op_;
@@ -157,6 +158,12 @@ namespace matx
         {
           return sizes_[dim];
         }
+
+        ~SliceOp() = default;
+        SliceOp(const SliceOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }            
 
         template<typename R> 
         __MATX_INLINE__ auto operator=(const R &rhs) { 

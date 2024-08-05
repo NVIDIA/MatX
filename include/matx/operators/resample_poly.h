@@ -46,8 +46,8 @@ namespace detail {
   class ResamplePolyOp : public BaseOp<ResamplePolyOp<OpA, FilterType>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::scalar_type>, 
-            typename FilterType::scalar_type, typename FilterType::scalar_type>;          
+      using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+            typename FilterType::value_type, typename FilterType::value_type>;          
       OpA a_;
       FilterType f_;
       index_t up_;
@@ -60,7 +60,7 @@ namespace detail {
       using matxop = bool;
       using matx_transform_op = bool;
       using resample_poly_xform_op = bool;
-      using scalar_type = out_t;            
+      using value_type = out_t;            
 
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ResamplePolyOp(OpA a, const FilterType &f, index_t up, index_t down) : 

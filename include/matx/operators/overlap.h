@@ -46,8 +46,9 @@ namespace matx
       class OverlapOp : public BaseOp<OverlapOp<DIM, T>>
     {
       public:
-        using scalar_type = typename T::scalar_type;
+        using value_type = typename T::value_type;
         using shape_type = index_t;
+        using self_type = OverlapOp<DIM, T>;
 
       private:
         typename base_type<T>::type op_;
@@ -118,7 +119,13 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        } 
+
+        ~OverlapOp() = default;
+        OverlapOp(const OverlapOp &rhs) = default;
+        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
+          return set(*this, rhs); 
+        }                       
 
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {

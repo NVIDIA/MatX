@@ -120,7 +120,7 @@ public:
    */
   template <typename TensorType>
   static inline auto
-  TransposeCopy(typename TensorType::scalar_type *tp, const TensorType &a, cudaStream_t stream = 0)
+  TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, cudaStream_t stream = 0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -183,7 +183,7 @@ template <typename OutputTensor, typename ATensor>
 class matxDnCholSolverPlan_t : public matxDnSolver_t {
   using OutTensor_t = remove_cvref_t<OutputTensor>;
   static_assert(OutTensor_t::Rank() == remove_cvref_t<ATensor>::Rank(), "Cholesky input/output tensor ranks must match");
-  using T1 = typename OutTensor_t::scalar_type;
+  using T1 = typename OutTensor_t::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
 
 public:
@@ -337,9 +337,9 @@ template <typename OutputTensor, typename PivotTensor, typename ATensor>
 class matxDnLUSolverPlan_t : public matxDnSolver_t {
   using OutTensor_t = remove_cvref_t<OutputTensor>;
   static constexpr int RANK = OutTensor_t::Rank();
-  using T1 = typename OutTensor_t::scalar_type;
+  using T1 = typename OutTensor_t::value_type;
   static_assert(RANK-1 == PivotTensor::Rank(), "Pivot tensor rank must be one less than output");
-  static_assert(std::is_same_v<typename PivotTensor::scalar_type, int64_t>, "Pivot tensor type must be int64_t");
+  static_assert(std::is_same_v<typename PivotTensor::value_type, int64_t>, "Pivot tensor type must be int64_t");
 
 public:
   /**
@@ -508,7 +508,7 @@ struct DnQRParams_t {
 template <typename OutTensor, typename TauTensor, typename ATensor>
 class matxDnQRSolverPlan_t : public matxDnSolver_t {
   using out_type_t = remove_cvref_t<OutTensor>;
-  using T1 = typename out_type_t::scalar_type;
+  using T1 = typename out_type_t::value_type;
   static constexpr int RANK = out_type_t::Rank();
   static_assert(out_type_t::Rank()-1 == TauTensor::Rank(), "Tau tensor must be one rank less than output tensor");
   static_assert(out_type_t::Rank() == ATensor::Rank(), "Output tensor must match A tensor rank in SVD");
@@ -690,10 +690,10 @@ struct DnSVDParams_t {
 
 template <typename UTensor, typename STensor, typename VTensor, typename ATensor>
 class matxDnSVDSolverPlan_t : public matxDnSolver_t {
-  using T1 = typename ATensor::scalar_type;
-  using T2 = typename UTensor::scalar_type;
-  using T3 = typename STensor::scalar_type;
-  using T4 = typename VTensor::scalar_type;
+  using T1 = typename ATensor::value_type;
+  using T2 = typename UTensor::value_type;
+  using T3 = typename STensor::value_type;
+  using T4 = typename VTensor::value_type;
   static constexpr int RANK = UTensor::Rank();
   static_assert(UTensor::Rank()-1 == STensor::Rank(), "S tensor must be 1 rank lower than U tensor in SVD");
   static_assert(UTensor::Rank() == ATensor::Rank(), "U tensor must match A tensor rank in SVD");
@@ -907,8 +907,8 @@ struct DnEigParams_t {
 template <typename OutputTensor, typename WTensor, typename ATensor>
 class matxDnEigSolverPlan_t : public matxDnSolver_t {
 public:
-  using T2 = typename WTensor::scalar_type;
-  using T1 = typename ATensor::scalar_type;
+  using T2 = typename WTensor::value_type;
+  using T1 = typename ATensor::value_type;
   static constexpr int RANK = remove_cvref_t<OutputTensor>::Rank();
   static_assert(RANK == ATensor::Rank(), "Output and A tensor ranks must match for eigen solver");
   static_assert(RANK-1 == WTensor::Rank(), "W tensor must be one rank lower than output for eigen solver");
@@ -1115,7 +1115,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
-  using T1 = typename OutputTensor_t::scalar_type;
+  using T1 = typename OutputTensor_t::value_type;
 
   auto a_new = OpToTensor(a, stream);
 
@@ -1197,7 +1197,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using T1 = typename remove_cvref_t<OutputTensor>::scalar_type;
+  using T1 = typename remove_cvref_t<OutputTensor>::value_type;
 
   auto piv_new = OpToTensor(piv, stream);
   auto a_new = OpToTensor(a, stream);
@@ -1291,7 +1291,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   s[RANK - 2] = cuda::std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
 
   auto piv = make_tensor<int64_t>(s, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto ac = make_tensor<typename OutputTensor::scalar_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto ac = make_tensor<typename OutputTensor::value_type>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
   lu_impl(ac, piv, a_new, stream);
   (out = prod(diag(ac))).run(stream);
@@ -1327,7 +1327,7 @@ void cusolver_qr_impl(OutTensor &&out, TauTensor &&tau,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using T1 = typename remove_cvref_t<OutTensor>::scalar_type;
+  using T1 = typename remove_cvref_t<OutTensor>::value_type;
 
   auto tau_new = OpToTensor(tau, stream);
   auto a_new = OpToTensor(a, stream);
@@ -1413,7 +1413,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using T1 = typename ATensor::scalar_type;
+  using T1 = typename ATensor::value_type;
 
   auto u_new = OpToTensor(u, stream);
   auto s_new = OpToTensor(s, stream);
@@ -1508,7 +1508,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
   */
-  using T1 = typename remove_cvref_t<OutputTensor>::scalar_type;
+  using T1 = typename remove_cvref_t<OutputTensor>::value_type;
 
   auto w_new = OpToTensor(w, stream);
   auto a_new = OpToTensor(a, stream);

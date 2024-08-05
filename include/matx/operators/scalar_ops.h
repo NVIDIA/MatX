@@ -92,7 +92,7 @@ public:
 
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1 &v1) const { return op(v1); }
 
-  using scalar_type = std::invoke_result_t<decltype(op), T1>;
+  using value_type = std::invoke_result_t<decltype(op), T1>;
 };
 
 template <typename T1, typename T2, typename F> class BinOp {
@@ -111,7 +111,7 @@ public:
     return op(v1, v2);
   }
 
-  using scalar_type = std::invoke_result_t<decltype(op), T1, T2>;
+  using value_type = std::invoke_result_t<decltype(op), T1, T2>;
 };
 
 template <typename T1, typename T2, typename T3, typename F> class TerOp {
@@ -127,7 +127,7 @@ public:
     return op(v1, v2, v3);
   }
 
-  using scalar_type = std::invoke_result_t<decltype(op), T1, T2, T3>;
+  using value_type = std::invoke_result_t<decltype(op), T1, T2, T3>;
 };
 
 MATX_UNARY_OP_GEN(ceil, Ceil);
@@ -156,6 +156,26 @@ template <typename T> struct SqrtF {
 template <typename T> using SqrtOp = UnOp<T, SqrtF<T>>;
 
 template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_rsqrt(T v1)
+{
+  if constexpr (is_matx_type_v<T>){
+    return rsqrt(v1);
+  }
+  else {
+    return ::rsqrt(v1);
+  }
+}
+template <typename T> struct RSqrtF {
+  static __MATX_INLINE__ std::string str() { return "rsqrt"; }
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto op(T v1)
+  {
+    return _internal_rsqrt(v1);
+  }
+};
+
+template <typename T> using RSqrtOp = UnOp<T, RSqrtF<T>>;
+
+template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_csqrt(T v1)
 {
   static_assert(std::is_floating_point_v<T>, "csqrt() only supports non-complex floating point inputs");
@@ -180,7 +200,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_conj(T v1)
     return cuda::std::conj(v1);
   }
   else {
-    return conj(v1);
+    return matx::conj(v1);
   }
 }
 template <typename T> struct ConjF {

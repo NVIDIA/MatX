@@ -54,14 +54,18 @@ template <int THREADS, typename OutType, typename InType, typename FilterType>
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     // Opportunistically store the filter taps in shared memory if the static shared memory
     // size is sufficient. Otherwise, we will read directly from global memory on use.
     const int SMEM_MAX_FILTER_TAPS = 128;
-    __shared__ filter_t smem_filter[SMEM_MAX_FILTER_TAPS];
+    // Versions of CUDA prior to 11.8 do not allow static shared memory allocations of
+    // cuda::std::complex types due to it having no trivial constructor. This workaround
+    // prevents an 'initializer not allowed for __shared__ variable' error.
+    __align__(sizeof(filter_t)) __shared__ uint8_t smem_filter_workaround[sizeof(filter_t)*SMEM_MAX_FILTER_TAPS];
+    filter_t (&smem_filter)[SMEM_MAX_FILTER_TAPS] = reinterpret_cast<filter_t (&)[SMEM_MAX_FILTER_TAPS]>(smem_filter_workaround);
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -179,9 +183,9 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 template <typename OutType, typename InType, typename FilterType>
 __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType filter, index_t elems_per_channel_per_cta)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     extern __shared__ uint8_t __attribute((aligned(16))) smem_dyn_align16[];
 
@@ -256,7 +260,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         __syncthreads();
 
         // Load next elems_per_channel_per_cta elements for each channel
-        const index_t next_last_elem = cuda::std::min(next_start_elem + by - 1, last_elem);
+        const index_t next_last_elem = cuda::std::min(next_start_elem + static_cast<index_t>(by) - 1, last_elem);
         const uint32_t out_samples_this_iter = static_cast<uint32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;
@@ -320,9 +324,9 @@ template <int THREADS, int NUM_CHAN, typename OutType, typename InType, typename
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterType filter)
 {
-    using output_t = typename OutType::scalar_type;
-    using input_t = typename InType::scalar_type;
-    using filter_t = typename FilterType::scalar_type;
+    using output_t = typename OutType::value_type;
+    using input_t = typename InType::value_type;
+    using filter_t = typename FilterType::value_type;
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -345,8 +349,12 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
+    // Versions of CUDA prior to 11.8 do not allow static shared memory allocations of
+    // cuda::std::complex types due to it having no trivial constructor. This workaround
+    // prevents an 'initializer not allowed for __shared__ variable' error.
+    __align__(sizeof(output_t)) __shared__ uint8_t smem_eij_workaround[sizeof(output_t)*NUM_CHAN*NUM_CHAN];
+    output_t (&smem_eij)[NUM_CHAN][NUM_CHAN] = reinterpret_cast<output_t (&)[NUM_CHAN][NUM_CHAN]>(smem_eij_workaround);
     // Pre-compute the DFT complex exponentials and store in shared memory
-    __shared__ output_t smem_eij[NUM_CHAN][NUM_CHAN];
     for (int t = tid; t < NUM_CHAN*NUM_CHAN; t += THREADS) {
         const int i = t / NUM_CHAN;
         const int j = t % NUM_CHAN;
@@ -517,7 +525,7 @@ __global__ void ChannelizePoly1DUnpackDFT(DataType inout)
     constexpr int Rank = DataType::Rank();
     constexpr int ChannelRank = Rank-1;
     constexpr int ElemRank = Rank-2;
-    using value_t = typename DataType::scalar_type;
+    using value_t = typename DataType::value_type;
 
     const int tid = blockIdx.y * blockDim.x + threadIdx.x;
 

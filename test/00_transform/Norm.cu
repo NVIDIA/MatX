@@ -56,7 +56,7 @@ protected:
     }
   }
 
-  void TearDown() { pb.reset(); }
+  void TearDown() override { pb.reset(); }
   GExecType exec{};   
   std::unique_ptr<detail::MatXPybind> pb;
   tensor_t<GTestType, 1> in_v{{a_len}};
