@@ -403,6 +403,7 @@ public:
 
         static_assert(std::is_same_v<T, float> || 
                       std::is_same_v<T, double> ||
+                      std::is_same_v<T, uint32_t> ||
                       std::is_same_v<T, cuda::std::complex<float>> ||
                       std::is_same_v<T, cuda::std::complex<double>>);        
 
@@ -531,6 +532,9 @@ public:
             curandGenerateUniformDouble(gen_, &tmp[0], 1);
             curandGenerateUniformDouble(gen_, &tmp[1], 1);
           }
+          else if constexpr (std::is_same_v<T, uint32_t>) {
+            curandGenerate(gen_, &val, 1);
+          }
 
           val = alpha_ * val + beta_;
         }
@@ -550,6 +554,10 @@ public:
             double *tmp = reinterpret_cast<double *>(&val);
             curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
             curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
+          }
+          else
+          {
+            MATX_THROW("Invalid Data Type for NORMAL distribution")
           }
         }
         else {
