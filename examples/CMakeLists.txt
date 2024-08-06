@@ -15,6 +15,7 @@ set(examples
     spectrogram_graph
     spherical_harmonics
     svd_power
+    repro
     qr
     black_scholes
     print_styles)
