@@ -49,6 +49,26 @@
 
 namespace matx {
 
+template <class dataType>
+static __global__ void argminmaxCpy(
+                                   dataType* inputData, 
+                                   size_t*  minIdx, 
+                                   size_t*  maxIdx, 
+                                   dataType* minVal,
+                                   dataType* maxVal,
+                                   index_t*  minIdxFinal,                                    
+                                   index_t*  maxIdxFinal
+                                   )
+{
+  if(threadIdx.x == 0 && blockIdx.x == 0 )
+  {
+    *maxVal      = inputData[*maxIdx];
+    *minVal      = inputData[*minIdx];
+    *maxIdxFinal = *maxIdx;
+    *minIdxFinal = *minIdx;
+  }
+}
+
 auto constexpr INVALID = std::numeric_limits<size_t>::max();
 
 struct minmax {
@@ -1298,49 +1318,62 @@ void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDes
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-//   // Get parameters required by these tensors
-//   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::scalar_type>;
-//   auto reduce_params = param_type{ReduceOp{}, init};
+ // Get parameters required by these tensors
 
 #ifndef MATX_DISABLE_CUB_CACHE
   // Get cache or new plan if it doesn't exist
-  auto params = detail::matxCubPlan_t<OutType,
-                                      InType,
-                                      detail::CUB_OP_REDUCE_ARGMINMAX,
-                                      param_type>::GetCubParams(minDest, in, stream);
-                                      using cache_val_type = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX, {}}>;
-                                      detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-                                                                                            detail::GetCacheIdFromType<detail::cub_cache_t>(),
-                                                                                            params,
-                                                                                            [&]() {
-                                                                                              return std::make_shared<cache_val_type>(minDest, in, {}, stream);
-                                                                                            },
-                                                                                            [&](std::shared_ptr<cache_val_type> ctype) {
-                                                                                              ctype->ExecArgMinMax(in, stream);
-                                                                                            }
-                                                                                          );
+  auto params = 
+      detail::matxCubPlan_t<OutType,
+                            InType,
+                            detail::CUB_OP_REDUCE_ARGMINMAX>::GetCubParams(minDest, in, stream);
+                            
+  using cache_val_type = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX, int>;
+  
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+            detail::GetCacheIdFromType<detail::cub_cache_t>(),
+            params,
+            [&]() {
+              int test; ///\todo TYLER_TODO: this should not be needed
+              return std::make_shared<cache_val_type>(minDest, in, test, stream);
+            },
+            [&](std::shared_ptr<cache_val_type> ctype) {
+              ctype->ExecArgMinMax(in, stream);
+              argminmaxCpy<<<1,32,0,stream>>>(
+                                             in.Data(),
+                                             &(ctype->d_minMax->argmin),
+                                             &(ctype->d_minMax->argmax),
+                                             minDest.Data(),
+                                             maxDest.Data(),
+                                             minIdxs.Data(),
+                                             maxIdxs.Data()
+                                             );                  
+            }
+          );
 
-}
 #else
 
   auto tmp = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX>{minDest, in, {}, stream};
       
   tmp.ExecArgMinMax(in, stream);   
 
-  cudaMemcpyAsync(minIdxs.Data(), &(tmp.d_minMax->argmin), sizeof(size_t), cudaMemcpyDefault, stream);
-  cudaMemcpyAsync(maxIdxs.Data(), &(tmp.d_minMax->argmax), sizeof(size_t), cudaMemcpyDefault, stream);
-      
-  (minDest = in(minIdxs())).run(stream);
-  (maxDest = in(maxIdxs())).run(stream);  
+  argminmaxCpy<<<1,32,0,stream>>>(
+                                  in.Data(),
+                                  &(tmp->d_minMax->argmin),
+                                  &(tmp->d_minMax->argmax),
+                                  minDest.Data(),
+                                  maxDest.Data(),
+                                  minIdxs.Data(),
+                                  maxIdxs.Data()
+                                  );  
+
+  // cudaMemcpyAsync(minIdxs.Data(), &(tmp.d_minMax->argmin), sizeof(size_t), cudaMemcpyDefault, stream);
+  // cudaMemcpyAsync(maxIdxs.Data(), &(tmp.d_minMax->argmax), sizeof(size_t), cudaMemcpyDefault, stream);    
+  // (minDest = at(in, minIdxs())).run(stream);
+  // (maxDest = at(in, maxIdxs())).run(stream);  
     
 #endif
 #endif
 }
-
-
-
-
-
 
 
 
