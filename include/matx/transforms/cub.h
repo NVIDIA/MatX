@@ -1225,13 +1225,12 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
                             InputOperator,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
 
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM, int>;
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM, EmptyParams_t>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
       detail::GetCacheIdFromType<detail::cub_cache_t>(),
       params,
       [&]() {
-        int test; ///\todo TYLER_TODO: this should not be needed
-        return std::make_shared<cache_val_type>(a_out, a, test, stream);
+        return std::make_shared<cache_val_type>(a_out, a, EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecSum(a_out, a, stream);
@@ -1271,13 +1270,12 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
                             InputOperator,
                             detail::CUB_OP_REDUCE_MIN>::GetCubParams(a_out, a, stream);
 
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN, int>;
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN, EmptyParams_t>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
       detail::GetCacheIdFromType<detail::cub_cache_t>(),
       params,
       [&]() {
-        int test; ///\todo TYLER_TODO: this should not be needed
-        return std::make_shared<cache_val_type>(a_out, a, test, stream);
+        return std::make_shared<cache_val_type>(a_out, a, EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecMin(a_out, a, stream);
@@ -1318,13 +1316,12 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
                             InputOperator,
                             detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a, stream);
 
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX, int>;
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX, EmptyParams_t>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
       detail::GetCacheIdFromType<detail::cub_cache_t>(),
       params,
       [&]() {
-        int test; ///\todo TYLER_TODO: this should not be needed
-        return std::make_shared<cache_val_type>(a_out, a, test, stream);
+        return std::make_shared<cache_val_type>(a_out, a, EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecMax(a_out, a, stream);
@@ -1478,13 +1475,12 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
   auto params =
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a, stream);
 
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM, int>;
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM, EmptyParams_t>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
       detail::GetCacheIdFromType<detail::cub_cache_t>(),
       params,
       [&]() {
-        int test; ///\todo TYLER_TODO: this should not be needed
-        return std::make_shared<cache_val_type>(a_out, a, test, stream);
+        return std::make_shared<cache_val_type>(a_out, a, EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecPrefixScanEx(a_out, a, stream);
