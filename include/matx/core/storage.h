@@ -255,7 +255,7 @@ namespace matx
           data_ = std::shared_ptr<T>(ptr, [](auto){});
         }
         else {
-          data_ = std::shared_ptr<T>(ptr, [size, &alloc = alloc_](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
+          data_ = std::shared_ptr<T>(ptr, [size, &alloc = alloc_](auto p) { alloc.deallocate(reinterpret_cast<void*>(p), size); });
         }
       }   
     }
