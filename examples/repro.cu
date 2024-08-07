@@ -3,6 +3,18 @@
 #include <iostream>
 #include <cstdio>
 
+// Macro for checking CUDA errors following a CUDA launch or API call
+#define cudaCheckError() {                                           \
+    cudaError_t e = cudaGetLastError();                              \
+    if (e != cudaSuccess) {                                          \
+        printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__,     \
+               cudaGetErrorString(e));                               \
+        exit(EXIT_FAILURE);                                          \
+    } else {                                                         \
+        printf("CUDA call successful: %s:%d\n", __FILE__, __LINE__); \
+    }                                                                \
+}
+
 auto createMockMnistDatasetMatX(int n = 70000, int d = 784) {
     auto mnist = matx::make_tensor<float>({n, d}, matx::MATX_DEVICE_MEMORY);
     auto mnist_16 = matx::make_tensor<matx::matxFp16>({n, d}, matx::MATX_DEVICE_MEMORY);
@@ -66,7 +78,8 @@ matx::tensor_t<matx::matxFp16, 2>  findDistancesMatX(matx::tensor_t<matx::matxFp
 
     auto AFlat_t = matx::flatten(A_t);
 
-    auto distances_t = matx::make_tensor<matx::matxFp16>({n, 2 * k * m}, matx::MATX_DEVICE_MEMORY);
+//    auto distances_t = matx::make_tensor<matx::matxFp16>({n, 2 * k * m}, matx::MATX_DEVICE_MEMORY);
+    auto distances_t = matx::make_tensor<matx::matxFp16>({n, 2 * k * m});
 
     //int j = 0;
     std::vector<double> times;
@@ -137,11 +150,18 @@ matx::tensor_t<matx::matxFp16, 2>  findDistancesMatX(matx::tensor_t<matx::matxFp
 }
 
 int main() {
-int k = 5;
-int n = 70000;
-int m = 50;
-int D = 1024;
-int d = 784;
+//int k = 5;
+//int n = 70000;
+//int m = 50;
+//int D = 1024;
+//int d = 784;
+
+// Downsizing the size of the problem
+int n = 30;
+int k = 3;
+int m = 4;
+int D = 10;
+int d = 20;
 
 auto A = createMockAMatrixMatX(n, k, D);
 auto B = createMockBMatrixMatX(n, m, D);
@@ -151,11 +171,19 @@ cudaDeviceSynchronize();
 
 auto start = std::chrono::high_resolution_clock::now();
 
-auto distances = findDistancesMatX(X, A, B, 1.2f, 250);
+auto distances = findDistancesMatX(X, A, B, 1.2f, 10);
 cudaDeviceSynchronize();
+
+cudaCheckError();
 
 // Record end time
 auto end = std::chrono::high_resolution_clock::now();
+
+auto *distances_ptr = distances.Data();
+
+for (int i = 0; i < n*2*k*m; i++) {
+    printf("%f ", matx::promote_half_t<matx::matxFp16>(distances_ptr[i])); // Alot of zeros
+}
 
 std::chrono::duration<double> duration = end - start;
 
