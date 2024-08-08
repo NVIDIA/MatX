@@ -445,54 +445,7 @@ public:
         // Shapeless constructor to be allocated at run invocation
         RandomOp() = delete;
   
-        ///\todo TYLER_TODO update to call base contrcutor and not copy code here
-        inline RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)
-        {
-          seed_ = seed;
-          fParams_ = params;
-          total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
-
-          if constexpr (RANK >= 1) {
-            strides_[RANK-1] = 1;
-          }
-
-          #pragma unroll
-          for (int i = 0; i < RANK; ++i)
-          {
-            shape_[i] = s[i];
-          }
-
-
-          #pragma unroll
-          for (int i = RANK - 2; i >= 0; i--) {
-            strides_[i] = strides_[i+1] * s[i+1];
-          }          
-        }
-        
-        ///\todo TYLER_TODO update to call base contrcutor and not copy code here
-        inline RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)  
-        {
-          seed_ = seed;
-          total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
-          iParams_ = params;
-
-          if constexpr (RANK >= 1) {
-            strides_[RANK-1] = 1;
-          }
-
-          #pragma unroll
-          for (int i = 0; i < RANK; ++i)
-          {
-            shape_[i] = s[i];
-          }
-
-
-          #pragma unroll
-          for (int i = RANK - 2; i >= 0; i--) {
-            strides_[i] = strides_[i+1] * s[i+1];
-          }          
-        }
-
+        // base constructor, should never be called directly
         inline RandomOp(ShapeType &&s, uint64_t seed) :
           seed_(seed)
         {
@@ -515,6 +468,19 @@ public:
           }
         }
 
+      // Constructor for randFloatParams
+      inline RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
+          RandomOp(std::forward<ShapeType>(s), seed)
+      {
+          fParams_ = params;
+      }
+
+      // Constructor for randIntParams
+      inline RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) :
+          RandomOp(std::forward<ShapeType>(s), seed)
+      {
+          iParams_ = params;
+      }
 
       template <typename ST, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex)
