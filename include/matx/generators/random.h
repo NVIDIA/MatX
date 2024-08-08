@@ -36,7 +36,6 @@
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>
-#include <variant>
 
 namespace matx {
 
@@ -67,8 +66,12 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 template <typename T, typename Gen>
 __inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, T min, T max)
 {
-  unsigned int random_int = curand(state);
-  val = (random_int % max) - min; // Scale to [0, 100]  
+  
+  float normFloat = curand_uniform(state);
+
+  // Scale to the provided min and max range
+  val = static_cast<T>(normFloat * static_cast<double>(max - min)) + min;
+
 };
 
 /**
@@ -423,11 +426,10 @@ public:
         bool init_ = false;
         bool device_;
         
-        // union{
-        std::variant< randFloatParams<inner_t>, randIntParams<inner_t>> params_;
-        // randFloatParams<inner_t> fParams_;
-        // randIntParams<inner_t> iParams_;
-        // }
+        union{
+        randFloatParams<inner_t> fParams_;
+        randIntParams<inner_t> iParams_;
+        };
         
         // Used by host operators only
         curandGenerator_t gen_;
@@ -446,8 +448,9 @@ public:
         ///\todo TYLER_TODO update to call base contrcutor and not copy code here
         inline RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)
         {
-         seed_=seed;
-         total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+          seed_ = seed;
+          fParams_ = params;
+          total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
 
           if constexpr (RANK >= 1) {
             strides_[RANK-1] = 1;
@@ -464,14 +467,14 @@ public:
           for (int i = RANK - 2; i >= 0; i--) {
             strides_[i] = strides_[i+1] * s[i+1];
           }          
-          params_ = params;
         }
         
         ///\todo TYLER_TODO update to call base contrcutor and not copy code here
         inline RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)  
         {
-        seed_=seed;
-         total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+          seed_ = seed;
+          total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+          iParams_ = params;
 
           if constexpr (RANK >= 1) {
             strides_[RANK-1] = 1;
@@ -488,7 +491,6 @@ public:
           for (int i = RANK - 2; i >= 0; i--) {
             strides_[i] = strides_[i+1] * s[i+1];
           }          
-          params_ = params;
         }
 
         inline RandomOp(ShapeType &&s, uint64_t seed) :
@@ -591,26 +593,30 @@ public:
                      std::is_same_v<T, cuda::std::complex<double>>
                      ) 
         {
-          detail::randFloatParams<T> floatParams = std::get<matx::detail::randFloatParams<T>>(params_);
           if constexpr (sizeof...(indices) == 0) {
-            get_random(val, &states_[0], floatParams.dist_);
+            get_random(val, &states_[0], fParams_.dist_);
           }
           else {
-            get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], floatParams.dist_);
+            get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], fParams_.dist_);
           }
 
-          val = floatParams.alpha_ * val + floatParams.beta_;
+          val = fParams_.alpha_ * val + fParams_.beta_;
         }
-        else
+        else if constexpr(
+                  std::is_same_v<T, uint32_t> || 
+                  std::is_same_v<T,  int32_t> ||
+                  std::is_same_v<T, uint64_t> ||
+                  std::is_same_v<T,  int64_t>   
+        )
         {
-          detail::randIntParams<T> intParams = std::get<matx::detail::randIntParams<T>>(params_);
           if constexpr (sizeof...(indices) == 0) {
-            get_randomi(val, &states_[0], intParams.min_, intParams.max_);
+            get_randomi(val, &states_[0], iParams_.min_, iParams_.max_);
           }
           else {
-            get_randomi(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], intParams.min_, intParams.max_);
+            get_randomi(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], iParams_.min_, iParams_.max_);
           }          
         }
+
 #else
         if constexpr (
                      std::is_same_v<T, float>  ||
@@ -620,9 +626,7 @@ public:
                      ) 
         {        
           
-          detail::randFloatParams<T> floatParams = std::get<matx::detail::randFloatParams<T>>(params_);
-          
-          if (floatParams.dist_ == UNIFORM) {
+          if (fParams_.dist_ == UNIFORM) {
             if constexpr (std::is_same_v<T, float>) {
               curandGenerateUniform(gen_, &val, 1);
             }
@@ -640,34 +644,42 @@ public:
               curandGenerateUniformDouble(gen_, &tmp[1], 1);
             }
 
-            val = floatParams.alpha_ * val + floatParams.beta_;
+            val = fParams_.alpha_ * val + fParams_.beta_;
           }
-          else if (floatParams.dist_ == NORMAL) {
+          else if (fParams_.dist_ == NORMAL) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateNormal(gen_, &val, 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormal(gen_, &val, 1, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateNormalDouble(gen_, &val, 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormalDouble(gen_, &val, 1, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
               float *tmp = reinterpret_cast<float *>(&val);
-              curandGenerateNormal(gen_, &tmp[0], 1, floatParams.beta_, floatParams.alpha_);
-              curandGenerateNormal(gen_, &tmp[1], 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormal(gen_, &tmp[0], 1, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, &tmp[1], 1, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
               double *tmp = reinterpret_cast<double *>(&val);
-              curandGenerateNormalDouble(gen_, &tmp[0], 1, floatParams.beta_, floatParams.alpha_);
-              curandGenerateNormalDouble(gen_, &tmp[1], 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormalDouble(gen_, &tmp[0], 1, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, &tmp[1], 1, fParams_.beta_, fParams_.alpha_);
             }
           }
           else {
             val = 0;
           }
         }
-        else
+        else if constexpr(
+                         std::is_same_v<T, uint32_t> || 
+                         std::is_same_v<T,  int32_t> ||
+                         std::is_same_v<T, uint64_t> ||
+                         std::is_same_v<T,  int64_t>   
+                         )
         {
-          // detail::randIntParams<T> intParams = std::get<matx::detail::randIntParams<T>>(params_);
-          val = 0;
+          float fScale;
+          curandGenerateUniform(gen_, &fScale, 1);
+                    
+          // Scale to the provided min and max range
+          val = static_cast<T>(fScale * static_cast<double>(iParams_.max_ - iParams_.min_)) + iParams_.min_;                                
         }
 #endif
 
