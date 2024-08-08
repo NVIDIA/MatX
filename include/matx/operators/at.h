@@ -45,7 +45,7 @@ namespace matx
     class AtOp : public BaseOp<AtOp<Op, Is...>>
     {
       private:
-        Op op_;
+        typename base_type<Op>::type op_;
         cuda::std::array<index_t, sizeof...(Is)> idx_;
 
       public:
