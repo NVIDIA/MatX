@@ -701,7 +701,11 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> rsqrt(const matxHalf<T
 #ifdef __CUDA_ARCH__
   return hrsqrt(x.x);
 #else
-  return static_cast<T>(::rsqrt(static_cast<float>(x.x)));
+  #ifdef __CUDACC__
+    return static_cast<__nv_bfloat16>(::rsqrt(static_cast<float>(x.x)));
+  #else
+    return static_cast<__nv_bfloat16>(1.f / cuda::std::sqrt(static_cast<float>(x.x)));
+  #endif
 #endif
 }
 
@@ -719,7 +723,11 @@ rsqrt(const matxHalf<__nv_bfloat16> &x)
 #if __CUDA_ARCH__ >= 800
   return hrsqrt(x.x);
 #else
-  return static_cast<__nv_bfloat16>(::rsqrt(static_cast<float>(x.x)));
+  #ifdef __CUDACC__
+    return static_cast<__nv_bfloat16>(::rsqrt(static_cast<float>(x.x)));
+  #else
+    return static_cast<__nv_bfloat16>(1.f / cuda::std::sqrt(static_cast<float>(x.x)));
+  #endif
 #endif
 }
 
