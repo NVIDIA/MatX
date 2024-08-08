@@ -35,8 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
-#include "matx/transforms/svd.h"
+#include "matx/transforms/svd/svd_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/svd/svd_lapack.h"
+#endif
 
 namespace matx {
 
@@ -47,8 +49,8 @@ namespace detail {
   {
     private:
       OpA a_;
-      char jobu_;
-      char jobv_;
+      SVDJob jobu_;
+      SVDJob jobvt_;
 
     public:
       using matxop = bool;
@@ -57,7 +59,7 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(OpA a, const char jobu, const char jobvt) : a_(a), jobu_(jobu), jobv_(jobvt) { };
+      __MATX_INLINE__ SVDOp(OpA a, const SVDJob jobu, const SVDJob jobvt) : a_(a), jobu_(jobu), jobvt_(jobvt) { };
 
       // This should never be called
       template <typename... Is>
@@ -65,10 +67,9 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "svd() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, V) = svd(A))");
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
 
-        svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex.getStream(), jobu_, jobv_);
+        svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobu_, jobvt_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -92,8 +93,13 @@ namespace detail {
   };
 }
 
+/**
+ * Perform a singular value decomposition (SVD) using cuSolver or a LAPACK host
+ * library.
+ * 
+ */
 template<typename OpA>
-__MATX_INLINE__ auto svd(const OpA &a, const char jobu = 'A', const char jobvt = 'A') {
+__MATX_INLINE__ auto svd(const OpA &a, const SVDJob jobu = SVDJob::ALL, const SVDJob jobvt = SVDJob::ALL) {
   return detail::SVDOp(a, jobu, jobvt);
 }
 
@@ -125,7 +131,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_cuda_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, V) = svdpi(A))");
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, VT) = svdpi(A))");
 
         svdpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, x_, iterations_, ex, k_);
       }
@@ -202,7 +208,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
         static_assert(is_cuda_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, V) = svdbpi(A))");
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, VT) = svdbpi(A))");
 
         svdbpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, max_iters_, tol_, ex);
       }

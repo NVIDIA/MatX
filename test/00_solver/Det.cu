@@ -46,39 +46,100 @@ template <typename T> class DetSolverTest : public ::testing::Test {
 protected:
   void SetUp() override
   {
+    if constexpr (!detail::CheckSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      exec = SelectThreadsHostExecutor{params};
+    }
+
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<GTestType>("00_solver", "det", "run", {m});
-    pb->NumpyToTensorView(Av, "A");
   }
 
   void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<GTestType, 2> Av{{m, m}};
-  tensor_t<GTestType, 2> Atv{{m, m}};
-  tensor_t<GTestType, 0> detv{{}};
+  float relTol = 2e-5f;
 };
 
 template <typename TensorType>
-class DetSolverTestNonComplexFloatTypes : public DetSolverTest<TensorType> {
+class DetSolverTestFloatTypes : public DetSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(DetSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypesCUDAExec);
+template<typename T>
+double getMaxMagnitude(const T& value) {
+  if constexpr (is_complex_v<T>) {
+    return cuda::std::max(cuda::std::fabs(value.real()), cuda::std::fabs(value.imag()));
+  } else {
+    return cuda::std::fabs(value);
+  }
+}
 
-TYPED_TEST(DetSolverTestNonComplexFloatTypes, Determinant)
+TYPED_TEST_SUITE(DetSolverTestFloatTypes,
+                 MatXFloatNonHalfTypesAllExecs);
+
+TYPED_TEST(DetSolverTestFloatTypes, DeterminantBasic)
 {
   MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
 
-  // cuSolver only supports col-major solving today, so we need to transpose,
-  // solve, then transpose again to compare to Python
-  (this->Atv = transpose(this->Av)).run(this->exec);
+  auto Av = make_tensor<TestType>({m, m});
+  auto detv = make_tensor<TestType>({});
+  auto detv_ref = make_tensor<TestType>({});
 
-  (this->detv = det(this->Atv)).run(this->exec);
-  (this->Av = transpose(this->Atv)).run(this->exec); // Transpose back to row-major
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "det", "run", {m});
+  this->pb->NumpyToTensorView(Av, "A");
+
+  // example-begin det-test-1
+  (detv = det(Av)).run(this->exec);
+  // example-end det-test-1
   this->exec.sync();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->detv, "det", 0.1);
+  this->pb->NumpyToTensorView(detv_ref, "det");
+
+  // The relative error is on the order of 2e-5 compared to the Python result
+  // for float types
+  auto thresh =  this->relTol * getMaxMagnitude(detv_ref());
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, detv, "det", thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DetSolverTestFloatTypes, DeterminantBasicBatched)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr int batches = 10;
+
+  auto Av = make_tensor<TestType>({batches, m, m});
+  auto detv = make_tensor<TestType>({batches});
+  auto detv_ref = make_tensor<TestType>({batches});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "det", "run", {batches, m});
+  this->pb->NumpyToTensorView(Av, "A");
+  this->pb->NumpyToTensorView(detv_ref, "det");
+
+  (detv = det(Av)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t b = 0; b < batches; b++) {
+    auto detv_ref_b = detv_ref(b);
+    auto thresh =  this->relTol * getMaxMagnitude(detv_ref_b);
+
+    if constexpr (is_complex_v<TestType>) {
+      ASSERT_NEAR(detv(b).real(), detv_ref_b.real(), thresh);
+      ASSERT_NEAR(detv(b).imag(), detv_ref_b.imag(), thresh);
+    } else {
+      ASSERT_NEAR(detv(b), detv_ref_b, thresh);
+    }
+  }
 
   MATX_EXIT_HANDLER();
 }

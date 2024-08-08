@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/qr.h"
+#include "matx/transforms/qr/qr_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/qr/qr_lapack.h"
+#endif
 
 namespace matx {
 
@@ -61,7 +64,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "svd() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor>, "qr() only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 3 outputs on qr(). ie: (mtie(Q, R) = qr(A))");
 
         qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
@@ -107,7 +110,7 @@ __MATX_INLINE__ auto qr(AType A) {
 
 namespace detail {
   template<typename OpA>
-  class CuSolverQROp : public BaseOp<CuSolverQROp<OpA>>
+  class SolverQROp : public BaseOp<SolverQROp<OpA>>
   {
     private:
       OpA a_;
@@ -117,10 +120,10 @@ namespace detail {
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
-      using cusolver_qr_xform_op = bool;
+      using qr_solver_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "cusolver_qr()"; }
-      __MATX_INLINE__ CuSolverQROp(OpA a) : a_(a) { };
+      __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
+      __MATX_INLINE__ SolverQROp(OpA a) : a_(a) { };
 
       // This should never be called
       template <typename... Is>
@@ -128,10 +131,9 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_cuda_executor_v<Executor>, "cusolver_qr() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(A, tau) = eig(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_solver(). ie: (mtie(A, tau) = eig(A))");     
 
-        cusolver_qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());
+        qr_solver_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -142,10 +144,10 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "cusolver_qr() must only be called with a single assignment since it has multiple return types");
+        MATX_ASSERT_STR(false, matxNotSupported, "qr_solver() must only be called with a single assignment since it has multiple return types");
       }
 
-      // Size is not relevant in cusolver_qr() since there are multiple return values and it
+      // Size is not relevant in qr_solver() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
@@ -155,9 +157,13 @@ namespace detail {
   };
 }
 
+/**
+ * Perform a QR decomposition on a matrix using cuSolver or a LAPACK host library.
+ * 
+ */
 template<typename OpA>
-__MATX_INLINE__ auto cusolver_qr(const OpA &a) {
-  return detail::CuSolverQROp(a);
+__MATX_INLINE__ auto qr_solver(const OpA &a) {
+  return detail::SolverQROp(a);
 }
 
 }

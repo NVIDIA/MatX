@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
+#include "matx/transforms/eig/eig_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/eig/eig_lapack.h"
+#endif
 
 namespace matx {
 
@@ -47,8 +50,8 @@ namespace detail {
   {
     private:
       OpA a_;
-      cusolverEigMode_t jobz_;
-      cublasFillMode_t uplo_;
+      EigenMode jobz_;
+      SolverFillMode uplo_;
 
     public:
       using matxop = bool;
@@ -57,7 +60,7 @@ namespace detail {
       using eig_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
-      __MATX_INLINE__ EigOp(OpA a, cusolverEigMode_t jobz, cublasFillMode_t uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
+      __MATX_INLINE__ EigOp(OpA a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
 
       // This should never be called
       template <typename... Is>
@@ -65,10 +68,9 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "eig () only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
-        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream(), jobz_, uplo_);
+        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex, jobz_, uplo_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -94,8 +96,8 @@ namespace detail {
 
 template<typename OpA>
 __MATX_INLINE__ auto eig(const OpA &a,
-                          cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR, 
-                          cublasFillMode_t uplo  = CUBLAS_FILL_MODE_UPPER) {
+                          EigenMode jobz = EigenMode::VECTOR, 
+                          SolverFillMode uplo  = SolverFillMode::UPPER) {
   return detail::EigOp(a, jobz, uplo);
 }
 

@@ -18,6 +18,6 @@ def to_file(var, name):
 
 def randn_ndarray(tshape, dtype):
     if np.issubdtype(dtype, np.floating):
-        return np.random.randn(*tshape)
+        return np.random.randn(*tshape).astype(dtype)
     else:
-        return np.random.randn(*tshape) + 1j*np.random.randn(*tshape)
+        return (np.random.randn(*tshape) + 1j*np.random.randn(*tshape)).astype(dtype)

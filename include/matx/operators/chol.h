@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
+#include "matx/transforms/chol/chol_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/chol/chol_lapack.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -44,7 +47,7 @@ namespace detail {
   {
     private:
       OpA a_;
-      cublasFillMode_t uplo_;
+      SolverFillMode uplo_;
       mutable matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
 
     public:
@@ -54,7 +57,7 @@ namespace detail {
       using chol_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "chol()"; }
-      __MATX_INLINE__ CholOp(OpA a, cublasFillMode_t uplo) : a_(a), uplo_(uplo) { };
+      __MATX_INLINE__ CholOp(OpA a, SolverFillMode uplo) : a_(a), uplo_(uplo) { };
 
       // This should never be called
       template <typename... Is>
@@ -62,9 +65,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "chol() only supports the CUDA executor currently");
-
-        chol_impl(cuda::std::get<0>(out),  a_, ex.getStream(), uplo_);  
+        chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_);  
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -114,7 +115,7 @@ namespace detail {
 }
 
 template<typename OpA>
-__MATX_INLINE__ auto chol(const OpA &a, cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER) {
+__MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
   return detail::CholOp(a, uplo);
 }
 

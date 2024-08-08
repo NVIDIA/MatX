@@ -40,100 +40,98 @@ using namespace matx;
 constexpr index_t m = 100;
 constexpr index_t n = 50;
 
-template <typename T> class SVDSolverTest : public ::testing::Test {
+template <typename T> class SVDTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;     
   void SetUp() override
   {
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<GTestType>("00_solver", "svd", "run", {m, n});
   }
 
   void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
+  float thresh = 0.001f;
+};
+
+template <typename T> class SVDSolverTest : public SVDTest<T> {
+protected:
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;     
+  void SetUp() override
+  {
+    if constexpr (!detail::CheckSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      this->exec = SelectThreadsHostExecutor{params};
+    }
+
+    this->pb = std::make_unique<detail::MatXPybind>();
+  }
 };
 
 template <typename TensorType>
 class SVDSolverTestNonHalfTypes : public SVDSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes,
-  MatXFloatNonHalfTypesCUDAExec);
+template <typename TensorType>
+class SVDPISolverTestNonHalfTypes : public SVDTest<TensorType> {
+};
+
+TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(SVDPISolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
 
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
-
   using value_type = typename inner_op_type_t<TestType>::type;
+
   tensor_t<TestType, 2> Av{{m, n}};
-  tensor_t<TestType, 2> Atv{{n, m}};
   tensor_t<value_type, 1> Sv{{std::min(m, n)}};
   tensor_t<TestType, 2> Uv{{m, m}};
-  tensor_t<TestType, 2> Vv{{n, n}};
+  tensor_t<TestType, 2> VTv{{n, n}};
 
-  tensor_t<value_type, 2> Sav{{m, n}};
-  tensor_t<TestType, 2> SSolav{{m, n}};
-  tensor_t<TestType, 2> Uav{{m, m}};
-  tensor_t<TestType, 2> Vav{{n, n}};
+  tensor_t<value_type, 2> Dv{{m, n}};
+  tensor_t<TestType, 2> UDVTv{{m, n}};
 
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {m, n});
   this->pb->NumpyToTensorView(Av, "A");
 
-  // Used only for validation
-  auto tmpV = make_tensor<TestType>({m, n});
-
   // example-begin svd-test-1
-  // cuSolver only supports col-major solving today, so we need to transpose,
-  // solve, then transpose again to compare to Python
-  (Atv = transpose(Av)).run(this->exec);
-
-  auto Atv2 = Atv.View({m, n});
-  (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
+  (mtie(Uv, Sv, VTv) = svd(Av)).run(this->exec);
   // example-end svd-test-1
 
   this->exec.sync();
 
   // Since SVD produces a solution that's not necessarily unique, we cannot
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
-  // However, U and V are in column-major format, so we have to transpose them
-  // back to verify the identity.
-  (Uav = transpose(Uv)).run(this->exec);
-  (Vav = transpose(Vv)).run(this->exec);
 
-  // Zero out s
-  (Sav = zeros<typename inner_op_type_t<TestType>::type>({m, n})).run(this->exec);
+  // Construct diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>({m, n})).run(this->exec);
   this->exec.sync();
 
-  // Construct S matrix since it's just a vector from cuSolver
   for (index_t i = 0; i < n; i++) {
-    Sav(i, i) = Sv(i);
+    Dv(i, i) = Sv(i);
   }
 
-  this->exec.sync();
-
-  (SSolav = 0).run(this->exec);
-  if constexpr (is_complex_v<TestType>) {
-    (SSolav.RealView() = Sav).run(this->exec);
-  }
-  else {
-    (SSolav = Sav).run(this->exec);
-  }
-
-  (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
-  (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
   this->exec.sync();
 
   for (index_t i = 0; i < Av.Size(0); i++) {
     for (index_t j = 0; j < Av.Size(1); j++) {
       if constexpr (is_complex_v<TestType>) {
-        ASSERT_NEAR(Av(i, j).real(), SSolav(i, j).real(), 0.001) << i << " " << j;
-        ASSERT_NEAR(Av(i, j).imag(), SSolav(i, j).imag(), 0.001) << i << " " << j;
+        ASSERT_NEAR(Av(i, j).real(), UDVTv(i, j).real(), this->thresh) << i << " " << j;
+        ASSERT_NEAR(Av(i, j).imag(), UDVTv(i, j).imag(), this->thresh) << i << " " << j;
       }
       else {
-        ASSERT_NEAR(Av(i, j), SSolav(i, j), 0.001) << i << " " << j;
+        ASSERT_NEAR(Av(i, j), UDVTv(i, j), this->thresh) << i << " " << j;
       }
     }
   }
@@ -146,78 +144,50 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
+  using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;
 
-  using value_type = typename inner_op_type_t<TestType>::type;
-  auto Av1 = make_tensor<TestType>({m, n});
-  this->pb->NumpyToTensorView(Av1, "A");
   auto Av = make_tensor<TestType>({batches, m, n});
-  auto Atv = make_tensor<TestType>({batches, n, m});
-  (Av = Av1).run(this->exec);  
-
   auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
   auto Uv = make_tensor<TestType>({batches, m, m});
-  auto Vv = make_tensor<TestType>({batches, n, n});
+  auto VTv = make_tensor<TestType>({batches, n, n});
 
-  auto Sav = make_tensor<value_type>({batches, m, n});
-  auto SSolav = make_tensor<TestType>({batches, m, n});
-  auto Uav = make_tensor<TestType>({batches, m, m});
-  auto Vav = make_tensor<TestType>({batches, n, n});
+  auto Dv = make_tensor<value_type>({batches, m, n});
+  auto UDVTv = make_tensor<TestType>({batches, m, n});
 
-  // Used only for validation
-  auto tmpV = make_tensor<TestType>({batches, m, n});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {batches, m, n});
+  this->pb->NumpyToTensorView(Av, "A");
 
-  // cuSolver only supports col-major solving today, so we need to transpose,
-  // solve, then transpose again to compare to Python
-  (Atv = transpose_matrix(Av)).run(this->exec);
-
-  auto Atv2 = Atv.View({batches, m, n});
-  (mtie(Uv, Sv, Vv) = svd(Atv2)).run(this->exec);
+  (mtie(Uv, Sv, VTv) = svd(Av)).run(this->exec);
 
   this->exec.sync();
 
   // Since SVD produces a solution that's not necessarily unique, we cannot
   // compare against Python output. Instead, we just make sure that A = U*S*V'.
-  // However, U and V are in column-major format, so we have to transpose them
-  // back to verify the identity.
-  (Uav = transpose_matrix(Uv)).run(this->exec);
-  (Vav = transpose_matrix(Vv)).run(this->exec);
 
-  // Zero out s
-  (Sav = zeros<typename inner_op_type_t<TestType>::type>({batches, m, n})).run(this->exec);
+  // Construct batched diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>({m, n})).run(this->exec);
   this->exec.sync();
 
-  // Construct S matrix since it's just a vector from cuSolver
   for (index_t b = 0; b < batches; b++) {
     for (index_t i = 0; i < n; i++) {
-      Sav(b, i, i) = Sv(b, i);
+      Dv(b, i, i) = Sv(b, i);
     }
   }
 
-  this->exec.sync();
-
-  (SSolav = 0).run(this->exec);
-  if constexpr (is_complex_v<TestType>) {
-    (SSolav.RealView() = Sav).run(this->exec);
-  }
-  else {
-    (SSolav = Sav).run(this->exec);
-  }
-
-  (tmpV = matmul(Uav, SSolav)).run(this->exec); // U * S
-  (SSolav = matmul(tmpV, Vav)).run(this->exec); // (U * S) * V'
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
   this->exec.sync();
 
   for (index_t b = 0; b < batches; b++) {
-    for (index_t i = 0; i < Av.Size(0); i++) {
-      for (index_t j = 0; j < Av.Size(1); j++) {
+    for (index_t i = 0; i < Av.Size(1); i++) {
+      for (index_t j = 0; j < Av.Size(2); j++) {
         if constexpr (is_complex_v<TestType>) {
-          ASSERT_NEAR(Av(b, i, j).real(), SSolav(b, i, j).real(), 0.001) << i << " " << j;
-          ASSERT_NEAR(Av(b, i, j).imag(), SSolav(b, i, j).imag(), 0.001) << i << " " << j;
+          ASSERT_NEAR(Av(b, i, j).real(), UDVTv(b, i, j).real(), this->thresh) << i << " " << j;
+          ASSERT_NEAR(Av(b, i, j).imag(), UDVTv(b, i, j).imag(), this->thresh) << i << " " << j;
         }
         else {
-          ASSERT_NEAR(Av(b, i, j), SSolav(b, i, j), 0.001) << i << " " << j;
+          ASSERT_NEAR(Av(b, i, j), UDVTv(b, i, j), this->thresh) << i << " " << j;
         }
       }
     }
@@ -336,7 +306,7 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   ASSERT_NEAR( mdiffA(), SType(0), .00001);
 }
 
-TYPED_TEST(SVDSolverTestNonHalfTypes, SVDPI)
+TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDPI)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -470,7 +440,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   exec.sync();
 }
 
-TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBPI)
+TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPI)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;  

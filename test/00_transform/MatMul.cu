@@ -52,6 +52,12 @@ protected:
       GTEST_SKIP();
     }
 
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      exec = SelectThreadsHostExecutor{params};
+    }
+
     pb = std::make_unique<detail::MatXPybind>(); // Half precision needs a bit more
                                          // tolerance when compared to fp32
     if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {

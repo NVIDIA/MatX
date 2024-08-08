@@ -41,17 +41,24 @@ namespace matx {
 
 // FFT
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
-    #define MATX_EN_CPU_FFT 1
+  #define MATX_EN_CPU_FFT 1
 #else
-    #define MATX_EN_CPU_FFT 0
+  #define MATX_EN_CPU_FFT 0
 #endif
 
 // MatMul
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_OPENBLAS) || defined(MATX_EN_BLIS)
-    #define MATX_EN_CPU_MATMUL 1
+  #define MATX_EN_CPU_MATMUL 1
 #else
-    #define MATX_EN_CPU_MATMUL 0
+  #define MATX_EN_CPU_MATMUL 0
 #endif  
+
+// Solver
+#if defined(MATX_EN_NVPL)
+  #define MATX_EN_CPU_SOLVER 1
+#else
+  #define MATX_EN_CPU_SOLVER 0
+#endif
 
 template <typename Exec, typename T>
 constexpr bool CheckFFTSupport() {
@@ -110,6 +117,15 @@ constexpr bool CheckMatMulSupport() {
     }
   }
   else {
+    return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool CheckSolverSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return MATX_EN_CPU_SOLVER;
+  } else {
     return true;
   }
 }
