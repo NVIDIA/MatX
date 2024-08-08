@@ -64,13 +64,13 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
  * @param state Generator state
  */
 template <typename T, typename Gen>
-__inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, T min, T max)
+__inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
 {
   
-  float normFloat = curand_uniform(state);
+  double normFloat = curand_uniform(state);
 
   // Scale to the provided min and max range
-  val = static_cast<T>(normFloat * static_cast<double>(max - min)) + min;
+  val = static_cast<T>(normFloat * (max - min)+ min);
 
 };
 
@@ -644,7 +644,9 @@ public:
           curandGenerateUniform(gen_, &fScale, 1);
                     
           // Scale to the provided min and max range
-          val = static_cast<T>(fScale * static_cast<double>(iParams_.max_ - iParams_.min_)) + iParams_.min_;                                
+          double fMax = static_cast<double>(iParams_.max_);
+          double fMin = static_cast<double>(iParams_.min_);
+          val = static_cast<T>(fScale * (fMax - fMin) + fMin);                                
         }
 #endif
 
