@@ -469,6 +469,62 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 }
 
 
+
+TYPED_TEST(ViewTestsIntegral, Randomi)
+{
+  MATX_ENTER_HANDLER();
+  {
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+    // example-begin random-test-1
+    index_t count = 3;
+
+    tensor_t<TestType, 3> t3f({count, count, count});
+
+    (t3f = (TestType)-1000000).run(this->exec);
+    (t3f = randomi<TestType>({count, count, count})).run(this->exec);
+    // example-end random-test-1    
+    this->exec.sync();
+    
+    matx::print(t3f);
+
+    TestType total = 0;
+    for (index_t i = 0; i < count; i++) {
+      for (index_t j = 0; j < count; j++) {
+        for (index_t k = 0; k < count; k++) {
+          TestType val = t3f(i, j, k); // mean centered at zero
+          // ASSERT_NE(val, -1000000);
+          total += val;
+          // ASSERT_LE(val, 0.5f);
+          // ASSERT_LE(-0.5f, val);
+        }
+      }
+    }
+
+    // ASSERT_LT(fabs(total / (count * count * count)), .05);
+
+    // (t3f = (TestType)-1000000).run(this->exec);
+    // (t3f = random<TestType>({count, count, count}, NORMAL)).run(this->exec);
+    // this->exec.sync();
+
+    // total = 0;
+
+    // for (index_t i = 0; i < count; i++) {
+    //   for (index_t j = 0; j < count; j++) {
+    //     for (index_t k = 0; k < count; k++) {
+    //       TestType val = t3f(i, j, k);
+    //       ASSERT_NE(val, -1000000);
+    //       total += val;
+    //     }
+    //   }
+    // }
+
+    // ASSERT_LT(fabs(total / (count * count * count)), .15);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(ViewTestsComplex, RealComplexView)
 {
   MATX_ENTER_HANDLER();

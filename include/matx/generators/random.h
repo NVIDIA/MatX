@@ -36,6 +36,7 @@
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>
+#include <variant>
 
 namespace matx {
 
@@ -53,6 +54,22 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
     curand_init(seed, idx, 0, &states[idx]);
 };
 #endif
+
+
+/**
+ * @brief Get a random number
+ *
+ * @tparam T inner type of data
+ * @tparam Gen Generator type
+ * @param val Value to store in
+ * @param state Generator state
+ */
+template <typename T, typename Gen>
+__inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, T min, T max)
+{
+  unsigned int random_int = curand(state);
+  val = (random_int % max) - min; // Scale to [0, 100]  
+};
 
 /**
  * @brief Get a random number
@@ -376,22 +393,42 @@ public:
 };
 
   namespace detail {
+    
+    
+  template< typename T >
+  struct randIntParams{
+    // randIntParams(T min, T max):min_(min), max_(max){}
+    T min_;
+    T max_;
+  };
+  
+  template< typename T >
+  struct randFloatParams{
+    // randFloatParams(Distribution_t dist, T alpha, T beta): dist_(dist), alpha_(alpha), beta_(beta){}
+    Distribution_t dist_;
+    T alpha_;
+    T beta_;
+  };  
+  
     template <typename T, typename ShapeType>
     class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
       private:
         using inner_t = typename inner_op_type_t<T>::type;
         static constexpr int RANK = cuda::std::tuple_size<ShapeType>{};
-        Distribution_t dist_;
         cuda::std::array<index_t, RANK> shape_;
         cuda::std::array<index_t, RANK> strides_;
         index_t total_size_;
         curandStatePhilox4_32_10_t *states_;
-        uint64_t seed_;
-        inner_t alpha_;
-        inner_t beta_;
+        uint64_t seed_;     
         bool init_ = false;
         bool device_;
-
+        
+        // union{
+        std::variant< randFloatParams<inner_t>, randIntParams<inner_t>> params_;
+        // randFloatParams<inner_t> fParams_;
+        // randIntParams<inner_t> iParams_;
+        // }
+        
         // Used by host operators only
         curandGenerator_t gen_;
         //T val;
@@ -399,21 +436,63 @@ public:
 
       public:
         using value_type = T;
-        using matxop = bool;
-
-        static_assert(std::is_same_v<T, float> || 
-                      std::is_same_v<T, double> ||
-                      std::is_same_v<T, uint32_t> ||
-                      std::is_same_v<T, cuda::std::complex<float>> ||
-                      std::is_same_v<T, cuda::std::complex<double>>);        
+        using matxop = bool;     
 
         __MATX_INLINE__ std::string str() const { return "random"; }
 
         // Shapeless constructor to be allocated at run invocation
         RandomOp() = delete;
+  
+        ///\todo TYLER_TODO update to call base contrcutor and not copy code here
+        inline RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)
+        {
+         seed_=seed;
+         total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
 
-        inline RandomOp(ShapeType &&s, Distribution_t dist, uint64_t seed, inner_t alpha, inner_t beta) :
-          dist_(dist), seed_(seed), alpha_(alpha), beta_(beta)
+          if constexpr (RANK >= 1) {
+            strides_[RANK-1] = 1;
+          }
+
+          #pragma unroll
+          for (int i = 0; i < RANK; ++i)
+          {
+            shape_[i] = s[i];
+          }
+
+
+          #pragma unroll
+          for (int i = RANK - 2; i >= 0; i--) {
+            strides_[i] = strides_[i+1] * s[i+1];
+          }          
+          params_ = params;
+        }
+        
+        ///\todo TYLER_TODO update to call base contrcutor and not copy code here
+        inline RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) //: RandomOp<T, ShapeType>(s, seed)  
+        {
+        seed_=seed;
+         total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+
+          if constexpr (RANK >= 1) {
+            strides_[RANK-1] = 1;
+          }
+
+          #pragma unroll
+          for (int i = 0; i < RANK; ++i)
+          {
+            shape_[i] = s[i];
+          }
+
+
+          #pragma unroll
+          for (int i = RANK - 2; i >= 0; i--) {
+            strides_[i] = strides_[i+1] * s[i+1];
+          }          
+          params_ = params;
+        }
+
+        inline RandomOp(ShapeType &&s, uint64_t seed) :
+          seed_(seed)
         {
           total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
 
@@ -505,62 +584,89 @@ public:
       {
         T val;
 #ifdef __CUDA_ARCH__
-        if constexpr (sizeof...(indices) == 0) {
-          get_random(val, &states_[0], dist_);
-        }
-        else {
-          get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], dist_);
-        }
+        if constexpr (
+                     std::is_same_v<T, float>  ||
+                     std::is_same_v<T, double> || 
+                     std::is_same_v<T, cuda::std::complex<float>> ||
+                     std::is_same_v<T, cuda::std::complex<double>>
+                     ) 
+        {
+          detail::randFloatParams<T> floatParams = std::get<matx::detail::randFloatParams<T>>(params_);
+          if constexpr (sizeof...(indices) == 0) {
+            get_random(val, &states_[0], floatParams.dist_);
+          }
+          else {
+            get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], floatParams.dist_);
+          }
 
-        val = alpha_ * val + beta_;
+          val = floatParams.alpha_ * val + floatParams.beta_;
+        }
+        else
+        {
+          detail::randIntParams<T> intParams = std::get<matx::detail::randIntParams<T>>(params_);
+          if constexpr (sizeof...(indices) == 0) {
+            get_randomi(val, &states_[0], intParams.min_, intParams.max_);
+          }
+          else {
+            get_randomi(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], intParams.min_, intParams.max_);
+          }          
+        }
 #else
+        if constexpr (
+                     std::is_same_v<T, float>  ||
+                     std::is_same_v<T, double> || 
+                     std::is_same_v<T, cuda::std::complex<float>> ||
+                     std::is_same_v<T, cuda::std::complex<double>>
+                     ) 
+        {        
+          
+          detail::randFloatParams<T> floatParams = std::get<matx::detail::randFloatParams<T>>(params_);
+          
+          if (floatParams.dist_ == UNIFORM) {
+            if constexpr (std::is_same_v<T, float>) {
+              curandGenerateUniform(gen_, &val, 1);
+            }
+            else if constexpr (std::is_same_v<T, double>) {
+              curandGenerateUniformDouble(gen_, &val, 1);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+              float *tmp = reinterpret_cast<float *>(&val);
+              curandGenerateUniform(gen_, &tmp[0], 1);
+              curandGenerateUniform(gen_, &tmp[1], 1);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+              double *tmp = reinterpret_cast<double *>(&val);
+              curandGenerateUniformDouble(gen_, &tmp[0], 1);
+              curandGenerateUniformDouble(gen_, &tmp[1], 1);
+            }
 
-        if (dist_ == UNIFORM) {
-          if constexpr (std::is_same_v<T, float>) {
-            curandGenerateUniform(gen_, &val, 1);
+            val = floatParams.alpha_ * val + floatParams.beta_;
           }
-          else if constexpr (std::is_same_v<T, double>) {
-            curandGenerateUniformDouble(gen_, &val, 1);
+          else if (floatParams.dist_ == NORMAL) {
+            if constexpr (std::is_same_v<T, float>) {
+              curandGenerateNormal(gen_, &val, 1, floatParams.beta_, floatParams.alpha_);
+            }
+            else if constexpr (std::is_same_v<T, double>) {
+              curandGenerateNormalDouble(gen_, &val, 1, floatParams.beta_, floatParams.alpha_);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+              float *tmp = reinterpret_cast<float *>(&val);
+              curandGenerateNormal(gen_, &tmp[0], 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormal(gen_, &tmp[1], 1, floatParams.beta_, floatParams.alpha_);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+              double *tmp = reinterpret_cast<double *>(&val);
+              curandGenerateNormalDouble(gen_, &tmp[0], 1, floatParams.beta_, floatParams.alpha_);
+              curandGenerateNormalDouble(gen_, &tmp[1], 1, floatParams.beta_, floatParams.alpha_);
+            }
           }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-            float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateUniform(gen_, &tmp[0], 1);
-            curandGenerateUniform(gen_, &tmp[1], 1);
-          }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-            double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateUniformDouble(gen_, &tmp[0], 1);
-            curandGenerateUniformDouble(gen_, &tmp[1], 1);
-          }
-          else if constexpr (std::is_same_v<T, uint32_t>) {
-            curandGenerate(gen_, &val, 1);
-          }
-
-          val = alpha_ * val + beta_;
-        }
-        else if (dist_ == NORMAL) {
-          if constexpr (std::is_same_v<T, float>) {
-            curandGenerateNormal(gen_, &val, 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, double>) {
-            curandGenerateNormalDouble(gen_, &val, 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-            float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateNormal(gen_, &tmp[0], 1, beta_, alpha_);
-            curandGenerateNormal(gen_, &tmp[1], 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-            double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
-            curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
-          }
-          else
-          {
-            MATX_THROW("Invalid Data Type for NORMAL distribution")
+          else {
+            val = 0;
           }
         }
-        else {
+        else
+        {
+          // detail::randIntParams<T> intParams = std::get<matx::detail::randIntParams<T>>(params_);
           val = 0;
         }
 #endif
@@ -595,8 +701,20 @@ public:
            std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
   inline auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
+    static_assert(
+                  std::is_same_v<T, float> || 
+                  std::is_same_v<T, double> ||
+                  std::is_same_v<T, cuda::std::complex<float>> ||
+                  std::is_same_v<T, cuda::std::complex<double>>);   
+
     using shape_strip_t = remove_cvref_t<ShapeType>;
-    return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), dist, seed, alpha, beta);
+    
+    ///\todo TYLER_TODO option for cleaner init?
+    matx::detail::randFloatParams<T> params;
+    params.dist_ = dist;
+    params.alpha_ = alpha;
+    params.beta_ = beta;
+    return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
   }
 
   /**
@@ -617,6 +735,58 @@ public:
   {
     auto sarray = detail::to_array(s);
     return random<T, decltype(sarray)>(std::move(sarray), dist, seed, alpha, beta);
+  }
+
+
+  /**
+   * @brief Return a random number with a specified shape
+   *
+   * @tparam ShapeType Shape type
+   * @tparam T Type of output
+   * @tparam LowerType Either T or the inner type of T if T is complex* 
+   * @param s Shape of operator
+   * @param seed Random number seed
+   * @param min min of generation range
+   * @param max max of generation range
+   * @return Random number operator
+   */
+  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
+           std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+  inline auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
+  {
+    static_assert(
+                  std::is_same_v<T, uint32_t> || 
+                  std::is_same_v<T,  int32_t> ||
+                  std::is_same_v<T, uint64_t> ||
+                  std::is_same_v<T,  int64_t> );      
+                  
+    using shape_strip_t = remove_cvref_t<ShapeType>;
+    
+    ///\todo TYLER_TODO option for cleaner init?
+    matx::detail::randIntParams<T> params;
+    params.min_ = min;
+    params.max_ = max;
+    
+    return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
+  }
+  
+  /**
+   * @brief Return a random number with a specified shape
+   *
+   * @tparam RANK Rank of operator
+   * @tparam T Type of output
+   * @tparam LowerType Either T or the inner type of T if T is complex
+   * @param s Array of dimensions
+   * @param seed Random number seed
+   * @param min min of generation range 
+   * @param max max of generation range
+   * @return Random number operator
+   */
+  template <typename T, int RANK, typename LowerType = typename inner_op_type_t<T>::type>
+  inline auto randomi(const index_t (&s)[RANK], uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
+  {
+    auto sarray = detail::to_array(s);
+    return randomi<T, decltype(sarray)>(std::move(sarray), seed, min, max);
   }
 
 } // end namespace matx
