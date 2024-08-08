@@ -400,7 +400,6 @@ public:
     
   template< typename T >
   struct randIntParams{
-    // randIntParams(T min, T max):min_(min), max_(max){}
     T min_;
     T max_;
   };
@@ -683,15 +682,12 @@ public:
                   std::is_same_v<T, float> || 
                   std::is_same_v<T, double> ||
                   std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>);   
+                  std::is_same_v<T, cuda::std::complex<double>>
+                 );   
 
     using shape_strip_t = remove_cvref_t<ShapeType>;
-    
-    ///\todo TYLER_TODO option for cleaner init?
-    matx::detail::randFloatParams<T> params;
-    params.dist_ = dist;
-    params.alpha_ = alpha;
-    params.beta_ = beta;
+    matx::detail::randFloatParams<T> params{dist, alpha, beta};
+
     return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
   }
 
@@ -736,14 +732,11 @@ public:
                   std::is_same_v<T, uint32_t> || 
                   std::is_same_v<T,  int32_t> ||
                   std::is_same_v<T, uint64_t> ||
-                  std::is_same_v<T,  int64_t> );      
+                  std::is_same_v<T,  int64_t> 
+                 );      
                   
     using shape_strip_t = remove_cvref_t<ShapeType>;
-    
-    ///\todo TYLER_TODO option for cleaner init?
-    matx::detail::randIntParams<T> params;
-    params.min_ = min;
-    params.max_ = max;
+    matx::detail::randIntParams<T> params{min, max};
     
     return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
   }
