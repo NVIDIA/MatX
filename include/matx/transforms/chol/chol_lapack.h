@@ -66,8 +66,6 @@ class matxDnCholHostPlan_t : matxDnHostSolver_t<typename remove_cvref_t<ATensor>
   using T1 = typename remove_cvref_t<ATensor>::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  using lapack_type = std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>, lapack_scomplex_t, 
-              std::conditional_t<std::is_same_v<T1, cuda::std::complex<double>>, lapack_dcomplex_t, T1>>;
 
 public:
   /**
@@ -143,7 +141,7 @@ public:
 
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       potrf_dispatch(&uplo, &params.n,
-                     reinterpret_cast<lapack_type*>(this->batch_a_ptrs[i]),
+                     reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.n, &info);
 
       MATX_ASSERT(info == 0, matxSolverError);
@@ -160,17 +158,17 @@ public:
   ~matxDnCholHostPlan_t() {}
 
 private:
-  void potrf_dispatch(const char* uplo, const lapack_int_t* n, lapack_type* a,
+  void potrf_dispatch(const char* uplo, const lapack_int_t* n, T1* a,
                       const lapack_int_t* lda, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<lapack_type, float>) {
-      spotrf_(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<lapack_type, double>) {
-      dpotrf_(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_scomplex_t>) {
-      cpotrf_(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_dcomplex_t>) {
-      zpotrf_(uplo, n, a, lda, info);
+    if constexpr (std::is_same_v<T1, float>) {
+      LAPACK_CALL(spotrf)(uplo, n, a, lda, info);
+    } else if constexpr (std::is_same_v<T1, double>) {
+      LAPACK_CALL(dpotrf)(uplo, n, a, lda, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      LAPACK_CALL(cpotrf)(uplo, n, a, lda, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      LAPACK_CALL(zpotrf)(uplo, n, a, lda, info);
     }
   }
   

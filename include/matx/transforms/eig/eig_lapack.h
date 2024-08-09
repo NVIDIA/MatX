@@ -71,8 +71,6 @@ public:
   using T2 = typename WTensor::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  using lapack_type = std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>, lapack_scomplex_t, 
-              std::conditional_t<std::is_same_v<T1, cuda::std::complex<double>>, lapack_dcomplex_t, T1>>;
   
   /**
    * Plan computing eigenvalues/vectors on square Hermitian A such that:
@@ -124,7 +122,7 @@ public:
   {
     // Perform a workspace query with lwork = -1.
     lapack_int_t info;
-    lapack_type work_query;
+    T1 work_query;
     T2 rwork_query;
     lapack_int_t iwork_query;
 
@@ -137,7 +135,7 @@ public:
 
     // the real part of the first elem of work holds the optimal lwork.
     if constexpr (is_complex_v<T1>) {
-      this->lwork = static_cast<lapack_int_t>(work_query.real);
+      this->lwork = static_cast<lapack_int_t>(work_query.real());
       this->lrwork = static_cast<lapack_int_t>(rwork_query);
     } else {
       this->lwork = static_cast<lapack_int_t>(work_query);
@@ -192,9 +190,9 @@ public:
     lapack_int_t info;
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       syevd_dispatch(&jobz, &uplo, &params.n,
-                      reinterpret_cast<lapack_type*>(this->batch_a_ptrs[i]),
+                      reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                       &params.n, reinterpret_cast<T2*>(this->batch_w_ptrs[i]),
-                      reinterpret_cast<lapack_type*>(this->work), &this->lwork,
+                      reinterpret_cast<T1*>(this->work), &this->lwork,
                       reinterpret_cast<T2*>(this->rwork), &this->lrwork,
                       reinterpret_cast<lapack_int_t*>(this->iwork), &this->liwork, &info);
 
@@ -213,7 +211,7 @@ public:
 
 private:
   void syevd_dispatch(const char* jobz, const char* uplo, const lapack_int_t* n,
-            lapack_type* a, const lapack_int_t* lda, T2* w, lapack_type* work_in,
+            T1* a, const lapack_int_t* lda, T2* w, T1* work_in,
             const lapack_int_t* lwork_in, [[maybe_unused]] T2* rwork_in,
             [[maybe_unused]] const lapack_int_t* lrwork_in, lapack_int_t* iwork_in,
             const lapack_int_t* liwork_in, lapack_int_t* info)
@@ -221,14 +219,14 @@ private:
     // TODO: remove warning suppression once syevd is optimized in NVPL LAPACK
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    if constexpr (std::is_same_v<lapack_type, float>) {
-      ssyevd_(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, double>) {
-      dsyevd_(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_scomplex_t>) {
-      cheevd_(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_dcomplex_t>) {
-      zheevd_(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
+    if constexpr (std::is_same_v<T1, float>) {
+      LAPACK_CALL(ssyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
+    } else if constexpr (std::is_same_v<T1, double>) {
+      LAPACK_CALL(dsyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      LAPACK_CALL(cheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      LAPACK_CALL(zheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
     }
 #pragma GCC diagnostic pop
   }

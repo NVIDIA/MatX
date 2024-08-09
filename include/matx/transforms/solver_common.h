@@ -33,12 +33,26 @@
 #pragma once
 
 #ifdef MATX_EN_NVPL
+  #ifndef nvpl_scomplex_t
+    #define nvpl_scomplex_t cuda::std::complex<float>
+    #define nvpl_dcomplex_t cuda::std::complex<double>
+  #endif
   #include <nvpl_lapack.h>
   using lapack_int_t = nvpl_int_t;
-  using lapack_scomplex_t = nvpl_scomplex_t;
-  using lapack_dcomplex_t = nvpl_dcomplex_t;
+  #define LAPACK_CALL(fn) NVPL_LAPACK_##fn
+#elif defined(MATX_EN_OPENBLAS_LAPACK)
+  #ifdef MATX_OPENBLAS_64BITINT
+    #define lapack_int int64_t
+  #else
+    #define lapack_int int32_t
+  #endif
+  #define lapack_complex_float cuda::std::complex<float>
+  #define lapack_complex_double cuda::std::complex<double>
+  #include <lapack.h>
+  using lapack_int_t = lapack_int;
+  #define LAPACK_CALL(fn) LAPACK_##fn
 #else
-  using lapack_int_t = int64_t;
+  using lapack_int_t = index_t;
 #endif
 
 namespace matx {

@@ -54,7 +54,7 @@ namespace matx {
 #endif  
 
 // Solver
-#if defined(MATX_EN_NVPL)
+#if defined(MATX_EN_NVPL) || defined(MATX_EN_OPENBLAS_LAPACK)
   #define MATX_EN_CPU_SOLVER 1
 #else
   #define MATX_EN_CPU_SOLVER 0

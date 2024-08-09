@@ -68,8 +68,6 @@ class matxDnLUHostPlan_t : matxDnHostSolver_t<typename ATensor::value_type> {
   using T2 = typename PivotTensor::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  using lapack_type = std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>, lapack_scomplex_t, 
-              std::conditional_t<std::is_same_v<T1, cuda::std::complex<double>>, lapack_dcomplex_t, T1>>;
 
 public:
   /**
@@ -149,7 +147,7 @@ public:
 
     lapack_int_t info;
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      getrf_dispatch(&params.m, &params.n, reinterpret_cast<lapack_type*>(this->batch_a_ptrs[i]),
+      getrf_dispatch(&params.m, &params.n, reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.m, reinterpret_cast<T2*>(this->batch_piv_ptrs[i]), &info);
 
       MATX_ASSERT(info == 0, matxSolverError);
@@ -166,17 +164,17 @@ public:
   ~matxDnLUHostPlan_t() {}
 
 private:
-  void getrf_dispatch(const lapack_int_t* m, const lapack_int_t* n, lapack_type* a,
+  void getrf_dispatch(const lapack_int_t* m, const lapack_int_t* n, T1* a,
                       const lapack_int_t* lda, lapack_int_t* piv, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<lapack_type, float>) {
-      sgetrf_(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<lapack_type, double>) {
-      dgetrf_(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_scomplex_t>) {
-      cgetrf_(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_dcomplex_t>) {
-      zgetrf_(m, n, a, lda, piv, info);
+    if constexpr (std::is_same_v<T1, float>) {
+      LAPACK_CALL(sgetrf)(m, n, a, lda, piv, info);
+    } else if constexpr (std::is_same_v<T1, double>) {
+      LAPACK_CALL(dgetrf)(m, n, a, lda, piv, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      LAPACK_CALL(cgetrf)(m, n, a, lda, piv, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      LAPACK_CALL(zgetrf)(m, n, a, lda, piv, info);
     }
   }
 
