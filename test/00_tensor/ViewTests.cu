@@ -477,7 +477,7 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
     using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
     // example-begin randomi-test-1
-    index_t count = 3;
+    index_t count = 50;
 
     tensor_t<TestType, 3> t3f({count, count, count});
     TestType minBound = std::numeric_limits<TestType>::min(); 
@@ -487,8 +487,6 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
     (t3f = randomi<TestType>({count, count, count}, 0, minBound, maxBound )).run(this->exec);
     // example-end randomi-test-1   
     this->exec.sync();
-    
-    matx::print(t3f);
 
     for (index_t i = 0; i < count; i++) {
       for (index_t j = 0; j < count; j++) {
