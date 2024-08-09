@@ -480,8 +480,8 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
     index_t count = 3;
 
     tensor_t<TestType, 3> t3f({count, count, count});
-    TestType minBound = std::numeric_limits<TestType>::min() / 100; 
-    TestType maxBound = std::numeric_limits<TestType>::max() / 100; 
+    TestType minBound = std::numeric_limits<TestType>::min(); 
+    TestType maxBound = std::numeric_limits<TestType>::max(); 
     
     (t3f = (TestType)0).run(this->exec);
     (t3f = randomi<TestType>({count, count, count}, 0, minBound, maxBound )).run(this->exec);

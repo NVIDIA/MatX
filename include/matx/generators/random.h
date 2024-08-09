@@ -688,7 +688,7 @@ public:
                  );   
 
     using shape_strip_t = remove_cvref_t<ShapeType>;
-    matx::detail::randFloatParams<T> params{dist, alpha, beta};
+    matx::detail::randFloatParams<LowerType> params{dist, alpha, beta};
 
     return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
   }
