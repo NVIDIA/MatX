@@ -39,7 +39,7 @@
 #include "matx/core/dlpack.h"
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
-
+#include "matx/transforms/copy.h"
 
 namespace matx
 {
@@ -1107,13 +1107,39 @@ void print(const Op &op)
 
 #endif // not DOXYGEN_ONLY
 
-template <typename Op>
-auto OpToTensor(Op &&op, [[maybe_unused]] cudaStream_t stream) {
+template <typename Op, typename Executor>
+auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
   if constexpr (!is_tensor_view_v<Op>) {
-    return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    if constexpr (is_cuda_executor_v<Executor>) {
+      return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    } else {
+      return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
+    }
   } else {
     return op;
   }
+}
+
+/**
+ * Get a transposed view of a tensor into a user-supplied buffer
+ *
+ * @param tp
+ *   Pointer to pre-allocated memory
+ * @param a
+ *   Tensor to transpose
+ * @param exec
+ *   Executor
+ */
+template <typename TensorType, typename Executor>
+__MATX_INLINE__ auto
+TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, const Executor &exec)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  auto pa = a.PermuteMatrix();
+  auto tv = make_tensor(tp, pa.Shape());
+  matx::copy(tv, pa, exec);
+  return tv;
 }
 
 /**

@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
+#include "matx/transforms/det.h"
 
 namespace matx {
 namespace detail {
@@ -62,9 +62,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const{
-        static_assert(is_cuda_executor_v<Executor>, "det() only supports the CUDA executor currently");
-
-        det_impl(cuda::std::get<0>(out), a_, ex.getStream());
+        det_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

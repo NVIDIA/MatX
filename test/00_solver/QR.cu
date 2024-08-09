@@ -42,56 +42,114 @@ constexpr int n = 50;
 
 template <typename T> class QRSolverTest : public ::testing::Test {
 protected:
-  using dtype = float;
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;   
    
   void SetUp() override
   {
+    if constexpr (!detail::CheckSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      exec = SelectThreadsHostExecutor{params};
+    }
+
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<GTestType>("00_solver", "qr", "run", {m, n});
-    pb->NumpyToTensorView(Av, "A");
-    pb->NumpyToTensorView(Qv, "Q");
-    pb->NumpyToTensorView(Rv, "R");
   }
 
   void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
-  GExecType exec{};   
-  tensor_t<GTestType, 2> Av{{m, n}};
-  tensor_t<GTestType, 2> Atv{{n, m}};
-  tensor_t<GTestType, 1> TauV{{std::min(m, n)}};
-  tensor_t<GTestType, 2> Qv{{m, std::min(m, n)}};
-  tensor_t<GTestType, 2> Rv{{std::min(m, n), n}};
+  GExecType exec{};
+  float thresh = 0.001f;
 };
 
 template <typename TensorType>
-class QRSolverTestNonComplexFloatTypes : public QRSolverTest<TensorType> {
+class QRSolverTestFloatTypes : public QRSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(QRSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(QRSolverTestFloatTypes,
+                 MatXFloatNonHalfTypesAllExecs);
 
-TYPED_TEST(QRSolverTestNonComplexFloatTypes, QRBasic)
+TYPED_TEST(QRSolverTestFloatTypes, QRBasic)
 {
   MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  // example-begin cusolver_qr-test-1
-  // cuSolver only supports col-major solving today, so we need to transpose,
-  // solve, then transpose again to compare to Python
-  (mtie(this->Av, this->TauV) = cusolver_qr(this->Av)).run(this->exec);
-  // example-end cusolver_qr-test-1
+  auto Av = make_tensor<TestType>({m, n});
+  auto TauV = make_tensor<TestType>({std::min(m,n)});
+  auto Qv = make_tensor<TestType>({m, std::min(m, n)});
+  auto Rv = make_tensor<TestType>({std::min(m, n), n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "qr", "run", {m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+  this->pb->NumpyToTensorView(Qv, "Q");
+  this->pb->NumpyToTensorView(Rv, "R");
+
+  // example-begin qr_solver-test-1
+  (mtie(Av, TauV) = qr_solver(Av)).run(this->exec);
+  // example-end qr_solver-test-1
   this->exec.sync();
 
   // For now we're only verifying R. Q is a bit more complex to compute since
   // cuSolver/BLAS don't return Q, and instead return Householder reflections
   // that are used to compute Q. Eventually compute Q here and verify
-  for (index_t i = 0; i < this->Av.Size(0); i++) {
-    for (index_t j = 0; j < this->Av.Size(1); j++) {
+  for (index_t i = 0; i < Av.Size(0); i++) {
+    for (index_t j = 0; j < Av.Size(1); j++) {
       // R is stored only in the top triangle of A
       if (i <= j) {
-        ASSERT_NEAR(this->Av(i, j), this->Rv(i, j), 0.001);
+        if constexpr (is_complex_v<TestType>) {
+          ASSERT_NEAR(Av(i, j).real(), Rv(i, j).real(), this->thresh);
+          ASSERT_NEAR(Av(i, j).imag(), Rv(i, j).imag(), this->thresh);
+        }
+        else {
+          ASSERT_NEAR(Av(i, j), Rv(i, j), this->thresh);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QRSolverTestFloatTypes, QRBasicBatched)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr int batches = 10;
+  auto Av = make_tensor<TestType>({batches, m, n});
+  auto TauV = make_tensor<TestType>({batches, std::min(m,n)});
+  auto Qv = make_tensor<TestType>({batches, m, std::min(m, n)});
+  auto Rv = make_tensor<TestType>({batches, std::min(m, n), n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "qr", "run", {batches, m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+  this->pb->NumpyToTensorView(Qv, "Q");
+  this->pb->NumpyToTensorView(Rv, "R");
+
+  (mtie(Av, TauV) = qr_solver(Av)).run(this->exec);
+  this->exec.sync();
+
+  // For now we're only verifying R. Q is a bit more complex to compute since
+  // cuSolver/BLAS don't return Q, and instead return Householder reflections
+  // that are used to compute Q. Eventually compute Q here and verify
+  for (index_t b = 0; b < Av.Size(0); b++) {
+    for (index_t i = 0; i < Av.Size(1); i++) {
+      for (index_t j = 0; j < Av.Size(2); j++) {
+        // R is stored only in the top triangle of A
+        if (i <= j) {
+          if constexpr (is_complex_v<TestType>) {
+            ASSERT_NEAR(Av(b, i, j).real(), Rv(b, i, j).real(), this->thresh);
+            ASSERT_NEAR(Av(b, i, j).imag(), Rv(b, i, j).imag(), this->thresh);
+          }
+          else {
+            ASSERT_NEAR(Av(b, i, j), Rv(b, i, j), this->thresh);
+          }
+        }
       }
     }
   }
