@@ -62,6 +62,8 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
  * @tparam Gen Generator type
  * @param val Value to store in
  * @param state Generator state
+ * @param min min of the range to generate
+ * @param max max of the range to generate
  */
 template <typename T, typename Gen>
 __inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
@@ -477,7 +479,9 @@ public:
   }
 
   /**
-   * @brief Return a random number with a specified shape
+   * @brief Return a random number with a specified shape.
+   * 
+   * Supported Types: float, double, complex<float>, complex<double>
    *
    * @tparam ShapeType Shape type
    * @tparam T Type of output
@@ -507,8 +511,10 @@ public:
   }
 
   /**
-   * @brief Return a random number with a specified shape
-   *
+   * @brief Return a random number with a specified shape.
+   * 
+   * Supported Types: float, double, complex<float>, complex<double>
+   * 
    * @tparam RANK Rank of operator
    * @tparam T Type of output
    * @tparam LowerType Either T or the inner type of T if T is complex
@@ -528,8 +534,10 @@ public:
 
 
   /**
-   * @brief Return a random number with a specified shape
-   *
+   * @brief Return a random number with a specified shape.
+   * 
+   *  Supported types: uint32_t, int32_t, uint64_t, int64_t
+   * 
    * @tparam ShapeType Shape type
    * @tparam T Type of output
    * @tparam LowerType Either T or the inner type of T if T is complex* 
@@ -557,7 +565,9 @@ public:
   }
   
   /**
-   * @brief Return a random number with a specified shape
+   * @brief Return a random number with a specified shape.
+   * 
+   *  Supported types: uint32_t, int32_t, uint64_t, int64_t
    *
    * @tparam RANK Rank of operator
    * @tparam T Type of output
