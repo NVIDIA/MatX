@@ -74,8 +74,6 @@ class matxDnSVDHostPlan_t : matxDnHostSolver_t<typename ATensor::value_type> {
   using T4 = typename VtTensor::value_type;
   static constexpr int RANK = UTensor::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  using lapack_type = std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>, lapack_scomplex_t, 
-              std::conditional_t<std::is_same_v<T1, cuda::std::complex<double>>, lapack_dcomplex_t, T1>>;
 
 public:
   /**
@@ -142,7 +140,7 @@ public:
     // Perform a workspace query with lwork = -1.
 
     lapack_int_t info;
-    lapack_type work_query;
+    T1 work_query;
     // Use all mode for a larger workspace size that works for all modes
     gesvd_dispatch("A", "A", &params.m, &params.n, nullptr,
                   &params.m, nullptr, nullptr, &params.m, nullptr, &params.n,
@@ -153,7 +151,7 @@ public:
     // the real part of the first elem of work holds the optimal lwork.
     // rwork has size 5*min(M,N) and is only used for complex types
     if constexpr (is_complex_v<T1>) {
-      this->lwork = static_cast<lapack_int_t>(work_query.real);
+      this->lwork = static_cast<lapack_int_t>(work_query.real());
       this->lrwork = 5 * cuda::std::min(params.m, params.n);
     } else {
       this->lwork = static_cast<lapack_int_t>(work_query);
@@ -208,11 +206,11 @@ public:
     lapack_int_t info;
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       gesvd_dispatch(&jobu, &jobvt, &params.m, &params.n,
-                      reinterpret_cast<lapack_type*>(this->batch_a_ptrs[i]),
+                      reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                       &params.m, reinterpret_cast<T3*>(this->batch_s_ptrs[i]),
-                      reinterpret_cast<lapack_type*>(this->batch_u_ptrs[i]), &params.m,
-                      reinterpret_cast<lapack_type*>(this->batch_vt_ptrs[i]), &params.n,
-                      reinterpret_cast<lapack_type*>(this->work), &this->lwork,
+                      reinterpret_cast<T1*>(this->batch_u_ptrs[i]), &params.m,
+                      reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &params.n,
+                      reinterpret_cast<T1*>(this->work), &this->lwork,
                       reinterpret_cast<T3*>(this->rwork), &info);
 
       MATX_ASSERT(info == 0, matxSolverError);
@@ -230,23 +228,23 @@ public:
 
 private:
   void gesvd_dispatch(const char *jobu, const char *jobvt, const lapack_int_t *m,
-                      const lapack_int_t *n, lapack_type *a,
-                      const lapack_int_t *lda, T3 *s, lapack_type *u,
-                      const lapack_int_t *ldu, lapack_type *vt,
-                      const lapack_int_t *ldvt, lapack_type *work_in,
+                      const lapack_int_t *n, T1 *a,
+                      const lapack_int_t *lda, T3 *s, T1 *u,
+                      const lapack_int_t *ldu, T1 *vt,
+                      const lapack_int_t *ldvt, T1 *work_in,
                       const lapack_int_t *lwork_in, [[maybe_unused]] T3 *rwork_in, lapack_int_t *info)
   {
     // TODO: remove warning suppression once gesvd is optimized in NVPL LAPACK
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    if constexpr (std::is_same_v<lapack_type, float>) {
-      sgesvd_(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, double>) {
-      dgesvd_(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_scomplex_t>) {
-      cgesvd_(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_dcomplex_t>) {
-      zgesvd_(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
+    if constexpr (std::is_same_v<T1, float>) {
+      LAPACK_CALL(sgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
+    } else if constexpr (std::is_same_v<T1, double>) {
+      LAPACK_CALL(dgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      LAPACK_CALL(cgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      LAPACK_CALL(zgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
     }
 #pragma GCC diagnostic pop
   }

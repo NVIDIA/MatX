@@ -69,8 +69,7 @@ class matxDnQRHostPlan_t : matxDnHostSolver_t<typename ATensor::value_type> {
   using T2 = typename TauTensor::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  using lapack_type = std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>, lapack_scomplex_t, 
-              std::conditional_t<std::is_same_v<T1, cuda::std::complex<double>>, lapack_dcomplex_t, T1>>;
+
 public:
   /**
    * Plan for factoring A such that \f$\textbf{A} = \textbf{Q} * \textbf{R}\f$
@@ -118,7 +117,7 @@ public:
   {
     // perform workspace query with lwork = -1
     lapack_int_t info;
-    lapack_type work_query;
+    T1 work_query;
 
     geqrf_dispatch(&params.m, &params.n, nullptr,
                     &params.m, nullptr,
@@ -127,7 +126,7 @@ public:
     
     // the real part of the first elem of work holds the optimal lwork
     if constexpr (is_complex_v<T1>) {
-      this->lwork = static_cast<lapack_int_t>(work_query.real);
+      this->lwork = static_cast<lapack_int_t>(work_query.real());
     } else {
       this->lwork = static_cast<lapack_int_t>(work_query);
     }
@@ -173,9 +172,9 @@ public:
 
     lapack_int_t info;
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      geqrf_dispatch(&params.m, &params.n, reinterpret_cast<lapack_type*>(this->batch_a_ptrs[i]),
-                     &params.m, reinterpret_cast<lapack_type*>(this->batch_tau_ptrs[i]),
-                     reinterpret_cast<lapack_type*>(this->work), &this->lwork, &info);
+      geqrf_dispatch(&params.m, &params.n, reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
+                     &params.m, reinterpret_cast<T1*>(this->batch_tau_ptrs[i]),
+                     reinterpret_cast<T1*>(this->work), &this->lwork, &info);
 
       MATX_ASSERT(info == 0, matxSolverError);
     }
@@ -191,18 +190,18 @@ public:
   ~matxDnQRHostPlan_t() {}
 
 private:
-  void geqrf_dispatch(const lapack_int_t* m, const lapack_int_t* n, lapack_type* a,
-                      const lapack_int_t* lda, lapack_type* tau, lapack_type* work_in,
+  void geqrf_dispatch(const lapack_int_t* m, const lapack_int_t* n, T1* a,
+                      const lapack_int_t* lda, T1* tau, T1* work_in,
                       const lapack_int_t* lwork_in, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<lapack_type, float>) {
-      sgeqrf_(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, double>) {
-      dgeqrf_(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_scomplex_t>) {
-      cgeqrf_(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<lapack_type, lapack_dcomplex_t>) {
-      zgeqrf_(m, n, a, lda, tau, work_in, lwork_in, info);
+    if constexpr (std::is_same_v<T1, float>) {
+      LAPACK_CALL(sgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
+    } else if constexpr (std::is_same_v<T1, double>) {
+      LAPACK_CALL(dgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      LAPACK_CALL(cgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
+    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      LAPACK_CALL(zgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
     }
   }
   

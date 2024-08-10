@@ -38,6 +38,26 @@ find_package(OpenBLAS CONFIG QUIET
   REQUIRED
 )
 
+find_path(LAPACK_INCLUDE_DIR
+  NAMES lapack.h
+  HINTS ${OpenBLAS_INCLUDE_DIRS}
+  QUIET
+)
+
+if(LAPACK_INCLUDE_DIR)
+  message(STATUS "Enabling LAPACK with OpenBLAS")
+  target_compile_definitions(matx INTERFACE LAPACK_COMPLEX_CUSTOM)
+  target_compile_definitions(matx INTERFACE MATX_EN_OPENBLAS_LAPACK)
+  include(CheckSymbolExists)
+  check_symbol_exists(OPENBLAS_USE64BITINT "${OpenBLAS_INCLUDE_DIRS}/openblas_config.h" OPENBLAS_USE64BITINT_FOUND)
+  if (OPENBLAS_USE64BITINT_FOUND)
+    target_compile_definitions(matx INTERFACE MATX_OPENBLAS_64BITINT)
+  endif()
+else()
+  message(STATUS "Could not find lapack.h. No LAPACK support is enabled.")
+endif()
+
+
 if(NOT TARGET OpenBLAS::OpenBLAS)
   add_library(OpenBLAS::OpenBLAS INTERFACE IMPORTED)
   set_target_properties(OpenBLAS::OpenBLAS PROPERTIES

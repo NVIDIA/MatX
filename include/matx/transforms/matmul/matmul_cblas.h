@@ -44,6 +44,10 @@
 #include <numeric>
 
 #ifdef MATX_EN_NVPL
+  #ifndef nvpl_scomplex_t
+    #define nvpl_scomplex_t cuda::std::complex<float>
+    #define nvpl_dcomplex_t cuda::std::complex<double>
+  #endif
   #include <nvpl_blas_cblas.h>
   using cblas_int_t = nvpl_int_t;
 #elif defined(MATX_EN_OPENBLAS)
