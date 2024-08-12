@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include "defines.h"
+
 #ifdef MATX_EN_NVPL
   #ifndef nvpl_scomplex_t
     #define nvpl_scomplex_t cuda::std::complex<float>
