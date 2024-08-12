@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
 #=============================================================================
 include_guard(GLOBAL)
 
-cmake_policy(SET CMP0007 NEW) # allow empty list entries
-cmake_policy(SET CMP0009 NEW) # don't follow symlinks
-cmake_policy(SET CMP0057 NEW) # allow `if( IN_LIST )`
+cmake_minimum_required(VERSION 3.26...3.29)
 
 #[=[
 The goal of this script is to re-parse the `CTestTestfile`
@@ -197,8 +195,8 @@ function(extract_install_info line)
   # item 1 is the install location item 2 is the filter if valid item 3+ are the lists of files
   # being installed
   list(GET line 2 type)
-  if(type STREQUAL " TYPE SHARED_LIBRARY FILES " OR type STREQUAL " TYPE STATIC_LIBRARY FILES "
-     OR type STREQUAL " TYPE OBJECT_LIBRARY FILES " OR type STREQUAL " TYPE EXECUTABLE FILES ")
+  if(type MATCHES " TYPE EXECUTABLE " OR type MATCHES " TYPE SHARED_LIBRARY "
+     OR type MATCHES " TYPE STATIC_LIBRARY " OR type MATCHES " TYPE OBJECT_LIBRARY ")
     list(GET line 1 install_loc)
     list(GET line 3 build_loc)
     cmake_path(GET build_loc FILENAME name)
@@ -234,7 +232,7 @@ set(test_file_content
 set(CTEST_SCRIPT_DIRECTORY \".\")
 set(CMAKE_INSTALL_PREFIX \"./${_RAPIDS_INSTALL_PREFIX}\")
 set(CTEST_RESOURCE_SPEC_FILE \"./${rapids_test_json_file_name}\")
-execute_process(COMMAND ./${rapids_test_generate_exe_name} OUTPUT_FILE \"\${CTEST_RESOURCE_SPEC_FILE}\")
+execute_process(COMMAND ./${rapids_test_generate_exe_name} OUTPUT_FILE \"\${CTEST_RESOURCE_SPEC_FILE}\" COMMAND_ERROR_IS_FATAL ANY)
 \n\n
 ")
 

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,3 +44,5 @@ add_cmake_config_test( find_generate_module-header-only )
 add_cmake_config_test( find_generate_module-code-blocks )
 add_cmake_config_test( find_generate_module-back-initial-code-block-var.cmake SHOULD_FAIL "INITIAL_CODE_BLOCK variable `var_doesn't_exist` doesn't exist")
 add_cmake_config_test( find_generate_module-back-final-code-block-var.cmake SHOULD_FAIL "FINAL_CODE_BLOCK variable `var_doesn't_exist` doesn't exist")
+
+add_cmake_config_test( find_generate_module-verify-copyright-header.cmake )

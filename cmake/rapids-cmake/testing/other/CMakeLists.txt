@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-add_cmake_config_test( rapids_cmake-multiple-cpm )
-add_cmake_config_test( rapids_cmake-multiple-simple )
+add_cmake_config_test( rapids_cmake-multiple-cpm NO_RAPIDS_CMAKE_HOOKS)
+add_cmake_config_test( rapids_cmake-multiple-simple NO_RAPIDS_CMAKE_HOOKS)
 
-add_cmake_config_test( FetchContent-legacy )
-add_cmake_config_test( FetchContent-hostile-legacy )
+add_cmake_config_test( rapids_cmake-fetch-via-git NO_RAPIDS_CMAKE_HOOKS)
+add_cmake_config_test( rapids_cmake-fetch-via-zip NO_RAPIDS_CMAKE_HOOKS)
+
+add_cmake_config_test( FetchContent-legacy NO_RAPIDS_CMAKE_HOOKS)
+add_cmake_config_test( FetchContent-hostile-legacy NO_RAPIDS_CMAKE_HOOKS)

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,12 +28,12 @@ rapids_cpm_package_details(rmm rmm_version rmm_repository rmm_tag rmm_shallow rm
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override1.json
   [=[
 {
-  "packages" : {
-    "nvbench" : {
-      "git_tag" : "my_tag"
+  "packages": {
+    "nvbench": {
+      "git_tag": "my_tag"
     },
-    "GTest" : {
-      "version" : "2.99"
+    "GTest": {
+      "version": "2.99"
     }
   }
 }
@@ -42,12 +42,12 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override1.json
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override2.json
   [=[
 {
-  "packages" : {
-    "rmm" : {
-      "git_tag" : "new_rmm_tag"
+  "packages": {
+    "rmm": {
+      "git_tag": "new_rmm_tag"
     },
-    "GTest" : {
-      "version" : "3.99"
+    "GTest": {
+      "version": "3.99"
     }
   }
 }

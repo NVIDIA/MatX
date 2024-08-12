@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "nvcomp" : {
-      "version" : "224",
-      "git_url" : "https://github.com/NVIDIA/nvcomp.git",
+  "packages": {
+    "nvcomp": {
+      "version": "224",
+      "git_url": "https://github.com/NVIDIA/nvcomp.git",
     }
   }
 }

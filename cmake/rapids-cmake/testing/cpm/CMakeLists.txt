@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,25 +23,51 @@ add_cmake_config_test( cpm_find-existing-target )
 add_cmake_config_test( cpm_find-existing-target-to-export-sets )
 add_cmake_config_test( cpm_find-gtest-no-gmock )
 add_cmake_config_test( cpm_find-options-escaped )
+add_cmake_config_test( cpm_find-patch-command NO_CPM_CACHE)
 add_cmake_config_test( cpm_find-restore-cpm-vars )
 add_cmake_config_test( cpm_find-version-explicit-install.cmake )
 
-add_cmake_config_test( cpm_init-bad-override-path.cmake SHOULD_FAIL "rapids_cpm_package_override can't load")
-add_cmake_config_test( cpm_init-override-multiple.cmake )
-add_cmake_config_test( cpm_init-override-simple.cmake )
+add_cmake_build_test( cpm_generate_pins-format-patches NO_CPM_CACHE)
+add_cmake_build_test( cpm_generate_pins-nested NO_CPM_CACHE)
+add_cmake_build_test( cpm_generate_pins-no-src-dir )
+add_cmake_build_test( cpm_generate_pins-override NO_CPM_CACHE)
+add_cmake_build_test( cpm_generate_pins-pure-cpm )
+add_cmake_build_test( cpm_generate_pins-simple NO_CPM_CACHE)
+add_cmake_build_test( cpm_generate_pins-simple-via-variable NO_CPM_CACHE)
+add_cmake_build_test( cpm_generate_pins-var-and-arg NO_CPM_CACHE)
 
+add_cmake_config_test( cpm_init-bad-default-path.cmake SHOULD_FAIL "rapids_cpm_init can't load")
+add_cmake_config_test( cpm_init-bad-default-cmake-var.cmake SHOULD_FAIL "rapids_cpm_init can't load")
+add_cmake_config_test( cpm_init-bad-override-path.cmake SHOULD_FAIL "rapids_cpm_package_override can't load")
+add_cmake_config_test( cpm_init-bad-override-cmake-var.cmake SHOULD_FAIL "rapids_cpm_package_override can't load")
+add_cmake_config_test( cpm_init-custom-default-simple.cmake)
+add_cmake_config_test( cpm_init-custom-default-multiple.cmake)
+add_cmake_config_test( cpm_init-custom-default-via-cmake-var.cmake)
+add_cmake_config_test( cpm_init-override-simple.cmake)
+add_cmake_config_test( cpm_init-override-multiple.cmake)
+add_cmake_config_test( cpm_init-override-via-cmake-var.cmake)
+
+
+add_cmake_config_test( cpm_package_override-add-new-project.cmake )
 add_cmake_config_test( cpm_package_override-bad-path.cmake SHOULD_FAIL "rapids_cpm_package_override can't load")
 add_cmake_config_test( cpm_package_override-before-init.cmake )
 add_cmake_config_test( cpm_package_override-empty.cmake )
+add_cmake_config_test( cpm_package_override-empty-patches.cmake )
+add_cmake_config_test( cpm_package_override-env-var-support.cmake )
 add_cmake_config_test( cpm_package_override-multiple.cmake )
+add_cmake_config_test( cpm_package_override-no-version-value.cmake SHOULD_FAIL "rapids_cmake can't parse")
 add_cmake_config_test( cpm_package_override-obey-cpm-source-var.cmake )
 add_cmake_config_test( cpm_package_override-patches.cmake )
 add_cmake_config_test( cpm_package_override-simple.cmake )
 
-
 add_cmake_config_test( cpm_generate_patch_command-invalid.cmake )
 add_cmake_config_test( cpm_generate_patch_command-override.cmake )
 add_cmake_config_test( cpm_generate_patch_command-current_json_dir.cmake )
+add_cmake_config_test( cpm_generate_patch_command-verify-copyright-header.cmake )
+
+add_cmake_config_test( cpm_cccl-simple.cmake )
+add_cmake_config_test( cpm_cccl-export.cmake )
+add_cmake_build_test( cpm_cccl-preserve-custom-install-loc )
 
 add_cmake_config_test( cpm_cuco-simple.cmake )
 add_cmake_config_test( cpm_cuco-export.cmake )
@@ -58,6 +84,7 @@ add_cmake_config_test( cpm_gbench-explicit-static.cmake)
 add_cmake_config_test( cpm_gtest-export.cmake )
 add_cmake_config_test( cpm_gtest-simple.cmake )
 add_cmake_config_test( cpm_gtest-static.cmake )
+add_cmake_config_test( cpm_gtest-explicit-static.cmake )
 
 add_cmake_config_test( cpm_libcudacxx-after_cpmfind.cmake SERIAL)
 add_cmake_config_test( cpm_libcudacxx-export.cmake )
@@ -76,7 +103,14 @@ add_cmake_config_test( cpm_nvcomp-proprietary-off.cmake )
 add_cmake_config_test( cpm_nvcomp-proprietary-on.cmake )
 add_cmake_config_test( cpm_nvcomp-simple.cmake )
 add_cmake_config_test( cpm_nvcomp-invalid-arch.cmake )
-add_cmake_config_test( cpm_nvcomp-override-clears-proprietary_binary.cmake )
+add_cmake_config_test( cpm_nvcomp-always-download-proprietary_binary.cmake SERIAL)
+add_cmake_config_test( cpm_nvcomp-override-clears-proprietary_binary.cmake SERIAL)
+add_cmake_build_test( cpm_nvcomp-proprietary_binary-lib-location.cmake SERIAL NO_CPM_CACHE)
+
+add_cmake_build_test( cpm_nvtx-build-config-works.cmake )
+add_cmake_build_test( cpm_nvtx-install-config-works.cmake )
+add_cmake_config_test( cpm_nvtx-export.cmake )
+add_cmake_config_test( cpm_nvtx-simple.cmake )
 
 add_cmake_config_test( cpm_proprietary-url-ctk-version-find-ctk.cmake )
 add_cmake_config_test( cpm_proprietary-url-ctk-version.cmake )

@@ -1,7 +1,6 @@
 {
   "parse": {
     "additional_commands": {
-
       "rapids_cmake_build_type": {
         "pargs": {
           "nargs": 1
@@ -10,7 +9,9 @@
       "rapids_cmake_install_lib_dir": {
         "pargs": {
           "nargs": 1,
-          "flags": ["MODIFY_INSTALL_LIBDIR"]
+          "flags": [
+            "MODIFY_INSTALL_LIBDIR"
+          ]
         }
       },
       "rapids_cmake_make_global": {
@@ -36,7 +37,9 @@
       "rapids_cmake_support_conda_env": {
         "pargs": {
           "nargs": 1,
-          "flags": ["MODIFY_PREFIX_PATH"]
+          "flags": [
+            "MODIFY_PREFIX_PATH"
+          ]
         }
       },
       "rapids_cmake_write_git_revision_file": {
@@ -55,8 +58,7 @@
           "PREFIX": 1
         }
       },
-
-     "rapids_cpm_find": {
+      "rapids_cpm_find": {
         "pargs": {
           "nargs": "2+"
         },
@@ -74,11 +76,23 @@
           "PATCH_COMMAND": "1"
         }
       },
-      "rapids_cpm_init": {
+      "rapids_cpm_generate_pinned_versions": {
         "pargs": {
           "nargs": 0
         },
         "kwargs": {
+          "OUTPUT": 1
+        }
+      },
+      "rapids_cpm_init": {
+        "pargs": {
+          "nargs": 0,
+          "flags": [
+            "GENERATE_PINNED_VERSIONS"
+          ]
+        },
+        "kwargs": {
+          "CUSTOM_DEFAULT_VERSION_FILE": 1,
           "OVERRIDE": 1
         }
       },
@@ -87,7 +101,15 @@
           "nargs": 1
         }
       },
-
+      "rapids_cpm_cccl": {
+        "pargs": {
+          "nargs": 0
+        },
+        "kwargs": {
+          "BUILD_EXPORT_SET": 1,
+          "INSTALL_EXPORT_SET": 1
+        }
+      },
       "rapids_cpm_cuco": {
         "pargs": {
           "nargs": 0
@@ -109,7 +131,9 @@
       "rapids_cpm_gbench": {
         "pargs": {
           "nargs": 0,
-          "flags": ["BUILD_STATIC"]
+          "flags": [
+            "BUILD_STATIC"
+          ]
         },
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
@@ -118,7 +142,10 @@
       },
       "rapids_cpm_gtest": {
         "pargs": {
-          "nargs": 0
+          "nargs": 0,
+          "flags": [
+            "BUILD_STATIC"
+          ]
         },
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
@@ -137,7 +164,9 @@
       "rapids_cpm_nvbench": {
         "pargs": {
           "nargs": 0,
-          "flags": ["BUILD_STATIC"]
+          "flags": [
+            "BUILD_STATIC"
+          ]
         },
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
@@ -182,7 +211,6 @@
           "INSTALL_EXPORT_SET": 1
         }
       },
-
       "rapids_cuda_init_architectures": {
         "pargs": {
           "nargs": 1
@@ -203,11 +231,13 @@
           "nargs": 3
         }
       },
-
       "rapids_export_cpm": {
         "pargs": {
           "nargs": "3+",
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         },
         "kwargs": {
           "GLOBAL_TARGETS": "+",
@@ -217,7 +247,10 @@
       "rapids_export": {
         "pargs": {
           "nargs": "2+",
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         },
         "kwargs": {
           "EXPORT_SET": 1,
@@ -234,7 +267,10 @@
       "rapids_export_find_package_file": {
         "pargs": {
           "nargs": "3+",
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         },
         "kwargs": {
           "EXPORT_SET": 1,
@@ -244,7 +280,10 @@
       "rapids_export_find_package_root": {
         "pargs": {
           "nargs": "3+",
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         },
         "kwargs": {
           "EXPORT_SET": 1,
@@ -264,16 +303,21 @@
       "rapids_export_write_dependencies": {
         "pargs": {
           "nargs": 3,
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         }
       },
       "rapids_export_write_language": {
         "pargs": {
           "nargs": 3,
-          "flags": ["INSTALL", "BUILD"]
+          "flags": [
+            "INSTALL",
+            "BUILD"
+          ]
         }
       },
-
       "rapids_find_generate_module": {
         "pargs": {
           "nargs": "1+",
@@ -364,7 +408,9 @@
       "rapids_test_install_relocatable": {
         "pargs": {
           "nargs": "0",
-          "flags": ["INCLUDE_IN_ALL"]
+          "flags": [
+            "INCLUDE_IN_ALL"
+          ]
         },
         "kwargs": {
           "INSTALL_COMPONENT_SET": "1",

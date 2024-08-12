@@ -66,10 +66,10 @@ The `rapids-cmake` module contains helpful general CMake functionality
 ### cpm
 
 The `rapids-cpm` module contains CPM functionality to allow projects to acquire dependencies consistently.
-For consistentcy All targets brought in via `rapids-cpm` are GLOBAL targets.
+For consistency, all targets brought in via `rapids-cpm` are GLOBAL targets.
 
 - `rapids_cpm_init()` handles initialization of the CPM module.
-- `raipds_cpm_find(<project> name BUILD_EXPORT_SET <name> INSTALL_EXPORT_SET <name>)` Will search for a module and fall back to installing via CPM. Offers support to track dependencies for easy package exporting
+- `rapids_cpm_find(<project> name BUILD_EXPORT_SET <name> INSTALL_EXPORT_SET <name>)` Will search for a module and fall back to installing via CPM. Offers support to track dependencies for easy package exporting
 
 ### cuda
 
@@ -140,6 +140,19 @@ At times projects or developers will need to verify ``rapids-cmake`` branches. T
 
   # Or to override the entire repository URL (e.g. to use a GitLab repo):
   set(rapids-cmake-url "https://gitlab.com/<my_user>/<my_fork>/-/archive/<my_branch>/<my_fork>-<my_branch>.zip")
+
+  # To override the usage of fetching the repository without git info
+  # This only works when specifying
+  #
+  # set(rapids-cmake-fetch-via-git "ON")
+  # set(rapids-cmake-branch "branch-<cal_ver>")
+  #
+  # or
+  # set(rapids-cmake-fetch-via-git "ON")
+  # set(rapids-cmake-url "https://gitlab.com/<my_user>/<private_fork>/")
+  # set(rapids-cmake-sha "ABC123")
+  #
+  set(rapids-cmake-fetch-via-git "ON")
 
   file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
       ${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)

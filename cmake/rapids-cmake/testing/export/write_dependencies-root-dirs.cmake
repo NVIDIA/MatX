@@ -16,7 +16,7 @@
 include(${rapids-cmake-dir}/export/find_package_root.cmake)
 include(${rapids-cmake-dir}/export/write_dependencies.cmake)
 
-rapids_export_find_package_root(BUILD RMM [=[${CMAKE_CURRENT_LIST_DIR}/fake/build/path]=] test_set)
+rapids_export_find_package_root(BUILD RMM [=[${CMAKE_CURRENT_LIST_DIR}/fake/build/path]=] EXPORT_SET test_set)
 rapids_export_write_dependencies(build test_set "${CMAKE_CURRENT_BINARY_DIR}/build_export_set.cmake")
 
 rapids_export_find_package_root(BUILD RMM "/bad/install/path" EXPORT_SET ${unknown_var}) #ignored
@@ -32,11 +32,11 @@ if(is_found EQUAL -1)
 endif()
 
 rapids_export_find_package_root(install RMM "/first/install/path" EXPORT_SET test_set)
-rapids_export_find_package_root(INSTALL RMM "/second/install/path" test_set)
+rapids_export_find_package_root(INSTALL RMM "/second/install/path" EXPORT_SET test_set)
 set(to_install FALSE)
 rapids_export_find_package_root(INSTALL RMM "/bad/install/path" EXPORT_SET test_set CONDITION to_install) #ignored
 
-rapids_export_find_package_root(install PKG2 "/pkg2/install/path" test_set)
+rapids_export_find_package_root(install PKG2 "/pkg2/install/path" EXPORT_SET test_set)
 rapids_export_write_dependencies(INSTALL test_set "${CMAKE_CURRENT_BINARY_DIR}/install_export_set.cmake")
 
 set(install_to_match_string_1 [=[set(RMM_ROOT "/first/install/path;/second/install/path"]=])

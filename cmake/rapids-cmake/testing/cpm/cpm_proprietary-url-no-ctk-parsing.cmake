@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,12 +24,14 @@ rapids_cpm_init()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "test_binary" : {
-      "version" : "2.6.1",
-      "proprietary_binary" : {
-        "x86_64-linux" :  "https://fake.url.com/x86_${version}.tgz",
-        "aarch64-linux" : "https://fake.url.com/aarch_${version}.tgz",
+  "packages": {
+    "test_binary": {
+      "version": "2.6.1",
+      "git_url": "empty",
+      "git_tag": "empty",
+      "proprietary_binary": {
+        "x86_64-linux":  "https://fake.url.com/x86_${version}.tgz",
+        "aarch64-linux": "https://fake.url.com/aarch_${version}.tgz",
       }
     }
   }

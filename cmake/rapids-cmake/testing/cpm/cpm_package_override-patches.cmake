@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ rapids_cpm_init()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "rmm" : {
-      "patches" : [
+  "packages": {
+    "rmm": {
+      "patches": [
         {
-          "file" : "rmm_patch_install_rules.diff",
-          "issue" : "Fake install rule patch file",
-          "fixed_in" : "39.99.0"
+          "file": "rmm_patch_install_rules.diff",
+          "issue": "Fake install rule patch file",
+          "fixed_in": "39.99.0"
         }
       ]
     }

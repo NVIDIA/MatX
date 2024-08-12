@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ set(ENV{CONDA_PREFIX} "/opt/conda/prefix")
 
 rapids_cmake_support_conda_env(conda_env)
 
-get_target_property(include_dirs conda_env INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(include_dirs conda_env INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
 if( "$ENV{BUILD_PREFIX}/include" IN_LIST include_dirs)
   message(FATAL_ERROR "Not expected env{BUILD_PREFIX} to be in the include dirs of `conda_env`")
 endif()

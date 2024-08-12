@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@ include(${rapids-cmake-dir}/cpm/init.cmake)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "nvbench" : {
-      "version" : "custom_version",
-      "git_url" : "my_url",
-      "git_tag" : "my_tag"
+  "packages": {
+    "nvbench": {
+      "version": "custom_version",
+      "git_url": "my_url",
+      "git_tag": "my_tag"
     }
   }
 }

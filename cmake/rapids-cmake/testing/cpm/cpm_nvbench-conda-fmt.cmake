@@ -25,7 +25,6 @@ rapids_cuda_set_architectures(RAPIDS)
 
 # Force shared libs so that nvbench doesn't have a chance to use a static fmt
 set(BUILD_SHARED_LIBS ON)
-set(NVBench_ENABLE_CUPTI OFF)
 rapids_cpm_init()
 rapids_cpm_rmm()
 rapids_cpm_nvbench()

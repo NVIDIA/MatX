@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) @current_year@, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ function(rapids_cpm_run_git_patch file issue)
   set(result 1)
   if(ext STREQUAL "diff")
     execute_process(
-      COMMAND ${git_command} apply ${file}
+      COMMAND ${git_command} apply --whitespace=fix ${file}
       RESULT_VARIABLE result
       ERROR_VARIABLE repo_error_info
     )
@@ -49,6 +49,9 @@ function(rapids_cpm_run_git_patch file issue)
       )
     endif()
   elseif(ext STREQUAL "patch")
+    # Setup a fake committer name/email so we execute everywhere
+    set(ENV{GIT_COMMITTER_NAME} "rapids-cmake" )
+    set(ENV{GIT_COMMITTER_EMAIL} "rapids.cmake@rapids.ai" )
     # no need to check if the git patch was already applied
     # `am` does that and returns a success error code for those cases
     execute_process(

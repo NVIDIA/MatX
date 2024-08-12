@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,3 +18,4 @@ include_guard(GLOBAL)
 include(${CMAKE_CURRENT_LIST_DIR}/cuda/init_architectures.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cuda/init_runtime.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cuda/set_architectures.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cuda/set_runtime.cmake)

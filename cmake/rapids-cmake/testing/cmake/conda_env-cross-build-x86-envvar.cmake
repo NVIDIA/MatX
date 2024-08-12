@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ if(NOT TARGET conda_env)
   message(FATAL_ERROR "Expected target conda_env to exist")
 endif()
 
-get_target_property(include_dirs conda_env INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(include_dirs conda_env INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
 if( NOT "$ENV{BUILD_PREFIX}/include" IN_LIST include_dirs)
   message(FATAL_ERROR "Expected env{BUILD_PREFIX} to be in the include dirs of `conda_env`")
 endif()

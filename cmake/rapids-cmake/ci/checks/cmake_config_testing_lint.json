@@ -1,6 +1,10 @@
 {
   "lint": {
-    "disabled_codes": ["C0301", "C0111","C0112"],
+    "disabled_codes": [
+      "C0301",
+      "C0111",
+      "C0112"
+    ],
     "function_pattern": "[0-9A-z_]+",
     "macro_pattern": "[0-9A-z_]+",
     "global_var_pattern": "[A-z][0-9A-z_]+",
