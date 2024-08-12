@@ -66,7 +66,7 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
  * @param max max of the range to generate
  */
 template <typename T, typename Gen>
-__inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
+__MATX_INLINE__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
 {
   
   double normFloat = curand_uniform(state);
@@ -85,7 +85,7 @@ __inline__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, doub
  * @param dist Distribution
  */
 template <typename Gen>
-__inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
+__MATX_INLINE__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
                                       Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -105,7 +105,7 @@ __inline__ __MATX_DEVICE__ void get_random(float &val, Gen *state,
  * @param dist Distribution
  */
 template <typename Gen>
-__inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
+__MATX_INLINE__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
                                       Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -125,7 +125,7 @@ __inline__ __MATX_DEVICE__ void get_random(double &val, Gen *state,
  * @param dist Distribution
  */
 template <typename Gen>
-__inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
+__MATX_INLINE__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
                                       Gen *state, Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -148,7 +148,7 @@ __inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<float> &val,
  * @param dist Distribution
  */
 template <typename Gen>
-__inline__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
+__MATX_INLINE__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
                                       Gen *state, Distribution_t dist)
 {
   if (dist == UNIFORM) {
@@ -192,7 +192,7 @@ public:
    * @param seed
    *   Seed for the RNG
    */
-  inline randomGenerator_t(index_t total_threads, uint64_t seed)
+  __MATX_INLINE__ randomGenerator_t(index_t total_threads, uint64_t seed)
       : total_threads_(total_threads)
   {
 #ifdef __CUDACC__
@@ -209,7 +209,7 @@ public:
   /**
    * Destroy the RNG and free all memory
    */
-  inline ~randomGenerator_t() { matxFree(states_); }
+  __MATX_INLINE__ ~randomGenerator_t() { matxFree(states_); }
 };
 
   namespace detail {
@@ -241,8 +241,8 @@ public:
         bool device_;
         
         union{
-        randFloatParams<inner_t> fParams_;
-        randIntParams<inner_t> iParams_;
+          randFloatParams<inner_t> fParams_;
+          randIntParams<inner_t>   iParams_;
         };
         
         // Used by host operators only
@@ -260,7 +260,7 @@ public:
         RandomOp() = delete;
   
         // base constructor, should never be called directly
-        inline RandomOp(ShapeType &&s, uint64_t seed) :
+        __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed) :
           seed_(seed)
         {
           total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
@@ -283,14 +283,14 @@ public:
         }
 
       // Constructor for randFloatParams
-      inline RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
+      __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
           RandomOp(std::forward<ShapeType>(s), seed)
       {
           fParams_ = params;
       }
 
       // Constructor for randIntParams
-      inline RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) :
+      __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randIntParams<inner_t> params) :
           RandomOp(std::forward<ShapeType>(s), seed)
       {
           iParams_ = params;
@@ -469,12 +469,12 @@ public:
       }
 
 
-      constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
       {
         return shape_[dim];
       }
 
-      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
     };
   }
 
@@ -495,7 +495,7 @@ public:
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
            std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
-  inline auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
+  __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
                   std::is_same_v<T, float> || 
@@ -526,7 +526,7 @@ public:
    * @return Random number operator
    */
   template <typename T, int RANK, typename LowerType = typename inner_op_type_t<T>::type>
-  inline auto random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
+  __MATX_INLINE__ auto random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     auto sarray = detail::to_array(s);
     return random<T, decltype(sarray)>(std::move(sarray), dist, seed, alpha, beta);
@@ -549,7 +549,7 @@ public:
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
            std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
-  inline auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
+  __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(
                   std::is_same_v<T, uint32_t> || 
@@ -579,7 +579,7 @@ public:
    * @return Random number operator
    */
   template <typename T, int RANK, typename LowerType = typename inner_op_type_t<T>::type>
-  inline auto randomi(const index_t (&s)[RANK], uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
+  __MATX_INLINE__ auto randomi(const index_t (&s)[RANK], uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     auto sarray = detail::to_array(s);
     return randomi<T, decltype(sarray)>(std::move(sarray), seed, min, max);

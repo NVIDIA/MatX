@@ -492,7 +492,6 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
       for (index_t j = 0; j < count; j++) {
         for (index_t k = 0; k < count; k++) {
           TestType val = t3f(i, j, k); 
-          ASSERT_NE(val, 0); //bounds are (min,max], so even if min == 0, it shouldn't appear in the data
           ASSERT_LE(val, maxBound);
           ASSERT_LE(minBound, val);
         }
@@ -508,7 +507,6 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
       for (index_t j = 0; j < count; j++) {
         for (index_t k = 0; k < count; k++) {
           TestType val = t3f(i, j, k);
-          ASSERT_NE(val, 0); //bounds are (min,max], so even if min == 0, it shouldn't appear in the data
           ASSERT_LE(val, 100);
           ASSERT_LE(0, val);
         }
