@@ -501,7 +501,9 @@ public:
                   std::is_same_v<T, float> || 
                   std::is_same_v<T, double> ||
                   std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>
+                  std::is_same_v<T, cuda::std::complex<double>>, 
+                  "random only supports floating point or complex floating point data types"
+
                  );   
 
     using shape_strip_t = remove_cvref_t<ShapeType>;
@@ -555,7 +557,8 @@ public:
                   std::is_same_v<T, uint32_t> || 
                   std::is_same_v<T,  int32_t> ||
                   std::is_same_v<T, uint64_t> ||
-                  std::is_same_v<T,  int64_t> 
+                  std::is_same_v<T,  int64_t> ,
+                  "randomi only supports signed and unsigned integral types"
                  );      
                   
     using shape_strip_t = remove_cvref_t<ShapeType>;
