@@ -35,7 +35,11 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
+#include "matx/transforms/lu/lu_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/lu/lu_lapack.h"
+#endif
+
 
 namespace matx {
 namespace detail {
@@ -62,10 +66,9 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "lu() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on cusolver_qr(). ie: (mtie(O, piv) = lu(A))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on lu(). ie: (mtie(O, piv) = lu(A))");     
 
-        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex.getStream());        
+        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);        
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

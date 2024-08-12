@@ -46,48 +46,108 @@ protected:
   using GExecType = cuda::std::tuple_element_t<1, T>;   
   void SetUp() override
   {
+    if constexpr (!detail::CheckSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      exec = SelectThreadsHostExecutor{params};
+    }
+
     pb = std::make_unique<detail::MatXPybind>();
-    pb->InitAndRunTVGenerator<GTestType>("00_solver", "lu", "run", {m, n});
-    pb->NumpyToTensorView(Av, "A");
-    pb->NumpyToTensorView(Lv, "L");
-    pb->NumpyToTensorView(Uv, "U");
   }
 
   void TearDown() override { pb.reset(); }
 
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
-  tensor_t<GTestType, 2> Av{{m, n}};
-  tensor_t<GTestType, 2> Atv{{n, m}};
-  tensor_t<int64_t, 1> PivV{{std::min(m, n)}};
-  tensor_t<GTestType, 2> Lv{{m, std::min(m, n)}};
-  tensor_t<GTestType, 2> Uv{{std::min(m, n), n}};
+  float thresh = 0.001f;
 };
 
 template <typename TensorType>
-class LUSolverTestNonComplexFloatTypes : public LUSolverTest<TensorType> {
+class LUSolverTestFloatTypes : public LUSolverTest<TensorType> {
 };
 
-TYPED_TEST_SUITE(LUSolverTestNonComplexFloatTypes,
-                 MatXFloatNonComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(LUSolverTestFloatTypes,
+                 MatXFloatNonHalfTypesAllExecs);
 
-TYPED_TEST(LUSolverTestNonComplexFloatTypes, LUBasic)
+TYPED_TEST(LUSolverTestFloatTypes, LUBasic)
 {
   MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+
+  auto Av = make_tensor<TestType>({m, n});
+  auto PivV = make_tensor<piv_value_type>({std::min(m, n)});
+  auto Lv = make_tensor<TestType>({m, std::min(m, n)});
+  auto Uv = make_tensor<TestType>({std::min(m, n), n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "lu", "run", {m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+  this->pb->NumpyToTensorView(Lv, "L");
+  this->pb->NumpyToTensorView(Uv, "U");
+
   // example-begin lu-test-1
-  (mtie(this->Av, this->PivV) =  lu(this->Av)).run(this->exec);
+  (mtie(Av, PivV) =  lu(Av)).run(this->exec);
   // example-end lu-test-1
   this->exec.sync();
 
   // The upper and lower triangle components are saved in Av. Python saves them
   // as separate matrices with the diagonal of the lower matrix set to 0
-  for (index_t i = 0; i < this->Av.Size(0); i++) {
-    for (index_t j = 0; j < this->Av.Size(1); j++) {
-      if (i > j) { // Lower triangle
-        ASSERT_NEAR(this->Av(i, j), this->Lv(i, j), 0.001);
+  for (index_t i = 0; i < Av.Size(0); i++) {
+    for (index_t j = 0; j < Av.Size(1); j++) {
+      TestType refv = i > j ? Lv(i, j) : Uv(i, j);
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR(Av(i, j).real(), refv.real(), this->thresh);
+        ASSERT_NEAR(Av(i, j).imag(), refv.imag(), this->thresh);
       }
       else {
-        ASSERT_NEAR(this->Av(i, j), this->Uv(i, j), 0.001);
+        ASSERT_NEAR(Av(i, j), refv, this->thresh);
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(LUSolverTestFloatTypes, LUBasicBatched)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+  constexpr int batches = 10;
+
+  auto Av = make_tensor<TestType>({batches, m, n});
+  auto PivV = make_tensor<piv_value_type>({batches, std::min(m, n)});
+  auto Lv = make_tensor<TestType>({batches, m, std::min(m, n)});
+  auto Uv = make_tensor<TestType>({batches, std::min(m, n), n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "lu", "run", {batches, m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+  this->pb->NumpyToTensorView(Lv, "L");
+  this->pb->NumpyToTensorView(Uv, "U");
+
+  (mtie(Av, PivV) =  lu(Av)).run(this->exec);
+  this->exec.sync();
+
+  // The upper and lower triangle components are saved in Av. Python saves them
+  // as separate matrices with the diagonal of the lower matrix set to 0
+  for (index_t b = 0; b < Av.Size(0); b++) {
+    for (index_t i = 0; i < Av.Size(1); i++) {
+      for (index_t j = 0; j < Av.Size(2); j++) {
+        TestType act = i > j ? Lv(b, i, j) : Uv(b, i, j);
+        if constexpr (is_complex_v<TestType>) {
+          ASSERT_NEAR(Av(b, i, j).real(), act.real(), this->thresh);
+          ASSERT_NEAR(Av(b, i, j).imag(), act.imag(), this->thresh);
+        }
+        else {
+          ASSERT_NEAR(Av(b, i, j), act, this->thresh);
+        }
       }
     }
   }

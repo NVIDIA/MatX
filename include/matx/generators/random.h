@@ -212,7 +212,7 @@ public:
   __MATX_INLINE__ ~randomGenerator_t() { matxFree(states_); }
 };
 
-  namespace detail {
+namespace detail {
 
   template< typename T >
   struct randIntParams{
@@ -227,60 +227,59 @@ public:
     T beta_;
   };  
   
-    template <typename T, typename ShapeType>
-    class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
-      private:
-        using inner_t = typename inner_op_type_t<T>::type;
-        static constexpr int RANK = cuda::std::tuple_size<ShapeType>{};
-        cuda::std::array<index_t, RANK> shape_;
-        cuda::std::array<index_t, RANK> strides_;
-        index_t total_size_;
-        curandStatePhilox4_32_10_t *states_;
-        uint64_t seed_;     
-        bool init_ = false;
-        bool device_;
-        
-        union{
-          randFloatParams<inner_t> fParams_;
-          randIntParams<inner_t>   iParams_;
-        };
-        
-        // Used by host operators only
-        curandGenerator_t gen_;
-        //T val;
+  template <typename T, typename ShapeType>
+  class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
+    private:
+      using inner_t = typename inner_op_type_t<T>::type;
+      static constexpr int RANK = cuda::std::tuple_size<ShapeType>{};
+      cuda::std::array<index_t, RANK> shape_;
+      cuda::std::array<index_t, RANK> strides_;
+      index_t total_size_;
+      mutable curandStatePhilox4_32_10_t *states_;
+      uint64_t seed_;     
+      mutable bool init_ = false;
+      mutable bool device_;
+      
+      union{
+        randFloatParams<inner_t> fParams_;
+        randIntParams<inner_t>   iParams_;
+      };
+      
+      // Used by host operators only
+      mutable curandGenerator_t gen_;
+      //T val;
 
 
-      public:
-        using value_type = T;
-        using matxop = bool;     
+    public:
+      using value_type = T;
+      using matxop = bool;     
 
-        __MATX_INLINE__ std::string str() const { return "random"; }
+      __MATX_INLINE__ std::string str() const { return "random"; }
 
-        // Shapeless constructor to be allocated at run invocation
-        RandomOp() = delete;
-  
-        // base constructor, should never be called directly
-        __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed) :
-          seed_(seed)
-        {
-          total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+      // Shapeless constructor to be allocated at run invocation
+      RandomOp() = delete;
 
-          if constexpr (RANK >= 1) {
-            strides_[RANK-1] = 1;
-          }
+      // base constructor, should never be called directly
+      __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed) : seed_(seed)
+      {
+        total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
 
-          #pragma unroll
-          for (int i = 0; i < RANK; ++i)
-          {
-            shape_[i] = s[i];
-          }
-
-
-          #pragma unroll
-          for (int i = RANK - 2; i >= 0; i--) {
-            strides_[i] = strides_[i+1] * s[i+1];
-          }
+        if constexpr (RANK >= 1) {
+          strides_[RANK-1] = 1;
         }
+
+        #pragma unroll
+        for (int i = 0; i < RANK; ++i)
+        {
+          shape_[i] = s[i];
+        }
+
+
+        #pragma unroll
+        for (int i = RANK - 2; i >= 0; i--) {
+          strides_[i] = strides_[i+1] * s[i+1];
+        }
+      }
 
       // Constructor for randFloatParams
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
@@ -297,8 +296,14 @@ public:
       }
 
       template <typename ST, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex)
+      __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {          
+      }
+           
+      template <typename ST, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex) const
       {
+        InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));          
 #ifdef __CUDACC__
         if constexpr (is_cuda_executor_v<Executor>) {
           if (!init_) {
@@ -334,7 +339,7 @@ public:
       }
 
       template <typename ST, typename Executor>
-      __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) noexcept
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
         if constexpr (is_cuda_executor_v<Executor>) {
           matxFree(states_);

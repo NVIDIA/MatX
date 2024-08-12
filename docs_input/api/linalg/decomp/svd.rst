@@ -3,7 +3,7 @@
 svd
 ###
 
-Perform a singular value decomposition (SVD) using the power iteration method. 
+Perform a singular value decomposition (SVD). 
 
 .. doxygenfunction:: svd
 

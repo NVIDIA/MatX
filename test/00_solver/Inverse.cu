@@ -51,6 +51,7 @@ protected:
   void TearDown() override { pb.reset(); }
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
+  float thresh = 0.001f;
 };
 
 template <typename TensorType>
@@ -69,7 +70,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
   auto Ainv = make_tensor<TestType>({4, 4});
   auto Ainv_ref = make_tensor<TestType>({4, 4});  
 
-  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {4, 1});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {4});
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
@@ -82,11 +83,11 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {
       if constexpr (is_complex_v<TestType>) {
-        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), 0.001);
-        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), this->thresh);
+        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), this->thresh);
       }
       else {
-        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), this->thresh);
       }
     }
   }
@@ -103,7 +104,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
   auto Ainv = make_tensor<TestType>({100, 4, 4});
   auto Ainv_ref = make_tensor<TestType>({100, 4, 4});  
 
-  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {4, 100});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {100, 4});
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
@@ -114,11 +115,11 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
     for (index_t i = 0; i < A.Size(1); i++) {
       for (index_t j = 0; j <= i; j++) {
         if constexpr (is_complex_v<TestType>) {
-          ASSERT_NEAR(Ainv_ref(b, i, j).real(), Ainv(b, i, j).real(), 0.001);
-          ASSERT_NEAR(Ainv_ref(b, i, j).imag(), Ainv(b, i, j).imag(), 0.001);
+          ASSERT_NEAR(Ainv_ref(b, i, j).real(), Ainv(b, i, j).real(), this->thresh);
+          ASSERT_NEAR(Ainv_ref(b, i, j).imag(), Ainv(b, i, j).imag(), this->thresh);
         }
         else {
-          ASSERT_NEAR(Ainv_ref(b, i, j), Ainv(b, i, j), 0.001);
+          ASSERT_NEAR(Ainv_ref(b, i, j), Ainv(b, i, j), this->thresh);
         }
       }
     }
@@ -136,7 +137,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8)
   auto Ainv = make_tensor<TestType>({8, 8});
   auto Ainv_ref = make_tensor<TestType>({8, 8});  
 
-  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {8, 1});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {8});
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
@@ -146,11 +147,11 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8)
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {
       if constexpr (is_complex_v<TestType>) {
-        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), 0.001);
-        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), this->thresh);
+        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), this->thresh);
       }
       else {
-        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), this->thresh);
       }
     }
   }
@@ -167,7 +168,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8Batched)
   auto Ainv = make_tensor<TestType>({100, 8, 8});
   auto Ainv_ref = make_tensor<TestType>({100, 8, 8});  
 
-  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {8, 100});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {100, 8});
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
@@ -178,11 +179,11 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv8x8Batched)
     for (index_t i = 0; i < A.Size(1); i++) {
       for (index_t j = 0; j <= i; j++) {
         if constexpr (is_complex_v<TestType>) {
-          ASSERT_NEAR(Ainv_ref(b, i, j).real(), Ainv(b, i, j).real(), 0.001);
-          ASSERT_NEAR(Ainv_ref(b, i, j).imag(), Ainv(b, i, j).imag(), 0.001);
+          ASSERT_NEAR(Ainv_ref(b, i, j).real(), Ainv(b, i, j).real(), this->thresh);
+          ASSERT_NEAR(Ainv_ref(b, i, j).imag(), Ainv(b, i, j).imag(), this->thresh);
         }
         else {
-          ASSERT_NEAR(Ainv_ref(b, i, j), Ainv(b, i, j), 0.001);
+          ASSERT_NEAR(Ainv_ref(b, i, j), Ainv(b, i, j), this->thresh);
         }
       }
     }
@@ -201,7 +202,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv256x256)
   auto Ainv = make_tensor<TestType>({256, 256});
   auto Ainv_ref = make_tensor<TestType>({256, 256});  
 
-  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {256, 1});
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {256});
   this->pb->NumpyToTensorView(A, "A");
   this->pb->NumpyToTensorView(Ainv_ref, "A_inv");  
 
@@ -211,11 +212,11 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv256x256)
   for (index_t i = 0; i < A.Size(0); i++) {
     for (index_t j = 0; j <= i; j++) {
       if constexpr (is_complex_v<TestType>) {
-        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), 0.001);
-        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j).real(), Ainv(i, j).real(), this->thresh);
+        ASSERT_NEAR(Ainv_ref(i, j).imag(), Ainv(i, j).imag(), this->thresh);
       }
       else {
-        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), 0.001);
+        ASSERT_NEAR(Ainv_ref(i, j), Ainv(i, j), this->thresh);
       }
     }
   }

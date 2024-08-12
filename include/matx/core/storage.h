@@ -255,7 +255,7 @@ namespace matx
           data_ = std::shared_ptr<T>(ptr, [](auto){});
         }
         else {
-          data_ = std::shared_ptr<T>(ptr, [=](auto p) { alloc_.deallocate(reinterpret_cast<void*>(p), size); });
+          data_ = std::shared_ptr<T>(ptr, [size, &alloc = alloc_](auto p) { alloc.deallocate(reinterpret_cast<void*>(p), size); });
         }
       }   
     }
@@ -282,7 +282,7 @@ namespace matx
      * @brief Default construct a smart_pointer_buffer. This should only be used when temporarily
      * creating an empty tensor for construction later.
     */
-    smart_pointer_buffer<T>() {};
+    smart_pointer_buffer() {};
 
     /**
      * @brief Construct a new smart pointer buffer from an existing object
@@ -290,7 +290,7 @@ namespace matx
      * @param ptr Smart poiner object
      * @param size Size of allocation
      */
-    smart_pointer_buffer<T>(T &&ptr, size_t size) : data_(std::forward<T>(ptr)), size_(size) {
+    smart_pointer_buffer(T &&ptr, size_t size) : data_(std::forward<T>(ptr)), size_(size) {
       static_assert(is_smart_ptr_v<T>);
     }
 
@@ -328,7 +328,7 @@ namespace matx
      * 
      * @param rhs Object to move from
      */
-    smart_pointer_buffer<T>(smart_pointer_buffer<T> &&rhs) {
+    smart_pointer_buffer(smart_pointer_buffer<T> &&rhs) {
       size_ = rhs.size_; 
       data_ = std::move(rhs.data_);
     }    
@@ -337,7 +337,7 @@ namespace matx
      * @brief Default destructor
      * 
      */  
-    ~smart_pointer_buffer<T>() = default;
+    ~smart_pointer_buffer() = default;
 
     /**
      * @brief Get underlying data pointer

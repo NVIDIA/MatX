@@ -160,7 +160,7 @@ namespace matx
                             NormOrder order = NormOrder::NONE) {
     auto perm = detail::getPermuteDims<Op::Rank()>(dims);
     auto permop = permute(op, perm);
-    return detail::NormOp<Op, detail::NormTypeVector>(permop, order);
+    return detail::NormOp<decltype(permop), detail::NormTypeVector>(permop, order);
   }
 
   /**

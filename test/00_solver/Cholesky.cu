@@ -40,14 +40,28 @@ using namespace matx;
 
 template <typename T> class CholSolverTest : public ::testing::Test {
 protected:
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;      
   void SetUp() override
   {
+    if constexpr (!detail::CheckSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+
+    // Use an arbitrary number of threads for the select threads host exec.
+    if constexpr (is_select_threads_host_executor_v<GExecType>) {
+      HostExecParams params{4};
+      exec = SelectThreadsHostExecutor{params};
+    }
+
     pb = std::make_unique<detail::MatXPybind>();
   }
 
   void TearDown() override { pb.reset(); }
 
   std::unique_ptr<detail::MatXPybind> pb;
+  GExecType exec{};
+  float thresh = 0.001f;
 };
 
 template <typename TensorType>
@@ -55,14 +69,13 @@ class CholSolverTestNonHalfFloatTypes : public CholSolverTest<TensorType> {
 };
 
 TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
-  MatXFloatNonHalfTypesCUDAExec);
+  MatXFloatNonHalfTypesAllExecs);
 
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
-  ExecType exec;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   const cuda::std::array dims {
     16,
@@ -81,23 +94,23 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
     this->pb->NumpyToTensorView(Lv, "L");
 
     // example-begin chol-test-1
-    (Bv = chol(Bv, CUBLAS_FILL_MODE_LOWER)).run(exec);
+    (Bv = chol(Bv, SolverFillMode::LOWER)).run(this->exec);
     // example-end chol-test-1
-    exec.sync();
+    this->exec.sync();
 
-    // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
+    // Cholesky fills the lower triangular portion (due to SolverFillMode::LOWER)
     // and destroys the upper triangular portion.
     if constexpr (is_complex_v<TestType>) {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
-          ASSERT_NEAR(Bv(i, j).real(), Lv(i, j).real(), 0.001);
-          ASSERT_NEAR(Bv(i, j).imag(), Lv(i, j).imag(), 0.001);
+          ASSERT_NEAR(Bv(i, j).real(), Lv(i, j).real(), this->thresh);
+          ASSERT_NEAR(Bv(i, j).imag(), Lv(i, j).imag(), this->thresh);
         }
       }
     } else {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
-          ASSERT_NEAR(Bv(i, j), Lv(i, j), 0.001);
+          ASSERT_NEAR(Bv(i, j), Lv(i, j), this->thresh);
         }
       }
     }
@@ -106,12 +119,61 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasicBatched)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  const cuda::std::array dims {
+    16,
+    50,
+    100,
+    130,
+    200,
+    1000
+  };
+  constexpr index_t batches = 10;
+
+  for (size_t k = 0; k < dims.size(); k++) {
+    this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "cholesky", "run", {batches, dims[k]});
+    auto Bv = make_tensor<TestType>({batches, dims[k], dims[k]});
+    auto Lv = make_tensor<TestType>({batches, dims[k], dims[k]});
+    this->pb->NumpyToTensorView(Bv, "B");
+    this->pb->NumpyToTensorView(Lv, "L");
+
+    (Bv = chol(Bv, SolverFillMode::LOWER)).run(this->exec);
+    this->exec.sync();
+
+    // Cholesky fills the lower triangular portion (due to SolverFillMode::LOWER)
+    // and destroys the upper triangular portion.
+    for (index_t b = 0; b < batches; b++) {
+      if constexpr (is_complex_v<TestType>) {
+        for (index_t i = 0; i < dims[k]; i++) {
+          for (index_t j = 0; j <= i; j++) {
+            ASSERT_NEAR(Bv(b, i, j).real(), Lv(b, i, j).real(), this->thresh);
+            ASSERT_NEAR(Bv(b, i, j).imag(), Lv(b, i, j).imag(), this->thresh);
+          }
+        }
+      } else {
+        for (index_t i = 0; i < dims[k]; i++) {
+          for (index_t j = 0; j <= i; j++) {
+            ASSERT_NEAR(Bv(b, i, j), Lv(b, i, j), this->thresh);
+          }
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
-  ExecType exec;  
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   const cuda::std::array dims {
     50,
@@ -129,25 +191,25 @@ TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyWindowed)
     auto Lv = make_tensor<TestType>({dims[k], dims[k]});
     this->pb->NumpyToTensorView(Cv, "B");
     this->pb->NumpyToTensorView(Lv, "L");
-    (Bslice = Cv).run(exec);
-    exec.sync();
+    (Bslice = Cv).run(this->exec);
+    this->exec.sync();
 
-    (Bslice = chol(Bslice, CUBLAS_FILL_MODE_LOWER)).run(exec);
-    exec.sync();
+    (Bslice = chol(Bslice, SolverFillMode::LOWER)).run(this->exec);
+    this->exec.sync();
 
-    // Cholesky fills the lower triangular portion (due to CUBLAS_FILL_MODE_LOWER)
+    // Cholesky fills the lower triangular portion (due to SolverFillMode::LOWER)
     // and destroys the upper triangular portion.
     if constexpr (is_complex_v<TestType>) {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
-          ASSERT_NEAR(Bslice(i, j).real(), Lv(i, j).real(), 0.001);
-          ASSERT_NEAR(Bslice(i, j).imag(), Lv(i, j).imag(), 0.001);
+          ASSERT_NEAR(Bslice(i, j).real(), Lv(i, j).real(), this->thresh);
+          ASSERT_NEAR(Bslice(i, j).imag(), Lv(i, j).imag(), this->thresh);
         }
       }
     } else {
       for (index_t i = 0; i < dims[k]; i++) {
         for (index_t j = 0; j <= i; j++) {
-          ASSERT_NEAR(Bslice(i, j), Lv(i, j), 0.001);
+          ASSERT_NEAR(Bslice(i, j), Lv(i, j), this->thresh);
         }
       }
     }

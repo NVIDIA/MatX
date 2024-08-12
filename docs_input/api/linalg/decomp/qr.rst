@@ -16,13 +16,13 @@ Examples
    :end-before: example-end qr-test-1
    :dedent:
 
-.. doxygenfunction:: cusolver_qr
+.. doxygenfunction:: qr_solver
 
 Examples
 ~~~~~~~~
 
 .. literalinclude:: ../../../../test/00_solver/QR.cu
    :language: cpp
-   :start-after: example-begin cusolver_qr-test-1
-   :end-before: example-end cusolver_qr-test-1
+   :start-after: example-begin qr_solver-test-1
+   :end-before: example-end qr_solver-test-1
    :dedent:
