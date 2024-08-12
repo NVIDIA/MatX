@@ -32,6 +32,8 @@
 
 #pragma once
 
+namespace matx {
+
 #ifdef MATX_EN_NVPL
   #ifndef nvpl_scomplex_t
     #define nvpl_scomplex_t cuda::std::complex<float>
@@ -53,9 +55,7 @@
   #define LAPACK_CALL(fn) LAPACK_##fn
 #else
   using lapack_int_t = index_t;
-#endif
-
-namespace matx {
+#endif  
 
 /* Parameter enums */
 
