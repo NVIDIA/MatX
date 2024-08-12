@@ -385,15 +385,15 @@ public:
         cuda::std::array<index_t, RANK> shape_;
         cuda::std::array<index_t, RANK> strides_;
         index_t total_size_;
-        curandStatePhilox4_32_10_t *states_;
+        mutable curandStatePhilox4_32_10_t *states_;
         uint64_t seed_;
         inner_t alpha_;
         inner_t beta_;
-        bool init_ = false;
-        bool device_;
+        mutable bool init_ = false;
+        mutable bool device_;
 
         // Used by host operators only
-        curandGenerator_t gen_;
+        mutable curandGenerator_t gen_;
         //T val;
 
 
@@ -433,140 +433,147 @@ public:
           }
         }
 
+        template <typename ST, typename Executor>
+        __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {          
+        }      
 
-      template <typename ST, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex)
-      {
+        template <typename ST, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex) const
+        {
+          InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));  
+
 #ifdef __CUDACC__
-        if constexpr (is_cuda_executor_v<Executor>) {
-          if (!init_) {
-            auto stream = ex.getStream();
-            matxAlloc((void **)&states_,
-                      total_size_ * sizeof(curandStatePhilox4_32_10_t),
-                      MATX_ASYNC_DEVICE_MEMORY, stream);
+          if constexpr (is_cuda_executor_v<Executor>) {
+            if (!init_) {
+              auto stream = ex.getStream();
+              matxAlloc((void **)&states_,
+                        total_size_ * sizeof(curandStatePhilox4_32_10_t),
+                        MATX_ASYNC_DEVICE_MEMORY, stream);
 
-            int threads = 128;
-            int blocks = static_cast<int>((total_size_ + threads - 1) / threads);
-            curand_setup_kernel<<<blocks, threads, 0, stream>>>(states_, seed_, total_size_);
-            init_   = true;
-            device_ = true;
+              int threads = 128;
+              int blocks = static_cast<int>((total_size_ + threads - 1) / threads);
+              curand_setup_kernel<<<blocks, threads, 0, stream>>>(states_, seed_, total_size_);
+              init_   = true;
+              device_ = true;
+            }
           }
-        }
-        else if constexpr (is_host_executor_v<Executor>) {
-          if (!init_) {
-            [[maybe_unused]] curandStatus_t ret;
+          else if constexpr (is_host_executor_v<Executor>) {
+            if (!init_) {
+              [[maybe_unused]] curandStatus_t ret;
 
-            ret = curandCreateGeneratorHost(&gen_, CURAND_RNG_PSEUDO_MT19937);
-            MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to create random number generator");
+              ret = curandCreateGeneratorHost(&gen_, CURAND_RNG_PSEUDO_MT19937);
+              MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to create random number generator");
 
-            ret = curandSetPseudoRandomGeneratorSeed(gen_, seed_);
-            MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random seed");
+              ret = curandSetPseudoRandomGeneratorSeed(gen_, seed_);
+              MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random seed");
 
-            // In the future we may allocate a buffer, but for now we generate a single number at a time
-            // matxAlloc((void **)&val, total_size_ * sizeof(T), MATX_HOST_MEMORY, stream);
-            init_   = true;
-            device_ = false;
+              // In the future we may allocate a buffer, but for now we generate a single number at a time
+              // matxAlloc((void **)&val, total_size_ * sizeof(T), MATX_HOST_MEMORY, stream);
+              init_   = true;
+              device_ = false;
+            }
           }
-        }
 #endif
-      }
-
-      template <typename ST, typename Executor>
-      __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) noexcept
-      {
-        if constexpr (is_cuda_executor_v<Executor>) {
-          matxFree(states_);
-        }
-        else if constexpr (is_host_executor_v<Executor>) {
-          curandDestroyGenerator(gen_);
-          //matxFree(val);
-        }
-      }
-
-      template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
-        return 0;
-      }
-
-      template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
-        return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*strides_[I];
-      }
-
-      /**
-       * Retrieve a value from a random view
-       *
-       * @tparam Is Index type
-       * @param indices Index values
-       */
-      template <typename... Is>
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()([[maybe_unused]] Is... indices) const
-      {
-        T val;
-#ifdef __CUDA_ARCH__
-        if constexpr (sizeof...(indices) == 0) {
-          get_random(val, &states_[0], dist_);
-        }
-        else {
-          get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], dist_);
         }
 
-        val = alpha_ * val + beta_;
-#else
-
-        if (dist_ == UNIFORM) {
-          if constexpr (std::is_same_v<T, float>) {
-            curandGenerateUniform(gen_, &val, 1);
+        template <typename ST, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+        {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(states_);
           }
-          else if constexpr (std::is_same_v<T, double>) {
-            curandGenerateUniformDouble(gen_, &val, 1);
+          else if constexpr (is_host_executor_v<Executor>) {
+            curandDestroyGenerator(gen_);
+            //matxFree(val);
           }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-            float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateUniform(gen_, &tmp[0], 1);
-            curandGenerateUniform(gen_, &tmp[1], 1);
+        }        
+
+
+        template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
+        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
+          return 0;
+        }
+
+        template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
+          return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*strides_[I];
+        }
+
+        /**
+         * Retrieve a value from a random view
+         *
+         * @tparam Is Index type
+         * @param indices Index values
+         */
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()([[maybe_unused]] Is... indices) const
+        {
+          T val;
+  #ifdef __CUDA_ARCH__
+          if constexpr (sizeof...(indices) == 0) {
+            get_random(val, &states_[0], dist_);
           }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-            double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateUniformDouble(gen_, &tmp[0], 1);
-            curandGenerateUniformDouble(gen_, &tmp[1], 1);
+          else {
+            get_random(val, &states_[GetValC<0, Is...>(cuda::std::make_tuple(indices...))], dist_);
           }
 
           val = alpha_ * val + beta_;
+  #else
+
+          if (dist_ == UNIFORM) {
+            if constexpr (std::is_same_v<T, float>) {
+              curandGenerateUniform(gen_, &val, 1);
+            }
+            else if constexpr (std::is_same_v<T, double>) {
+              curandGenerateUniformDouble(gen_, &val, 1);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+              float *tmp = reinterpret_cast<float *>(&val);
+              curandGenerateUniform(gen_, &tmp[0], 1);
+              curandGenerateUniform(gen_, &tmp[1], 1);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+              double *tmp = reinterpret_cast<double *>(&val);
+              curandGenerateUniformDouble(gen_, &tmp[0], 1);
+              curandGenerateUniformDouble(gen_, &tmp[1], 1);
+            }
+
+            val = alpha_ * val + beta_;
+          }
+          else if (dist_ == NORMAL) {
+            if constexpr (std::is_same_v<T, float>) {
+              curandGenerateNormal(gen_, &val, 1, beta_, alpha_);
+            }
+            else if constexpr (std::is_same_v<T, double>) {
+              curandGenerateNormalDouble(gen_, &val, 1, beta_, alpha_);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+              float *tmp = reinterpret_cast<float *>(&val);
+              curandGenerateNormal(gen_, &tmp[0], 1, beta_, alpha_);
+              curandGenerateNormal(gen_, &tmp[1], 1, beta_, alpha_);
+            }
+            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+              double *tmp = reinterpret_cast<double *>(&val);
+              curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
+              curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
+            }
+          }
+          else {
+            val = 0;
+          }
+  #endif
+
+          return val;
         }
-        else if (dist_ == NORMAL) {
-          if constexpr (std::is_same_v<T, float>) {
-            curandGenerateNormal(gen_, &val, 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, double>) {
-            curandGenerateNormalDouble(gen_, &val, 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-            float *tmp = reinterpret_cast<float *>(&val);
-            curandGenerateNormal(gen_, &tmp[0], 1, beta_, alpha_);
-            curandGenerateNormal(gen_, &tmp[1], 1, beta_, alpha_);
-          }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-            double *tmp = reinterpret_cast<double *>(&val);
-            curandGenerateNormalDouble(gen_, &tmp[0], 1, beta_, alpha_);
-            curandGenerateNormalDouble(gen_, &tmp[1], 1, beta_, alpha_);
-          }
+
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
+        {
+          return shape_[dim];
         }
-        else {
-          val = 0;
-        }
-#endif
 
-        return val;
-      }
-
-
-      constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
-      {
-        return shape_[dim];
-      }
-
-      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
     };
   }
 
