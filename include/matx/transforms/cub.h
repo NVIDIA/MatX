@@ -45,9 +45,65 @@
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
 #include "matx/core/operator_utils.h"
-
+#include "matx/operators/select.h"
 
 namespace matx {
+
+
+template <class dataType>
+static __global__ void argminmaxCpy(
+                                   dataType* inputData, 
+                                   size_t*  minIdx, 
+                                   size_t*  maxIdx, 
+                                   dataType* minVal,
+                                   dataType* maxVal,
+                                   index_t*  minIdxFinal,                                    
+                                   index_t*  maxIdxFinal
+                                   )
+{
+  if(threadIdx.x == 0 && blockIdx.x == 0 )
+  {
+    *maxVal      = inputData[*maxIdx];
+    *minVal      = inputData[*minIdx];
+    *maxIdxFinal = *maxIdx;
+    *minIdxFinal = *minIdx;
+  }
+}
+
+auto constexpr INVALID = std::numeric_limits<size_t>::max();
+
+struct minmax {
+    __host__ __device__ minmax() : argmin{INVALID}, argmax{INVALID} {};
+    // Conversion from an index -- kind of a hack for the binary operator
+    __host__ __device__ minmax(size_t val) : argmin{val}, argmax{val} {};
+    __host__ __device__ minmax(size_t argmin, size_t argmax) : argmin{argmin}, argmax{argmax} {};
+    size_t argmin;
+    size_t argmax;
+};
+
+template<typename T>
+struct minmaxer {
+    T* data;
+    size_t data_len;
+
+    minmaxer(T* newData)
+    :data(newData)
+    {
+    }
+
+    minmax __device__ operator()(minmax lhs, minmax rhs) {
+        if (lhs.argmin == INVALID) {
+            return rhs;
+        }
+        if (rhs.argmin == INVALID) {
+            return lhs;
+        }
+        size_t argmin = data[lhs.argmin] < data[rhs.argmin] ? lhs.argmin : rhs.argmin;
+        size_t argmax = data[lhs.argmax] > data[rhs.argmax] ? lhs.argmax : rhs.argmax;
+        return minmax{argmin, argmax};
+    }
+};
+
 
 /**
  * @brief Direction for sorting
@@ -70,6 +126,7 @@ typedef enum {
   CUB_OP_REDUCE_SUM,
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
+  CUB_OP_REDUCE_ARGMINMAX,
   CUB_OP_SELECT,
   CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE
@@ -173,6 +230,10 @@ public:
     else if constexpr (op == CUB_OP_REDUCE_MAX) {
       ExecMax(a_out, a, stream);
     }
+    else if constexpr (op == CUB_OP_REDUCE_ARGMINMAX) {
+      matxAlloc((void **)&d_minMax, sizeof(minmax), MATX_ASYNC_DEVICE_MEMORY,stream);
+      ExecArgMinMax(a, stream);
+    }    
     else if constexpr (op == CUB_OP_SELECT) {
       ExecSelect(a_out, a, stream);
     }
@@ -878,6 +939,41 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
+  /**
+   * Execute a max on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecArgMinMax(const InputOperator &in,
+                            const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    // Set up CUB stuff
+    auto d_in = thrust::counting_iterator<size_t>(0);
+    auto min_op = minmaxer{in.Data()};
+    auto init = minmax{INVALID};
+
+    // Run reduction
+    cub::DeviceReduce::Reduce(
+      d_temp, temp_storage_bytes,
+      d_in, d_minMax, in.TotalSize(), min_op, init, stream);
+
+#endif
+  }
 
 
   /**
@@ -1075,6 +1171,7 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
+  minmax* d_minMax = nullptr; // used for argMinMax()
 private:
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
@@ -1083,7 +1180,7 @@ private:
   cudaStream_t stream_;
   CParams cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
-  int *d_histogram = nullptr; // Used for hist()
+  // int *d_histogram = nullptr; // Used for hist()
   size_t temp_storage_bytes = 0;
 };
 
@@ -1194,6 +1291,111 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
 #endif
 #endif
 }
+
+
+
+/**
+ * Reduce a tensor using CUB but accessing data through compare operator
+ *
+ * Reduces a tensor using the CUB library for either a 0D or 1D output tensor. There
+ * is an existing reduce() implementation as part of matx_reduce.h, but this function
+ * exists in cases where CUB is more optimal/faster.
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam InputOperator
+ *   Input tensor type
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param init
+ *   Value to initialize the reduction with
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDest, TensorIndexType &maxIdxs, const InType &in, const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+ // Get parameters required by these tensors
+
+#ifndef MATX_DISABLE_CUB_CACHE
+  // Get cache or new plan if it doesn't exist
+  auto params = 
+      detail::matxCubPlan_t<OutType,
+                            InType,
+                            detail::CUB_OP_REDUCE_ARGMINMAX>::GetCubParams(minDest, in, stream);
+
+  using cache_val_type = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX, detail::EmptyParams_t>;
+
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+            detail::GetCacheIdFromType<detail::cub_cache_t>(),
+            params,
+            [&]() {
+              return std::make_shared<cache_val_type>(minDest, in, detail::EmptyParams_t{}, stream);
+            },
+            [&](std::shared_ptr<cache_val_type> ctype) {
+              ctype->ExecArgMinMax(in, stream);
+              // argminmaxCpy<<<1,32,0,stream>>>(
+              //                                in.Data(),
+              //                                &(ctype->d_minMax->argmin),
+              //                                &(ctype->d_minMax->argmax),
+              //                                minDest.Data(),
+              //                                maxDest.Data(),
+              //                                minIdxs.Data(),
+              //                                maxIdxs.Data()
+              //                                );   
+                                                          
+              auto argmin = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(ctype->d_minMax), {1} );
+              auto argmax = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(ctype->d_minMax) + 1, {1} );
+
+              auto outputOp =( 
+                             minIdxs = argmin,
+                             maxIdxs = argmax,
+                             minDest = matx::select(in, argmin),
+                             maxDest = matx::select(in, argmax)
+                             );
+
+              outputOp.run(stream);
+
+
+            }
+          );
+
+#else
+
+  auto tmp = detail::matxCubPlan_t<OutType, InType, detail::CUB_OP_REDUCE_ARGMINMAX>{minDest, in, {}, stream};
+
+  tmp.ExecArgMinMax(in, stream);   
+
+  // argminmaxCpy<<<1,32,0,stream>>>(
+  //                                 in.Data(),
+  //                                 &(tmp->d_minMax->argmin),
+  //                                 &(tmp->d_minMax->argmax),
+  //                                 minDest.Data(),
+  //                                 maxDest.Data(),
+  //                                 minIdxs.Data(),
+  //                                 maxIdxs.Data()
+  //                                 );  
+
+  auto argmin = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp->d_minMax), {1} );
+  auto argmax = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp->d_minMax) + 1, {1} );
+
+  auto outputOp =( 
+                 minIdxs = argmin,
+                 maxIdxs = argmax,
+                 minDest = matx::select(in, argmin),
+                 maxDest = matx::select(in, argmax)
+                 );
+
+  outputOp.run(stream);
+
+#endif
+#endif
+}
+
 
 /**
  * Sum a tensor using CUB
