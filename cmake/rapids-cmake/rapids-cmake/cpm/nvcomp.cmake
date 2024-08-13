@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,6 +53,8 @@ across all RAPIDS projects.
 Result Targets
 ^^^^^^^^^^^^^^
   nvcomp::nvcomp target will be created
+  nvcomp::nvcomp_gdeflate target will be created
+  nvcomp::nvcomp_bitcomp target will be created
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -91,15 +93,16 @@ function(rapids_cpm_nvcomp)
   # first search locally if `rapids_cmake_always_download` is false
   if(NOT rapids_cmake_always_download)
     include("${rapids-cmake-dir}/find/package.cmake")
-    rapids_find_package(nvcomp ${version} GLOBAL_TARGETS nvcomp::nvcomp ${_RAPIDS_EXPORT_ARGUMENTS}
-                        FIND_ARGS QUIET)
+    rapids_find_package(nvcomp ${version}
+                        GLOBAL_TARGETS nvcomp::nvcomp nvcomp::nvcomp_gdeflate nvcomp::nvcomp_bitcomp
+                                       ${_RAPIDS_EXPORT_ARGUMENTS} FIND_ARGS QUIET)
     if(nvcomp_FOUND)
       # report where nvcomp was found
       message(STATUS "Found nvcomp: ${nvcomp_DIR} (found version ${nvcomp_VERSION})")
     endif()
   endif()
 
-  # second see if we have a proprietary pre-built binary listed in versions.json and it if
+  # second see if we have a proprietary pre-built binary listed in versions.json and download it if
   # requested.
   set(nvcomp_proprietary_binary OFF) # will be set to true by rapids_cpm_get_proprietary_binary
   if(_RAPIDS_USE_PROPRIETARY_BINARY AND NOT nvcomp_FOUND)
@@ -110,13 +113,35 @@ function(rapids_cpm_nvcomp)
       rapids_cpm_download_proprietary_binary(nvcomp ${nvcomp_url})
     endif()
 
-    # Record the nvcomp_DIR so that if USE_PROPRIETARY_BINARY is disabled we can safely clear the
-    # nvcomp_DIR value
     if(nvcomp_proprietary_binary)
-      set(nvcomp_proprietary_binary_dir "${nvcomp_ROOT}/lib/cmake/nvcomp")
+      # Set up the version of nvcomp we have downloaded to match the OS layout. that means ensuring
+      # we have a `lib64` directory on Fedora based machines
+      include("${rapids-cmake-dir}/cmake/install_lib_dir.cmake")
+      rapids_cmake_install_lib_dir(lib_dir)
+
+      # Replace ${_IMPORT_PREFIX}/lib/ with ${_IMPORT_PREFIX}/${lib_dir}/ in
+      # nvcomp-release-targets.cmake. Guarded in an EXISTS check so we only try to do this on the
+      # first configuration pass
+      if(NOT EXISTS "${nvcomp_ROOT}/${lib_dir}/cmake/nvcomp/nvcomp-targets-release.cmake")
+        file(READ "${nvcomp_ROOT}/lib/cmake/nvcomp/nvcomp-targets-release.cmake" FILE_CONTENTS)
+        string(REPLACE "\$\{_IMPORT_PREFIX\}/lib/" "\$\{_IMPORT_PREFIX\}/${lib_dir}/" FILE_CONTENTS
+                       ${FILE_CONTENTS})
+        file(WRITE "${nvcomp_ROOT}/lib/cmake/nvcomp/nvcomp-targets-release.cmake" ${FILE_CONTENTS})
+        file(RENAME "${nvcomp_ROOT}/lib/" "${nvcomp_ROOT}/${lib_dir}/")
+      endif()
+
+      # Record the nvcomp_DIR so that if USE_PROPRIETARY_BINARY is disabled we can safely clear the
+      # nvcomp_DIR value
+      set(nvcomp_proprietary_binary_dir "${nvcomp_ROOT}/${lib_dir}/cmake/nvcomp")
       cmake_path(NORMAL_PATH nvcomp_proprietary_binary_dir)
       set(rapids_cpm_nvcomp_proprietary_binary_dir "${nvcomp_proprietary_binary_dir}"
           CACHE INTERNAL "nvcomp proprietary location")
+
+      # Enforce that we need to find the local download of nvcomp and nothing else when we have a
+      # proprietary binary enabled.
+      list(APPEND CMAKE_PREFIX_PATH "${nvcomp_ROOT}/${lib_dir}/cmake/nvcomp")
+      unset(CPM_DOWNLOAD_ALL)
+      set(CPM_USE_LOCAL_PACKAGES ON)
     endif()
   elseif(DEFINED nvcomp_DIR)
     cmake_path(NORMAL_PATH nvcomp_DIR)
@@ -136,13 +161,12 @@ function(rapids_cpm_nvcomp)
 
   include("${rapids-cmake-dir}/cpm/find.cmake")
   rapids_cpm_find(nvcomp ${version} ${_RAPIDS_UNPARSED_ARGUMENTS}
-                  GLOBAL_TARGETS nvcomp::nvcomp
+                  GLOBAL_TARGETS nvcomp::nvcomp nvcomp::nvcomp_gdeflate nvcomp::nvcomp_bitcomp
                   CPM_ARGS
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
                   GIT_SHALLOW ${shallow}
-                  EXCLUDE_FROM_ALL ${to_exclude}
-                  PATCH_COMMAND ${patch_command}
+                  EXCLUDE_FROM_ALL ${to_exclude} ${patch_command}
                   OPTIONS "BUILD_STATIC ON" "BUILD_TESTS OFF" "BUILD_BENCHMARKS OFF"
                           "BUILD_EXAMPLES OFF")
 
@@ -152,6 +176,12 @@ function(rapids_cpm_nvcomp)
   # provide consistent targets between a found nvcomp and one building from source
   if(NOT TARGET nvcomp::nvcomp AND TARGET nvcomp)
     add_library(nvcomp::nvcomp ALIAS nvcomp)
+  endif()
+  if(NOT TARGET nvcomp::nvcomp_gdeflate AND TARGET nvcomp_gdeflate)
+    add_library(nvcomp::nvcomp_gdeflate ALIAS nvcomp_gdeflate)
+  endif()
+  if(NOT TARGET nvcomp::nvcomp_bitcomp AND TARGET nvcomp_bitcomp)
+    add_library(nvcomp::nvcomp_bitcomp ALIAS nvcomp_bitcomp)
   endif()
 
   # Propagate up variables that CPMFindPackage provide
@@ -163,17 +193,20 @@ function(rapids_cpm_nvcomp)
 
   # Set up up install rules when using the proprietary_binary. When building from source, nvcomp
   # will set the correct install rules
-  include("${rapids-cmake-dir}/export/find_package_root.cmake")
   if(NOT to_exclude AND nvcomp_proprietary_binary)
+    include("${rapids-cmake-dir}/cmake/install_lib_dir.cmake")
+    rapids_cmake_install_lib_dir(lib_dir)
     include(GNUInstallDirs)
-    install(DIRECTORY "${nvcomp_ROOT}/lib/" DESTINATION lib)
-    install(DIRECTORY "${nvcomp_ROOT}/include/" DESTINATION include)
+
+    install(DIRECTORY "${nvcomp_ROOT}/${lib_dir}/" DESTINATION "${lib_dir}")
+    install(DIRECTORY "${nvcomp_ROOT}/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     # place the license information in the location that conda uses
     install(FILES "${nvcomp_ROOT}/NOTICE" DESTINATION info/ RENAME NVCOMP_NOTICE)
     install(FILES "${nvcomp_ROOT}/LICENSE" DESTINATION info/ RENAME NVCOMP_LICENSE)
   endif()
 
   # point our consumers to where they can find the pre-built version
+  include("${rapids-cmake-dir}/export/find_package_root.cmake")
   rapids_export_find_package_root(BUILD nvcomp "${nvcomp_ROOT}"
                                   EXPORT_SET ${_RAPIDS_BUILD_EXPORT_SET}
                                   CONDITION nvcomp_proprietary_binary)

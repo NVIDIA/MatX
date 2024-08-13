@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,6 +42,10 @@ across all RAPIDS projects.
 ``BUILD_STATIC``
   Will build nvbench statically. No local searching for a previously
   built version will occur.
+
+.. versionchanged:: v24.02.00
+
+NVBench_ENABLE_CUPTI is set to OFF by default.
 
 Result Targets
 ^^^^^^^^^^^^^^
@@ -90,11 +94,13 @@ function(rapids_cpm_nvbench)
                   CPM_ARGS
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow}
-                  PATCH_COMMAND ${patch_command}
+                  GIT_SHALLOW ${shallow} ${patch_command}
                   EXCLUDE_FROM_ALL ${exclude}
-                  OPTIONS "NVBench_ENABLE_NVML ${nvbench_with_nvml}" "NVBench_ENABLE_EXAMPLES OFF"
-                          "NVBench_ENABLE_TESTING OFF" "NVBench_ENABLE_INSTALL_RULES ${to_install}"
+                  OPTIONS "NVBench_ENABLE_NVML ${nvbench_with_nvml}"
+                          "NVBench_ENABLE_CUPTI OFF"
+                          "NVBench_ENABLE_EXAMPLES OFF"
+                          "NVBench_ENABLE_TESTING OFF"
+                          "NVBench_ENABLE_INSTALL_RULES ${to_install}"
                           "BUILD_SHARED_LIBS ${build_shared}")
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")

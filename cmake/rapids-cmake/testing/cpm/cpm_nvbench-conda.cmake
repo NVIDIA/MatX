@@ -29,7 +29,6 @@ set(ENV{CONDA_BUILD} "1")
 set(ENV{BUILD_PREFIX} "/usr/local/build_prefix")
 set(ENV{PREFIX} "/opt/local/prefix")
 set(ENV{CONDA_PREFIX} "/opt/conda/prefix")
-set(NVBench_ENABLE_CUPTI OFF)
 rapids_cpm_init()
 rapids_cpm_nvbench()
 

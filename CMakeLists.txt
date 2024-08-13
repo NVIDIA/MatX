@@ -20,10 +20,14 @@ else()
   list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 endif()
 
+include(${rapids-cmake-dir}/cpm/cccl.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
+include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
+
+set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
@@ -118,10 +122,11 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
     message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
 endif()
 
-# libcudacxx is now part of CCCL, so grab that repo if needed
-message(STATUS "Need CCCL. Finding...")
-set(CCCL_VERSION "v2.4.0" CACHE STRING "Version of CCCL to use")
-include(cmake/FindCCCL.cmake)
+message(STATUS "Finding CCCL...")
+rapids_cpm_cccl(
+    BUILD_EXPORT_SET matx-exports
+    INSTALL_EXPORT_SET matx-exports
+)
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 

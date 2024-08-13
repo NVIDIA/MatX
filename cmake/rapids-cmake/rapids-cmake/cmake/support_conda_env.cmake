@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,12 @@ Establish a target that holds the CONDA include and link directories.
 
 Creates a global interface target called `target_name` that holds
 the CONDA include and link directories, when executed.
+
+.. versionadded:: v24.06.00
+
+The include directories that `target_name` holds will be `-isystem` to match
+the behavior of conda when it builds projects.
+
 
 Also offers the ability to modify :cmake:variable:`CMAKE_PREFIX_PATH <cmake:variable:CMAKE_PREFIX_PATH>` to
 include the following paths based on the current conda environment:
@@ -136,8 +142,8 @@ function(rapids_cmake_support_conda_env target)
         set(targetsDir "targets/sbsa-linux")
       endif()
 
-      target_include_directories(${target} INTERFACE "$ENV{PREFIX}/include"
-                                                     "$ENV{BUILD_PREFIX}/include")
+      target_include_directories(${target} SYSTEM INTERFACE "$ENV{PREFIX}/include"
+                                                            "$ENV{BUILD_PREFIX}/include")
       target_link_directories(${target} INTERFACE "$ENV{PREFIX}/lib" "$ENV{BUILD_PREFIX}/lib")
 
       if(DEFINED CMAKE_SHARED_LIBRARY_RPATH_LINK_CUDA_FLAG
@@ -163,7 +169,7 @@ function(rapids_cmake_support_conda_env target)
       endif()
 
     elseif(in_conda_prefix)
-      target_include_directories(${target} INTERFACE "$ENV{CONDA_PREFIX}/include")
+      target_include_directories(${target} SYSTEM INTERFACE "$ENV{CONDA_PREFIX}/include")
       target_link_directories(${target} INTERFACE "$ENV{CONDA_PREFIX}/lib")
       if(DEFINED CMAKE_SHARED_LIBRARY_RPATH_LINK_CUDA_FLAG
          OR DEFINED CMAKE_SHARED_LIBRARY_RPATH_LINK_CXX_FLAG)

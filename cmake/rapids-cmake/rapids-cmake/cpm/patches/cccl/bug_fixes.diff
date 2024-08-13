@@ -1,0 +1,52 @@
+diff --git a/cub/cmake/CubInstallRules.cmake b/cub/cmake/CubInstallRules.cmake
+index d26da438e..a8b3b1940 100644
+--- a/cub/cmake/CubInstallRules.cmake
++++ b/cub/cmake/CubInstallRules.cmake
+@@ -12,7 +12,7 @@ install(DIRECTORY "${CUB_SOURCE_DIR}/cub"
+ 
+ install(DIRECTORY "${CUB_SOURCE_DIR}/cub/cmake/"
+   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/cub"
+-  PATTERN *.cmake.in EXCLUDE
++  REGEX "(.*-header-search\.cmake|.*\.cmake\.in)" EXCLUDE
+ )
+ # Need to configure a file to store the infix specified in
+ # CMAKE_INSTALL_INCLUDEDIR since it can be defined by the user
+diff --git a/lib/cmake/cccl/cccl-config.cmake b/lib/cmake/cccl/cccl-config.cmake
+index 9baebb1b5..d9eeeba50 100644
+--- a/lib/cmake/cccl/cccl-config.cmake
++++ b/lib/cmake/cccl/cccl-config.cmake
+@@ -71,7 +71,7 @@ foreach(component IN LISTS components)
+         "${cccl_cmake_dir}/.."                            # Install layout
+     )
+ 
+-    if (TARGET Thrust::Thrust AND NOT CCCL::Thrust)
++    if (TARGET Thrust::Thrust AND NOT TARGET CCCL::Thrust)
+       # By default, configure a CCCL::Thrust target with host=cpp device=cuda
+       option(CCCL_ENABLE_DEFAULT_THRUST_TARGET
+         "Create a CCCL::Thrust target using CCCL_THRUST_[HOST|DEVICE]_SYSTEM."
+diff --git a/libcudacxx/cmake/libcudacxxInstallRules.cmake b/libcudacxx/cmake/libcudacxxInstallRules.cmake
+index f99a5606f..1c1ed5cb0 100644
+--- a/libcudacxx/cmake/libcudacxxInstallRules.cmake
++++ b/libcudacxx/cmake/libcudacxxInstallRules.cmake
+@@ -22,7 +22,7 @@ install(DIRECTORY "${libcudacxx_SOURCE_DIR}/include/nv"
+ # Libcudacxx cmake package
+ install(DIRECTORY "${libcudacxx_SOURCE_DIR}/lib/cmake/libcudacxx"
+   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake"
+-  PATTERN *.cmake.in EXCLUDE
++  REGEX "(.*-header-search\.cmake|.*\.cmake\.in)" EXCLUDE
+ )
+ 
+ # Need to configure a file to store CMAKE_INSTALL_INCLUDEDIR
+diff --git a/thrust/cmake/ThrustInstallRules.cmake b/thrust/cmake/ThrustInstallRules.cmake
+index 0898d3964..54b40e515 100644
+--- a/thrust/cmake/ThrustInstallRules.cmake
++++ b/thrust/cmake/ThrustInstallRules.cmake
+@@ -13,7 +13,7 @@ install(DIRECTORY "${Thrust_SOURCE_DIR}/thrust"
+ 
+ install(DIRECTORY "${Thrust_SOURCE_DIR}/thrust/cmake/"
+   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/thrust"
+-  PATTERN *.cmake.in EXCLUDE
++  REGEX "(.*-header-search\.cmake|.*\.cmake\.in)" EXCLUDE
+ )
+ # Need to configure a file to store the infix specified in
+ # CMAKE_INSTALL_INCLUDEDIR since it can be defined by the user

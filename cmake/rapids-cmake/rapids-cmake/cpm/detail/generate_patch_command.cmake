@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,37 +72,40 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
     message(WARNING "Unable to apply git patches to ${package_name}, git not found")
     return()
   endif()
-
-  # Gather number of patches
-  string(JSON patch_count LENGTH "${json_data}")
-  math(EXPR patch_count "${patch_count} - 1")
-
   # For each project cache the subset of the json
   set(patch_files_to_run)
   set(patch_issues_to_ref)
-  foreach(index RANGE ${patch_count})
-    string(JSON patch_data GET "${json_data}" ${index})
-    rapids_cpm_json_get_value(${patch_data} fixed_in)
-    if(NOT fixed_in OR version VERSION_LESS fixed_in)
-      rapids_cpm_json_get_value(${patch_data} file)
-      rapids_cpm_json_get_value(${patch_data} issue)
 
-      cmake_language(EVAL CODE "set(file ${file})")
-      cmake_path(IS_RELATIVE file is_relative)
-      if(is_relative)
-        set(file "${rapids-cmake-dir}/cpm/patches/${file}")
+  # Gather number of patches
+  string(JSON patch_count LENGTH "${json_data}")
+  if(patch_count GREATER_EQUAL 1)
+    math(EXPR patch_count "${patch_count} - 1")
+    foreach(index RANGE ${patch_count})
+      string(JSON patch_data GET "${json_data}" ${index})
+      rapids_cpm_json_get_value(${patch_data} fixed_in)
+      if(NOT fixed_in OR version VERSION_LESS fixed_in)
+        rapids_cpm_json_get_value(${patch_data} file)
+        rapids_cpm_json_get_value(${patch_data} issue)
+        if(file AND issue)
+          cmake_language(EVAL CODE "set(file ${file})")
+          cmake_path(IS_RELATIVE file is_relative)
+          if(is_relative)
+            set(file "${rapids-cmake-dir}/cpm/patches/${file}")
+          endif()
+          list(APPEND patch_files_to_run "${file}")
+          list(APPEND patch_issues_to_ref "${issue}")
+        endif()
       endif()
-      list(APPEND patch_files_to_run "${file}")
-      list(APPEND patch_issues_to_ref "${issue}")
-    endif()
-  endforeach()
+    endforeach()
+  endif()
 
   set(patch_script "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/patch.cmake")
   set(log_file "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/log")
   if(patch_files_to_run)
+    string(TIMESTAMP current_year "%Y" UTC)
     configure_file(${rapids-cmake-dir}/cpm/patches/command_template.cmake.in "${patch_script}"
                    @ONLY)
-    set(${patch_command} ${CMAKE_COMMAND} -P ${patch_script} PARENT_SCOPE)
+    set(${patch_command} PATCH_COMMAND ${CMAKE_COMMAND} -P ${patch_script} PARENT_SCOPE)
   else()
     # remove any old patch / log files that exist and are no longer needed due to a change in the
     # package version / version.json
