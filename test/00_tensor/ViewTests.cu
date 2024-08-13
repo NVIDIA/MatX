@@ -469,6 +469,54 @@ TYPED_TEST(ViewTestsFloatNonComplexNonHalf, Random)
 }
 
 
+
+TYPED_TEST(ViewTestsIntegral, Randomi)
+{
+  MATX_ENTER_HANDLER();
+  {
+    using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+    // example-begin randomi-test-1
+    index_t count = 50;
+
+    tensor_t<TestType, 3> t3f({count, count, count});
+    TestType minBound = std::numeric_limits<TestType>::min(); 
+    TestType maxBound = std::numeric_limits<TestType>::max(); 
+    
+    (t3f = (TestType)0).run(this->exec);
+    (t3f = randomi<TestType>({count, count, count}, 0, minBound, maxBound )).run(this->exec);
+    // example-end randomi-test-1   
+    this->exec.sync();
+
+    for (index_t i = 0; i < count; i++) {
+      for (index_t j = 0; j < count; j++) {
+        for (index_t k = 0; k < count; k++) {
+          TestType val = t3f(i, j, k); 
+          ASSERT_LE(val, maxBound);
+          ASSERT_LE(minBound, val);
+        }
+      }
+    }
+
+
+    // test default range to make sure it's still 0-100 for all integral types
+    (t3f = randomi<TestType>({count, count, count})).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < count; i++) {
+      for (index_t j = 0; j < count; j++) {
+        for (index_t k = 0; k < count; k++) {
+          TestType val = t3f(i, j, k);
+          ASSERT_LE(val, 100);
+          ASSERT_LE(0, val);
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+
 TYPED_TEST(ViewTestsComplex, RealComplexView)
 {
   MATX_ENTER_HANDLER();
