@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -8,10 +8,10 @@ set -euo pipefail
 rapids-logger "Generate C++ testing dependencies"
 rapids-dependency-file-generator \
   --output conda \
-  --file_key test \
+  --file-key test \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch)" | tee env.yaml
 
-rapids-mamba-retry env create --force -f env.yaml -n test
+rapids-mamba-retry env create --yes -f env.yaml -n test
 
 # Temporarily allow unbound variables for conda activation.
 set +u
@@ -35,7 +35,7 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-ctest -j20 --schedule-random --output-on-failure
+ctest -j20 --schedule-random --output-on-failure --no-tests=error
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -282,6 +282,7 @@ if EXPORT_NAME isn't set for the export targets.")
 
     set(scratch_dir "${PROJECT_BINARY_DIR}/rapids-cmake/${project_name}/export/${project_name}")
 
+    string(TIMESTAMP current_year "%Y" UTC)
     configure_package_config_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/template/config.cmake.in"
                                   "${scratch_dir}/${project_name}-config.cmake"
                                   INSTALL_DESTINATION "${install_location}")
@@ -322,6 +323,7 @@ if EXPORT_NAME isn't set for the export targets.")
 
   else()
     set(install_location "${PROJECT_BINARY_DIR}")
+    string(TIMESTAMP current_year "%Y" UTC)
     configure_package_config_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/template/config.cmake.in"
                                   "${install_location}/${project_name}-config.cmake"
                                   INSTALL_DESTINATION "${install_location}")

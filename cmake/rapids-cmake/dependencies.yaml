@@ -4,7 +4,8 @@ files:
     output: none
     includes:
       - build
-      - cudatoolkit
+      - cuda
+      - cuda_version
       - docs
       - py_version
       - test
@@ -17,7 +18,7 @@ files:
   docs:
     output: none
     includes:
-      - cudatoolkit
+      - cuda_version
       - docs
 channels:
   - rapidsai
@@ -35,6 +36,30 @@ dependencies:
           - cxx-compiler
           - make
     specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              cuda: "11.[245]"
+            packages:
+              - gcc<11.0.0
+          - matrix:
+              cuda: "11.[68]"
+            packages:
+              - gcc<12.0.0
+          - matrix:
+              cuda: "12.*"
+            packages:
+              - gcc<13.0.0
+      - output_types: conda
+        matrices:
+          - matrix:
+              arch: x86_64
+            packages:
+              - sysroot_linux-64==2.17
+          - matrix:
+              arch: aarch64
+            packages:
+              - sysroot_linux-aarch64==2.17
       - output_types: conda
         matrices:
           - matrix:
@@ -78,11 +103,10 @@ dependencies:
             packages:
               - nvcc_linux-aarch64=11.8
           - matrix:
-              cuda: "12.0"
+              cuda: "12.*"
             packages:
-              - cuda-version=12.0
               - cuda-nvcc
-  cudatoolkit:
+  cuda_version:
     specific:
       - output_types: conda
         matrices:
@@ -90,44 +114,42 @@ dependencies:
               cuda: "11.2"
             packages:
               - cuda-version=11.2
-              - cudatoolkit
-              - gcc<11.0.0
-              - sysroot_linux-64==2.17
           - matrix:
               cuda: "11.4"
             packages:
               - cuda-version=11.4
-              - cudatoolkit
-              - gcc<11.0.0
-              - sysroot_linux-64==2.17
           - matrix:
               cuda: "11.5"
             packages:
               - cuda-version=11.5
-              - cudatoolkit
-              - gcc<11.0.0
-              - sysroot_linux-64==2.17
           - matrix:
               cuda: "11.6"
             packages:
               - cuda-version=11.6
-              - cudatoolkit
-              - gcc<12.0.0
-              - sysroot_linux-64==2.17
           - matrix:
               cuda: "11.8"
             packages:
               - cuda-version=11.8
-              - cudatoolkit
-              - gcc<12.0.0
-              - sysroot_linux-64==2.17
           - matrix:
               cuda: "12.0"
             packages:
               - cuda-version=12.0
+          - matrix:
+              cuda: "12.2"
+            packages:
+              - cuda-version=12.2
+  cuda:
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              cuda: "11.*"
+            packages:
+              - cudatoolkit
+          - matrix:
+              cuda: "12.*"
+            packages:
               - cuda-cupti-dev
-              - gcc<13.0.0
-              - sysroot_linux-64==2.17
   docs:
     common:
       - output_types: [conda]
@@ -143,7 +165,6 @@ dependencies:
       - output_types: [conda, requirements]
         packages:
           - cython>=0.29,<0.30
-          - scikit-build>=0.13.1
           - libpng
           - zlib
       - output_types: [conda]
@@ -162,8 +183,12 @@ dependencies:
             packages:
               - python=3.10
           - matrix:
+              py: "3.11"
             packages:
-              - python>=3.9,<3.11
+              - python=3.11
+          - matrix:
+            packages:
+              - python>=3.9,<3.12
   style_checks:
     common:
       - output_types: [conda, requirements]

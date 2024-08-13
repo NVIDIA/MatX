@@ -162,7 +162,11 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_rsqrt(T v1)
     return rsqrt(v1);
   }
   else {
+#ifdef __CUDACC__
     return ::rsqrt(v1);
+#else
+    return static_cast<T>(1) / sqrt(v1);
+#endif
   }
 }
 template <typename T> struct RSqrtF {

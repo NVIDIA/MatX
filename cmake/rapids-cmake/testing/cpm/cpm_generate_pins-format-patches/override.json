@@ -1,0 +1,33 @@
+{
+  "packages": {
+    "cuco": {
+      "version": "0.0.1",
+      "git_shallow": false,
+      "git_url": "https://github.com/NVIDIA/cuCollections.git",
+      "git_tag": "f823d30d6b08a60383266db25821074dbdbe5822",
+      "patches": [
+        {
+          "file": "${current_json_dir}/patches/0001-move-git-sha1.patch",
+          "issue": "Move git sha1",
+          "fixed_in": ""
+        }
+      ]
+    },
+    "rmm": {
+      "version": "22.02",
+      "git_tag": "v22.02.00",
+      "patches": [
+        {
+          "file": "${current_json_dir}/patches/0001-move-git-sha1.patch",
+          "issue": "Move git sha1",
+          "fixed_in": ""
+        },
+        {
+          "file": "${current_json_dir}/patches/0002-move-git-sha1-a-second-time.patch",
+          "issue": "Move git sha1 a second time",
+          "fixed_in": ""
+        }
+      ]
+    }
+  }
+}

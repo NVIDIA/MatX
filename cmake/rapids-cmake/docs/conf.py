@@ -25,9 +25,9 @@ author = "NVIDIA"
 # built documents.
 #
 # The short X.Y version.
-version = "23.12"
+version = "24.06"
 # The full version, including alpha/beta/rc tags.
-release = "23.12.00"
+release = "24.06.00"
 
 
 # -- General configuration ---------------------------------------------------

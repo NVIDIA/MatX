@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,6 +74,7 @@ function(rapids_export_cpm type name export_set)
     endif()
   endif()
 
+  string(TIMESTAMP current_year "%Y" UTC)
   configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/template/cpm.cmake.in"
                  "${CMAKE_BINARY_DIR}/rapids-cmake/${export_set}/${type}/cpm_${name}.cmake" @ONLY)
 

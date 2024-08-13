@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ add_cmake_config_test( export-verify-file-names.cmake )
 add_cmake_config_test( export-verify-implicit-disabled-version.cmake )
 add_cmake_config_test( export-verify-implicit-major-version-only-matching.cmake )
 add_cmake_config_test( export-verify-version.cmake )
+add_cmake_config_test( export-verify-copyright-header.cmake )
 
 add_cmake_config_test( export_component-build )
 

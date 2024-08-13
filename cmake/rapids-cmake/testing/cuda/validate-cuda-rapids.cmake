@@ -22,8 +22,8 @@ if(NOT location EQUAL -1)
 endif()
 
 # Each item should be `number-real` and should be ordered from low to high.
-# In addition the values should map to Pascal+ GPU arch ( 60+ )
-set(previous_value 59)
+# In addition the values should map to Volta+ GPU arch ( 70+ )
+set(previous_value 69)
 foreach(value IN LISTS CMAKE_CUDA_ARCHITECTURES)
   # verify it ends with `-real`
   string(FIND ${value} "-real" location)
@@ -34,13 +34,13 @@ foreach(value IN LISTS CMAKE_CUDA_ARCHITECTURES)
   string(REPLACE "-real" "" value "${value}")
   if( value LESS previous_value )
       message(FATAL_ERROR "CMAKE_CUDA_ARCHITECTURES values should be ordered lowest to highest."
-                          "with lowest >= 60")
+                          "with lowest >= 70")
   endif()
 endforeach()
 
 if( last_value LESS previous_value )
   message(FATAL_ERROR "CMAKE_CUDA_ARCHITECTURES values should be ordered lowest to highest."
-                      "with lowest >= 60")
+                      "with lowest >= 70")
 endif()
 
 list(APPEND CMAKE_CUDA_ARCHITECTURES ${last_value})

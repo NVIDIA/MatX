@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -130,6 +130,7 @@ endif()\n")
 
   string(APPEND _RAPIDS_EXPORT_CONTENTS "set(rapids_global_targets ${global_targets})\n")
 
+  string(TIMESTAMP current_year "%Y" UTC)
   configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/template/dependencies.cmake.in" "${file_path}"
                  @ONLY)
 endfunction()

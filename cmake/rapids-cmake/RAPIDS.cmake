@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 # Allow users to control which version is used
 if(NOT rapids-cmake-version)
   # Define a default version if the user doesn't set one
-  set(rapids-cmake-version 23.12)
+  set(rapids-cmake-version 24.06)
 endif()
 
 # Allow users to control which GitHub repo is fetched
@@ -39,16 +39,30 @@ endif()
 if(NOT rapids-cmake-url)
   # Construct a default URL if the user doesn't set one
   set(rapids-cmake-url "https://github.com/${rapids-cmake-repo}/")
+
   # In order of specificity
-  if(rapids-cmake-sha)
-    # An exact git SHA takes precedence over anything
-    string(APPEND rapids-cmake-url "archive/${rapids-cmake-sha}.zip")
-  elseif(rapids-cmake-tag)
-    # Followed by a git tag name
-    string(APPEND rapids-cmake-url "archive/refs/tags/${rapids-cmake-tag}.zip")
+  if(rapids-cmake-fetch-via-git)
+    if(rapids-cmake-sha)
+      # An exact git SHA takes precedence over anything
+      set(rapids-cmake-value-to-clone "${rapids-cmake-sha}")
+    elseif(rapids-cmake-tag)
+      # Followed by a git tag name
+      set(rapids-cmake-value-to-clone "${rapids-cmake-tag}")
+    else()
+      # Or if neither of the above two were defined, use a branch
+      set(rapids-cmake-value-to-clone "${rapids-cmake-branch}")
+    endif()
   else()
-    # Or if neither of the above two were defined, use a branch
-    string(APPEND rapids-cmake-url "archive/refs/heads/${rapids-cmake-branch}.zip")
+    if(rapids-cmake-sha)
+      # An exact git SHA takes precedence over anything
+      set(rapids-cmake-value-to-clone "archive/${rapids-cmake-sha}.zip")
+    elseif(rapids-cmake-tag)
+      # Followed by a git tag name
+      set(rapids-cmake-value-to-clone "archive/refs/tags/${rapids-cmake-tag}.zip")
+    else()
+      # Or if neither of the above two were defined, use a branch
+      set(rapids-cmake-value-to-clone "archive/refs/heads/${rapids-cmake-branch}.zip")
+    endif()
   endif()
 endif()
 
@@ -57,7 +71,14 @@ if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)
 endif()
 include(FetchContent)
-FetchContent_Declare(rapids-cmake URL "${rapids-cmake-url}")
+if(rapids-cmake-fetch-via-git)
+  FetchContent_Declare(rapids-cmake
+    GIT_REPOSITORY "${rapids-cmake-url}"
+    GIT_TAG "${rapids-cmake-value-to-clone}")
+else()
+  string(APPEND rapids-cmake-url "${rapids-cmake-value-to-clone}")
+  FetchContent_Declare(rapids-cmake URL "${rapids-cmake-url}")
+endif()
 if(POLICY CMP0135)
   cmake_policy(POP)
 endif()

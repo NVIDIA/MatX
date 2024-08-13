@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,16 +22,18 @@ rapids_cpm_init()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "rmm" : {
-      "git_url" : "new_rmm_url",
-      "git_shallow" : "OFF",
-      "exclude_from_all" : "ON"
+  "packages": {
+    "rmm": {
+      "git_url": "new_rmm_url",
+      "git_shallow": "OFF",
+      "exclude_from_all": "ON"
     },
-    "not_in_base" : {
-      "git_url" : "new_rmm_url",
-      "git_shallow" : "OFF",
-      "exclude_from_all" : "ON"
+    "not_in_base": {
+      "version": "1.0",
+      "git_url": "new_rmm_url",
+      "git_tag": "main",
+      "git_shallow": "OFF",
+      "exclude_from_all": "ON"
     }
   }
 }

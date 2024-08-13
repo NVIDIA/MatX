@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,30 +27,32 @@ endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
   [=[
 {
-  "packages" : {
-    "pkg_with_patch" : {
-      "version" : "10.2",
-      "git_tag" : "a_tag",
-      "git_shallow" : "OFF",
-      "exclude_from_all" : "ON",
-      "patches" : [
+  "packages": {
+    "pkg_with_patch": {
+      "version": "10.2",
+      "git_url": "a_url",
+      "git_tag": "a_tag",
+      "git_shallow": "OFF",
+      "exclude_from_all": "ON",
+      "patches": [
         {
-          "file" : "e/example.diff",
-          "issue" : "explain",
-          "fixed_in" : ""
+          "file": "e/example.diff",
+          "issue": "explain",
+          "fixed_in": ""
         }
       ]
     },
-    "pkg_patch_not_applied" : {
-      "version" : "10.2",
-      "git_tag" : "a_tag",
-      "git_shallow" : "OFF",
-      "exclude_from_all" : "ON",
-      "patches" : [
+    "pkg_patch_not_applied": {
+      "version": "10.2",
+      "git_url": "a_url",
+      "git_tag": "a_tag",
+      "git_shallow": "OFF",
+      "exclude_from_all": "ON",
+      "patches": [
         {
-          "file" : "e/example.diff",
-          "issue" : "explain",
-          "fixed_in" : "3"
+          "file": "e/example.diff",
+          "issue": "explain",
+          "fixed_in": "3"
         }
       ]
     }

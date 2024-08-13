@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from scipy import linalg as slinalg
+import cupy as cp
+from cupyx.scipy import linalg as cplinalg
 from numpy import random
 import math
 import matx_common
@@ -15,14 +16,15 @@ class inv:
         np.random.seed(1234)
 
     def run(self):
-        n = self.size[0]
-        batches = self.size[1]
-
-        # Create a positive-definite matrix
-        if batches > 1:
-            A = matx_common.randn_ndarray((batches, n,n), self.dtype)
+        n = self.size[-1]
+        if len(self.size) == 1:
+            shape = (n, n)
         else:
-            A = matx_common.randn_ndarray((n,n), self.dtype)
+            batch_size = self.size[0]
+            shape = (batch_size, n, n)
+
+        # Create an invertible matrix
+        A = matx_common.randn_ndarray(shape, self.dtype)
         A_inv = np.linalg.inv(A)
 
         return {
@@ -38,13 +40,16 @@ class cholesky:
         np.random.seed(1234)
 
     def run(self):
-        n = self.size[0]
-
-        if self.dtype in ('complex64', 'complex128'):
-            A = np.random.randn(n, n) + 1j*np.random.randn(n, n)
+        n = self.size[-1]
+        if len(self.size) == 1:
+            shape = (n, n)
         else:
-            A = np.random.randn(n, n)
-        B = np.matmul(A, A.conj().T)
+            batch_size = self.size[0]
+            shape = (batch_size, n, n)
+
+        # Create a positive-definite matrix
+        A = matx_common.randn_ndarray(shape, self.dtype)
+        B = np.matmul(A, np.conj(A).swapaxes(-2, -1))
         B = B + n*np.eye(n)
 
         L = np.linalg.cholesky(B)
@@ -62,10 +67,35 @@ class lu:
         np.random.seed(1234)
 
     def run(self):
-        m, n = self.size[0], self.size[1]
+        m, n = self.size[-2:]
+        if len(self.size) == 2:
+            shape = (m, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, m, n)
 
-        A = np.random.randn(m, n)
-        P, L, U = slinalg.lu(A)
+        A = matx_common.randn_ndarray(shape, self.dtype)
+        A_cp = cp.asarray(A)
+
+        if len(self.size) == 2:
+            P_cp, L_cp, U_cp = cplinalg.lu(A_cp)
+        else:
+            P_list = []
+            L_list = []
+            U_list = []
+
+            for i in range(batch_size):
+                P_i, L_i, U_i = cplinalg.lu(A_cp[i])
+                P_list.append(P_i)
+                L_list.append(L_i)
+                U_list.append(U_i)
+            
+            P_cp = cp.stack(P_list)
+            L_cp = cp.stack(L_list)
+            U_cp = cp.stack(U_list)
+
+        cp.cuda.Stream.null.synchronize()
+        P, L, U = cp.asnumpy(P_cp), cp.asnumpy(L_cp), cp.asnumpy(U_cp)
 
         return {
             'A': A,
@@ -82,9 +112,14 @@ class qr:
         np.random.seed(1234)
 
     def run(self):
-        m, n = self.size[0], self.size[1]
+        m, n = self.size[-2:]
+        if len(self.size) == 2:
+            shape = (m, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, m, n)
 
-        A = np.random.randn(m, n)
+        A = matx_common.randn_ndarray(shape, self.dtype)
         Q, R = np.linalg.qr(A)
 
         return {
@@ -101,9 +136,14 @@ class svd:
         np.random.seed(1234)
 
     def run(self):
-        m, n = self.size[0], self.size[1]
+        m, n = self.size[-2:]
+        if len(self.size) == 2:
+            shape = (m, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, m, n)
 
-        A = matx_common.randn_ndarray((m,n), self.dtype)
+        A = matx_common.randn_ndarray(shape, self.dtype)
         U, S, V = np.linalg.svd(A)
 
         return {
@@ -121,10 +161,16 @@ class eig:
         np.random.seed(1234)
 
     def run(self):
-        n = self.size[0]
+        n = self.size[-1]
+        if len(self.size) == 1:
+            shape = (n, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, n, n)
+        
         # Create a positive-definite matrix
-        A = np.random.randn(n, n)
-        B = np.matmul(A, A.conj().T)
+        A = matx_common.randn_ndarray(shape, self.dtype)
+        B = np.matmul(A, np.conj(A).swapaxes(-2, -1))
         B = B + n*np.eye(n)
 
         W, V = np.linalg.eig(B)
@@ -142,10 +188,15 @@ class det:
         np.random.seed(1234)
 
     def run(self):
-        n = self.size[0]
+        n = self.size[-1]
+        if len(self.size) == 1:
+            shape = (n, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, n, n)
 
-        # Create a positive-definite matrix
-        A = np.random.randn(n, n)
+        # Create an invertible matrix
+        A = matx_common.randn_ndarray(shape, self.dtype)
         det = np.linalg.det(A)
 
         return {

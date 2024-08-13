@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,6 +64,17 @@ function(rapids_cpm_package_details package_name version_var url_var tag_var sha
   rapids_cpm_json_get_value(git_url)
   rapids_cpm_json_get_value(git_tag)
 
+  # Only do validation if we have an entry
+  if(json_data OR override_json_data)
+    # Validate that we have the required fields
+    foreach(var IN ITEMS version git_url git_tag)
+      if(NOT ${var})
+        message(FATAL_ERROR "rapids_cmake can't parse '${package_name}' json entry, it is missing a `${var}` entry"
+        )
+      endif()
+    endforeach()
+  endif()
+
   if(override_json_data)
     string(JSON value ERROR_VARIABLE no_url_override GET "${override_json_data}" git_url)
     string(JSON value ERROR_VARIABLE no_tag_override GET "${override_json_data}" git_tag)
@@ -97,6 +108,7 @@ function(rapids_cpm_package_details package_name version_var url_var tag_var sha
 
   cmake_language(EVAL CODE "set(version ${version})")
   cmake_language(EVAL CODE "set(git_tag ${git_tag})")
+  cmake_language(EVAL CODE "set(git_url ${git_url})")
 
   set(${version_var} ${version} PARENT_SCOPE)
   set(${url_var} ${git_url} PARENT_SCOPE)

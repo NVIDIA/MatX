@@ -33,7 +33,10 @@ tracking of these dependencies for correct export support.
 
    /command/rapids_cpm_init
    /command/rapids_cpm_find
+   /command/rapids_cpm_generate_pinned_versions
    /command/rapids_cpm_package_override
+
+.. _`cpm_pre-configured_packages`:
 
 CPM Pre-Configured Packages
 ***************************
@@ -48,6 +51,7 @@ package uses :ref:`can be found here. <cpm_versions>`
 .. toctree::
    :titlesonly:
 
+   /packages/rapids_cpm_cccl
    /packages/rapids_cpm_cuco
    /packages/rapids_cpm_fmt
    /packages/rapids_cpm_gbench
@@ -55,6 +59,7 @@ package uses :ref:`can be found here. <cpm_versions>`
    /packages/rapids_cpm_libcudacxx
    /packages/rapids_cpm_nvbench
    /packages/rapids_cpm_nvcomp
+   /packages/rapids_cpm_nvtx3
    /packages/rapids_cpm_rmm
    /packages/rapids_cpm_spdlog
    /packages/rapids_cpm_thrust
@@ -63,6 +68,28 @@ package uses :ref:`can be found here. <cpm_versions>`
 
 Cython
 ******
+
+The ``rapids-cython-core`` module allows projects to easily build cython modules using
+`scikit-build-core <https://scikit-build-core.readthedocs.io/en/latest/>`_.
+
+.. note::
+  Use of rapids-cython-core requires scikit-build-core. The behavior of the functions provided by
+  this component is undefined if they are invoked outside of a build managed by scikit-build-core.
+
+.. toctree::
+   :titlesonly:
+
+   /command/rapids_cython_core_init
+   /command/rapids_cython_core_create_modules
+   /command/rapids_cython_core_add_rpath_entries
+
+.. _`cython_legacy`:
+
+Cython (legacy)
+***************
+
+.. note::
+  ``rapids-cython`` is deprecated. Please switch to ``rapids-cython-core``.
 
 The `rapids_cython` functions allow projects to easily build cython modules using
 `scikit-build <https://scikit-build.readthedocs.io/en/latest/>`_.
@@ -116,12 +143,11 @@ require.
 Export Set Generation
 *********************
 
-These `rapids_export` functions allow projects to generate correct build and install tree `Project-Config.cmake` modules including required dependencies.
+These `rapids_export` functions allow projects to generate correct build and install tree ``Project-Config.cmake`` modules including required dependencies.
 
 For the vast majority of projects :cmake:command:`rapids_export` should be sufficient. But when
-not projects may use commands such as :cmake:command:`rapids_write_dependencies` and
-cmake:command:`rapids_write_language` to create a custom `Project-Config.cmake`.
-
+not projects may use commands such as :cmake:command:`rapids_export_write_dependencies` and
+:cmake:command:`rapids_export_write_language` to create a custom ``Project-Config.cmake``.
 
 .. toctree::
    :maxdepth: 1

@@ -20,10 +20,14 @@ else()
   list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 endif()
 
+include(${rapids-cmake-dir}/cpm/cccl.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
+include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
+
+set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
@@ -61,7 +65,7 @@ option(MATX_EN_FILEIO OFF)
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
 option(MATX_EN_BLIS OFF "Enable BLIS support")
-option(MATX_EN_OPENBLAS OFF "Enable OpenBLAS support")
+option(MATX_EN_OPENBLAS OFF "Enable OpenBLAS (BLAS + LAPACK) support")
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 
@@ -118,10 +122,11 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
     message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
 endif()
 
-# libcudacxx is now part of CCCL, so grab that repo if needed
-message(STATUS "Need CCCL. Finding...")
-set(CCCL_VERSION "v2.4.0" CACHE STRING "Version of CCCL to use")
-include(cmake/FindCCCL.cmake)
+message(STATUS "Finding CCCL...")
+rapids_cpm_cccl(
+    BUILD_EXPORT_SET matx-exports
+    INSTALL_EXPORT_SET matx-exports
+)
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
@@ -205,11 +210,12 @@ if (MATX_EN_NVPL OR MATX_EN_X86_FFTW OR MATX_EN_BLIS OR MATX_EN_OPENBLAS)
 
     if (MATX_EN_NVPL)
         message(STATUS "Enabling NVPL library support for ARM CPUs with ${INT_TYPE} interface")
-        find_package(nvpl REQUIRED COMPONENTS fft blas HINTS ${blas_DIR})
+        find_package(nvpl REQUIRED COMPONENTS fft blas lapack HINTS ${blas_DIR})
         if (NOT MATX_BUILD_32_BIT)
             target_compile_definitions(matx INTERFACE NVPL_ILP64)
         endif()
-        target_link_libraries(matx INTERFACE nvpl::fftw nvpl::blas_${INT_TYPE}_omp)
+        target_compile_definitions(matx INTERFACE NVPL_LAPACK_COMPLEX_CUSTOM)
+        target_link_libraries(matx INTERFACE nvpl::fftw nvpl::blas_${INT_TYPE}_omp nvpl::lapack_${INT_TYPE}_omp)
         target_compile_definitions(matx INTERFACE MATX_EN_NVPL)
     else()
         # FFTW

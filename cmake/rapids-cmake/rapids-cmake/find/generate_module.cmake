@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ when installed.
   Note: This requires the code block variable instead of the contents
   so that we can properly insert CMake code
 
-  ``FINAL_CODE_BLOCK``
+``FINAL_CODE_BLOCK``
   Optional value of the variable that holds a string of code that will
   be executed as the last step of this config file.
 
@@ -201,6 +201,7 @@ function(rapids_find_generate_module name)
   endif()
 
   # Need to generate the module
+  string(TIMESTAMP current_year "%Y" UTC)
   configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/template/find_module.cmake.in"
                  "${CMAKE_BINARY_DIR}/cmake/find_modules/Find${name}.cmake" @ONLY)
 
@@ -211,19 +212,11 @@ function(rapids_find_generate_module name)
   endif()
 
   # Record what export sets this module is part of
-  if(_RAPIDS_BUILD_EXPORT_SET)
-    include("${rapids-cmake-dir}/export/find_package_file.cmake")
-    rapids_export_find_package_file(BUILD
-                                    "${CMAKE_BINARY_DIR}/cmake/find_modules/Find${name}.cmake"
-                                    ${_RAPIDS_BUILD_EXPORT_SET})
-  endif()
-
-  if(_RAPIDS_INSTALL_EXPORT_SET)
-    include("${rapids-cmake-dir}/export/find_package_file.cmake")
-    rapids_export_find_package_file(INSTALL
-                                    "${CMAKE_BINARY_DIR}/cmake/find_modules/Find${name}.cmake"
-                                    ${_RAPIDS_INSTALL_EXPORT_SET})
-  endif()
+  include("${rapids-cmake-dir}/export/find_package_file.cmake")
+  rapids_export_find_package_file(BUILD "${CMAKE_BINARY_DIR}/cmake/find_modules/Find${name}.cmake"
+                                  EXPORT_SET ${_RAPIDS_BUILD_EXPORT_SET})
+  rapids_export_find_package_file(INSTALL "${CMAKE_BINARY_DIR}/cmake/find_modules/Find${name}.cmake"
+                                  EXPORT_SET ${_RAPIDS_INSTALL_EXPORT_SET})
 endfunction()
 
 cmake_policy(POP)

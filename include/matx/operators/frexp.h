@@ -35,7 +35,6 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/solver.h"
 
 namespace matx {
 
@@ -44,7 +43,7 @@ namespace detail {
   class FrexpOp : public BaseOp<FrexpOp<OpA, WHICH>>
   {
     private:
-      OpA a_;
+      typename base_type<OpA>::type a_;
 
     public:
       using matxop = bool;

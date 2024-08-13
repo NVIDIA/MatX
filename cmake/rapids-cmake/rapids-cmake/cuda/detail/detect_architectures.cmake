@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   if(EXISTS "${eval_exe}")
     execute_process(COMMAND "${eval_exe}" OUTPUT_VARIABLE __gpu_archs
                     OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_FILE "${error_file}")
-    message(STATUS "Auto detection of gpu-archs: ${__gpu_archs}")
+    message(STATUS "Using auto detection of gpu-archs: ${__gpu_archs}")
   else()
     message(STATUS "Failed auto detection of gpu-archs. Falling back to using ${__gpu_archs}.")
   endif()

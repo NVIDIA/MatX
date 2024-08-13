@@ -41,5 +41,6 @@ if(RAPIDS_CMAKE_ENABLE_DOWNLOAD_TESTS)
 
   add_subdirectory(cpm)
   add_subdirectory(cython)
+  add_subdirectory(cython-core)
   add_subdirectory(other)
 endif()

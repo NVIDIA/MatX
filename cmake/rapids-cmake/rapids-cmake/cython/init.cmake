@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -38,6 +38,11 @@ Result Variables
 #]=======================================================================]
 macro(rapids_cython_init)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cython.init")
+  include("${rapids-cmake-dir}/cmake/detail/policy.cmake")
+  rapids_cmake_policy(DEPRECATED_IN 24.02
+                      REMOVED_IN 24.08
+                      MESSAGE [=[Usage of `rapids-cython` is deprecated, use rapids-cython-core instead.]=]
+  )
   # Only initialize once.
   if(NOT DEFINED RAPIDS_CYTHON_INITIALIZED)
     # Verify that we are using scikit-build.
@@ -63,4 +68,5 @@ macro(rapids_cython_init)
     # Flag
     set(RAPIDS_CYTHON_INITIALIZED TRUE)
   endif()
+  list(POP_BACK CMAKE_MESSAGE_CONTEXT)
 endmacro()

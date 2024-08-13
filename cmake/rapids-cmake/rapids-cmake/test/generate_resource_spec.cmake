@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,47 +51,33 @@ function(rapids_test_generate_resource_spec DESTINATION filepath)
     )
   endif()
 
-  set(gpu_json_contents
-      [=[
-{
-"version": {"major": 1, "minor": 0},
-"local": [{
-  "gpus": [{"id":"0", "slots": 0}]
-}]
-}
-]=])
-
   include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/default_names.cmake)
-  set(eval_file ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/generate_resource_spec.cpp)
   set(eval_exe ${PROJECT_BINARY_DIR}/rapids-cmake/${rapids_test_generate_exe_name})
-  set(error_file ${PROJECT_BINARY_DIR}/rapids-cmake/detect_gpus.stderr.log)
 
   if(NOT EXISTS "${eval_exe}")
     find_package(CUDAToolkit QUIET)
     file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/rapids-cmake/")
 
-    if(CUDAToolkit_FOUND)
-      set(compile_options "-I${CUDAToolkit_INCLUDE_DIRS}" "-DHAVE_CUDA")
-    endif()
-    set(link_options ${CUDA_cudart_LIBRARY})
     set(compiler "${CMAKE_CXX_COMPILER}")
-    if(NOT DEFINED CMAKE_CXX_COMPILER)
+    set(lang CXX)
+    if(DEFINED CMAKE_CUDA_COMPILER)
       set(compiler "${CMAKE_CUDA_COMPILER}")
+      set(lang CUDA)
     endif()
 
-    execute_process(COMMAND "${compiler}" "${eval_file}" ${compile_options} ${link_options} -o
-                            "${eval_exe}" OUTPUT_VARIABLE compile_output
-                    ERROR_VARIABLE compile_output)
-  endif()
+    try_compile(result "${PROJECT_BINARY_DIR}/rapids-cmake/generate_ctest_json-build"
+                "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/generate_resource_spec"
+                generate_resource_spec
+                CMAKE_FLAGS "-DCUDAToolkit_ROOT=${CUDAToolkit_ROOT}" "-Doutput_file=${eval_exe}"
+                            "-Dlang=${lang}" "-Dcuda_toolkit=${CUDAToolkit_FOUND}"
+                OUTPUT_VARIABLE compile_output)
 
-  if(NOT EXISTS "${eval_exe}")
-    message(STATUS "rapids_test_generate_resource_spec failed to build detection executable, presuming no GPUs."
-    )
-    message(STATUS "rapids_test_generate_resource_spec compile[${compiler} ${compile_options} ${link_options}] failure details are ${compile_output}"
-    )
-    file(WRITE "${filepath}" "${gpu_json_contents}")
-  else()
-    execute_process(COMMAND ${eval_exe} OUTPUT_FILE "${filepath}")
+    if(NOT result)
+      string(REPLACE "\n" "\n  " compile_output "${compile_output}")
+      message(FATAL_ERROR "rapids_test_generate_resource_spec failed to build detection executable.\nfailure details are:\n  ${compile_output}"
+      )
+    endif()
   endif()
+  execute_process(COMMAND ${eval_exe} OUTPUT_FILE "${filepath}" COMMAND_ERROR_IS_FATAL ANY)
 
 endfunction()

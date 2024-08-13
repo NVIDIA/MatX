@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ Result Variables
 function(rapids_cuda_set_architectures mode)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cuda.set_architectures")
 
-  set(supported_archs "60" "70" "75" "80" "86" "90")
+  set(supported_archs "70" "75" "80" "86" "90")
 
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA" AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.1.0)
     list(REMOVE_ITEM supported_archs "86")
@@ -71,13 +71,25 @@ function(rapids_cuda_set_architectures mode)
     list(TRANSFORM supported_archs APPEND "-real")
     list(APPEND supported_archs ${latest_arch})
 
-    set(CMAKE_CUDA_ARCHITECTURES ${supported_archs} PARENT_SCOPE)
+    set(CMAKE_CUDA_ARCHITECTURES ${supported_archs})
   elseif(${mode} STREQUAL "NATIVE")
     include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/detect_architectures.cmake)
     rapids_cuda_detect_architectures(supported_archs CMAKE_CUDA_ARCHITECTURES)
 
     list(TRANSFORM CMAKE_CUDA_ARCHITECTURES APPEND "-real")
-    set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} PARENT_SCOPE)
   endif()
+
+  # cache the cuda archs.
+  get_property(cached_value GLOBAL PROPERTY rapids_cuda_architectures)
+  if(NOT cached_value)
+    set_property(GLOBAL PROPERTY rapids_cuda_architectures "${CMAKE_CUDA_ARCHITECTURES}")
+  endif()
+  if(NOT cached_value STREQUAL CMAKE_CUDA_ARCHITECTURES)
+    string(REPLACE ";" "\n  " _cuda_architectures_pretty "${CMAKE_CUDA_ARCHITECTURES}")
+    message(STATUS "Project ${PROJECT_NAME} is building for CUDA architectures:\n  ${_cuda_architectures_pretty}"
+    )
+  endif()
+
+  set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} PARENT_SCOPE)
 
 endfunction()

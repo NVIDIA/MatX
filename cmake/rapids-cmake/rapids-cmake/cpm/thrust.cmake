@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,11 @@ tracking of these dependencies for correct export support.
 
 Uses the version of Thrust :ref:`specified in the version file <cpm_versions>` for consistency
 across all RAPIDS projects.
+
+.. deprecated:: v24.04.00
+  ``rapids_cpm_thrust`` uses Thrust 1.x. Users should migrate to
+  ``rapids_cpm_cccl`` which uses CCCL 2.x, including new versions of Thrust,
+  CUB, and libcudacxx.
 
 .. code-block:: cmake
 
@@ -63,6 +68,12 @@ Result Variables
 function(rapids_cpm_thrust NAMESPACE namespaces_name)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.thrust")
 
+  include("${rapids-cmake-dir}/cmake/detail/policy.cmake")
+  rapids_cmake_policy(DEPRECATED_IN 24.04
+                      REMOVED_IN 24.10
+                      MESSAGE [=[Usage of `rapids_cpm_thrust` has been deprecated in favor of `rapids_cpm_cccl`.]=]
+  )
+
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(Thrust version repository tag shallow exclude)
 
@@ -84,8 +95,7 @@ function(rapids_cpm_thrust NAMESPACE namespaces_name)
                   CPM_ARGS FIND_PACKAGE_ARGUMENTS EXACT
                   GIT_REPOSITORY ${repository}
                   GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow}
-                  PATCH_COMMAND ${patch_command}
+                  GIT_SHALLOW ${shallow} ${patch_command}
                   EXCLUDE_FROM_ALL ${exclude}
                   OPTIONS "THRUST_ENABLE_INSTALL_RULES ${to_install}")
 

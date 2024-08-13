@@ -111,7 +111,7 @@ For the CMake side you can use :cmake:command:`rapids_test_gpu_requirements` to 
   add_test(NAME test_small_alloc COMMAND cuda_test 50)
   rapids_test_gpu_requirements(test_small_alloc GPUS 1 PERCENT 10)
 
-Now in the C++ you need to parse the relevant `CTEST_RESOURCE_GROUP` environment variables.
+Now in the C++ you need to parse the relevant ``CTEST_RESOURCE_GROUP`` environment variables.
 To simplify the process, here is some helper C++ code that will do the heavy lifting for you:
 
 .. literalinclude:: cpp_code_snippets/rapids_cmake_ctest_allocation.hpp

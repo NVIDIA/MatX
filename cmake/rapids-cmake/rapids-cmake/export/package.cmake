@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ generated information will include a :cmake:command:`find_dependency` call for <
   Will record <PackageName> is part of the build directory export set
 
 ``INSTALL``
-  Will record <PackageName> is part of the build directory export set
+  Will record <PackageName> is part of the install directory export set
 
 ``VERSION``
   .. versionadded:: v22.04.00

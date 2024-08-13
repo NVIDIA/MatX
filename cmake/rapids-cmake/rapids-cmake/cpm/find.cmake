@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,6 +80,10 @@ consistency. List all targets used by your project in `GLOBAL_TARGET`.
   Required placeholder to be provided before any extra arguments that need to
   be passed down to :cmake:command:`CPMFindPackage`.
 
+  .. note::
+    A ``PATCH_COMMAND`` will always trigger usage of :cmake:command:`CPMAddPackage` instead of :cmake:command:`CPMFindPackage`. *This is true even
+    if the patch command is empty.*
+
 Result Variables
 ^^^^^^^^^^^^^^^^
   :cmake:variable:`<PackageName>_SOURCE_DIR` is set to the path to the source directory of <PackageName>.
@@ -132,7 +136,7 @@ Overriding
 ^^^^^^^^^^
 
 The :cmake:command:`rapids_cpm_package_override` command provides a way
-for projects to override the default values for any :cmake:command:`rapids_cpm_find`, `rapids_cpm_* <../api.html#cpm-pre-configured-packages>`__,
+for projects to override the default values for any :cmake:command:`rapids_cpm_find`, :ref:`rapids_cpm_* <cpm_pre-configured_packages>`,
 `CPM <https://github.com/cpm-cmake/CPM.cmake>`_, and :cmake:module:`FetchContent() <cmake:module:FetchContent>` package.
 
 By default when an override for a project is provided no local search
@@ -152,6 +156,14 @@ function(rapids_cpm_find name version)
     message(FATAL_ERROR "rapids_cpm_find requires you to specify CPM_ARGS before any CPM arguments")
   endif()
 
+  set(has_patch FALSE)
+  foreach(unparsed_arg IN LISTS _RAPIDS_UNPARSED_ARGUMENTS)
+    if(unparsed_arg MATCHES "PATCH_COMMAND")
+      set(has_patch TRUE)
+      break()
+    endif()
+  endforeach()
+
   set(package_needs_to_be_added TRUE)
   if(_RAPIDS_GLOBAL_TARGETS)
     foreach(target IN LISTS _RAPIDS_GLOBAL_TARGETS)
@@ -170,7 +182,8 @@ function(rapids_cpm_find name version)
   endif()
 
   if(package_needs_to_be_added)
-    if(CPM_${name}_SOURCE)
+    # Any patch command triggers CPMAddPackage.
+    if(CPM_${name}_SOURCE OR has_patch)
       CPMAddPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})
     else()
       CPMFindPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})

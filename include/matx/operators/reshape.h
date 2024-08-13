@@ -50,7 +50,7 @@ namespace matx
         using value_type = typename T::value_type;
 	
       private:
-        T op_;
+        typename base_type<T>::type op_;
 	      ShapeType sizes_;
 
       public:
