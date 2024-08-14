@@ -96,6 +96,16 @@ namespace detail {
 /**
  * Perform a singular value decomposition (SVD) using cuSolver or a LAPACK host
  * library.
+ *
+ * @tparam OpA
+ *   Operator input type
+ *
+ * @param a
+ *   Input operator of shape MxN
+ * @param jobu
+ *   Compute all or part of matrix U
+ * @param jobvt
+ *   Compute all or part of matrix V^T
  * 
  */
 template<typename OpA>
