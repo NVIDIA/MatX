@@ -1,7 +1,7 @@
 #include <nvbench/nvbench.cuh>
 #include "matx.h"
 
-#if MATX_EN_CUTENSOR
+#ifdef MATX_EN_CUTENSOR
 
 using namespace matx;
 
