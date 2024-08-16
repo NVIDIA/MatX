@@ -49,8 +49,8 @@ namespace detail {
   {
     private:
       OpA a_;
-      SVDJob jobu_;
-      SVDJob jobvt_;
+      SVDMode jobz_;
+      SVDHostAlgo algo_;
 
     public:
       using matxop = bool;
@@ -59,7 +59,7 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(OpA a, const SVDJob jobu, const SVDJob jobvt) : a_(a), jobu_(jobu), jobvt_(jobvt) { };
+      __MATX_INLINE__ SVDOp(OpA a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
 
       // This should never be called
       template <typename... Is>
@@ -68,8 +68,11 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
-
-        svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobu_, jobvt_);
+        if constexpr (is_cuda_executor_v<Executor>) {
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobz_);
+        } else {
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobz_, algo_);
+        }
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -102,15 +105,21 @@ namespace detail {
  *
  * @param a
  *   Input operator of shape MxN
- * @param jobu
- *   Compute all or part of matrix U
- * @param jobvt
- *   Compute all or part of matrix V^T
+ * @param jobz
+ *   Compute all, part, or none of matrices U and VT
+ * @param algo
+ *   For Host SVD calls, whether to use more efficient divide-and-conquer based
+ *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
+ *   can run significantly faster, especially for large matrices. However, `gesdd`
+ *   requires \f$ O(\min(M,N) ^ 2) \f$ memory as compared to \f$ O(\max(M,N)) \f$ for
+ *   `gesvd`, and it can have poorer accuracy in some cases.
+ *   Ignored for CUDA SVD calls.
  * 
  */
 template<typename OpA>
-__MATX_INLINE__ auto svd(const OpA &a, const SVDJob jobu = SVDJob::ALL, const SVDJob jobvt = SVDJob::ALL) {
-  return detail::SVDOp(a, jobu, jobvt);
+__MATX_INLINE__ auto svd(const OpA &a, const SVDMode jobz = SVDMode::ALL,
+                        const SVDHostAlgo algo = SVDHostAlgo::DC) {
+  return detail::SVDOp(a, jobz, algo);
 }
 
 

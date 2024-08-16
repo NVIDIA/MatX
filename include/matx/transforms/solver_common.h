@@ -71,31 +71,73 @@ enum class EigenMode {
   VECTOR     // Both eigenvalues and eigenvectors are computed
 };
 
-// SVD job options for computing columns of U (jobu) and rows of VT (jobvt)
-enum class SVDJob {
-  ALL,     // For jobu: All M columns of U are computed
-           // For jobvt: All N rows of V^T are computed
-  REDUCED, // For jobu: The first min(m,n) columns of U are computed
-           // For jobvt: The first min(m,n) rows of V^T are computed
-  NONE     // For jobu: No columns of U are computed
-           // For jobvt: No rows of V^T are computed
+// SVD modes for computing columns of U and rows of VT, which are
+// termed jobu and jobvt in LAPACK/cuSolver. The same option is used for
+// both jobu and jobvt in MatX.
+enum class SVDMode {
+  ALL,     // Compute all columns of U and all rows of V^T
+           // Equivalent to jobu = jobvt = 'A'
+  REDUCED, // Compute only the first min(m,n) columns of U and rows of V^T
+           // Equivalent to jobu = jobvt = 'S'
+  NONE     // Compute no columns of U or rows of V^T
+           // Equivalent to jobu = jobvt = 'N'
+};
+
+// Controls the LAPACK driver used for SVD on host.
+enum class SVDHostAlgo {
+  QR,  // QR based (corresponds to GESVD)
+  DC   // Divide and Conquer based (corresponds to GESDD)
 };
 
 namespace detail {
 
-__MATX_INLINE__ char SVDJobToChar(SVDJob job) {
-  switch (job) {
-    case SVDJob::ALL:
+__MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
+  switch (jobz) {
+    case SVDMode::ALL:
       return 'A';
-    case SVDJob::REDUCED:
+    case SVDMode::REDUCED:
       return 'S';
-    case SVDJob::NONE:
+    case SVDMode::NONE:
       return 'N';
     default:
-      MATX_ASSERT_STR(false, matxInvalidParameter, "Job for SVD not supported");
+      MATX_ASSERT_STR(false, matxInvalidParameter, "Mode for SVD not supported");
       return '\0';
   }
 }
+
+
+template <typename Op, typename Executor>
+__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
+  constexpr int RANK = Op::Rank();
+
+  bool supported = true;
+  if constexpr (!(is_tensor_view_v<Op>)) {
+    supported = false;
+  } else {
+
+    // Need inner dimension(s) to be contiguous
+    if (in.Stride(RANK - 1) != (index_t)1) {
+      supported = false;
+    }
+
+    if constexpr (RANK >= 2) {
+      if (in.Stride(RANK - 2) != in.Size(RANK - 1)) {
+        supported = false;
+      }
+    }
+  }
+
+  if (supported) {
+    return in;
+  } else {
+    if constexpr (is_cuda_executor_v<Executor>) {
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    } else {
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
+    }
+  }
+}
+
 
 /* Solver utility functions */
 
