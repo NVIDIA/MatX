@@ -150,7 +150,8 @@ public:
                     &params.m, nullptr, nullptr, &params.m, nullptr, &params.n,
                     &work_query, &this->lwork, nullptr, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK gesvd workspace query").c_str());
 
       // the real part of the first elem of work holds the optimal lwork.
       // rwork has size 5*min(M,N) and is only used for complex types
@@ -166,7 +167,8 @@ public:
                     nullptr, &params.m, nullptr, &params.n, &work_query,
                     &this->lwork, nullptr, nullptr, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK gesdd workspace query").c_str());
 
       this->liwork = 8 * mn; // iwork has size 8*min(M,N) and is used for all types
 
@@ -234,8 +236,8 @@ public:
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
     lapack_int_t info;
-    for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      if (params.algo == SVDHostAlgo::QR) {
+    if (params.algo == SVDHostAlgo::QR) {
+      for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
         gesvd_dispatch(&jobz, &jobz, &params.m, &params.n,
                         reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                         &params.m, reinterpret_cast<T3*>(this->batch_s_ptrs[i]),
@@ -243,7 +245,12 @@ public:
                         reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &params.n,
                         reinterpret_cast<T1*>(this->work), &this->lwork,
                         reinterpret_cast<T3*>(this->rwork), &info);
-      } else if (params.algo == SVDHostAlgo::DC) {
+
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in LAPACK").c_str());
+      }
+    } else if (params.algo == SVDHostAlgo::DC) {
+      for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
         gesdd_dispatch(&jobz, &params.m, &params.n,
                         reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                         &params.m, reinterpret_cast<T3*>(this->batch_s_ptrs[i]),
@@ -252,9 +259,9 @@ public:
                         reinterpret_cast<T1*>(this->work), &this->lwork,
                         reinterpret_cast<T3*>(this->rwork),
                         reinterpret_cast<lapack_int_t*>(this->iwork), &info);
-      }
 
-      MATX_ASSERT(info == 0, matxSolverError);
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "gesdd error in LAPACK");     
+      }
     }
   }
 

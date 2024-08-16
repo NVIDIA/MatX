@@ -170,7 +170,13 @@ public:
     cudaStreamSynchronize(stream);
 
     for (const auto& info : h_info) {
-      MATX_ASSERT(info == 0, matxSolverError);
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xpotrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + "-th leading minor is not positive definite in cuSolver Xpotrf").c_str());
+      }
     }
   }
 

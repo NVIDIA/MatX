@@ -179,7 +179,13 @@ public:
     cudaStreamSynchronize(stream);
 
     for (const auto& info : h_info) {
-      MATX_ASSERT(info == 0, matxSolverError);
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgetrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in cuSolver Xgetrf").c_str());
+      }
     }
   }
 

@@ -150,7 +150,13 @@ public:
       getrf_dispatch(&params.m, &params.n, reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.m, reinterpret_cast<T2*>(this->batch_piv_ptrs[i]), &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK getrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in LAPACK getrf").c_str());
+      }
     }
   }
 

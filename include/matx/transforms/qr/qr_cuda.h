@@ -368,7 +368,8 @@ public:
     cudaStreamSynchronize(stream);
 
     for (const auto& info : h_info) {
-      MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
     }
   }
 
