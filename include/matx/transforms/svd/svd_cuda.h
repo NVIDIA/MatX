@@ -664,8 +664,8 @@ public:
     SetBatchPointers<BatchType::MATRIX>(vt, this->batch_vt_ptrs);
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
-    cusolverDnSetStream(this->handle, exec.getStream());
-    int info;
+    const auto stream = exec.getStream();
+    cusolverDnSetStream(this->handle, stream);
 
     // At this time cuSolver does not have a batched 64-bit SVD interface. Change
     // this to use the batched version once available.
@@ -682,9 +682,15 @@ public:
           this->d_info + i);
 
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    }
 
-      // This will block. Figure this out later
-      cudaMemcpy(&info, this->d_info + i, sizeof(info), cudaMemcpyDeviceToHost);
+    std::vector<int> h_info(this->batch_a_ptrs.size());
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+
+    // This will block. Figure this out later
+    cudaStreamSynchronize(stream);
+
+    for (const auto& info : h_info) {
       MATX_ASSERT(info == 0, matxSolverError);
     }
   }
