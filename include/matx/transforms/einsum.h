@@ -33,7 +33,7 @@
 
 #pragma once
 
-#ifdef MATX_ENABLE_CUTENSOR
+#ifdef MATX_EN_CUTENSOR
 #include <cstdio>
 #include <numeric>
 #include "error.h"
@@ -486,7 +486,7 @@ namespace cutensor {
   template <typename OutputType, typename... InT>
   void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors)
   {
-#ifdef MATX_ENABLE_CUTENSOR
+#ifdef MATX_EN_CUTENSOR
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     // Get parameters required by these tensors
@@ -507,7 +507,7 @@ namespace cutensor {
       }
     );
 #else
-    MATX_THROW(matxNotSupported, "einsum() currently requires MATX_ENABLE_CUTENSOR=ON but MATX_ENABLE_CUTENSOR=OFF");
+    MATX_THROW(matxNotSupported, "einsum() currently requires MATX_EN_CUTENSOR=ON but MATX_EN_CUTENSOR=OFF");
 #endif
   }
 }
