@@ -133,7 +133,7 @@ namespace detail {
 template <typename InType, int D>
 __MATX_INLINE__ auto max(const InType &in, const int (&dims)[D])
 {
-  static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D < InType::Rank(), "reduction dimensions must be < Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
@@ -144,7 +144,7 @@ template <typename InType, int D>
 [[deprecated("Use max() instead of rmax() for reductions")]]
 __MATX_INLINE__ auto rmax(const InType &in, const int (&dims)[D])
 {
-  static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D < InType::Rank(), "reduction dimensions must be < Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
