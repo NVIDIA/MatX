@@ -122,7 +122,8 @@ public:
     geqrf_dispatch(&params.m, &params.n, nullptr,
                     &params.m, nullptr,
                     &work_query, &this->lwork, &info);
-    MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK geqrf workspace query").c_str());
     
     // the real part of the first elem of work holds the optimal lwork
     if constexpr (is_complex_v<T1>) {
@@ -176,7 +177,7 @@ public:
                      &params.m, reinterpret_cast<T1*>(this->batch_tau_ptrs[i]),
                      reinterpret_cast<T1*>(this->work), &this->lwork, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "LAPACK geqrf error");
     }
   }
 

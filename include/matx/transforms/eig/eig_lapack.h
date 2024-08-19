@@ -131,7 +131,8 @@ public:
                     nullptr, &work_query, &this->lwork, &rwork_query,
                     &this->lrwork, &iwork_query, &this->liwork, &info);
     
-    MATX_ASSERT(info == 0, matxSolverError);
+    MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+      ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK syevd workspace query").c_str());
 
     // the real part of the first elem of work holds the optimal lwork.
     if constexpr (is_complex_v<T1>) {
@@ -196,7 +197,8 @@ public:
                       reinterpret_cast<T2*>(this->rwork), &this->lrwork,
                       reinterpret_cast<lapack_int_t*>(this->iwork), &this->liwork, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero in LAPACK syevd").c_str());
     }
   }
 

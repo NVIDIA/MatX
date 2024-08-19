@@ -37,8 +37,6 @@
 #include "gtest/gtest.h"
 
 using namespace matx;
-constexpr index_t m = 100;
-constexpr index_t n = 50;
 
 template <typename T> class SVDTest : public ::testing::Test {
 protected:
@@ -92,6 +90,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
+  constexpr index_t m = 100;
+  constexpr index_t n = 50;
 
   tensor_t<TestType, 2> Av{{m, n}};
   tensor_t<value_type, 1> Sv{{std::min(m, n)}};
@@ -117,7 +117,113 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
   (Dv = zeros<value_type>({m, n})).run(this->exec);
   this->exec.sync();
 
-  for (index_t i = 0; i < n; i++) {
+  for (index_t i = 0; i < Sv.Size(0); i++) {
+    Dv(i, i) = Sv(i);
+  }
+
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
+  this->exec.sync();
+
+  for (index_t i = 0; i < Av.Size(0); i++) {
+    for (index_t j = 0; j < Av.Size(1); j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR(Av(i, j).real(), UDVTv(i, j).real(), this->thresh) << i << " " << j;
+        ASSERT_NEAR(Av(i, j).imag(), UDVTv(i, j).imag(), this->thresh) << i << " " << j;
+      }
+      else {
+        ASSERT_NEAR(Av(i, j), UDVTv(i, j), this->thresh) << i << " " << j;
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDMLeqN)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
+  using value_type = typename inner_op_type_t<TestType>::type;
+  constexpr index_t m = 50;
+  constexpr index_t n = 100;
+
+  tensor_t<TestType, 2> Av{{m, n}};
+  tensor_t<value_type, 1> Sv{{std::min(m, n)}};
+  tensor_t<TestType, 2> Uv{{m, m}};
+  tensor_t<TestType, 2> VTv{{n, n}};
+
+  tensor_t<value_type, 2> Dv{{m, n}};
+  tensor_t<TestType, 2> UDVTv{{m, n}};
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+
+  (mtie(Uv, Sv, VTv) = svd(Av)).run(this->exec);
+
+  this->exec.sync();
+
+  // Since SVD produces a solution that's not necessarily unique, we cannot
+  // compare against Python output. Instead, we just make sure that A = U*S*V'.
+
+  // Construct diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>({m, n})).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 0; i < Sv.Size(0); i++) {
+    Dv(i, i) = Sv(i);
+  }
+
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
+  this->exec.sync();
+
+  for (index_t i = 0; i < Av.Size(0); i++) {
+    for (index_t j = 0; j < Av.Size(1); j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR(Av(i, j).real(), UDVTv(i, j).real(), this->thresh) << i << " " << j;
+        ASSERT_NEAR(Av(i, j).imag(), UDVTv(i, j).imag(), this->thresh) << i << " " << j;
+      }
+      else {
+        ASSERT_NEAR(Av(i, j), UDVTv(i, j), this->thresh) << i << " " << j;
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDHostAlgoQR)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
+  using value_type = typename inner_op_type_t<TestType>::type;
+  constexpr index_t m = 100;
+  constexpr index_t n = 50;
+
+  tensor_t<TestType, 2> Av{{m, n}};
+  tensor_t<value_type, 1> Sv{{std::min(m, n)}};
+  tensor_t<TestType, 2> Uv{{m, m}};
+  tensor_t<TestType, 2> VTv{{n, n}};
+
+  tensor_t<value_type, 2> Dv{{m, n}};
+  tensor_t<TestType, 2> UDVTv{{m, n}};
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+
+  (mtie(Uv, Sv, VTv) = svd(Av, SVDMode::ALL, SVDHostAlgo::QR)).run(this->exec);
+
+  this->exec.sync();
+
+  // Since SVD produces a solution that's not necessarily unique, we cannot
+  // compare against Python output. Instead, we just make sure that A = U*S*V'.
+
+  // Construct diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>({m, n})).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 0; i < Sv.Size(0); i++) {
     Dv(i, i) = Sv(i);
   }
 
@@ -147,6 +253,8 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;
+  constexpr index_t m = 100;
+  constexpr index_t n = 50;
 
   auto Av = make_tensor<TestType>({batches, m, n});
   auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
@@ -171,7 +279,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
   this->exec.sync();
 
   for (index_t b = 0; b < batches; b++) {
-    for (index_t i = 0; i < n; i++) {
+    for (index_t i = 0; i < Sv.Size(1); i++) {
       Dv(b, i, i) = Sv(b, i);
     }
   }

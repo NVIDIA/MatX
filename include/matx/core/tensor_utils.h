@@ -1121,7 +1121,7 @@ auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
 }
 
 /**
- * Get a transposed view of a tensor into a user-supplied buffer
+ * Get a transposed view of a tensor or operator into a user-supplied buffer
  *
  * @param tp
  *   Pointer to pre-allocated memory
@@ -1136,7 +1136,7 @@ TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, const Ex
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  auto pa = a.PermuteMatrix();
+  auto pa = transpose_matrix(a);
   auto tv = make_tensor(tp, pa.Shape());
   matx::copy(tv, pa, exec);
   return tv;

@@ -155,8 +155,8 @@ public:
       (out = a).run(exec);
     }
 
-    cusolverDnSetStream(this->handle, exec.getStream());
-    int info;
+    const auto stream = exec.getStream();
+    cusolverDnSetStream(this->handle, stream);
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
@@ -170,10 +170,22 @@ public:
           this->d_info + i);
 
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    }
 
-      // This will block. Figure this out later
-      cudaMemcpy(&info, this->d_info + i, sizeof(info), cudaMemcpyDeviceToHost);
-      MATX_ASSERT(info == 0, matxSolverError);
+    std::vector<int> h_info(this->batch_a_ptrs.size());
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+
+    // This will block. Figure this out later
+    cudaStreamSynchronize(stream);
+
+    for (const auto& info : h_info) {
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgetrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in cuSolver Xgetrf").c_str());
+      }
     }
   }
 

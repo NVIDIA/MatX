@@ -144,7 +144,13 @@ public:
                      reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.n, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK potrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + "-th leading minor is not positive definite in LAPACK potrf").c_str());
+      }
     }
   }
 
