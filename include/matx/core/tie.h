@@ -83,12 +83,12 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   static __MATX_INLINE__ constexpr int32_t Rank()
   {
-    return matxNoRank;
+    return decltype(cuda::std::get<0>(ts_))::Rank();
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
   {
-    return 0;
+    return cuda::std::get<0>(ts_).Size(dim);
   }  
 
   template <typename Executor>

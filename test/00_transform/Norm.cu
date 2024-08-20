@@ -85,10 +85,22 @@ TYPED_TEST(NormTestFloatTypes, VectorL1)
   this->pb->RunTVGenerator("vector_l1");
   this->pb->NumpyToTensorView(this->in_v, "in_v");
   this->pb->NumpyToTensorView(this->out_v, "out_v");
+
+  auto redOp = vector_norm(this->in_v, NormOrder::L1);
+
+  EXPECT_TRUE(redOp.Rank() == this->out_v.Rank());
+  for(int i = 0; i < redOp.Rank(); i++) {
+    EXPECT_TRUE(redOp.Size(i) == this->out_v.Size(i));
+  }
+  (this->out_v = redOp).run(this->exec);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_v, "out_v", this->thresh);
+
+  (this->out_v = TestType(0)).run(this->exec);
+
   // example-begin vector-norm-test-1
   (this->out_v = vector_norm(this->in_v, NormOrder::L1)).run(this->exec);
   // example-end vector-norm-test-1
-
+  
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_v, "out_v", this->thresh);
 
   MATX_EXIT_HANDLER();
@@ -102,6 +114,19 @@ TYPED_TEST(NormTestFloatTypes, VectorL2)
   this->pb->RunTVGenerator("vector_l2");
   this->pb->NumpyToTensorView(this->in_v, "in_v");
   this->pb->NumpyToTensorView(this->out_v, "out_v");
+  
+  auto redOp = vector_norm(this->in_v, NormOrder::L2);
+  
+  EXPECT_TRUE(redOp.Rank() == this->out_v.Rank());
+  for(int i = 0; i < redOp.Rank(); i++) {
+    EXPECT_TRUE(redOp.Size(i) == this->out_v.Size(i));
+  }
+  (this->out_v = redOp).run(this->exec);
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_v, "out_v", this->thresh);
+  
+  (this->out_v = TestType(0)).run(this->exec);
+
   // example-begin vector-norm-test-2
   (this->out_v = vector_norm(this->in_v, NormOrder::L2)).run(this->exec);
   // example-end vector-norm-test-2
@@ -119,6 +144,20 @@ TYPED_TEST(NormTestFloatTypes, MatrixL1)
   this->pb->RunTVGenerator("matrix_l1");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
+  
+  auto redOp = matrix_norm(this->in_m, NormOrder::L1);
+  
+  EXPECT_TRUE(redOp.Rank() == this->out_v.Rank());
+  for(int i = 0; i < redOp.Rank(); i++) {
+    EXPECT_TRUE(redOp.Size(i) == this->out_v.Size(i));
+  }
+  
+  (this->out_m = redOp).run(this->exec);
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+  
+  (this->out_v = TestType(0)).run(this->exec);
+  
   // example-begin matrix-norm-test-1
   (this->out_m = matrix_norm(this->in_m, NormOrder::L1)).run(this->exec);
   // example-end matrix-norm-test-1
@@ -136,6 +175,19 @@ TYPED_TEST(NormTestFloatTypes, MatrixL2)
   this->pb->RunTVGenerator("matrix_frob");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
+  
+  auto redOp = matrix_norm(this->in_m, NormOrder::FROB);
+  
+  EXPECT_TRUE(redOp.Rank() == this->out_v.Rank());
+  for(int i = 0; i < redOp.Rank(); i++) {
+    EXPECT_TRUE(redOp.Size(i) == this->out_v.Size(i));
+  }
+  (this->out_m = redOp).run(this->exec);
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+  
+  (this->out_v = TestType(0)).run(this->exec);
+  
   // example-begin matrix-norm-test-2
   (this->out_m = matrix_norm(this->in_m, NormOrder::FROB)).run(this->exec);
   // example-end matrix-norm-test-2
