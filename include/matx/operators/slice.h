@@ -110,7 +110,7 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, T::Rank()> ind;
 
 #pragma unroll 
             for(int32_t i = 0; i < T::Rank(); i++) {
@@ -134,7 +134,7 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<shape_type, Rank()> inds{indices...};
-            cuda::std::array<shape_type, T::Rank()> ind{indices...};
+            cuda::std::array<shape_type, T::Rank()> ind;
 
 #pragma unroll 
             for(int i = 0; i < T::Rank(); i++) {
