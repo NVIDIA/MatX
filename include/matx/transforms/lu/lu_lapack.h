@@ -188,32 +188,6 @@ private:
   DnLUHostParams_t params;
 };
 
-/**
- * Crude hash to get a reasonably good delta for collisions. This doesn't need
- * to be perfect, but fast enough to not slow down lookups, and different enough
- * so the common solver parameters change
- */
-struct DnLUHostParamsKeyHash {
-  std::size_t operator()(const DnLUHostParams_t &k) const noexcept
-  {
-    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
-           (std::hash<uint64_t>()(k.batch_size));
-  }
-};
-
-/**
- * Test LU parameters for equality. Unlike the hash, all parameters must match.
- */
-struct DnLUHostParamsKeyEq {
-  bool operator()(const DnLUHostParams_t &l, const DnLUHostParams_t &t) const noexcept
-  {
-    return l.n == t.n && l.m == t.m && l.batch_size == t.batch_size &&
-           l.dtype == t.dtype;
-  }
-};
-
-// Static caches of LU this->handles
-using lu_host_cache_t = std::unordered_map<DnLUHostParams_t, std::any, DnLUHostParamsKeyHash, DnLUHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
@@ -227,6 +201,8 @@ using lu_host_cache_t = std::unordered_map<DnLUHostParams_t, std::any, DnLUHostP
  * library by deducing all parameters needed to perform an LU decomposition from
  * only the matrix A. The input and output parameters may be the same tensor. In
  * that case, the input is destroyed and the output is stored in-place.
+ * 
+ * No caching as LAPACK allocation/setup is not needed.
  *
  * @tparam T1
  *   Data type of matrix A
@@ -272,21 +248,8 @@ void lu_impl([[maybe_unused]] OutputTensor &&out,
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
-  // Get parameters required by these tensors
-  auto params = detail::matxDnLUHostPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt);
-
-  // Get cache or new LU plan if it doesn't exist
-  using cache_val_type = detail::matxDnLUHostPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::lu_host_cache_t>(
-    detail::GetCacheIdFromType<detail::lu_host_cache_t>(),
-    params,
-    [&]() {
-      return std::make_shared<cache_val_type>(piv_new, tvt);
-    },
-    [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tvt, piv_new, tvt, exec);
-    }
-  );
+  detail::matxDnLUHostPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)> lu_plan(piv_new, tvt);
+  lu_plan.Exec(tvt, piv_new, tvt, exec);
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
