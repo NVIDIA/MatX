@@ -65,7 +65,7 @@ namespace matx
         }
 
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
-
+        
 	      __MATX_INLINE__ PermuteOp(T op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
             
           for(int32_t i = 0; i < Rank(); i++) {
@@ -85,15 +85,28 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> ind;
+            //cuda::std::array<index_t, T::Rank()> ind{indices...};
 
+#if 0
+	    //This causes register spills but might be faster if Rank is large
 #pragma unroll 
             for(int32_t i = 0; i < Rank(); i++) {	  
               ind[dims_[i]] = inds[i];
-              //ind[i] = inds[dims_[i]];
             }
+#else
+#pragma unroll 
+	    // use double loop to avoid register spills
+            for(int32_t i = 0; i < Rank(); i++) {	  
+#pragma unroll 
+              for(int32_t j = 0; j < Rank(); j++) {	  
+                if(dims_[j] == i) {
+                  ind[i] = inds[j];
+                }			
+              }
+	    }
+#endif
 
-            //return op_(ind);
             return cuda::std::apply(op_, ind);
           }
 
@@ -105,12 +118,27 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
+            //cuda::std::array<index_t, T::Rank()> ind{indices...};
+            cuda::std::array<index_t, Rank()> ind;
 
+#if 0
+	    //This causes register spills but might be faster if Rank is large
 #pragma unroll 
-            for(int i = 0; i < Rank(); i++) {	  
+            for(int32_t i = 0; i < Rank(); i++) {	  
               ind[dims_[i]] = inds[i];
             }
+#else
+#pragma unroll 
+	    // use double loop to avoid register spills
+            for(int32_t i = 0; i < Rank(); i++) {	  
+#pragma unroll 
+              for(int32_t j = 0; j < Rank(); j++) {	  
+                if(dims_[j] == i) {
+                  ind[i] = inds[j];
+                }			
+              }
+	    }
+#endif
 
             return cuda::std::apply(op_, ind);
           }
