@@ -205,7 +205,7 @@ struct DnCholHostParamsKeyEq {
   }
 };
 
-using chol_Host_cache_t = std::unordered_map<DnCholHostParams_t, std::any, DnCholHostParamsKeyHash, DnCholHostParamsKeyEq>;
+using chol_host_cache_t = std::unordered_map<DnCholHostParams_t, std::any, DnCholHostParamsKeyHash, DnCholHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
@@ -284,8 +284,8 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
   auto params = detail::matxDnCholHostPlan_t<OutputTensor, decltype(tv)>::GetCholParams(tv, uplo_lapack);
 
   using cache_val_type = detail::matxDnCholHostPlan_t<OutputTensor, decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::chol_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::chol_Host_cache_t>(),
+  detail::GetCache().LookupAndExec<detail::chol_host_cache_t>(
+    detail::GetCacheIdFromType<detail::chol_host_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tv, uplo_lapack);

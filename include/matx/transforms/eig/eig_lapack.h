@@ -71,7 +71,7 @@ public:
   using T2 = typename WTensor::value_type;
   static constexpr int RANK = OutTensor_t::Rank();
   static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
-  
+
   /**
    * Plan computing eigenvalues/vectors on square Hermitian A such that:
    *
@@ -122,12 +122,20 @@ public:
   {
     // Perform a workspace query with lwork = -1.
     lapack_int_t info;
-    T1 work_query;
-    T2 rwork_query;
+
+    // Due to a LAPACK bug which gives incorrect workspace size calculations for single-precision
+    // routines at large matrix sizes from to float-to-int conversions, should use double-precision
+    // for the query. Only an issue in routines which may need O(n^2) memory.
+    using WorkQuery = std::conditional_t<std::is_same_v<T1, float>, double,
+                      std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>,
+                                        cuda::std::complex<double>, T1>>;
+    using RworkQuery = std::conditional_t<std::is_same_v<T2, float>, double, T2>;
+    WorkQuery work_query;
+    RworkQuery rwork_query;
     lapack_int_t iwork_query;
 
     // Use vector mode for a larger workspace size that works for both modes
-    syevd_dispatch("V", &params.uplo, &params.n, nullptr, &params.n,
+    syevd_dispatch<WorkQuery, RworkQuery>("V", &params.uplo, &params.n, nullptr, &params.n,
                     nullptr, &work_query, &this->lwork, &rwork_query,
                     &this->lrwork, &iwork_query, &this->liwork, &info);
     
@@ -140,7 +148,7 @@ public:
       this->lrwork = static_cast<lapack_int_t>(rwork_query);
     } else {
       this->lwork = static_cast<lapack_int_t>(work_query);
-      this->lrwork = 0; // Complex variants do not use rwork.
+      this->lrwork = 0; // rwork is not used for real types
     }
     this->liwork = static_cast<lapack_int_t>(iwork_query);
   }
@@ -212,22 +220,26 @@ public:
   ~matxDnEigHostPlan_t() {}
 
 private:
+  /**
+   * Cannot use T1 and T2, as we always use the double versions for workspace queries
+   */
+  template <typename AType, typename WType>
   void syevd_dispatch(const char* jobz, const char* uplo, const lapack_int_t* n,
-            T1* a, const lapack_int_t* lda, T2* w, T1* work_in,
-            const lapack_int_t* lwork_in, [[maybe_unused]] T2* rwork_in,
+            AType* a, const lapack_int_t* lda, WType* w, AType* work_in,
+            const lapack_int_t* lwork_in, [[maybe_unused]] WType* rwork_in,
             [[maybe_unused]] const lapack_int_t* lrwork_in, lapack_int_t* iwork_in,
             const lapack_int_t* liwork_in, lapack_int_t* info)
   {
     // TODO: remove warning suppression once syevd is optimized in NVPL LAPACK
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (std::is_same_v<AType, float>) {
       LAPACK_CALL(ssyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (std::is_same_v<AType, double>) {
       LAPACK_CALL(dsyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (std::is_same_v<AType, cuda::std::complex<float>>) {
       LAPACK_CALL(cheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    } else if constexpr (std::is_same_v<AType, cuda::std::complex<double>>) {
       LAPACK_CALL(zheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
     }
 #pragma GCC diagnostic pop
@@ -260,7 +272,7 @@ struct DnEigHostParamsKeyEq {
   }
 };
 
-using eig_Host_cache_t = std::unordered_map<DnEigHostParams_t, std::any, DnEigHostParamsKeyHash, DnEigHostParamsKeyEq>;
+using eig_host_cache_t = std::unordered_map<DnEigHostParams_t, std::any, DnEigHostParamsKeyHash, DnEigHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
@@ -335,8 +347,8 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
 
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigHostPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::eig_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::eig_Host_cache_t>(),
+  detail::GetCache().LookupAndExec<detail::eig_host_cache_t>(
+    detail::GetCacheIdFromType<detail::eig_host_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz_lapack, uplo_lapack);

@@ -141,11 +141,11 @@ public:
     // larger workspace size that works for all modes
 
     lapack_int_t info;
-    T1 work_query;
     lapack_int_t mn = cuda::std::min(params.m, params.n);
     lapack_int_t mx = cuda::std::max(params.m, params.n);
 
     if (params.algo == SVDHostAlgo::QR) {
+      T1 work_query;
       gesvd_dispatch("A", "A", &params.m, &params.n, nullptr,
                     &params.m, nullptr, nullptr, &params.m, nullptr, &params.n,
                     &work_query, &this->lwork, nullptr, &info);
@@ -163,7 +163,16 @@ public:
         this->lrwork = 0;
       }
     } else if (params.algo == SVDHostAlgo::DC) {
-      gesdd_dispatch("A", &params.m, &params.n, nullptr, &params.m, nullptr,
+      // Due to a LAPACK bug which gives incorrect workspace size calculations for single-precision
+      // routines at large matrix sizes from to float-to-int conversions, should use double-precision
+      // for the query. Only an issue in routines which may need O(n^2) memory.
+      using WorkQuery = std::conditional_t<std::is_same_v<T1, float>, double,
+                          std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>,
+                                            cuda::std::complex<double>, T1>>;
+      using RworkQuery = std::conditional_t<std::is_same_v<T3, float>, double, T3>;
+      WorkQuery work_query;
+
+      gesdd_dispatch<WorkQuery, RworkQuery>("A", &params.m, &params.n, nullptr, &params.m, nullptr,
                     nullptr, &params.m, nullptr, &params.n, &work_query,
                     &this->lwork, nullptr, nullptr, &info);
 
@@ -173,11 +182,11 @@ public:
       this->liwork = 8 * mn; // iwork has size 8*min(M,N) and is used for all types
 
       // the real part of the first elem of work holds the optimal lwork.
-      if constexpr (is_complex_v<T1>) {
+      if constexpr (is_complex_v<WorkQuery>) {
         this->lwork = static_cast<lapack_int_t>(work_query.real());
         
         lapack_int_t mnthr = (mn * 5) / 3;
-        if (mx >= mnthr) {
+        if (mx >= mnthr) { // mx >> mn condition in LAPACK
           this->lrwork = 5*mn*mn + 5*mn;
         } else {
           this->lrwork = cuda::std::max(5*mn*mn + 5*mn, 2*mx*mn + 2*mn*mn + mn);
@@ -297,18 +306,22 @@ private:
 #pragma GCC diagnostic pop
   }
 
+  /**
+   * Cannot use T1 and T3, as we always use the double versions for workspace queries
+   */
+  template <typename T, typename S>
   void gesdd_dispatch(const char *jobz, const lapack_int_t *m, const lapack_int_t *n,
-                      T1 *a, const lapack_int_t *lda, T3 *s, T1 *u, const lapack_int_t *ldu,
-                      T1 *vt, const lapack_int_t *ldvt, T1 *work_in, const lapack_int_t *lwork_in,
-                      [[maybe_unused]] T3 *rwork_in, lapack_int_t *iwork_in, lapack_int_t *info)
+                      T *a, const lapack_int_t *lda, S *s, T *u, const lapack_int_t *ldu,
+                      T *vt, const lapack_int_t *ldvt, T *work_in, const lapack_int_t *lwork_in,
+                      [[maybe_unused]] S *rwork_in, lapack_int_t *iwork_in, lapack_int_t *info)
   {
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (std::is_same_v<T, float>) {
       LAPACK_CALL(sgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, iwork_in, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (std::is_same_v<T, double>) {
       LAPACK_CALL(dgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, iwork_in, info);
-    } else if constexpr  (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
       LAPACK_CALL(cgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, iwork_in, info);
-    } else if constexpr   (std::is_same_v<T1, cuda::std::complex<double>>)  {
+    } else if constexpr (std::is_same_v<T, cuda::std::complex<double>>)  {
       LAPACK_CALL(zgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, iwork_in, info);
     }
   }
@@ -343,7 +356,7 @@ struct DnSVDHostParamsKeyEq {
   }
 };
 
-using svd_Host_cache_t = std::unordered_map<DnSVDHostParams_t, std::any, DnSVDHostParamsKeyHash, DnSVDHostParamsKeyEq>;
+using svd_host_cache_t = std::unordered_map<DnSVDHostParams_t, std::any, DnSVDHostParamsKeyHash, DnSVDHostParamsKeyEq>;
 #endif
 
 }
@@ -424,8 +437,8 @@ void svd_impl([[maybe_unused]] UTensor &&u,
 
   // Get cache or new SVD plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDHostPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
-  detail::GetCache().LookupAndExec<detail::svd_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::svd_Host_cache_t>(),
+  detail::GetCache().LookupAndExec<detail::svd_host_cache_t>(
+    detail::GetCacheIdFromType<detail::svd_host_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, job_lapack, algo);

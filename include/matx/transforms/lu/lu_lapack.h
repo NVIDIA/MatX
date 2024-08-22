@@ -213,7 +213,7 @@ struct DnLUHostParamsKeyEq {
 };
 
 // Static caches of LU this->handles
-using lu_Host_cache_t = std::unordered_map<DnLUHostParams_t, std::any, DnLUHostParamsKeyHash, DnLUHostParamsKeyEq>;
+using lu_host_cache_t = std::unordered_map<DnLUHostParams_t, std::any, DnLUHostParamsKeyHash, DnLUHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
@@ -277,8 +277,8 @@ void lu_impl([[maybe_unused]] OutputTensor &&out,
 
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUHostPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::lu_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::lu_Host_cache_t>(),
+  detail::GetCache().LookupAndExec<detail::lu_host_cache_t>(
+    detail::GetCacheIdFromType<detail::lu_host_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(piv_new, tvt);

@@ -234,7 +234,7 @@ struct DnQRHostParamsKeyEq {
   }
 };
 
-using qr_Host_cache_t = std::unordered_map<DnQRHostParams_t, std::any, DnQRHostParamsKeyHash, DnQRHostParamsKeyEq>;
+using qr_host_cache_t = std::unordered_map<DnQRHostParams_t, std::any, DnQRHostParamsKeyHash, DnQRHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
@@ -297,8 +297,8 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRHostPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::qr_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::qr_Host_cache_t>(),
+  detail::GetCache().LookupAndExec<detail::qr_host_cache_t>(
+    detail::GetCacheIdFromType<detail::qr_host_cache_t>(),
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt);
