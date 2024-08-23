@@ -38,23 +38,77 @@
 namespace matx {
   namespace st {
 
-    // Single threaded implementation of Gauss Newton algorithm to solve a nonlinear least squares problem
-    // Note: This implementation is specialized for 3 parameters.
-    // TODO: For a generic N parameter version, we need a single threaded NxN matrix inversion implementation
-    // https://en.wikipedia.org/wiki/Gauss%E2%80%93Newton_algorithm
+    /**
+     * Single threaded implementation of Gauss Newton algorithm to solve a nonlinear least squares problem
+     *
+     * This CRTP base class implements the Gauss-Newton iterative method for solving a nonlinear
+     * least squares problem, with optional adhoc user-defined bounds. The user must derive a class
+     * from this CRTP base class which defines a function f().
+     *
+     * For more details see https://en.wikipedia.org/wiki/Gauss%E2%80%93Newton_algorithm
+     *
+     * Note: This implementation is specialized for 3 parameters.
+     * TODO: For a generic N parameter version, we need a single threaded NxN matrix inversion implementation
+     *
+     * @tparam OPT_FUNC
+     *   CRTP derived class.  The derived class must implement a function f() with signature
+     *   static void f(const float (&x)[NP], const float (&n)[NX], float& y, float (&dy)[NP])
+     *   Note that the classic Gauss-Newton algorithm does not support constraints/bounds
+     *   on the parameter estimates, however he derived class may optionally overload
+     *   apply_bounds() to define custom parameter update rules after each iteration.
+     *
+     * @tparam NP Number of parameters to solve for function f()
+     *
+     * @tparam NX Number of independent variable inputs to function f()
+     *
+     * @tparam NF Number of observations of the function f()
+     *
+     * @tparam VERBOSE 0:no debug prints, 1:print solution, 2:print iteration details.
+     *   Warning: No thread/block information is included in the debug prints, it is
+     *            recommmended to only use VERBOSE>0 with a single block/single thread
+     */
     template<typename OPT_FUNC, int NP, int NX, int NF, int VERBOSE=0>
     class gn_base
     {
       public:
+
+      /**
+       * Optionally apply bounds
+       *
+       * The base apply_bounds() implementation does nothing.  The derived template function may
+       * optionally modify the parameter estimate 'x' after each iteration.
+       *
+       * @param[in,out] x
+       *   The parameter estimate vector being optimized
+       *
+       */
       __device__ inline void apply_bounds(float (&x)[NP])
       {
         // Do nothing in base class
       }
 
+      /**
+       * Iteratively solves a nonlinear least squares problem using the Gauss-Newton method
+       *
+       * solve() implements the Guass-Newton iterative method for solving a nonlinear least
+       * squares problem.  solve() requires a CRTP derived function OPT_FUNC::f() to calculate
+       * scalar value and NP partial differentials of the function being optimized.
+       *
+       * @param[in,out] x
+       *   NP-length parameter estimate vector.  The vector should be set to an initial value
+       *   by the caller.  The vector is updated with the solver solution.
+       *
+       * @param[in] observations
+       *   NF-length observation vector
+       *
+       * @param[in] n
+       *   NF-length list of NX independent variables used in OPT_FUNC::f() corresponding to the
+       *   observations vector
+       *
+       */
       __device__ void solve(float (&x)[NP], const float (&observations)[NF], const float (&n)[NF][NX])
       {
         static_assert(NP == 3, "This implementation is specialized for 3 parameters.");
-        static_assert(NX == 2, "This implementation is specialized for 2 independent variables.");
         const int n_iterations = 256;
 
         if (VERBOSE > 0)

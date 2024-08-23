@@ -190,10 +190,13 @@ epub_title = project
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ['search.html']
 
+build_datetime = f"{datetime.datetime.now(datetime.timezone.utc)}"
+
 # Export some CICD info
 rst_epilog = f"""
 .. |ProjectVersion| replace:: {version}
 .. |ProjectRelease| replace:: {release}
+.. |ProjectDate| replace:: {build_datetime}
 """
 
 ci_env_list = [

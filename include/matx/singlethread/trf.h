@@ -4,6 +4,10 @@
 // Copyright (c) 2024, NVIDIA Corporation
 // All rights reserved.
 //
+// Original TRF python code https://github.com/scipy/scipy/blob/bfaef273d1ec251ea3d5ef52853fadeb7f39fc5e/scipy/optimize/_lsq/
+// Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.
+// All rights reserved.
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -30,39 +34,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-
-//Original TRF python code https://github.com/scipy/scipy/blob/bfaef273d1ec251ea3d5ef52853fadeb7f39fc5e/scipy/optimize/_lsq/
-//Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.
-//All rights reserved.
-//
-//Redistribution and use in source and binary forms, with or without
-//modification, are permitted provided that the following conditions
-//are met:
-//
-//1. Redistributions of source code must retain the above copyright
-//   notice, this list of conditions and the following disclaimer.
-//
-//2. Redistributions in binary form must reproduce the above
-//   copyright notice, this list of conditions and the following
-//   disclaimer in the documentation and/or other materials provided
-//   with the distribution.
-//
-//3. Neither the name of the copyright holder nor the names of its
-//   contributors may be used to endorse or promote products derived
-//   from this software without specific prior written permission.
-//
-//THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-//"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-//LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-//A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-//OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-//SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-//LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-//DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-//THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-//(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-//OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #pragma once
 
 #include "matx.h"
@@ -72,12 +43,44 @@
 namespace matx {
   namespace st {
 
-    /*
-      OPT_FUNC function to optimize
-      NP number of parameters of OPT_FUNC to optimize
-      NX number of independent variables for OPT_FUNC
-      NF number of observations of OPT_FUNC
-    */
+    /**
+     * Single threaded implementation of Trust Region Reflective algorithm to
+     * solve a nonlinear least squares problem
+     *
+     * This CRTP base class implements the TRF iterative method for solving a nonlinear
+     * least squares problem with bounds. The user must derive a class
+     * from this CRTP base class which defines a function f().
+     *
+     * For more details see
+     *   1. Branch, M.A., T.F. Coleman, and Y. Li, "A Subspace, Interior,
+     *      and Conjugate Gradient Method for Large-Scale Bound-Constrained
+     *      Minimization Problems," SIAM Journal on Scientific Computing,
+     *      Vol. 21, Number 1, pp 1-23, 1999.
+     *
+     *   2. More, J. J., "The Levenberg-Marquardt Algorithm: Implementation
+     *      and Theory," Numerical Analysis, ed. G. A. Watson, Lecture
+     *
+     *   3. TRF python implementation https://github.com/scipy/scipy/blob/main/scipy/optimize/_lsq
+     *
+     * Note: This implementation does not implement all features of the python version
+     *
+     * @tparam OPT_FUNC
+     *   CRTP derived class.  The derived class must implement a function f() with signature
+     *   static void f(const float (&x)[NP], const float (&n)[NX], float& y, float (&dy)[NP])
+     *   Note that the classic Gauss-Newton algorithm does not support constraints/bounds
+     *   on the parameter estimates, however he derived class may optionally overload
+     *   apply_bounds() to define custom parameter update rules after each iteration.
+     *
+     * @tparam NP Number of parameters to solve for function f()
+     *
+     * @tparam NX Number of independent variable inputs to function f()
+     *
+     * @tparam NF Number of observations of the function f()
+     *
+     * @tparam VERBOSE 0:no debug prints, 1:print solution, 2:print iteration details.
+     *   Warning: No thread/block information is included in the debug prints, it is
+     *            recommmended to only use VERBOSE>0 with a single block/single thread
+     */
     template<typename OPT_FUNC, int NP, int NX, int NF, int VERBOSE=0>
     class trf_base
     {
@@ -699,15 +702,33 @@ namespace matx {
 
     public:
       /**
-         * Performs the TRF nonlinear least squares solver algorithm
-         *
-         * @param x
-         *   output array of function paramteter estimates
-         * @param observations
-         *   array of observations
-         * @param svdpi_init
-         *   initial random guess for svd power iteration algorithm
-      **/
+       * Iteratively solves a nonlinear least squares problem using the TRF method
+       *
+       * trf_bounds() implements the Trust Region Reflective iterative method for
+       * solving a nonlinear least squares problem.
+       * trf_bounds() requires a CRTP derived function OPT_FUNC::f() to calculate
+       * scalar value and NP partial differentials of the function being optimized.
+       *
+       * @param[in,out] x
+       *   NP-length parameter estimate vector.  The vector should be set to an initial value
+       *   by the caller.  The vector is updated with the solver solution.
+       *
+       * @param[in] observations
+       *   NF-length observation vector
+       *
+       * @param[in] n
+       *   NF-length list of NX independent variables used in OPT_FUNC::f() corresponding to the
+       *   observations vector
+       *
+       * @param[in] ub
+       *   NP-length upper bound vector
+       *
+       * @param[in] lb
+       *   NP-length lower bound vector
+       *
+       * @param[in] svdpi_init
+       *   NP+NF length random vector used in SVD power iteration portion of the algorithm
+       */
       __device__ void inline trf_bounds(float (&x)[NP], const float (&observations)[NF], const float (&n)[NF][NX], const float (&lb)[NP], const float (&ub)[NP], const float (&svdpi_init)[NP+NF])
       {
 

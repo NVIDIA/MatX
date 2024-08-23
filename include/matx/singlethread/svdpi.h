@@ -41,6 +41,43 @@
 
 namespace matx {
   namespace st {
+
+    /**
+     * Single threaded implementation of SVD power iteration method
+     *
+     * svdpi() computes the first num_values singular values of matrix A and partial
+     * SVD decomposition of matrix A into right and left singular matrices U and V.
+     *
+     * @tparam T
+     *   Scalar element type of arrays
+     *
+     * @tparam M
+     *   Outer dimension of matrix A and U
+     *
+     * @tparam N
+     *   Inner dimension of matrix A and inner dimension of V.T
+     *
+     * @tparam MIN_M_N
+     *   Minimum of M or N.  Inner dimensino of matris U, outer dimension of V.T
+     *
+     * @tparam MAX_M_N
+     *   Maximum of M or N.
+     *
+     * @param[in] A matrix to perform SVD decomposition
+     *
+     * @param[out] U left singular vectors
+     *
+     * @param[out] S singular values
+     *
+     * @param[out] VT transpose of right singular vectors
+     *
+     * @param[in] x0 Input random vector used in SVD power iteration method
+     *
+     * @param[in] num_values Number of singular values to compute
+     *
+     * @param[in] max_iter Maximum number of iterations per singular value computed
+     *
+     */
     template<typename T, size_t M, size_t N, size_t MIN_M_N, size_t MAX_M_N>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ void svdpi(const T (&A)[M][N], T (&U)[M][MIN_M_N], T(&S)[MIN_M_N], T (&VT)[MIN_M_N][N], const T (&x0)[MAX_M_N], int num_values, int max_iter)
     {

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2024, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -193,32 +193,14 @@ int main(void)
     matx::st::svdpi(Amat, Umat, Svec, VTmat, x0vec, 3, 100);
   }
 
-  auto Smat = matx::make_tensor<float>({3,3});
-  //auto Smat = matx::diag<float>({3,3}, S);
-  for (int m=0; m<3; m++)
-  {
-    for (int n=0; n<3; n++)
-    {
-      if (m == n)
-      {
-        Smat(m,n) = S(m);
-      }
-      else
-      {
-        Smat(m,n) = 0;
-      }
-    }
-  }
-
   auto US = matx::make_tensor<float>({3,3});
-  (US = matx::matmul(U,Smat)).run(stream);
+  (US = U * S).run(stream);
 
   auto Ahat = matx::make_tensor<float>({3,3});
   (Ahat = matx::matmul(US, VT)).run(stream);
   CHECK_CUDA(cudaStreamSynchronize(stream));
   printf("U\n"); matx::print(U);
   printf("S\n"); matx::print(S);
-  printf("Smat\n"); matx::print(Smat);
   printf("VT\n"); matx::print(VT);
   printf("Ahat\n"); matx::print(Ahat);
   for (int m=0; m<3; m++)

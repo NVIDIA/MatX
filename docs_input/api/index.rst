@@ -10,7 +10,7 @@ API Reference
    manipulation/index.rst
    io/index.rst
    math/index.rst
-   linalg/index.rst   
+   linalg/index.rst
    stats/index.rst
    searchsort/index.rst
    logic/index.rst
@@ -23,4 +23,5 @@ API Reference
    dft/index.rst
    viz/index.rst
    type_traits.rst
-   
+   singlethread/index.rst
+
