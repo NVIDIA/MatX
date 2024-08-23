@@ -1428,8 +1428,6 @@ public:
    * more dimensions of a tensor. This includes completely dropping an unwanted
    * dimension, or simply taking a piece of a wanted dimension. Slice() is very
    * similar to indexing operations in both Python and MATLAB.
-   * 
-   * *NOTE* Users should not call Slice() directly anymore. Use the slice() operator instead.
    *
    * @param firsts
    *   List of starting index into each dimension. Indexing is 0-based
@@ -1452,10 +1450,10 @@ public:
    * @returns Sliced view of tensor
    *
    */
-  template <int N = RANK, typename StrideType>
+  template <int N = RANK>
   __MATX_INLINE__ auto Slice([[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &firsts,
-                            [[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &ends,
-                            [[maybe_unused]] StrideType strides) const
+                             [[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &ends,
+                             [[maybe_unused]] const cuda::std::array<typename Desc::stride_type, RANK> &strides) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
 
@@ -1466,6 +1464,7 @@ public:
 
     T *data = this->ldata_;
     int d = 0;
+    bool def_stride = (strides[0] == -1);
 
     [[maybe_unused]] int end_count = 0;
     for (int i = 0; i < RANK; i++) {
@@ -1487,14 +1486,9 @@ public:
 
       MATX_ASSERT_STR(first < end, matxInvalidSize, "Slice must be at least one element long");
 
-      [[maybe_unused]] typename Desc::stride_type stride_mult;
-      
-      if constexpr (std::is_same_v<StrideType, detail::NoStride>) {
-        stride_mult = 1;
-      }
-      else {
-        stride_mult = (strides[i] == matxKeepStride) ? 1 : strides[i];
-      }
+      [[maybe_unused]] typename Desc::stride_type stride_mult = (def_stride || strides[i] == matxKeepStride)
+                                ? 1
+                                : strides[i]; // custom stride
 
       MATX_ASSERT_STR(first < end, matxInvalidParameter,
                       "Starting slice must be less than end slice");
@@ -1531,10 +1525,10 @@ public:
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 
-  template <typename StrideType, int N = RANK>
+  template <int N = RANK>
   __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
-                            const typename Desc::shape_type (&ends)[RANK],
-                            StrideType strides) const
+                             const typename Desc::shape_type (&ends)[RANK],
+                             const typename Desc::stride_type (&strides)[RANK]) const
   {
     return Slice<N>(detail::to_array(firsts), detail::to_array(ends), detail::to_array(strides));
   }
@@ -1565,13 +1559,15 @@ public:
    */
   template <int N = RANK>
   __MATX_INLINE__ auto Slice(const cuda::std::array<typename Desc::shape_type, RANK> &firsts,
-                            const cuda::std::array<typename Desc::shape_type, RANK> &ends) const
+                             const cuda::std::array<typename Desc::shape_type, RANK> &ends) const
   {
     static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    return Slice<detail::NoStride, N>(firsts, ends, detail::NoStride{});
+    const cuda::std::array<typename Desc::stride_type, RANK> strides = {-1};
+
+    return Slice<N>(firsts, ends, strides);
   }
 
   template <int N = RANK>

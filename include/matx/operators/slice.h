@@ -42,21 +42,20 @@ namespace matx
    * Slices elements from an operator/tensor.
    */
   namespace detail {
-
-    template <int DIM, typename T, typename StrideType>
-      class SliceOp : public BaseOp<SliceOp<DIM, T, StrideType>>
+    template <int DIM, typename T>
+      class SliceOp : public BaseOp<SliceOp<DIM, T>>
     {
       public: 
         using value_type = typename T::value_type;
         using shape_type = index_t; 
-        using self_type = SliceOp<DIM, T, StrideType>;
+        using self_type = SliceOp<DIM, T>;
 
       private:
         typename base_type<T>::type op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
-        StrideType strides_; // Add [[no_unique_address]] in c++20
+        cuda::std::array<shape_type, T::Rank()> strides_;
 
       public:
         using matxop = bool;
@@ -69,7 +68,7 @@ namespace matx
 
         __MATX_INLINE__ SliceOp(T op, const cuda::std::array<shape_type, T::Rank()> &starts,
                                       const cuda::std::array<shape_type, T::Rank()> &ends,
-                                      StrideType strides) : op_(op) {
+                                      const cuda::std::array<shape_type, T::Rank()> &strides) : op_(op) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
             shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
@@ -81,10 +80,7 @@ namespace matx
               "Slice end index out of range of operator");
 
             starts_[i] = start;
-
-            if constexpr (!std::is_same_v<NoStride, StrideType>) {
-              strides_[i] = strides[i];
-            }
+            strides_[i] = strides[i];
 
             // compute dims and sizes
             if(end != matxDropDim) {
@@ -99,10 +95,7 @@ namespace matx
               }
 
               //adjust size by stride
-              if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[d]));
-              }
-
+              sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[d]));
               d++;
             }
           }
@@ -115,7 +108,7 @@ namespace matx
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-#if 0
+            // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T::Rank()> ind{indices...};
 
@@ -128,29 +121,6 @@ namespace matx
             for(int32_t i = 0; i < Rank(); i++) {
               ind[dims_[i]] += inds[i] * strides_[i]; 
             }
-#else            
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind;
-            cuda::std::array<index_t, Rank()> inds{indices...};
-
-            #pragma unroll            
-            for (int32_t i = 0; i < T::Rank(); i++) {
-              #pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {
-                if(dims_[j] == i) {
-                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts_[j] + inds[j] * strides_[i];
-                  }
-                  else {
-                    ind[i] = starts_[j] + inds[j];
-                  }
-                }
-                else {
-                  ind[i] = starts_[i];
-                }
-              }
-            }       
-#endif                   
 
             //return op_(ind);
             return cuda::std::apply(op_, ind);
@@ -162,42 +132,19 @@ namespace matx
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-#if 0
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
+            // convert variadic type to tuple so we can read/update
+            cuda::std::array<shape_type, Rank()> inds{indices...};
+            cuda::std::array<shape_type, T::Rank()> ind{indices...};
 
 #pragma unroll 
-            for(int32_t i = 0; i < T::Rank(); i++) {
+            for(int i = 0; i < T::Rank(); i++) {
               ind[i] = starts_[i];
             }
 
 #pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {
+            for(int i = 0; i < Rank(); i++) {
               ind[dims_[i]] += inds[i] * strides_[i]; 
             }
-#else            
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind;
-            cuda::std::array<index_t, Rank()> inds{indices...};
-
-            #pragma unroll            
-            for (int32_t i = 0; i < T::Rank(); i++) {
-              #pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {
-                if(dims_[j] == i) {
-                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts_[j] + inds[j] * strides_[i];
-                  }
-                  else {
-                    ind[i] = starts_[j] + inds[j];
-                  }
-                }
-                else {
-                  ind[i] = starts_[i];
-                }
-              }
-            }        
-#endif       
 
             //return op_(ind);
             return cuda::std::apply(op_, ind);
@@ -269,22 +216,9 @@ namespace matx
     if constexpr (is_tensor_view_v<OpType>) {
       return op.Slice(starts, ends, strides);
     } else {
-      return detail::SliceOp<OpType::Rank(),OpType,decltype(strides)>(op, starts, ends, strides);
+      return detail::SliceOp<OpType::Rank(),OpType>(op, starts, ends, strides);
     }
   }
-
-  template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
-      const cuda::std::array<index_t, OpType::Rank()> &starts,
-      const cuda::std::array<index_t, OpType::Rank()> &ends,
-      detail::NoStride strides)
-  {
-    if constexpr (is_tensor_view_v<OpType>) {
-      return op.Slice(starts, ends, strides);
-    } else {
-      return detail::SliceOp<OpType::Rank(),OpType,detail::NoStride>(op, starts, ends, detail::NoStride{});
-    }
-  }  
 
   template <typename OpType>
   __MATX_INLINE__ auto slice( const OpType &op, 
@@ -316,7 +250,10 @@ namespace matx
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
-    return slice(op, starts, ends, detail::NoStride{});
+    cuda::std::array<index_t, OpType::Rank()> strides;
+    strides.fill(1);
+
+    return slice(op, starts, ends, strides);
   }
   template <typename OpType>
   __MATX_INLINE__ auto slice( const OpType &op, 
@@ -354,23 +291,9 @@ namespace matx
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template Slice<N>(starts, ends, strides);
     } else {
-      return detail::SliceOp<N,OpType,decltype(strides)>(op, starts, ends, strides);
+      return detail::SliceOp<N,OpType>(op, starts, ends, strides);
     }
   }
-
-  template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType op, 
-      const cuda::std::array<index_t, OpType::Rank()> &starts,
-      const cuda::std::array<index_t, OpType::Rank()> &ends,
-      detail::NoStride no_stride)
-  {
-    if constexpr (is_tensor_view_v<OpType>) {
-      return op.template Slice<N>(starts, ends);
-    } else {
-      return detail::SliceOp<N,OpType,detail::NoStride>(op, starts, ends, detail::NoStride{});
-    }
-  }
-
 
   template <int N, typename OpType>
     __MATX_INLINE__ auto slice( const OpType op, 
@@ -405,7 +328,9 @@ namespace matx
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
-    return slice<N,OpType,detail::NoStride>(opIn, starts, ends, detail::NoStride{});
+    cuda::std::array<index_t, OpType::Rank()> strides;
+    strides.fill(1);
+    return slice<N,OpType>(opIn, starts, ends, strides);
   }
 
   template <int N, typename OpType>
