@@ -97,7 +97,7 @@ public:
    *   Inverse of A (if it exists)
    *
    */
-  matxInversePlan_t(TensorTypeAInv &a_inv, const TensorTypeA &a)
+  matxInversePlan_t(TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream)
   {
     static_assert(RANK >= 2);
 
@@ -116,7 +116,11 @@ public:
     ret = cublasCreate(&handle);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
 
-    params = GetInverseParams(a_inv, a);
+    params = GetInverseParams(a_inv, a, stream);
+
+    // The cuBLAS getr*Batched LU decomposition functions overwrite the input, so
+    // we use a temporary buffer to store the inputs.
+    make_tensor(a_workbuf, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       // cuBLAS requires a list of pointers to each matrix. Construct that list
@@ -124,42 +128,46 @@ public:
       std::vector<const T1 *> in_pointers;
       std::vector<T1 *> out_pointers;
       if constexpr (RANK == 2) {
-        in_pointers.push_back(&a(0, 0));
+        in_pointers.push_back(&a_workbuf(0, 0));
         out_pointers.push_back(&a_inv(0, 0));
       }
       else {
-        using shape_type = typename TensorTypeA::desc_type::shape_type;
+        using ShapeTypeA = typename decltype(a_workbuf)::desc_type::shape_type;
+        using ShapeTypeAInv = typename TensorTypeAInv::desc_type::shape_type;
         int batch_offset = 2;
-        cuda::std::array<shape_type, TensorTypeA::Rank()> idx{0};
+        cuda::std::array<ShapeTypeA, TensorTypeA::Rank()> a_idx{0};
+        cuda::std::array<ShapeTypeAInv, TensorTypeAInv::Rank()> a_inv_idx{0};
         auto a_shape = a.Shape();
         // Get total number of batches
-        size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+        size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - batch_offset, 1, std::multiplies<ShapeTypeA>());
         for (size_t iter = 0; iter < total_iter; iter++) {
-          auto ip = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto op = cuda::std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, idx);
-
+          auto ip = cuda::std::apply([&a_workbuf = a_workbuf](auto... param) { return a_workbuf.GetPointer(param...); }, a_idx);
           in_pointers.push_back(ip);
-          out_pointers.push_back(op);
-
           // Update all but the last 2 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a, idx, batch_offset);
+          UpdateIndices<decltype(a_workbuf), ShapeTypeA, TensorTypeA::Rank()>(a_workbuf, a_idx, batch_offset);
+
+          auto op = cuda::std::apply([&a_inv](auto... param) { return a_inv.GetPointer(param...); }, a_inv_idx);
+          out_pointers.push_back(op);
+          UpdateIndices<TensorTypeAInv, ShapeTypeAInv, TensorTypeAInv::Rank()>(a_inv, a_inv_idx, batch_offset);
         }
       }
 
       // Allocate any workspace needed by inverse
       matxAlloc((void **)&d_A_array, in_pointers.size() * sizeof(T1 *),
-                MATX_DEVICE_MEMORY);
-      matxAlloc((void **)&d_A_inv_array, in_pointers.size() * sizeof(T1 *),
-                MATX_DEVICE_MEMORY);
+                MATX_ASYNC_DEVICE_MEMORY, stream);
+      matxAlloc((void **)&d_A_inv_array, out_pointers.size() * sizeof(T1 *),
+                MATX_ASYNC_DEVICE_MEMORY, stream);
       matxAlloc((void **)&d_pivot,
                 a.Size(RANK - 1) * in_pointers.size() * sizeof(*d_info),
-                MATX_DEVICE_MEMORY);
+                MATX_ASYNC_DEVICE_MEMORY, stream);
       matxAlloc((void **)&d_info, in_pointers.size() * sizeof(*d_info),
-                MATX_DEVICE_MEMORY);
-      cudaMemcpy(d_A_array, in_pointers.data(),
-                 in_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice);
-      cudaMemcpy(d_A_inv_array, out_pointers.data(),
-                 out_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice);
+                MATX_ASYNC_DEVICE_MEMORY, stream);
+      matxAlloc((void **)&h_info, in_pointers.size() * sizeof(*h_info),
+                MATX_HOST_MEMORY, stream);
+      cudaMemcpyAsync(d_A_array, in_pointers.data(),
+                      in_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream);
+      cudaMemcpyAsync(d_A_inv_array, out_pointers.data(),
+                      out_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream);
     }
     else {
       MATX_THROW(matxInvalidType, "Invalid inverse algorithm");
@@ -167,14 +175,20 @@ public:
   }
 
   static InverseParams_t GetInverseParams(TensorTypeAInv &a_inv,
-                                          const TensorTypeA &a)
+                                          const TensorTypeA &a,
+                                          cudaStream_t stream)
   {
     InverseParams_t params;
-    params.A = a.Data();
+    if constexpr (is_tensor_view_v<TensorTypeA>) {
+      params.A = a.Data();
+    } else {
+      params.A = nullptr;
+    }
     params.A_inv = a_inv.Data();
     params.algo = ALGO;
     params.n = a.Size(RANK - 1);
     params.dtype = TypeToInt<T1>();
+    params.stream = stream;
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       if constexpr (RANK == 2) {
@@ -201,6 +215,7 @@ public:
     matxFree(d_A_inv_array, cudaStreamDefault);
     matxFree(d_pivot, cudaStreamDefault);
     matxFree(d_info, cudaStreamDefault);
+    matxFree(h_info);
 
     cublasDestroy(handle);
   }
@@ -219,11 +234,13 @@ public:
    *   CUDA stream
    *
    */
-  inline void Exec(cudaStream_t stream)
+  inline void Exec([[maybe_unused]] TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     cublasSetStream(handle, stream);
+
+    (a_workbuf = a).run(stream);
 
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       if constexpr (std::is_same_v<T1, float>) {
@@ -242,7 +259,6 @@ public:
                                 reinterpret_cast<cuComplex *const *>(d_A_array),
                                 static_cast<int>(params.n), d_pivot, d_info,
                                 static_cast<int>(params.batch_size));
-        cudaDeviceSynchronize();
       }
       else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
         ret = cublasZgetrfBatched(
@@ -254,10 +270,13 @@ public:
 
       MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxLUError);
 
-      int h_info = 0;
-      cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-
-      MATX_ASSERT(h_info == 0, matxLUError);
+      cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
+      cudaStreamSynchronize(stream);
+      for (size_t i = 0; i < params.batch_size; i++) {
+        if (h_info[i] != 0) {
+          MATX_THROW(matxLUError, "inverse failed");
+        }
+      }
 
       if constexpr (std::is_same_v<T1, float>) {
         ret = cublasSgetriBatched(handle, static_cast<int>(params.n), d_A_array,
@@ -292,8 +311,13 @@ public:
 
       MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
 
-      cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-      MATX_ASSERT(h_info == 0, matxInverseError);
+      cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
+      cudaStreamSynchronize(stream);
+      for (size_t i = 0; i < params.batch_size; i++) {
+        if (h_info[i] != 0) {
+          MATX_THROW(matxLUError, "inverse failed");
+        }
+      }
     }
   }
 
@@ -303,8 +327,10 @@ private:
 
   InverseParams_t params;
   cublasHandle_t handle;
+  matx::tensor_t<typename TensorTypeA::value_type, TensorTypeA::Rank()> a_workbuf;
   int *d_pivot;
   int *d_info;
+  int *h_info;
   T1 **d_A_array;
   T1 **d_A_inv_array;
 };
@@ -360,18 +386,17 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   // Get parameters required by these tensors
-  auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a);
-  params.stream = stream;
+  auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a, stream);
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
     detail::GetCacheIdFromType<detail::inv_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(a_inv, a);
+      return std::make_shared<cache_val_type>(a_inv, a, stream);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(stream);
+      ctype->Exec(a_inv, a, stream);
     }
   );
 }
