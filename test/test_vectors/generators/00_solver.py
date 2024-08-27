@@ -203,3 +203,52 @@ class det:
             'A': A,
             'det': det
         }
+
+
+class pinv:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)
+
+    def run(self):
+        m, n = self.size[-2:]
+        if len(self.size) == 2:
+            shape = (m, n)
+        else:
+            batch_size = self.size[0]
+            shape = (batch_size, m, n)
+
+        A = matx_common.randn_ndarray(shape, self.dtype)
+        p_inv = np.linalg.pinv(A)
+
+        return {
+            'A': A,
+            'pinv': p_inv
+        }
+    
+    def run_rank_deficient(self):
+        m, n = self.size[-2:]
+
+        # Create a rank-deficient matrix
+        rank = min(m, n) - 10  # rank-deficient by 10
+        if len(self.size) == 2:
+            U = matx_common.randn_ndarray((m, rank), self.dtype)
+            V = matx_common.randn_ndarray((rank, n), self.dtype)
+        else:
+            batch_size = self.size[0]
+            U = matx_common.randn_ndarray((batch_size, m, rank), self.dtype)
+            V = matx_common.randn_ndarray((batch_size, rank, n), self.dtype)
+        
+        A = np.matmul(U, V)
+
+        # 1e-15 is default rcond in numpy but it should match the machine precision
+        # value of the datatype. This is 1e-7 for floats but 1e-6 works better
+        # for singular matrices to mask out singular values that should be zero.
+        tol = 1e-6 if A.dtype == np.float32 or A.dtype == np.complex64 else 1e-15
+        p_inv = np.linalg.pinv(A, rcond=tol)
+
+        return {
+            'A': A,
+            'pinv': p_inv
+        }

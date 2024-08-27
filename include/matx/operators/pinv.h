@@ -35,37 +35,42 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/chol/chol_cuda.h"
-#ifdef MATX_EN_CPU_SOLVER
-  #include "matx/transforms/chol/chol_lapack.h"
-#endif
+#include "matx/transforms/pinv.h"
 
 namespace matx {
 namespace detail {
   template<typename OpA>
-  class CholOp : public BaseOp<CholOp<OpA>>
+  class PinvOp : public BaseOp<PinvOp<OpA>>
   {
     private:
       OpA a_;
-      SolverFillMode uplo_;
-      mutable matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      float rcond_;
+      cuda::std::array<index_t, OpA::Rank()> out_dims_;
+      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
-      using chol_xform_op = bool;
+      using pinv_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "chol()"; }
-      __MATX_INLINE__ CholOp(OpA a, SolverFillMode uplo) : a_(a), uplo_(uplo) { };
+      __MATX_INLINE__ std::string str() const { return "pinv()"; }
+      __MATX_INLINE__ PinvOp(OpA a, float rcond) : a_(a), rcond_(rcond) {
+        for (int r = 0; r < Rank(); r++) {
+          if (r >= Rank() - 2) {
+            out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);
+          }
+          else {
+            out_dims_[r] = a_.Size(r);
+          }
+        } 
+      };
 
-      // This should never be called
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
-
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_);  
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        return tmp_out_(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -73,12 +78,22 @@ namespace detail {
         return OpA::Rank();
       }
 
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_.Size(dim);
+      }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const{
+        pinv_impl(cuda::std::get<0>(out), a_, ex, rcond_);
+      }
+
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }             
+        }       
       }      
 
       template <typename ShapeType, typename Executor>
@@ -86,12 +101,7 @@ namespace detail {
       {
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
-        }
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
@@ -102,19 +112,33 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return a_.Size(dim);
       }
 
   };
 }
 
+/**
+ * Perfom a generalized inverse of a matrix using its singular-value decomposition (SVD).
+ * It automatically removes small singular values for stability.
+ * 
+ * For tensors of rank > 2, batching is performed.
+ * 
+ * @tparam OpA
+ *   Tensor or operator type of input A
+ * 
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * @param rcond
+ *   Cutoff for small singular values. For stability, singular values
+ *   smaller than `rcond * largest_singular_value` are set to 0 for each matrix
+ *   in the batch. By default, `rcond` is approximately the machine epsilon of the tensor dtype.
+ * 
+ * @return
+ *   An operator that gives a tensor of size `... x n x m` representing the pseudo-inverse of the input
+ */
 template<typename OpA>
-__MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
-  return detail::CholOp(a, uplo);
+__MATX_INLINE__ auto pinv(const OpA &a, float rcond = get_default_rcond<typename OpA::value_type>()) {
+  return detail::PinvOp(a, rcond);
 }
 
 }

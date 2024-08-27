@@ -110,8 +110,6 @@ namespace detail {
 }
 
 /**
- * Computes the trace of a tensor
- *
  * Computes the trace of a square matrix by summing the diagonal
  *
  * @tparam InputOperator

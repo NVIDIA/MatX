@@ -235,9 +235,15 @@ public:
     }
 
     // Inner size checks
-    MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
-    MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
-    MATX_ASSERT_STR(s.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "S must be ... x min(m,n)");
+    lapack_int_t k = cuda::std::min(params.m, params.n);
+    if (jobz == 'S') {
+      MATX_ASSERT_STR((u.Size(RANK-1) == k) && (u.Size(RANK-2) == params.m), matxInvalidSize, "U must be ... x m x min(m,n)");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == k), matxInvalidSize, "VT must be ... x min(m,n) x n");
+    } else {
+      MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
+    }
+    MATX_ASSERT_STR(s.Size(RANK-2) == k, matxInvalidSize, "S must be ... x min(m,n)");
 
     SetBatchPointers<BatchType::MATRIX>(a, this->batch_a_ptrs);
     SetBatchPointers<BatchType::MATRIX>(u, this->batch_u_ptrs);
@@ -245,15 +251,17 @@ public:
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
     lapack_int_t info;
+    lapack_int_t ldvt = vt.Size(RANK-2);
     if (params.algo == SVDHostAlgo::QR) {
       for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
         gesvd_dispatch(&jobz, &jobz, &params.m, &params.n,
                         reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                         &params.m, reinterpret_cast<T3*>(this->batch_s_ptrs[i]),
                         reinterpret_cast<T1*>(this->batch_u_ptrs[i]), &params.m,
-                        reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &params.n,
+                        reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &ldvt,
                         reinterpret_cast<T1*>(this->work), &this->lwork,
                         reinterpret_cast<T3*>(this->rwork), &info);
+
 
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
           (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in LAPACK").c_str());
@@ -264,7 +272,7 @@ public:
                         reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                         &params.m, reinterpret_cast<T3*>(this->batch_s_ptrs[i]),
                         reinterpret_cast<T1*>(this->batch_u_ptrs[i]), &params.m,
-                        reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &params.n,
+                        reinterpret_cast<T1*>(this->batch_vt_ptrs[i]), &ldvt,
                         reinterpret_cast<T1*>(this->work), &this->lwork,
                         reinterpret_cast<T3*>(this->rwork),
                         reinterpret_cast<lapack_int_t*>(this->iwork), &info);
@@ -425,9 +433,11 @@ void svd_impl([[maybe_unused]] UTensor &&u,
   (a_copy = a).run(exec);
   auto at_col_maj = transpose_matrix(a_copy);
 
-  // swap U and VT
-  auto u_in = vt_new;
-  auto vt_in = u_new;
+  // swap U and VT. svd(AT) = V*S*UT
+  // Need the tensors to appear like V and UT since that is expected based on AT view
+  // inputted, although the results when read as row-major are VT and U.
+  auto u_in = transpose_matrix(vt_new);
+  auto vt_in = transpose_matrix(u_new);
 
   const char job_lapack = detail::SVDModeToChar(jobz);
 

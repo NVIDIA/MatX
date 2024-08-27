@@ -51,10 +51,8 @@ namespace matx {
 /**
  * Compute the determinant of a matrix
  *
- * Computes the terminant of a matrix by first computing the LU composition,
- * then reduces the product of the diagonal elements of U. The input and output
- * parameters may be the same tensor. In that case, the input is destroyed and
- * the output is stored in-place.
+ * Computes the determinant of a matrix by first computing the LU decomposition,
+ * then reduces the product of the diagonal elements of U.
  *
  * @tparam T1
  *   Data type of matrix A
@@ -80,22 +78,16 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   constexpr int RANK = InputTensor::Rank();
   using value_type = typename OutputTensor::value_type;
   using piv_value_type = std::conditional_t<is_cuda_executor_v<Executor>, int64_t, lapack_int_t>;
-  
-  auto a_new = OpToTensor(a, exec);
-
-  if(!a_new.isSameView(a)) {
-    (a_new = a).run(exec);
-  }
 
   // Get parameters required by these tensors
   cuda::std::array<index_t, RANK - 1> s;
 
   // Set batching dimensions of piv
   for (int i = 0; i < RANK - 2; i++) {
-    s[i] = a_new.Size(i);
+    s[i] = a.Size(i);
   }
 
-  index_t piv_len = cuda::std::min(a_new.Size(RANK - 1), a_new.Size(RANK - 2));
+  index_t piv_len = cuda::std::min(a.Size(RANK - 1), a.Size(RANK - 2));
   s[RANK - 2] = piv_len;
 
   tensor_t<piv_value_type, RANK-1> piv;
@@ -104,13 +96,13 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   if constexpr (is_cuda_executor_v<Executor>) {
     const auto stream = exec.getStream();
     make_tensor(piv, s, MATX_ASYNC_DEVICE_MEMORY, stream);
-    make_tensor(ac, a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    make_tensor(ac, a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
   } else {
     make_tensor(piv, s, MATX_HOST_MALLOC_MEMORY);
-    make_tensor(ac, a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
+    make_tensor(ac, a.Shape(), MATX_HOST_MALLOC_MEMORY);
   }
 
-  lu_impl(ac, piv, a_new, exec);
+  lu_impl(ac, piv, a, exec);
 
   // Determinant sign adjustment based on piv permutation
   // Create indices corresponding to no permutation to compare against
