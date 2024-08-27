@@ -946,7 +946,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __MATX_HOST__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
 
   /**
    * Set the underlying data pointer from the view
@@ -1473,7 +1473,7 @@ public:
       }
     }
 
-    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize, 
+    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
             "Number of matxDropDim specifiers must match the output rank");
 
 #pragma unroll
