@@ -309,7 +309,7 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv256x256)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(InvSolverTestFloatTypes, InvOperatorInput)
+TYPED_TEST(InvSolverTestFloatTypes, InvOperatorInputSmall)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -317,6 +317,42 @@ TYPED_TEST(InvSolverTestFloatTypes, InvOperatorInput)
   const int num_batches = 3;
   const int N = 16;
   auto Afull = make_tensor<TestType>({num_batches, 1, 1, N, N});
+  auto A = lcollapse<3>(Afull);
+  auto Ainv = make_tensor<TestType>({num_batches, N, N});
+  auto Ainv_ref = make_tensor<TestType>({num_batches, N, N});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "inv", "run", {num_batches, N});
+  this->pb->NumpyToTensorView(A, "A");
+  this->pb->NumpyToTensorView(Ainv_ref, "A_inv");
+
+  (Ainv = inv(A)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t b = 0; b < A.Size(0); b++) {
+    for (index_t i = 0; i < A.Size(1); i++) {
+      for (index_t j = 0; j < A.Size(2); j++) {
+        if constexpr (is_complex_v<TestType>) {
+          ASSERT_NEAR(Ainv_ref(b, i, j).real(), Ainv(b, i, j).real(), this->thresh);
+          ASSERT_NEAR(Ainv_ref(b, i, j).imag(), Ainv(b, i, j).imag(), this->thresh);
+        }
+        else {
+          ASSERT_NEAR(Ainv_ref(b, i, j), Ainv(b, i, j), this->thresh);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(InvSolverTestFloatTypes, InvOperatorInputLarge)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  const int num_batches = 8;
+  const int N = 200;
+  auto Afull = make_tensor<TestType>({2, 2, 2, N, N});
   auto A = lcollapse<3>(Afull);
   auto Ainv = make_tensor<TestType>({num_batches, N, N});
   auto Ainv_ref = make_tensor<TestType>({num_batches, N, N});
