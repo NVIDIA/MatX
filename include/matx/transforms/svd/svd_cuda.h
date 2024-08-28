@@ -40,6 +40,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/cache.h"
 #include "matx/operators/slice.h"
+#include "matx/transforms/qr/qr_cuda.h"
 #include "matx/transforms/solver_common.h"
 
 #include <cstdio>
@@ -650,8 +651,14 @@ public:
     }
 
     // Inner size checks
-    MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
-    MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
+    int64_t k = cuda::std::min(params.m, params.n);
+    if (jobz == 'S') {
+      MATX_ASSERT_STR((u.Size(RANK-1) == k) && (u.Size(RANK-2) == params.m), matxInvalidSize, "U must be ... x m x min(m,n)");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == k), matxInvalidSize, "VT must be ... x min(m,n) x n");
+    } else {
+      MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
+    }
     MATX_ASSERT_STR(s.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "S must be ... x min(m,n)");
 
     SetBatchPointers<BatchType::MATRIX>(a, this->batch_a_ptrs);
@@ -661,6 +668,7 @@ public:
 
     const auto stream = exec.getStream();
     cusolverDnSetStream(this->handle, stream);
+    const int64_t ldvt = vt.Size(RANK-2);
 
     // At this time cuSolver does not have a batched 64-bit SVD interface. Change
     // this to use the batched version once available.
@@ -671,7 +679,7 @@ public:
           MatXTypeToCudaType<T1>(), this->batch_a_ptrs[i], params.m,
           MatXTypeToCudaType<T3>(), this->batch_s_ptrs[i], MatXTypeToCudaType<T2>(),
           this->batch_u_ptrs[i], params.m, MatXTypeToCudaType<T4>(), this->batch_vt_ptrs[i],
-          params.n, MatXTypeToCudaType<T1>(),
+          ldvt, MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
           this->d_info + i);
@@ -796,7 +804,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // cuSolver destroys the input, so we need to make a copy of A regardless
   T1 *tp;
   auto a_shape = a.Shape();
-  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies< typename ATensor::desc_type::shape_type>());
+  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies<index_t>());
   matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
 
   const char job_cusolver = detail::SVDModeToChar(jobz);
@@ -811,9 +819,11 @@ void svd_impl(UTensor &&u, STensor &&s,
     auto u_new = getSolverSupportedTensor(u, exec);
     auto vt_new = getSolverSupportedTensor(vt, exec);
 
-    // swap U and VT
-    auto u_in = vt_new;
-    auto vt_in = u_new;
+    // swap U and VT. svd(AT) = V*S*UT
+    // Need the tensors to appear like V and UT since that is expected based on AT view
+    // inputted, although the results when read as row-major are VT and U.
+    auto u_in = transpose_matrix(vt_new);
+    auto vt_in = transpose_matrix(u_new);
 
     // Get parameters required by these tensors
     auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>::
@@ -864,8 +874,18 @@ void svd_impl(UTensor &&u, STensor &&s,
     );
 
     // cuSolver writes u and vt in col-major format, so we need to transpose them back.
-    (u = transpose_matrix(u_col_maj)).run(exec);
-    (vt = transpose_matrix(vt_col_maj)).run(exec);
+    // We need to first create transposed views. Can't use transpose_matrix directly because
+    // only want to swap the shapes, not the strides. Once we have a row-major tranposed view,
+    // can set to the original tensor.
+    auto utShape = u.Shape();
+    std::swap(utShape[RANK - 2], utShape[RANK - 1]);
+    auto ut = u_col_maj.View(utShape);
+    (u = transpose_matrix(ut)).run(exec);
+
+    auto vShape = vt.Shape();
+    std::swap(vShape[RANK - 2], vShape[RANK - 1]);
+    auto v = vt_col_maj.View(vShape);
+    (vt = transpose_matrix(v)).run(exec);
   }
 
   if(!s_new.isSameView(s)) {

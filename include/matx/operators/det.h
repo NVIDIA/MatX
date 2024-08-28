@@ -96,8 +96,6 @@ namespace detail {
         }
       }        
 
-      // Size is not relevant in det() since there are multiple return values and it
-      // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
         return a_.Size(dim);
@@ -106,6 +104,13 @@ namespace detail {
   };
 }
 
+/**
+ * Computes the determinant by performing an LU factorization of the input,
+ * and then calculating the product of diagonal entries of the U factor.
+ * 
+ * For tensors of rank > 2, batching is performed.
+ * 
+ */
 template<typename OpA>
 __MATX_INLINE__ auto det(const OpA &a) {
   return detail::DetOp(a);

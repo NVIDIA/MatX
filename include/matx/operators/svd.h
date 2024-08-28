@@ -65,6 +65,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
+      // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
@@ -99,6 +100,10 @@ namespace detail {
 /**
  * Perform a singular value decomposition (SVD) using cuSolver or a LAPACK host
  * library.
+ * 
+ * The singular values within each vector are sorted in descending order.
+ * 
+ * For tensors of Rank > 2, batching is performed.
  *
  * @tparam OpA
  *   Operator input type
