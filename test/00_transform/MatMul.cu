@@ -498,8 +498,8 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
     tensor_t<TestType, 3> b{{batches, k, n}};
     tensor_t<TestType, 3> c{{batches, m, n}};  
 
-    auto as = a.Slice({0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
-    auto bs = b.Slice({0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
+    auto as = slice(a, {0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
+    auto bs = slice(b, {0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
     tensor_t<TestType, 3> cs{{batches/2, m, n}};
 
 

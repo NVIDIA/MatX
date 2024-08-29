@@ -138,13 +138,13 @@ TYPED_TEST(ViewTestsIntegral, SliceStride)
 {
   MATX_ENTER_HANDLER();
   this->t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
-  auto t1t = this->t1.Slice({0}, {matxEnd}, {2});
+  auto t1t = slice(this->t1, {0}, {matxEnd}, {2});
 
   for (index_t i = 0; i < this->t1.Size(0); i += 2) {
     ASSERT_EQ(this->t1(i), t1t(i / 2));
   }
 
-  auto t1t2 = this->t1.Slice({2}, {matxEnd}, {2});
+  auto t1t2 = slice(this->t1, {2}, {matxEnd}, {2});
 
   for (index_t i = 0; i < t1t2.Size(0); i++) {
     ASSERT_EQ(30 + 20 * i, t1t2(i));
@@ -156,14 +156,14 @@ TYPED_TEST(ViewTestsIntegral, SliceStride)
 TYPED_TEST(ViewTestsIntegral, Slice)
 {
   MATX_ENTER_HANDLER();
-  auto t2t = this->t2.Slice({1, 2}, {3, 5});
-  auto t3t = this->t3.Slice({1, 2, 3}, {3, 5, 7});
-  auto t4t = this->t4.Slice({1, 2, 3, 4}, {3, 5, 7, 9});
+  auto t2t = slice(this->t2, {1, 2}, {3, 5});
+  auto t3t = slice(this->t3, {1, 2, 3}, {3, 5, 7});
+  auto t4t = slice(this->t4, {1, 2, 3, 4}, {3, 5, 7, 9});
 
 #ifndef NDEBUG
   // Negative slice test
   try {
-    auto t2e = this->t2.Slice({1, 2}, {1, 2});
+    auto t2e = slice(this->t2, {1, 2}, {1, 2});
     ASSERT_EQ(true, false);
   }
   catch (...) {
@@ -217,7 +217,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
   MATX_ENTER_HANDLER();
   {
     index_t j = 0;
-    auto t2sly = t2t.Slice<1>({0, j}, {matxEnd, matxDropDim});
+    auto t2sly = slice<1>(t2t, {0, j}, {matxEnd, matxDropDim});
     for (index_t i = 0; i < t2sly.Size(0); i++) {
       ASSERT_EQ(t2sly(i), t2t(i, j));
     }
@@ -225,7 +225,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
 
   {
     index_t i = 0;
-    auto t2slx = t2t.Slice<1>({i, 0}, {matxDropDim, matxEnd});
+    auto t2slx = slice<1>(t2t, {i, 0}, {matxDropDim, matxEnd});
     for (index_t j = 0; j < t2slx.Size(0); j++) {
       ASSERT_EQ(t2slx(j), t2t(i, j));
     }
@@ -234,7 +234,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
   {
     index_t j = 0;
     index_t k = 0;
-    auto t3slz = t3t.Slice<1>({0, j, k}, {matxEnd, matxDropDim, matxDropDim});
+    auto t3slz = slice<1>(t3t, {0, j, k}, {matxEnd, matxDropDim, matxDropDim});
     for (index_t i = 0; i < t3slz.Size(0); i++) {
       ASSERT_EQ(t3slz(i), t3t(i, j, k));
     }
@@ -243,7 +243,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
   {
     index_t i = 0;
     index_t k = 0;
-    auto t3sly = t3t.Slice<1>({i, 0, k}, {matxDropDim, matxEnd, matxDropDim});
+    auto t3sly = slice<1>(t3t, {i, 0, k}, {matxDropDim, matxEnd, matxDropDim});
     for (index_t j = 0; j < t3sly.Size(0); j++) {
       ASSERT_EQ(t3sly(j), t3t(i, j, k));
     }
@@ -252,7 +252,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
   {
     index_t i = 0;
     index_t j = 0;
-    auto t3slx = t3t.Slice<1>({i, j, 0}, {matxDropDim, matxDropDim, matxEnd});
+    auto t3slx = slice<1>(t3t, {i, j, 0}, {matxDropDim, matxDropDim, matxEnd});
     for (index_t k = 0; k < t3slx.Size(0); k++) {
       ASSERT_EQ(t3slx(k), t3t(i, j, k));
     }
@@ -260,7 +260,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
 
   {
     index_t k = 0;
-    auto t3slzy = t3t.Slice<2>({0, 0, k}, {matxEnd, matxEnd, matxDropDim});
+    auto t3slzy = slice<2>(t3t, {0, 0, k}, {matxEnd, matxEnd, matxDropDim});
     for (index_t i = 0; i < t3slzy.Size(0); i++) {
       for (index_t j = 0; j < t3slzy.Size(1); j++) {
         ASSERT_EQ(t3slzy(i, j), t3t(i, j, k));
@@ -270,7 +270,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
 
   {
     index_t j = 0;
-    auto t3slzx = t3t.Slice<2>({0, j, 0}, {matxEnd, matxDropDim, matxEnd});
+    auto t3slzx = slice<2>(t3t, {0, j, 0}, {matxEnd, matxDropDim, matxEnd});
     for (index_t i = 0; i < t3slzx.Size(0); i++) {
       for (index_t k = 0; k < t3slzx.Size(1); k++) {
         ASSERT_EQ(t3slzx(i, k), t3t(i, j, k));
@@ -280,7 +280,7 @@ TYPED_TEST(ViewTestsAll, SliceAndReduce)
 
   {
     index_t i = 0;
-    auto t3slyx = t3t.Slice<2>({i, 0, 0}, {matxDropDim, matxEnd, matxEnd});
+    auto t3slyx = slice<2>(t3t, {i, 0, 0}, {matxDropDim, matxEnd, matxEnd});
     for (index_t j = 0; j < t3slyx.Size(0); j++) {
       for (index_t k = 0; k < t3slyx.Size(1); k++) {
         ASSERT_EQ(t3slyx(j, k), t3t(i, j, k));

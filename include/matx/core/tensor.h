@@ -1572,7 +1572,7 @@ public:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    return Slice<detail::NoStride, N>(firsts, ends, detail::NoStride{});
+    return Slice<N, detail::NoStride>(firsts, ends, detail::NoStride{});
   }
 
   template <int N = RANK>

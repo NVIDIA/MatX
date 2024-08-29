@@ -69,7 +69,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (sigViewComplex = fft(sigView)).run(exec);
 
   // Slice
-  auto sliceView = sigViewComplex.Slice({0}, {nyq});
+  auto sliceView = slice(sigViewComplex, {0}, {nyq});
 
   // Inverse Transform - FFT size based on output
   (resampView = ifft(sliceView)).run(exec);
@@ -81,7 +81,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (sigViewComplex = fft(sigView)).run(exec);
 
     // Slice
-    auto sv = sigViewComplex.Slice({0}, {nyq});
+    auto sv = slice(sigViewComplex, {0}, {nyq});
 
     // Inverse Transform - FFT size based on output
     (resampView = ifft(sv)).run(exec);

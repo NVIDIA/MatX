@@ -246,6 +246,7 @@ namespace matx
     };
   }
 
+#ifndef DOXYGEN_ONLY
   /**
    * @brief Operator to logically slice a tensor or operator.
    *
@@ -346,7 +347,7 @@ namespace matx
    * @return sliced operator
    */
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType op, 
+    __MATX_INLINE__ auto slice( const OpType &op, 
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
       const cuda::std::array<index_t, OpType::Rank()> &strides)
@@ -359,21 +360,21 @@ namespace matx
   }
 
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType op, 
+    __MATX_INLINE__ auto slice( const OpType &op, 
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
-      detail::NoStride no_stride)
+      [[maybe_unused]] detail::NoStride no_stride)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template Slice<N>(starts, ends);
     } else {
-      return detail::SliceOp<N,OpType,detail::NoStride>(op, starts, ends, detail::NoStride{});
+      return detail::SliceOp<N,OpType,detail::NoStride>(op, starts, ends, no_stride);
     }
   }
 
 
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType op, 
+    __MATX_INLINE__ auto slice( const OpType &op, 
         const index_t (&starts)[OpType::Rank()],
         const index_t (&ends)[OpType::Rank()],
         const index_t (&strides)[OpType::Rank()]) 
@@ -395,26 +396,37 @@ namespace matx
    *
    * @tparam N The Rank of the output operator - optional when slice produces same rank as input
    * @tparam OpType Input operator/tensor type
-   * @param opIn Input operator
+   * @param op Input operator
    * @param starts the first element (inclusive) of each dimension of the input operator.
    * @param ends the last element (exclusive) of each dimension of the input operator.  matxDrop Dim removes that dimension.  matxEnd deontes all remaining elements in that dimension.
    * @return sliced operator
    */
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType opIn, 
+  __MATX_INLINE__ auto slice (const OpType &op, 
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
-    return slice<N,OpType,detail::NoStride>(opIn, starts, ends, detail::NoStride{});
+    return slice<N,OpType>(op, starts, ends, detail::NoStride{});
   }
 
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType opIn, 
+  __MATX_INLINE__ auto slice (const OpType &op, 
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()]) 
   {
-    return slice<N,OpType>(opIn, 
+    return slice<N,OpType>(op, 
         detail::to_array(starts), 
         detail::to_array(ends));
   }
+
+#else
+   auto slice (const OpType &op, 
+      const index_t (&starts)[OpType::Rank()],
+      const index_t (&ends)[OpType::Rank()]) { }
+
+   auto slice (const OpType &op, 
+      const index_t (&starts)[OpType::Rank()],
+      const index_t (&ends)[OpType::Rank()],
+      const index_t (&strides)[OpType::Rank()]) { }      
+#endif  
 } // end namespace matx

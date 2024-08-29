@@ -104,7 +104,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   tensor_t<cuda::std::complex<typename OutputTensor::value_type>, 1> tmp{{N + 1}};
 
   fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
-  auto s = tmp.Slice({0}, {N});
+  auto s = slice(tmp, {0}, {N});
   detail::dctOp(out, s, N).run(stream);
 }
 

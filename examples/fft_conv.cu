@@ -149,7 +149,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Now the sig_freq view contains the full convolution result. Verify against
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.
-  auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
+  auto filt1 = slice<1>(filt_time, {0,0}, {matxDropDim, matxEnd});
   (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
   exec.sync();

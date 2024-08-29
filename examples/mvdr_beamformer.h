@@ -108,7 +108,7 @@ public:
 
     (cbfView = matmul(vhView, inVecView)).run(exec);
 
-    matx::copy(ivsView, inVecView.Slice({0, 0}, {matxEnd, snap_len_}), stream);
+    matx::copy(ivsView, slice(inVecView, {0, 0}, {matxEnd, snap_len_}), stream);
 
     (ivshView = hermitianT(ivsView)).run(exec);
 
