@@ -108,7 +108,18 @@ namespace detail {
  * Computes the determinant by performing an LU factorization of the input,
  * and then calculating the product of diagonal entries of the U factor.
  * 
- * For tensors of rank > 2, batching is performed.
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ * 
+ * @param a
+ *   Input square tensor or operator of shape `... x n x n`
+ * 
+ * @return
+ *   Operator that produces the determinant output of shape `...`. This means
+ *   rank 2 inputs will have an output shape of `{}`, while higher dimensional
+ *   inputs will have output shape matching the batch dimension(s).
  * 
  */
 template<typename OpA>

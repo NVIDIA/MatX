@@ -94,6 +94,31 @@ namespace detail {
   };
 }
 
+
+/**
+ * Performs an eigenvalue decomposition, computing the eigenvalues, and
+ * optionally the eigenvectors, for a Hermitian or real symmetric matrix.
+ * 
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ * 
+ * @param a
+ *   Input Hermitian/symmetric tensor or operator of shape `... x n x n`
+ * @param jobz
+ *   Whether to compute eigenvectors.
+ * @param uplo
+ *   Part of matrix to fill
+ * 
+ * @return 
+ *   Operator that produces eigenvectors and eigenvalues tensors. Regardless of jobz,
+ *   both tensors must be correctly setup for the operation and used with `mtie()`.
+ *   - **Eigenvectors** - The eigenvectors tensor of shape `... x n x n` where each column
+ *       contains the normalized eigenvectors.
+ *   - **Eigenvalues** - The eigenvalues tensor of shape `... x n`. This must be real
+ *       and match the inner type of the input/output tensors.
+ */
 template<typename OpA>
 __MATX_INLINE__ auto eig(const OpA &a,
                           EigenMode jobz = EigenMode::VECTOR, 

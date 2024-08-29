@@ -121,7 +121,7 @@ namespace detail {
  * Perfom a generalized inverse of a matrix using its singular-value decomposition (SVD).
  * It automatically removes small singular values for stability.
  * 
- * For tensors of rank > 2, batching is performed.
+ * If rank > 2, operations are batched.
  * 
  * @tparam OpA
  *   Tensor or operator type of input A
@@ -131,10 +131,11 @@ namespace detail {
  * @param rcond
  *   Cutoff for small singular values. For stability, singular values
  *   smaller than `rcond * largest_singular_value` are set to 0 for each matrix
- *   in the batch. By default, `rcond` is approximately the machine epsilon of the tensor dtype.
+ *   in the batch. By default, `rcond` is approximately the machine epsilon of the tensor dtype
+ *   (`1e-6 `for float types and `1e-15` for double types).
  * 
  * @return
- *   An operator that gives a tensor of size `... x n x m` representing the pseudo-inverse of the input
+ *   Operator that produces a tensor of size `... x n x m` representing the pseudo-inverse of the input
  */
 template<typename OpA>
 __MATX_INLINE__ auto pinv(const OpA &a, float rcond = get_default_rcond<typename OpA::value_type>()) {

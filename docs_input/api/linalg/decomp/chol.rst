@@ -3,12 +3,21 @@
 chol
 ####
 
-Perform a Cholesky factorization and saves the result in either the upper or lower triangle of the output. 
+Perform a Cholesky factorization.
 
 .. note::
-  The input matrix must be positive semidefinite
+  The input matrix must be symmetric positive-definite
 
 .. doxygenfunction:: chol
+
+Enums
+~~~~~
+
+The following enums are used for configuring the behavior of Cholesky operations.
+
+.. _solverfillmode:
+
+.. doxygenenum:: SolverFillMode
 
 Examples
 ~~~~~~~~

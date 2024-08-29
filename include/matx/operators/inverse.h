@@ -107,6 +107,25 @@ namespace detail {
   };
 }
 
+/**
+ * Performs a matrix inverse on a square matrix. The inverse API currently uses
+ * cuBLAS as a backend with the `cublas<t>matinvBatched()` family of functions
+ * for `N <= 32` and `getri/getrf` functions otherwise.
+ * 
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ * @tparam ALGO
+ *   Algorithm to use for matrix inversion. Currently only suport MAT_INVERSE_ALGO_LU
+ * 
+ * @param a
+ *   Input tensor or operator of shape `... x n x n`
+ * 
+ * @return
+ *   Operator that produces the inverse tensor of shape `... x n x n`.
+ * 
+ */
 template<typename OpA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 __MATX_INLINE__ auto inv(const OpA &a) {
   return detail::InvOp(a);

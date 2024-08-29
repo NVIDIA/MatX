@@ -93,7 +93,9 @@ namespace detail {
 
 
 /**
- * Perform QR decomposition on a matrix using housholders reflections. If rank > 2 operations are batched.
+ * Perform QR decomposition on a matrix using housholders reflections.
+ * 
+ * If rank > 2, operations are batched.
  *
  * @tparam AType
  *   Tensor or operator type for output of A input tensors.
@@ -160,6 +162,19 @@ namespace detail {
 /**
  * Perform a QR decomposition on a matrix using cuSolver or a LAPACK host library.
  * 
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * 
+ * @return
+ *   Operator that produces R/householder vectors and tau tensor outputs.
+ *   - **Out** - Of shape `... x m x n`. The householder vectors are returned in the
+ *               bottom half and *R* is returned in the top half.
+ *   - **Tau** - The scalar factors *tau* of shape `... x min(m, n)`.
  */
 template<typename OpA>
 __MATX_INLINE__ auto qr_solver(const OpA &a) {

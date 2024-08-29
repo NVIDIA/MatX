@@ -7,6 +7,15 @@ Perform a singular value decomposition (SVD).
 
 .. doxygenfunction:: svd
 
+Enums
+~~~~~
+
+The following enums are used for configuring the behavior of SVD operations.
+
+.. doxygenenum:: SVDMode
+.. doxygenenum:: SVDHostAlgo
+
+
 Examples
 ~~~~~~~~
 
