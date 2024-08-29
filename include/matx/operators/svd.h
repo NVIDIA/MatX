@@ -103,15 +103,15 @@ namespace detail {
  * 
  * The singular values within each vector are sorted in descending order.
  * 
- * For tensors of Rank > 2, batching is performed.
+ * If rank > 2, operations are batched.
  *
  * @tparam OpA
  *   Operator input type
  *
  * @param a
- *   Input operator of shape MxN
+ *   Input operator of shape `... x m x n`
  * @param jobz
- *   Compute all, part, or none of matrices U and VT
+ *   Compute all, part, or none of matrices *U* and *VT*
  * @param algo
  *   For Host SVD calls, whether to use more efficient divide-and-conquer based
  *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
@@ -120,6 +120,16 @@ namespace detail {
  *   `gesvd`, and it can have poorer accuracy in some cases.
  *   Ignored for CUDA SVD calls.
  * 
+ * @return 
+ *   Operator that produces *U*, *S*, and *VT* tensors. Regardless of jobz, all 3 tensors
+ *   must be correctly setup for the operation and used with `mtie()`. `k = min(m, n)`
+ *   - **U** - The unitary matrix containing the left singular vectors. A tensor of
+ *             shape `... x m x k` for `SVDMode::REDUCED` and `... x m x m` otherwise.
+ *   - **S** - A tensor of shape `... x k` containing the singular values in
+ *             descending order. It must be of real type and match the inner type of
+ *             the other tensors.
+ *   - **VT** - The unitary matrix containing the right singular vectors. A tensor of
+ *             shape `... x k x n` for `SVDMode::REDUCED` and `... x n x n` otherwise.
  */
 template<typename OpA>
 __MATX_INLINE__ auto svd(const OpA &a, const SVDMode jobz = SVDMode::ALL,
@@ -189,10 +199,10 @@ namespace detail {
  *   Tensor or operator type for X0 initial guess in power iteration.
  *
  * @param A
- *   Input tensor or operator for tensor A input with size "batches by m by n"
+ *   Input tensor or operator for tensor A input with size `batches x m x n`
  * @param x0
  *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
- *   Random tensor of size batches x min(n,m) is suggested.
+ *   Random tensor of size `batches x min(n,m)` is suggested.
  * @param iterations
  *   The number of power iterations to perform for each singular value.  
  * @param k
@@ -266,7 +276,7 @@ namespace detail {
  *   Tensor or operator type for output of A input tensors.
  *
  * @param A
- *   Input tensor or operator for tensor A input with size "batches by m by n"
+ *   Input tensor or operator for tensor A input with size `batches x m x n`
  * @param max_iters
  *   The approximate maximum number of QR iterations to perform. 
  * @param tol

@@ -3,9 +3,17 @@
 eig
 ###
 
-Perform an eigenvalue decomposition saving the eigenvalues, and optionally saving eigenvectors
+Perform an eigenvalue decomposition for Hermitian or real symmetric matrices.
 
 .. doxygenfunction:: eig
+
+Enums
+~~~~~
+
+The following enums are used for configuring the behavior of Eig operations.
+
+.. doxygenenum:: EigenMode
+
 
 Examples
 ~~~~~~~~

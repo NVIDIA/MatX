@@ -59,34 +59,44 @@ namespace matx {
 
 /* Parameter enums */
 
-// Which part (lower or upper) of the dense matrix was filled
-// and should be used by the function
+/**
+ * @enum SolverFillMode
+ *   Indicates which part (lower or upper) of the dense matrix was filled
+ *   and should be used by the function.
+ */
 enum class SolverFillMode {
-  UPPER,
-  LOWER
+  UPPER,  /**< Use the upper part of the matrix */
+  LOWER   /**< Use the lower part of the matrix */
 };
 
+/**
+ * @enum EigenMode
+ *   Specifies whether or not eigenvectors should be computed.
+ */
 enum class EigenMode {
-  NO_VECTOR, // Only eigenvalues are computed
-  VECTOR     // Both eigenvalues and eigenvectors are computed
+  NO_VECTOR,  /**< Only eigenvalues are computed */
+  VECTOR      /**< Both eigenvalues and eigenvectors are computed */
 };
 
-// SVD modes for computing columns of U and rows of VT, which are
-// termed jobu and jobvt in LAPACK/cuSolver. The same option is used for
-// both jobu and jobvt in MatX.
+/**
+ * @enum SVDMode
+ *   Modes for computing columns of *U* and rows of *VT* in Singular Value Decomposition (SVD).
+ *   Corresponds to the LAPACK/cuSolver parameters jobu and jobvt. The same option is used
+ *   for both jobu and jobvt in MatX.
+ */
 enum class SVDMode {
-  ALL,     // Compute all columns of U and all rows of V^T
-           // Equivalent to jobu = jobvt = 'A'
-  REDUCED, // Compute only the first min(m,n) columns of U and rows of V^T
-           // Equivalent to jobu = jobvt = 'S'
-  NONE     // Compute no columns of U or rows of V^T
-           // Equivalent to jobu = jobvt = 'N'
+  ALL,     /**< Compute all columns of *U* and all rows of *VT* (Equivalent to jobu = jobvt = 'A') */
+  REDUCED, /**< Compute only the first `min(m,n` columns of *U* and rows of *VT* (Equivalent to jobu = jobvt = 'S') */
+  NONE     /**< Compute no columns of *U* or rows of *VT* (Equivalent to jobu = jobvt = 'N') */
 };
 
-// Controls the LAPACK driver used for SVD on host.
+/**
+ * @enum SVDHostAlgo
+ *   Controls the LAPACK driver used for SVD on host.
+ */
 enum class SVDHostAlgo {
-  QR,  // QR based (corresponds to GESVD)
-  DC   // Divide and Conquer based (corresponds to GESDD)
+  QR,  /**< QR-based method (corresponds to `gesvd`) */
+  DC   /**< Divide and Conquer method (corresponds to `gesdd`) */
 };
 
 namespace detail {
