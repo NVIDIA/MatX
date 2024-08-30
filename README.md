@@ -59,7 +59,7 @@ MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hop
 The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments) 
 and pay attention to the [required versions of the dependencies](https://nvidia.github.io/MatX/build.html#required-third-party-dependencies).
 
-**Note for CPU/Host support**: CPU/Host execution is considered beta. Only operator execution is supported right now, but no functions that require libraries (FFT/GEMM, etc). If you find a bug in an operator on CPU, please report it in the issues above. 
+**Note for CPU/Host support**: CPU/Host execution support is nearly on par with GPU support. Currently all elementwise operators, reductions, and FFT/BLAS/LAPACK transforms are supported. Most host functions with the exception of reductions support multithreading. If you find a bug in an operator on CPU, please report it in the issues above. More detail can be found here [documentation](https://nvidia.github.io/MatX/build.html#host-cpu-support).
 
 
 ## Installation
@@ -151,7 +151,7 @@ doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, f
 
 - Current documentation can be [found here](https://nvidia.github.io/MatX)
 - A quick start guide can be [found here](https://nvidia.github.io/MatX/quickstart.html)
-- Current library limitations are [listed here](https://nvidia.github.io/MatX/limitations.html)
+- Current library executor support is [listed here](https://nvidia.github.io/MatX/executor_compatibility.html)
 - A conversion from MATLAB and Python syntax is [found here](https://nvidia.github.io/MatX/matlabpython.html)
 - A self-guided Jupyer notebook training can be [found here](docs/notebooks)
 

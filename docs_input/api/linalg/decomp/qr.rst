@@ -8,7 +8,7 @@ Perform a QR decomposition.
 .. doxygenfunction:: qr
 
 .. note::
-   This function is currently is not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU)
 
 Examples
 ~~~~~~~~

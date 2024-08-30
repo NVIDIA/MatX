@@ -3,10 +3,7 @@
 fft2
 ####
 
-Perform a 2D FFT
-
-.. note::
-   These functions are currently not supported with host-based executors (CPU)
+Perform a 2D FFT. Batching is supported for any tensor with a rank higher than 2.
 
 
 .. doxygenfunction:: fft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD)

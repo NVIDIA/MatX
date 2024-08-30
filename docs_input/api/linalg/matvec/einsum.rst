@@ -70,7 +70,7 @@ contraction step.
    einsum's permute capability is significantly faster than the permute operator and should be preferred when possible.
 
 .. note::
-   This function is currently is not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU)
 
 API
 ---

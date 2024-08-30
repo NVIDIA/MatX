@@ -5,6 +5,10 @@ cov
 
 Compute a covariance matrix
 
+.. note::
+   This function is currently not supported with host-based executors (CPU)
+
+
 .. doxygenfunction:: cov(AType a)
 
 Examples

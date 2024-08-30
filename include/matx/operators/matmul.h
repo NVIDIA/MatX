@@ -171,13 +171,16 @@ namespace matx
    *    Data type of B tensor or operator
    *
    * @param A
-   *   A A Tensor or Operator
+   *   A Tensor or Operator of shape `... x m x k`
    * @param B
-   *   B B Tensor or Operator
+   *   B Tensor or Operator of shape `... x k x n`
    * @param alpha
    *   Scalar multiplier to apply to operator A
    * @param beta
    *   Scalar multiplier to apply to operator C on input
+   * 
+   * @return 
+   *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0) {
@@ -199,15 +202,18 @@ namespace matx
    *    Data type of B tensor or operator
    *
    * @param A
-   *   A A Tensor or Operator
+   *   A Tensor or Operator of shape `... x m x k`
    * @param B
-   *   B B Tensor or Operator
-  * @param axis
-  *   the axis of the tensor or operator to perform the gemm along
+   *   B Tensor or Operator of shape `... x k x n`
+   * @param axis
+   *   the axis of the tensor or operator to perform the gemm along
    * @param alpha
    *   Scalar multiplier to apply to operator A
    * @param beta
    *   Scalar multiplier to apply to operator C on input
+   * 
+   * @return 
+   *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA A, const OpB B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0) {
