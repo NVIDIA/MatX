@@ -9,9 +9,6 @@ Matrix Multiply (GEMM)
 `matmul` performs a transformation for Generic Matrix Multiplies (GEMMs) for complex and real-valued tensors. Batching
 is supported for any tensor with a rank higher than 2.
 
-.. note::
-   This function is currently is not supported with host-based executors (CPU)
-
 
 .. doxygenfunction:: matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0)
 .. doxygenfunction:: matmul(const OpA A, const OpB B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)

@@ -3,10 +3,7 @@
 ifft2
 #####
 
-Perform a 2D inverse FFT
-
-.. note::
-   These functions are currently not supported with host-based executors (CPU)
+Perform a 2D inverse FFT. Batching is supported for any tensor with a rank higher than 2.
 
 
 .. doxygenfunction:: ifft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD)

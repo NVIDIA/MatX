@@ -3,10 +3,7 @@
 fft
 ###
 
-Perform a 1D FFT
-
-.. note::
-   These functions are currently not supported with host-based executors (CPU)
+Perform a 1D FFT. Batching is supported for any tensor with a rank higher than 1.
 
 
 .. doxygenfunction:: fft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)

@@ -1,12 +1,13 @@
 Welcome To MatX's Documentation!
 ================================
 
-**MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and limited support for CPUs. The main
+**MatX** is a modern C++ library for numerical computing on NVIDIA GPUs and CPUs. The main
 features include:
 
 * Compile-time expression evaluation for generating GPU kernels
 * Near-native performance for GPU kernels while using a syntax similar to Python or MATLAB
 * Easy frontend API to many popular CUDA libraries
+* Easy frontend API to CPU libraries (NVPL, FFTW, OpenBLAS, BLIS) on ARM and x86
 * Header-only without need for compilation
 * Single tensor type used across entire API
 * Intuitive error messages
@@ -45,5 +46,5 @@ Table of Contents
     basics/index.rst
     api/index.rst
     examples/index.rst
-    limitations
+    executor_compatibility
     version

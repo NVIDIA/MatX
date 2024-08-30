@@ -42,13 +42,29 @@ Optional Third-party Dependencies
 
 Host (CPU) Support
 ------------------
-Host support is provided both by the C++ standard library and NVIDIA's NVPL_ library. Host support is
-considered experimental and is still a work in progress. Currently all reduction functions are supported, 
-but only FFT transforms are supported. All host support is limited to a single thread in this release.
+Host support is provided by the C++ standard library and different CPU math libraries. NVIDIA's NVPL_ library can
+be used for FFT, BLAS, and LAPACK support on ARM. Other supported libraries include FFTW_ for FFT support, OpenBLAS_ or BLIS_
+for BLAS support, and OpenBLAS for LAPACK support. BLAS enables matrix and vector product functions like ``matmul``, ``outer``,
+and ``matvec``. LAPACK enables all matrix decomposition/factorization functions like ``chol``, ``qr``, ``svd``, and others.
 
-To enable NVPL support use the CMake option `-DMATX_EN_NVPL=ON`.
+Below are the CMake options to enable each library:
+
+* **NVPL** support for FFT, BLAS, and LAPACK operations on ARM: ``-DMATX_EN_NVPL=ON``
+* **FFTW** support for FFT: ``-DMATX_EN_X86_FFTW=ON``
+* **BLIS** support for BLAS operations: ``-DMATX_EN_BLIS=ON``
+* **OpenBLAS** support for BLAS and LAPACK operations: ``-DMATX_EN_OPENBLAS=ON``
+
+**Note**: Enabling NVPL will enable NVPL libraries for FFT, BLAS and LAPACK, and so it cannot be used in conjunction with other CPU libraries
+at this time. The ``blas_DIR`` CMake variable may be needed to configure either BLIS or OpenBLAS library
+
+Currently all elementwise operators, reductions, and FFT/BLAS/LAPACK transforms are supported. Most host functions with
+the exception of reductions support multithreading. A more detailed breakdown of the Host support/limitations for each function
+is available in the :ref:`Executor Compatibility <executor_compatibility>` section.
 
 .. _NVPL: https://developer.nvidia.com/nvpl
+.. _OpenBLAS: https://www.openblas.net/
+.. _FFTW: http://www.fftw.org/
+.. _BLIS: https://github.com/flame/blis
 
 Build Options
 =============

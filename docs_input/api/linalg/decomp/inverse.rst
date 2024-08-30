@@ -9,7 +9,7 @@ Matrix inverse
 Compute the inverse of a square matrix.
 
 .. note::
-   This function is currently is not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU)
 
 .. doxygenfunction:: inv(const OpA &a)
 
