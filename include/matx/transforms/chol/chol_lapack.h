@@ -77,7 +77,7 @@ public:
    * matrix using the Cholesky method, where M is either the upper or lower
    * triangular portion of A. Input matrix A must be a square Hermitian matrix
    * positive-definite where only the upper or lower triangle is used. This does
-   * require a workspace.
+   * not require a workspace.
    *
    * @tparam T1
    *  Data type of A matrix
@@ -144,7 +144,13 @@ public:
                      reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.n, &info);
 
-      MATX_ASSERT(info == 0, matxSolverError);
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK potrf").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + "-th leading minor is not positive definite in LAPACK potrf").c_str());
+      }
     }
   }
 
@@ -175,38 +181,13 @@ private:
   DnCholHostParams_t params;
 };
 
-/**
- * Crude hash to get a reasonably good delta for collisions. This doesn't need
- * to be perfect, but fast enough to not slow down lookups, and different enough
- * so the common solver parameters change
- */
-struct DnCholHostParamsKeyHash {
-  std::size_t operator()(const DnCholHostParams_t &k) const noexcept
-  {
-    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size));
-  }
-};
-
-/**
- * Test cholesky parameters for equality. Unlike the hash, all parameters must
- * match.
- */
-struct DnCholHostParamsKeyEq {
-  bool operator()(const DnCholHostParams_t &l, const DnCholHostParams_t &t) const
-      noexcept
-  {
-    return l.n == t.n && l.batch_size == t.batch_size && l.dtype == t.dtype;
-  }
-};
-
-using chol_Host_cache_t = std::unordered_map<DnCholHostParams_t, std::any, DnCholHostParamsKeyHash, DnCholHostParamsKeyEq>;
 #endif
 
 } // end namespace detail
 
 
 /**
- * Perform a Cholesky decomposition using a cached plan
+ * Perform a Cholesky decomposition.
  *
  * See documentation of matxDnCholHostPlan_t for a description of how the
  * algorithm works. This function provides a simple interface to the LAPACK
@@ -214,6 +195,8 @@ using chol_Host_cache_t = std::unordered_map<DnCholHostParams_t, std::any, DnCho
  * from only the matrix A. The input and output parameters may be the same
  * tensor. In that case, the input is destroyed and the output is stored
  * in-place. Input must be a positive-definite Hermitian or real symmetric matrix.
+ * 
+ * No caching as LAPACK allocation/setup is not needed.
  *
  * @tparam T1
  *   Data type of matrix A
@@ -274,20 +257,8 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
 
   const char uplo_lapack = (uplo == SolverFillMode::UPPER)? 'U' : 'L';
 
-  // Get parameters required by these tensors
-  auto params = detail::matxDnCholHostPlan_t<OutputTensor, decltype(tv)>::GetCholParams(tv, uplo_lapack);
-
-  using cache_val_type = detail::matxDnCholHostPlan_t<OutputTensor, decltype(a_new)>;
-  detail::GetCache().LookupAndExec<detail::chol_Host_cache_t>(
-    detail::GetCacheIdFromType<detail::chol_Host_cache_t>(),
-    params,
-    [&]() {
-      return std::make_shared<cache_val_type>(tv, uplo_lapack);
-    },
-    [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tv, tv, exec, uplo_lapack);
-    }
-  );
+  detail::matxDnCholHostPlan_t<OutputTensor, decltype(a_new)> chol_plan(tv, uplo_lapack);
+  chol_plan.Exec(tv, tv, exec, uplo_lapack);
 
   if (! allContiguous) {
     matx::copy(out, tv, exec);

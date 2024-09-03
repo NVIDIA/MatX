@@ -35,15 +35,17 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/det.h"
+#include "matx/transforms/pinv.h"
 
 namespace matx {
 namespace detail {
   template<typename OpA>
-  class DetOp : public BaseOp<DetOp<OpA>>
+  class PinvOp : public BaseOp<PinvOp<OpA>>
   {
     private:
       OpA a_;
+      float rcond_;
+      cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr; 
 
@@ -51,23 +53,39 @@ namespace detail {
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
-      using det_xform_op = bool;
+      using pinv_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "det()"; }
-      __MATX_INLINE__ DetOp(OpA a) : a_(a) { };
+      __MATX_INLINE__ std::string str() const { return "pinv()"; }
+      __MATX_INLINE__ PinvOp(OpA a, float rcond) : a_(a), rcond_(rcond) {
+        for (int r = 0; r < Rank(); r++) {
+          if (r >= Rank() - 2) {
+            out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);
+          }
+          else {
+            out_dims_[r] = a_.Size(r);
+          }
+        } 
+      };
 
-      // This should never be called
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
-
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const{
-        det_impl(cuda::std::get<0>(out), a_, ex);
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        return tmp_out_(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return OpA::Rank();
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_.Size(dim);
+      }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const{
+        pinv_impl(cuda::std::get<0>(out), a_, ex, rcond_);
       }
 
       template <typename ShapeType, typename Executor>
@@ -83,7 +101,7 @@ namespace detail {
       {
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
@@ -94,37 +112,34 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return a_.Size(dim);
       }
 
   };
 }
 
 /**
- * Computes the determinant by performing an LU factorization of the input,
- * and then calculating the product of diagonal entries of the U factor.
+ * Perfom a generalized inverse of a matrix using its singular-value decomposition (SVD).
+ * It automatically removes small singular values for stability.
  * 
  * If rank > 2, operations are batched.
  * 
  * @tparam OpA
- *   Data type of input a tensor or operator
+ *   Tensor or operator type of input A
  * 
  * @param a
- *   Input square tensor or operator of shape `... x n x n`
+ *   Input tensor or operator of shape `... x m x n`
+ * @param rcond
+ *   Cutoff for small singular values. For stability, singular values
+ *   smaller than `rcond * largest_singular_value` are set to 0 for each matrix
+ *   in the batch. By default, `rcond` is approximately the machine epsilon of the tensor dtype
+ *   (`1e-6 `for float types and `1e-15` for double types).
  * 
  * @return
- *   Operator that produces the determinant output of shape `...`. This means
- *   rank 2 inputs will have an output shape of `{}`, while higher dimensional
- *   inputs will have output shape matching the batch dimension(s).
- * 
+ *   Operator that produces a tensor of size `... x n x m` representing the pseudo-inverse of the input
  */
 template<typename OpA>
-__MATX_INLINE__ auto det(const OpA &a) {
-  return detail::DetOp(a);
+__MATX_INLINE__ auto pinv(const OpA &a, float rcond = get_default_rcond<typename OpA::value_type>()) {
+  return detail::PinvOp(a, rcond);
 }
 
 }

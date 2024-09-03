@@ -96,8 +96,14 @@ Executors are types that describe how to execute an operator expression or trans
 may even use C++ execution policies behind the scenes. Executors are designed so that the code can remain unchanged while executing 
 on a variety of different targets. Currently the following executors are defined:
 
-* cudaExecutor - Execute on a CUDA-supported device
-* HostExecutor - Execute on one or more host (CPU) threads
+* ``cudaExecutor`` - Execute on a CUDA-supported device
+* ``HostExecutor`` - Execute on one or more host (CPU) threads
+
+  The following type aliases can be used for easier threading configuration:
+
+  - ``SingleThreadedHostExecutor`` - Execute on a single thread.
+  - ``SelectThreadsHostExecutor``  - Execute on a specific number of threads.
+  - ``AllThreadsHostExecutor``     - Execute on all available threads.
 
 More executor types will be added in future releases.
 

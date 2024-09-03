@@ -7,6 +7,9 @@ Perform a QR decomposition.
 
 .. doxygenfunction:: qr
 
+.. note::
+   This function is currently not supported with host-based executors (CPU)
+
 Examples
 ~~~~~~~~
 
@@ -16,7 +19,12 @@ Examples
    :end-before: example-end qr-test-1
    :dedent:
 
+
 .. doxygenfunction:: qr_solver
+
+.. note::
+   This function does not return `Q` explicitly as it only runs :literal:`geqrf` from LAPACK/cuSolver.
+   For full `Q/R`, use :literal:`qr_solver` on a CUDA executor.
 
 Examples
 ~~~~~~~~

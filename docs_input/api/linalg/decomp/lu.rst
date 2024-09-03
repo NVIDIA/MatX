@@ -3,8 +3,7 @@
 lu
 ##
 
-Perform an LU factorization. The input and output tensors may be the same tensor, in which case the
-input is overwritten.
+Perform an LU factorization.
 
 .. doxygenfunction:: lu
 

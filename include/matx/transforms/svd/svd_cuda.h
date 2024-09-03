@@ -40,6 +40,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/cache.h"
 #include "matx/operators/slice.h"
+#include "matx/transforms/qr/qr_cuda.h"
 #include "matx/transforms/solver_common.h"
 
 #include <cstdio>
@@ -528,8 +529,7 @@ namespace detail {
 struct DnSVDCUDAParams_t {
   int64_t m;
   int64_t n;
-  char jobu;
-  char jobvt;
+  char jobz;
   void *A;
   void *U;
   void *VT;
@@ -574,19 +574,16 @@ public:
    *   Output tensor view for VT matrix
    * @param a
    *   Input tensor view for A matrix
-   * @param jobu
-   *   Specifies options for computing all or part of the matrix U: = 'A'. See
-   * SVDJob documentation for more info
-   * @param jobvt
-   *   specifies options for computing all or part of the matrix V**T. See
-   * SVDJob documentation for more info
+   * @param jobz
+   *   Specifies options for computing all, part, or none of the matrices U and VT. See
+   *  SVDMode documentation for more info
    *
    */
   matxDnSVDCUDAPlan_t(UTensor &u,
                         STensor &s,
                         VtTensor &vt,
-                        const ATensor &a, const char jobu = 'A',
-                        const char jobvt = 'A')
+                        const ATensor &a,
+                        const char jobz = 'A')
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -602,7 +599,7 @@ public:
     MATX_STATIC_ASSERT_STR(!is_complex_v<T3>, matxInvalidType, "S type must be real");
     MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
 
-    params = GetSVDParams(u, s, vt, a, jobu, jobvt);
+    params = GetSVDParams(u, s, vt, a, jobz);
     this->GetWorkspaceSize();
     this->AllocateWorkspace(params.batch_size);
   }
@@ -624,7 +621,7 @@ public:
   static DnSVDCUDAParams_t
   GetSVDParams(UTensor &u, STensor &s,
                VtTensor &vt, const ATensor &a,
-               const char jobu = 'A', const char jobvt = 'A')
+               const char jobz = 'A')
   {
     DnSVDCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -634,8 +631,7 @@ public:
     params.U = u.Data();
     params.VT = vt.Data();
     params.S = s.Data();
-    params.jobu = jobu;
-    params.jobvt = jobvt;
+    params.jobz = jobz;
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -643,7 +639,7 @@ public:
 
   void Exec(UTensor &u, STensor &s, VtTensor &vt,
             const ATensor &a, const cudaExecutor &exec,
-            const char jobu = 'A', const char jobvt = 'A')
+            const char jobz = 'A')
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -655,8 +651,14 @@ public:
     }
 
     // Inner size checks
-    MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
-    MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
+    int64_t k = cuda::std::min(params.m, params.n);
+    if (jobz == 'S') {
+      MATX_ASSERT_STR((u.Size(RANK-1) == k) && (u.Size(RANK-2) == params.m), matxInvalidSize, "U must be ... x m x min(m,n)");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == k), matxInvalidSize, "VT must be ... x min(m,n) x n");
+    } else {
+      MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
+      MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
+    }
     MATX_ASSERT_STR(s.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "S must be ... x min(m,n)");
 
     SetBatchPointers<BatchType::MATRIX>(a, this->batch_a_ptrs);
@@ -664,28 +666,41 @@ public:
     SetBatchPointers<BatchType::MATRIX>(vt, this->batch_vt_ptrs);
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
-    cusolverDnSetStream(this->handle, exec.getStream());
-    int info;
+    const auto stream = exec.getStream();
+    cusolverDnSetStream(this->handle, stream);
+    const int64_t ldvt = vt.Size(RANK-2);
 
     // At this time cuSolver does not have a batched 64-bit SVD interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
 
       auto ret = cusolverDnXgesvd(
-          this->handle, this->dn_params, jobu, jobvt, params.m, params.n,
+          this->handle, this->dn_params, jobz, jobz, params.m, params.n,
           MatXTypeToCudaType<T1>(), this->batch_a_ptrs[i], params.m,
           MatXTypeToCudaType<T3>(), this->batch_s_ptrs[i], MatXTypeToCudaType<T2>(),
           this->batch_u_ptrs[i], params.m, MatXTypeToCudaType<T4>(), this->batch_vt_ptrs[i],
-          params.n, MatXTypeToCudaType<T1>(),
+          ldvt, MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
           this->d_info + i);
 
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    }
 
-      // This will block. Figure this out later
-      cudaMemcpy(&info, this->d_info + i, sizeof(info), cudaMemcpyDeviceToHost);
-      MATX_ASSERT(info == 0, matxSolverError);
+    std::vector<int> h_info(this->batch_a_ptrs.size());
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+
+    // This will block. Figure this out later
+    cudaStreamSynchronize(stream);
+
+    for (const auto& info : h_info) {
+      if (info < 0) {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgesvd").c_str());
+      } else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+          (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in cuSolver Xgesvd").c_str());
+      }
     }
   }
 
@@ -738,7 +753,7 @@ using svd_cuda_cache_t = std::unordered_map<DnSVDCUDAParams_t, std::any, DnSVDCU
  * See documentation of matxDnSVDCUDAPlan_t for a description of how the
  * algorithm works. This function provides a simple interface to the cuSolver
  * library by deducing all parameters needed to perform a SVD decomposition from
- * only the matrix A. cuSolver only support m >= n.
+ * only the matrix A.
  *
  * @tparam T1
  *   Data type of matrix A
@@ -755,72 +770,127 @@ using svd_cuda_cache_t = std::unordered_map<DnSVDCUDAParams_t, std::any, DnSVDCU
  *   Input matrix A
  * @param exec
  *   CUDA Executor
- * @param jobu
- *   Specifies options for computing all or part of the matrix U: = 'A'. See
- * SVDJob documentation for more info
- * @param jobvt
- *   specifies options for computing all or part of the matrix V**T. See
- * SVDJob documentation for more info
+ * @param jobz
+ *   Specifies options for computing all, part, or none of the matrices U and VT. See
+ * SVDMode documentation for more info
  *
  */
 template <typename UTensor, typename STensor, typename VtTensor, typename ATensor>
 void svd_impl(UTensor &&u, STensor &&s,
          VtTensor &&vt, const ATensor &a,
-         const cudaExecutor &exec, const SVDJob jobu = SVDJob::ALL,
-         const SVDJob jobvt = SVDJob::ALL)
+         const cudaExecutor &exec, const SVDMode jobz = SVDMode::ALL)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using T1 = typename ATensor::value_type;
   constexpr int RANK = ATensor::Rank();
   const auto stream = exec.getStream();
 
-  auto u_new = OpToTensor(u, exec);
-  auto s_new = OpToTensor(s, exec);
-  auto vt_new = OpToTensor(vt, exec);
-  auto a_new = OpToTensor(a, exec);
-
-  if(!a_new.isSameView(a)) {
-    (a_new = a).run(exec);
-  }
+  auto s_new = getSolverSupportedTensor(s, exec);
 
   /* Temporary WAR
-     cuSolver doesn't support row-major layouts. Since we want to make the
-     library appear as though everything is row-major, we take a performance hit
-     to transpose in and out of the function. Eventually this may be fixed in
-     cuSolver.
+     cuSolver assumes column-major matrices and MatX uses row-major matrices.
+     One way to address this is to create a transposed copy of the input to
+     use with the factorization, followed by transposing the outputs. For SVD,
+     we can skip this by passing in a permuted view of row-major A, which is
+     equivalent to col-major AT, and swapping the inputs U and VT.
+
+     However, cuSolver only supports m>=n. Thus, this optimization can be used
+     for m<=n, but for m>n, we must do temp allocations for U/VT and tranpose the
+     col-major cuSolver outputs.
+
+     Eventually these limitations may be fixed in cuSolver.
   */
  
+  // cuSolver destroys the input, so we need to make a copy of A regardless
   T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto tv = TransposeCopy(tp, a_new, exec);
-  auto tvt = tv.PermuteMatrix();
+  auto a_shape = a.Shape();
+  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies<index_t>());
+  matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
 
-  auto u_col_maj = make_tensor<T1>(u_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto vt_col_maj = make_tensor<T1>(vt_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+  const char job_cusolver = detail::SVDModeToChar(jobz);
+  const bool m_leq_n = a.Size(RANK-2) <= a.Size(RANK-1);
+  
+  if (m_leq_n) {
+    // get col-major AT
+    auto a_new = make_tensor(tp, a_shape);
+    (a_new = a).run(exec);
+    auto at_col_maj = transpose_matrix(a_new);
 
-  const char jobu_cusolver = detail::SVDJobToChar(jobu);
-  const char jobvt_cusolver = detail::SVDJobToChar(jobvt);
+    auto u_new = getSolverSupportedTensor(u, exec);
+    auto vt_new = getSolverSupportedTensor(vt, exec);
 
-  // Get parameters required by these tensors
-  auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_new), decltype(s_new), decltype(vt_new), decltype(tvt)>::
-      GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, jobu_cusolver, jobvt_cusolver);
+    // swap U and VT. svd(AT) = V*S*UT
+    // Need the tensors to appear like V and UT since that is expected based on AT view
+    // inputted, although the results when read as row-major are VT and U.
+    auto u_in = transpose_matrix(vt_new);
+    auto vt_in = transpose_matrix(u_new);
 
-  // Get cache or new QR plan if it doesn't exist
-  using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
-  detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
-    params,
-    [&]() {
-      return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, jobu_cusolver, jobvt_cusolver);
-    },
-    [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, jobu_cusolver, jobvt_cusolver);
+    // Get parameters required by these tensors
+    auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>::
+      GetSVDParams(u_in, s_new, vt_in, at_col_maj, job_cusolver);
+
+    // Get cache or new SVD plan if it doesn't exist
+    using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
+    detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
+      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, job_cusolver);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver);
+      }
+    );
+
+    if(!u_new.isSameView(u)) {
+      (u = u_new).run(exec);
     }
-  );
+    if(!vt_new.isSameView(vt)) {
+      (vt = vt_new).run(exec);
+    }
+  } else {
+    // get col-major A
+    auto tv = TransposeCopy(tp, a, exec);
+    auto tvt = tv.PermuteMatrix();
 
-  // cuSolver writes to them in col-major format, so we need to transpose them back.
-  (u = transpose_matrix(u_col_maj)).run(exec);
-  (vt = transpose_matrix(vt_col_maj)).run(exec);
+    auto u_col_maj = make_tensor<T1>(u.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    auto vt_col_maj = make_tensor<T1>(vt.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+
+    // Get parameters required by these tensors
+    auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>::
+        GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver);
+
+    // Get cache or new SVD plan if it doesn't exist
+    using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
+    detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
+      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);
+      }
+    );
+
+    // cuSolver writes u and vt in col-major format, so we need to transpose them back.
+    // We need to first create transposed views. Can't use transpose_matrix directly because
+    // only want to swap the shapes, not the strides. Once we have a row-major tranposed view,
+    // can set to the original tensor.
+    auto utShape = u.Shape();
+    std::swap(utShape[RANK - 2], utShape[RANK - 1]);
+    auto ut = u_col_maj.View(utShape);
+    (u = transpose_matrix(ut)).run(exec);
+
+    auto vShape = vt.Shape();
+    std::swap(vShape[RANK - 2], vShape[RANK - 1]);
+    auto v = vt_col_maj.View(vShape);
+    (vt = transpose_matrix(v)).run(exec);
+  }
+
+  if(!s_new.isSameView(s)) {
+    (s = s_new).run(exec);
+  }
 
   matxFree(tp);
 }

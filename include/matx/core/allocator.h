@@ -261,7 +261,7 @@ __MATX_INLINE__ MemTracker &GetAllocMap() {
  */
 inline bool HostPrintable(matxMemorySpace_t mem)
 {
-  return (mem == MATX_MANAGED_MEMORY || mem == MATX_HOST_MEMORY);
+  return (mem == MATX_MANAGED_MEMORY || mem == MATX_HOST_MEMORY || mem == MATX_HOST_MALLOC_MEMORY);
 }
 
 /**

@@ -104,8 +104,6 @@ namespace detail {
         }
       }        
 
-      // Size is not relevant in eig() since there are multiple return values and it
-      // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
         return a_.Size(dim);
@@ -114,6 +112,24 @@ namespace detail {
   };
 }
 
+/**
+ * Performs a Cholesky factorization, saving the result in either the upper or
+ * lower triangle of the output. 
+ * 
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ * 
+ * @param a
+ *   Input tensor or operator of shape `... x n x n`
+ * @param uplo
+ *   Part of matrix to fill
+ * 
+ * @return
+ *   Operator that produces the factorization output of shape `... x n x n`.
+ * 
+ */
 template<typename OpA>
 __MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
   return detail::CholOp(a, uplo);

@@ -96,7 +96,7 @@ TYPED_TEST_SUITE(EinsumTestsIntegral, MatXAllIntegralTypesCUDAExec);
 TYPED_TEST_SUITE(EinsumTestsNumericNonComplex, MatXNumericNonComplexTypesCUDAExec);
 TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypesCUDAExec);
 
-#if MATX_ENABLE_CUTENSOR
+#if MATX_EN_CUTENSOR
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
 {
   MATX_ENTER_HANDLER();

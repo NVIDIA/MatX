@@ -6,11 +6,10 @@ inv
 Matrix inverse
 --------------
 
-Perform a matrix inverse on a square matrix using LU decomposition. The inverse API is currently using cuBLAS as a backend and uses
-getri/getrf functions for LU decomposition.
+Compute the inverse of a square matrix.
 
 .. note::
-   This function is currently is not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU)
 
 .. doxygenfunction:: inv(const OpA &a)
 

@@ -260,7 +260,7 @@ if (MATX_EN_CUTENSOR)
 
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTENSOR)
+    target_compile_definitions(matx INTERFACE MATX_EN_CUTENSOR)
 
     target_link_libraries(matx INTERFACE cuTENSOR::cuTENSOR)
     target_link_libraries(matx INTERFACE cuTensorNet::cuTensorNet)

@@ -59,43 +59,95 @@ namespace matx {
 
 /* Parameter enums */
 
-// Which part (lower or upper) of the dense matrix was filled
-// and should be used by the function
+/**
+ * @enum SolverFillMode
+ *   Indicates which part (lower or upper) of the dense matrix was filled
+ *   and should be used by the function.
+ */
 enum class SolverFillMode {
-  UPPER,
-  LOWER
+  UPPER,  /**< Use the upper part of the matrix */
+  LOWER   /**< Use the lower part of the matrix */
 };
 
+/**
+ * @enum EigenMode
+ *   Specifies whether or not eigenvectors should be computed.
+ */
 enum class EigenMode {
-  NO_VECTOR, // Only eigenvalues are computed
-  VECTOR     // Both eigenvalues and eigenvectors are computed
+  NO_VECTOR,  /**< Only eigenvalues are computed */
+  VECTOR      /**< Both eigenvalues and eigenvectors are computed */
 };
 
-// SVD job options for computing columns of U (jobu) and rows of VT (jobvt)
-enum class SVDJob {
-  ALL,     // For jobu: All M columns of U are computed
-           // For jobvt: All N rows of V^T are computed
-  REDUCED, // For jobu: The first min(m,n) columns of U are computed
-           // For jobvt: The first min(m,n) rows of V^T are computed
-  NONE     // For jobu: No columns of U are computed
-           // For jobvt: No rows of V^T are computed
+/**
+ * @enum SVDMode
+ *   Modes for computing columns of *U* and rows of *VT* in Singular Value Decomposition (SVD).
+ *   Corresponds to the LAPACK/cuSolver parameters jobu and jobvt. The same option is used
+ *   for both jobu and jobvt in MatX.
+ */
+enum class SVDMode {
+  ALL,     /**< Compute all columns of *U* and all rows of *VT* (Equivalent to jobu = jobvt = 'A') */
+  REDUCED, /**< Compute only the first `min(m,n` columns of *U* and rows of *VT* (Equivalent to jobu = jobvt = 'S') */
+  NONE     /**< Compute no columns of *U* or rows of *VT* (Equivalent to jobu = jobvt = 'N') */
+};
+
+/**
+ * @enum SVDHostAlgo
+ *   Controls the LAPACK driver used for SVD on host.
+ */
+enum class SVDHostAlgo {
+  QR,  /**< QR-based method (corresponds to `gesvd`) */
+  DC   /**< Divide and Conquer method (corresponds to `gesdd`) */
 };
 
 namespace detail {
 
-__MATX_INLINE__ char SVDJobToChar(SVDJob job) {
-  switch (job) {
-    case SVDJob::ALL:
+__MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
+  switch (jobz) {
+    case SVDMode::ALL:
       return 'A';
-    case SVDJob::REDUCED:
+    case SVDMode::REDUCED:
       return 'S';
-    case SVDJob::NONE:
+    case SVDMode::NONE:
       return 'N';
     default:
-      MATX_ASSERT_STR(false, matxInvalidParameter, "Job for SVD not supported");
+      MATX_ASSERT_STR(false, matxInvalidParameter, "Mode for SVD not supported");
       return '\0';
   }
 }
+
+
+template <typename Op, typename Executor>
+__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
+  constexpr int RANK = Op::Rank();
+
+  bool supported = true;
+  if constexpr (!(is_tensor_view_v<Op>)) {
+    supported = false;
+  } else {
+
+    // Need inner dimension(s) to be contiguous
+    if (in.Stride(RANK - 1) != (index_t)1) {
+      supported = false;
+    }
+
+    if constexpr (RANK >= 2) {
+      if (in.Stride(RANK - 2) != in.Size(RANK - 1)) {
+        supported = false;
+      }
+    }
+  }
+
+  if (supported) {
+    return in;
+  } else {
+    if constexpr (is_cuda_executor_v<Executor>) {
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    } else {
+      return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
+    }
+  }
+}
+
 
 /* Solver utility functions */
 

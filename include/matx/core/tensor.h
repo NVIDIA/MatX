@@ -658,9 +658,10 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
-        sizeof(M) * shape.TotalSize() <= storage_.Bytes(), matxInvalidSize,
+        sizeof(M) * prod <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
 
     // This could be loosened up to make sure only the fastest changing dims
@@ -877,7 +878,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
+    static_assert(RANK >= 1, "Only tensors of rank 1 and higher can be permuted.");
     cuda::std::array<shape_type, RANK> n;
     cuda::std::array<stride_type, RANK> s;
     [[maybe_unused]] bool done[RANK] = {0};
@@ -946,7 +947,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __MATX_HOST__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
 
   /**
    * Set the underlying data pointer from the view
@@ -1473,7 +1474,7 @@ public:
       }
     }
 
-    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize, 
+    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
             "Number of matxDropDim specifiers must match the output rank");
 
 #pragma unroll

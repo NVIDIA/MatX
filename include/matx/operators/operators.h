@@ -80,6 +80,7 @@
 #include "matx/operators/outer.h"
 #include "matx/operators/overlap.h"
 #include "matx/operators/percentile.h"
+#include "matx/operators/pinv.h"
 #include "matx/operators/permute.h"
 #include "matx/operators/planar.h"
 #include "matx/operators/polyval.h"
