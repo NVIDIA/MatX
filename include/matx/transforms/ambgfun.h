@@ -204,7 +204,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
     newYNorm(new_ynorm_v, x_normdiv_v, y_normdiv_v).run(stream);
 
     auto fullfft = make_tensor<T1>({(len_seq - 1), nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto partfft = fullfft.Slice({0, 0}, {(len_seq - 1), xlen});
+    auto partfft = slice(fullfft, {0, 0}, {(len_seq - 1), xlen});
 
     (fullfft = 0).run(stream);
     matx::copy(partfft, new_ynorm_v, stream);
@@ -220,7 +220,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   }
   else if (cut == ::matx::AMBGFUN_CUT_TYPE_DELAY) {
     auto fullfft_x = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto partfft_x = fullfft_x.Slice({0}, {xlen});
+    auto partfft_x = slice(fullfft_x, {0}, {xlen});
     (fullfft_x = 0).run(stream);
     matx::copy(partfft_x, x_normdiv_v, stream);
 
@@ -231,7 +231,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
     auto fullfft_y = make_tensor<T1>({nfreq}, MATX_ASYNC_DEVICE_MEMORY, stream);
     (fullfft_y = 0).run(stream);
 
-    auto partfft_y = fullfft_y.Slice({0}, {xlen});
+    auto partfft_y = slice(fullfft_y, {0}, {xlen});
     matx::copy(partfft_y, y_normdiv_v, stream);
     (fullfft_y = fullfft_y * conj(fullfft_x)).run(stream);
     ifft_impl(fullfft_y, fullfft_y, 0, FFTNorm::BACKWARD, stream);
@@ -248,7 +248,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   }
   else if (cut == ::matx::AMBGFUN_CUT_TYPE_DOPPLER) {
     auto fullfft_y = make_tensor<T1>({len_seq - 1}, MATX_ASYNC_DEVICE_MEMORY, stream);
-    auto partfft_y = fullfft_y.Slice({0}, {y_normdiv_v.Size(0)});
+    auto partfft_y = slice(fullfft_y, {0}, {y_normdiv_v.Size(0)});
 
     (fullfft_y = 0).run(stream);
     matx::copy(partfft_y, y_normdiv_v, stream);

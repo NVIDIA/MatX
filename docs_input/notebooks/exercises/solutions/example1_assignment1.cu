@@ -67,7 +67,7 @@ int main() {
    * Get a slice of the second and third rows with all columns
    * https://devtech-compute.gitlab-master-pages.nvidia.com/matx/quickstart.html#slicing-and-dicing
    *****************************************************************************************************/
-  auto t2s = t2.Slice({1, 0}, {3, matxEnd}); // Put code here
+  auto t2s = slice(t2, {1, 0}, {3, matxEnd}); // Put code here
   /*** End editing ***/
 
   // Verify slice is correct

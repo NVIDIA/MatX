@@ -90,7 +90,7 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
   (amf_delay_v = ambgfun(xv, 1e3, AMBGFUN_CUT_TYPE_DELAY, 1.0)).run();
   // example-end ambgfun-test-1
 
-  auto delay1d = amf_delay_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
+  auto delay1d = slice<1>(amf_delay_v, {0, 0}, {matxDropDim, matxEnd});
   MATX_TEST_ASSERT_COMPARE(pb, delay1d, "amf_delay", 0.01);
 
   MATX_EXIT_HANDLER();
@@ -110,7 +110,7 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDoppler)
   (amf_doppler_v = ambgfun(xv, 1e3, AMBGFUN_CUT_TYPE_DOPPLER, 1.0)).run();
   // example-end ambgfun-test-2
 
-  auto doppler1d = amf_doppler_v.Slice<1>({0, 0}, {matxDropDim, matxEnd});
+  auto doppler1d = slice<1>(amf_doppler_v, {0, 0}, {matxDropDim, matxEnd});
   MATX_TEST_ASSERT_COMPARE(pb, doppler1d, "amf_doppler", 0.01);
 
   MATX_EXIT_HANDLER();

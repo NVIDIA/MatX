@@ -119,7 +119,7 @@ namespace detail {
       // slice.
       if (act_fft_size < nom_fft_size) {
         ends[RANK - 1] = act_fft_size;
-        return i.Slice(starts, ends);
+        return slice(i, starts, ends);
       }
       else { // FFT length is longer than the input. Pad input
 
@@ -138,7 +138,7 @@ namespace detail {
           const auto stream = exec.getStream();
           auto i_new = make_tensor<T2>(shape, MATX_ASYNC_DEVICE_MEMORY, stream);
           ends[RANK - 1] = i.Lsize();
-          auto i_pad_part_v = i_new.Slice(starts, ends);
+          auto i_pad_part_v = slice(i_new, starts, ends);
 
           (i_new = static_cast<promote_half_t<T2>>(0)).run(stream);
           // example-begin copy-test-1
@@ -149,7 +149,7 @@ namespace detail {
         else {
           auto i_new = make_tensor<T2>(shape, MATX_HOST_MALLOC_MEMORY);
           ends[RANK - 1] = i.Lsize();
-          auto i_pad_part_v = i_new.Slice(starts, ends);
+          auto i_pad_part_v = slice(i_new, starts, ends);
 
           (i_new = static_cast<promote_half_t<T2>>(0)).run(exec);
           matx::copy(i_pad_part_v, i, exec);

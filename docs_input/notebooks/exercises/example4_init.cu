@@ -49,8 +49,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     cudaEventCreate(&stop);    
 
     auto radar = RadarPipeline(numPulses, numSamples, waveformLength, numChannels, stream);
-    auto rv = radar.GetNormT().Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16});
-    rv.print();
+    auto rv = slice<1>(radar.GetNormT(), {0, 0, 0}, {matxSliceDim, matxSliceDim, 16});
+    print(rv);
     cudaStreamDestroy(stream);
 
     return 0;

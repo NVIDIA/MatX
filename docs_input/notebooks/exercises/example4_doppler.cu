@@ -53,7 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     radar.DopplerProcessing();
 
     printf("Doppler output:\n");
-    radar.GetTPCView().Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16}).rint();
+    print(slice<1>(radar.GetTPCView(), {0, 0, 0}, {matxSliceDim, matxSliceDim, 16}));
 
     cudaStreamDestroy(stream);
 

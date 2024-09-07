@@ -53,7 +53,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     radar.CFARDetections();
 
     printf("FFT output:\n");
-    print(radar.GetTPCData()->View().Slice<1>({0, 0, 0}, {matxSliceDim, matxSliceDim, 16}));
+    print(slice<1>(radar.GetTPCData()->View(), {0, 0, 0}, {matxSliceDim, matxSliceDim, 16}));
 
     cudaStreamDestroy(stream);
 

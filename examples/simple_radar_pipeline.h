@@ -237,11 +237,11 @@ public:
   void PulseCompression()
   {
     // reshape waveform to be waveformLength
-    auto waveformPart = waveformView.Slice({0}, {waveformLength});
+    auto waveformPart = slice(waveformView, {0}, {waveformLength});
     auto waveformT =
         waveformView.template Clone<3>({numChannels, numPulses, matxKeepDim});
 
-    auto waveformFull = waveformView.Slice({0}, {numSamplesRnd});
+    auto waveformFull = slice(waveformView, {0}, {numSamplesRnd});
 
     auto x = inputView;
 
@@ -285,9 +285,9 @@ public:
    */
   void ThreePulseCanceller()
   {
-    auto x = inputView.Permute({0, 2, 1}).Slice(
+    auto x = slice(inputView.Permute({0, 2, 1}), 
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
-    auto xo = tpcView.Permute({0, 2, 1}).Slice(
+    auto xo = slice(tpcView.Permute({0, 2, 1}), 
         {0, 0, 0}, {numChannels, numCompressedSamples, numPulses});
     (xo = conv1d(x, cancelMask, matxConvCorrMode_t::MATX_C_MODE_SAME)).run(exec);
   }
@@ -311,7 +311,7 @@ public:
     const index_t cpulses = numPulses - (cancelMask.Size(0) - 1);
 
     auto xc =
-        tpcView.Slice({0, 0, 0}, {numChannels, cpulses, numCompressedSamples});
+        slice(tpcView, {0, 0, 0}, {numChannels, cpulses, numCompressedSamples});
 
     auto xf = tpcView.Permute({0, 2, 1});
 
@@ -368,11 +368,11 @@ public:
     // This can be done with a convolution of the cfarMask with
     // ones.
     // norm = conv2(ones(size(X)), mask, 'same');
-    auto normTrim = normT.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
+    auto normTrim = slice(normT, {0, cfarMaskY / 2, cfarMaskX / 2},
                                  {numChannels, numPulsesRnd + cfarMaskY / 2,
                                   numCompressedSamples + cfarMaskX / 2});
 
-    auto baTrim = ba.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
+    auto baTrim = slice(ba, {0, cfarMaskY / 2, cfarMaskX / 2},
                             {numChannels, numPulsesRnd + cfarMaskY / 2,
                              numCompressedSamples + cfarMaskX / 2});
     (baTrim = baTrim / normTrim).run(exec);

@@ -1710,14 +1710,14 @@ void __MATX_INLINE__ median_impl(OutType dest,
       // Store median
       if (tmp_sort.Lsize() & 1) {
         auto middlev =
-          tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
+          slice<0>(tmp_sort, {tmp_sort.Lsize() / 2}, {matxDropDim});
         matx::copy(dest, middlev, stream);
       }
       else {
         auto middle1v =
-          tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2 - 1}, {matxDropDim});
+          slice<0>(tmp_sort, {tmp_sort.Lsize() / 2 - 1}, {matxDropDim});
         auto middle2v =
-          tmp_sort.template Slice<0>({tmp_sort.Lsize() / 2}, {matxDropDim});
+          slice<0>(tmp_sort, {tmp_sort.Lsize() / 2}, {matxDropDim});
         (dest = (middle1v + middle2v) / 2.0f).run(stream);
       }
     }
@@ -1727,14 +1727,14 @@ void __MATX_INLINE__ median_impl(OutType dest,
       matx::sort_impl(tmp_sort, in, SORT_DIR_ASC, stream);
 
       if (tmp_sort.Lsize() & 1) {
-        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+        auto sv = slice<1>(tmp_sort, {0, tmp_sort.Lsize() / 2},
             {matxEnd, matxDropDim});
         (dest = self(sv)).run(stream);
       }
       else {
-        auto sv = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2 - 1},
+        auto sv = slice<1>(tmp_sort, {0, tmp_sort.Lsize() / 2 - 1},
             {matxEnd, matxDropDim});
-        auto sv2 = tmp_sort.template Slice<1>({0, tmp_sort.Lsize() / 2},
+        auto sv2 = slice<1>(tmp_sort, {0, tmp_sort.Lsize() / 2},
             {matxEnd, matxDropDim});
         (dest = (sv + sv2) / 2.0f).run(stream);
       }

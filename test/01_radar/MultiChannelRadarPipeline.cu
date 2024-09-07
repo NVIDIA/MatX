@@ -85,7 +85,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
 
   auto data =
       tensor_t<TestType, 2>({this->numPulses, this->numSamplesRnd});
-  auto x_in = data.Slice({0, 0}, {this->numPulses, this->numSamples});
+  auto x_in = slice(data, {0, 0}, {this->numPulses, this->numSamples});
   auto x_clone =
       data.template Clone<3>({this->numChannels, matxKeepDim, matxKeepDim});
   this->pb->NumpyToTensorView(x_in, "x_init");
@@ -94,13 +94,13 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, PulseCompression)
   matx::copy(d, x_clone, 0);
 
   auto wfd = p.GetwaveformView();
-  auto wf = wfd.Slice({0}, {this->waveformLength});
+  auto wf = slice(wfd, {0}, {this->waveformLength});
 
   this->pb->NumpyToTensorView(wf, "waveform");
 
   p.PulseCompression();
 
-  auto xc = d.Slice({0, 0, 0}, {this->numChannels, this->numPulses,
+  auto xc = slice(d, {0, 0, 0}, {this->numChannels, this->numPulses,
                                  this->numCompressedSamples});
 
   MATX_TEST_ASSERT_COMPARE(this->pb, xc, "x_compressed", 0.01);
@@ -117,12 +117,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
 
   auto d = p.GetInputView();
 
-  // auto data = tensor_t<complex,2>({this->numPulses,
-  // this->numSamplesRnd}); auto x_in = data.View().Slice({0, 0},
-  // {this->numPulses, this->numCompressedSamples}); auto x_clone =
-  // data.View().Clone<3>({this->numChannels, matxKeepDim, matxKeepDim});
-
-  auto v = d.Slice({0, 0, 0}, {this->numChannels, this->numPulses,
+  auto v = slice(d, {0, 0, 0}, {this->numChannels, this->numPulses,
                                 this->numCompressedSamples});
   this->pb->NumpyToTensorView(v, "x_compressed");
 
@@ -131,7 +126,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, ThreePulseCanceller)
   p.ThreePulseCanceller();
 
   auto out = p.GetTPCView();
-  auto tpcView = out.Slice({0, 1, 0}, {this->numChannels, this->numPulses - 1,
+  auto tpcView = slice(out, {0, 1, 0}, {this->numChannels, this->numPulses - 1,
                                         this->numCompressedSamples});
 
   MATX_TEST_ASSERT_COMPARE(this->pb, tpcView, "x_conv2", 0.01);
@@ -147,7 +142,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, Doppler)
                                     this->waveformLength, this->numChannels, 0);
   auto in = p.GetTPCView();
 
-  auto v = in.Slice({0, 0, 0}, {this->numChannels, this->numPulses - 2,
+  auto v = slice(in, {0, 0, 0}, {this->numChannels, this->numPulses - 2,
                                  this->numCompressedSamples});
   this->pb->NumpyToTensorView(v, "x_conv2");
 
@@ -178,7 +173,7 @@ TYPED_TEST(MultiChannelRadarPipelineTypes, CFARDetection)
   auto detsView = p.GetDetections();
   auto ba = p.GetBackgroundAverages();
 
-  auto baTrim = ba.Slice({0, cfarMaskY / 2, cfarMaskX / 2},
+  auto baTrim = slice(ba, {0, cfarMaskY / 2, cfarMaskX / 2},
                          {this->numChannels, fft_size + cfarMaskY / 2,
                           this->numCompressedSamples + cfarMaskX / 2});
 

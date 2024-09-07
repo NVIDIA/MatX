@@ -1207,8 +1207,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, FindIdxAndSelect)
     // Since we use the output on the host in select() we need to synchronize first
     exec.sync();
 
-    auto t1o_slice = t1o.Slice({0}, {num_found()});
-    auto t1o_idx_slice = t1o_idx.Slice({0}, {num_found()});
+    auto t1o_slice = slice(t1o, {0}, {num_found()});
+    auto t1o_idx_slice = slice(t1o_idx, {0}, {num_found()});
     (t1o_slice = select(t1o_slice, t1o_idx_slice)).run(exec);
 
     // Compare to simply finding the values

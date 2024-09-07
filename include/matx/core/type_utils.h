@@ -66,6 +66,7 @@ enum class MemoryLayout {
 namespace detail {
 struct NoShape{};
 struct EmptyOp{};
+struct NoStride{};
 
 template <typename T>
 struct is_noshape : std::integral_constant<bool, std::is_same_v<NoShape, T>> {};
