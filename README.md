@@ -152,7 +152,7 @@ doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, f
 - Current documentation can be [found here](https://nvidia.github.io/MatX)
 - A quick start guide can be [found here](https://nvidia.github.io/MatX/quickstart.html)
 - Current library executor support is [listed here](https://nvidia.github.io/MatX/executor_compatibility.html)
-- A conversion from MATLAB and Python syntax is [found here](https://nvidia.github.io/MatX/matlabpython.html)
+- A conversion from MATLAB and Python syntax is [found here](https://nvidia.github.io/MatX/basics/matlabpython.html)
 - A self-guided Jupyer notebook training can be [found here](docs/notebooks)
 
 MatX uses semantic versioning and reserve the right to introduce breaking API changes on major releases.
