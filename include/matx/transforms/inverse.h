@@ -156,7 +156,7 @@ public:
         size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - batch_offset, 1, std::multiplies<index_t>());
         for (size_t iter = 0; iter < total_iter; iter++) {
           if (use_input_workbuf) {
-            auto ip = cuda::std::apply([&workbuf - a_workbuf](auto... param) { return workbuf.GetPointer(param...); }, a_idx);
+            auto ip = cuda::std::apply([&workbuf = a_workbuf](auto... param) { return workbuf.GetPointer(param...); }, a_idx);
             in_pointers.push_back(ip);
             UpdateIndices<decltype(a_workbuf), index_t, TensorTypeA::Rank()>(a_workbuf, a_idx, batch_offset);
           } else {
