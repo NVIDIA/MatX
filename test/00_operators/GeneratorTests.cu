@@ -145,10 +145,11 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
   MATX_ENTER_HANDLER();
   {
     // example-begin diag-op-test-1
-    // The generator form of `diag()` takes an operator input and returns only
+    // The generator form of `diag()` with a >= 2D input takes an operator input and returns only
     // the diagonal elements as output
     auto tc = make_tensor<TestType>({10, 10});
     auto td = make_tensor<TestType>({10});
+    auto tdk = make_tensor<TestType>({4});
 
     // Initialize the diagonal elements of `tc`
     for (int i = 0; i < 10; i++) {
@@ -170,6 +171,38 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
         }
       }
     }
+
+    {
+      // example-begin diag-op-test-2
+      // Assign the diagonal elements of `tc` to `td` with the 6th diagonal.
+      auto op = diag(tc, 6);
+      (tdk = op).run(exec);
+      // example-end diag-op-test-2
+
+      exec.sync();
+
+      ASSERT_EQ(op.Size(0), 4);
+      ASSERT_EQ(op.Rank(), 1);
+      for (int i = 0; i < tdk.Size(0); i++) {
+        MATX_ASSERT_EQ(tdk(i), tc(i, i + 6));
+      }
+    }
+
+    {
+      // example-begin diag-op-test-3
+      // Assign the diagonal elements of `tc` to `td` with the 6th diagonal.
+      auto op = diag(tc, -6);
+      (tdk = op).run(exec);
+      // example-end diag-op-test-3
+
+      exec.sync();
+
+      ASSERT_EQ(op.Size(0), 4);
+      ASSERT_EQ(op.Rank(),  1);
+      for (int i = 0; i < tdk.Size(0); i++) {
+        MATX_ASSERT_EQ(tdk(i), tc(i + 6, i));
+      }
+    }    
 
     // Test with a nested transform. Restrict to floating point types for
     // the convolution
