@@ -52,6 +52,7 @@ namespace matx
     {
       private:
         typename base_type<T1>::type op_;
+        index_t k_;
 
       public:
         using matxop = bool;
@@ -59,32 +60,74 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "diag(" + op_.str() + ")"; }
  
-        __MATX_INLINE__ DiagOp(T1 op) : op_(op) {}
+        __MATX_INLINE__ DiagOp(T1 op, index_t k) : op_(op), k_(k) { }
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
           {
-            static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer index than rank of operator");
-            static_assert(RANK > 1, "Cannot make get diagonals from 0D tensor");
-
+            static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
             using tt = cuda::std::tuple_element_t<0, cuda::std::tuple<Is...>>;
-            auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-            cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...);
-            return cuda::std::apply(op_, tup);
+
+            if constexpr (RANK == 1) {
+              static_assert(sizeof...(Is) == 2, "Indexing of diag() on a 1D input must be 2 indices");
+              if (((pp_get<0>(indices...) == indices) && ...)) {
+                return (value_type)(pp_get<0>(indices...));
+              }
+              else {
+                return (value_type)(0);
+              }
+            }
+            else {
+              static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer op() index than rank of operator");
+              
+              // Offset either the rows or columns by k_, depending on if it's negative
+              if (k_ < 0) {
+                auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
+                cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
+                cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
+                return cuda::std::apply(op_, tup);
+              }
+              else {
+                auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
+                cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
+                return cuda::std::apply(op_, tup);                
+              }
+            }
           }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
-          return RANK - 1;
+          if constexpr (RANK == 1) {
+            return 2;
+          }
+          else {
+            return RANK - 1;
+          }
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
         {
-          if (dim < RANK - 2) {
-            return op_.Size(dim);
+          if constexpr (RANK == 1) {
+            return op_.Size(0);
           }
           else {
-            return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+            if (dim < RANK - 2) {
+              return op_.Size(dim);
+            }
+            else {
+              if (k_ == 0) {
+                return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+              }
+              else {
+                // If k is off the main diagonal we need to adjust the sizes
+                if (k_ > 0) {
+                  return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2) - k_);
+                }
+                else {
+                  return cuda::std::min(op_.Size(RANK - 1) + k_, op_.Size(RANK-2));
+                }
+              }
+            }
           }
         }
 
@@ -107,11 +150,21 @@ namespace matx
   }
 
   /**
-   * Get the elements on the diagonal
+   * Get the elements on the diagonal (2D inputs and above), or generate a diagonal matrix (1D input)
    *
    * @param t
    *   Input operator
+   * @param k
+   *   Diagonal to pull (0 is the main diagonal). Only used for 2D tensors and above
    */
-  template <typename T1>
-    auto __MATX_INLINE__ diag(T1 t) { return detail::DiagOp<T1, T1::Rank()>(t); } 
+#ifdef DOXYGEN_ONLY
+  auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
+#else
+  template <typename T1, std::enable_if_t<is_matx_op<T1>(), bool> = true>
+    auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
+#endif      
+      MATX_ASSERT_STR(T1::Rank() != 1 || k == 0, matxInvalidParameter, 
+          "k parameter in diag() can only be used for 2D tensors and above");
+      return detail::DiagOp<T1, T1::Rank()>(t, k); 
+    } 
 } // end namespace matx

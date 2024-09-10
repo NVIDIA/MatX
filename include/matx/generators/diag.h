@@ -121,7 +121,8 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type> &&
+                   !is_matx_op<ShapeType>(), bool> = true>
   inline auto diag(ShapeType &&s, T val)
   {
     return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
