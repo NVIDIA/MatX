@@ -8,7 +8,7 @@ tensor with a given value or a 1D input operator, while the operator pulls diago
 
 Operator
 ________
-.. doxygenfunction:: matx::diag(T1 t, index_t k = 0)
+.. doxygenfunction:: diag(T1 t, index_t k = 0)
 
 Examples
 ~~~~~~~~

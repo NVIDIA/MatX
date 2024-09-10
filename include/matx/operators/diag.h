@@ -157,8 +157,12 @@ namespace matx
    * @param k
    *   Diagonal to pull (0 is the main diagonal). Only used for 2D tensors and above
    */
+#ifdef DOXYGEN_ONLY
+  auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
+#else
   template <typename T1, std::enable_if_t<is_matx_op<T1>(), bool> = true>
     auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
+#endif      
       MATX_ASSERT_STR(T1::Rank() != 1 || k == 0, matxInvalidParameter, 
           "k parameter in diag() can only be used for 2D tensors and above");
       return detail::DiagOp<T1, T1::Rank()>(t, k); 
