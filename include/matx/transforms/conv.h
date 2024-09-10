@@ -61,7 +61,24 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
 
   std::fill(std::begin(slice_start), std::end(slice_start), 0);
   std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);
+
   
+#if (CUDART_VERSION <= 11080)
+  matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s1;
+  matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s2;
+  matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> sifft;
+
+  if constexpr (is_cuda_executor_v<Executor>) {
+    make_tensor(s1, in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    make_tensor(s2, in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    make_tensor(sifft, in_shape_padded, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  }
+  else {
+    make_tensor(s1, in_shape_padded, MATX_HOST_MALLOC_MEMORY);
+    make_tensor(s2, in_shape_padded, MATX_HOST_MALLOC_MEMORY);
+    make_tensor(sifft, in_shape_padded, MATX_HOST_MALLOC_MEMORY);
+  }
+#else
   auto allocate_tensor = [&](auto shape) {
     if constexpr (is_cuda_executor_v<Executor>) {
       return make_tensor<complex_from_scalar_t<typename InType::value_type>>(shape, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
@@ -73,6 +90,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   auto s1 = allocate_tensor(in_shape_padded);
   auto s2 = allocate_tensor(in_shape_padded);
   auto sifft = allocate_tensor(in_shape_padded);
+#endif  
 
   if constexpr (! is_complex_v<typename InType::value_type>) {
     slice_end[InType::Rank() - 1] = padded_size/2 + 1;
