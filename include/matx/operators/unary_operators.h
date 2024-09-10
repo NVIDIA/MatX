@@ -360,6 +360,13 @@ namespace matx
  */
   Op isinf( Op x) {}  
 
+ /**
+ * Returns values from the standard normal cumulative distribution function
+  * @param x
+ *   Input operator
+ */
+  Op normcdf( Op x) {}  
+
 #else
   DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
   DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
