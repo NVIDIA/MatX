@@ -241,7 +241,7 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
 
   using cache_val_type = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>;
   detail::GetCache().LookupAndExec<detail::cov_cache_t>(
-    detail::GetCacheIdFromType<detail::cov_cache_t>(),
+    detail::CacheName::COV,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(c, a);

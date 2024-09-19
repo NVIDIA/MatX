@@ -564,7 +564,7 @@ private:
 #if MATX_EN_CPU_FFT                                  
     using cache_val_type = detail::matxFFTWPlan_t<OutputTensor, InputTensor>;
     detail::GetCache().LookupAndExec<detail::fft_fftw_cache_t>(
-      detail::GetCacheIdFromType<detail::fft_fftw_cache_t>(),
+      detail::CacheName::FFTW,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(o, i, params, exec);

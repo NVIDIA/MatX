@@ -832,7 +832,7 @@ void svd_impl(UTensor &&u, STensor &&s,
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      detail::CacheName::SVD,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, job_cusolver);
@@ -863,7 +863,7 @@ void svd_impl(UTensor &&u, STensor &&s,
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      detail::CacheName::SVD,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver);

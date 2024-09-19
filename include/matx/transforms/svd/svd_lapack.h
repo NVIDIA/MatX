@@ -448,7 +448,7 @@ void svd_impl([[maybe_unused]] UTensor &&u,
   // Get cache or new SVD plan if it doesn't exist
   using cache_val_type = detail::matxDnSVDHostPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
   detail::GetCache().LookupAndExec<detail::svd_host_cache_t>(
-    detail::GetCacheIdFromType<detail::svd_host_cache_t>(),
+    detail::CacheName::SVD_HOST,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, job_lapack, algo);

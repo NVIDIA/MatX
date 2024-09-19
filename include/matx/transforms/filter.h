@@ -478,7 +478,7 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
 
   using cache_val_type = detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>;
   detail::GetCache().LookupAndExec<detail::filter_cache_t>(
-    detail::GetCacheIdFromType<detail::filter_cache_t>(),
+    detail::CacheName::FILTER,
     params,
     [&]() {
       return matxMakeFilter(o, i, h_rec, h_nonrec);

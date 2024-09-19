@@ -292,7 +292,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::chol_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::chol_cuda_cache_t>(),
+    detail::CacheName::CHOL,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tv, uplo_cusolver);

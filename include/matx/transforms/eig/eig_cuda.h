@@ -315,7 +315,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigCUDAPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::eig_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::eig_cuda_cache_t>(),
+    detail::CacheName::EIG,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz_cusolver, uplo_cusolver);

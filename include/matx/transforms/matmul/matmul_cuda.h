@@ -1218,7 +1218,7 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
 
     using cache_val_type = detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>;
     detail::GetCache().LookupAndExec<detail::gemm_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>(),
+      detail::CacheName::GEMM,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(c, a, b);

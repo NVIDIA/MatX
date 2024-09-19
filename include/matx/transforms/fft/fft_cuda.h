@@ -738,7 +738,7 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    detail::CacheName::FFT_1D,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in, stream);
@@ -783,7 +783,7 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    detail::CacheName::FFT_1D,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in, stream);
@@ -823,7 +823,7 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
 
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    detail::CacheName::FFT_2D,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in, stream);
@@ -864,7 +864,7 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm nor
   // Get cache or new FFT plan if it doesn't exist
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    detail::CacheName::FFT_2D,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in, stream);

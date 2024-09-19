@@ -470,7 +470,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::qr_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
+    detail::CacheName::QR,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt);
