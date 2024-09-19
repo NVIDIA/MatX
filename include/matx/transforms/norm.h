@@ -40,6 +40,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/operators/sum.h"
 
 namespace matx {
 
@@ -64,10 +65,19 @@ __MATX_INLINE__ void norm_impl(OutputOp out, const InputOp &in,
 
   if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
     if (order == NormOrder::NONE || order == NormOrder::L2) {
-      (out = sqrt(sum(abs2(in), {InputOp::Rank() - 1}))).run(exec);
+      // This is really just:
+      // (out = sqrt(sum(abs2(in), {InputOp::Rank() - 1}))).run(exec);
+      // But we need to force the output rank here to avoid a no-op permute using the {} syntax on sum
+      auto tOp = abs2(in);
+      auto sumOp = sum<decltype(tOp), 1>(tOp);
+      (out = sqrt(sumOp)).run(exec);      
     }
     else if (order == NormOrder::L1) {
-      (out = sum(abs(in), {InputOp::Rank() - 1})).run(exec);
+      // This is really just:
+      // (out = sum(abs(in), {InputOp::Rank() - 1})).run(exec);
+      // But we need to force the output rank here to avoid a no-op permute using the {} syntax on sum      
+      auto tOp = abs(in);
+      (out = sum<decltype(tOp), 1>(tOp)).run(exec);      
     }
     else {
       MATX_ASSERT_STR(false, matxInvalidParameter, "Invalid order type for vector norm");
@@ -75,10 +85,17 @@ __MATX_INLINE__ void norm_impl(OutputOp out, const InputOp &in,
   }
   else {
     if (order == NormOrder::NONE || order == NormOrder::FROB) {
-      (out = sqrt(sum(abs2(in), {InputOp::Rank() - 2, InputOp::Rank() - 1}))).run(exec);
+      // See comments above
+      // Same as (out = sqrt(sum(abs2(in), {InputOp::Rank() - 2, InputOp::Rank() - 1}))).run(exec);
+      auto tOp = abs2(in);
+      auto sumOp = sum<decltype(tOp), 2>(tOp);
+      (out = sqrt(sumOp)).run(exec);      
     }
     else if (order == NormOrder::L1) {
-      (out = max(sum(abs(in), {InputOp::Rank() - 2}), {InputOp::Rank() - 2})).run(exec);
+      // See comment above
+      // Same as (out = max(sum(abs(in), {InputOp::Rank() - 2}), {InputOp::Rank() - 2})).run(exec);
+      const auto sumOp = sum(abs(in), {InputOp::Rank() - 2});
+      (out = max<decltype(sumOp), 1>(sumOp)).run(exec);
     }
     else {
       MATX_ASSERT_STR(false, matxInvalidParameter, "Invalid order type for matrix norm");

@@ -158,22 +158,32 @@ __MATX_INLINE__ auto rmin(const InType &in, const int (&dims)[D])
  *
  * @tparam InType
  *   Input data type
+ * @tparam D
+ *   Number of right-most dimensions to reduce over
  *
  * @param in
  *   Input data to reduce
  * @returns Operator with reduced values of min-reduce computed
  */
+#ifdef DOXYGEN_ONLY
 template <typename InType>
+#else
+template <typename InType, int D = InType::Rank()>
+#endif
 __MATX_INLINE__ auto min(const InType &in)
 {
-  return detail::MinOp<decltype(in), 0>(in);
+  return detail::MinOp<decltype(in), InType::Rank() - D>(in);
 }
 
+#ifdef DOXYGEN_ONLY
 template <typename InType>
+#else
+template <typename InType, int D = InType::Rank()>
+#endif
 [[deprecated("Use min() instead of rmin() for reductions")]]
 __MATX_INLINE__ auto rmin(const InType &in)
 {
-  return detail::MinOp<decltype(in), 0>(in);
+  return detail::MinOp<decltype(in), InType::Rank() - D>(in);
 }
 
 }
