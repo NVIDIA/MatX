@@ -158,22 +158,32 @@ __MATX_INLINE__ auto rmax(const InType &in, const int (&dims)[D])
  *
  * @tparam InType
  *   Input data type
+ * @tparam D
+ *   Number of right-most dimensions to reduce over
  *
  * @param in
  *   Input data to reduce
  * @returns Operator with reduced values of max-reduce computed
  */
+#ifdef DOXYGEN_ONLY
 template <typename InType>
+#else
+template <typename InType, int D = InType::Rank()>
+#endif
 __MATX_INLINE__ auto max(const InType &in)
 {
-  return detail::MaxOp<decltype(in), 0>(in);
+  return detail::MaxOp<decltype(in), InType::Rank() - D>(in);
 }
 
+#ifdef DOXYGEN_ONLY
 template <typename InType>
+#else
+template <typename InType, int D = InType::Rank()>
+#endif
 [[deprecated("Use max() instead of rmax() for reductions")]]
 __MATX_INLINE__ auto rmax(const InType &in)
 {
-  return detail::MaxOp<decltype(in), 0>(in);
+  return detail::MaxOp<decltype(in), InType::Rank() - D>(in);
 }
 
 }

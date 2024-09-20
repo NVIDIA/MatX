@@ -152,10 +152,14 @@ __MATX_INLINE__ auto prod(const InType &in, const int (&dims)[D])
  *   Input data to reduce
  * @returns Operator with reduced values of prod-reduce computed
  */
+#ifdef DOXYGEN_ONLY
 template <typename InType>
+#else
+template <typename InType, int D = InType::Rank()>
+#endif
 __MATX_INLINE__ auto prod(const InType &in)
 {
-  return detail::ProdOp<decltype(in), 0>(in);
+  return detail::ProdOp<decltype(in), InType::Rank() - D>(in);
 }
 
 }
