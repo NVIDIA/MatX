@@ -45,7 +45,7 @@ namespace matx
     template <typename T>
       class PermuteOp : public BaseOp<PermuteOp<T>>
     {
-      public: 
+      public:
         using value_type = typename T::value_type;
         using self_type = PermuteOp<T>;
 
@@ -56,18 +56,18 @@ namespace matx
       public:
         using matxop = bool;
         using matxoplvalue = bool;
-        
+
         __MATX_INLINE__ std::string str() const { return "permute(" + op_.str() + ")"; }
- 
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return T::Rank();
         }
 
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
-        
+
 	      __MATX_INLINE__ PermuteOp(T op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
-            
+
           for(int32_t i = 0; i < Rank(); i++) {
             [[maybe_unused]] int32_t dim = dims[i];
             MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
@@ -78,28 +78,31 @@ namespace matx
 
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
             cuda::std::array<index_t, Rank()> ind;
+#pragma GCC diagnostic pop
             //cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #if 0
 	    //This causes register spills but might be faster if Rank is large
-#pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {	  
+#pragma unroll
+            for(int32_t i = 0; i < Rank(); i++) {	
               ind[dims_[i]] = inds[i];
             }
 #else
-#pragma unroll 
+#pragma unroll
 	    // use double loop to avoid register spills
-            for(int32_t i = 0; i < Rank(); i++) {	  
-#pragma unroll 
-              for(int32_t j = 0; j < Rank(); j++) {	  
+            for(int32_t i = 0; i < Rank(); i++) {	
+#pragma unroll
+              for(int32_t j = 0; j < Rank(); j++) {	
                 if(dims_[j] == i) {
                   ind[i] = inds[j];
                 }			
@@ -119,20 +122,23 @@ namespace matx
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
             //cuda::std::array<index_t, T::Rank()> ind{indices...};
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
             cuda::std::array<index_t, Rank()> ind;
+#pragma GCC diagnostic pop
 
 #if 0
 	    //This causes register spills but might be faster if Rank is large
-#pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {	  
+#pragma unroll
+            for(int32_t i = 0; i < Rank(); i++) {	
               ind[dims_[i]] = inds[i];
             }
 #else
-#pragma unroll 
+#pragma unroll
 	    // use double loop to avoid register spills
-            for(int32_t i = 0; i < Rank(); i++) {	  
-#pragma unroll 
-              for(int32_t j = 0; j < Rank(); j++) {	  
+            for(int32_t i = 0; i < Rank(); i++) {	
+#pragma unroll
+              for(int32_t j = 0; j < Rank(); j++) {	
                 if(dims_[j] == i) {
                   ind[i] = inds[j];
                 }			
@@ -162,31 +168,31 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }   
+        }
 
         ~PermuteOp() = default;
         PermuteOp(const PermuteOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }                      
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
     };
   }
-  
+
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
    * The each dimension must appear in the dims array once.
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam T Input operator/tensor type
    * @param op Input operator
@@ -194,7 +200,7 @@ namespace matx
    * @return permuted operator
    */
   template <typename T>
-    __MATX_INLINE__ auto permute( const T &op, 
+    __MATX_INLINE__ auto permute( const T &op,
         const cuda::std::array<int32_t, T::Rank()> &dims) {
       if constexpr (is_tensor_view_v<T>) {
         return op.Permute(dims);
@@ -202,14 +208,14 @@ namespace matx
         return detail::PermuteOp<T>(op, dims);
       }
     }
-  
+
 
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
    * The each dimension must appear in the dims array once.
 
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam T Input operator/tensor type
    * @param op Input operator
@@ -217,7 +223,7 @@ namespace matx
    * @return permuted operator
    */
   template <typename T>
-    __MATX_INLINE__ auto permute( const T &op, 
+    __MATX_INLINE__ auto permute( const T &op,
         const int32_t (&dims)[T::Rank()]) {
       return permute(op, detail::to_array(dims));
     }

@@ -55,10 +55,16 @@ namespace matx
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
         {
           if constexpr (is_matx_half_v<T>) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
             return first_ + T(static_cast<T>((float)idx) * step_);
+#pragma GCC diagnostic pop
           }
           else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
             return first_ + T(static_cast<T>(idx) * step_);
+#pragma GCC diagnostic pop
           }
         }
     };
@@ -107,6 +113,6 @@ namespace matx
     {
       return range<Dim>(detail::to_array(s), first, step);
     }
- 
+
 
 } // end namespace matx
