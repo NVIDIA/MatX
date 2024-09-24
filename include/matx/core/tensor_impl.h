@@ -52,21 +52,21 @@ namespace detail {
 
 /**
  * @brief Bare implementation of tensor class
- * 
+ *
  * Defines the minimum operations needed for a tensor to be useful. This class
  * should be limited to primitive types. The bare class contains operations that
  * are necessary to function on a device (getters/setters), but does not contain
  * any ownership semantics.
- * 
+ *
  * This class is designed to be inherited from more capable tensor classes like
  * tensor_t below. Because of the asynchronous nature of GPU devices, derived classes
- * are responsible for handling ownership and lifetime of the pointer in a 
- * tensor_impl_t. 
- * 
+ * are responsible for handling ownership and lifetime of the pointer in a
+ * tensor_impl_t.
+ *
  * @tparam T Type of tensor
  * @tparam RANK Rank of tensor
  */
-template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>> 
+template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>>
 class tensor_impl_t {
   public:
     // Type specifier for reflection on class
@@ -109,13 +109,13 @@ class tensor_impl_t {
 
       swap(lhs.ldata_, rhs.ldata_);
       swap(lhs.desc_, rhs.desc_);
-    }     
+    }
 
     /**
      * Constructor for a rank-0 tensor (scalar).
      */
     tensor_impl_t() {
-      
+
     }
 
     /**
@@ -124,7 +124,7 @@ class tensor_impl_t {
      * @param data
      *   Data pointer
      */
-    tensor_impl_t(T *const data) : ldata_(data) { 
+    tensor_impl_t(T *const data) : ldata_(data) {
       static_assert(RANK == 0, "tensor_impl_t with single pointer parameter must be a rank 0 tensor");
     }
 
@@ -134,7 +134,7 @@ class tensor_impl_t {
      * @param shape
      *   Tensor shape
      */
-    template <typename ShapeType, 
+    template <typename ShapeType,
               std::enable_if_t<!is_tensor_view_v<typename remove_cvref<ShapeType>::type> && !is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape) : desc_(std::forward<ShapeType>(shape))
     {
@@ -152,7 +152,7 @@ class tensor_impl_t {
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape, StrideType &&strides)
         : desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
-    }    
+    }
 
     /**
      * Constructor for a rank-1 and above tensor using a user pointer and shape
@@ -182,11 +182,11 @@ class tensor_impl_t {
      * @param ldata
      *   Offset data pointer (start of view)
      * @param shape
-     *   Sizes for each dimension. 
+     *   Sizes for each dimension.
      * @param strides
      *   Tensor strides
      */
-    template <typename ShapeType, typename StrideType>    
+    template <typename ShapeType, typename StrideType>
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
                     ShapeType &&shape,
                     StrideType &&strides)
@@ -229,13 +229,13 @@ class tensor_impl_t {
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
     {
-    }      
+    }
 
     __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
     {
       ldata_ = rhs.ldata_;
       desc_ = rhs.desc_;
-    }    
+    }
 
     /**
      * Lazy assignment operator=. Used to create a "set" object for deferred
@@ -251,11 +251,11 @@ class tensor_impl_t {
     {
       ldata_ = op.ldata_;
       desc_ = op.desc_;
-    }      
+    }
 
 
     // Lazy operators
-    
+
     /**
      * Lazy assignment operator=. Used to create a "set" object for deferred
      * execution on a device
@@ -621,7 +621,7 @@ class tensor_impl_t {
      * @return
      *    A shape of the data with the appropriate strides set
      */
-    __MATX_INLINE__ auto Strides() const noexcept { return this->desc_.Strides(); }    
+    __MATX_INLINE__ auto Strides() const noexcept { return this->desc_.Strides(); }
 
     /**
      * Set the size of a dimension
@@ -629,13 +629,13 @@ class tensor_impl_t {
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    __MATX_INLINE__ auto Descriptor() const noexcept { return this->desc_; }     
+    __MATX_INLINE__ auto Descriptor() const noexcept { return this->desc_; }
 
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
       return ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
-    }    
+    }
 
     /**
      * Check if a tensor is linear in memory for all elements in the view
@@ -651,7 +651,10 @@ class tensor_impl_t {
     template <int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
         return GetVal<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
+#pragma GCC diagnostic pop
       }
       else {
         return 0;
@@ -661,12 +664,15 @@ class tensor_impl_t {
     template <int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
         return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
+#pragma GCC diagnostic pop
       }
       else {
         return 0;
-      }             
-    }    
+      }
+    }
 
     /**
      * operator() getter
@@ -696,16 +702,16 @@ class tensor_impl_t {
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is, 
+    template <int M = RANK, typename... Is,
       std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
-#endif      
+#endif
       return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
-    }    
+    }
 
     /**
      * operator() getter with an array index
@@ -717,8 +723,8 @@ class tensor_impl_t {
     {
       return cuda::std::apply([&](auto &&...args) -> T {
           return this->operator()(args...);
-        }, idx);      
-    }  
+        }, idx);
+    }
 
     /**
      * operator() getter with an array index
@@ -730,8 +736,8 @@ class tensor_impl_t {
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
           return this->operator()(args...);
-        }, idx);      
-    }      
+        }, idx);
+    }
 
 
     /**
@@ -755,7 +761,7 @@ class tensor_impl_t {
     //   else {
     //     return this->operator()(idx[0], idx[1], idx[2], idx[3]);
     //   }
-    // }      
+    // }
 
     /**
      * Get the rank of the tensor
@@ -773,7 +779,7 @@ class tensor_impl_t {
      * @returns Total number of elements across all dimensions
      *
      */
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept { return desc_.TotalSize(); }  
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept { return desc_.TotalSize(); }
 
     /**
      * Get the size of a single dimension of the tensor
@@ -818,21 +824,21 @@ class tensor_impl_t {
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
       return TotalSize() * sizeof(*ldata_);
-    }   
+    }
 
     /**
      * @brief Get data pointer
-     * 
-     * @return data pointer 
+     *
+     * @return data pointer
      */
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto Data() const noexcept {
       return ldata_;
-    } 
+    }
 
 
     /**
      * @brief Set local data pointer
-     * 
+     *
      * @param data
      *   Data pointer to set
      */
@@ -841,12 +847,12 @@ class tensor_impl_t {
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept 
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept 
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
     }
 

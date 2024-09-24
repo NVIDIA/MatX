@@ -42,6 +42,7 @@ namespace matx
     template <std::size_t CRank, typename T>
       class CloneOp : public BaseOp<CloneOp<CRank, T>>
     {
+      static_assert(CRank > T::Rank(), "Clone rank must be higher than input rank");
       private:
         mutable typename base_type<T>::type op_;
         cuda::std::array<index_t, CRank> sizes_;         // size of each dimension after cloning
@@ -54,29 +55,39 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 
         __MATX_INLINE__ CloneOp(T op, cuda::std::array<index_t, CRank> shape) : op_(op) {
+          static_assert(T::Rank() < CRank, "Cloning rank must be higher than input operator rank");
+
+          const index_t num_keep = std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; });
+          MATX_ASSERT_STR(num_keep == T::Rank(), matxInvalidParameter, 
+            "Number of matxKeepDim in a clone must match input operator rank");
+
           // create gather list
           int d = 0;
           for(int i = 0; i < Rank(); i++) {
             if constexpr (T::Rank() > 0) { // This is needed since the compiler can be fooled
               if(shape[i] == matxKeepDim) {
                 sizes_[i] = op_.Size(d);
+                // gcc incorrectly shows an invalid access to array element [1] in a unit test here. This is not
+                // possible based on runtime checks we have. Disable the warning temporarily.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
                 dims_[d++] = i;
+#pragma GCC diagnostic pop                
               } else {
                 sizes_[i] = shape[i];
               }
             }
             else {
               MATX_ASSERT(shape[i] != matxKeepDim, matxInvalidDim);
-              sizes_[i] = shape[i];             
+              sizes_[i] = shape[i];
             }
-
           }
           MATX_ASSERT(d == T::Rank(), matxInvalidDim);
 
         };
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
 
           // convert variadic type to tuple so we can read/update
@@ -143,26 +154,31 @@ namespace matx
    * @tparam Rank the rank of the cloned operator
    * @tparam T source operator/tensor type
    * @param t source operator/tensor
-   * @param shape the shape of the cloned operator/tensor.  
+   * @param shape the shape of the cloned operator/tensor.
    * Each element is either the size of the cloned dimension or matxKeepDim to be from the source tensor
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const cuda::std::array<index_t, Rank> &shape)
     {
-      if constexpr (is_tensor_view_v<Op>) {
+      static_assert(Rank >= Op::Rank(), "Cloning rank must be >= input operator rank");
+
+      if constexpr (Op::Rank() == Rank) {
+        return t; // No-op to same rank
+      }
+      else if constexpr (is_tensor_view_v<Op>) {
         return t.template Clone<static_cast<int>(Rank)>(shape);
       } else {
         return detail::CloneOp<static_cast<int>(Rank), Op>(t, shape);
 
       }
-    };  
+    };
 
   template <int Rank, typename Op>
     auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
     {
       return clone<Rank, Op>(t, detail::to_array(shape));
-    };   
-  
+    };
+
 
 } // end namespace matx
