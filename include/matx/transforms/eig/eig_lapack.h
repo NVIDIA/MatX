@@ -348,7 +348,7 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigHostPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
   detail::GetCache().LookupAndExec<detail::eig_host_cache_t>(
-    detail::GetCacheIdFromType<detail::eig_host_cache_t>(),
+    detail::CacheName::EIG_HOST,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, jobz_lapack, uplo_lapack);

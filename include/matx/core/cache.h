@@ -55,6 +55,7 @@ enum class CacheName : uint8_t {
   SVD,
   SVD_HOST,
   EIG,
+  EIG_HOST,
   CUB,
   GEMM,
   COV,
