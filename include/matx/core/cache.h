@@ -46,9 +46,11 @@ namespace detail {
 
 using CacheId = uint64_t;
 
+__attribute__ ((visibility ("default")))
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 
 template<typename CacheType>
+__attribute__ ((visibility ("default")))
 CacheId GetCacheIdFromType()
 {
   static CacheId id = CacheIdCounter.fetch_add(1);
