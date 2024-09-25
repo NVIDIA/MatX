@@ -46,7 +46,9 @@ namespace detail {
 
 using CacheId = uint64_t;
 
+#ifndef DOXYGEN_ONLY
 __attribute__ ((visibility ("default")))
+#endif
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 
 template<typename CacheType>
