@@ -369,8 +369,7 @@ template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
-                  typename TensorType::shape_container &&shape,
-                  bool owning = false) {
+                  typename TensorType::shape_container &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), false);
