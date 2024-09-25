@@ -315,8 +315,6 @@ auto make_tensor( T *data,
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
- * @param owning
- *   If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
@@ -365,8 +363,6 @@ auto make_tensor( T *data,
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
@@ -406,8 +402,6 @@ auto make_tensor( T *ptr,
  *  Tensor object to store newly-created tensor into
  * @param ptr
  *  Pointer to data
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
@@ -525,8 +519,6 @@ auto make_tensor( T* const data,
  *   Pointer to device data
  * @param desc
  *   Tensor descriptor (tensor_desc_t)
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
@@ -624,8 +616,6 @@ auto make_tensor( T *const data,
  *   Shape of tensor
  * @param strides
  *   Strides of tensor
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
