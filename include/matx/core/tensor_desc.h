@@ -287,10 +287,9 @@ public:
     }
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"     
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized") 
     return *(shape_.begin() + dim); 
-#pragma GCC diagnostic pop    
+IGNORE_WARNING_POP
   }
 
   /**
@@ -315,14 +314,9 @@ public:
     /*  In release mode with O3 on g++ seems to give incorrect warnings on this line from Clone()
         and clone(). It appears there's no valid code path that would cause this to be unitialized,
         so we're ignoring the warning in this one spot. */
-#if defined(__GNUC__) && !defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-    return *(stride_.begin() + dim); 
-    #pragma GCC diagnostic pop
-#else
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized")
     return *(stride_.begin() + dim);
-#endif    
+IGNORE_WARNING_POP
   }
 
   /**

@@ -85,10 +85,9 @@ namespace matx
 
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized")
             cuda::std::array<index_t, Rank()> ind;
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP
             //cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #if 0
@@ -122,10 +121,9 @@ namespace matx
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, Rank()> inds{indices...};
             //cuda::std::array<index_t, T::Rank()> ind{indices...};
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized")
             cuda::std::array<index_t, Rank()> ind;
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP
 
 #if 0
 	    //This causes register spills but might be faster if Rank is large

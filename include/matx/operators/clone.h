@@ -69,10 +69,9 @@ namespace matx
                 sizes_[i] = op_.Size(d);
                 // gcc incorrectly shows an invalid access to array element [1] in a unit test here. This is not
                 // possible based on runtime checks we have. Disable the warning temporarily.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
+IGNORE_WARNING_PUSH("-Warray-bounds")                
                 dims_[d++] = i;
-#pragma GCC diagnostic pop                
+IGNORE_WARNING_POP           
               } else {
                 sizes_[i] = shape[i];
               }
@@ -91,11 +90,10 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"          
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized")        
           cuda::std::array<index_t, Rank()> sind{indices...};
           cuda::std::array<index_t, T::Rank()> gind;
-#pragma GCC diagnostic pop       
+IGNORE_WARNING_POP
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {
@@ -111,11 +109,10 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"          
+IGNORE_WARNING_PUSH("-Wmaybe-uninitialized")         
           cuda::std::array<index_t, Rank()> sind{indices...};
           cuda::std::array<index_t, T::Rank()> gind;
-#pragma GCC diagnostic pop 
+IGNORE_WARNING_POP
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {

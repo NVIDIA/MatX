@@ -231,8 +231,7 @@ private:
             const lapack_int_t* liwork_in, lapack_int_t* info)
   {
     // TODO: remove warning suppression once syevd is optimized in NVPL LAPACK
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+IGNORE_WARNING_PUSH("-Wdeprecated-declarations")
     if constexpr (std::is_same_v<AType, float>) {
       LAPACK_CALL(ssyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
     } else if constexpr (std::is_same_v<AType, double>) {
@@ -242,7 +241,7 @@ private:
     } else if constexpr (std::is_same_v<AType, cuda::std::complex<double>>) {
       LAPACK_CALL(zheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
     }
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP
   }
 
   std::vector<T2 *> batch_w_ptrs;

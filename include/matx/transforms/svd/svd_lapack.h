@@ -300,8 +300,7 @@ private:
                       const lapack_int_t *lwork_in, [[maybe_unused]] T3 *rwork_in, lapack_int_t *info)
   {
     // TODO: remove warning suppression once gesvd is optimized in NVPL LAPACK
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+IGNORE_WARNING_PUSH("-Wdeprecated-declarations")
     if constexpr (std::is_same_v<T1, float>) {
       LAPACK_CALL(sgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
     } else if constexpr (std::is_same_v<T1, double>) {
@@ -311,7 +310,7 @@ private:
     } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
     }
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP
   }
 
   /**

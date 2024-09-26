@@ -61,6 +61,26 @@ namespace matx {
     #define __MATX_INLINE__ inline
 #endif
 
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#ifdef __GNUC__ 
+    #define IGNORE_WARNING_PUSH(WARN_MSG) \
+        _Pragma("GCC diagnostic push") \
+        _Pragma(TOSTRING(GCC diagnostic ignored WARN_MSG))
+
+    #define IGNORE_WARNING_POP \
+        _Pragma("GCC diagnostic pop")
+#elif defined(__clang__ )
+    #define IGNORE_WARNING_PUSH(WARN_MSG) \
+        _Pragma("clang diagnostic push") \
+        _Pragma(TOSTRING(clang diagnostic ignored WARN_MSG))
+
+    #define IGNORE_WARNING_POP \
+        _Pragma("clang diagnostic pop")
+#endif        
+
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
