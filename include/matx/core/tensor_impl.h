@@ -208,12 +208,16 @@ class tensor_impl_t {
      * @param ldata
      *   Data type
      */
+// gcc 14.1 incorrectly reports desc as uninitialized in some contexts
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"           
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
-                    DescriptorType &&desc)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,  
+                    DescriptorType &&desc)                
         : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
     {
     }
+#pragma GCC diagnostic pop    
 
     /**
      * Constructor for creating a view with only a descriptor

@@ -91,8 +91,11 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"          
           cuda::std::array<index_t, Rank()> sind{indices...};
           cuda::std::array<index_t, T::Rank()> gind;
+#pragma GCC diagnostic pop       
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {
@@ -108,8 +111,11 @@ namespace matx
         {
 
           // convert variadic type to tuple so we can read/update
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"          
           cuda::std::array<index_t, Rank()> sind{indices...};
           cuda::std::array<index_t, T::Rank()> gind;
+#pragma GCC diagnostic pop 
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {

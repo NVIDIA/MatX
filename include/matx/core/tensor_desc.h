@@ -286,7 +286,11 @@ public:
       return static_cast<shape_type>(1);
     }
 
+// gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"     
     return *(shape_.begin() + dim); 
+#pragma GCC diagnostic pop    
   }
 
   /**

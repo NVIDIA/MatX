@@ -82,13 +82,23 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   __MATX_INLINE__ ~matxHalf() = default;
 
   /**
-   * @brief Float casting operator
+   * @brief Half casting operator
    * 
-   * @return float of value
+   * @return Underlying half type
    */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator T() const
   {
-    return static_cast<T>(x);
+    return x;
+  }  
+
+  /**
+   * @brief Half reference casting operator
+   * 
+   * @return Underlying reference to half type
+   */
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator T&()
+  {
+    return x;
   }  
 
   /**
