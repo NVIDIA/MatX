@@ -66,18 +66,24 @@ namespace matx {
 #define TOSTRING(x) STRINGIFY(x)
 
 #ifdef __GNUC__ 
-    #define IGNORE_WARNING_PUSH(WARN_MSG) \
+    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define IGNORE_WARNING_POP_CLANG
+
+    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
         _Pragma("GCC diagnostic push") \
         _Pragma(TOSTRING(GCC diagnostic ignored WARN_MSG))
 
-    #define IGNORE_WARNING_POP \
+    #define IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
 #elif defined(__clang__ )
-    #define IGNORE_WARNING_PUSH(WARN_MSG) \
+    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define IGNORE_WARNING_POP_GCC
+
+    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG) \
         _Pragma("clang diagnostic push") \
         _Pragma(TOSTRING(clang diagnostic ignored WARN_MSG))
 
-    #define IGNORE_WARNING_POP \
+    #define IGNORE_WARNING_POP_CLANG \
         _Pragma("clang diagnostic pop")
 #endif        
 
