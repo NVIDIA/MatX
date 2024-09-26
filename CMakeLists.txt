@@ -205,7 +205,7 @@ if (MATX_EN_NVPL OR MATX_EN_X86_FFTW OR MATX_EN_BLIS OR MATX_EN_OPENBLAS)
         endif()
     endforeach()
     if(ENABLED_BLAS_COUNT GREATER 1)
-        message(WARNING "Multiple Host BLAS libraries (${ENABLED_BLAS_COUNT}) are enabled. Only 1 will be used.")
+        message(AUTHOR_WARNING "Multiple Host BLAS libraries (${ENABLED_BLAS_COUNT}) are enabled. Only 1 will be used.")
     endif()
 
     if (MATX_EN_NVPL)
@@ -304,7 +304,7 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
         check_python_libs("plotly.express")
     endif()
 else()
-    message(WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
+    message(AUTHOR_WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
 endif()
 
 # Add in all CUDA linker dependencies
