@@ -65,17 +65,7 @@ namespace matx {
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#ifdef __GNUC__ 
-    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
-    #define IGNORE_WARNING_POP_CLANG
-
-    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
-        _Pragma("GCC diagnostic push") \
-        _Pragma(TOSTRING(GCC diagnostic ignored WARN_MSG))
-
-    #define IGNORE_WARNING_POP_GCC \
-        _Pragma("GCC diagnostic pop")
-#elif defined(__clang__ )
+#if defined(__clang__ )
     #define IGNORE_WARNING_PUSH_GCC(WARN_MSG)
     #define IGNORE_WARNING_POP_GCC
 
@@ -85,6 +75,16 @@ namespace matx {
 
     #define IGNORE_WARNING_POP_CLANG \
         _Pragma("clang diagnostic pop")
+#elif defined(__GNUC__)
+    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define IGNORE_WARNING_POP_CLANG
+
+    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
+        _Pragma("GCC diagnostic push") \
+        _Pragma(TOSTRING(GCC diagnostic ignored WARN_MSG))
+
+    #define IGNORE_WARNING_POP_GCC \
+        _Pragma("GCC diagnostic pop")
 #endif        
 
 // std::ceil is not constexpr until C++23
