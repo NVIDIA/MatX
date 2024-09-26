@@ -315,19 +315,16 @@ auto make_tensor( T *data,
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
- * @param owning
- *   If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
-                  const index_t (&shape)[TensorType::Rank()],
-                  bool owning = false) {
+                  const index_t (&shape)[TensorType::Rank()]) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, owning);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, false);
   tensor.Shallow(tmp);
 }
 
@@ -366,19 +363,16 @@ auto make_tensor( T *data,
  *   Pointer to device data
  * @param shape
  *   Shape of tensor
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
-                  typename TensorType::shape_container &&shape,
-                  bool owning = false) {
+                  typename TensorType::shape_container &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), owning);
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), false);
   tensor.Shallow(tmp);
 }
 
@@ -407,16 +401,13 @@ auto make_tensor( T *ptr,
  *  Tensor object to store newly-created tensor into
  * @param ptr
  *  Pointer to data
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
   std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
-                  typename TensorType::value_type *ptr,
-                  bool owning = false) {
-  auto tmp = make_tensor<typename TensorType::value_type>(ptr, owning);
+                  typename TensorType::value_type *ptr) {
+  auto tmp = make_tensor<typename TensorType::value_type>(ptr, false);
   tensor.Shallow(tmp);
 }
 
@@ -527,19 +518,17 @@ auto make_tensor( T* const data,
  *   Pointer to device data
  * @param desc
  *   Tensor descriptor (tensor_desc_t)
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
           std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type* const data,
-                  typename TensorType::desc_type &&desc,
-                  bool owning = false) {
+                  typename TensorType::desc_type &&desc) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::desc_type>(data, std::forward<typename TensorType::desc_type>(desc), owning);
+  // This tensor should be non-owning regardless of the original ownership since it will go out of scope at the end of the function
+  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::desc_type>(data, std::forward<typename TensorType::desc_type>(desc), false);
   tensor.Shallow(tmp);
 }
 
@@ -626,8 +615,6 @@ auto make_tensor( T *const data,
  *   Shape of tensor
  * @param strides
  *   Strides of tensor
- * @param owning
- *    If this class owns memory of data
  * @returns New tensor
  **/
 template <typename TensorType,
@@ -635,11 +622,10 @@ template <typename TensorType,
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *const data,
                   const index_t (&shape)[TensorType::Rank()],
-                  const index_t (&strides)[TensorType::Rank()],
-                  bool owning = false) {
+                  const index_t (&strides)[TensorType::Rank()]) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, strides, owning);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, strides, false);
   tensor.Shallow(tmp);
 }
 
