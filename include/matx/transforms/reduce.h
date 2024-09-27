@@ -2339,13 +2339,13 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] c
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
-          return vin != 0;
+          return vin != static_cast<typename InType::value_type>(0);
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
         lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
-          return vin != 0;
+          return vin != static_cast<typename InType::value_type>(0);
         });
       }
     }
@@ -2412,13 +2412,13 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] c
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
-          return vin != 0;
+          return vin != static_cast<typename InType::value_type>(0);
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
         lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
-          return vin != 0;
+          return vin != static_cast<typename InType::value_type>(0);
         });
       }
     }

@@ -84,18 +84,16 @@ namespace matx
               if (k_ < 0) {
                 auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
                 cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
                 cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP_GCC
                 return cuda::std::apply(op_, tup);
               }
               else {
                 auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
                 cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
-#pragma GCC diagnostic pop
+IGNORE_WARNING_POP_GCC
                 return cuda::std::apply(op_, tup);                
               }
             }

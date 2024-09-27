@@ -71,12 +71,14 @@ struct RandomOperatorIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator*() const
   {
     if constexpr (OperatorType::Rank() == 0) {
-      return static_cast<value_type>(t_.operator()());
+      const auto tmp = t_.operator()();
+      return tmp;
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
-      return cuda::std::apply([&](auto &&...args) {
-          return static_cast<value_type>(t_.operator()(args...));
+      return cuda::std::apply([&](auto &&...args) -> value_type {
+          const auto tmp = t_.operator()(args...);
+          return tmp;
         }, arrs);     
     }
   }  
@@ -103,7 +105,7 @@ struct RandomOperatorIterator {
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_+offset);
-      return cuda::std::apply([&](auto &&...args) {
+      return cuda::std::apply([&](auto &&...args) -> value_type {
           return static_cast<value_type>(t_.operator()(args...));
         }, arrs);     
     }
@@ -200,13 +202,15 @@ struct RandomOperatorOutputIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*()
   {
     if constexpr (OperatorType::Rank() == 0) {
-      return (reference)(t_.operator()());
+      auto &tmp = t_.operator()();
+      return tmp;
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
 
       return cuda::std::apply([&](auto &&...args) -> reference {
-          return (reference)(t_.operator()(args...));
+          auto &tmp = t_.operator()(args...);
+          return tmp;
         }, arrs);    
     }
   }  

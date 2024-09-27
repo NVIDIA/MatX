@@ -46,8 +46,9 @@ namespace matx
     {
       public:
         using matxop = bool;
-        using value_type = typename remove_cvref_t<Op2>::value_type;
-        using inner_type = typename inner_op_type_t<value_type>::type;
+        using value_type = int;
+        using op_type = typename remove_cvref_t<Op2>::value_type;
+        using inner_type = typename inner_op_type_t<op_type>::type;
 
         __MATX_INLINE__ std::string str() const { return "isclose()"; }
 
