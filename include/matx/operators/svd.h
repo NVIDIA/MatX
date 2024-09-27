@@ -59,7 +59,7 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(OpA a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
 
       // This should never be called
       template <typename... Is>
@@ -209,7 +209,7 @@ namespace detail {
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
 template<typename AType, typename X0Type>
-__MATX_INLINE__ auto svdpi(AType &A, X0Type &x0, int iterations, index_t k=-1) {
+__MATX_INLINE__ auto svdpi(const AType &A, const X0Type &x0, int iterations, index_t k=-1) {
   return detail::SVDPIOp(A, x0, iterations, k);
 }
 
@@ -283,7 +283,7 @@ namespace detail {
  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  */
 template<typename AType>
-__MATX_INLINE__ auto svdbpi(AType &A, int max_iters=10, float tol=0.0f) {
+__MATX_INLINE__ auto svdbpi(const AType &A, int max_iters=10, float tol=0.0f) {
   return detail::SVDBPIOp(A, max_iters, tol);
 }
 

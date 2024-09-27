@@ -73,7 +73,7 @@ namespace matx
         return "toeplitz(" + top1 + "," + top2 + ")"; 
       }
 
-        __MATX_INLINE__ TopelitzOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
+        __MATX_INLINE__ TopelitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
       {
         if constexpr (is_matx_op<T1>()) {
           static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");

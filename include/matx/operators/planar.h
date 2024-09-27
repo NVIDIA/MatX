@@ -51,7 +51,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "planar(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ComplexPlanarOp(T1 op) : op_(op) {
+        __MATX_INLINE__ ComplexPlanarOp(const T1 &op) : op_(op) {
           static_assert(is_complex_v<extract_value_type_t<T1>>, "Complex planar op only works on complex types");
           static_assert(Rank() > 0);
         };
@@ -133,7 +133,7 @@ namespace matx
    *
    */
   template <typename T1>
-    auto planar(T1 t)
+    auto planar(const T1 &t)
     {
       static_assert(is_complex_v<extract_value_type_t<T1>>, "Input to interleaved operator must be complex-valued");
       return detail::ComplexPlanarOp<T1>(t);

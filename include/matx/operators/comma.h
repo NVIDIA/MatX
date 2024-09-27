@@ -48,7 +48,7 @@ namespace matx
     template<class Op1, class Op2>
       class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
         public:
-          __MATX_HOST__ __MATX_INLINE__  CommaOp(Op1 op1, Op2 op2) : op1_(op1), op2_(op2) {
+          __MATX_HOST__ __MATX_INLINE__  CommaOp(const Op1 &op1, const Op2 &op2) : op1_(op1), op2_(op2) {
             MATX_STATIC_ASSERT_STR(Op1::Rank() == Op2::Rank(), matxInvalidSize, 
                 "Chained expressions using the comma operator must match in rank");
             if constexpr ( Rank() > 0) {
@@ -116,7 +116,7 @@ namespace matx
    * @return Result of comma operator
    */
   template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
-    __MATX_INLINE__ __MATX_HOST__ auto operator,(T l, S r)
+    __MATX_INLINE__ __MATX_HOST__ auto operator,(const T &l, const S &r)
     {
       return detail::CommaOp(l, r);
     }

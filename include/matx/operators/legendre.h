@@ -94,7 +94,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
-        __MATX_INLINE__ LegendreOp(T1 n, T2 m, const T3 in, cuda::std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
+        __MATX_INLINE__ LegendreOp(const T1 &n, const T2 &m, const T3 &in, cuda::std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
           static_assert(get_rank<T1>() <= 1, "legendre op:  n must be a scalar, rank 0 or 1 operator");
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
@@ -221,7 +221,7 @@ namespace matx
    *   New operator with Rank+1 and size of last dimension = order.
    */
   template <typename T1, typename T2, typename T3>
-    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in)
+    auto __MATX_INLINE__ legendre(const T1 &n, const T2 &m, const T3 &in)
     {
       int axis[2] = {0,1};
       return detail::LegendreOp<T1,T2,T3>(n, m, in, detail::to_array(axis));
@@ -248,14 +248,15 @@ namespace matx
    *   New operator with Rank+1 and size of last dimension = order.
    */
   template <typename T1, typename T2, typename T3>
-    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, cuda::std::array<int, 2> axis)
-    {
-      return detail::LegendreOp<T1,T2,T3>(n, m, in, axis);
-    };
+  auto __MATX_INLINE__ legendre(const T1 &n, const T2 &m, const T3 &in, cuda::std::array<int, 2> axis)
+  {
+    return detail::LegendreOp<T1,T2,T3>(n, m, in, axis);
+  };
+
   template <typename T1, typename T2, typename T3>
-    auto __MATX_INLINE__ legendre(T1 n, T2 m, const T3 in, int (&axis)[2])
-    {
-      return detail::LegendreOp<T1,T2,T3>(n, m, in, detail::to_array(axis));
-    };
+  auto __MATX_INLINE__ legendre(const T1 &n, const T2 &m, const T3 &in, int (&axis)[2])
+  {
+    return detail::LegendreOp<T1,T2,T3>(n, m, in, detail::to_array(axis));
+  };
 
 } // end namespace matx

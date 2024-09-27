@@ -51,7 +51,7 @@ namespace detail {
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
       using matxop = bool;
@@ -62,12 +62,18 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { 
         return "filter(" + get_type_str(a_) + ")";
       }
-      __MATX_INLINE__ FilterOp(OpA a, const cuda::std::array<FilterType, NR> h_rec,
+      __MATX_INLINE__ FilterOp(const OpA &a, const cuda::std::array<FilterType, NR> h_rec,
             const cuda::std::array<FilterType, NNR> h_nonrec) : a_(a), h_rec_(h_rec), h_nonrec_(h_nonrec) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }              
       };
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~FilterOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }        
 
       // This should never be called
       template <typename... Is>

@@ -60,7 +60,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "diag(" + op_.str() + ")"; }
  
-        __MATX_INLINE__ DiagOp(T1 op, index_t k) : op_(op), k_(k) { }
+        __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) { }
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
@@ -162,7 +162,7 @@ IGNORE_WARNING_POP_GCC
    *   Diagonal to pull (0 is the main diagonal). Only used for 2D tensors and above
    */
 #ifdef DOXYGEN_ONLY
-  auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
+  auto __MATX_INLINE__ diag(const T1 &t, index_t k = 0) { 
 #else
   template <typename T1, std::enable_if_t<is_matx_op<T1>(), bool> = true>
     auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 

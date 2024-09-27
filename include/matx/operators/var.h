@@ -51,7 +51,7 @@ namespace detail {
       int ddof_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr;  
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;  
 
     public:
       using matxop = bool;
@@ -60,16 +60,22 @@ namespace detail {
       using var_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "var(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ VarOp(OpA a, int ddof) : a_(a), ddof_(ddof) { 
+      __MATX_INLINE__ VarOp(const OpA &a, int ddof) : a_(a), ddof_(ddof) { 
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }        
-      };
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~VarOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif
+      }       
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
         return tmp_out_(indices...);
-      };
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {

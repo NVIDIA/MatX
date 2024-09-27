@@ -51,7 +51,7 @@ namespace matx
         float cut_val_;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::value_type *ptr;         
+        mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;         
 
       public:
         using matxop = bool;
@@ -68,7 +68,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ AmbgFunOp(OpX x, OpY y, double fs, AMBGFunCutType_t cut, float cut_val) : 
+        __MATX_INLINE__ AmbgFunOp(const OpX &x, const OpY &y, double fs, AMBGFunCutType_t cut, float cut_val) : 
               x_(x), y_(y), fs_(fs), cut_(cut), cut_val_(cut_val) {
           
           static_assert(OpX::Rank() == 1, "Input to ambgfun must be rank 1");                
@@ -88,6 +88,12 @@ namespace matx
             MATX_ASSERT_STR(false, matxInvalidParameter, "Invalid cut type in ambgfun()");
           }
         }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~AmbgFunOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }            
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -179,7 +185,7 @@ namespace matx
  *
  */
 template <typename XTensor, typename YTensor>
-__MATX_INLINE__ auto ambgfun(XTensor &x,
+__MATX_INLINE__ auto ambgfun(const XTensor &x,
                     YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0)
 {
@@ -212,7 +218,7 @@ __MATX_INLINE__ auto ambgfun(XTensor &x,
  *
  */
 template <typename XTensor>
-__MATX_INLINE__ auto ambgfun(XTensor &x,
+__MATX_INLINE__ auto ambgfun(const XTensor &x,
                     double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

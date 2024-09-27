@@ -40,7 +40,7 @@
 #define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
-  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1)                         \
+  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1)                         \
   {                                                                 \
     using I1Type = extract_value_type_t<I1>;                       \
     using Op = TENSOR_OP<I1Type>;                                   \
@@ -71,7 +71,7 @@ namespace matx
       return op_.str() + "(" + get_type_str(in1_) + ")";
     }
 
-    __MATX_INLINE__ matxUnaryOp(I1 in1, Op op) : in1_(in1), op_(op) {
+    __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &op) : in1_(in1), op_(op) {
       if constexpr (Rank() > 0) {
         for (int32_t i = 0; i < Rank(); i++) {
           size_[i] = get_size(in1_, i);

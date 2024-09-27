@@ -56,7 +56,7 @@ namespace detail {
       using argmax_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmax(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMaxOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ ArgMaxOp(const OpA &a) : a_(a) { 
      
       };
 

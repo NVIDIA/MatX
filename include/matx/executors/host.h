@@ -117,7 +117,7 @@ class HostExecutor {
      * @param op Operator to execute
      */
     template <typename Op>
-    void Exec(Op &op) const noexcept {
+    void Exec(const Op &op) const noexcept {
       if constexpr (Op::Rank() == 0) {
         op();
       } 

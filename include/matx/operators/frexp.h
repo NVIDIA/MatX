@@ -50,7 +50,7 @@ namespace detail {
       using value_type = typename OpA::value_type;
 
       __MATX_INLINE__ std::string str() const { return "frexp()"; }
-      __MATX_INLINE__ FrexpOp(OpA a) : a_(a) { 
+      __MATX_INLINE__ FrexpOp(const OpA &a) : a_(a) { 
         static_assert(std::is_floating_point_v<value_type> ||
                       is_cuda_complex_v<value_type>, "frexp() must take a floating point input");
 

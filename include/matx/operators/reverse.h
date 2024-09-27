@@ -61,7 +61,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "reverse(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ReverseOp(T1 op) : op_(op){};
+        __MATX_INLINE__ ReverseOp(const T1 &op) : op_(op){};
 
 
         template <typename... Is>
@@ -141,7 +141,7 @@ namespace matx
    * @param t Input operator
    */
   template <int DIM, typename Op>
-    auto __MATX_INLINE__ reverse(Op t)
+    auto __MATX_INLINE__ reverse(const Op &t)
     {
       return detail::ReverseOp<DIM, Op>(t);
     };
@@ -156,8 +156,8 @@ namespace matx
    * @tparam Op Input operator/tensor type
    * @param t Input operator
    */
-  template <int DIM1, int DIM2, int... DIMS, typename Op_type>
-    auto __MATX_INLINE__ reverse(Op_type t)
+  template <int DIM1, int DIM2, int... DIMS, typename Op>
+    auto __MATX_INLINE__ reverse(const Op &t)
     {
       // recursively call remap on remaining bits
       auto op = reverse<DIM2, DIMS...>(t);
@@ -170,7 +170,7 @@ namespace matx
    * Flip the vertical axis of a tensor.
    */
   template <typename T1>
-    auto __MATX_INLINE__ flipud(T1 t)
+    auto __MATX_INLINE__ flipud(const T1 &t)
     {
       if constexpr (T1::Rank() == 1)
       {
@@ -184,7 +184,7 @@ namespace matx
    * Flip the horizontal axis of a tensor.
    */
   template <typename T1>
-    auto __MATX_INLINE__ fliplr(T1 t)
+    auto __MATX_INLINE__ fliplr(const T1 &t)
     {
       if constexpr (T1::Rank() == 1)
       {

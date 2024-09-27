@@ -63,7 +63,7 @@ namespace matx
         static_assert(DIM == 1, "overlap() only supports input rank 1 currently");
 
         __MATX_INLINE__ std::string str() const { return "overlap(" + op_.str() + ")"; }
-        __MATX_INLINE__ OverlapOp(T op, const cuda::std::array<shape_type, DIM> &windows,
+        __MATX_INLINE__ OverlapOp(const T &op, const cuda::std::array<shape_type, DIM> &windows,
                                       const cuda::std::array<shape_type, DIM> &strides) : op_(op) {
 
           // This only works for 1D tensors going to 2D at the moment. Generalize to

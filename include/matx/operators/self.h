@@ -57,7 +57,7 @@ namespace matx
         
         __MATX_INLINE__ std::string str() const { return "self(" + op_.str() + ")"; }
         
-	__MATX_INLINE__ SelfOp(T1 op) : op_(op) {}
+	      __MATX_INLINE__ SelfOp(const T1 &op) : op_(op) {}
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
@@ -112,5 +112,5 @@ namespace matx
    *   Operator of input
    */
   template <typename T1>
-    auto self(T1 t) { return detail::SelfOp<T1, T1::Rank()>(t); };
+    auto self(const T1 &t) { return detail::SelfOp<T1, T1::Rank()>(t); };
 } // end namespace matx

@@ -51,7 +51,7 @@ namespace detail {
       typename OpA::value_type upper_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
-      mutable int *ptr;  
+      mutable int *ptr = nullptr;  
 
     public:
       using matxop = bool;
@@ -60,11 +60,17 @@ namespace detail {
       using hist_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "hist()"; }
-      __MATX_INLINE__ HistOp(OpA a, typename OpA::value_type lower, typename OpA::value_type upper) : a_(a), lower_(lower), upper_(upper) { 
+      __MATX_INLINE__ HistOp(const OpA &a, typename OpA::value_type lower, typename OpA::value_type upper) : a_(a), lower_(lower), upper_(upper) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }
-      };
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~HistOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }          
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {

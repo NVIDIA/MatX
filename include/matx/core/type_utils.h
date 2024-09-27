@@ -43,7 +43,7 @@
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
-#include "matx/executors/device.h"
+#include "matx/executors/cuda.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -707,7 +707,7 @@ struct extract_value_type_impl<T, typename std::enable_if_t<is_matx_op<T>()>> {
  * @tparam T Type to extract from
  */
 template <typename T>
-using extract_value_type_t = typename detail::extract_value_type_impl<T>::value_type;
+using extract_value_type_t = typename detail::extract_value_type_impl<std::remove_cv_t<T>>::value_type;
 
 /**
  * @brief Promote half precision floating point value to fp32, or leave untouched if not half

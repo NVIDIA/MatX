@@ -49,7 +49,7 @@ namespace detail {
     private:
       OpA a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
       using matxop = bool;
@@ -58,7 +58,13 @@ namespace detail {
       using lu_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(OpA a) : a_(a) { };
+      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) { };
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~LUOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }        
 
       // This should never be called
       template <typename... Is>

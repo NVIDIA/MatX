@@ -67,7 +67,7 @@ namespace matx
        * @param cond Condition to perform the IF/ELSE on
        * @param op Operator if conditional branch is true
        */    
-      __MATX_INLINE__ IFOP(T1 cond, T2 op) : cond_(cond), op_(op)
+      __MATX_INLINE__ IFOP(const T1 &cond, const T2 &op) : cond_(cond), op_(op)
     {
       static_assert((!is_tensor_view_v<T2>),
           "Only operator emmitters are allowed in IF. Tensor views are "

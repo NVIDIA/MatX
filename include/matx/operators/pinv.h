@@ -47,7 +47,7 @@ namespace detail {
       float rcond_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
       using matxop = bool;
@@ -56,7 +56,7 @@ namespace detail {
       using pinv_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "pinv()"; }
-      __MATX_INLINE__ PinvOp(OpA a, float rcond) : a_(a), rcond_(rcond) {
+      __MATX_INLINE__ PinvOp(const OpA &a, float rcond) : a_(a), rcond_(rcond) {
         for (int r = 0; r < Rank(); r++) {
           if (r >= Rank() - 2) {
             out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);
@@ -65,7 +65,13 @@ namespace detail {
             out_dims_[r] = a_.Size(r);
           }
         } 
-      };
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~PinvOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif
+      }        
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const

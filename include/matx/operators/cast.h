@@ -69,7 +69,7 @@ namespace matx
         using value_type = NewType;
 
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
-        __MATX_INLINE__ CastOp(T op) : op_(op){};  
+        __MATX_INLINE__ CastOp(const T &op) : op_(op){};  
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
@@ -211,7 +211,7 @@ namespace matx
    * @return Operator output casted to NewType (must be complex)
    */
   template <typename NewType, typename T1, typename T2>
-    auto __MATX_INLINE__ as_complex_type(T1 t1, T2 t2)
+    auto __MATX_INLINE__ as_complex_type(const T1 &t1, const T2 &t2)
     {
       return detail::ComplexCastOp<T1, T2, NewType>(t1, t2);
     };
@@ -224,7 +224,7 @@ namespace matx
    * @return Operator output casted to int 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_int(T t)
+    auto __MATX_INLINE__ as_int(const T &t)
     {
       return as_type<int>(t);
     };   
@@ -237,7 +237,7 @@ namespace matx
    * @return Operator output casted to float 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_float(T t)
+    auto __MATX_INLINE__ as_float(const T &t)
     {
       return as_type<float>(t);
     };   
@@ -250,7 +250,7 @@ namespace matx
    * @return Operator output casted to cuda::std::complex<float>
    */
   template <typename T>
-    auto __MATX_INLINE__ as_complex_float(T t)
+    auto __MATX_INLINE__ as_complex_float(const T &t)
     {
       return as_type<cuda::std::complex<float>>(t);
     };
@@ -265,7 +265,7 @@ namespace matx
    * @return Operator output casted to cuda::std::complex<float>
    */
   template <typename T1, typename T2>
-    auto __MATX_INLINE__ as_complex_float(T1 t1, T2 t2)
+    auto __MATX_INLINE__ as_complex_float(const T1 &t1, const T2 &t2)
     {
       return as_complex_type<cuda::std::complex<float>>(t1, t2);
     };
@@ -280,7 +280,7 @@ namespace matx
    * @return Operator output casted to cuda::std::complex<double>
    */
   template <typename T1, typename T2>
-    auto __MATX_INLINE__ as_complex_double(T1 t1, T2 t2)
+    auto __MATX_INLINE__ as_complex_double(const T1 &t1, const T2 &t2)
     {
       return as_complex_type<cuda::std::complex<double>>(t1, t2);
     };
@@ -293,7 +293,7 @@ namespace matx
    * @return Operator output casted to double 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_double(T t)
+    auto __MATX_INLINE__ as_double(const T &t)
     {
       return as_type<double>(t);
     };   
@@ -306,7 +306,7 @@ namespace matx
    * @return Operator output casted to cuda::std::complex<double>
    */
   template <typename T>
-    auto __MATX_INLINE__ as_complex_double(T t)
+    auto __MATX_INLINE__ as_complex_double(const T &t)
     {
       return as_type<cuda::std::complex<double>>(t);
     };
@@ -319,7 +319,7 @@ namespace matx
    * @return Operator output casted to uint32_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_uint32(T t)
+    auto __MATX_INLINE__ as_uint32(const T &t)
     {
       return as_type<uint32_t>(t);
     };   
@@ -332,7 +332,7 @@ namespace matx
    * @return Operator output casted to int32_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_int32(T t)
+    auto __MATX_INLINE__ as_int32(const T &t)
     {
       return as_type<int32_t>(t);
     }; 
@@ -345,7 +345,7 @@ namespace matx
    * @return Operator output casted to int16_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_int16(T t)
+    auto __MATX_INLINE__ as_int16(const T &t)
     {
       return as_type<int16_t>(t);
     }; 
@@ -358,7 +358,7 @@ namespace matx
    * @return Operator output casted to uint16_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_uint16(T t)
+    auto __MATX_INLINE__ as_uint16(const T &t)
     {
       return as_type<uint16_t>(t);
     }; 
@@ -371,7 +371,7 @@ namespace matx
    * @return Operator output casted to int8_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_int8(T t)
+    auto __MATX_INLINE__ as_int8(const T &t)
     {
       return as_type<int8_t>(t);
     }; 
@@ -384,7 +384,7 @@ namespace matx
    * @return Operator output casted to uint8_t 
    */
   template <typename T>
-    auto __MATX_INLINE__ as_uint8(T t)
+    auto __MATX_INLINE__ as_uint8(const T &t)
     {
       return as_type<uint8_t>(t);
     }; 

@@ -54,7 +54,7 @@ namespace detail {
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
-      mutable out_t *ptr;       
+      mutable out_t *ptr = nullptr;       
 
     public:
       using matxop = bool;
@@ -63,7 +63,7 @@ namespace detail {
       using value_type = out_t;            
 
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
-      __MATX_INLINE__ ResamplePolyOp(OpA a, const FilterType &f, index_t up, index_t down) : 
+      __MATX_INLINE__ ResamplePolyOp(const OpA &a, const FilterType &f, index_t up, index_t down) : 
           a_(a), f_(f), up_(up), down_(down) 
       { 
         const index_t up_len = a_.Size(OpA::Rank() - 1) * up_;
@@ -75,6 +75,12 @@ namespace detail {
 
         out_dims_[OpA::Rank() - 1] = b_len;
       }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ResamplePolyOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif
+      }      
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {

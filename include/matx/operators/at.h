@@ -53,7 +53,7 @@ namespace matx
         using value_type = typename Op::value_type;
 
         __MATX_INLINE__ std::string str() const { return "at()"; }
-        __MATX_INLINE__ AtOp(Op op, Is... is) : op_(op), idx_{is...} {};
+        __MATX_INLINE__ AtOp(const Op &op, Is... is) : op_(op), idx_{is...} {};
 
         template <typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
@@ -95,7 +95,7 @@ namespace matx
 #else
   template <typename Op, typename... Is>
 #endif
-  __MATX_INLINE__ auto at(const Op op, Is... indices) {
+  __MATX_INLINE__ auto at(const Op &op, Is... indices) {
     return detail::AtOp(op, indices...);
   }
 } // end namespace matx

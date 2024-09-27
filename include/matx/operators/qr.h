@@ -56,7 +56,7 @@ namespace detail {
       using qr_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ QROp(OpA a) : a_(a) { };
+      __MATX_INLINE__ QROp(const OpA &a) : a_(a) { };
 
       // This should never be called
       template <typename... Is>
@@ -105,7 +105,7 @@ namespace detail {
  * @returns Operator to generate Q/R outputs
  */
 template<typename AType>
-__MATX_INLINE__ auto qr(AType A) {
+__MATX_INLINE__ auto qr(const AType &A) {
   return detail::QROp(A);
 }
 
@@ -125,7 +125,7 @@ namespace detail {
       using qr_solver_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
-      __MATX_INLINE__ SolverQROp(OpA a) : a_(a) { };
+      __MATX_INLINE__ SolverQROp(const OpA &a) : a_(a) { }    
 
       // This should never be called
       template <typename... Is>

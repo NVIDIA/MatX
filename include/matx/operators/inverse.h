@@ -47,7 +47,7 @@ namespace detail {
     private:
       OpA a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
       using matxop = bool;
@@ -56,7 +56,13 @@ namespace detail {
       using inv_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "inv()"; }
-      __MATX_INLINE__ InvOp(OpA a) : a_(a) {};
+      __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {};
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~InvOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }      
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const

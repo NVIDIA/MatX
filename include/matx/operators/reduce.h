@@ -51,7 +51,7 @@ namespace matx
         bool init_;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -68,6 +68,12 @@ namespace matx
           for (int r = 0; r < ORank; r++) {
             out_dims_[r] = a_.Size(r);
           }
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ReduceOp() {
+        #ifndef __CUDA_ARCH__
+          matxFree(ptr);
+        #endif
         }
 
         template <typename... Is>

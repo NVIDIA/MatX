@@ -62,7 +62,9 @@ namespace matx
     public:
       using value_type = void; ///< Scalar type for type extraction
 
-      __MATX_INLINE__ std::string str() const { return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}"; }
+      __MATX_INLINE__ std::string str() const { 
+        return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}"; 
+      }
 
       /**
        * @brief Constructor for an IFELSE statement
@@ -71,7 +73,8 @@ namespace matx
        * @param op1 Operator if conditional branch is true
        * @param op2 Operator if conditional branch is false
        */
-      __MATX_INLINE__ IFELSE(C1 cond, T1 op1, T2 op2) : cond_(cond), op1_(op1), op2_(op2)
+      __MATX_INLINE__ IFELSE(const C1 &cond, const T1 &op1, const T2 &op2) : 
+                              cond_(cond), op1_(op1), op2_(op2)
     {
       static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
           "Only operator emmitters are allowed in IFELSE. Tensor views "

@@ -50,7 +50,7 @@ namespace matx
         static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -78,6 +78,11 @@ namespace matx
         }
       }
 
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~NormOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif
+      }        
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {

@@ -75,7 +75,7 @@ namespace matx
         return get_str<-1>();
       }
 
-      __MATX_INLINE__ ConcatOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
+      __MATX_INLINE__ ConcatOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
@@ -243,7 +243,7 @@ namespace matx
    * @return concatenated operator 
    */
   template <typename... Ts>
-    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, Ts... ts)
+    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, const Ts&... ts)
     {
       auto first = detail::pp_get<0>(ts...);
 

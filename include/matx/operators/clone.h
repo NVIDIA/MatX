@@ -54,7 +54,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ CloneOp(T op, cuda::std::array<index_t, CRank> shape) : op_(op) {
+        __MATX_INLINE__ CloneOp(const T &op, cuda::std::array<index_t, CRank> shape) : op_(op) {
           static_assert(T::Rank() < CRank, "Cloning rank must be higher than input operator rank");
 
           const index_t num_keep = std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; });
@@ -83,7 +83,7 @@ IGNORE_WARNING_POP_GCC
           }
           MATX_ASSERT(d == T::Rank(), matxInvalidDim);
 
-        };
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -162,7 +162,7 @@ IGNORE_WARNING_POP_GCC
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>
-    auto __MATX_INLINE__ clone(Op t, const cuda::std::array<index_t, Rank> &shape)
+    auto __MATX_INLINE__ clone(const Op &t, const cuda::std::array<index_t, Rank> &shape)
     {
       static_assert(Rank >= Op::Rank(), "Cloning rank must be >= input operator rank");
 

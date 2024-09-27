@@ -57,7 +57,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sph2cart(" + get_type_str(theta_) + 
           "," + get_type_str(phi_) + "," + get_type_str(r_) + ")"; }
 
-        __MATX_INLINE__ Sph2CartOp(T1 theta, T2 phi, T3 r) : theta_(theta), phi_(phi), r_(r)
+        __MATX_INLINE__ Sph2CartOp(const T1 &theta, const T2 &phi, const T3 &r) : theta_(theta), phi_(phi), r_(r)
       {
         ASSERT_COMPATIBLE_OP_SIZES(theta);
         ASSERT_COMPATIBLE_OP_SIZES(phi);
@@ -151,7 +151,7 @@ namespace matx
    *   Tuple of operators for x, y, and z.
    */
   template <typename T1, typename T2, typename T3>
-    auto __MATX_INLINE__ sph2cart(T1 theta, T2 phi, T3 r)
+    auto __MATX_INLINE__ sph2cart(const T1 &theta, const T2 &phi, const T3 &r)
     {
       return cuda::std::tuple{ 
         detail::Sph2CartOp<T1,T2,T3,0>(theta, phi, r),

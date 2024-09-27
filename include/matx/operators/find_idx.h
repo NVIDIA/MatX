@@ -56,7 +56,7 @@ namespace detail {
       using find_idx_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find_idx()"; }
-      __MATX_INLINE__ FindIdxOp(OpA a, SelectType sel) : a_(a), sel_(sel) { };
+      __MATX_INLINE__ FindIdxOp(const OpA &a, SelectType sel) : a_(a), sel_(sel) { };
 
       // This should never be called
       template <typename... Is>

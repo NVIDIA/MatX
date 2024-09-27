@@ -56,7 +56,7 @@ namespace detail {
       index_t decimation_factor_;
       cuda::std::array<index_t, OpA::Rank() + 1> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank() + 1> tmp_out_;
-      mutable out_t *ptr;       
+      mutable out_t *ptr = nullptr;       
 
     public:
       using matxop = bool;
@@ -65,7 +65,7 @@ namespace detail {
       using value_type = out_t;            
 
       __MATX_INLINE__ std::string str() const { return "channelize_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
-      __MATX_INLINE__ ChannelizePolyOp(OpA a, const FilterType &f, index_t num_channels, index_t decimation_factor) :
+      __MATX_INLINE__ ChannelizePolyOp(const OpA &a, const FilterType &f, index_t num_channels, index_t decimation_factor) :
           a_(a), f_(f), num_channels_(num_channels), decimation_factor_(decimation_factor)
       { 
         const index_t b_len = (a_.Size(OpA::Rank() - 1) + num_channels - 1) / num_channels;
@@ -77,6 +77,12 @@ namespace detail {
         out_dims_[Rank() - 2] = b_len;
         out_dims_[Rank() - 1] = num_channels;
       }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ChannelizePolyOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }          
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {

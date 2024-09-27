@@ -54,7 +54,7 @@ namespace matx
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
         mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
-        mutable out_t *ptr; 
+        mutable out_t *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -65,6 +65,12 @@ namespace matx
         __MATX_INLINE__ std::string str() const { 
           return "conv1d(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
         }
+
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~CorrOp() {
+        #ifndef __CUDA_ARCH__
+          matxFree(ptr);
+        #endif        
+        }          
 
         __MATX_INLINE__ CorrOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {

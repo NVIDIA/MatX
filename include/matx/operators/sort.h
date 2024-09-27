@@ -50,7 +50,7 @@ namespace detail {
       SortDirection_t dir_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
       using matxop = bool;
@@ -59,11 +59,17 @@ namespace detail {
       using sort_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "sort()"; }
-      __MATX_INLINE__ SortOp(OpA a, SortDirection_t dir) : a_(a), dir_(dir) { 
+      __MATX_INLINE__ SortOp(const OpA &a, SortDirection_t dir) : a_(a), dir_(dir) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }
       };
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~SortOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif
+      }      
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {

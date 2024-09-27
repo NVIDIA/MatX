@@ -52,7 +52,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "isclose()"; }
 
-        __MATX_INLINE__ IsCloseOp(Op1 op1, Op2 op2, double rtol, double atol) : 
+        __MATX_INLINE__ IsCloseOp(const Op1 &op1, const Op2 &op2, double rtol, double atol) : 
           op1_(op1), op2_(op2), rtol_(static_cast<inner_type>(rtol)), atol_(static_cast<inner_type>(atol)) 
         {
           static_assert(op1.Rank() == op2.Rank(), "Operator ranks must match in isclose()");
@@ -128,7 +128,7 @@ namespace matx
    * @return IsClose operator
    */
   template <typename Op1, typename Op2>
-  __MATX_INLINE__ auto isclose(Op1 op1, Op2 op2, double rtol = 1e-5, double atol = 1e-8) {
+  __MATX_INLINE__ auto isclose(const Op1 &op1, const Op2 &op2, double rtol = 1e-5, double atol = 1e-8) {
     return detail::IsCloseOp<Op1, Op2>(op1, op2, rtol, atol);
   }
 } // end namespace matx

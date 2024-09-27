@@ -49,6 +49,7 @@ namespace detail {
       OpA a_;
       SolverFillMode uplo_;
       mutable matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable typename OpA::value_type *ptr = nullptr;      
 
     public:
       using matxop = bool;
@@ -57,7 +58,13 @@ namespace detail {
       using chol_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "chol()"; }
-      __MATX_INLINE__ CholOp(OpA a, SolverFillMode uplo) : a_(a), uplo_(uplo) { };
+      __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) { };
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~CholOp() {
+      #ifndef __CUDA_ARCH__
+        matxFree(ptr);
+      #endif        
+      }          
 
       // This should never be called
       template <typename... Is>
@@ -86,12 +93,7 @@ namespace detail {
       {
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, a_.Shape(), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, a_.Shape(), MATX_HOST_MEMORY);
-        }
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }

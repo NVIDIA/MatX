@@ -66,7 +66,7 @@ namespace matx
 
         static_assert(Rank() > 0, "PermuteOp: Rank of operator must be greater than 0.");
 
-	      __MATX_INLINE__ PermuteOp(T op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
+	      __MATX_INLINE__ PermuteOp(const T &op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
 
           for(int32_t i = 0; i < Rank(); i++) {
             [[maybe_unused]] int32_t dim = dims[i];

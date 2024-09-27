@@ -58,7 +58,7 @@ namespace detail {
       using einsum_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "einsum()"; }
-      __MATX_INLINE__ EinsumOp(const std::string &subscripts, OpA... ops) : subscripts_(subscripts), a_(cuda::std::make_tuple(ops...)) { };
+      __MATX_INLINE__ EinsumOp(const std::string &subscripts, const OpA&... ops) : subscripts_(subscripts), a_(cuda::std::make_tuple(ops...)) { };
 
       // This should never be called
       template <typename... Is>
@@ -121,7 +121,7 @@ namespace cutensor {
    * @param ops List of input operators
    */
   template <typename... InT>
-  __MATX_INLINE__ auto einsum(const std::string &subscripts, InT... ops) {
+  __MATX_INLINE__ auto einsum(const std::string &subscripts, const InT&... ops) {
     return detail::EinsumOp(subscripts, ops...);
   }
 }

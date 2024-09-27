@@ -74,7 +74,7 @@ namespace matx
         return get_str<-1>();
       }
 
-      __MATX_INLINE__ StackOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
+      __MATX_INLINE__ StackOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
         static_assert((... && (RANK == ts.Rank())), "stacked ops must have the same rank");
@@ -214,11 +214,11 @@ namespace matx
    * @return stacked operator 
    */
   template <typename... Ts>
-    __MATX_INLINE__ __MATX_HOST__  auto stack(int axis, Ts... ts)
+    __MATX_INLINE__ __MATX_HOST__  auto stack(int axis, const Ts&... ts)
     {
       auto first = detail::pp_get<0>(ts...);
 
-      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than or equal to the the rank of the operators");
+      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "stack must take an axis less than or equal to the the rank of the operators");
       return detail::StackOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx

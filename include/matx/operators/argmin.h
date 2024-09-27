@@ -56,7 +56,7 @@ namespace detail {
       using argmin_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMinOp(OpA a) : a_(a) {
+      __MATX_INLINE__ ArgMinOp(const OpA &a) : a_(a) {
      
       };
 
