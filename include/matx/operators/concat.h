@@ -245,9 +245,9 @@ namespace matx
   template <typename... Ts>
     __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, Ts... ts)
     {
-      auto first = detail::pp_get<0>(ts...);
-
+      [[maybe_unused]] const auto first = detail::pp_get<0>(ts...);
       MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");
+
       return detail::ConcatOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx
