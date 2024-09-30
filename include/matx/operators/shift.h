@@ -54,7 +54,7 @@ namespace matx
       class ShiftOp : public BaseOp<ShiftOp<DIM, T1, T2>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         T2 shift_;
 
       public:

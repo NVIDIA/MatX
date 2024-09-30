@@ -51,7 +51,7 @@ namespace matx
         using self_type = OverlapOp<DIM, T>;
 
       private:
-        typename base_type<T>::type op_;
+        typename detail::base_type_t<T> op_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, DIM+1> n_;
         cuda::std::array<shape_type, DIM+1> s_;

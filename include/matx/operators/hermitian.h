@@ -49,7 +49,7 @@ namespace matx
       class HermitianTransOp : public BaseOp<HermitianTransOp<T1, DIM>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;

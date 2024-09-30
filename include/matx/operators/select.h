@@ -47,8 +47,8 @@ namespace matx
       class SelectOp : public BaseOp<SelectOp<T, IdxType>>
     {
       private:
-        typename base_type<T>::type op_;
-        typename base_type<IdxType>::type idx_;
+        typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<IdxType> idx_;
 
       public:
         using matxop = bool;

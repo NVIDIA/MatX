@@ -61,12 +61,12 @@ namespace matx
         }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const 
-          {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const 
+        {
 
-            return static_cast<int>(detail::_internal_abs(op1_(indices...) - op2_(indices...)) <= 
-               static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * detail::_internal_abs(op2_(indices...)));
-          }
+          return static_cast<int>(detail::_internal_abs(op1_(indices...) - op2_(indices...)) <= 
+              static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * detail::_internal_abs(op2_(indices...)));
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -105,8 +105,8 @@ namespace matx
         }          
 
       private:
-        Op1 op1_;
-        Op2 op2_;
+        typename detail::base_type_t<Op1> op1_;
+        typename detail::base_type_t<Op2> op2_;
         inner_type rtol_;
         inner_type atol_;
 

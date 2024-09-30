@@ -47,7 +47,7 @@ namespace detail {
   class MinOp : public BaseOp<MinOp<OpA, ORank>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;     
@@ -65,11 +65,7 @@ namespace detail {
         }        
       }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~MinOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif
-      }      
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -110,6 +106,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       } 
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

@@ -50,7 +50,7 @@ namespace detail {
       // will be cuda::std::complex<double>.
       using out_t = cuda::std::common_type_t<
         complex_from_scalar_t<typename OpA::value_type>, complex_from_scalar_t<typename FilterType::value_type>>;
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       FilterType f_;
       index_t num_channels_;
       index_t decimation_factor_;
@@ -78,11 +78,7 @@ namespace detail {
         out_dims_[Rank() - 1] = num_channels;
       }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ChannelizePolyOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }          
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
@@ -133,6 +129,8 @@ namespace detail {
         if constexpr (is_matx_op<FilterType>()) {
           f_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         } 
+
+        matxFree(ptr);
       }        
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

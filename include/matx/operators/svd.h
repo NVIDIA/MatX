@@ -48,7 +48,7 @@ namespace detail {
   class SVDOp : public BaseOp<SVDOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       SVDMode jobz_;
       SVDHostAlgo algo_;
 
@@ -84,7 +84,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svd() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in svd() since there are multiple return values and it
@@ -143,8 +145,8 @@ namespace detail {
   class SVDPIOp : public BaseOp<SVDPIOp<OpA,OpX>>
   {
     private:
-      OpA a_;
-      OpX x_;
+      typename detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpX> x_;
       int iterations_;
       index_t k_;
 
@@ -176,9 +178,11 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svdpi() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -221,7 +225,7 @@ namespace detail {
   class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       int max_iters_;
       float tol_;
 
@@ -253,9 +257,11 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svdbpi() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

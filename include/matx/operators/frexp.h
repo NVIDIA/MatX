@@ -43,7 +43,7 @@ namespace detail {
   class FrexpOp : public BaseOp<FrexpOp<OpA, WHICH>>
   {
     private:
-      typename base_type<OpA>::type a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;

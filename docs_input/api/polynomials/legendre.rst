@@ -5,9 +5,9 @@ legendre
 
 Return Legendre polynomial coefficients at the input operator
 
-.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in)
-.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in, int (&axis)[2])
-.. doxygenfunction:: legendre(T1 n, T2 m, const T3 in, cuda::std::array<int, 2> axis)  
+.. doxygenfunction:: legendre(const T1 &n, const T2 &m, const T3 &in)
+.. doxygenfunction:: legendre(const T1 &n, const T2 &m, const T3 &in, int (&axis)[2])
+.. doxygenfunction:: legendre(const T1 &n, const T2 &m, const T3 &in, cuda::std::array<int, 2> axis)  
 
 Examples
 ~~~~~~~~

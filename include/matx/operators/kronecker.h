@@ -50,8 +50,8 @@ namespace matx
       class KronOp : public BaseOp<KronOp<T1, T2, DIM>>
     {
       private:
-        typename base_type<T1>::type op1_;
-        typename base_type<T2>::type op2_;
+        typename detail::base_type_t<T1> op1_;
+        typename detail::base_type_t<T2> op2_;
 
       public:
         using matxop = bool;

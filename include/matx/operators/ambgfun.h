@@ -44,6 +44,7 @@ namespace matx
     class AmbgFunOp : public BaseOp<AmbgFunOp<OpX, OpY>>
     {
       private:
+        // Make these base_type once we get rid of std::optional
         mutable OpX x_;
         mutable OpY y_;
         double fs_;
@@ -89,11 +90,7 @@ namespace matx
           }
         }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~AmbgFunOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }            
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -149,6 +146,8 @@ namespace matx
           if constexpr (is_matx_op<OpY>()) {
             y_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr); 
         }            
     };
   }
@@ -186,7 +185,7 @@ namespace matx
  */
 template <typename XTensor, typename YTensor>
 __MATX_INLINE__ auto ambgfun(const XTensor &x,
-                    YTensor &y, double fs, AMBGFunCutType_t cut,
+                    const YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

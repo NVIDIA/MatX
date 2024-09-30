@@ -46,9 +46,9 @@ namespace matx
       class Sph2CartOp : public BaseOp<Sph2CartOp<T1, T2, T3, WHICH>>
     {
       private:
-        typename base_type<T1>::type theta_;
-        typename base_type<T2>::type phi_;
-        typename base_type<T3>::type r_;
+        typename detail::base_type_t<T1> theta_;
+        typename detail::base_type_t<T2> phi_;
+        typename detail::base_type_t<T3> r_;
 
       public:
         using matxop = bool;

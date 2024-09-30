@@ -45,7 +45,7 @@ namespace matx
     {
       private:
         using out_type = typename inner_op_type_t<typename remove_cvref_t<OpA>::value_type>::type;
-        OpA a_;
+        typename detail::base_type_t<OpA> a_;
         NormOrder order_;
         static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
@@ -67,6 +67,7 @@ namespace matx
           return "matrix_norm";
         }
       }
+
       __MATX_INLINE__ NormOp(const OpA &op, NormOrder order) : a_(op), order_(order) {
         if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
           MATX_ASSERT_STR(order == NormOrder::NONE || order == NormOrder::L1 || order == NormOrder::L2, matxInvalidParameter,
@@ -78,11 +79,7 @@ namespace matx
         }
       }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~NormOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif
-      }        
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -122,6 +119,8 @@ namespace matx
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

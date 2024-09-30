@@ -10,8 +10,8 @@ Matrix Multiply (GEMM)
 is supported for any tensor with a rank higher than 2.
 
 
-.. doxygenfunction:: matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0)
-.. doxygenfunction:: matmul(const OpA A, const OpB B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)
+.. doxygenfunction:: matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0)
+.. doxygenfunction:: matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)
 
 Examples
 ~~~~~~~~

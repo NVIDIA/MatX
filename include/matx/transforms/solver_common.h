@@ -116,12 +116,18 @@ __MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
 }
 
 
+
 template <typename Op, typename Executor>
 __MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
   constexpr int RANK = Op::Rank();
 
   bool supported = true;
-  if constexpr (!(is_tensor_view_v<Op>)) {
+  if constexpr (is_matx_transform_op<Op>()) {
+    // We can assume that if a transform is passed to the input then PreRun has already completed
+    // on the transform and we can use the internal pointer
+    return make_tensor<typename Op::value_type>(in.Data(), Shape(in));
+  }  
+  else if constexpr (!(is_tensor_view_v<Op>)) {
     supported = false;
   } else {
 
@@ -138,7 +144,7 @@ __MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec
   }
 
   if (supported) {
-    return in;
+    return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
   } else {
     if constexpr (is_cuda_executor_v<Executor>) {
       return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());

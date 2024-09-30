@@ -6,8 +6,8 @@ ifft
 Perform a 1D inverse FFT. Batching is supported for any tensor with a rank higher than 1.
 
 
-.. doxygenfunction:: ifft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
-.. doxygenfunction:: ifft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: ifft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 
 Examples
 ~~~~~~~~

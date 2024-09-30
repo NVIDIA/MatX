@@ -44,8 +44,8 @@ namespace matx
     class CGSolveOp : public BaseOp<CGSolveOp<OpA, OpB>>
     {
       private:
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         double tol_;
         int max_iters_;
         cuda::std::array<index_t, 2> out_dims_;
@@ -70,11 +70,7 @@ namespace matx
           }
         }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~CGSolveOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }           
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -130,6 +126,8 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           } 
+
+          matxFree(ptr); 
         }           
     };
   }

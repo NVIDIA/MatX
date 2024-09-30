@@ -278,7 +278,7 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
   auto tau_new = OpToTensor(tau, exec);
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 

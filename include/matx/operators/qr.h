@@ -47,7 +47,7 @@ namespace detail {
   class QROp : public BaseOp<QROp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -78,7 +78,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "qr() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in qr() since there are multiple return values and it
@@ -115,8 +117,7 @@ namespace detail {
   class SolverQROp : public BaseOp<SolverQROp<OpA>>
   {
     private:
-      OpA a_;
-      matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -146,7 +147,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "qr_solver() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in qr_solver() since there are multiple return values and it

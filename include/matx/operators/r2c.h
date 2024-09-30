@@ -43,7 +43,7 @@ namespace matx
       class R2COp : public BaseOp<R2COp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         index_t orig_size_;
 
       public:

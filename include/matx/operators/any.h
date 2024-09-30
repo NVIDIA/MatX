@@ -63,13 +63,9 @@ namespace detail {
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }        
-      };
+      }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~AnyOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }         
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -110,6 +106,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr); 
       }          
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

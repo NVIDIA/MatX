@@ -231,6 +231,34 @@ template <typename T> constexpr bool is_matx_op_lvalue()
 }
 
 namespace detail {
+template <typename T, typename = void> struct is_tensor_t : std::false_type {};
+template <typename T>
+struct is_tensor_t<T, std::void_t<typename T::tensor_t_type>> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a MatX tensor_t
+ * 
+ * @tparam T Type to test
+ */
+template< class T >
+inline constexpr bool is_tensor_t_v = detail::is_tensor_t<typename remove_cvref<T>::type>::value;
+
+namespace detail {
+template <typename T, typename = void> struct is_tensor_impl : std::false_type {};
+template <typename T>
+struct is_tensor_impl<T, std::void_t<typename T::tensor_impl>> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a MatX tensor_impl_t
+ * 
+ * @tparam T Type to test
+ */
+template< class T >
+inline constexpr bool is_tensor_impl_v = detail::is_tensor_impl<typename remove_cvref<T>::type>::value;
+
+namespace detail {
 template <typename T, typename = void> struct is_tensor_view : std::false_type {
 };
 
@@ -781,7 +809,7 @@ struct base_type {
 };
 
 template <typename T> 
-struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
+struct base_type<T, typename std::enable_if_t<is_tensor_t_v<T>>> {
   using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type>;
 };
 

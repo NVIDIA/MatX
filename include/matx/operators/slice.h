@@ -52,7 +52,7 @@ namespace matx
         using self_type = SliceOp<DIM, T, StrideType>;
 
       private:
-        typename base_type<T>::type op_;
+        typename detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
@@ -114,24 +114,10 @@ namespace matx
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
-#if 0
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
-
-#pragma unroll 
-            for(int32_t i = 0; i < T::Rank(); i++) {
-              ind[i] = starts_[i];
-            }
-
-#pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {
-              ind[dims_[i]] += inds[i] * strides_[i]; 
-            }
-#else            
+       
             // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind;
-            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T::Rank()> ind = starts_;
+            cuda::std::array<index_t, Rank()> inds{indices...};   
 
             #pragma unroll            
             for (int32_t i = 0; i < T::Rank(); i++) {
@@ -145,14 +131,9 @@ namespace matx
                     ind[i] = starts_[j] + inds[j];
                   }
                 }
-                else {
-                  ind[i] = starts_[i];
-                }
               }
             }       
-#endif                   
-
-            //return op_(ind);
+               
             return cuda::std::apply(op_, ind);
           }
 
@@ -161,23 +142,9 @@ namespace matx
           {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
-#if 0
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ind{indices...};
-
-#pragma unroll 
-            for(int32_t i = 0; i < T::Rank(); i++) {
-              ind[i] = starts_[i];
-            }
-
-#pragma unroll 
-            for(int32_t i = 0; i < Rank(); i++) {
-              ind[dims_[i]] += inds[i] * strides_[i]; 
-            }
-#else            
+          
             // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind;
+            cuda::std::array<index_t, T::Rank()> ind = starts_;
             cuda::std::array<index_t, Rank()> inds{indices...};
 
             #pragma unroll            
@@ -192,14 +159,9 @@ namespace matx
                     ind[i] = starts_[j] + inds[j];
                   }
                 }
-                else {
-                  ind[i] = starts_[i];
-                }
               }
-            }        
-#endif       
+            }              
 
-            //return op_(ind);
             return cuda::std::apply(op_, ind);
           }
 

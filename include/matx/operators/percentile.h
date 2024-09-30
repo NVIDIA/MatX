@@ -45,7 +45,7 @@ namespace detail {
   class PercentileOp : public BaseOp<PercentileOp<OpA,ORank>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       uint32_t q_;
       PercentileMethod method_;
       cuda::std::array<index_t, ORank> out_dims_; 
@@ -65,11 +65,7 @@ namespace detail {
         }
       }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~PercentileOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif
-      }         
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -110,6 +106,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }             
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

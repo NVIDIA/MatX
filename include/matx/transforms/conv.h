@@ -278,9 +278,9 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
 
   const int Rank = In1Type::Rank();
   //detail::tensor_impl_t<typename OutputType::value_type, OutputType::Rank(), typename OutputType::desc_type> &o_base = o;
-  typename detail::base_type<OutputType>::type &o_base = o;
-  const typename detail::base_type<In1Type>::type &in1_base = i1;
-  const typename detail::base_type<In2Type>::type &in2_base = i2;
+  typename detail::base_type_t<OutputType> &o_base = o;
+  const typename detail::base_type_t<In1Type> &in1_base = i1;
+  const typename detail::base_type_t<In2Type> &in2_base = i2;
 
   if (i1.Size(Rank-1) < i2.Size(Rank-1)) {
     if (method == MATX_C_METHOD_DIRECT) {

@@ -259,7 +259,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
 
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 
@@ -273,37 +273,40 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   // contiguous tensor for use with cuSolver.
   uplo = (uplo == SolverFillMode::UPPER) ? SolverFillMode::LOWER : SolverFillMode::UPPER;
 
+  T1 *out_ptr = nullptr;
+  detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
-  auto tv = [allContiguous, &a_new, &out, &exec]() -> auto {
-    if (allContiguous) {
-      (out = a_new).run(exec);
-      return out;
-    } else{
-      auto t = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-      (t = a_new).run(exec);
-      return t;
-    }
-  }();
+  
+  if (allContiguous) {
+    make_tensor(tmp_out, out.Data(), out.Shape());
+    (out = a_new).run(exec);
+  }
+  else {
+    matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    make_tensor(tmp_out, out_ptr, a_new.Shape());
+    (tmp_out = a_new).run(exec);
+  }
 
   cublasFillMode_t uplo_cusolver = (uplo == SolverFillMode::UPPER)? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tv)>::GetCholParams(tv, uplo_cusolver);
+  auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>::GetCholParams(tmp_out, uplo_cusolver);
 
-  using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(a_new)>;
+  using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>;
   detail::GetCache().LookupAndExec<detail::chol_cuda_cache_t>(
     detail::GetCacheIdFromType<detail::chol_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(tv, uplo_cusolver);
+      return std::make_shared<cache_val_type>(tmp_out, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tv, tv, exec, uplo_cusolver);
+      ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver);
     }
   );
 
-  if (! allContiguous) {
-    matx::copy(out, tv, exec);
+  if (!allContiguous) {
+    matx::copy(out, tmp_out, exec);
+    matxFree(out_ptr);
   }
 }
 
