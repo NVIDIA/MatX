@@ -186,7 +186,7 @@ namespace matx
  */
 template <typename XTensor, typename YTensor>
 __MATX_INLINE__ auto ambgfun(const XTensor &x,
-                    YTensor &y, double fs, AMBGFunCutType_t cut,
+                    const YTensor &y, double fs, AMBGFunCutType_t cut,
                     float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

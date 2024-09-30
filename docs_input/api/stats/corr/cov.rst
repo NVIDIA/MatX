@@ -9,7 +9,7 @@ Compute a covariance matrix
    This function is currently not supported with host-based executors (CPU)
 
 
-.. doxygenfunction:: cov(AType a)
+.. doxygenfunction:: cov(const AType &a)
 
 Examples
 ~~~~~~~~

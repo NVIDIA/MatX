@@ -162,26 +162,26 @@ IGNORE_WARNING_POP_GCC
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>
-    auto __MATX_INLINE__ clone(const Op &t, const cuda::std::array<index_t, Rank> &shape)
-    {
-      static_assert(Rank >= Op::Rank(), "Cloning rank must be >= input operator rank");
+  auto __MATX_INLINE__ clone(const Op &t, const cuda::std::array<index_t, Rank> &shape)
+  {
+    static_assert(Rank >= Op::Rank(), "Cloning rank must be >= input operator rank");
 
-      if constexpr (Op::Rank() == Rank) {
-        return t; // No-op to same rank
-      }
-      else if constexpr (is_tensor_view_v<Op>) {
-        return t.template Clone<static_cast<int>(Rank)>(shape);
-      } else {
-        return detail::CloneOp<static_cast<int>(Rank), Op>(t, shape);
+    if constexpr (Op::Rank() == Rank) {
+      return t; // No-op to same rank
+    }
+    else if constexpr (is_tensor_view_v<Op>) {
+      return t.template Clone<static_cast<int>(Rank)>(shape);
+    } else {
+      return detail::CloneOp<static_cast<int>(Rank), Op>(t, shape);
 
-      }
-    };
+    }
+  };
 
   template <int Rank, typename Op>
-    auto __MATX_INLINE__ clone(Op t, const index_t (&shape)[Rank])
-    {
-      return clone<Rank, Op>(t, detail::to_array(shape));
-    };
+  auto __MATX_INLINE__ clone(const Op &t, const index_t (&shape)[Rank])
+  {
+    return clone<Rank, Op>(t, detail::to_array(shape));
+  };
 
 
 } // end namespace matx
