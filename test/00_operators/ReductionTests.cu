@@ -784,6 +784,8 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
     tensor_t<TestType, 2> t2e{{2, 4}};
     tensor_t<TestType, 2> t2o{{2, 5}};
     tensor_t<TestType, 1> t1out{{2}};
+    tensor_t<TestType, 1> t4out{{4}};
+    tensor_t<TestType, 1> t5out{{5}};
 
     t1e.SetVals({1, 3, 8, 2, 9, 6, 7, 4, 5, 0});
     t1o.SetVals({1, 3, 8, 2, 9, 6, 7, 4, 5, 0, 10});
@@ -806,10 +808,25 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(2.5f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(2.5f)));
 
+    (t4out = median(t2e, {0})).run(exec);
+    exec.sync();
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t4out(0), (TestType)(2.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t4out(1), (TestType)(2.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t4out(2), (TestType)(1.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t4out(3), (TestType)(3.5f)));
+
     (t1out = median(t2o, {1})).run(exec);
     exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(0), (TestType)(3.0f)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1out(1), (TestType)(3.0f)));
+
+    (t5out = median(t2o, {0})).run(exec);
+    exec.sync();
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t5out(0), (TestType)(2.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t5out(1), (TestType)(2.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t5out(2), (TestType)(3.0f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t5out(3), (TestType)(2.5f)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t5out(4), (TestType)(4.5f)));
   }
 
   MATX_EXIT_HANDLER();

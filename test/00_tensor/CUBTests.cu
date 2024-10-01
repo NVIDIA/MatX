@@ -212,6 +212,16 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
     ASSERT_TRUE(tmpv(i) < tmpv(i - 1));
   }
 
+  // operator input test
+  const auto L = tmpv.Lsize();
+  (tmpv = matx::sort(matx::concat(0,
+    static_cast<TestType>(2.0) * matx::ones<TestType>({1}), matx::ones<TestType>({L-1})), SORT_DIR_ASC)).run(this->exec);
+  this->exec.sync();
+  ASSERT_TRUE(tmpv(L-1) == static_cast<TestType>(2.0));
+  for (index_t i = 0; i < L-1; i++) {
+    ASSERT_TRUE(tmpv(i) == static_cast<TestType>(1.0));
+  }
+
   // 2D tests
   auto tmpv2 = make_tensor<TestType>(this->t2.Shape());
 
@@ -228,6 +238,15 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
     for (index_t j = 1; j < tmpv2.Size(1); j++) {
       ASSERT_TRUE(tmpv2(i, j) > tmpv2(i, j - 1));
     }
+  }
+
+  // Sort the first column of t2
+  auto tmpslice = make_tensor<TestType>({this->t2.Size(0)});
+  (tmpslice = matx::sort(matx::slice<1>(this->t2, {0, 0}, {matx::matxEnd, matx::matxDropDim}), SORT_DIR_ASC)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 1; i < this->t2.Size(0); i++) {
+    ASSERT_TRUE(tmpslice(i) > tmpslice(i-1));
   }
 
   // Descending

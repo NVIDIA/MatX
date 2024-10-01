@@ -563,7 +563,9 @@ inline void ExecSort(OutputTensor &a_out,
 
 #ifdef __CUDACC__
   static_assert(is_tensor_view_v<InputOperator>, "Sorting only accepts tensors for now (no operators)");
-  MATX_ASSERT_STR(a.IsContiguous(), matxInvalidType, "Tensor must be contiguous in memory for sorting");
+  if (! a.IsContiguous()) {
+    MATX_THROW(matxInvalidType, "Tensor must be contiguous in memory for sorting");
+  }
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -1131,6 +1133,48 @@ struct CubParamsKeyEq {
   }
 };
 
+/**
+ * Inner function for the public sort_impl(). sort_impl() allocates a temporary
+ * tensor if needed so that the inner function can assume contiguous tensor views
+ * as inputs.
+ */
+template <typename OutputTensor, typename InputOperator>
+void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
+          const SortDirection_t dir,
+          cudaExecutor exec = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  cudaStream_t stream = exec.getStream();
+
+  detail::SortParams_t p{dir};
+
+#ifndef MATX_DISABLE_CUB_CACHE
+  auto params =
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
+                            detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
+
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, detail::SortParams_t>;
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(a_out, a, p, stream);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->ExecSort(a_out, a, dir, stream);
+      }
+    );
+#else
+  auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
+      a_out, a, p, stream};
+  tmp.ExecSort(a_out, a, dir, stream);
+#endif
+#endif
+}
+
 using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
 
 }
@@ -1371,30 +1415,20 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 
   cudaStream_t stream = exec.getStream();
 
-  detail::SortParams_t p{dir};
-
-#ifndef MATX_DISABLE_CUB_CACHE
-  auto params =
-      detail::matxCubPlan_t<OutputTensor,
-                            InputOperator,
-                            detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
-
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, detail::SortParams_t>;
-  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
-      params,
-      [&]() {
-        return std::make_shared<cache_val_type>(a_out, a, p, stream);
-      },
-      [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->ExecSort(a_out, a, dir, stream);
+  // sorting currently requires a contiguous tensor view, so allocate a temporary
+  // tensor to copy the input if necessary.
+  auto a_contig = [&a, &stream]() -> auto {
+    if constexpr (is_tensor_view_v<InputOperator>) {
+      if (a.IsContiguous()) {
+        return a;
       }
-    );
-#else
-  auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
-      a_out, a, p, stream};
-  tmp.ExecSort(a_out, a, dir, stream);
-#endif
+    }
+    auto a_tmp = make_tensor<typename InputOperator::value_type>(a.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    (a_tmp = a).run(stream);
+    return a_tmp;
+  }();
+
+  detail::sort_impl_inner(a_out, a_contig, dir, exec);
 #endif
 }
 
