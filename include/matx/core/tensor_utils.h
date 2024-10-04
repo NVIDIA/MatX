@@ -842,7 +842,7 @@ namespace detail {
       PrintKernel<<<1, 1>>>(op, dims...);
     }
     else {
-      auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
+      auto tmpv = make_tensor<typename matx::remove_cvref_t<typename Op::value_type>>(op.Shape());
       (tmpv = op).run();
       PrintData(fp, tmpv, dims...);
     }
@@ -881,7 +881,11 @@ void PrintData(FILE* fp, const Op &op, Args... dims) {
 #ifdef __CUDACC__
   cudaDeviceSynchronize();
   if constexpr (is_tensor_view_v<Op>) {
-    auto kind = GetPointerKind(op.Data());
+    // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
+    // as if it's not const. This is because the ownership decision is done at runtime instead of compile-time,
+    // so even though the lookup will never be done, the compilation path happens.
+    auto ptr_strip = const_cast<typename matx::remove_cvref_t<typename Op::value_type>*>(op.Data());
+    auto kind = GetPointerKind(ptr_strip);
 
     // Try to get pointer from cuda
     if (kind == MATX_INVALID_MEMORY) {
