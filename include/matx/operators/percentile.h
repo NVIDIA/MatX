@@ -137,7 +137,7 @@ namespace detail {
 template <typename InType, int D>
 __MATX_INLINE__ auto percentile(const InType &in, unsigned char q, const int (&dims)[D], PercentileMethod method = PercentileMethod::LINEAR)
 {
-  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D < InType::Rank(), "reduction dimensions must be < Rank of input");
   MATX_ASSERT_STR(q < 100, matxInvalidParameter, "Percentile must be < 100");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);

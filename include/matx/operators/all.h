@@ -135,7 +135,7 @@ namespace detail {
 template <typename InType, int D>
 __MATX_INLINE__ auto all(const InType &in, const int (&dims)[D])
 {
-  static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(D < InType::Rank(), "reduction dimensions must be < Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
