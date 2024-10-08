@@ -119,5 +119,6 @@
 #include "matx/operators/max.h"
 #include "matx/operators/argmin.h"
 #include "matx/operators/argmax.h"
+#include "matx/operators/argminmax.h"
 #include "matx/operators/all.h"
 #include "matx/operators/any.h"
