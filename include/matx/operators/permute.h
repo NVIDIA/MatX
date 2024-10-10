@@ -50,7 +50,7 @@ namespace matx
         using self_type = PermuteOp<T>;
 
       private:
-        typename base_type<T>::type op_;
+        typename detail::base_type_t<T> op_;
         cuda::std::array<int32_t, T::Rank()> dims_;
 
       public:

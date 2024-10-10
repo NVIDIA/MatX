@@ -101,8 +101,8 @@ namespace matx
           }       
                  
         private:
-          typename base_type<Op1>::type op1_;
-          typename base_type<Op2>::type op2_;
+          typename detail::base_type_t<Op1> op1_;
+          typename detail::base_type_t<Op2> op2_;
       };  
   }
 

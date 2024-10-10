@@ -43,7 +43,7 @@ namespace detail {
   class DetOp : public BaseOp<DetOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
@@ -54,13 +54,9 @@ namespace detail {
       using det_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "det()"; }
-      __MATX_INLINE__ DetOp(const OpA &a) : a_(a) { };
+      __MATX_INLINE__ DetOp(const OpA &a) : a_(a) { }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~DetOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }           
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       // This should never be called
       template <typename... Is>
@@ -100,6 +96,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }        
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

@@ -120,7 +120,7 @@ TEST(TensorStats, Hist)
   cudaExecutor exec{};
 
   // example-begin hist-test-1
-  (outv = hist(inv, 0.0f, 12.0f)).run(exec);
+  (outv = hist(inv, 0.0f, 12.0f, levels)).run(exec);
   // example-end hist-test-1
   exec.sync();
 

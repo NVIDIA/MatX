@@ -48,7 +48,7 @@ namespace detail {
   class EinsumOp : public BaseOp<EinsumOp<OpA...>>
   {
     private:
-      cuda::std::tuple<OpA...> a_;
+      cuda::std::tuple<typename detail::base_type_t<OpA> ...> a_;
       std::string subscripts_;
 
     public:
@@ -82,13 +82,30 @@ namespace detail {
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
         // Maybe do something here later if we take operators as input        
-      }         
+      }
+
+      template <int I, typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        if constexpr (I < sizeof...(OpA)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<OpA...>>>()) {
+            cuda::std::get<I>(a_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            PreRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        } else if constexpr (I == sizeof...(OpA)-1) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<OpA...>>>()) {
+            cuda::std::get<I>(a_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+            // This was the last ops_ element, so stop recursion
+          }
+        }
+      }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "einsum() must only be called with a single assignment since it has multiple return types");
-      }
+        PreRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+      }          
+
 
       // Size is not relevant in einsum() since there are multiple return values and it
       // is not allowed to be called in larger expressions

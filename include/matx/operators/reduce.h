@@ -45,7 +45,7 @@ namespace matx
     {
       private:
         static constexpr int ORank = permute_rank<OpA, PermDims, ReductionOp>::rank;
-        OpA a_;
+        typename detail::base_type_t<OpA> a_;
         PermDims perm_;
         ReductionOp reduction_op_;
         bool init_;
@@ -70,11 +70,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ReduceOp() {
-        #ifndef __CUDA_ARCH__
-          matxFree(ptr);
-        #endif
-        }
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -127,6 +123,8 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr);
         }               
     };
   }

@@ -86,6 +86,7 @@ struct CubParams_t {
 template <typename T> struct HistEvenParams_t {
   T lower_level;
   T upper_level;
+  int num_levels;
 };
 
 struct SortParams_t {
@@ -159,7 +160,7 @@ public:
       ExecPrefixScanEx(a_out, a, stream);
     }
     else if constexpr (op == CUB_OP_HIST_EVEN) {
-      ExecHistEven(a_out, a, cparams_.lower_level, cparams_.upper_level, stream);
+      ExecHistEven(a_out, a, cparams_.lower_level, cparams_.upper_level, cparams_.num_levels, stream);
     }
     else if constexpr (op == CUB_OP_REDUCE) { // General reduce
       ExecReduce(a_out, a, stream);
@@ -308,13 +309,15 @@ public:
    *   Lower bound on histogram
    * @param upper
    *   Upper bound on histogram
+   * @param num_levels
+   *   Number of levels in histogram
    * @param stream
    *   CUDA stream
    *
    */
   inline void ExecHistEven(OutputTensor &a_out,
                            const InputOperator &a, const T1 lower,
-                           const T1 upper, const cudaStream_t stream)
+                           const T1 upper, int num_levels, const cudaStream_t stream)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -325,20 +328,20 @@ public:
         if (a.IsContiguous()) {
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-              static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+              num_levels, lower, upper,
               static_cast<int>(a.Size(a.Rank() - 1)), stream);
         }
         else {
           cub::DeviceHistogram::HistogramEven(
               d_temp, temp_storage_bytes, RandomOperatorIterator{base}, a_out.Data(),
-              static_cast<int>(a_out.Size(a_out.Rank() - 1) + 1), lower, upper,
+              num_levels, lower, upper,
               static_cast<int>(a.Size(a.Rank() - 1)), stream);
         }
       }
       else {
         cub::DeviceHistogram::HistogramEven(
             d_temp, temp_storage_bytes, RandomOperatorIterator{a}, a_out.Data(),
-            static_cast<int>(a_out.Size(a_out.Rank() - 1)  + 1), lower, upper,
+            num_levels, lower, upper,
             static_cast<int>(a.Size(a.Rank() - 1)), stream);
       }
     }
@@ -1547,20 +1550,24 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
  *   Lower limit
  * @param upper
  *   Upper limit
+ * @param num_levels
+ *   Number of levels
  * @param stream
  *   CUDA stream
  */
 template <typename OutputTensor, typename InputOperator>
 void hist_impl(OutputTensor &a_out, const InputOperator &a,
           const typename InputOperator::value_type lower,
-          const typename InputOperator::value_type upper, const cudaStream_t stream = 0)
+          const typename InputOperator::value_type upper, 
+          int num_levels, 
+          const cudaStream_t stream = 0)
 {
   static_assert(std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using param_type = typename detail::HistEvenParams_t<typename InputOperator::value_type>;
-  detail::HistEvenParams_t<typename InputOperator::value_type> hp{lower, upper};
+  detail::HistEvenParams_t<typename InputOperator::value_type> hp{lower, upper, num_levels};
 #ifndef MATX_DISABLE_CUB_CACHE
   auto params =
       detail::matxCubPlan_t<OutputTensor,
@@ -1575,7 +1582,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, hp, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->ExecHistEven(a_out, a, lower, upper, stream);
+        ctype->ExecHistEven(a_out, a, lower, upper, num_levels, stream);
       }
     );
 
@@ -1586,7 +1593,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
                                         detail::HistEvenParams_t<typename InputOperator::value_type>>{
       a_out, a, detail::HistEvenParams_t<typename InputOperator::value_type>{hp}, stream};
 
-  tmp.ExecHistEven(a_out, a, lower, upper, stream);
+  tmp.ExecHistEven(a_out, a, lower, upper, num_levels, stream);
 #endif
 
 #endif

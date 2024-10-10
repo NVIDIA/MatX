@@ -62,8 +62,8 @@ template <typename T, int RANK, typename Desc> class tensor_impl_t; ///< Tensor 
 template <typename T, typename Op>
 class set : public BaseOp<set<T, Op>> {
 private:
-  mutable typename base_type<T>::type out_;
-  mutable typename base_type<Op>::type op_;
+  mutable typename detail::base_type_t<T> out_;
+  mutable typename detail::base_type_t<Op> op_;
 
 public:
   // Type specifier for reflection on class
@@ -100,6 +100,7 @@ public:
 
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
+   // printf("%lld %lld %lld -> %lld %lld %lld\n", op.Size(0), op.Size(1), op.Size(2), out.Size(0), out.Size(1), out.Size(2));
     if constexpr (!is_mtie<T>()) {
       ASSERT_COMPATIBLE_OP_SIZES(op);
     }
@@ -166,6 +167,26 @@ public:
     }     
     if constexpr (is_matx_op<Op>()) {
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+  }
+
+  // Used as a shortcut where the RHS is an executor and LHS is a tensor. In this case we
+  // want to avoid the RHS from allocating any temporary output memory, so we call
+  // InnerPreRun on it to call any nested PreRun calls, then output directly into the LHS
+  // tensor.
+  template <typename ShapeType, typename Executor>
+  void TransformExec(ShapeType &&shape, Executor &&ex) const noexcept {
+    op_.InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    op_.Exec(cuda::std::make_tuple(out_), std::forward<Executor>(ex));
+    op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+  }
+
+  static constexpr bool IsTransformSet() {
+    if constexpr (is_matx_transform_op<Op>() && is_tensor_view_v<T>) {
+      return true;
+    }
+    else {
+      return false;
     }
   }
 

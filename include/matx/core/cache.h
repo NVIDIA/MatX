@@ -101,11 +101,13 @@ public:
     auto &rmap = std::any_cast<CacheType&>(cval);
     auto cache_el = rmap.find(params);
     if (cache_el == rmap.end()) {
+      printf("cache miss for %d\n", (int)id);
       std::any tmp = mfun();
       rmap.insert({params, tmp});
       efun(std::any_cast<decltype(mfun())>(tmp));
     }
     else {
+      printf("cache hit for %d\n", (int)id);
       efun(std::any_cast<decltype(mfun())>(cache_el->second));
     }
   }

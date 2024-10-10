@@ -229,7 +229,7 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
 
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 

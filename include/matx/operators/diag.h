@@ -51,7 +51,7 @@ namespace matx
       class DiagOp : public BaseOp<DiagOp<T1, RANK>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         index_t k_;
 
       public:

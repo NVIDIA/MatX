@@ -46,9 +46,9 @@ namespace matx
       class RemapOp : public BaseOp<RemapOp<DIM, T, IdxType>>
     {
       private:
-        //mutable typename base_type<T>::type op_;
-        typename base_type<T>::type op_;
-        typename base_type<IdxType>::type idx_;
+        //mutable typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<IdxType> idx_;
 
       public:
         using matxop = bool;

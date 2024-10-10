@@ -44,8 +44,8 @@ namespace matx
     class PWelchOp : public BaseOp<PWelchOp<OpX,OpW>>
     {
       private:
-        OpX x_;
-        OpW w_;
+        typename detail::base_type_t<OpX> x_;
+        typename detail::base_type_t<OpW> w_;
 
         index_t nperseg_;
         index_t noverlap_;
@@ -73,11 +73,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~PWelchOp() {
-        #ifndef __CUDA_ARCH__
-          matxFree(ptr);
-        #endif
-        }         
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -124,7 +120,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpX>()) {
             x_.PostRun(Shape(x_), std::forward<Executor>(ex));
@@ -133,6 +129,8 @@ namespace matx
           if constexpr (is_matx_op<OpW>()) {
             w_.PostRun(Shape(w_), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr);
         }               
     };
   }

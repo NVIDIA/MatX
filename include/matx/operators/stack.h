@@ -199,7 +199,7 @@ namespace matx
       }
 
       private:
-      cuda::std::tuple<typename base_type<Ts>::type ...> ops_;
+      cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
       index_t size_;    
       int axis_;
     }; // end class StackOp

@@ -267,7 +267,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   auto piv_new = OpToTensor(piv, exec);
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 

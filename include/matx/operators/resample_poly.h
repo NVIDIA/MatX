@@ -48,8 +48,8 @@ namespace detail {
     private:
       using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
             typename FilterType::value_type, typename FilterType::value_type>;          
-      OpA a_;
-      FilterType f_;
+      typename detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<FilterType> f_;
       index_t up_;
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
@@ -76,11 +76,7 @@ namespace detail {
         out_dims_[OpA::Rank() - 1] = b_len;
       }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~ResamplePolyOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif
-      }      
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
@@ -130,7 +126,9 @@ namespace detail {
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
+        } 
+
+        matxFree(ptr);       
       }             
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

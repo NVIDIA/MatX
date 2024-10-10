@@ -1109,7 +1109,12 @@ void print(const Op &op)
 
 template <typename Op, typename Executor>
 auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
-  if constexpr (!is_tensor_view_v<Op>) {
+  if constexpr (is_matx_transform_op<Op>()) {
+    // We can assume that if a transform is passed to the input then PreRun has already completed
+    // on the transform and we can use the internal pointer
+    return make_tensor<typename Op::value_type>(op.Data(), Shape(op));
+  }    
+  else if constexpr (!is_tensor_view_v<Op>) {
     if constexpr (is_cuda_executor_v<Executor>) {
       return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     } else {

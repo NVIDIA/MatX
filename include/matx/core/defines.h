@@ -90,4 +90,14 @@ namespace matx {
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
+enum {
+  matxKeepDim     = std::numeric_limits<index_t>::max(),
+  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
+  matxEnd         = std::numeric_limits<index_t>::max() - 2,
+  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
+
+  // If adding a new marker adjust this to the last element above
+  matxIdxSentinel = matxKeepStride - 1,
+};
+
 }

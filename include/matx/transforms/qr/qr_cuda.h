@@ -127,6 +127,7 @@ namespace detail {
       vSliceB.fill(0); vSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
       vSliceE[RANK-2] = matxDropDim; 
+      printf("slice %d %d %d %d %d\n", RANK-1, Qin.Rank(), vSliceE[0]==matxDropDim, vSliceE[1]==matxDropDim, vSliceE[2]==matxDropDim);
       auto v = slice<RANK-1>(Qin, vSliceB, vSliceE);
       auto xz = v; // alias 
 
@@ -448,7 +449,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
   auto tau_new = OpToTensor(tau, exec);
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 

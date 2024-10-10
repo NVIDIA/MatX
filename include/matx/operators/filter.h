@@ -46,7 +46,7 @@ namespace detail {
   class FilterOp : public BaseOp<FilterOp<OpA, FilterType, NR, NNR>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
@@ -67,13 +67,9 @@ namespace detail {
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }              
-      };
+      }
 
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~FilterOp() {
-      #ifndef __CUDA_ARCH__
-        matxFree(ptr);
-      #endif        
-      }        
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       // This should never be called
       template <typename... Is>
@@ -117,6 +113,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }        
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

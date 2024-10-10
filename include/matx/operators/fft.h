@@ -47,7 +47,7 @@ namespace matx
     class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTType>>
     {
       private:
-        OpA a_;
+        typename detail::base_type_t<OpA> a_;
         uint64_t fft_size_;
         PermDims perm_;
         FFTType type_;
@@ -57,7 +57,7 @@ namespace matx
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_;
+        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr = nullptr;                                           
 
       public:
@@ -128,12 +128,8 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~FFTOp() {
-        #ifndef __CUDA_ARCH__
-          matxFree(ptr);
-        #endif        
-        }                    
-
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+                  
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -193,6 +189,8 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr); 
         }
     };
   }
@@ -304,7 +302,7 @@ namespace matx
     class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType>>
     {
       private:
-        OpA a_;
+        typename detail::base_type_t<OpA> a_;
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;
@@ -313,7 +311,7 @@ namespace matx
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable matx::tensor_t<ttype, OpA::Rank()> tmp_out_; 
+        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
         mutable ttype *ptr = nullptr;                                                
 
       public:
@@ -348,11 +346,7 @@ namespace matx
           }  
         }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~FFT2Op() {
-        #ifndef __CUDA_ARCH__
-          matxFree(ptr);
-        #endif        
-        }            
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -403,6 +397,16 @@ namespace matx
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<OpA>()) {
+            a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          matxFree(ptr);           
+        }        
     };    
   }
 

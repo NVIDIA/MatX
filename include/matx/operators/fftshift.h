@@ -43,7 +43,7 @@ namespace matx
       class FFTShift1DOp : public BaseOp<FFTShift1DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
@@ -124,7 +124,7 @@ namespace matx
       class FFTShift2DOp : public BaseOp<FFTShift2DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
@@ -195,7 +195,7 @@ namespace matx
       class IFFTShift1DOp : public BaseOp<IFFTShift1DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
@@ -265,7 +265,7 @@ namespace matx
       class IFFTShift2DOp : public BaseOp<IFFTShift2DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;

@@ -47,8 +47,8 @@ namespace matx
         using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
               typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         matxConvCorrMode_t mode_;
         matxConvCorrMethod_t method_;
         PermDims perm_;
@@ -67,12 +67,6 @@ namespace matx
         __MATX_INLINE__ std::string str() const { 
           return "conv1d(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
         }
-
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ ~Conv1DOp() {
-        #ifndef __CUDA_ARCH__
-          matxFree(ptr);
-        #endif        
-        }          
 
         __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
@@ -138,6 +132,8 @@ namespace matx
                           "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }
 
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -187,6 +183,20 @@ namespace matx
 
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if constexpr (is_matx_op<OpA>()) {
+            a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }     
+
+          if constexpr (is_matx_op<OpB>()) {
+            b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          } 
+
+          matxFree(ptr);
+        }  
     };
   }
 
@@ -314,6 +324,8 @@ namespace detail {
         }
       }
 
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
@@ -362,6 +374,20 @@ namespace detail {
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }     
+
+        if constexpr (is_matx_op<OpB>()) {
+          b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        } 
+
+        matxFree(ptr);
+      }       
     };
   }
 
