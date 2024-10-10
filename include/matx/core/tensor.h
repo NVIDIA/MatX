@@ -1362,7 +1362,6 @@ public:
                             [[maybe_unused]] StrideType strides) const
   {
     auto [new_desc, data] = this->template SliceImpl<N, StrideType>(firsts, ends, strides);
-    printf("ptr %p\n", data);
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 
