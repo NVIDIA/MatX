@@ -75,7 +75,7 @@ namespace matx
         return get_str<-1>();
       }
 
-      __MATX_INLINE__ ConcatOp(int axis, Ts... ts) : ops_(ts...), axis_(axis)
+      __MATX_INLINE__ ConcatOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
@@ -227,7 +227,7 @@ namespace matx
       }
 
       private:
-      cuda::std::tuple<typename base_type<Ts>::type ...> ops_;
+      cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
       index_t size_;    
       int axis_;
     }; // end class ConcatOp
@@ -243,7 +243,7 @@ namespace matx
    * @return concatenated operator 
    */
   template <typename... Ts>
-    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, Ts... ts)
+    __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, const Ts&... ts)
     {
       [[maybe_unused]] const auto first = detail::pp_get<0>(ts...);
       MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");

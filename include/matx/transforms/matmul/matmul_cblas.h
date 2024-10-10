@@ -436,31 +436,26 @@ __MATX_INLINE__ void matmul_dispatch(TensorTypeC &c,
 } // end namespace detail
 
 template <typename Op>
-__MATX_INLINE__ auto getCBLASSupportedTensor(const Op &in) {
-  constexpr int RANK = Op::Rank();
-
-  if constexpr (!(is_tensor_view_v<Op>)) {
-    return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
-  } else {
-    bool supported = true;
-
-    if (
-        // either RANK-1 or RANK-2 stride must equal one in cblas
-        (in.Stride(RANK - 1) != (index_t)1 && in.Stride(RANK - 2) != (index_t)1) ||
+__MATX_INLINE__ auto getCBLASSupportedTensor( const Op &in) {
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = [&in]() {
+    if constexpr (is_tensor_view_v<Op>) {
+      return !(
+        (in.Stride(Op::Rank() - 1) != (index_t)1 && in.Stride(Op::Rank() - 2) != (index_t)1) ||
         // verify that the corresponding size of a 0 stride dim is 1.
         // otherwise, it means a vector was repeated along a dimension, requiring a new tensor
-        (in.Stride(RANK - 1) == (index_t)0 && in.Size(RANK - 1) != (index_t)1) ||
-        (in.Stride(RANK - 2) == (index_t)0 && in.Size(RANK - 2) != (index_t)1)) {
-      supported = false;
+        (in.Stride(Op::Rank() - 1) == (index_t)0 && in.Size(Op::Rank() - 1) != (index_t)1) ||
+        (in.Stride(Op::Rank() - 2) == (index_t)0 && in.Size(Op::Rank() - 2) != (index_t)1)
+      );
     }
-
-    if (supported) {
-      return in;
-    } else {
-      return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
+    else {
+      return true;
     }
-  }
+  };
+  
+  return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
 }
+
 
 /**
  * Run a CBLAS GEMM

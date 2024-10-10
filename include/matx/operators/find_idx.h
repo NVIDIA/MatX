@@ -46,7 +46,7 @@ namespace detail {
   class FindIdxOp : public BaseOp<FindIdxOp<OpA, SelectType>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       SelectType sel_;
 
     public:
@@ -56,7 +56,7 @@ namespace detail {
       using find_idx_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find_idx()"; }
-      __MATX_INLINE__ FindIdxOp(OpA a, SelectType sel) : a_(a), sel_(sel) { };
+      __MATX_INLINE__ FindIdxOp(const OpA &a, SelectType sel) : a_(a), sel_(sel) { };
 
       // This should never be called
       template <typename... Is>
@@ -77,7 +77,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "find_idx() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in find_idx() since there are multiple return values and it

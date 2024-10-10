@@ -52,7 +52,7 @@ namespace matx
         using self_type = SliceOp<DIM, T, StrideType>;
 
       private:
-        typename base_type<T>::type op_;
+        typename detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
@@ -67,7 +67,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "slice(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ SliceOp(T op, const cuda::std::array<shape_type, T::Rank()> &starts,
+        __MATX_INLINE__ SliceOp(const T &op, const cuda::std::array<shape_type, T::Rank()> &starts,
                                       const cuda::std::array<shape_type, T::Rank()> &ends,
                                       StrideType strides) : op_(op) {
           int32_t d = 0;

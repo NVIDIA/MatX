@@ -44,14 +44,14 @@ namespace matx
     class MatVecOp : public BaseOp<MatVecOp<OpA, OpB>>
     {
       private:
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         static constexpr int RANK = remove_cvref_t<OpB>::Rank();
         cuda::std::array<index_t, RANK> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -70,6 +70,8 @@ namespace matx
             out_dims_[r] = a_.Size(r);
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -124,6 +126,8 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           } 
+
+          matxFree(ptr);
         }           
     };
   }
@@ -140,27 +144,26 @@ namespace matx
    * decide if a plan is cached, it may be able to reused plans for different
    * A/B/C matrices as long as they were configured with the same dimensions.
    *
-   * @tparam TensorTypeA
-   *    Data type of A tensor or operator
-   * @tparam TensorTypeB
-   *    Data type of B tensor or operator
+   * @tparam OpA
+   *    Data type of A operator
+   * @tparam OpB
+   *    Data type of B operator
    *
    * @param A
-   *   A input tensor or operator
+   *   A input operator
    * @param B
-   *   B input tensor or operator
+   *   B input operator
    * @param alpha
    *   Scalar multiplier to apply to operator A
    * @param beta
    *   Scalar multiplier to apply to operator C on input
    *
    */
-  template <typename TensorTypeA, typename TensorTypeB>
-  __MATX_INLINE__ auto matvec(const TensorTypeA A, const TensorTypeB B,
+  template <typename OpA, typename OpB>
+  __MATX_INLINE__ auto matvec(const OpA &A, const OpB &B,
               float alpha = 1.0, float beta = 0.0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
     return detail::MatVecOp(A, B, alpha, beta);
   }
 

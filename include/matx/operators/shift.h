@@ -54,7 +54,7 @@ namespace matx
       class ShiftOp : public BaseOp<ShiftOp<DIM, T1, T2>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         T2 shift_;
 
       public:
@@ -65,7 +65,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ShiftOp(T1 op, T2 shift) : op_(op), shift_(shift)
+        __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
       {
         static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
         ASSERT_COMPATIBLE_OP_SIZES(shift_); 
@@ -171,7 +171,7 @@ namespace matx
    *   New operator with shifted indices
    */
   template <int DIM, typename OpT, typename ShiftOpT>
-    auto __MATX_INLINE__ shift(OpT op, ShiftOpT s)
+    auto __MATX_INLINE__ shift(const OpT &op, ShiftOpT s)
     {
       return detail::ShiftOp<DIM, OpT, ShiftOpT>(op, s);
     };
@@ -205,7 +205,7 @@ namespace matx
    *   New operator with shifted indices
    */
   template <int DIM, int... DIMS,  typename OpT, typename ShiftT,  typename... ShiftsT>
-    auto __MATX_INLINE__ shift(OpT op, ShiftT s, ShiftsT... shifts)
+    auto __MATX_INLINE__ shift(const OpT &op, ShiftT s, ShiftsT... shifts)
     {
       static_assert(sizeof...(DIMS) == sizeof...(shifts), "shift: number of DIMs must match number of shifts");
 

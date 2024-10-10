@@ -33,5 +33,5 @@
 #pragma once
 
 #include "matx/executors/support.h"
-#include "matx/executors/device.h"
+#include "matx/executors/cuda.h"
 #include "matx/executors/host.h"

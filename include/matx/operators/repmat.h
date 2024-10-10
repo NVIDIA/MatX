@@ -52,7 +52,7 @@ namespace matx
       class RepMatOp : public BaseOp<RepMatOp<T1, DIM>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         index_t reps_[T1::Rank()];
 
       public:
@@ -61,7 +61,7 @@ namespace matx
 
 	    __MATX_INLINE__ std::string str() const { return "repmat(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ RepMatOp(T1 op, index_t reps) : op_(op)
+        __MATX_INLINE__ RepMatOp(const T1 &op, index_t reps) : op_(op)
       {
         for (int dim = 0; dim < DIM; dim++)
         {
@@ -69,7 +69,7 @@ namespace matx
         }
       }
 
-      __MATX_INLINE__ RepMatOp(T1 op, const cuda::std::array<index_t, DIM> reps) : op_(op)
+      __MATX_INLINE__ RepMatOp(const T1 &op, const cuda::std::array<index_t, DIM> reps) : op_(op)
       {
         for (int dim = 0; dim < DIM; dim++)
         {
@@ -77,7 +77,7 @@ namespace matx
         }
       }
 
-      __MATX_INLINE__ RepMatOp(T1 op, const index_t *reps) : op_(op)
+      __MATX_INLINE__ RepMatOp(const T1 &op, const index_t *reps) : op_(op)
       {
         for (int dim = 0; dim < DIM; dim++)
         {
@@ -162,7 +162,7 @@ namespace matx
    *   New operator with repeated data
    */
   template <typename T1>
-    auto __MATX_INLINE__ repmat(T1 t, index_t reps)
+    auto __MATX_INLINE__ repmat(const T1 &t, index_t reps)
     {
       return detail::RepMatOp<T1, T1::Rank()>(t, reps);
     };
@@ -181,7 +181,7 @@ namespace matx
    *   New operator with repeated data
    */
   template <typename T1, int N>
-    auto __MATX_INLINE__ repmat(T1 t, const index_t (&reps)[N])
+    auto __MATX_INLINE__ repmat(const T1 &t, const index_t (&reps)[N])
     {
       return detail::RepMatOp<T1, T1::Rank()>(t, detail::to_array(reps));
     };
@@ -200,7 +200,7 @@ namespace matx
    *   New operator with repeated data
    */
   template <typename T1>
-    auto __MATX_INLINE__ repmat(T1 t, const index_t *reps)
+    auto __MATX_INLINE__ repmat(const T1 &t, const index_t *reps)
     {
       return detail::RepMatOp<T1, T1::Rank()>(t, reps);
     };

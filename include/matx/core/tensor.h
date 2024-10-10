@@ -56,15 +56,6 @@ template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
 /* Special values used to indicate properties of tensors */
 namespace matx {
-enum {
-  matxKeepDim     = std::numeric_limits<index_t>::max(),
-  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
-  matxEnd         = std::numeric_limits<index_t>::max() - 2,
-  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
-
-  // If adding a new marker adjust this to the last element above
-  matxIdxSentinel = matxKeepStride - 1,
-};
 
 
 /**
@@ -92,6 +83,7 @@ public:
   using matxop = bool; ///< Indicate this is a MatX operator
   using matxoplvalue = bool; ///< Indicate this is a MatX operator that can be on the lhs of an equation
   using tensor_view = bool; ///< Indicate this is a MatX tensor view
+  using tensor_t_type = bool; ///< This is a tensor_t (not a tensor_impl_t)
   using storage_type = Storage; ///< Storage type trait
   using shape_type = typename Desc::shape_type;
   using stride_type = typename Desc::stride_type;
@@ -114,7 +106,7 @@ public:
    *
    * @param rhs Object to copy from
    */
-  __MATX_DEVICE__ __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
+  __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
       { }
 
@@ -127,16 +119,6 @@ public:
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
   { }
 
-  template <typename O>
-  __MATX_INLINE__ bool isSameView(const O &o) {
-    if constexpr (is_tensor_view_v<O> && RANK == O::Rank()) {
-      return Data() == o.Data() &&
-        this->Shape() == o.Shape() &&
-        this->desc_.Strides() == o.desc_.Strides();
-    } else {
-      return false;
-    }
-  }
 
   /** Perform a shallow copy of a tensor view
    *
@@ -284,15 +266,8 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
   {
-    // In the case where we have a tensor on the LHS and a pure transform
-    // on the RHS we skip set() entirely since it's not used
-    if constexpr (is_matx_transform_op<T2>()) {
-      return mtie(*this, op);
-    }
-    else {
-      const typename detail::base_type<T2>::type &op_base = op;
-      return detail::set(*this, op_base);
-    }
+    const typename detail::base_type_t<T2> &op_base = op;
+    return detail::set(*this, op_base);
   }
 
   /**
@@ -323,7 +298,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator+=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this + op_base);
   }
 
@@ -357,7 +332,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator-=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this - op_base);
   }
 
@@ -389,7 +364,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator*=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this * op_base);
   }
 
@@ -421,7 +396,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator/=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this / op_base);
   }
 
@@ -453,7 +428,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator<<=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this << op_base);
   }
 
@@ -485,7 +460,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator>>=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this >> op_base);
   }
 
@@ -517,7 +492,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator|=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this | op_base);
   }
 
@@ -549,7 +524,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator&=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this & op_base);
   }
 
@@ -581,7 +556,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator^=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, *this ^ op_base);
   }
 
@@ -613,7 +588,7 @@ public:
   template <typename T2>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator%=(const T2 &op)
   {
-    const typename detail::base_type<T2>::type &op_base = op;
+    const typename detail::base_type_t<T2> &op_base = op;
       return detail::set(*this, *this % op_base);
   }
 
@@ -878,24 +853,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    static_assert(RANK >= 1, "Only tensors of rank 1 and higher can be permuted.");
-    cuda::std::array<shape_type, RANK> n;
-    cuda::std::array<stride_type, RANK> s;
-    [[maybe_unused]] bool done[RANK] = {0};
-
-#pragma unroll
-    for (int i = 0; i < RANK; i++) {
-      int d = dims[i];
-      MATX_ASSERT_STR(d < RANK, matxInvalidDim,
-                      "Index to permute is larger than tensor rank");
-      MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
-                      "Cannot list the same dimension to permute twice");
-      done[d] = true;
-      n[i] = this->Size(d);
-      s[i] = this->Stride(d);
-    }
-
-    Desc new_desc{std::move(n), std::move(s)};
+    auto new_desc = this->PermuteImpl(dims);
     return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
   }
 
@@ -947,7 +905,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
+  __MATX_HOST__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
 
   /**
    * Set the underlying data pointer from the view
@@ -1070,37 +1028,8 @@ public:
   template <int N>
   __MATX_INLINE__ auto
   OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
-              const cuda::std::array<typename Desc::stride_type, N> &strides) const
-  {
-    static_assert(RANK == 1, "Overlapped views only supported on 1D tensors.");
-
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-    cuda::std::array<typename Desc::shape_type, RANK+1> n;
-    cuda::std::array<typename Desc::stride_type, RANK+1> s;
-
-    // This only works for 1D tensors going to 2D at the moment. Generalize to
-    // higher dims later
-    typename Desc::stride_type window_size = *(windows.begin());
-    typename Desc::stride_type stride_size = *(strides.begin());
-
-    MATX_ASSERT(stride_size < window_size, matxInvalidSize);
-    MATX_ASSERT(stride_size > 0, matxInvalidSize);
-
-    // Figure out the actual length of the signal we can use. It might be
-    // shorter than the original tensor if the window/stride doesn't line up
-    // properly to make a rectangular matrix.
-    typename Desc::shape_type adj_el = this->desc_.Size(0) - window_size;
-    while ((adj_el % stride_size) != 0) {
-      adj_el--;
-    }
-
-    n[1] = window_size;
-    s[1] = 1;
-    n[0] = adj_el / stride_size + 1;
-    s[0] = stride_size;
-
-    tensor_desc_t<decltype(n), decltype(s), RANK+1> new_desc{std::move(n), std::move(s)};
+              const cuda::std::array<typename Desc::stride_type, N> &strides) const {
+    auto new_desc = this->template OverlapViewImpl<N>(windows, strides);
     return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
   }
 
@@ -1134,33 +1063,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    cuda::std::array<index_t, N> n;
-    cuda::std::array<typename Desc::stride_type, N> s;
-
-    int d = 0;
-
-#pragma unroll
-    for (int i = 0; i < N; i++) {
-      index_t size = clones[i];
-
-      if (size == matxKeepDim) {
-        n[i] = this->desc_.Size(d);
-        if constexpr (RANK == 0) {
-          s[i] = 1;
-        }
-        else {
-          s[i] = this->desc_.Stride(d);
-        }
-        d++;
-      }
-      else {
-        n[i] = size;
-        s[i] = 0;
-      }
-    }
-    MATX_ASSERT_STR(d == RANK, matxInvalidDim,
-                    "Must keep as many dimension as the original tensor has");
-    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
+    auto new_desc = this->template CloneImpl<N>(clones);
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
   }
 
@@ -1458,77 +1361,7 @@ public:
                             [[maybe_unused]] const cuda::std::array<typename Desc::shape_type, RANK> &ends,
                             [[maybe_unused]] StrideType strides) const
   {
-    static_assert(N <= RANK && RANK > 0, "Must slice to a rank the same or less than current rank.");
-
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-    cuda::std::array<typename Desc::shape_type, N> n = {};
-    cuda::std::array<typename Desc::stride_type, N> s = {};
-
-    T *data = this->ldata_;
-    int d = 0;
-
-    [[maybe_unused]] int end_count = 0;
-    for (int i = 0; i < RANK; i++) {
-      if (ends[i] == matxDropDim) {
-        end_count++;
-      }
-    }
-
-    MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
-            "Number of matxDropDim specifiers must match the output rank");
-
-#pragma unroll
-    for (int i = 0; i < RANK; i++) {
-      typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
-      typename Desc::shape_type end = ends[i]   < 0 ? this->Size(i) + ends[i]   : ends[i];
-
-      MATX_ASSERT_STR((end > matxIdxSentinel) || (end <= this->Size(i)), matxInvalidDim,
-        "Slice end index out of range of operator");
-
-      MATX_ASSERT_STR(first < end, matxInvalidSize, "Slice must be at least one element long");
-
-      [[maybe_unused]] typename Desc::stride_type stride_mult;
-      
-      if constexpr (std::is_same_v<StrideType, detail::NoStride>) {
-        stride_mult = 1;
-      }
-      else {
-        stride_mult = (strides[i] == matxKeepStride) ? 1 : strides[i];
-      }
-
-      MATX_ASSERT_STR(first < end, matxInvalidParameter,
-                      "Starting slice must be less than end slice");
-      MATX_ASSERT_STR(first < this->desc_.Size(i), matxInvalidParameter,
-                      "Requested slice start index out of bounds");
-
-      // offset by first
-      data += first * Stride(i);
-
-      if constexpr (N > 0) {
-        if (end != matxDropDim) {
-          MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
-          if (end == matxEnd) {
-            n[d] = this->Size(i) - first;
-          }
-          else {
-            n[d] = end - first;
-          }
-
-          // New length is shorter if we have a non-1 stride
-          n[d] = static_cast<typename Desc::shape_type>(std::ceil(
-              static_cast<double>(n[d]) / static_cast<double>(stride_mult)));
-
-          s[d] = Stride(i) * stride_mult;
-          d++;
-        }
-      }
-    }
-
-    MATX_ASSERT_STR(d == N, matxInvalidDim,
-                    "Number of indices must match the target rank to slice to");
-
-    tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
+    auto [new_desc, data] = this->template SliceImpl<N, StrideType>(firsts, ends, strides);
     return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 

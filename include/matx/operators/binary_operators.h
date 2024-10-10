@@ -40,13 +40,13 @@
   template <typename I1, typename I2,                                \
             typename = typename std::enable_if_t<is_matx_op<I1>() or \
                                                  is_matx_op<I2>()>>  \
-  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(I1 i1, I2 i2)                   \
+  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1, const I2 &i2)                   \
   {                                                                  \
     using I1Type = extract_value_type_t<I1>;                        \
     using I2Type = extract_value_type_t<I2>;                        \
     using Op = TENSOR_OP<I1Type, I2Type>;                            \
-    const typename detail::base_type<I1>::type &base1 = i1;       \
-    const typename detail::base_type<I2>::type &base2 = i2;       \
+    const typename detail::base_type_t<I1> &base1 = i1;       \
+    const typename detail::base_type_t<I2> &base2 = i2;       \
     return detail::matxBinaryOp(base1, base2, Op());              \
   }
 
@@ -94,9 +94,9 @@ namespace matx
       class matxBinaryOp : public BaseOp<matxBinaryOp<I1,I2,Op>>
     {
       private:
-        mutable typename base_type<I1>::type in1_;
-        mutable typename base_type<I2>::type in2_;
-        typename base_type<Op>::type op_;
+        mutable typename detail::base_type_t<I1> in1_;
+        mutable typename detail::base_type_t<I2> in2_;
+        typename detail::base_type_t<Op> op_;
 
       public:
         // dummy type to signal this is a matxop
@@ -108,7 +108,7 @@ namespace matx
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(I1 in1, I2 in2, Op op) : in1_(in1), in2_(in2), op_(op)
+        __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {

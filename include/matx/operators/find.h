@@ -46,7 +46,7 @@ namespace detail {
   class FindOp : public BaseOp<FindOp<OpA, SelectType>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       SelectType sel_;
 
     public:
@@ -56,7 +56,7 @@ namespace detail {
       using find_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find()"; }
-      __MATX_INLINE__ FindOp(OpA a, SelectType sel) : a_(a), sel_(sel) { };
+      __MATX_INLINE__ FindOp(const OpA &a, SelectType sel) : a_(a), sel_(sel) { };
 
       // This should never be called
       template <typename... Is>
@@ -77,7 +77,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "find() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in find() since there are multiple return values and it

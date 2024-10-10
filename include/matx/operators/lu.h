@@ -47,9 +47,7 @@ namespace detail {
   class LUOp : public BaseOp<LUOp<OpA>>
   {
     private:
-      OpA a_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -58,7 +56,7 @@ namespace detail {
       using lu_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(OpA a) : a_(a) { };
+      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) { };
 
       // This should never be called
       template <typename... Is>
@@ -79,7 +77,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "lu() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in eig() since there are multiple return values and it

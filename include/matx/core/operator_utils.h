@@ -129,6 +129,29 @@ namespace matx {
         matxAlloc((void**)ptr, ttl_size, MATX_HOST_MEMORY);
         make_tensor(tensor, *ptr, shape);        
       }  
-    }  
+    }
+
+    template <typename Op, typename ValidFunc>
+    __MATX_INLINE__ auto GetSupportedTensor(const Op &in, const ValidFunc &fn, matxMemorySpace_t space, cudaStream_t stream = 0) {
+      constexpr int RANK = Op::Rank();
+
+      if constexpr (is_matx_transform_op<Op>()) {
+        // We can assume that if a transform is passed to the input then PreRun has already completed
+        // on the transform and we can use the internal pointer
+        return make_tensor<typename Op::value_type>(in.Data(), Shape(in));
+      }
+      else if constexpr (!is_tensor_view_v<Op>) {
+        return make_tensor<typename Op::value_type>(in.Shape(), space, stream);
+      }   
+      else {
+        bool supported = fn();
+
+        if(supported) {
+          return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
+        } else {
+          return make_tensor<typename Op::value_type>(in.Shape(), space, stream);
+        }
+      }      
+    }
   }
 }; 

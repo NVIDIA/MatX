@@ -204,30 +204,6 @@ auto make_tensor_p( ShapeType &&shape,
   decltype(desc)>{std::move(s), std::move(desc)};
 }
 
-/**
- * Create a tensor from a conforming container type
- *
- * Conforming containers have sequential iterators defined (both const and non-const). cuda::std::array
- * and std::vector meet this criteria.  Caller is responsible for deleting tensor.
- *
- * @param tensor Tensor object to store newly-created tensor into
- * @param shape  Shape of tensor
- * @param space  memory space to allocate in.  Default is managed memory memory.
- * @param stream cuda stream to allocate in (only applicable to async allocations)
- * @returns Pointer to new tensor
- *
- **/
-template <typename TensorType,
-  std::enable_if_t< is_tensor_view_v<TensorType>, bool> = true>
-auto make_tensor_p( TensorType &tensor,
-                    typename TensorType::shape_container &&shape,
-                    matxMemorySpace_t space = MATX_MANAGED_MEMORY,
-                    cudaStream_t stream = 0) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-  auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(std::forward<typename TensorType::shape_container>(shape), space, stream);
-  tensor.Shallow(tmp);
-}
 
 /**
  * Create a 0D tensor with implicitly-allocated memory.
@@ -371,7 +347,6 @@ auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
                   typename TensorType::shape_container &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
   auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::shape_container>(data, std::forward<typename TensorType::shape_container>(shape), false);
   tensor.Shallow(tmp);
 }
@@ -567,7 +542,7 @@ auto make_tensor( D &&desc,
  * @returns New tensor
  **/
 template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+  std::enable_if_t<is_tensor_view_v<TensorType> && is_matx_descriptor_v<typename TensorType::desc_type>, bool> = true>
 auto make_tensor( TensorType &&tensor,
                   typename TensorType::desc_type &&desc,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,

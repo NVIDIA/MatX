@@ -81,7 +81,7 @@ namespace matx
        * @param op value
        **/
       template <typename Op>
-        void Exec(Op &op) const {
+        void Exec(const Op &op) const {
 #ifdef __CUDACC__      
           dim3 threads, blocks;  
 

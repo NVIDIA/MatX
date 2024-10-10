@@ -35,5 +35,4 @@ Return by Pointer
 ~~~~~~~~~~~~~~~~~
 .. doxygenfunction:: make_tensor_p( const index_t (&shape)[RANK],  matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor_p( ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
-.. doxygenfunction:: make_tensor_p( TensorType &tensor, typename TensorType::shape_container &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor_p( T *const data, ShapeType &&shape, bool owning = false)

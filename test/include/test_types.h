@@ -32,7 +32,7 @@
 #pragma once
 
 #include <cuda/std/ccomplex>
-#include "matx/executors/device.h"
+#include "matx/executors/cuda.h"
 #include "matx/executors/host.h"
 #include "gtest/gtest.h"
 #include "matx.h"

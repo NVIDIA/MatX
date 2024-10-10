@@ -44,13 +44,13 @@ namespace matx
     class CGSolveOp : public BaseOp<CGSolveOp<OpA, OpB>>
     {
       private:
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         double tol_;
         int max_iters_;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename OpA::value_type, 2> tmp_out_;
-        mutable typename OpA::value_type *ptr;               
+        mutable typename OpA::value_type *ptr = nullptr;               
 
       public:
         using matxop = bool;
@@ -69,6 +69,8 @@ namespace matx
             out_dims_[r] = b_.Size(r);
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -124,6 +126,8 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           } 
+
+          matxFree(ptr); 
         }           
     };
   }
@@ -143,7 +147,7 @@ namespace matx
    *
    */
   template <typename AType, typename BType>
-    __MATX_INLINE__ auto cgsolve(AType A, BType B, double tol=1e-6, int max_iters=4)
+    __MATX_INLINE__ auto cgsolve(const AType &A, const BType &B, double tol=1e-6, int max_iters=4)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     

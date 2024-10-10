@@ -43,7 +43,7 @@ namespace matx
       class FFTShift1DOp : public BaseOp<FFTShift1DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
@@ -51,7 +51,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ FFTShift1DOp(T1 op) : op_(op){
+        __MATX_INLINE__ FFTShift1DOp(const T1 &op) : op_(op){
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };
 
@@ -116,7 +116,7 @@ namespace matx
    *
    */
   template <typename T1>
-    auto fftshift1D(T1 t) { return detail::FFTShift1DOp<T1>(t); }
+    auto fftshift1D(const T1 &t) { return detail::FFTShift1DOp<T1>(t); }
 
 
   namespace detail {
@@ -124,13 +124,13 @@ namespace matx
       class FFTShift2DOp : public BaseOp<FFTShift2DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-        __MATX_INLINE__ FFTShift2DOp(T1 op) : op_(op){
+        __MATX_INLINE__ FFTShift2DOp(const T1 &op) : op_(op){
           static_assert(Rank() >= 2, "2D FFT shift must have a rank 2 operator or higher");
         };
 
@@ -195,13 +195,13 @@ namespace matx
       class IFFTShift1DOp : public BaseOp<IFFTShift1DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-        __MATX_INLINE__ IFFTShift1DOp(T1 op) : op_(op) {
+        __MATX_INLINE__ IFFTShift1DOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 1, "1D IFFT shift must have a rank 1 operator or higher");
         };
 
@@ -265,13 +265,13 @@ namespace matx
       class IFFTShift2DOp : public BaseOp<IFFTShift2DOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-        __MATX_INLINE__ IFFTShift2DOp(T1 op) : op_(op) {
+        __MATX_INLINE__ IFFTShift2DOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 2, "2D IFFT shift must have a rank 2 operator or higher");
         };
 
@@ -329,5 +329,5 @@ namespace matx
    *
    */
   template <typename T1>
-    auto ifftshift2D(T1 t) { return detail::IFFTShift2DOp<T1>(t); }
+    auto ifftshift2D(const T1 &t) { return detail::IFFTShift2DOp<T1>(t); }
 } // end namespace matx

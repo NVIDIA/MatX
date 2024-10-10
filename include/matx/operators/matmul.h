@@ -47,16 +47,16 @@ namespace matx
     class MatMulOp : public BaseOp<MatMulOp<OpA, OpB, PermDims>>
     {
       private:
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         PermDims perm_; 
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
-        mutable matx::tensor_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -68,18 +68,18 @@ namespace matx
             return "matmul(" + get_type_str(a_) + "," + get_type_str(b_) + ")";
         }
 
-        __MATX_INLINE__ MatMulOp(OpA a, OpB b, float alpha, float beta, PermDims perm) : 
+        __MATX_INLINE__ MatMulOp(const OpA &a, const OpB &b, float alpha, float beta, PermDims perm) : 
               a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
-              if (perm_[r] == Rank() - 2) {
-                out_dims_[r] = a_.Size(perm_[r]);
+              if (r == Rank() - 2) {
+                out_dims_[perm_[r]] = a_.Size(r);
               }
-              else if (perm_[r] == Rank() - 1) {
-                out_dims_[r] = b_.Size(perm_[r]);
+              else if (r == Rank() - 1) {
+                out_dims_[perm_[r]] = b_.Size(r);
               }
               else {
-                out_dims_[r] = OpA::Rank() > OpB::Rank() ? a_.Size(r) : b_.Size(r);
+                out_dims_[perm_[r]] = OpA::Rank() > OpB::Rank() ? a_.Size(r) : b_.Size(r);
               }
             }
           }
@@ -92,6 +92,8 @@ namespace matx
             out_dims_[Rank() - 1] = b_.Size(OpB::Rank() - 1);
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -142,7 +144,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -151,6 +153,8 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr);         
         }
     };
   }
@@ -183,7 +187,7 @@ namespace matx
    *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
-  __MATX_INLINE__ auto matmul(const OpA A, const OpB B, float alpha = 1.0, float beta = 0.0) {
+  __MATX_INLINE__ auto matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0) {
     return detail::MatMulOp(A, B, alpha, beta, detail::no_permute_t{});
   }
 
@@ -216,7 +220,7 @@ namespace matx
    *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
-  __MATX_INLINE__ auto matmul(const OpA A, const OpB B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0) {
+  __MATX_INLINE__ auto matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0) {
     MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
     MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
 

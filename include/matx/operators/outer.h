@@ -44,14 +44,14 @@ namespace matx
     class OuterOp : public BaseOp<OuterOp<OpA, OpB>>
     {
       private:
-        OpA a_;
-        OpB b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
         cuda::std::array<index_t, RANK> out_dims_;
-        mutable matx::tensor_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -79,6 +79,8 @@ namespace matx
             }
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -133,6 +135,8 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           } 
+
+          matxFree(ptr);
         }           
     };
   }
@@ -162,7 +166,7 @@ namespace matx
    *
    */
   template <typename TensorTypeA, typename TensorTypeB>
-  __MATX_INLINE__ auto outer(const TensorTypeA A, const TensorTypeB B,
+  __MATX_INLINE__ auto outer(const TensorTypeA &A, const TensorTypeB &B,
               float alpha = 1.0, float beta = 0.0)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

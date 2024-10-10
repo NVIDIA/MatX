@@ -46,12 +46,13 @@ namespace detail {
   class HistOp : public BaseOp<HistOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       typename OpA::value_type lower_;
       typename OpA::value_type upper_;
+      int num_levels_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
-      mutable int *ptr;  
+      mutable int *ptr = nullptr;  
 
     public:
       using matxop = bool;
@@ -60,11 +61,16 @@ namespace detail {
       using hist_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "hist()"; }
-      __MATX_INLINE__ HistOp(OpA a, typename OpA::value_type lower, typename OpA::value_type upper) : a_(a), lower_(lower), upper_(upper) { 
+      __MATX_INLINE__ HistOp(const OpA &a, typename OpA::value_type lower, typename OpA::value_type upper, int num_levels) : 
+          a_(a), lower_(lower), upper_(upper), num_levels_(num_levels) { 
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }
-      };
+
+        out_dims_[out_dims_.size() - 1] = num_levels_ - 1;
+      }
+
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -75,7 +81,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
 
-        hist_impl(cuda::std::get<0>(out), a_, lower_, upper_, ex.getStream());
+        hist_impl(cuda::std::get<0>(out), a_, lower_, upper_, num_levels_, ex.getStream());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -107,6 +113,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }        
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -121,10 +129,10 @@ namespace detail {
  * Compute a histogram of rows in a tensor
  *
  * Computes a histogram with the given number of levels and upper/lower limits.
- * The number of levels is one greater than the number of bins generated, and is
- * determined by the size of the last dimension of the output tensor. Each bin
- * contains elements falling within idx*(upper-lower)/a.out.Lsize(). In other
- * words, each bin is as large as the difference between the upper and lower
+ * The number of levels is explicitly passed in, and the output must be large
+ * enough to hold all levels.
+ * Each bin contains elements falling within idx*(upper-lower)/a.out.Lsize(). In 
+ * other words, each bin is as large as the difference between the upper and lower
  * bounds and the number of bins
  *
  * @tparam InputOperator
@@ -135,12 +143,15 @@ namespace detail {
  *   Lower limit
  * @param upper
  *   Upper limit
+ * @param num_levels
+ *   Number of levels
  */
 template <typename InputOperator>
 __MATX_INLINE__ auto hist(const InputOperator &a,
           const typename InputOperator::value_type lower,
-          const typename InputOperator::value_type upper) {
-  return detail::HistOp(a, lower, upper);
+          const typename InputOperator::value_type upper,
+          int num_levels) {
+  return detail::HistOp(a, lower, upper, num_levels);
 }
 
 }

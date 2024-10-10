@@ -44,21 +44,23 @@ namespace matx
     class PWelchOp : public BaseOp<PWelchOp<OpX,OpW>>
     {
       private:
-        OpX x_;
-        OpW w_;
+        typename detail::base_type_t<OpX> x_;
+        typename detail::base_type_t<OpW> w_;
 
         index_t nperseg_;
         index_t noverlap_;
         index_t nfft_;
         cuda::std::array<index_t, 1> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::value_type *ptr; 
+        mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
         using value_type = typename OpX::value_type::value_type;
         using matx_transform_op = bool;
         using pwelch_xform_op = bool;
+
+        static_assert(is_complex_v<typename OpX::value_type>, "pwelch() must have a complex input type");
 
         __MATX_INLINE__ std::string str() const {
           return "pwelch(" + get_type_str(x_) + "," + get_type_str(w_) + ")";
@@ -69,9 +71,11 @@ namespace matx
 
           MATX_STATIC_ASSERT_STR(OpX::Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
           for (int r = 0; r < OpX::Rank(); r++) {
-            out_dims_[r] = x_.Size(r);
+            out_dims_[r] = nfft_;
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -118,7 +122,7 @@ namespace matx
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpX>()) {
             x_.PostRun(Shape(x_), std::forward<Executor>(ex));
@@ -127,6 +131,8 @@ namespace matx
           if constexpr (is_matx_op<OpW>()) {
             w_.PostRun(Shape(w_), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr);
         }               
     };
   }

@@ -48,7 +48,7 @@ namespace detail {
   class SVDOp : public BaseOp<SVDOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       SVDMode jobz_;
       SVDHostAlgo algo_;
 
@@ -59,7 +59,7 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(OpA a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
 
       // This should never be called
       template <typename... Is>
@@ -84,7 +84,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svd() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in svd() since there are multiple return values and it
@@ -143,8 +145,8 @@ namespace detail {
   class SVDPIOp : public BaseOp<SVDPIOp<OpA,OpX>>
   {
     private:
-      OpA a_;
-      OpX x_;
+      typename detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpX> x_;
       int iterations_;
       index_t k_;
 
@@ -176,9 +178,11 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svdpi() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -209,7 +213,7 @@ namespace detail {
  *    The number of singular values to find.  Default is all singular values: min(m,n).
  */
 template<typename AType, typename X0Type>
-__MATX_INLINE__ auto svdpi(AType &A, X0Type &x0, int iterations, index_t k=-1) {
+__MATX_INLINE__ auto svdpi(const AType &A, const X0Type &x0, int iterations, index_t k=-1) {
   return detail::SVDPIOp(A, x0, iterations, k);
 }
 
@@ -221,7 +225,7 @@ namespace detail {
   class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       int max_iters_;
       float tol_;
 
@@ -253,9 +257,11 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "svdbpi() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -283,7 +289,7 @@ namespace detail {
  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  */
 template<typename AType>
-__MATX_INLINE__ auto svdbpi(AType &A, int max_iters=10, float tol=0.0f) {
+__MATX_INLINE__ auto svdbpi(const AType &A, int max_iters=10, float tol=0.0f) {
   return detail::SVDBPIOp(A, max_iters, tol);
 }
 

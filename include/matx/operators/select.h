@@ -47,8 +47,8 @@ namespace matx
       class SelectOp : public BaseOp<SelectOp<T, IdxType>>
     {
       private:
-        typename base_type<T>::type op_;
-        typename base_type<IdxType>::type idx_;
+        typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<IdxType> idx_;
 
       public:
         using matxop = bool;
@@ -57,7 +57,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "select(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ SelectOp(T op, IdxType idx) : op_(op), idx_(idx) {};  
+        __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
@@ -122,7 +122,7 @@ namespace matx
    * @return Value in t from each location in idx
    */
   template <typename T, typename IdxType>
-    auto __MATX_INLINE__ select(T t, IdxType idx)
+    auto __MATX_INLINE__ select(const T &t, IdxType idx)
     {
       return detail::SelectOp<T, IdxType>(t, idx);
     };   

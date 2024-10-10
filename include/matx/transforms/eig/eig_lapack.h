@@ -324,7 +324,7 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
   auto w_new = OpToTensor(w, exec);
   auto a_new = OpToTensor(a, exec);
 
-  if(!a_new.isSameView(a)) {
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
 

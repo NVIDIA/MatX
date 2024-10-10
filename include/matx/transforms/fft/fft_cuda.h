@@ -662,51 +662,38 @@ struct FftCUDAParamsKeyEq {
 
 using fft_cuda_cache_t = std::unordered_map<FftCUDAParams_t, std::any, FftCUDAParamsKeyHash, FftCUDAParamsKeyEq>;
 
-
-
-template <typename TensorOp>
-__MATX_INLINE__ auto getCufft1DSupportedTensor( const TensorOp &in, cudaStream_t stream) {
-  if constexpr ( !(is_tensor_view_v<TensorOp>)) {
-    return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  } else {
-
-    bool supported = true;
-
-    // If there are any unsupported layouts for cufft add them here
-    if (supported) {
-      return in;
-    } else {
-      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-    }
-  }
+template <typename Op>
+__MATX_INLINE__ auto getCufft1DSupportedTensor( const Op &in, cudaStream_t stream) {
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = []() {
+    return true;
+  };
+  
+  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
-template <typename TensorOp>
-__MATX_INLINE__ auto getCufft2DSupportedTensor( const TensorOp &in, cudaStream_t stream) {
-
-  constexpr int IRANK = TensorOp::Rank();
-
-  if constexpr ( !is_tensor_view_v<TensorOp>) {
-    return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  } else {
-    bool supported = true;
-
-    // only a subset of strides are supported per cufft indexing scheme.
-    if ( in.Stride(IRANK-2) != in.Stride(IRANK-1) * in.Size(IRANK-1)) {
-      supported = false;
-    } else if constexpr ( IRANK > 2) {
-      if(in.Stride(IRANK-3) != in.Size(IRANK-2) * in.Stride(IRANK-2)) {
-        supported = false;
+template <typename Op>
+__MATX_INLINE__ auto getCufft2DSupportedTensor( const Op &in, cudaStream_t stream) {
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = [&in]() {
+    if constexpr (is_tensor_view_v<Op>) {
+      if ( in.Stride(Op::Rank()-2) != in.Stride(Op::Rank()-1) * in.Size(Op::Rank()-1)) {
+        return false;
+      } else if constexpr ( Op::Rank() > 2) {
+        if(in.Stride(Op::Rank()-3) != in.Size(Op::Rank()-2) * in.Stride(Op::Rank()-2)) {
+          return false;
+        }
       }
+      return true;
     }
-
-    if (supported) {
-      return in;
-    } else {
-      return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    else {
+      return true;
     }
-  }
+  };
+  
+  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
+
 
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
