@@ -246,16 +246,14 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
   T1 *out_ptr = nullptr;
   detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
-  auto tv = [allContiguous, &a_new, &out, &exec]() -> auto {
-    if (allContiguous) {
-      make_tensor(tmp_out, out.Data(), out.Shape());
-      (out = a_new).run(exec);
-    } else{
-      matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
-      make_tensor(tmp_out, out_ptr, a_new.Shape());         
-    }
-  }();
-
+  if (allContiguous) {
+    make_tensor(tmp_out, out.Data(), out.Shape());
+    (out = a_new).run(exec);
+  } else{
+    matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+    make_tensor(tmp_out, out_ptr, a_new.Shape());         
+  }
+  
   const char uplo_lapack = (uplo == SolverFillMode::UPPER)? 'U' : 'L';
 
   detail::matxDnCholHostPlan_t<OutputTensor, decltype(tmp_out)> chol_plan(tmp_out, uplo_lapack);
