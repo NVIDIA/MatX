@@ -619,32 +619,4 @@ auto make_static_tensor() {
   return tensor_t<T, desc.Rank(), decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
 }
 
-// namespace detail {
-// template <typename TensorType,typename ShapeType,
-//   std::enable_if_t<is_tensor_impl_v<TensorType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-// auto make_tensor_impl( TensorType &tensor,
-//                   ShapeType &&shape,
-//                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
-//                   cudaStream_t stream = 0) {
-//     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-//     // This tensor should be non-owning regardless of the original ownership since it will go out of scope at the end of the function
-//     auto tmp = make_tensor<typename TensorType::value_type, typename TensorType::desc_type>(data, std::forward<typename TensorType::desc_type>(desc), false);
-//     tensor.Shallow(tmp);
-//   }
-
-// template <typename TensorType,typename ShapeType,
-//   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-// auto make_tensor_impl(ShapeType &&shape,
-//                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
-//                       cudaStream_t stream = 0) {
-//     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-//     constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
-//     DefaultDescriptor<RANK>  desc{std::forward<ShapeType>(shape)};
-//     // This tensor should be non-owning regardless of the original ownership since it will go out of scope at the end of the function
-//     return tensor_
-//   }  
-//};
-
 } // namespace matx
