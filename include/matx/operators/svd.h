@@ -225,7 +225,7 @@ namespace detail {
   class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       int max_iters_;
       float tol_;
 

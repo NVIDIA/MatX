@@ -106,7 +106,7 @@ public:
    *
    * @param rhs Object to copy from
    */
-  __MATX_DEVICE__ __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
+  __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
       { }
 
@@ -905,7 +905,7 @@ public:
    * @returns Underlying data pointer of type T
    *
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
+  __MATX_HOST__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
 
   /**
    * Set the underlying data pointer from the view
