@@ -69,7 +69,7 @@ namespace matx
 
           MATX_STATIC_ASSERT_STR(OpX::Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
           for (int r = 0; r < OpX::Rank(); r++) {
-            out_dims_[r] = x_.Size(r);
+            out_dims_[r] = nfft_;
           }
         }
 
