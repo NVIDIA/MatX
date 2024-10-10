@@ -243,25 +243,27 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
   // contiguous tensor for use with LAPACK.
   uplo = (uplo == SolverFillMode::UPPER) ? SolverFillMode::LOWER : SolverFillMode::UPPER;
 
+  T1 *out_ptr = nullptr;
+  detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
   auto tv = [allContiguous, &a_new, &out, &exec]() -> auto {
     if (allContiguous) {
+      make_tensor(tmp_out, out.Data(), out.Shape());
       (out = a_new).run(exec);
-      return out;
     } else{
-      auto t = make_tensor<T1>(a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
-      (t = a_new).run(exec);
-      return t;
+      matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+      make_tensor(tmp_out, out_ptr, a_new.Shape());         
     }
   }();
 
   const char uplo_lapack = (uplo == SolverFillMode::UPPER)? 'U' : 'L';
 
-  detail::matxDnCholHostPlan_t<OutputTensor, decltype(a_new)> chol_plan(tv, uplo_lapack);
-  chol_plan.Exec(tv, tv, exec, uplo_lapack);
+  detail::matxDnCholHostPlan_t<OutputTensor, decltype(tmp_out)> chol_plan(tmp_out, uplo_lapack);
+  chol_plan.Exec(tmp_out, tmp_out, exec, uplo_lapack);
 
-  if (! allContiguous) {
-    matx::copy(out, tv, exec);
+  if (!allContiguous) {
+    matx::copy(out, tmp_out, exec);
+    matxFree(out_ptr);
   }
 #endif
 }

@@ -284,20 +284,6 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     make_tensor(tmp_out, out_ptr, a_new.Shape());      
   }
-  // auto tv = [allContiguous, &a_new, &out, &exec, ptr_addr = &out_ptr, &tmp_out]() -> auto {
-  //   if (allContiguous) {
-  //     (out = a_new).run(exec);
-  //     return out;
-  //   } else {
-  //     matxAlloc((void**)ptr_addr, TotalSize(a_new) * sizeof(T1), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-  //     make_tensor(tmp_out, *ptr_addr, a_new.Shape());      
-  //     (tmp_out = a_new).run(exec);
-  //     return tmp_out;
-  //     // auto t = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-  //     // (t = a_new).run(exec);
-  //     // return t;
-  //   }
-  // }();
 
   cublasFillMode_t uplo_cusolver = (uplo == SolverFillMode::UPPER)? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
 
