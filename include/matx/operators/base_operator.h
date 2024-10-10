@@ -84,13 +84,11 @@ namespace matx
               ex.Exec(*tp);
 
               if constexpr (is_matx_op<T>()) {
-                printf("running base postrun\n");
                 tp->PostRun(tp->Shape(), ex);
               }              
             }
           }
           else {
-            printf("not transform set path\n");
             if constexpr (is_matx_op<T>()) {
               tp->PreRun(tp->Shape(), ex);
             }
@@ -98,7 +96,6 @@ namespace matx
             ex.Exec(*tp);
 
             if constexpr (is_matx_op<T>()) {
-              printf("running base postrun\n");
               tp->PostRun(tp->Shape(), ex);
             }
           }

@@ -99,7 +99,6 @@ struct mtie : public BaseOp<mtie<Ts...>>{
     input_op.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
     input_op.Exec(ts_, std::forward<Executor>(ex));
     input_op.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
-    printf("tie postrun\n");    
   }
 
   // We need these to be converted to the base type for cases where we have a transform on the right and

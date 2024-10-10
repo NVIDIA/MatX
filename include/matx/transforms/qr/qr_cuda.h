@@ -127,7 +127,6 @@ namespace detail {
       vSliceB.fill(0); vSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
       vSliceE[RANK-2] = matxDropDim; 
-      printf("slice %d %d %d %d %d\n", RANK-1, Qin.Rank(), vSliceE[0]==matxDropDim, vSliceE[1]==matxDropDim, vSliceE[2]==matxDropDim);
       auto v = slice<RANK-1>(Qin, vSliceB, vSliceE);
       auto xz = v; // alias 
 

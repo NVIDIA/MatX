@@ -523,41 +523,6 @@ private:
     return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
   }
 
-  // template <typename TensorOp>
-  // __MATX_INLINE__ auto getFFTW1DSupportedTensor( const TensorOp &in) {
-
-  //   constexpr int RANK=TensorOp::Rank();
-
-  //   if constexpr (is_matx_transform_op<TensorOp>()) {
-  //     // We can assume that if a transform is passed to the input then PreRun has already completed
-  //     // on the transform and we can use the internal pointer
-  //     return make_tensor<typename TensorOp::value_type>(in.Data(), Shape(in));
-  //   }  
-  //   else if constexpr ( !(is_tensor_view_v<TensorOp>)) {
-  //     return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
-  //   } else {
-
-  //     bool supported = true;
-  //     // only a subset of strides are supported per fftw indexing scheme.
-  //     if constexpr (RANK >= 2) {
-  //       if (in.Stride(RANK - 2) != in.Stride(RANK - 1) * in.Size(RANK - 1)) {
-  //         supported = false;
-  //       }
-  //     }
-  //     if constexpr (RANK > 2) {
-  //       if (in.Stride(RANK - 3) != in.Size(RANK - 2) * in.Stride(RANK - 2)) {
-  //         supported = false;
-  //       }
-  //     }
-
-  //     // If there are any unsupported layouts for fftw add them here
-  //     if (supported) {
-  //       return make_tensor<typename TensorOp::value_type>(in.Data(), in.Shape());
-  //     } else {
-  //       return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
-  //     }
-  //   }
-  // }
 
   template <typename Op>
   __MATX_INLINE__ auto getFFTW2DSupportedTensor( const Op &in) {
@@ -582,37 +547,6 @@ private:
     return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
   }  
 
-  // template <typename TensorOp>
-  // __MATX_INLINE__ auto getFFTW2DSupportedTensor( const TensorOp &in) {
-
-  //   constexpr int RANK=TensorOp::Rank();
-
-  //   if constexpr (is_matx_transform_op<TensorOp>()) {
-  //     // We can assume that if a transform is passed to the input then PreRun has already completed
-  //     // on the transform and we can use the internal pointer
-  //     return make_tensor<typename TensorOp::value_type>(in.Data(), Shape(in));
-  //   }  
-  //   else if constexpr ( !is_tensor_view_v<TensorOp>) {
-  //     return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
-  //   } else {
-  //     bool supported = true;
-
-  //     // only a subset of strides are supported per fftw indexing scheme.
-  //     if ( in.Stride(RANK-2) != in.Stride(RANK-1) * in.Size(RANK-1)) {
-  //       supported = false;
-  //     } else if constexpr ( RANK > 2) {
-  //       if(in.Stride(RANK-3) != in.Size(RANK-2) * in.Stride(RANK-2)) {
-  //         supported = false;
-  //       }
-  //     }
-  
-  //     if (supported) {
-  //       return make_tensor<typename TensorOp::value_type>(in.Data(), in.Shape());
-  //     } else {
-  //       return make_tensor<typename TensorOp::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY); 
-  //     }
-  //   }
-  // }
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft_exec([[maybe_unused]] OutputTensor &o, 

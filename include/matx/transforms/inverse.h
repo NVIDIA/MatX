@@ -425,7 +425,6 @@ private:
 struct InverseParamsKeyHash {
   std::size_t operator()(const InverseParams_t &k) const noexcept
   {
-    printf("inv hash %lld %zu %p %p %p\n", k.n, k.batch_size, k.A, k.A_inv, k.stream);
     return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size)) +
            (std::hash<uint64_t>()((uint64_t)k.A)) +
            (std::hash<uint64_t>()((uint64_t)k.A_inv)) +
@@ -441,9 +440,6 @@ struct InverseParamsKeyEq {
   bool operator()(const InverseParams_t &l, const InverseParams_t &t) const
       noexcept
   {
-    printf("inv cache %d %d %d %d %d %d %d\n", l.n == t.n , l.A == t.A , l.A_inv == t.A_inv ,
-           l.stream == t.stream , l.algo == t.algo ,
-           l.batch_size == t.batch_size , l.dtype == t.dtype);
     return l.n == t.n && l.A == t.A && l.A_inv == t.A_inv &&
            l.stream == t.stream && l.algo == t.algo &&
            l.batch_size == t.batch_size && l.dtype == t.dtype;
@@ -475,7 +471,6 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a, stream);
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
-  printf("inv_impl cache %d\n", (int)detail::GetCacheIdFromType<detail::inv_cache_t>());
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
     detail::GetCacheIdFromType<detail::inv_cache_t>(),
     params,

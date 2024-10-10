@@ -138,32 +138,17 @@ namespace matx {
       if constexpr (is_matx_transform_op<Op>()) {
         // We can assume that if a transform is passed to the input then PreRun has already completed
         // on the transform and we can use the internal pointer
-        printf("transform\n");
         return make_tensor<typename Op::value_type>(in.Data(), Shape(in));
       }
       else if constexpr (!is_tensor_view_v<Op>) {
-        printf("not tv\n");
         return make_tensor<typename Op::value_type>(in.Shape(), space, stream);
       }   
       else {
         bool supported = fn();
-   // printf("Strides %lld %lld\n", in.Stride(RANK-2), in.Stride(RANK-1));
-        // if(
-
-        //   // either RANK-1 or RANK-2 stride must equal one in cublasLt
-        //   (in.Stride(RANK-1) != (index_t)1 && in.Stride(RANK-2) != (index_t)1) ||
-        //   // cublas allows 0 strides, but verify that the corresponding size is 1
-        //   (in.Stride(RANK-1) == (index_t)0 && in.Size(RANK-1) != (index_t)1) ||
-        //   (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1)
-        //   ) {
-        //   supported = false;
-        // }
 
         if(supported) {
-          printf("supported\n");
           return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
         } else {
-          printf("not\n");
           return make_tensor<typename Op::value_type>(in.Shape(), space, stream);
         }
       }      

@@ -198,10 +198,10 @@ public:
         MATX_ASSERT(b.Size(i) == c.Size(i), matxInvalidSize);
       }
     }
- printf("done in ctor1\n");
+ 
     // This must come before the things below to properly set class parameters
     params_ = GetGemmParams(c, a, b);
- printf("done in ctor2\n");
+ 
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
       // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
       // https://docs.nvidia.com/cuda/cublas/#cublassetworkspace
@@ -209,13 +209,13 @@ public:
       // if so. Otherwise, default to 4 MiB, which still works on Hopper+.
       constexpr size_t MiB = 1024*1024;
       workspaceSize = detail::IsHopperOrAbove() ? 32*MiB : 4*MiB;
-printf("before alloc\n");
+
       // Workspace buffer
       matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
-printf("before configure\n");
+
       ConfigureCublasLt();
     }
-    printf("done in ctor\n");
+    
   }
 
   template <typename InputType>
@@ -494,7 +494,7 @@ printf("before configure\n");
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Reorder C/A to match cutlass API
-    printf("exec\n");
+    
     MatMulDispatchA(a, b, c, stream, alpha, beta);
   }
 
@@ -525,25 +525,25 @@ private:
 
   void ConfigureCublasLt()
   {
-    printf("config\n");
+    
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     ret = cublasLtCreate(&ltHandle);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  printf("config\n");
+  
     ret = cublasLtMatmulPreferenceCreate(&preference);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  printf("config\n");
+  
     ret = cublasLtMatmulDescCreate(
                     &operationDesc, MatXTypeToCudaComputeType<T1>(),
                     MatXTypeToCudaType<T1>());
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  printf("config\n");
+  
     ret = cublasLtMatmulPreferenceSetAttribute(
                     preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                     &workspaceSize,
                     sizeof(workspaceSize));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-printf("config\n");
+
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
     cublasLtOrder_t colOrder = CUBLASLT_ORDER_COL;
 
@@ -559,7 +559,7 @@ printf("config\n");
                     operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &op,
                     sizeof(op));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-printf("config\n");
+
     // Update this later when we're more flexible on compute type
     int32_t scaleType;
     if constexpr (std::is_same_v<T1, float> || is_matx_half_v<T1>) {
@@ -575,7 +575,7 @@ printf("config\n");
     else {
       scaleType = CUDA_R_64F;
     }
-printf("config\n");
+
     ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scaleType,
                     sizeof(scaleType));
@@ -643,7 +643,7 @@ printf("config\n");
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     int64_t stride;
-printf("config\n");
+
     if constexpr (is_complex_half_v<T2>) {
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
@@ -676,7 +676,7 @@ printf("config\n");
     else {
       stride = params_.bstride;
     }
-printf("config3\n");
+
     ret = cublasLtMatrixLayoutSetAttribute(
                     Bdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
@@ -717,7 +717,7 @@ printf("config3\n");
                       sizeof(planarC));
       MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
     }
-printf("config4\n");
+
     int res;
     ret = cublasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc,
                                                Bdesc, Cdesc, Cdesc, preference,
@@ -755,7 +755,7 @@ printf("config4\n");
     [[maybe_unused]] TensorTypeA a_adj { a };
     [[maybe_unused]] TensorTypeB b_adj { b };
     [[maybe_unused]] TensorTypeC c_adj { c };
-printf("gg\n");
+
     // If the tensors are complex half precision, we need to do a planar
     // transform since all libraries expect this format at the moment.
     if constexpr (is_complex_half_v<T1>) {
@@ -791,7 +791,7 @@ printf("gg\n");
       b_adj.Reset(reinterpret_cast<T2 *>(b_planar.Data()));
       c_adj.Reset(reinterpret_cast<T3 *>(c_planar.Data()));
     }
-printf("pp\n");
+
     // Prep for batch looping
     using shape_type = typename TensorTypeA::desc_type::shape_type;
     [[maybe_unused]] cuda::std::array<shape_type, TensorTypeA::Rank()> a_idx{0};
@@ -1166,7 +1166,7 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
     constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::value_type>;
     static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex ");
   }
-printf("here0\n");
+
   // promote A and B to the type of C
   auto A_ = as_type<typename TensorTypeC::value_type>(A);
   auto B_ = as_type<typename TensorTypeC::value_type>(B);
@@ -1179,27 +1179,24 @@ printf("here0\n");
   auto c = getCublasSupportedTensor(C, stream);
   auto a = getCublasSupportedTensor(A_, stream);
   auto b = getCublasSupportedTensor(B_, stream);
-printf("here1\n");
+
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
   cudaDeviceSynchronize();
   if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
-    printf("copy1 %d %lld %lld %lld %lld\n", a.Rank(), a.Size(0), a.Size(1), a.Size(2), a.Size(3));
     (a = A_).run(stream);
   }
   cudaDeviceSynchronize();
   if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
-printf("copy2 %d %lld %lld %lld %lld\n", b.Rank(), b.Size(0), b.Size(1), b.Size(2), b.Size(3));
     (b = B_).run(stream);
   }
   cudaDeviceSynchronize();
   if(beta != 0 && !c.isSameView(C)) {
-printf("copy3\n");    
     (c = C).run(stream);
   }
   cudaDeviceSynchronize();
-printf("here2 %d %lld %lld %lld %lld\n", c.Rank(), c.Size(0), c.Size(1), c.Size(2), c.Size(3));
+
 #ifndef MATX_ENABLE_CUTLASS
   // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
   // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
@@ -1214,7 +1211,7 @@ printf("here2 %d %lld %lld %lld %lld\n", c.Rank(), c.Size(0), c.Size(1), c.Size(
     auto params =
       detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
     params.stream = stream;
-printf("running matmul cache id %d\n", (int)detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>());
+
     using cache_val_type = detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>;
     detail::GetCache().LookupAndExec<detail::gemm_cuda_cache_t>(
       detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>(),
@@ -1227,7 +1224,7 @@ printf("running matmul cache id %d\n", (int)detail::GetCacheIdFromType<detail::g
       }
     );
    }
-printf("here3\n");
+
   // if c and C are not the same then we need to copy results out.
   if(!c.isSameView(C)) {
     (C = c).run(stream);

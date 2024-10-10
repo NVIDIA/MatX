@@ -121,7 +121,7 @@ struct MemTracker {
     }
 
     size_t bytes = iter->second.size;
-printf("Dealloc %p %zu\n", ptr, bytes);    
+
     matxMemoryStats.currentBytesAllocated -= bytes;
 
     switch (iter->second.kind) {
@@ -202,7 +202,7 @@ printf("Dealloc %p %zu\n", ptr, bytes);
     if (*ptr == nullptr) {
       MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
     }
-printf("Alloc %p %zu type=%d\n", *ptr, bytes, (int)space);
+
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     matxMemoryStats.currentBytesAllocated += bytes;
     matxMemoryStats.totalBytesAllocated += bytes;

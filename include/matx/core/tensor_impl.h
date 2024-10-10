@@ -648,7 +648,7 @@ IGNORE_WARNING_POP_GCC
           end_count++;
         }
       }
-printf("ends %d rank %d %d\n", end_count, RANK, N);
+
       MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
               "Number of matxDropDim specifiers must match the output rank");
 

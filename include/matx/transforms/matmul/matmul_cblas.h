@@ -456,32 +456,6 @@ __MATX_INLINE__ auto getCBLASSupportedTensor( const Op &in) {
   return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
 }
 
-// template <typename Op>
-// __MATX_INLINE__ auto getCBLASSupportedTensor(const Op &in) {
-//   constexpr int RANK = Op::Rank();
-
-//   if constexpr (!(is_tensor_view_v<Op>)) {
-//     return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
-//   } else {
-//     bool supported = true;
-
-//     if (
-//         // either RANK-1 or RANK-2 stride must equal one in cblas
-//         (in.Stride(RANK - 1) != (index_t)1 && in.Stride(RANK - 2) != (index_t)1) ||
-//         // verify that the corresponding size of a 0 stride dim is 1.
-//         // otherwise, it means a vector was repeated along a dimension, requiring a new tensor
-//         (in.Stride(RANK - 1) == (index_t)0 && in.Size(RANK - 1) != (index_t)1) ||
-//         (in.Stride(RANK - 2) == (index_t)0 && in.Size(RANK - 2) != (index_t)1)) {
-//       supported = false;
-//     }
-
-//     if (supported) {
-//       return in;
-//     } else {
-//       return make_tensor<typename Op::value_type>(in.Shape(), MATX_HOST_MALLOC_MEMORY);
-//     }
-//   }
-// }
 
 /**
  * Run a CBLAS GEMM

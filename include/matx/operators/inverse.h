@@ -92,12 +92,10 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        printf("inverse prerun\n");
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
-printf("inv alloc\n");
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
 
-      printf("inv exec\n");
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }      
 
@@ -107,7 +105,7 @@ printf("inv alloc\n");
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }  
-        printf("inv postrun %p\n", ptr);
+
         matxFree(ptr);
       }
   };

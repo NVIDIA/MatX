@@ -79,10 +79,8 @@ namespace matx
                 out_dims_[perm_[r]] = b_.Size(r);
               }
               else {
-                printf("heregggg\n");
                 out_dims_[perm_[r]] = OpA::Rank() > OpB::Rank() ? a_.Size(r) : b_.Size(r);
               }
-              //printf("outdims %d %d %lld %lld %lld %lld %lld %lld %lld\n", r, perm_[r], out_dims_[r], a.Size(0), a.Size(1), a.Size(2),  b.Size(0), b.Size(1), b.Size(2));
             }
           }
           else {
@@ -126,7 +124,6 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          printf("matmul inner prerun\n");
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }     
@@ -139,13 +136,11 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          printf("matmul prerun\n");
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
-printf("matmul alloc\n");
+
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
-printf("done with alloc\n");
+
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
-          printf("matmul exec\n");
         }
 
         template <typename ShapeType, typename Executor>
@@ -158,7 +153,7 @@ printf("done with alloc\n");
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-printf("matmul postrun %p\n", ptr);
+
           matxFree(ptr);         
         }
     };
