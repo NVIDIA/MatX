@@ -276,13 +276,15 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   T1 *out_ptr = nullptr;
   detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
+  
   if (allContiguous) {
     make_tensor(tmp_out, out.Data(), out.Shape());
     (out = a_new).run(exec);
   }
   else {
     matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-    make_tensor(tmp_out, out_ptr, a_new.Shape());      
+    make_tensor(tmp_out, out_ptr, a_new.Shape());
+    (tmp_out = a_new).run(exec.getStream());
   }
 
   cublasFillMode_t uplo_cusolver = (uplo == SolverFillMode::UPPER)? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;

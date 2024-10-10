@@ -251,9 +251,10 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
     (out = a_new).run(exec);
   } else{
     matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
-    make_tensor(tmp_out, out_ptr, a_new.Shape());         
+    make_tensor(tmp_out, out_ptr, a_new.Shape());
+    (tmp_out = a_new).run(exec.getStream());
   }
-  
+
   const char uplo_lapack = (uplo == SolverFillMode::UPPER)? 'U' : 'L';
 
   detail::matxDnCholHostPlan_t<OutputTensor, decltype(tmp_out)> chol_plan(tmp_out, uplo_lapack);
