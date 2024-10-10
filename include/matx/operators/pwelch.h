@@ -60,6 +60,8 @@ namespace matx
         using matx_transform_op = bool;
         using pwelch_xform_op = bool;
 
+        static_assert(is_complex_v<typename OpX::value_type>, "pwelch() must have a complex input type");
+
         __MATX_INLINE__ std::string str() const {
           return "pwelch(" + get_type_str(x_) + "," + get_type_str(w_) + ")";
         }
