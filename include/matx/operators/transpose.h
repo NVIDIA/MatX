@@ -46,9 +46,10 @@ namespace detail {
   class TransposeMatrixOp : public BaseOp<TransposeMatrixOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
 
     public:
       using matxop = bool;
@@ -60,7 +61,7 @@ namespace detail {
       using self_type = TransposeMatrixOp<OpA>;
 
       __MATX_INLINE__ std::string str() const { return "transpose_matrix(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ TransposeMatrixOp(OpA a) : a_(a) {
+      __MATX_INLINE__ TransposeMatrixOp(const OpA &a) : a_(a) {
         for (int r = 0; r < Rank(); r++) {
           if (r >= Rank() - 2) {
             out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);
@@ -70,6 +71,8 @@ namespace detail {
           }
         }        
       }
+
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -99,12 +102,7 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }     
 
-        if constexpr (is_cuda_executor_v<Executor>) {
-          make_tensor(tmp_out_, out_dims_, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-        }
-        else {
-          make_tensor(tmp_out_, out_dims_, MATX_HOST_MEMORY);
-        }
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
@@ -115,6 +113,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -122,7 +122,6 @@ namespace detail {
         return out_dims_[dim];
       }
 
-      ~TransposeMatrixOp() = default;
       TransposeMatrixOp(const TransposeMatrixOp &rhs) = default;
       __MATX_INLINE__ auto operator=(const self_type &rhs) { 
         return set(*this, rhs); 
@@ -154,7 +153,7 @@ namespace detail {
   * @return transposed operator
   */
   template <typename T>
-  __MATX_INLINE__ auto transpose(const T op) {
+  __MATX_INLINE__ auto transpose(const T &op) {
   
     static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
     int32_t dims[T::Rank()];
@@ -178,7 +177,7 @@ namespace detail {
    * @return permuted operator
    */
   template <typename T>
-  __MATX_INLINE__ auto transpose_matrix(const T op) {
+  __MATX_INLINE__ auto transpose_matrix(const T &op) {
     static_assert(T::Rank() >= 2, "transpose operator must be on rank 2 or greater");
 
     int32_t dims[T::Rank()];

@@ -47,7 +47,7 @@ namespace detail {
   class ArgMinOp : public BaseOp<ArgMinOp<OpA, ORank>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -56,7 +56,7 @@ namespace detail {
       using argmin_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMinOp(OpA a) : a_(a) {
+      __MATX_INLINE__ ArgMinOp(const OpA &a) : a_(a) {
      
       };
 
@@ -77,7 +77,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "argmin() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

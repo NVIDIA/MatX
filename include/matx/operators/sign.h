@@ -47,7 +47,7 @@ namespace matx
       class SignOp : public BaseOp<SignOp<T>>
     {
       private:
-        typename base_type<T>::type op_;
+        typename detail::base_type_t<T> op_;
 
       public:
         using matxop = bool;
@@ -56,7 +56,7 @@ namespace matx
         value_type zval_; 
 
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
-        __MATX_INLINE__ SignOp(T op, value_type zval) : op_(op), zval_(zval) {};  
+        __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
@@ -106,7 +106,7 @@ namespace matx
   } // end namespace detail   
 
   template <typename T>
-  __MATX_INLINE__ auto sign(T op, typename T::value_type zval=0) {
+  __MATX_INLINE__ auto sign(const T &op, typename T::value_type zval=0) {
     return detail::SignOp(op,zval);
   }
 

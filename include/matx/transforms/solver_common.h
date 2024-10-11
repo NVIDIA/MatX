@@ -116,11 +116,12 @@ __MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
 }
 
 
+
 template <typename Op, typename Executor>
 __MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
   constexpr int RANK = Op::Rank();
 
-  bool supported = true;
+  bool supported = true; 
   if constexpr (!(is_tensor_view_v<Op>)) {
     supported = false;
   } else {
@@ -138,7 +139,7 @@ __MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec
   }
 
   if (supported) {
-    return in;
+    return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
   } else {
     if constexpr (is_cuda_executor_v<Executor>) {
       return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());

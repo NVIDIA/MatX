@@ -44,10 +44,10 @@ namespace matx
     class CovOp : public BaseOp<CovOp<OpA>>
     {
       private:
-        OpA a_;
+        typename detail::base_type_t<OpA> a_;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
         using matxop = bool;
@@ -66,6 +66,8 @@ namespace matx
             out_dims_[r] = a_.Size(r);
           }
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -112,6 +114,8 @@ namespace matx
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          matxFree(ptr);
         }          
     };
   }
@@ -133,7 +137,7 @@ namespace matx
  *   Covariance operator input view
  */
   template <typename AType>
-    __MATX_INLINE__ auto cov(AType a)
+    __MATX_INLINE__ auto cov(const AType &a)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     

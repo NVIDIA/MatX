@@ -46,9 +46,9 @@ namespace detail {
   class TraceOp : public BaseOp<TraceOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, 0> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr;
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
 
     public:
       using matxop = bool;
@@ -57,13 +57,14 @@ namespace detail {
       using trace_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "trace()"; }
-      __MATX_INLINE__ TraceOp(OpA a) : a_(a) { 
-      };
+      __MATX_INLINE__ TraceOp(const OpA &a) : a_(a) {}
+
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
         return tmp_out_(indices...);
-      };
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -99,6 +100,8 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+
+        matxFree(ptr);
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

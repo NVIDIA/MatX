@@ -18,7 +18,7 @@ the operation is launched:
 
     (a = at(b, 5)).run();
 
-.. doxygenfunction:: at(const Op op, Is... indices)
+.. doxygenfunction:: at(const Op &op, Is... indices)
 
 Examples
 ~~~~~~~~

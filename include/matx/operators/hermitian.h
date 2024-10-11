@@ -49,14 +49,14 @@ namespace matx
       class HermitianTransOp : public BaseOp<HermitianTransOp<T1, DIM>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
 
 	__MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
-        __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {
+        __MATX_INLINE__ HermitianTransOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }
 
@@ -102,7 +102,7 @@ namespace matx
    * Helper function for creating a hermitian transpose from an operator/View
    */
   template <typename T1>
-    auto __MATX_INLINE__ hermitianT(T1 t)
+    auto __MATX_INLINE__ hermitianT(const T1 &t)
     {
       return detail::HermitianTransOp<T1, T1::Rank()>(t);
     }

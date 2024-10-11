@@ -6,9 +6,9 @@ ifft2
 Perform a 2D inverse FFT. Batching is supported for any tensor with a rank higher than 2.
 
 
-.. doxygenfunction:: ifft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD)
-.. doxygenfunction:: ifft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)  
-
+.. doxygenfunction:: ifft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: ifft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)
+  
 Examples
 ~~~~~~~~
 .. literalinclude:: ../../../../test/00_transform/FFT.cu

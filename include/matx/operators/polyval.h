@@ -47,7 +47,7 @@ namespace matx
     class PolyvalOp : public BaseOp<PolyvalOp<Op, Coeffs>>
     {
       private:
-        Op op_;
+        typename detail::base_type_t<Op> op_;
         Coeffs coeffs_;
 
       public:

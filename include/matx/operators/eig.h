@@ -49,7 +49,7 @@ namespace detail {
   class EigOp : public BaseOp<EigOp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
       EigenMode jobz_;
       SolverFillMode uplo_;
 
@@ -60,7 +60,7 @@ namespace detail {
       using eig_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
-      __MATX_INLINE__ EigOp(OpA a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
+      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
 
       // This should never be called
       template <typename... Is>
@@ -81,7 +81,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "eig() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in eig() since there are multiple return values and it

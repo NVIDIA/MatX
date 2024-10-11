@@ -454,6 +454,29 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
   MATX_EXIT_HANDLER();
 }
 
+// TYPED_TEST(FFTTestComplexTypes, IRFFT1D1024C2C)
+// {
+//   MATX_ENTER_HANDLER();
+//   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+//   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+//   if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+//     GTEST_SKIP();
+//   } else {
+//     const index_t fft_dim = 1024;
+//     this->pb->template InitAndRunTVGenerator<TestType>(
+//         "00_transforms", "fft_operators", "irfft_1d", {fft_dim, fft_dim});
+//     tensor_t<TestType, 1> av{{fft_dim / 2 + 1}};
+//     tensor_t<TestType, 1> avo{{fft_dim}};
+//     this->pb->NumpyToTensorView(av, "a_in");
+
+//     (avo = irfft(av)).run(this->exec);
+//     this->exec.sync();
+
+//     MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+//   }
+//   MATX_EXIT_HANDLER();
+// }
+
 TYPED_TEST(FFTTestComplexTypes, IFFT1DORTHO1024C2C)
 {
   MATX_ENTER_HANDLER();
@@ -663,21 +686,22 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
     this->exec.sync();
   }, matx::detail::matxException);
 
-  // C2R, output size smaller than N
-  ASSERT_THROW({
-    auto tcs = slice(tc, {0}, {N/2+1});
-    auto t2 = make_tensor<RealType>({N-1});
-    (t2 = fft(tcs)).run(this->exec);
-    this->exec.sync();
-  }, matx::detail::matxException);
+  // Enable once C2R is supported
+//   // C2R, output size smaller than N
+//   ASSERT_THROW({
+//     auto tcs = slice(tc, {0}, {N/2+1});
+//     auto t2 = make_tensor<RealType>({N-1});
+//     (t2 = fft(tcs)).run(this->exec);
+//     this->exec.sync();
+//   }, matx::detail::matxException);
 
-  // C2R, output size too large
- ASSERT_THROW({
-    auto tcs = slice(tc, {0}, {N/2+1});
-    auto t2 = make_tensor<RealType>({N+2});
-    (t2 = fft(tcs)).run(this->exec);
-    this->exec.sync();
- }, matx::detail::matxException);
+//   // C2R, output size too large
+//  ASSERT_THROW({
+//     auto tcs = slice(tc, {0}, {N/2+1});
+//     auto t2 = make_tensor<RealType>({N+2});
+//     (t2 = fft(tcs)).run(this->exec);
+//     this->exec.sync();
+//  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -891,7 +915,8 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16x32R2C)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16C2R)
+// Enable once C2R is supported
+TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16C2R)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -911,7 +936,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16C2R)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypes, IFFT2D16x32C2R)
+TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16x32C2R)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

@@ -121,6 +121,7 @@ struct MemTracker {
     }
 
     size_t bytes = iter->second.size;
+
     matxMemoryStats.currentBytesAllocated -= bytes;
 
     switch (iter->second.kind) {

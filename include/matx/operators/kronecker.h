@@ -50,8 +50,8 @@ namespace matx
       class KronOp : public BaseOp<KronOp<T1, T2, DIM>>
     {
       private:
-        typename base_type<T1>::type op1_;
-        typename base_type<T2>::type op2_;
+        typename detail::base_type_t<T1> op1_;
+        typename detail::base_type_t<T2> op2_;
 
       public:
         using matxop = bool;
@@ -59,7 +59,7 @@ namespace matx
 
       __MATX_INLINE__ std::string str() const { return "kron(" + op1_.str() + "," + op2_.str() + ")"; }
 
-        __MATX_INLINE__ KronOp(T1 op1, T2 op2) : op1_(op1), op2_(op2)
+        __MATX_INLINE__ KronOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
       {
         static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
       }
@@ -147,7 +147,7 @@ namespace matx
    *   New operator of the kronecker product
    */
   template <typename T1, typename T2>
-    auto __MATX_INLINE__ kron(T1 a, T2 b)
+    auto __MATX_INLINE__ kron(const T1 &a, const T2 &b)
     {
       return detail::KronOp<T1, T2, T1::Rank()>(a, b);
     };

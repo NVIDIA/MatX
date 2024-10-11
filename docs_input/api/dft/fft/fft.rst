@@ -6,8 +6,8 @@ fft
 Perform a 1D FFT. Batching is supported for any tensor with a rank higher than 1.
 
 
-.. doxygenfunction:: fft(OpA &&a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
-.. doxygenfunction:: fft(OpA &&a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 
 Examples
 ~~~~~~~~

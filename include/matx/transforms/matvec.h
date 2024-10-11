@@ -85,7 +85,7 @@ __MATX_INLINE__ void matvec_impl(TensorTypeC C, const TensorTypeA A,
     shape[i] = matxKeepDim;
   }
   // clone last dim by 1 to create an Nx1 matrix
-  shape[TensorTypeC::Rank()]=1;
+  shape[TensorTypeC::Rank()] = 1;
 
   auto c = clone<TensorTypeC::Rank()+1>(C, shape);
   auto b = clone<TensorTypeB::Rank()+1>(B, shape);

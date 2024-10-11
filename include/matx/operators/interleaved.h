@@ -43,7 +43,7 @@ namespace matx
       class ComplexInterleavedOp : public BaseOp<ComplexInterleavedOp<T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;
@@ -54,7 +54,7 @@ namespace matx
               cuda::std::complex<value_type>>;
         __MATX_INLINE__ std::string str() const { return "interleaved(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ComplexInterleavedOp(T1 op) : op_(op) {
+        __MATX_INLINE__ ComplexInterleavedOp(const T1 &op) : op_(op) {
           static_assert(!is_complex_v<extract_value_type_t<T1>>, "Complex interleaved op only works on scalar input types");
           static_assert(Rank() > 0);
         };
@@ -137,7 +137,7 @@ namespace matx
    *
    */
   template <typename T1>
-    auto interleaved(T1 t)
+    auto interleaved(const T1 &t)
     {
       static_assert(!is_complex_v<extract_value_type_t<T1>>, "Input to interleaved operator must be real-valued");
       return detail::ComplexInterleavedOp<T1>(t);

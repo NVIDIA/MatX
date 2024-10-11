@@ -5,7 +5,7 @@ transpose_matrix
 
 Transpose the last two dimensions of an operator
 
-.. doxygenfunction:: transpose_matrix(const T op)
+.. doxygenfunction:: transpose_matrix(const T &op)
 
 Examples
 ~~~~~~~~

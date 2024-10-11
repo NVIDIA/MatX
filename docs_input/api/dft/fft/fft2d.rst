@@ -6,8 +6,8 @@ fft2
 Perform a 2D FFT. Batching is supported for any tensor with a rank higher than 2.
 
 
-.. doxygenfunction:: fft2(OpA &&a, FFTNorm norm = FFTNorm::BACKWARD)
-.. doxygenfunction:: fft2(OpA &&a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)  
+.. doxygenfunction:: fft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD)
+.. doxygenfunction:: fft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)  
 
 Examples
 ~~~~~~~~

@@ -46,9 +46,9 @@ namespace matx
       class RemapOp : public BaseOp<RemapOp<DIM, T, IdxType>>
     {
       private:
-        //mutable typename base_type<T>::type op_;
-        typename base_type<T>::type op_;
-        typename base_type<IdxType>::type idx_;
+        //mutable typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<T> op_;
+        typename detail::base_type_t<IdxType> idx_;
 
       public:
         using matxop = bool;
@@ -64,7 +64,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
 
-	__MATX_INLINE__ RemapOp(T op, IdxType idx) : op_(op), idx_(idx) {};
+	__MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
 
         template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
@@ -176,7 +176,7 @@ namespace matx
    * @return Value in t from each location in idx
    */
   template <int DIM, typename Op, typename Ind>
-    auto __MATX_INLINE__ remap(Op t, Ind idx)
+    auto __MATX_INLINE__ remap(const Op &t, Ind idx)
     {
       return detail::RemapOp<DIM, Op, Ind>(t, idx);
     };   
@@ -206,7 +206,7 @@ namespace matx
    * @return Value in t from each location in idx
    */
   template <int DIM, int... DIMS, typename Op, typename Ind, typename... Inds>
-    auto __MATX_INLINE__ remap(Op t, Ind idx, Inds... inds)
+    auto __MATX_INLINE__ remap(const Op &t, Ind idx, Inds... inds)
     {
       static_assert(sizeof...(DIMS) == sizeof...(Inds), "remap number of DIMs must match number of index arrays");
 

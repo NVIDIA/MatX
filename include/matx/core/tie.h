@@ -72,7 +72,7 @@ struct mtie : public BaseOp<mtie<Ts...>>{
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(RHS &&rhs)
   {
     return cuda::std::apply([&](auto... args) {
-      return mtie<Ts..., RHS>{args..., rhs};
+      return mtie<typename detail::base_type_t<Ts> ..., RHS>{args..., rhs};
     }, ts_);
   }
 
@@ -83,25 +83,27 @@ struct mtie : public BaseOp<mtie<Ts...>>{
 
   static __MATX_INLINE__ constexpr int32_t Rank()
   {
-    return decltype(cuda::std::get<0>(ts_))::Rank();
+    return remove_cvref_t<decltype(cuda::std::get<0>(ts_))>::Rank();
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept
   {
     return cuda::std::get<0>(ts_).Size(dim);
-  }  
+  }
 
   template <typename Executor>
   __MATX_INLINE__ void Exec(Executor &&ex) {
-    // Run the PreRun on the inner type to avoid allocation but allow transforms using MatX operators
-    // to do any setup needed
-    if constexpr (sizeof...(Ts) == 2) {
-      cuda::std::get<sizeof...(Ts) - 1>(ts_).InnerPreRun(detail::NoShape{}, std::forward<Executor>(ex));
-    }
-    cuda::std::get<sizeof...(Ts) - 1>(ts_).Exec(ts_, std::forward<Executor>(ex));
+    auto input_op = cuda::std::get<sizeof...(Ts) - 1>(ts_);
+
+    // Use NoShape instead of input_op.Shape() since some RHS operators have no shape
+    input_op.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+    input_op.Exec(ts_, std::forward<Executor>(ex));
+    input_op.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
   }
 
-  cuda::std::tuple<Ts...> ts_;
+  // We need these to be converted to the base type for cases where we have a transform on the right and
+  // tensor_t on the left that we're assigning to. This is the same as what set() does
+  cuda::std::tuple<typename detail::base_type_t<Ts> ...> ts_;
 };
 
 

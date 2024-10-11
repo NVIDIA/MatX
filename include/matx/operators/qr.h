@@ -47,7 +47,7 @@ namespace detail {
   class QROp : public BaseOp<QROp<OpA>>
   {
     private:
-      OpA a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -56,7 +56,7 @@ namespace detail {
       using qr_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ QROp(OpA a) : a_(a) { };
+      __MATX_INLINE__ QROp(const OpA &a) : a_(a) { };
 
       // This should never be called
       template <typename... Is>
@@ -78,7 +78,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "qr() must only be called with a single assignment");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in qr() since there are multiple return values and it
@@ -105,7 +107,7 @@ namespace detail {
  * @returns Operator to generate Q/R outputs
  */
 template<typename AType>
-__MATX_INLINE__ auto qr(AType A) {
+__MATX_INLINE__ auto qr(const AType &A) {
   return detail::QROp(A);
 }
 
@@ -115,8 +117,7 @@ namespace detail {
   class SolverQROp : public BaseOp<SolverQROp<OpA>>
   {
     private:
-      OpA a_;
-      matx::tensor_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -125,7 +126,7 @@ namespace detail {
       using qr_solver_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
-      __MATX_INLINE__ SolverQROp(OpA a) : a_(a) { };
+      __MATX_INLINE__ SolverQROp(const OpA &a) : a_(a) { }    
 
       // This should never be called
       template <typename... Is>
@@ -146,7 +147,9 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "qr_solver() must only be called with a single assignment since it has multiple return types");
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
       }
 
       // Size is not relevant in qr_solver() since there are multiple return values and it

@@ -144,7 +144,6 @@ TYPED_TEST(InvSolverTestFloatTypes, Inv4x4Batched)
   // Repeat the test using in-place transforms
   (A = inv(A)).run(this->exec);
   this->exec.sync();
-  cudaDeviceSynchronize();
 
   for (index_t b = 0; b < A.Size(0); b++) {
     for (index_t i = 0; i < A.Size(1); i++) {

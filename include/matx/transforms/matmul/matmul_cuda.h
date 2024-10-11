@@ -198,10 +198,10 @@ public:
         MATX_ASSERT(b.Size(i) == c.Size(i), matxInvalidSize);
       }
     }
-
+ 
     // This must come before the things below to properly set class parameters
     params_ = GetGemmParams(c, a, b);
-
+ 
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
       // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
       // https://docs.nvidia.com/cuda/cublas/#cublassetworkspace
@@ -215,6 +215,7 @@ public:
 
       ConfigureCublasLt();
     }
+    
   }
 
   template <typename InputType>
@@ -493,6 +494,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Reorder C/A to match cutlass API
+    
     MatMulDispatchA(a, b, c, stream, alpha, beta);
   }
 
@@ -523,18 +525,19 @@ private:
 
   void ConfigureCublasLt()
   {
+    
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     ret = cublasLtCreate(&ltHandle);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
+  
     ret = cublasLtMatmulPreferenceCreate(&preference);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
+  
     ret = cublasLtMatmulDescCreate(
                     &operationDesc, MatXTypeToCudaComputeType<T1>(),
                     MatXTypeToCudaType<T1>());
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
+  
     ret = cublasLtMatmulPreferenceSetAttribute(
                     preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                     &workspaceSize,
@@ -584,7 +587,7 @@ private:
                     params_.a_cols, params_.lda);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    ret =cublasLtMatrixLayoutCreate(
+    ret = cublasLtMatrixLayoutCreate(
                     &Bdesc, MatXTypeToCudaType<T3>(), params_.b_rows,
                     params_.b_cols, params_.ldb);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
@@ -1098,30 +1101,22 @@ using gemm_cuda_cache_t = std::unordered_map<MatMulCUDAParams_t, std::any,  MatM
 
 template <typename Op>
 __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream) {
-  constexpr int RANK=Op::Rank();
-
-  if constexpr ( !(is_tensor_view_v<Op>)) {
-    return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
-  } else {
-    bool supported = true;
-
-    if(
-
-      // either RANK-1 or RANK-2 stride must equal one in cublasLt
-      (in.Stride(RANK-1) != (index_t)1 && in.Stride(RANK-2) != (index_t)1) ||
-      // cublas allows 0 strides, but verify that the corresponding size is 1
-      (in.Stride(RANK-1) == (index_t)0 && in.Size(RANK-1) != (index_t)1) ||
-      (in.Stride(RANK-2) == (index_t)0 && in.Size(RANK-2) != (index_t)1)
-      ) {
-      supported = false;
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = [&in]() {
+    if constexpr (is_tensor_view_v<Op>) {
+      return !(
+        (in.Stride(Op::Rank()-1) != (index_t)1 && in.Stride(Op::Rank()-2) != (index_t)1) ||
+        // cublas allows 0 strides, but verify that the corresponding size is 1
+        (in.Stride(Op::Rank()-1) == (index_t)0 && in.Size(Op::Rank()-1) != (index_t)1) ||
+        (in.Stride(Op::Rank()-2) == (index_t)0 && in.Size(Op::Rank()-2) != (index_t)1)
+      );
     }
-
-    if(supported) {
-      return in;
-    } else {
-      return make_tensor<typename Op::value_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    else {
+      return true;
     }
-  }
+  };
+  
+  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
 /**
@@ -1188,15 +1183,15 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
-
-  if(!a.isSameView(A_)) {
+  
+  if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(stream);
   }
-
-  if(!b.isSameView(B_)) {
+  
+  if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
     (b = B_).run(stream);
   }
-
+  
   if(beta != 0 && !c.isSameView(C)) {
     (c = C).run(stream);
   }

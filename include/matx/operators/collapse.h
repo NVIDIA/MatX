@@ -43,7 +43,7 @@ namespace matx
       class LCollapseOp : public BaseOp<LCollapseOp<DIM, T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         index_t size_;  // size of collapsed dim
 
       public:
@@ -54,7 +54,7 @@ namespace matx
         using self_type = LCollapseOp<DIM, T1>;
 
         __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
-        __MATX_INLINE__ LCollapseOp(const T1 op) : op_(op)
+        __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
       {
         static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
         static_assert(DIM > 1, "Must collapse multiple dims");
@@ -198,7 +198,7 @@ namespace matx
       class RCollapseOp : public BaseOp<RCollapseOp<DIM, T1>>
     {
       private:
-        typename base_type<T1>::type op_;
+        typename detail::base_type_t<T1> op_;
         index_t size_;  // size of collapsed dim
 
       public:
@@ -339,7 +339,7 @@ namespace matx
    *   Operator with collapsed input
    */
   template <int DIM, typename T1>
-    auto __MATX_INLINE__ rcollapse(const T1 a)
+    auto __MATX_INLINE__ rcollapse(const T1 &a)
     {
       if constexpr (DIM <= 1) {
         return a;
