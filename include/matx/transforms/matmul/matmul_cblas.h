@@ -519,11 +519,11 @@ void matmul_impl([[maybe_unused]] TensorTypeC C,
   typedef decltype(a) atype;
   typedef decltype(b) btype;
 
-  if (!a.isSameView(A_)) {
+  if (!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(exec);
   }
 
-  if (!b.isSameView(B_)) {
+  if (!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
     (b = B_).run(exec);
   }
 

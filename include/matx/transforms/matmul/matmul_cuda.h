@@ -1183,19 +1183,18 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
-  cudaDeviceSynchronize();
+  
   if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(stream);
   }
-  cudaDeviceSynchronize();
+  
   if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
     (b = B_).run(stream);
   }
-  cudaDeviceSynchronize();
+  
   if(beta != 0 && !c.isSameView(C)) {
     (c = C).run(stream);
   }
-  cudaDeviceSynchronize();
 
 #ifndef MATX_ENABLE_CUTLASS
   // cublasLt does not allow transpose modes on C.  Thus we need to make sure that the right most dimension has a stride of 1.
