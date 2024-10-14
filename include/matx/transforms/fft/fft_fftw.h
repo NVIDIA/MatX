@@ -607,18 +607,18 @@ private:
       factor = static_cast<s_type>(params.n[0]);
 
       if (norm == FFTNorm::ORTHO) {
-        (o *= s_one / std::sqrt(factor)).run(exec);
+        (o *= static_cast<s_type>(1.0 / std::sqrt(factor))).run(exec);
       } else if (norm == FFTNorm::FORWARD) {
-        (o *= s_one / factor).run(exec);
+        (o *= static_cast<s_type>(1.0 / factor)).run(exec);
       }
     }
     else {
       factor = static_cast<s_type>(params.n[0]);
 
       if (norm == FFTNorm::ORTHO) {
-        (o *= s_one / std::sqrt(factor)).run(exec);
+        (o *= static_cast<s_type>(static_cast<s_type>(1) / std::sqrt(factor))).run(exec);
       } else if (norm == FFTNorm::BACKWARD) {
-        (o *= s_one / factor).run(exec);
+        (o *= static_cast<s_type>(static_cast<s_type>(1) / factor)).run(exec);
       }    
     }  
   }
