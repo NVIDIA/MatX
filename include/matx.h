@@ -42,6 +42,7 @@
 #include "matx/core/half_complex.h"
 #include "matx/core/half.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/print.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
 #include "matx/core/tie.h"

@@ -9,7 +9,7 @@ the memory is on the host or device and print the tensor appropriately. The `pri
 operator as the first parameter, and optionally the number of elements to print in each dimension. The
 value of 0 is a special placeholder for "all", and using it prints all values in that dimension.
 
-To print a tensor:
+To print a tensor or operator:
 
 .. code-block:: cpp
 
@@ -25,7 +25,7 @@ in a tensor is optional. The following code gives the same result:
     auto t = make_tensor<TypeParam>({3});
     print(ones(t.Shape()));
 
-In this case MatX is printing data from the operator without going to the device.
+By just printing the operator, MatX can materialize the data without going to device memory
 
 To print only two elements:
 
@@ -41,6 +41,13 @@ element in the second dimension, and 10 elements in the last dimension.
 
     auto t = make_tensor<TypeParam>({3, 10, 20});
     print(ones(t.Shape()), 1, 0, 10);
+
+To print just the shape and type of an operator, use `print_shape`:
+
+.. code-block:: cpp
+
+    auto t = make_tensor<TypeParam>({3, 10, 20});
+    print_shape(ones(t.Shape()), 1, 0, 10);
 
 
 Print Formatting Styles
