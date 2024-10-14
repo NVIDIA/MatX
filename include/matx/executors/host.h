@@ -50,11 +50,6 @@ struct cpu_set_t {
   cuda::std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
 };
 
-enum class ThreadsMode {
-  SINGLE,
-  SELECT,
-  ALL,
-};
 
 struct HostExecParams {
   HostExecParams(int threads = 1) : threads_(threads) {}
@@ -150,9 +145,5 @@ class HostExecutor {
     private:
       HostExecParams params_;
 };
-
-using SingleThreadedHostExecutor = HostExecutor<ThreadsMode::SINGLE>;
-using SelectThreadsHostExecutor  = HostExecutor<ThreadsMode::SELECT>;
-using AllThreadsHostExecutor     = HostExecutor<ThreadsMode::ALL>;
 
 }

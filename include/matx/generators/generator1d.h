@@ -49,10 +49,10 @@ namespace matx
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-            return f_(pp_get<Dim>(indices...));
-          }
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+          return f_(pp_get<Dim>(indices...));
+        }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
         {

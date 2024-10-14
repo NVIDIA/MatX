@@ -366,7 +366,7 @@ namespace detail {
        * @tparam Is Index type
        * @param indices Index values
        */
-      template <typename... Is>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()([[maybe_unused]] Is... indices) const
       {
         T val;

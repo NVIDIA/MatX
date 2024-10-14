@@ -74,13 +74,25 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return static_cast<NewType>(op_(indices...));     
+          return static_cast<NewType>(op_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...));
+        }
+
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return static_cast<NewType>(op_.template operator()<InWidth, OutWidth>(indices...));
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
-          return static_cast<NewType>(op_(indices...));
+          return static_cast<NewType>(op_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...));
+        }
+
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return static_cast<NewType>(op_.template operator()<InWidth, OutWidth>(indices...));
         }
 
         template <typename ShapeType, typename Executor>
@@ -131,14 +143,14 @@ namespace matx
           }
         };
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           using inner_type = typename inner_op_type_t<NewType>::type;
           return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           using inner_type = typename inner_op_type_t<NewType>::type;

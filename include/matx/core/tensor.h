@@ -91,6 +91,7 @@ public:
   using stride_container = typename Desc::stride_container;
   using desc_type = Desc; ///< Descriptor type trait
   using self_type = tensor_t<T, RANK, Storage, Desc>;
+  using matx_width = bool; ///< Signal we can do vector types from this operator
 
   /**
    * @brief Construct a new 0-D tensor t object

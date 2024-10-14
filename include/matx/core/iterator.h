@@ -71,13 +71,13 @@ struct RandomOperatorIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator*() const
   {
     if constexpr (OperatorType::Rank() == 0) {
-      const auto tmp = t_.operator()();
+      const auto tmp = static_cast<value_type>(t_.template operator()<detail::VecWidth::SCALAR, detail::VecWidth::SCALAR>());
       return tmp;
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
       return cuda::std::apply([&](auto &&...args) -> value_type {
-          const auto tmp = t_.operator()(args...);
+          const auto tmp = static_cast<value_type>(t_.template operator()<detail::VecWidth::SCALAR, detail::VecWidth::SCALAR>(args...));
           return tmp;
         }, arrs);     
     }

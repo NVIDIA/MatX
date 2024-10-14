@@ -153,5 +153,26 @@ namespace matx {
         }
       }      
     }
+
+    template <typename Op>
+    __MATX_HOST__ __MATX_INLINE__ VecWidth GetOpWidth(const Op &op) {
+      if constexpr(has_matx_width<Op>()) {
+        return op.GetMaxWidth();
+      }
+      else if constexpr (!is_matx_op<Op>()) {
+        return MAX_VECWIDTH_VAL;
+      }
+      else {
+        return VecWidth::ONE;
+      }
+    }
+
+    template <typename Op1, typename Op2>
+    __MATX_HOST__ __MATX_INLINE__ VecWidth MinCompatibleWidth(const Op1 &a, const Op2 &b) {
+      VecWidth in1 = GetOpWidth(a);
+      VecWidth in2 = GetOpWidth(b);
+
+      return static_cast<VecWidth>(cuda::std::min(static_cast<int>(in1), static_cast<int>(in2)));
+    }    
   }
 }; 

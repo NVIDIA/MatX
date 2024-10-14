@@ -53,42 +53,42 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-      __MATX_INLINE__ std::string str() const { 
-        std::string top1;
-        if constexpr (is_matx_op<T1>()) {
-          top1 = op1_.str();
-        }
-        else {
-          top1 = "array";
-        }
-
-        std::string top2;
-        if constexpr (is_matx_op<T2>()) {
-          top2 = op2_.str();
-        }
-        else {
-          top2 = "array";
-        }        
-
-        return "toeplitz(" + top1 + "," + top2 + ")"; 
-      }
-
-        __MATX_INLINE__ TopelitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
-      {
-        if constexpr (is_matx_op<T1>()) {
-          static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
-        }
-
-        if constexpr (!std::is_same_v<T2, EmptyOp>) {
-          static_assert(std::is_same_v<typename T1::value_type, 
-                                       typename T2::value_type>, "Input types to toeplitz() must match");
-          if constexpr (is_matx_op<T2>()) {
-            static_assert(T2::Rank() == 1, "toeplitz() operator input rank must be 1");
+        __MATX_INLINE__ std::string str() const { 
+          std::string top1;
+          if constexpr (is_matx_op<T1>()) {
+            top1 = op1_.str();
           }
-        }        
-      }
+          else {
+            top1 = "array";
+          }
 
-        template <typename... Is>
+          std::string top2;
+          if constexpr (is_matx_op<T2>()) {
+            top2 = op2_.str();
+          }
+          else {
+            top2 = "array";
+          }        
+
+          return "toeplitz(" + top1 + "," + top2 + ")"; 
+        }
+
+          __MATX_INLINE__ TopelitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
+        {
+          if constexpr (is_matx_op<T1>()) {
+            static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
+          }
+
+          if constexpr (!std::is_same_v<T2, EmptyOp>) {
+            static_assert(std::is_same_v<typename T1::value_type, 
+                                        typename T2::value_type>, "Input types to toeplitz() must match");
+            if constexpr (is_matx_op<T2>()) {
+              static_assert(T2::Rank() == 1, "toeplitz() operator input rank must be 1");
+            }
+          }        
+        }
+
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
           if (j > i) {

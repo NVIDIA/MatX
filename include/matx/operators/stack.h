@@ -86,84 +86,84 @@ namespace matx
       }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
 
-          if constexpr ( I == N ) {
-            // This should never happen
-            return value_type(-9999);
+        if constexpr ( I == N ) {
+          // This should never happen
+          return value_type(-9999);
+        } else {
+          if ( I < oidx ) {
+            // this is not the correct operator, recurse
+            return GetVal<I+1, N>(oidx, indices);
           } else {
-            if ( I < oidx ) {
-              // this is not the correct operator, recurse
-              return GetVal<I+1, N>(oidx, indices);
-            } else {
-              // this is the correct operator, return it's value
-              auto &op = cuda::std::get<I>(ops_);
-              return cuda::std::apply(op, indices);
-            }
+            // this is the correct operator, return it's value
+            auto &op = cuda::std::get<I>(ops_);
+            return cuda::std::apply(op, indices);
           }
         }
+      }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
 
-          if constexpr ( I == N ) {
-            // This should never happen
-            auto &op = cuda::std::get<I-1>(ops_);
-            return cuda::std::apply(op, indices);
+        if constexpr ( I == N ) {
+          // This should never happen
+          auto &op = cuda::std::get<I-1>(ops_);
+          return cuda::std::apply(op, indices);
 
+        } else {
+          if ( I < oidx ) {
+            // this is not the correct operator, recurse
+            return GetVal<I+1, N>(oidx, indices);
           } else {
-            if ( I < oidx ) {
-              // this is not the correct operator, recurse
-              return GetVal<I+1, N>(oidx, indices);
-            } else {
-              // this is the correct operator, return it's value
-              auto &op = cuda::std::get<I>(ops_);
-              return cuda::std::apply(op, indices);
-            }
+            // this is the correct operator, return it's value
+            auto &op = cuda::std::get<I>(ops_);
+            return cuda::std::apply(op, indices);
           }
         }
+      }
 
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
-        {
-          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-          cuda::std::array<index_t, RANK> indices_o;
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
+      {
+        cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+        cuda::std::array<index_t, RANK> indices_o;
 
-          // operator index
-          index_t oidx = indices[axis_];
+        // operator index
+        index_t oidx = indices[axis_];
 
-          // removing operator axis from indices
-          for(int i = 0; i < axis_; i++) {
-            indices_o[i] = indices[i];
-          } 
-          
-          for(int i = axis_; i < (int)indices_o.size(); i++) {
-            indices_o[i] = indices[i+1];
-          }
-
-          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+        // removing operator axis from indices
+        for(int i = 0; i < axis_; i++) {
+          indices_o[i] = indices[i];
+        } 
+        
+        for(int i = axis_; i < (int)indices_o.size(); i++) {
+          indices_o[i] = indices[i+1];
         }
 
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
-        {
-          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-          cuda::std::array<index_t, RANK> indices_o;
+        return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+      }
 
-          // operator index
-          index_t oidx = indices[axis_];
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
+      {
+        cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+        cuda::std::array<index_t, RANK> indices_o;
 
-          // removing operator axis from indices
-          for(int i = 0; i < axis_; i++) {
-            indices_o[i] = indices[i];
-          } 
-          
-          for(int i = axis_; i < (int)indices_o.size(); i++) {
-            indices_o[i] = indices[i+1];
-          } 
+        // operator index
+        index_t oidx = indices[axis_];
 
-          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
-        }
+        // removing operator axis from indices
+        for(int i = 0; i < axis_; i++) {
+          indices_o[i] = indices[i];
+        } 
+        
+        for(int i = axis_; i < (int)indices_o.size(); i++) {
+          indices_o[i] = indices[i+1];
+        } 
+
+        return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+      }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
       {

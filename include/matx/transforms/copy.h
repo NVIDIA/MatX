@@ -32,7 +32,7 @@
 
 #pragma once
 
-
+#include "matx/executors/cuda.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
 

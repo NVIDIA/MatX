@@ -65,6 +65,7 @@ namespace matx
     // dummy type to signal this is a matxop
     using matxop = bool;
     using value_type = typename Op::value_type;
+    using matx_width = bool; ///< Signal we can do vector types from this operator
     using self_type = matxUnaryOp<I1, Op>;
 
     __MATX_INLINE__ const std::string str() const {
@@ -79,18 +80,37 @@ namespace matx
       }
     }
 
+    VecWidth GetMaxWidth() const {
+      return GetOpWidth(in1_);
+    }
+
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args)  {
-          return this->operator()(args...);
+          return this->operator()<VecWidth::SCALAR, VecWidth::SCALAR>(args...);
+        }, idx);
+    }    
+
+    template <VecWidth InWidth, VecWidth OutWidth>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
+    {
+      return cuda::std::apply([&](auto &&...args)  {
+          return this->operator()<InWidth, OutWidth>(args...);
         }, idx);      
     }  
 
     template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value(in1_, indices...);
-      return op_(i1);
+      auto i1 = get_value<VecWidth::SCALAR, VecWidth::SCALAR>(in1_, indices...);
+      return op_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(i1);
+    }
+
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+    {
+      auto i1 = get_value<InWidth, OutWidth>(in1_, indices...);
+      return op_.template operator()<InWidth, OutWidth>(i1);
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

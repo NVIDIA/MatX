@@ -58,15 +58,15 @@ namespace matx
         }
       };
 
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-          if (((pp_get<0>(indices...) == indices) && ...)) {
-            return T(val_);
-          }
-          else {
-            return T(0.0f);
-          }
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        if (((pp_get<0>(indices...) == indices) && ...)) {
+          return T(val_);
         }
+        else {
+          return T(0.0f);
+        }
+      }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
       {

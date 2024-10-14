@@ -37,7 +37,7 @@ namespace matx {
 namespace detail {
 
 template <int RANK>
-inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes,
+inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, uint8_t ilp_factor,
                           int max_cta_size = 1024)
 {
   bool stride = false;
@@ -46,16 +46,17 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
   threads.y = 1;
   threads.z = 1;
   // Dynamic logic to pick thread block size.
-  //   Fill in order x, y, z up to 1024 threads
+  // Fill in order x, y, z up to max_cta_size threads
   if constexpr (RANK == 1) {
     while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[0]) {
+      if ((static_cast<index_t>(threads.x) * ilp_factor) < sizes[0]) {
         threads.x *= 2;
       }
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    int rnd_threads = ilp_factor * threads.x;
+    blocks.x = static_cast<int>((sizes[0] + rnd_threads - 1) / rnd_threads);    
     blocks.y = 1;
     blocks.z = 1;  
   }

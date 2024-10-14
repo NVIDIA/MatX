@@ -90,10 +90,18 @@ namespace matx
           MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
+          detail::VecWidth width = detail::VecWidth::ONE;
+          if constexpr(has_matx_width<Op>()) {
+            width = op.GetMaxWidth();
+            printf("width2 %d\n", (int)width);
+          }
+
+          printf("width %d\n", (int)width);              
+
           if constexpr (Op::Rank() == 0) {
             threads = 1;
             blocks = 1;
-            detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+            detail::matxOpT0Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op);
           }
           else {
             cuda::std::array<index_t, Op::Rank()> sizes;
@@ -101,35 +109,57 @@ namespace matx
               sizes[i] = op.Size(i);
             }        
 
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
+            // Arbitrary number that's roughly close to the number of cores on a standard GPU. This will prevent launching a
+            // vector kernel when the amount of work is very small.
+            if (TotalSize(op) < 1024) {
+              width = detail::VecWidth::ONE;
+            }
+
+            const auto ilp  = static_cast<uint8_t>(width);
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, ilp, 256);
+
+printf("%d %d %d %d %d width=%d\n", blocks.x, blocks.y, threads.x, threads.y, ilp, (int)width);
 
             if constexpr (Op::Rank() == 1) {
-              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              switch (width) {
+                case detail::VecWidth::ONE:
+                  detail::matxOpT1Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                case detail::VecWidth::TWO:
+                  detail::matxOpT1Kernel<detail::VecWidth::TWO, detail::VecWidth::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                case detail::VecWidth::FOUR:
+                  detail::matxOpT1Kernel<detail::VecWidth::FOUR, detail::VecWidth::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  break;
+                default:
+                  MATX_ASSERT_STR(false, matxInvalidParameter, "Failed to get load/store width for kernel");
+                  break;
+              }
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {
-                detail::matxOpT2StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                detail::matxOpT2StrideKernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
               } else {
-                detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                detail::matxOpT2Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
               }
             }
             else if constexpr (Op::Rank() == 3) {
               if(stride) {
-                detail::matxOpT3StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                detail::matxOpT3StrideKernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
               } else {
-                detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                detail::matxOpT3Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
               }
             }
             else if constexpr (Op::Rank() == 4) {
               if(stride) {
-                detail::matxOpT4StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                detail::matxOpT4StrideKernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
               } else {
-                detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                detail::matxOpT4Kernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
               }
             }        
             else {
               index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
-              detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+              detail::matxOpTDKernel<detail::VecWidth::ONE, detail::VecWidth::ONE><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
             } 
           }
 #else

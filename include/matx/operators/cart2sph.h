@@ -64,21 +64,21 @@ namespace matx
         ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-          {
-            auto x = get_value(x_, indices...);
-            auto y = get_value(y_, indices...);
-            [[maybe_unused]] auto z = get_value(z_, indices...);
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          auto x = get_value(x_, indices...);
+          auto y = get_value(y_, indices...);
+          [[maybe_unused]] auto z = get_value(z_, indices...);
 
-            if constexpr (WHICH==0) { // theta
-              return _internal_atan2(y, x);
-            } else if constexpr (WHICH==1) { // phi
-              return _internal_atan2(z, _internal_sqrt(x * x + y * y));
-            } else {  // r
-              return _internal_sqrt(x * x + y * y + z * z);
-            }
-          }    
+          if constexpr (WHICH==0) { // theta
+            return _internal_atan2(y, x);
+          } else if constexpr (WHICH==1) { // phi
+            return _internal_atan2(z, _internal_sqrt(x * x + y * y));
+          } else {  // r
+            return _internal_sqrt(x * x + y * y + z * z);
+          }
+        }    
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

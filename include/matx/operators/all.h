@@ -69,8 +69,13 @@ namespace detail {
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_(indices...);
+        return tmp_out_.template operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...);
       };
+
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_.template operator()<InWidth, OutWidth>(indices...);
+      };      
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {

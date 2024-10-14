@@ -41,7 +41,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
-//#include "matx_exec_kernel.h"
+#include "matx/core/vector.h"
 #include "iterator.h"
 #include "matx/core/make_tensor.h"
 
@@ -78,6 +78,7 @@ class tensor_impl_t {
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
     using matxoplvalue = bool;
+    using matx_width = bool; ///< Signal we can do vector types from this operator
     using self_type = tensor_impl_t<T, RANK, Desc>;
 
     // Type specifier for signaling this is a matx operation
@@ -917,14 +918,20 @@ IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is>
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
-      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
 #endif
-      return *(ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+      if constexpr (OutWidth != VecWidth::SCALAR) {
+        using vec_type = Vector<T, static_cast<size_t>(InWidth)>;
+        return *(reinterpret_cast<vec_type*>(ldata_) + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+      }
+      else {
+        return *(ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+      }
     }
 
     /**
@@ -936,15 +943,69 @@ IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is,
+    template <VecWidth InWidth, VecWidth OutWidth, typename... Is,
       std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
-      static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
       assert(ldata_ != nullptr);
 #endif
-      return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+      if constexpr (OutWidth != VecWidth::SCALAR) {
+        using vec_type = Vector<T, static_cast<size_t>(InWidth)>;
+        return *(reinterpret_cast<vec_type*>(ldata_) + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+      }
+      else {
+        return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+      }
+    }
+
+    // These operator() are called from a user-facing context to set/get individual values
+    /**
+     * operator() getter
+     *
+     * @param indices
+     *   Indices of tensor
+     *
+     * @returns value at given index
+     *
+     */
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
+    {
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif
+      return operator()<VecWidth::SCALAR, VecWidth::SCALAR, Is...>(indices...);
+    }
+
+    /**
+     * operator() getter
+     *
+     * @param indices
+     *   Indices of tensor
+     *
+     * @returns value at given index
+     *
+     */
+    template <typename... Is,
+      std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
+    {
+      static_assert(sizeof...(Is) == RANK, "Number of indices of operator() must match rank of tensor");
+#ifndef NDEBUG
+      assert(ldata_ != nullptr);
+#endif
+      return operator()<VecWidth::SCALAR, VecWidth::SCALAR, Is...>(indices...);
+    }    
+
+     template <VecWidth InWidth, VecWidth OutWidth>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T {
+          return this->operator()<InWidth, OutWidth>(args...);
+        }, idx);
     }
 
     /**
@@ -956,7 +1017,7 @@ IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()(args...);
+          return this->operator()<VecWidth::SCALAR, VecWidth::SCALAR>(args...);
         }, idx);
     }
 
@@ -966,36 +1027,47 @@ IGNORE_WARNING_POP_GCC
      * @returns value in tensor
      *
      */
+    template <VecWidth InWidth, VecWidth OutWidth>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()(args...);
+          return this->operator()<InWidth, OutWidth>(args...);
         }, idx);
     }
 
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T& {
+          return this->operator()<VecWidth::SCALAR, VecWidth::SCALAR>(args...);
+        }, idx);
+    }    
 
-    /**
-     * operator() setter with an array index
-     *
-     * @returns value in tensor
-     *
-     */
-    // template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
-    // {
-    //   if constexpr (RANK == 1) {
-    //     return this->operator()(idx[0]);
-    //   }
-    //   else if constexpr (RANK == 2) {
-    //     return this->operator()(idx[0], idx[1]);
-    //   }
-    //   else if constexpr (RANK == 3) {
-    //     return this->operator()(idx[0], idx[1], idx[2]);
-    //   }
-    //   else {
-    //     return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-    //   }
-    // }
+
+    VecWidth GetMaxWidth() const {
+      constexpr int MAX_VEC_WIDTH = 16; // 16B loads and stores
+      //if (IsContiguous()) {
+        uint32_t width = 4;
+        while (width > 1) {
+          if (((Lsize() % width) == 0) &&
+            (Stride(Rank() - 1) == 1) &&
+            ((sizeof(T) * width) <= MAX_VEC_WIDTH) &&
+            (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width)) == 0) {
+
+            if constexpr (Rank() > 1) {
+              if (((Stride(Rank() - 2) % width) == 0)) {
+                break;
+              }
+            }
+            else {
+              break;
+            }
+          }
+
+          width /= 2;
+        }
+printf("ret %u %zu\n", width, sizeof(T));
+        return static_cast<VecWidth>(width);
+    }
 
     /**
      * Get the rank of the tensor

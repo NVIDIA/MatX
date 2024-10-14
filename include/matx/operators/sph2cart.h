@@ -58,13 +58,13 @@ namespace matx
           "," + get_type_str(phi_) + "," + get_type_str(r_) + ")"; }
 
         __MATX_INLINE__ Sph2CartOp(const T1 &theta, const T2 &phi, const T3 &r) : theta_(theta), phi_(phi), r_(r)
-      {
-        ASSERT_COMPATIBLE_OP_SIZES(theta);
-        ASSERT_COMPATIBLE_OP_SIZES(phi);
-        ASSERT_COMPATIBLE_OP_SIZES(r);
-      }
+        {
+          ASSERT_COMPATIBLE_OP_SIZES(theta);
+          ASSERT_COMPATIBLE_OP_SIZES(phi);
+          ASSERT_COMPATIBLE_OP_SIZES(r);
+        }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           [[maybe_unused]] auto theta = get_value(theta_, indices...);

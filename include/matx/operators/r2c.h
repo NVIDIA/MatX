@@ -58,7 +58,7 @@ namespace matx
 
         // This version of the operator returns auto rather than decltype(auto) because we need to force the 
         // return type to be by value and not pass through references
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           auto tup = cuda::std::make_tuple(indices...);
@@ -72,7 +72,7 @@ namespace matx
           return cuda::std::apply(op_, tup);
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
           auto tup = cuda::std::make_tuple(indices...);

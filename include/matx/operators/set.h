@@ -71,6 +71,7 @@ public:
   using tensor_type = T;
   using op_type = Op;
   using matx_setop = bool;
+  using matx_width = bool; ///< Signal we can do vector types from this operator
 
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
@@ -105,46 +106,44 @@ public:
     }
   }
 
-  template <typename... Is>
+  template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
     if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
-      out_(indices...) = static_cast<float>(detail::get_value(op_, indices...));
+                  std::is_integral_v<decltype(detail::get_value<InWidth, OutWidth>(op_, indices...))>) {
+      out_.template operator()<InWidth, OutWidth>(indices...) = static_cast<float>(detail::get_value<InWidth, OutWidth>(op_, indices...));
     }
     else {
-      out_(indices...) = detail::get_value(op_, indices...);
+      out_.template operator()<InWidth, OutWidth>(indices...) = detail::get_value<InWidth, OutWidth>(op_, indices...);
     }
 
-    return out_(indices...);
+    return out_.template operator()<InWidth, OutWidth>(indices...);
   }
 
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
-  template <typename... Ts>
+  template <VecWidth InWidth, VecWidth OutWidth, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
     if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, args...))>) {
-      auto r = static_cast<float>(detail::get_value(op_, args...));
-      out_(args...) = r;
+                  std::is_integral_v<decltype(detail::get_value<InWidth, OutWidth>(op_, args...))>) {
+      auto r = static_cast<float>(detail::get_value<InWidth, OutWidth>(op_, args...));
+      out_.template operator()<InWidth, OutWidth>(args...) = r;
       return r;
     }
     else {
-      auto r = detail::get_value(op_, args...);
-      out_(args...) = r;
+      auto r = detail::get_value<InWidth, OutWidth>(op_, args...);
+      out_.template operator()<InWidth, OutWidth>(args...) = r;
       return r;
     }
   }
 
-  template <typename ShapeType>
-  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
+  template <VecWidth InWidth, VecWidth OutWidth>
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<index_t, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
-        return _internal_mapply(args...);
+        return _internal_mapply<InWidth, OutWidth>(args...);
       }, idx
     );
-
-    return res;
   }
 
   template <typename ShapeType, typename Executor>
@@ -188,6 +187,11 @@ public:
       return false;
     }
   }
+
+
+  VecWidth GetMaxWidth() const {
+    return MinCompatibleWidth(out_, op_);
+  }  
 
   /**
    * Get the rank of the operator

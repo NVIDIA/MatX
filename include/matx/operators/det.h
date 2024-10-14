@@ -59,7 +59,7 @@ namespace detail {
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       // This should never be called
-      template <typename... Is>
+      template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
       template <typename Out, typename Executor>

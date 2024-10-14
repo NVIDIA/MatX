@@ -43,14 +43,11 @@
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
-#include "matx/executors/cuda.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
  * the host compiler, so no device code should be present
  */
-
-
 namespace matx {
 
 enum {
@@ -62,7 +59,18 @@ enum class MemoryLayout {
   MEMORY_LAYOUT_COL_MAJOR,
 };
 
+enum class ThreadsMode {
+  SINGLE,
+  SELECT,
+  ALL,
+};
 
+class cudaExecutor;
+template <ThreadsMode MODE> class HostExecutor;
+
+using SingleThreadedHostExecutor = HostExecutor<ThreadsMode::SINGLE>;
+using SelectThreadsHostExecutor  = HostExecutor<ThreadsMode::SELECT>;
+using AllThreadsHostExecutor     = HostExecutor<ThreadsMode::ALL>;
 namespace detail {
 struct NoShape{};
 struct EmptyOp{};
@@ -71,16 +79,6 @@ struct NoStride{};
 template <typename T>
 struct is_noshape : std::integral_constant<bool, std::is_same_v<NoShape, T>> {};
 };
-
-/**
- * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
- * 
- * @tparam T Type to test
- */
-template <class T>
-inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
-
-
 
 /**
  * @brief Removes cv and reference qualifiers on a type
@@ -94,6 +92,62 @@ struct remove_cvref {
 
 template <typename T>
 using remove_cvref_t = typename remove_cvref<T>::type;
+
+/**
+ * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
+ * 
+ * @tparam T Type to test
+ */
+template <class T>
+inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
+
+namespace detail {
+  enum class VecWidth : uint8_t {
+    SCALAR = 0,
+    ONE = 1,
+    TWO = 2,
+    FOUR = 4, // Leave these values to match the words to make casting easier
+  };
+
+  static inline constexpr VecWidth MAX_VECWIDTH_VAL = VecWidth::FOUR;
+
+
+  template <typename T, typename = void>
+  struct has_matx_width : std::false_type {
+  };
+
+  template <typename T>
+  struct has_matx_width<T, std::void_t<typename T::matx_width>> : std::true_type {
+  };
+};
+
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool has_matx_width()
+{
+  return detail::has_matx_width<typename matx::remove_cvref_t<T>>::value;
+}
+
+
+namespace detail {
+  template <typename T, typename = void>
+  struct is_matx_multi_return_op_impl : std::false_type {
+  };
+
+  template <typename T>
+  struct is_matx_multi_return_op_impl<T, std::void_t<typename matx::remove_cvref_t<T>::matx_multi_return_op>> : std::true_type {
+  };
+}
+
+/**
+ * @brief Determine if a type is a MatX multi-return operator
+ *
+ * @tparam T Type to test
+ */
+template <typename T> constexpr bool is_matx_multi_return_op()
+{
+  return detail::is_matx_multi_return_op_impl<typename matx::remove_cvref_t<T>>::value;
+}
+
+
 
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
@@ -110,7 +164,7 @@ struct is_mtie_impl<T, std::void_t<typename T::mtie_type>> : std::true_type {
 
 template <typename T> constexpr bool is_mtie()
 {
-  return detail::is_mtie_impl<typename remove_cvref<T>::type>::value;
+  return detail::is_mtie_impl<typename matx::remove_cvref_t<T>>::value;
 }
 
 
@@ -131,7 +185,7 @@ struct is_matx_op_impl<T, std::void_t<typename T::matxop>> : std::true_type {
  */
 template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
 {
-  return detail::is_matx_op_impl<typename remove_cvref<T>::type>::value;
+  return detail::is_matx_op_impl<typename matx::remove_cvref_t<T>>::value;
 }
 
 namespace detail {
@@ -140,7 +194,7 @@ struct is_matx_tensor_set_op_impl : std::false_type {
 };
 
 template <typename T>
-struct is_matx_tensor_set_op_impl<T, std::void_t<typename remove_cvref_t<T>::tensor_type::tensor_view>> : std::true_type {
+struct is_matx_tensor_set_op_impl<T, std::void_t<typename matx::remove_cvref_t<T>::tensor_type::tensor_view>> : std::true_type {
 };
 }
 
@@ -150,7 +204,7 @@ struct is_matx_transform_set_op_impl : std::false_type {
 };
 
 template <typename T>
-struct is_matx_transform_set_op_impl<T, std::void_t<typename remove_cvref_t<T>::op_type::matx_transform_op>> : std::true_type {
+struct is_matx_transform_set_op_impl<T, std::void_t<typename matx::remove_cvref_t<T>::op_type::matx_transform_op>> : std::true_type {
 };
 }
 
@@ -160,7 +214,7 @@ struct is_matx_transform_op_impl : std::false_type {
 };
 
 template <typename T>
-struct is_matx_transform_op_impl<T, std::void_t<typename remove_cvref_t<T>::matx_transform_op>> : std::true_type {
+struct is_matx_transform_op_impl<T, std::void_t<typename matx::remove_cvref_t<T>::matx_transform_op>> : std::true_type {
 };
 }
 
@@ -171,7 +225,7 @@ struct is_matx_transform_op_impl<T, std::void_t<typename remove_cvref_t<T>::matx
  */
 template <typename T> constexpr bool is_matx_transform_op()
 {
-  return detail::is_matx_transform_op_impl<typename remove_cvref<T>::type>::value;
+  return detail::is_matx_transform_op_impl<typename matx::remove_cvref_t<T>>::value;
 }
 
 namespace detail {
@@ -203,7 +257,7 @@ struct is_matx_set_op_impl<T, std::void_t<typename T::matx_setop>> : std::true_t
  */
 template <typename T> constexpr bool is_matx_set_op()
 {
-  return detail::is_matx_set_op_impl<typename remove_cvref<T>::type>::value;
+  return detail::is_matx_set_op_impl<typename matx::remove_cvref_t<T>>::value;
 }
 
 
@@ -242,7 +296,7 @@ struct is_tensor_t<T, std::void_t<typename T::tensor_t_type>> : std::true_type {
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_t_v = detail::is_tensor_t<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_tensor_t_v = detail::is_tensor_t<typename matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void> struct is_tensor_impl : std::false_type {};
@@ -256,7 +310,7 @@ struct is_tensor_impl<T, std::void_t<typename T::tensor_impl>> : std::true_type 
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_impl_v = detail::is_tensor_impl<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_tensor_impl_v = detail::is_tensor_impl<typename matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void> struct is_tensor_view : std::false_type {
@@ -274,7 +328,7 @@ struct is_tensor_view<T, std::void_t<typename T::tensor_view>>
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename matx::remove_cvref_t<T>>::value;
 
 template <typename> struct is_tuple: std::false_type {};
 template <typename ...T> struct is_tuple<cuda::std::tuple<T...>>: std::true_type {};
@@ -283,6 +337,7 @@ template <typename T>
 inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_set_op_impl<T>, 
                                                detail::is_matx_transform_set_op_impl<T>>;
                                                //detail::is_matx_tensor_set_op_impl<T>>; // Can be tuple also
+
 
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};
@@ -298,7 +353,7 @@ template <ThreadsMode MODE> struct is_executor<HostExecutor<MODE>> : std::true_t
 template <typename T> 
 constexpr bool is_executor_t()
 {
-  return detail::is_executor<typename remove_cvref<T>::type>::value;
+  return detail::is_executor<typename matx::remove_cvref_t<T>>::value;
 }
 
 
@@ -313,7 +368,7 @@ template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template<typename T> struct is_host_executor : std::false_type {};
@@ -329,7 +384,7 @@ template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecuto
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref_t<T>>::value;
+inline constexpr bool is_host_executor_v = detail::is_host_executor<matx::remove_cvref_t<T>>::value;
 
 /**
  * @brief Determine if a type is a select threads host executor
@@ -337,7 +392,7 @@ inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_select_threads_host_executor_v = detail::is_select_threads_host_executor<remove_cvref_t<T>>::value;
+inline constexpr bool is_select_threads_host_executor_v = detail::is_select_threads_host_executor<matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void>
@@ -420,7 +475,7 @@ struct is_cuda_complex<cuda::std::complex<T>> : std::true_type {
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<remove_cvref_t<T>>::value;
+inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<matx::remove_cvref_t<T>>::value;
 
 
 
@@ -447,7 +502,7 @@ template <> struct is_complex<matxBf16Complex> : std::true_type {
  * 
  * @tparam T Type to test
  */
-template <class T> inline constexpr bool is_complex_v = detail::is_complex<remove_cvref_t<T>>::value;
+template <class T> inline constexpr bool is_complex_v = detail::is_complex<matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T> struct scalar_to_complex {
@@ -542,7 +597,7 @@ struct is_matx_shape<T, std::void_t<typename T::matx_shape>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_shape_v = detail::is_matx_shape<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_matx_shape_v = detail::is_matx_shape<typename matx::remove_cvref_t<T>>::value;
 
 
 namespace detail {
@@ -561,7 +616,7 @@ struct is_matx_storage<T, std::void_t<typename T::matx_storage>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_storage_v = detail::is_matx_storage<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_matx_storage_v = detail::is_matx_storage<typename matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void>
@@ -579,7 +634,7 @@ struct is_matx_storage_container<T, std::void_t<typename T::matx_storage_contain
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_storage_container_v = detail::is_matx_storage_container<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_matx_storage_container_v = detail::is_matx_storage_container<typename matx::remove_cvref_t<T>>::value;
 
 
 namespace detail {
@@ -598,7 +653,7 @@ struct is_matx_descriptor<T, std::void_t<typename T::matx_descriptor>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename matx::remove_cvref_t<T>>::value;
 
 namespace detail {
 template <typename T, typename = void>
@@ -616,7 +671,7 @@ struct is_matx_static_descriptor<T, std::void_t<typename T::matx_static_descript
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_static_descriptor_v = detail::is_matx_static_descriptor<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_matx_static_descriptor_v = detail::is_matx_static_descriptor<typename matx::remove_cvref_t<T>>::value;
 
 
 namespace detail {
@@ -635,7 +690,7 @@ struct has_shape_type<T, std::void_t<typename T::shape_type>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool has_shape_type_v = detail::has_shape_type<typename remove_cvref<T>::type>::value;
+inline constexpr bool has_shape_type_v = detail::has_shape_type<typename matx::remove_cvref_t<T>>::value;
 
 
 
@@ -813,7 +868,7 @@ struct base_type<T, typename std::enable_if_t<is_tensor_t_v<T>>> {
   using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type>;
 };
 
-template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+template <typename T> using base_type_t = typename base_type<typename matx::remove_cvref_t<T>>::type;
 
 template <typename T, typename = void> 
 struct complex_from_scalar {
@@ -830,7 +885,7 @@ struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_
   using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
 };
 
-template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
+template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename matx::remove_cvref_t<T>>::type;
 
 
 template <typename T, typename = void> 
@@ -843,7 +898,7 @@ struct exec_type<T, typename std::enable_if_t<std::is_same_v<T, int>>> {
   using type = cudaExecutor;
 };
 
-template <typename T> using exec_type_t = typename exec_type<typename remove_cvref<T>::type>::type;
+template <typename T> using exec_type_t = typename exec_type<typename matx::remove_cvref_t<T>>::type;
 
 // Type traits to help with the lack of short-circuit template logic. Numpy
 // doesn't support bfloat16 at all, we just use fp32 for the numpy side
@@ -894,7 +949,7 @@ template <typename ...T> struct is_std_tuple<cuda::std::tuple<T...>>: std::true_
 template<typename T> struct is_std_array : std::false_type {};
 template<typename T, size_t N> struct is_std_array<cuda::std::array<T, N>> : std::true_type {};
 template<typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
-template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
+template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<matx::remove_cvref_t<T>>::value;
 
 
 

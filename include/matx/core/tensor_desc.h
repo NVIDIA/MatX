@@ -36,6 +36,7 @@
 
 #include <cuda/std/array>
 #include <type_traits>
+#include <numeric>
 #include "matx/core/error.h"
 
 namespace matx {
@@ -410,7 +411,7 @@ public:
    * @return Product of all sizes
    */  
   static constexpr auto TotalSize() {
-      return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
+    return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
   }  
 
 private:

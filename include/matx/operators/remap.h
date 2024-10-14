@@ -64,45 +64,45 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
 
-	__MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
+	      __MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          static_assert(sizeof...(Is)==Rank());
+          static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, Rank()> ind{indices...};
+          // convert variadic type to tuple so we can read/update
+          cuda::std::array<index_t, Rank()> ind{indices...};
 
-            // remap current index for dim
-            if constexpr (IdxType::Rank() == 0) {
-              ind[DIM] = idx_();
-            } else {
-              ind[DIM] = idx_(ind[DIM]);
-            }
-            //return op_(ind);
-            return cuda::std::apply(op_, ind);
+          // remap current index for dim
+          if constexpr (IdxType::Rank() == 0) {
+            ind[DIM] = idx_();
+          } else {
+            ind[DIM] = idx_(ind[DIM]);
           }
+          //return op_(ind);
+          return cuda::std::apply(op_, ind);
+        }
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-          {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          static_assert(sizeof...(Is)==Rank());
+          static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, Rank()> ind{indices...};
+          // convert variadic type to tuple so we can read/update
+          cuda::std::array<index_t, Rank()> ind{indices...};
 
-            // remap current index for dim
-            if constexpr (IdxType::Rank() == 0) {
-              ind[DIM] = idx_();
-            } else {
-              ind[DIM] = idx_(ind[DIM]);
-            }
-            //return op_(ind);
-            return cuda::std::apply(op_, ind);
+          // remap current index for dim
+          if constexpr (IdxType::Rank() == 0) {
+            ind[DIM] = idx_();
+          } else {
+            ind[DIM] = idx_(ind[DIM]);
           }
+          //return op_(ind);
+          return cuda::std::apply(op_, ind);
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

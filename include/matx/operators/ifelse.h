@@ -75,32 +75,32 @@ namespace matx
        */
       __MATX_INLINE__ IFELSE(const C1 &cond, const T1 &op1, const T2 &op2) : 
                               cond_(cond), op1_(op1), op2_(op2)
-    {
-      static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
-          "Only operator emmitters are allowed in IFELSE. Tensor views "
-          "are not allowed");
-      constexpr int32_t rank0 = detail::get_rank<C1>();
-      constexpr int32_t rank1 = detail::get_rank<T1>();
-      constexpr int32_t rank2 = detail::get_rank<T2>();
-      static_assert(rank0 == matxNoRank || rank0 == Rank());
-      static_assert(rank1 == matxNoRank || rank1 == Rank());
-      static_assert(rank2 == matxNoRank || rank2 == Rank());
-
-      if constexpr (Rank() > 0)
       {
-        for (int i = 0; i < Rank(); i++)
-        {
-          index_t size0 = detail::get_expanded_size<Rank()>(cond_, i);
-          index_t size1 = detail::get_expanded_size<Rank()>(op1, i);
-          index_t size2 = detail::get_expanded_size<Rank()>(op2, i);
-          size_[i] = detail::matx_max(size0, size1, size2);
-        }
-      }
+        static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
+            "Only operator emmitters are allowed in IFELSE. Tensor views "
+            "are not allowed");
+        constexpr int32_t rank0 = detail::get_rank<C1>();
+        constexpr int32_t rank1 = detail::get_rank<T1>();
+        constexpr int32_t rank2 = detail::get_rank<T2>();
+        static_assert(rank0 == matxNoRank || rank0 == Rank());
+        static_assert(rank1 == matxNoRank || rank1 == Rank());
+        static_assert(rank2 == matxNoRank || rank2 == Rank());
 
-      ASSERT_COMPATIBLE_OP_SIZES(op1_);
-      ASSERT_COMPATIBLE_OP_SIZES(op2_);
-      ASSERT_COMPATIBLE_OP_SIZES(cond_);
-    }
+        if constexpr (Rank() > 0)
+        {
+          for (int i = 0; i < Rank(); i++)
+          {
+            index_t size0 = detail::get_expanded_size<Rank()>(cond_, i);
+            index_t size1 = detail::get_expanded_size<Rank()>(op1, i);
+            index_t size2 = detail::get_expanded_size<Rank()>(op2, i);
+            size_[i] = detail::matx_max(size0, size1, size2);
+          }
+        }
+
+        ASSERT_COMPATIBLE_OP_SIZES(op1_);
+        ASSERT_COMPATIBLE_OP_SIZES(op2_);
+        ASSERT_COMPATIBLE_OP_SIZES(cond_);
+      }
 
       /**
        * @brief Operator() for getting values of an if/else
@@ -108,15 +108,15 @@ namespace matx
        * @tparam Is Index types
        * @param indices Index values
        */
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value(cond_, indices...)) {
-            get_value(op1_, indices...);
-          }
-          else {
-            get_value(op2_, indices...);
-          }
-        }      
+      template <detail::VecWidth InWidth, detail::VecWidth OutWidth, typename... Is>
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+        if (get_value(cond_, indices...)) {
+          get_value(op1_, indices...);
+        }
+        else {
+          get_value(op2_, indices...);
+        }
+      }      
 
       /**
        * @brief Rank of IF/ELSE operator

@@ -99,50 +99,50 @@ namespace matx
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
-          {
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T3::Rank()> xinds{};
-            
-            int axis1 = axis_[0];
-            int axis2 = axis_[1];
-            
-            // compute n
-            index_t nind = inds[axis1];
-            int n = get_value(n_, nind);
-            
-            // compute m 
-            index_t mind = inds[axis2];
-            int m = get_value(m_, mind);
-            
-            if(axis1>axis2) 
-              cuda::std::swap(axis1, axis2);
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
+        {
+          cuda::std::array<index_t, Rank()> inds{indices...};
+          cuda::std::array<index_t, T3::Rank()> xinds{};
+          
+          int axis1 = axis_[0];
+          int axis2 = axis_[1];
+          
+          // compute n
+          index_t nind = inds[axis1];
+          int n = get_value(n_, nind);
+          
+          // compute m 
+          index_t mind = inds[axis2];
+          int m = get_value(m_, mind);
+          
+          if(axis1>axis2) 
+            cuda::std::swap(axis1, axis2);
 
-            // compute indices for x
-            int idx = 0;
-            for(int i = 0; i < Rank(); i++) {
-              index_t ind = inds[i];
-              if(i != axis1 && i != axis2) {
-                xinds[idx++] = ind;
-              }
+          // compute indices for x
+          int idx = 0;
+          for(int i = 0; i < Rank(); i++) {
+            index_t ind = inds[i];
+            if(i != axis1 && i != axis2) {
+              xinds[idx++] = ind;
             }
+          }
 
-            auto x = cuda::std::apply(in_, xinds);
+          auto x = cuda::std::apply(in_, xinds);
 
-            value_type ret;
+          value_type ret;
 
-            // if we are half precision up cast to float
-            if constexpr (is_complex_half_v<value_type>) {
-              ret = static_cast<value_type>(legendre(n, m, cuda::std::complex<float>(x)));
-            } else if constexpr (is_matx_half_v<value_type>) {
-              ret = static_cast<value_type>(legendre(n, m, float(x)));
-            } else {
-              ret = legendre(n, m, x);
-            }
-            
-            return ret;
-          }    
+          // if we are half precision up cast to float
+          if constexpr (is_complex_half_v<value_type>) {
+            ret = static_cast<value_type>(legendre(n, m, cuda::std::complex<float>(x)));
+          } else if constexpr (is_matx_half_v<value_type>) {
+            ret = static_cast<value_type>(legendre(n, m, float(x)));
+          } else {
+            ret = legendre(n, m, x);
+          }
+          
+          return ret;
+        }    
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept

@@ -86,14 +86,16 @@ namespace matx
           s_[0] = stride_size;
         };
 
+        template <detail::VecWidth InWidth, detail::VecWidth OutWidth>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return op_(i0*s_[0] + i1);
+          return op_<InWidth, OutWidth>(i0*s_[0] + i1);
         }
 
+        template <detail::VecWidth InWidth, detail::VecWidth OutWidth>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return op_(i0*s_[0] + i1);
+          return op_<InWidth, OutWidth>(i0*s_[0] + i1);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

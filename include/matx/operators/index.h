@@ -55,7 +55,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "index()"; } 
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t operator()(Is... indices) const 
         {
           cuda::std::array<index_t, sizeof...(Is)> inds{indices...};

@@ -58,7 +58,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           auto v = get_value(op_,indices...);

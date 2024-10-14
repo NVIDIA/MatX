@@ -59,42 +59,42 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-	    __MATX_INLINE__ std::string str() const { return "repmat(" + op_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "repmat(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RepMatOp(const T1 &op, index_t reps) : op_(op)
-      {
-        for (int dim = 0; dim < DIM; dim++)
         {
-          reps_[dim] = reps;
+          for (int dim = 0; dim < DIM; dim++)
+          {
+            reps_[dim] = reps;
+          }
         }
-      }
 
-      __MATX_INLINE__ RepMatOp(const T1 &op, const cuda::std::array<index_t, DIM> reps) : op_(op)
-      {
-        for (int dim = 0; dim < DIM; dim++)
+        __MATX_INLINE__ RepMatOp(const T1 &op, const cuda::std::array<index_t, DIM> reps) : op_(op)
         {
-          reps_[dim] = reps[dim];
+          for (int dim = 0; dim < DIM; dim++)
+          {
+            reps_[dim] = reps[dim];
+          }
         }
-      }
 
-      __MATX_INLINE__ RepMatOp(const T1 &op, const index_t *reps) : op_(op)
-      {
-        for (int dim = 0; dim < DIM; dim++)
+        __MATX_INLINE__ RepMatOp(const T1 &op, const index_t *reps) : op_(op)
         {
-          reps_[dim] = reps[dim];
+          for (int dim = 0; dim < DIM; dim++)
+          {
+            reps_[dim] = reps[dim];
+          }
         }
-      }
 
 
         template <int I = 0, typename ...Is>
-          __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void UpdateIndex(cuda::std::tuple<Is...> &tup) const {
-            if constexpr (I != sizeof...(Is)) {
-              cuda::std::get<I>(tup) %= op_.Size(I);
-              UpdateIndex<I+1, Is...>(tup);
-            }
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void UpdateIndex(cuda::std::tuple<Is...> &tup) const {
+          if constexpr (I != sizeof...(Is)) {
+            cuda::std::get<I>(tup) %= op_.Size(I);
+            UpdateIndex<I+1, Is...>(tup);
           }
+        }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           if constexpr (Rank() == 0) {
@@ -107,7 +107,7 @@ namespace matx
           }
         }
 
-        template <typename... Is>
+        template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           if constexpr (Rank() == 0) {
