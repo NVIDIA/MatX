@@ -171,8 +171,9 @@ namespace matx {
     __MATX_HOST__ __MATX_INLINE__ VecWidth MinCompatibleWidth(const Op1 &a, const Op2 &b) {
       VecWidth in1 = GetOpWidth(a);
       VecWidth in2 = GetOpWidth(b);
-
+printf("MinCompatibleWidth: %d %d\n", (int)in1, (int)in2);
       return static_cast<VecWidth>(cuda::std::min(static_cast<int>(in1), static_cast<int>(in2)));
-    }    
+    }
+
   }
 }; 

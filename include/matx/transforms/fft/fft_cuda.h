@@ -108,9 +108,9 @@ public:
     } else {
       factor = static_cast<s_type>(params_.n[0] * params_.n[1]);
     }
-
+printf("running fft\n");
     Exec(o, i, CUFFT_FORWARD);
-
+printf("scaling fft\n");
     if (norm == FFTNorm::ORTHO) {
       (o *= static_cast<s_type>(1.0 / std::sqrt(factor))).run(stream);
     } else if (norm == FFTNorm::FORWARD) {
@@ -801,6 +801,7 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
   auto in = detail::getCufft2DSupportedTensor(i, stream);
 
   if(!in.isSameView(i)) {
+    printf("fft copy\n");
     (in = i).run(stream);
   }
 

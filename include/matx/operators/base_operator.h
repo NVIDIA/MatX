@@ -152,6 +152,14 @@ namespace matx
         {
         }
 
+        template <detail::VecWidth InWidth, detail::VecWidth OutWidth, typename Idx>
+        __MATX_INLINE__ auto ApplyVec(const Idx &idx) {
+          auto apply_op = [this](auto... args) {
+              return static_cast<T *>(this)->template operator()<InWidth, OutWidth>(args...);
+          };
+
+          return cuda::std::apply(apply_op, idx);
+        }        
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() const {
           if constexpr (T::Rank() == 0) {

@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
@@ -93,7 +94,13 @@ namespace matx
           }
 
           return cuda::std::apply(op_, out);
-        }    
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...);
+        }
 
         template <VecWidth InWidth, VecWidth OutWidth, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
@@ -117,8 +124,20 @@ namespace matx
             ind /= op_.Size(d);
           }
 
-          return cuda::std::apply(op_, out);
-        }    
+
+      // auto apply_op = [this](auto... args) {
+      //     return this->op_.template operator()<InWidth, OutWidth>(args...);
+      // };
+      // return cuda::std::apply(apply_op, out);
+          //return cuda::std::apply(op_, out);
+          return this->ApplyVec<InWidth, OutWidth>(out);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        {
+          return operator()<VecWidth::SCALAR, VecWidth::SCALAR>(indices...);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

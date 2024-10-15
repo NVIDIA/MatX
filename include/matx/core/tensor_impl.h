@@ -1048,6 +1048,8 @@ IGNORE_WARNING_POP_GCC
       //if (IsContiguous()) {
         uint32_t width = 4;
         while (width > 1) {
+printf("ret width=%u size=%zu (Lsize() %% width)==0=%d (Stride(Rank() - 1) == 1)=%d  (sizeof(T) * width)<= MAX_VEC_WIDTH=%d     (reinterpret_cast<uintptr_t>(ldata_) %% (sizeof(T) * width))== 0  =%d\n", 
+          width, sizeof(T), (Lsize() % width)==0, (Stride(Rank() - 1) == 1), (sizeof(T) * width)<= MAX_VEC_WIDTH, (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width))== 0);          
           if (((Lsize() % width) == 0) &&
             (Stride(Rank() - 1) == 1) &&
             ((sizeof(T) * width) <= MAX_VEC_WIDTH) &&
@@ -1064,8 +1066,9 @@ IGNORE_WARNING_POP_GCC
           }
 
           width /= 2;
+          
         }
-printf("ret %u %zu\n", width, sizeof(T));
+
         return static_cast<VecWidth>(width);
     }
 

@@ -139,8 +139,9 @@ namespace detail {
           auto i_new = make_tensor<T2>(shape, MATX_ASYNC_DEVICE_MEMORY, stream);
           ends[RANK - 1] = i.Lsize();
           auto i_pad_part_v = slice(i_new, starts, ends);
-
+printf("fft copy\n");
           (i_new = static_cast<promote_half_t<T2>>(0)).run(stream);
+          printf("fft copy2\n");
           // example-begin copy-test-1
           matx::copy(i_pad_part_v, i, stream);
           // example-end copy-test-1
