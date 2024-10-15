@@ -114,7 +114,6 @@ namespace matx {
 
     return shape;
   }
-
   namespace detail {
     // Used inside of transforms to allocate temporary output
     template <typename TensorType, typename Executor, typename ShapeType> 
