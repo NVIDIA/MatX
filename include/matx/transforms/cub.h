@@ -1136,6 +1136,8 @@ struct CubParamsKeyEq {
   }
 };
 
+using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
+
 /**
  * Inner function for the public sort_impl(). sort_impl() allocates a temporary
  * tensor if needed so that the inner function can assume contiguous tensor views
@@ -1177,8 +1179,6 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
 #endif
 #endif
 }
-
-using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
 
 }
 
