@@ -110,60 +110,38 @@ namespace matx
         };
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
-       
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind = starts_;
-            cuda::std::array<index_t, Rank()> inds{indices...};   
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          static_assert(sizeof...(Is)==Rank());
+          static_assert((std::is_convertible_v<Is, index_t> && ... ));
+      
+          // convert variadic type to tuple so we can read/update
+          cuda::std::array<index_t, T::Rank()> ind = starts_;
+          cuda::std::array<index_t, Rank()> inds{indices...};   
 
-            #pragma unroll            
-            for (int32_t i = 0; i < T::Rank(); i++) {
-              #pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {
-                if(dims_[j] == i) {
-                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts_[j] + inds[j] * strides_[i];
-                  }
-                  else {
-                    ind[i] = starts_[j] + inds[j];
-                  }
+          #pragma unroll            
+          for (int32_t i = 0; i < T::Rank(); i++) {
+            #pragma unroll
+            for(int32_t j = 0; j < Rank(); j++) {
+              if(dims_[j] == i) {
+                if constexpr (!std::is_same_v<NoStride, StrideType>) {
+                  ind[i] = starts_[j] + inds[j] * strides_[i];
+                }
+                else {
+                  ind[i] = starts_[j] + inds[j];
                 }
               }
-            }       
-               
-            return cuda::std::apply(op_, ind);
-          }
+            }
+          }       
+              
+          return cuda::std::apply(op_, ind);
+        }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-          {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
-          
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, T::Rank()> ind = starts_;
-            cuda::std::array<index_t, Rank()> inds{indices...};
-
-            #pragma unroll            
-            for (int32_t i = 0; i < T::Rank(); i++) {
-              #pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {
-                if(dims_[j] == i) {
-                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts_[j] + inds[j] * strides_[i];
-                  }
-                  else {
-                    ind[i] = starts_[j] + inds[j];
-                  }
-                }
-              }
-            }              
-
-            return cuda::std::apply(op_, ind);
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return std::as_const(*this).template operator()(indices...);
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

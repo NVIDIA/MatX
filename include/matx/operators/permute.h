@@ -78,74 +78,45 @@ namespace matx
 
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
-          {
-            static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          static_assert(sizeof...(Is)==Rank());
+          static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, Rank()> inds{indices...};
+          // convert variadic type to tuple so we can read/update
+          cuda::std::array<index_t, Rank()> inds{indices...};
 IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            cuda::std::array<index_t, Rank()> ind;
+          cuda::std::array<index_t, Rank()> ind;
 IGNORE_WARNING_POP_GCC
-            //cuda::std::array<index_t, T::Rank()> ind{indices...};
+          //cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #if 0
-	    //This causes register spills but might be faster if Rank is large
+    //This causes register spills but might be faster if Rank is large
 #pragma unroll
-            for(int32_t i = 0; i < Rank(); i++) {	
-              ind[dims_[i]] = inds[i];
-            }
+          for(int32_t i = 0; i < Rank(); i++) {	
+            ind[dims_[i]] = inds[i];
+          }
 #else
 #pragma unroll
-	    // use double loop to avoid register spills
-            for(int32_t i = 0; i < Rank(); i++) {	
+    // use double loop to avoid register spills
+          for(int32_t i = 0; i < Rank(); i++) {	
 #pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {	
-                if(dims_[j] == i) {
-                  ind[i] = inds[j];
-                }			
-              }
-	    }
+            for(int32_t j = 0; j < Rank(); j++) {	
+              if(dims_[j] == i) {
+                ind[i] = inds[j];
+              }			
+            }
+    }
 #endif
 
-            return cuda::std::apply(op_, ind);
-          }
+          return cuda::std::apply(op_, ind);
+        }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-          {
-            static_assert(sizeof...(Is)==Rank());
-            //          static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            //cuda::std::array<index_t, T::Rank()> ind{indices...};
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            cuda::std::array<index_t, Rank()> ind;
-IGNORE_WARNING_POP_GCC
-
-#if 0
-	    //This causes register spills but might be faster if Rank is large
-#pragma unroll
-            for(int32_t i = 0; i < Rank(); i++) {	
-              ind[dims_[i]] = inds[i];
-            }
-#else
-#pragma unroll
-	    // use double loop to avoid register spills
-            for(int32_t i = 0; i < Rank(); i++) {	
-#pragma unroll
-              for(int32_t j = 0; j < Rank(); j++) {	
-                if(dims_[j] == i) {
-                  ind[i] = inds[j];
-                }			
-              }
-	    }
-#endif
-
-            return cuda::std::apply(op_, ind);
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return std::as_const(*this).template operator()(indices...);
+        }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {

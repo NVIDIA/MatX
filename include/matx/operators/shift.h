@@ -66,43 +66,33 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
-      {
-        static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
-        ASSERT_COMPATIBLE_OP_SIZES(shift_); 
-        ASSERT_COMPATIBLE_OP_SIZES(op_); 
-      }
+        {
+          static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
+          ASSERT_COMPATIBLE_OP_SIZES(shift_); 
+          ASSERT_COMPATIBLE_OP_SIZES(op_); 
+        }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            auto tup = cuda::std::make_tuple(indices...);
-            index_t shift = -get_value(shift_, indices...);
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
+          index_t shift = -get_value(shift_, indices...);
 
 
-            shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
+          shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
 
-            if(shift<0) shift += Size(DIM);
+          if(shift<0) shift += Size(DIM);
 
-            cuda::std::get<DIM>(tup) = shift;
+          cuda::std::get<DIM>(tup) = shift;
 
-            return cuda::std::apply(op_, tup);
-          }    
+          return cuda::std::apply(op_, tup);
+        }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-          {
-            auto tup = cuda::std::make_tuple(indices...);
-            index_t shift = -get_value(shift_, indices...);
-
-
-            shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
-
-            if(shift<0) shift += Size(DIM);
-
-            cuda::std::get<DIM>(tup) = shift;
-
-            return cuda::std::apply(op_, tup);
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return std::as_const(*this).template operator()(indices...);
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept

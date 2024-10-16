@@ -61,14 +61,14 @@ namespace matx
         }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            auto tup = cuda::std::make_tuple(indices...);
-            auto stl = cuda::std::get<Rank()-2>(tup);
-            cuda::std::get<Rank()-2>(tup) = cuda::std::get<Rank()-1>(tup);
-            cuda::std::get<Rank()-1>(tup) = stl;      
-            return conj(cuda::std::apply(op_, tup));
-          }
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          auto tup = cuda::std::make_tuple(indices...);
+          auto stl = cuda::std::get<Rank()-2>(tup);
+          cuda::std::get<Rank()-2>(tup) = cuda::std::get<Rank()-1>(tup);
+          cuda::std::get<Rank()-1>(tup) = stl;      
+          return conj(cuda::std::apply(op_, tup));
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
