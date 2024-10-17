@@ -78,16 +78,9 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          if constexpr (Rank() == 0) {
-            return op_();
-          } 
-          else {
-            auto tup = cuda::std::make_tuple(indices...);
-            cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
-            return cuda::std::apply(op_, tup);
-          }
+          return std::as_const(*this).template operator()(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
