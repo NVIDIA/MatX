@@ -37,6 +37,8 @@
 #include <cstdio>
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
 #endif
 #include <numeric>
 
@@ -45,6 +47,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
 #include "matx/core/operator_utils.h"
+#include "matx/operators/reshape.h"
 
 
 namespace matx {
@@ -72,7 +75,8 @@ typedef enum {
   CUB_OP_REDUCE_MAX,
   CUB_OP_SELECT,
   CUB_OP_SELECT_IDX,
-  CUB_OP_UNIQUE
+  CUB_OP_UNIQUE,
+  CUB_OP_REDUCE_ARGMAX
 } CUBOperation_t;
 
 struct CubParams_t {
@@ -1092,6 +1096,163 @@ private:
   size_t temp_storage_bytes = 0;
 };
 
+struct CustomArgMaxCmp
+{
+  template <typename T>
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(const T &a, const T &b) const {
+    return thrust::get<1>(a) < thrust::get<1>(b) ? b : a;
+  }
+};
+
+template <typename OutputTensor, typename TensorIndexType, typename InputOperator, CUBOperation_t op, typename CParams = EmptyParams_t>
+class matxCubTwoOutputPlan_t {
+  using T1 = typename InputOperator::value_type;
+
+public:
+  matxCubTwoOutputPlan_t(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a, const CParams &cparams, const cudaStream_t stream = 0) :
+    cparams_(cparams)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    if constexpr (op == CUB_OP_REDUCE_ARGMAX) {
+      ExecArgMax(a_out, aidx_out, a, stream);
+    }
+    else {
+      MATX_THROW(matxNotSupported, "Invalid CUB operation");
+    }
+
+    // Allocate any workspace needed by underly CUB algorithm
+    matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+              stream);
+#endif
+  }
+  
+  static auto GetCubParams([[maybe_unused]] OutputTensor &a_out,
+                           [[maybe_unused]] TensorIndexType &aidx_out,
+                                  const InputOperator &a,
+                                  cudaStream_t stream)
+  {
+    CubParams_t params;
+
+    for (int r = 0; r < InputOperator::Rank(); r++) {
+      params.size.push_back(a.Size(r));
+    }
+
+    params.op = op;
+    if constexpr (OutputTensor::Rank() > 0)
+    {
+      params.batches = TotalSize(a_out);
+    }
+    else
+    {
+      params.batches = 1;
+    }
+    params.dtype = TypeToInt<T1>();
+    params.stream = stream;
+
+    return params;
+  }
+
+  /**
+   * Execute an argmax on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam TensorIndexType
+   *   Type of the output index tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a_out
+   *   Output tensor
+   * @param aidx_out
+   *   Output index tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecArgMax(OutputTensor &a_out,
+                         TensorIndexType &aidx_out,
+                         const InputOperator &a,
+                         const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    CustomArgMaxCmp cmp_op;
+    auto initial_value = cuda::std::tuple<matx::index_t,typename InputOperator::value_type>(-1, std::numeric_limits<typename InputOperator::value_type>::lowest());
+
+    if constexpr (OutputTensor::Rank() > 0) {
+      auto a_iter = matx::RandomOperatorOutputIterator{a};
+      auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
+      auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+
+      int BATCHES = static_cast<int>(TotalSize(a_out));
+      int N = static_cast<int>(TotalSize(a)) / BATCHES;
+
+      auto r0 = matx::range<0>({BATCHES},0,N);
+      auto r0_iter = matx::RandomOperatorIterator{r0};
+      auto r1 = matx::range<0>({BATCHES},N,N);
+      auto r1_iter = matx::RandomOperatorIterator{r1};
+
+      cub::DeviceSegmentedReduce::Reduce(
+        d_temp,
+        temp_storage_bytes,
+        zipped_input,
+        zipped_output,
+        BATCHES,
+        r0_iter,
+        r1_iter,
+        cmp_op,
+        initial_value,
+        stream);
+    }
+    else {
+      auto a_iter = matx::RandomOperatorOutputIterator{a};
+      auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
+      auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+
+      int N = static_cast<int>(TotalSize(a));
+
+      cub::DeviceReduce::Reduce(
+        d_temp,
+        temp_storage_bytes,
+        zipped_input,
+        zipped_output,
+        N,
+        cmp_op,
+        initial_value,
+        stream);
+    }
+#endif
+  }
+
+  /**
+   * Destructor
+   *
+   * Destroys any helper data used for provider type and any workspace memory
+   * created
+   *
+   */
+  ~matxCubTwoOutputPlan_t()
+  {
+    matxFree(d_temp, cudaStreamDefault);
+  }
+
+private:
+  // Member variables
+  cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
+
+  cudaStream_t stream_;
+  CParams cparams_; ///< Parameters specific to the operation type
+  uint8_t *d_temp = nullptr;
+  size_t temp_storage_bytes = 0;
+};
+
 
 /**
  * Crude hash to get a reasonably good delta for collisions. This doesn't need
@@ -1136,6 +1297,8 @@ struct CubParamsKeyEq {
   }
 };
 
+using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
+
 /**
  * Inner function for the public sort_impl(). sort_impl() allocates a temporary
  * tensor if needed so that the inner function can assume contiguous tensor views
@@ -1177,9 +1340,6 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
 #endif
 #endif
 }
-
-using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, CubParamsKeyEq>;
-
 }
 
 
@@ -1378,6 +1538,184 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
       a_out, a, {}, stream};
   tmp.ExecMax(a_out, a, stream);
+#endif
+#endif
+}
+
+/**
+ * Find argmax of an operator using CUB
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam InputOperator
+ *   Input operator type
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename TensorIndexType, typename InputOperator>
+void cub_argmax(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a,
+          const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+#ifndef MATX_DISABLE_CUB_CACHE
+  auto params =
+      detail::matxCubTwoOutputPlan_t<OutputTensor,
+                                     TensorIndexType,
+                                     InputOperator,
+                                     detail::CUB_OP_REDUCE_ARGMAX>::GetCubParams(a_out, aidx_out, a, stream);
+
+  using cache_val_type = detail::matxCubTwoOutputPlan_t<OutputTensor, TensorIndexType, InputOperator, detail::CUB_OP_REDUCE_ARGMAX, detail::EmptyParams_t>;
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(a_out, aidx_out, a, detail::EmptyParams_t{}, stream);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->ExecArgMax(a_out, aidx_out, a, stream);
+      }
+    );
+#else
+  auto tmp = detail::matxCubTwoOutputPlan_t<OutputTensor, TensorIndexType, InputOperator, detail::CUB_OP_REDUCE_ARGMAX, detail::EmptyParams_t>{
+      a_out, aidx_out, a, {}, stream};
+  tmp.ExecArgMax(a_out, aidx_out, a, stream);
+#endif
+#endif
+
+
+
+
+
+
+
+
+
+
+#if 0
+#if 0 //#ifndef MATX_DISABLE_CUB_CACHE
+  auto params =
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
+                            detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a, stream);
+
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX, detail::EmptyParams_t>;
+  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->ExecMax(a_out, a, stream);
+      }
+    );
+#else
+  //auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
+  //    a_out, a, {}, stream};
+  //tmp.ExecMax(a_out, a, stream);
+    
+  // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
+  // type of reduction where there's not a single output, since any type of reduction can be generalized
+  // to a segmented type
+  if constexpr (OutputTensor::Rank() > 0) {
+    auto a_iter = matx::RandomOperatorOutputIterator{a};
+    auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
+    auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+
+    int BATCHES = static_cast<int>(TotalSize(a_out));
+    int N = static_cast<int>(TotalSize(a)) / BATCHES;
+
+    auto r0 = matx::range<0>({BATCHES},0,N);
+    auto r0_iter = matx::RandomOperatorIterator{r0};
+    auto r1 = matx::range<0>({BATCHES},N,N);
+    auto r1_iter = matx::RandomOperatorIterator{r1};
+
+    // TODO
+    auto initial_value = cuda::std::tuple<matx::index_t,typename InputOperator::value_type>(-1, std::numeric_limits<typename InputOperator::value_type>::lowest());
+    CustomMax cmp_op;
+
+    size_t temp_storage_bytes = 0;
+    cub::DeviceSegmentedReduce::Reduce(
+      nullptr,
+      temp_storage_bytes,
+      zipped_input,
+      zipped_output,
+      BATCHES,
+      r0_iter,
+      r1_iter,
+      //segment_start_offset_iter,
+      //segment_end_offset_iter,
+      //t_offsets.Data(),
+      //t_offsets.Data() + 1,
+      cmp_op,
+      initial_value,
+      stream);
+
+    auto t_temp_storage = matx::make_tensor<uint8_t>({static_cast<matx::index_t>(temp_storage_bytes)});
+
+    // Run reduction
+    cub::DeviceSegmentedReduce::Reduce(
+      t_temp_storage.Data(),
+      temp_storage_bytes,
+      zipped_input,
+      zipped_output,
+      BATCHES,
+      r0_iter,
+      r1_iter,
+      //segment_start_offset_iter,
+      //segment_end_offset_iter,
+      //t_offsets.Data(),
+      //t_offsets.Data() + 1,
+      cmp_op,
+      initial_value,
+      stream);
+
+    // Normalize indices
+    //auto idx_offset = matx::reshape(r0, aidx_out.Shape());
+    //(aidx_out -= idx_offset).run(stream);
+    //(aidx_out %= N).run(stream);
+  }
+  else {
+  
+    auto a_iter = matx::RandomOperatorOutputIterator{a};
+    auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
+    auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+
+    int N = static_cast<int>(TotalSize(a));
+
+    // TODO
+    auto initial_value = cuda::std::tuple<matx::index_t,typename InputOperator::value_type>(-1, std::numeric_limits<typename InputOperator::value_type>::lowest());
+    CustomArgMaxCmp cmp_op;
+
+    size_t temp_storage_bytes = 0;
+    cub::DeviceReduce::Reduce(
+      nullptr,
+      temp_storage_bytes,
+      zipped_input,
+      zipped_output,
+      N,
+      cmp_op,
+      initial_value,
+      stream);
+
+    auto t_temp_storage = matx::make_tensor<uint8_t>({static_cast<matx::index_t>(temp_storage_bytes)});
+
+    // Run reduction
+    cub::DeviceReduce::Reduce(
+      t_temp_storage.Data(),
+      temp_storage_bytes,
+      zipped_input,
+      zipped_output,
+      N,
+      cmp_op,
+      initial_value,
+      stream);
+  }
 #endif
 #endif
 }
