@@ -55,12 +55,12 @@ namespace matx {
  * 
  */
 enum matxMemorySpace_t {
-  MATX_MANAGED_MEMORY,
-  MATX_HOST_MEMORY,
-  MATX_HOST_MALLOC_MEMORY,
-  MATX_DEVICE_MEMORY,
-  MATX_ASYNC_DEVICE_MEMORY,
-  MATX_INVALID_MEMORY
+  MATX_MANAGED_MEMORY,      ///< CUDA managed memory or CUDA Unified Memory (UM) from cudaMallocManaged
+  MATX_HOST_MEMORY,         ///< CUDA host-pinned memory from cudaHostAlloc
+  MATX_HOST_MALLOC_MEMORY,  ///< Host-alloced memory (pageable) from malloc
+  MATX_DEVICE_MEMORY,       ///< CUDA device memory from cudaMalloc
+  MATX_ASYNC_DEVICE_MEMORY, ///< CUDA asynchronous device memory corresponding to a stream from cudaMallocAsync
+  MATX_INVALID_MEMORY       ///< Sentinel value
 };
 
 namespace detail {
