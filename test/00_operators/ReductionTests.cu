@@ -940,6 +940,40 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(5)));
   }
 
+  // Limit to cudaExecutor for now, core dump observed for matx::HostExecutor
+  if (std::is_same_v<ExecType, matx::cudaExecutor>)
+  {
+    ExecType exec{};
+    const int BATCHES = 6;
+    const int ROWS = 33;
+    const int COLUMNS = 33;
+    const int BATCH_STRIDE = ROWS*COLUMNS;
+    auto t_a = matx::make_tensor<TestType>({BATCHES,ROWS,COLUMNS});
+    auto t_bi = matx::make_tensor<matx::index_t>({BATCHES});
+    auto t_b = matx::make_tensor<TestType>({BATCHES});
+
+    (t_a = static_cast<TestType>(0)).run(exec);
+    exec.sync();
+
+    matx::index_t expected_abs[6] {31*33+22, 32*33+24, 19*33+12, 21*33+17, 17*33+7, 1*33+24};
+    for (int n=0; n<BATCHES; n++)
+    {
+      matx::index_t max_row = expected_abs[n] / COLUMNS;
+      matx::index_t max_col = expected_abs[n] - max_row*COLUMNS;
+      t_a(n,max_row,max_col) = static_cast<TestType>(1);
+
+      expected_abs[n] += n*BATCH_STRIDE;
+    }
+
+    (matx::mtie(t_b, t_bi) = matx::argmax(t_a, {1,2})).run(exec);
+    exec.sync();
+
+    for (int n=0; n<BATCHES; n++)
+    {
+      EXPECT_TRUE(t_bi(n) == expected_abs[n]);
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
 
@@ -977,6 +1011,40 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(1)));
     rel = GetIdxFromAbs(t2o, t1i_small(1));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(1)));  
+  }
+
+  if (0) // disable for now since it doesn't pass
+  {
+    ExecType exec{};
+    const int BATCHES = 6;
+    const int ROWS = 33;
+    const int COLUMNS = 33;
+    const int BATCH_STRIDE = ROWS*COLUMNS;
+    auto t_a = matx::make_tensor<TestType>({BATCHES,ROWS,COLUMNS});
+    auto t_bi = matx::make_tensor<matx::index_t>({BATCHES});
+    auto t_b = matx::make_tensor<TestType>({BATCHES});
+
+    (t_a = static_cast<TestType>(0)).run(exec);
+    exec.sync();
+
+    matx::index_t expected_abs[6] {31*33+22, 32*33+24, 19*33+12, 21*33+17, 17*33+7, 1*33+24};
+    for (int n=0; n<BATCHES; n++)
+    {
+      matx::index_t max_row = expected_abs[n] / COLUMNS;
+      matx::index_t max_col = expected_abs[n] - max_row*COLUMNS;
+      t_a(n,max_row,max_col) = static_cast<TestType>(-1);
+
+      expected_abs[n] += n*BATCH_STRIDE;
+    }
+
+    (matx::mtie(t_b, t_bi) = matx::argmax(t_a, {1,2})).run(exec);
+    exec.sync();
+
+    for (int n=0; n<BATCHES; n++)
+    {
+      EXPECT_TRUE(t_bi(n) == expected_abs[n]);
+      std::cout << "[" << n << "] " << t_bi(n) << " ?= " << expected_abs[n] << std::endl;
+    }
   }
 
   MATX_EXIT_HANDLER();

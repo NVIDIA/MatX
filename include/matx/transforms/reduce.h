@@ -2082,11 +2082,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  // example-begin reduce-2
-  // Reduce "in" into both "dest" and "idest" using a max operation for the reduction. "dest" will contain
-  // the reduced values while "idest" will include the indices of the reduced values
-  reduce(dest, idest, in, detail::reduceOpMax<typename OutType::value_type>(), stream, true);
-  // example-end reduce-2
+  cub_argmax(dest, idest, in, stream);
 #endif
 }
 
