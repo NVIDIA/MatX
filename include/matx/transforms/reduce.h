@@ -2081,8 +2081,12 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 #ifdef __CUDACC__
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::lowest());
+  using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMaxCmp, decltype(initial_value)>;
+  auto reduce_params = reduce_param_type{detail::CustomArgMaxCmp{}, initial_value};
+
   cudaStream_t stream = exec.getStream();
-  cub_argmax(dest, idest, in, stream);
+  cub_argreduce(dest, idest, in, reduce_params, stream);
 #endif
 }
 
@@ -2228,8 +2232,12 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 #ifdef __CUDACC__
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::max());
+  using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMinCmp, decltype(initial_value)>;
+  auto reduce_params = reduce_param_type{detail::CustomArgMinCmp{}, initial_value};
+
   cudaStream_t stream = exec.getStream();
-  reduce(dest, idest, in, detail::reduceOpMin<typename OutType::value_type>(), stream, true);
+  cub_argreduce(dest, idest, in, reduce_params, stream);
 #endif
 }
 

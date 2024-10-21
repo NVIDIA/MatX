@@ -1013,7 +1013,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(1)));  
   }
 
-  if (0) // disable for now since it doesn't pass
+  if (std::is_same_v<ExecType, matx::cudaExecutor>)
   {
     ExecType exec{};
     const int BATCHES = 6;
@@ -1037,13 +1037,12 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
       expected_abs[n] += n*BATCH_STRIDE;
     }
 
-    (matx::mtie(t_b, t_bi) = matx::argmax(t_a, {1,2})).run(exec);
+    (matx::mtie(t_b, t_bi) = matx::argmin(t_a, {1,2})).run(exec);
     exec.sync();
 
     for (int n=0; n<BATCHES; n++)
     {
       EXPECT_TRUE(t_bi(n) == expected_abs[n]);
-      std::cout << "[" << n << "] " << t_bi(n) << " ?= " << expected_abs[n] << std::endl;
     }
   }
 
