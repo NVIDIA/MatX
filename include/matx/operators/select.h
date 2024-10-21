@@ -69,7 +69,7 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return std::as_const(*this).template operator()(i);
+          return cuda::std::as_const(*this).template operator()(i);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
