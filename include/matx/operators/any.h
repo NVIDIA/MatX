@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <thrust/reduce.h>
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
@@ -39,8 +40,6 @@
 #include "matx/transforms/reduce.h"
 
 namespace matx {
-
-
 
 namespace detail {
   template<typename OpA, int ORank>
@@ -73,8 +72,21 @@ namespace detail {
       };
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        any_impl(cuda::std::get<0>(out), a_, ex);
+      void Exec(Out &&out, Executor) const {
+        auto output_ = cuda::std::get<0>(out);
+        using out_t = decltype(output_);
+        using value_t = typename out_t::value_type;
+        auto op = detail::reduceOpAny<value_t>();
+        auto fn = [&](auto &&input, 
+          auto &&, 
+          auto &&begin,  
+          auto &&end) { 
+            return thrust::reduce(
+              input + *begin, input + *end, op.Init(), op
+            );
+        };
+        auto rv = ReduceInput(fn, output_, a_);
+        MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in any");
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
