@@ -2048,7 +2048,7 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] c
 
 
 /**
- * Compute maxn reduction of a tensor and returns value + index
+ * Compute max reduction of an operator and returns value + index
  *
  * Returns a tensor with maximums and indices
  *
@@ -2198,7 +2198,7 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] c
 
 
 /**
- * Compute min reduction of a tensor and returns value + index
+ * Compute min reduction of an operator and returns value + index
  *
  * Returns a tensor with minimums and indices
  *
@@ -2231,6 +2231,52 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 
   cudaStream_t stream = exec.getStream();
   cub_argreduce(dest, idest, in, reduce_params, stream);
+#endif
+}
+
+/**
+ * Compute min and max reduction of an operator and returns value + index
+ *
+ * Returns tensors with minimums and indices, and maximums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ *
+ * @param destmin
+ *   Destination view of min reduction
+ * @param idestmin
+ *   Destination for min indices
+ * @param destmax
+ *   Destination view of max reduction
+ * @param idestmax
+ *   Destination for max indices
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   CUDA executor or stream ID
+ */
+template <typename OutType, typename TensorIndexType, typename InType>
+void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, cudaExecutor exec = 0)
+{
+  static_assert(OutType::Rank() == TensorIndexType::Rank());
+#ifdef __CUDACC__
+  MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  const auto initial_value = cuda::std::make_tuple(
+    static_cast<matx::index_t>(-1),
+    std::numeric_limits<typename InType::value_type>::max(),
+    static_cast<matx::index_t>(-1),
+    std::numeric_limits<typename InType::value_type>::lowest()
+  );
+  using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMinMaxCmp, decltype(initial_value)>;
+  auto reduce_params = reduce_param_type{detail::CustomArgMinMaxCmp{}, initial_value};
+
+  cudaStream_t stream = exec.getStream();
+  cub_dualargreduce(destmin, idestmin, destmax, idestmax, in, reduce_params, stream);
 #endif
 }
 

@@ -71,7 +71,7 @@ namespace detail {
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return matxNoRank;
+        return ORank;
       }
 
       template <typename ShapeType, typename Executor>
@@ -91,7 +91,7 @@ namespace detail {
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index along specified axes
+ * Compute max reduction of an operator and returns value + index along specified axes
  *
  * @tparam InType
  *   Input data type
