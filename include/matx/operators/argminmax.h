@@ -44,7 +44,7 @@ namespace matx {
 
 namespace detail {
   template<typename OpA, int ORank>
-  class ArgMinOp : public BaseOp<ArgMinOp<OpA, ORank>>
+  class ArgMinMaxOp : public BaseOp<ArgMinMaxOp<OpA, ORank>>
   {
     private:
       typename detail::base_type_t<OpA> a_;
@@ -53,10 +53,10 @@ namespace detail {
       using matxop = bool;
       using value_type = typename remove_cvref_t<OpA>::value_type;
       using matx_transform_op = bool;
-      using argmin_xform_op = bool;
+      using argminmax_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMinOp(const OpA &a) : a_(a) {
+      __MATX_INLINE__ std::string str() const { return "argminmax(" + get_type_str(a_) + ")"; }
+      __MATX_INLINE__ ArgMinMaxOp(const OpA &a) : a_(a) {
      
       };
 
@@ -65,8 +65,8 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmin(). ie: (mtie(O, I) = argmin(A))");   
-        argmin_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 5, "Must use mtie with 4 outputs on argminmax(). ie: (mtie(MinVal, MinIdx, MaxVal, MaxIdx) = argminmax(A))");   
+        argminmax_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), cuda::std::get<3>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -91,7 +91,7 @@ namespace detail {
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index along specified axes
+ * Compute min and max reduction of a tensor and returns value + index along specified axes
  *
  * @tparam InType
  *   Input data type
@@ -105,17 +105,17 @@ namespace detail {
  * @returns Operator with reduced values of argmin-reduce computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto argmin(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto argminmax(const InType &in, const int (&dims)[D])
 {
   static_assert(D < InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::ArgMinOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::ArgMinMaxOp<decltype(permop), InType::Rank() - D>(permop);
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index
+ * Compute min and max reduction of a tensor and returns value + index
  *
  * @tparam InType
  *   Input data type
@@ -125,9 +125,9 @@ __MATX_INLINE__ auto argmin(const InType &in, const int (&dims)[D])
  * @returns Operator with reduced values of argmin-reduce computed
  */
 template <typename InType>
-__MATX_INLINE__ auto argmin(const InType &in)
+__MATX_INLINE__ auto argminmax(const InType &in)
 {
-  return detail::ArgMinOp<decltype(in), 0>(in);
+  return detail::ArgMinMaxOp<decltype(in), 0>(in);
 }
 
 }

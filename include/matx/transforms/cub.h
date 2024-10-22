@@ -75,7 +75,8 @@ typedef enum {
   CUB_OP_SELECT,
   CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE,
-  CUB_OP_ARG_REDUCE,
+  CUB_OP_SINGLE_ARG_REDUCE,
+  CUB_OP_DUAL_ARG_REDUCE,
 } CUBOperation_t;
 
 struct CubParams_t {
@@ -1111,18 +1112,52 @@ struct CustomArgMinCmp
   }
 };
 
+struct CustomArgMinMaxCmp
+{
+  template <typename T>
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(const T &a, const T &b) const {
+    T result;
+
+    // Min part
+    if (thrust::get<1>(a) >= thrust::get<1>(b))
+    {
+      thrust::get<0>(result) = thrust::get<0>(b);
+      thrust::get<1>(result) = thrust::get<1>(b);
+    }
+    else
+    {
+      thrust::get<0>(result) = thrust::get<0>(a);
+      thrust::get<1>(result) = thrust::get<1>(a);
+    }
+
+    // Max part
+    if (thrust::get<3>(a) < thrust::get<3>(b))
+    {
+      thrust::get<2>(result) = thrust::get<2>(b);
+      thrust::get<3>(result) = thrust::get<3>(b);
+    }
+    else
+    {
+      thrust::get<2>(result) = thrust::get<2>(a);
+      thrust::get<3>(result) = thrust::get<3>(a);
+    }
+
+    return result;
+  }
+};
+
 template <typename OutputTensor, typename TensorIndexType, typename InputOperator, typename CParams = EmptyParams_t>
-class matxCubTwoOutputPlan_t {
+class matxCubSingleArgPlan_t {
   using T1 = typename InputOperator::value_type;
 
 public:
-  matxCubTwoOutputPlan_t(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a, CUBOperation_t op, const CParams &cparams, const cudaStream_t stream = 0) :
+  matxCubSingleArgPlan_t(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a, CUBOperation_t op, const CParams &cparams, const cudaStream_t stream = 0) :
     cparams_(cparams)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if (op == CUB_OP_ARG_REDUCE) {
+    if (op == CUB_OP_SINGLE_ARG_REDUCE) {
       ExecArgReduce(a_out, aidx_out, a, stream);
     }
     else {
@@ -1137,9 +1172,9 @@ public:
   
   static auto GetCubParams([[maybe_unused]] OutputTensor &a_out,
                            [[maybe_unused]] TensorIndexType &aidx_out,
-                                  const InputOperator &a,
-                                  CUBOperation_t op,
-                                  cudaStream_t stream)
+                           const InputOperator &a,
+                           CUBOperation_t op,
+                           cudaStream_t stream)
   {
     CubParams_t params;
 
@@ -1231,6 +1266,168 @@ public:
     }
 #endif
   }
+  
+  /**
+   * Destructor
+   *
+   * Destroys any helper data used for provider type and any workspace memory
+   * created
+   *
+   */
+  ~matxCubSingleArgPlan_t()
+  {
+    matxFree(d_temp, cudaStreamDefault);
+  }
+
+private:
+  // Member variables
+  cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
+
+  cudaStream_t stream_;
+  CParams cparams_; ///< Parameters specific to the operation type
+  uint8_t *d_temp = nullptr;
+  size_t temp_storage_bytes = 0;
+};
+
+template <typename OutputTensor, typename TensorIndexType, typename InputOperator, typename CParams = EmptyParams_t>
+class matxCubDualArgPlan_t {
+  using T1 = typename InputOperator::value_type;
+
+public:
+  matxCubDualArgPlan_t(OutputTensor &a1_out,
+                       TensorIndexType &aidx1_out,
+                       OutputTensor &a2_out,
+                       TensorIndexType &aidx2_out,
+                       const InputOperator &a,
+                       CUBOperation_t op,
+                       const CParams &cparams,
+                       const cudaStream_t stream = 0) :
+    cparams_(cparams)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    if (op == CUB_OP_DUAL_ARG_REDUCE) {
+      ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
+    }
+    else {
+      MATX_THROW(matxNotSupported, "Invalid CUB operation");
+    }
+
+    // Allocate any workspace needed by underly CUB algorithm
+    matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+              stream);
+#endif
+  }
+  
+  static auto GetCubParams([[maybe_unused]] OutputTensor &a1_out,
+                           [[maybe_unused]] TensorIndexType &aidx1_out,
+                           [[maybe_unused]] OutputTensor &a2_out,
+                           [[maybe_unused]] TensorIndexType &aidx2_out,
+                           const InputOperator &a,
+                           CUBOperation_t op,
+                           cudaStream_t stream)
+  {
+    CubParams_t params;
+
+    for (int r = 0; r < InputOperator::Rank(); r++) {
+      params.size.push_back(a.Size(r));
+    }
+
+    params.op = op;
+    if constexpr (OutputTensor::Rank() > 0)
+    {
+      params.batches = TotalSize(a1_out);
+    }
+    else
+    {
+      params.batches = 1;
+    }
+    params.dtype = TypeToInt<T1>();
+    params.stream = stream;
+
+    return params;
+  }
+
+  /**
+   * Execute an 2 value / 2 index arg reduce on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam TensorIndexType
+   *   Type of the output index tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a1_out
+   *   Output first tensor
+   * @param aidx1_out
+   *   Output first index tensor
+   * @param a2_out
+   *   Output second tensor
+   * @param aidx2_out
+   *   Output second index tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecDualArgReduce(OutputTensor &a1_out,
+                                TensorIndexType &aidx1_out,
+                                OutputTensor &a2_out,
+                                TensorIndexType &aidx2_out,
+                                const InputOperator &a,
+                                const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    const auto a_iter = matx::RandomOperatorThrustIterator{a};
+    const auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0),
+                                                        a_iter,
+                                                        thrust::make_counting_iterator<matx::index_t>(0),
+                                                        a_iter);
+    const auto zipped_output = thrust::make_zip_iterator(aidx1_out.Data(), a1_out.Data(), aidx2_out.Data(), a2_out.Data());
+
+    if constexpr (OutputTensor::Rank() > 0) {
+      const int BATCHES = static_cast<int>(TotalSize(a1_out));
+      const int N = static_cast<int>(TotalSize(a)) / BATCHES;
+
+      const auto r0 = matx::range<0>({BATCHES},0,N);
+      const auto r0_iter = matx::RandomOperatorIterator{r0};
+      const auto r1 = matx::range<0>({BATCHES},N,N);
+      const auto r1_iter = matx::RandomOperatorIterator{r1};
+
+      cub::DeviceSegmentedReduce::Reduce(
+        d_temp,
+        temp_storage_bytes,
+        zipped_input,
+        zipped_output,
+        BATCHES,
+        r0_iter,
+        r1_iter,
+        cparams_.reduce_op,
+        cparams_.init,
+        stream);
+    }
+    else {
+      const int N = static_cast<int>(TotalSize(a));
+
+      cub::DeviceReduce::Reduce(
+        d_temp,
+        temp_storage_bytes,
+        zipped_input,
+        zipped_output,
+        N,
+        cparams_.reduce_op,
+        cparams_.init,
+        stream);
+    }
+#endif
+  }
+
 
   /**
    * Destructor
@@ -1239,7 +1436,7 @@ public:
    * created
    *
    */
-  ~matxCubTwoOutputPlan_t()
+  ~matxCubDualArgPlan_t()
   {
     matxFree(d_temp, cudaStreamDefault);
   }
@@ -1556,9 +1753,9 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
  * @tparam CParams
  *   Custom reduction parameters type
  * @param a_out
- *   Output maximum value tensor
+ *   Output value tensor
  * @param aidx_out
- *   Output maximum value index tensor
+ *   Output value index tensor
  * @param a
  *   Input tensor
  * @param reduce_params
@@ -1573,10 +1770,10 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using cache_val_type = detail::matxCubTwoOutputPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>;
+  using cache_val_type = detail::matxCubSingleArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>;
 
   #ifndef MATX_DISABLE_CUB_CACHE
-    auto params = cache_val_type::GetCubParams(a_out, aidx_out, a, detail::CUB_OP_ARG_REDUCE, stream);
+    auto params = cache_val_type::GetCubParams(a_out, aidx_out, a, detail::CUB_OP_SINGLE_ARG_REDUCE, stream);
   
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
         detail::GetCacheIdFromType<detail::cub_cache_t>(),
@@ -1589,8 +1786,68 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
         }
       );
   #else
-    auto tmp = cache_val_type{a_out, aidx_out, a, detail::CUB_OP_ARG_REDUCE, reduce_params, stream};
+    auto tmp = cache_val_type{a_out, aidx_out, a, detail::CUB_OP_SINGLE_ARG_REDUCE, reduce_params, stream};
     tmp.ExecArgReduce(a_out, aidx_out, a, stream);
+  #endif
+#endif
+}
+
+/**
+ * Find two indices and values of custom reduction of an operator using CUB
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam TensorIndexType
+ *   Output tensor index type
+ * @tparam InputOperator
+ *   Input operator type
+ * @tparam CParams
+ *   Custom reduction parameters type
+ * @param a1_out
+ *   Output first value tensor
+ * @param aidx1_out
+ *   Output first value index tensor
+ * @param a2_out
+ *   Output second value tensor
+ * @param aidx2_out
+ *   Output second value index tensor
+ * @param a
+ *   Input tensor
+ * @param reduce_params
+ *   Reduction configuration parameters
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename TensorIndexType, typename InputOperator, typename CParams>
+void cub_dualargreduce(OutputTensor &a1_out,
+                       TensorIndexType &aidx1_out,
+                       OutputTensor &a2_out,
+                       TensorIndexType &aidx2_out,
+                       const InputOperator &a,
+                       const CParams& reduce_params,
+                       const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  using cache_val_type = detail::matxCubDualArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>;
+
+  #ifndef MATX_DISABLE_CUB_CACHE
+    auto params = cache_val_type::GetCubParams(a1_out, aidx1_out, a2_out, aidx2_out, a, detail::CUB_OP_DUAL_ARG_REDUCE, stream);
+  
+    detail::GetCache().LookupAndExec<detail::cub_cache_t>(
+        detail::GetCacheIdFromType<detail::cub_cache_t>(),
+        params,
+        [&]() {
+          return std::make_shared<cache_val_type>(a1_out, aidx1_out, a2_out, aidx2_out, a, reduce_params, stream);
+        },
+        [&](std::shared_ptr<cache_val_type> ctype) {
+          ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidex2_out, a, stream);
+        }
+      );
+  #else
+    auto tmp = cache_val_type{a1_out, aidx1_out, a2_out, aidx2_out, a, detail::CUB_OP_DUAL_ARG_REDUCE, reduce_params, stream};
+    tmp.ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
   #endif
 #endif
 }
