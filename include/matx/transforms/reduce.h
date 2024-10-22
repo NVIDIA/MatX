@@ -801,34 +801,27 @@ public:
 template <typename T> class reduceOpAny {
 public:
   using matx_reduce = bool;
-  using matx_no_cub_reduce = bool; // Don't use CUB for this reduction type
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
   {
     return (v1 != 0) || (v2 != 0);
   }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) || (v2 != 0)); return v1; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
 
 /**
- * Operator for performing an any reduction
+ * Operator for performing an all reduction
  *
- * Performs a reduction of two values of type T by returning 1 if either
+ * Performs a reduction of two values of type T by returning 1 if all
  * of the values are non-zero.
  */
 template <typename T> class reduceOpAll {
 public:
   using matx_reduce = bool;
-  using matx_no_cub_reduce = bool; // Don't use CUB for this reduction type
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
   {
     return (v1 != 0) && (v2 != 0);
   }
-
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(T &v1, T &v2) { v1 = ((v1 != 0) && (v2 != 0)); return v1; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
 /**
