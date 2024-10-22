@@ -940,8 +940,6 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(5)));
   }
 
-  // Limit to cudaExecutor for now, core dump observed for matx::HostExecutor
-  if (std::is_same_v<ExecType, matx::cudaExecutor>)
   {
     ExecType exec{};
     const int BATCHES = 6;
@@ -1013,7 +1011,6 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(1)));  
   }
 
-  if (std::is_same_v<ExecType, matx::cudaExecutor>)
   {
     ExecType exec{};
     const int BATCHES = 6;
@@ -1055,8 +1052,6 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMinMax)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  // Limit to cudaExecutor for now, not yet implemented for matx::HostExecutor
-  if constexpr (std::is_same_v<ExecType, matx::cudaExecutor>)
   {
     ExecType exec{};
     using T = TestType;
@@ -1097,8 +1092,6 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMinMax)
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2o(rel), (TestType)(5)));
   }
 
-  // Limit to cudaExecutor for now, not yet implemented for matx::HostExecutor
-  if constexpr (std::is_same_v<ExecType, matx::cudaExecutor>)
   {
     ExecType exec{};
     const int BATCHES = 6;

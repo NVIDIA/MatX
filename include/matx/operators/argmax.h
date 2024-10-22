@@ -115,7 +115,7 @@ __MATX_INLINE__ auto argmax(const InType &in, const int (&dims)[D])
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index
+ * Compute max reduction of an operator and returns value + index
  *
  * @tparam InType
  *   Input data type

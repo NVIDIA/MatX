@@ -1976,12 +1976,9 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] 
 
 
 /**
- * Compute max reduction of a tensor
+ * Compute max reduction of an operator
  *
  * Returns a tensor representing the max of all numbers in the reduction
- *
- * @note This function uses the name rmax instead of max to not collide with the
- * element-wise operator max.
  *
  * @tparam OutType
  *   Output data type
@@ -2007,12 +2004,9 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, cudaExecutor exec 
 }
 
 /**
- * Compute max reduction of a tensor
+ * Compute max reduction of an operator
  *
  * Returns a tensor representing the max of all numbers in the reduction
- *
- * @note This function uses the name rmax instead of max to not collide with the
- * element-wise operator max.
  *
  * @tparam OutType
  *   Output data type
@@ -2036,8 +2030,9 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] c
       *lout = *std::max_element(lin, lin + TotalSize(in));
     }
     else {
-      auto els = lend[1] - lbegin[0];
-      for (index_t b = 0; b < els; b++) {
+      const index_t BATCHES = TotalSize(dest);
+      const index_t els = lend[0] - lbegin[0];
+      for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]);
       }
     }
@@ -2084,9 +2079,9 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 }
 
 /**
- * Compute maxn reduction of a tensor and returns value + index
+ * Compute max reduction of an operator and returns value + index
  *
- * Returns a tensor with maximums and indices
+ * Returns a tensor with maximums and a tensor with indices
  *
  * @tparam OutType
  *   Output data type
@@ -2114,8 +2109,9 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
       *lout = cuda::std::max_element(lin, lin + TotalSize(in)) - lin;
     }
     else {
-      auto els = lend[0] - lbegin[0];
-      for (index_t b = 0; b < els; b++) {
+      const index_t BATCHES = TotalSize(dest);
+      const index_t els = lend[0] - lbegin[0];
+      for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
     }
@@ -2130,7 +2126,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 
 
 /**
- * Compute min reduction of a tensor
+ * Compute min reduction of an operator
  *
  * Returns a tensor representing the min of all numbers in the reduction
  *
@@ -2158,12 +2154,9 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, cudaExecutor exec 
 }
 
 /**
- * Compute min reduction of a tensor
+ * Compute min reduction of an operator
  *
  * Returns a tensor representing the min of all numbers in the reduction
- *
- * @note This function uses the name rmin instead of min to not collide with the
- * element-wise operator min.
  *
  * @tparam OutType
  *   Output data type
@@ -2186,8 +2179,9 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] c
       *lout = *std::min_element(lin, lin + TotalSize(in));
     }
     else {
-      auto els = lend[1] - lbegin[0];
-      for (index_t b = 0; b < els; b++) {
+      const index_t BATCHES = TotalSize(dest);
+      const index_t els = lend[0] - lbegin[0];
+      for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]);
       }
     }
@@ -2232,6 +2226,53 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
   cudaStream_t stream = exec.getStream();
   cub_argreduce(dest, idest, in, reduce_params, stream);
 #endif
+}
+
+/**
+ * Compute min reduction of an operator and returns value + index
+ *
+ * Returns a tensor with minimums and indices
+ *
+ * @tparam OutType
+ *   Output data type
+ * @tparam TensorIndexType
+ *   Output type stpring indices
+ * @tparam InType
+ *   Input data type
+ * @tparam MODE
+ *   Host executor threads mode
+ *
+ * @param dest
+ *   Destination view of reduction
+ * @param idest
+ *   Destination for indices
+ * @param in
+ *   Input data to reduce
+ * @param exec
+ *   Single host executor
+ */
+template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
+void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+{
+  MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+
+  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
+    if constexpr (OutType::Rank() == 0) {
+      *lout = cuda::std::min_element(lin, lin + TotalSize(in)) - lin;
+    }
+    else {
+      const index_t BATCHES = TotalSize(dest);
+      const index_t els = lend[0] - lbegin[0];
+      for (index_t b = 0; b < BATCHES; b++) {
+        lout[b] = cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
+      }
+    }
+  };
+
+  // This could be more efficient by not running two reductions to find the same values, but
+  // for brevity this is faster
+  ReduceInput(ft, idest, in);
+  min_impl(dest, in, exec);
 }
 
 /**
@@ -2281,9 +2322,9 @@ void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, 
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index
+ * Compute min and max reduction of an operator and returns value + index
  *
- * Returns a tensor with minimums and indices
+ * Returns tensors with minimums and indices, and maximums and indices
  *
  * @tparam OutType
  *   Output data type
@@ -2291,39 +2332,33 @@ void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, 
  *   Output type stpring indices
  * @tparam InType
  *   Input data type
+ * @tparam MODE
+ *   Host executor threads mode
  *
- * @param dest
- *   Destination view of reduction
- * @param idest
- *   Destination for indices
+ * @param destmin
+ *   Destination view of min reduction
+ * @param idestmin
+ *   Destination for min indices
+ * @param destmax
+ *   Destination view of max reduction
+ * @param idestmax
+ *   Destination for max indices
  * @param in
  *   Input data to reduce
  * @param exec
- *   SIngle host executor
+ *   Single host executor
  */
 template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
 {
-  MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  static_assert(OutType::Rank() == TensorIndexType::Rank());
+  MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
-    if constexpr (OutType::Rank() == 0) {
-      *lout = cuda::std::min_element(lin, lin + TotalSize(in)) - lin;
-    }
-    else {
-      auto els = lend[1] - lbegin[0];
-      for (index_t b = 0; b < els; b++) {
-        lout[b] = cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
-      }
-    }
-  };
-
-  // This could be more efficient by not running two reductions to find the same values, but
+  // This could be more efficient by not running argmin and argmax separately but
   // for brevity this is faster
-  ReduceInput(ft, idest, in);
-  min_impl(dest, in, exec);
+  argmin_impl(destmin, idestmin, in, exec);
+  argmax_impl(destmax, idestmax, in, exec);
 }
-
 
 
 /**

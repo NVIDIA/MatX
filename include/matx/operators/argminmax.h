@@ -91,7 +91,7 @@ namespace detail {
 }
 
 /**
- * Compute min and max reduction of a tensor and returns value + index along specified axes
+ * Compute min and max reduction of an operator and returns value + index along specified axes
  *
  * @tparam InType
  *   Input data type
@@ -102,7 +102,7 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
- * @returns Operator with reduced values of argmin-reduce computed
+ * @returns Operator with reduced values of argminmax-reduce computed
  */
 template <typename InType, int D>
 __MATX_INLINE__ auto argminmax(const InType &in, const int (&dims)[D])
@@ -115,14 +115,14 @@ __MATX_INLINE__ auto argminmax(const InType &in, const int (&dims)[D])
 }
 
 /**
- * Compute min and max reduction of a tensor and returns value + index
+ * Compute min and max reduction of an operator and returns value + index
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
  *   Input data to reduce
- * @returns Operator with reduced values of argmin-reduce computed
+ * @returns Operator with reduced values of argminmax-reduce computed
  */
 template <typename InType>
 __MATX_INLINE__ auto argminmax(const InType &in)
