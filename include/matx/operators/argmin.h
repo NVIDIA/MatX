@@ -91,7 +91,7 @@ namespace detail {
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index along specified axes
+ * Compute min reduction of an operator and returns value + index along specified axes
  *
  * @tparam InType
  *   Input data type
@@ -115,7 +115,7 @@ __MATX_INLINE__ auto argmin(const InType &in, const int (&dims)[D])
 }
 
 /**
- * Compute min reduction of a tensor and returns value + index
+ * Compute min reduction of an operator and returns value + index
  *
  * @tparam InType
  *   Input data type
