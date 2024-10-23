@@ -120,7 +120,7 @@ public:
 
   void GetWorkspaceSize() override
   {
-#if CUSOLVER_VERSION >= 11701 && CUSOLVER_VER_BUILD >= 2    
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     // Use vector mode for a larger workspace size that works for both modes
     cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
@@ -175,11 +175,6 @@ public:
       }
     }
 
-#if CUSOLVER_VERSION < 11701 || CUSOLVER_VER_BUILD < 2 
-    SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
-    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs); 
-#endif   
-
     if (out.Data() != a.Data()) {
       (out = a).run(exec);
     }
@@ -187,7 +182,7 @@ public:
     const auto stream = exec.getStream();
     cusolverDnSetStream(this->handle, stream);
 
-#if CUSOLVER_VERSION >= 11701 && CUSOLVER_VER_BUILD >= 2    
+#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
     auto ret = cusolverDnXsyevBatched(
         this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
         out.Data(), params.n, MatXTypeToCudaType<T2>(), w.Data(),
@@ -202,6 +197,9 @@ public:
     std::vector<int> h_info(params.batch_size);
     cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
 #else
+    SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
+    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs); 
+    
     // Older cuSolver versions do not support batching with cusolverDnXsyevd
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       auto ret = cusolverDnXsyevd(
