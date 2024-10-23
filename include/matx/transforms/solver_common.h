@@ -255,8 +255,20 @@ public:
     cusolverDnDestroy(handle);
   }
 
-  void AllocateWorkspace(size_t batches)
+  void AllocateWorkspace([[maybe_unused]] size_t batches)
   {
+#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
+    // Newer cuSolver
+    if (dspace > 0) {
+      matxAlloc(&d_workspace, dspace, MATX_DEVICE_MEMORY);
+    }
+
+    matxAlloc((void **)&d_info, sizeof(*d_info), MATX_DEVICE_MEMORY);
+
+    if (hspace > 0) {
+      matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
+    }
+#else  
     if (dspace > 0) {
       matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
     }
@@ -266,6 +278,7 @@ public:
     if (hspace > 0) {
       matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
     }
+#endif    
   }
 
   virtual void GetWorkspaceSize() = 0;
