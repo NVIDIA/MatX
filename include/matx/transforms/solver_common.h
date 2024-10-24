@@ -255,7 +255,7 @@ public:
     cusolverDnDestroy(handle);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, bool batched_api)
+  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
   {
 #if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
     if (batched_api) {
