@@ -115,7 +115,11 @@ public:
 
     params = GetEigParams(w, a, jobz, uplo);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size);
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)    
+    this->AllocateWorkspace(params.batch_size, true);
+#else    
+    this->AllocateWorkspace(params.batch_size, false);
+#endif    
   }
 
   void GetWorkspaceSize() override

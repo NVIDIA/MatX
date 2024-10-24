@@ -168,6 +168,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
+  {
+    int dim_size = 8;
+    int nbatches = 2;//2246;
+    auto Bv = make_tensor<complex>({dim_size, dim_size});
+    auto BvB = make_tensor<complex>({nbatches, dim_size, dim_size});
+    auto Evv = make_tensor<complex>({nbatches, dim_size, dim_size});
+    auto Wov = make_tensor<float>({nbatches, dim_size});
+    auto pb = std::make_unique<detail::MatXPybind>();
+
+    pb->template InitAndRunTVGenerator<complex>("00_solver", "eig", "run", {dim_size});
+    pb->NumpyToTensorView(Bv, "B");
+    (BvB = Bv).run(stream);
+//print(slice<2>(BvB, {0, 0, 0}, {matxDropDim, matxEnd, matxEnd}));
+print(BvB);
+    (mtie(Evv, Wov) = eig(BvB)).run(stream);    
+    cudaDeviceSynchronize();
+  }
+
   std::cout << "Verification successful" << std::endl;
 
   CUDA_CHECK_LAST_ERROR();
