@@ -103,7 +103,7 @@ public:
 
     params = GetCholParams(a, uplo);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size);
+    this->AllocateWorkspace(params.batch_size, false);
   }
 
   void GetWorkspaceSize() override
