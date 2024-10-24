@@ -263,7 +263,10 @@ public:
       matxAlloc(&d_workspace, dspace, MATX_DEVICE_MEMORY);
     }
 
-    matxAlloc((void **)&d_info, sizeof(*d_info), MATX_DEVICE_MEMORY);
+    // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex. 
+    // Zero it out for all types for now.
+    cudaMemset(d_workspace, 0, dspace);
+    matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_DEVICE_MEMORY);    
 
     if (hspace > 0) {
       matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
