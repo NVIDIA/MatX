@@ -1096,6 +1096,7 @@ private:
   size_t temp_storage_bytes = 0;
 };
 
+#ifdef __CUDACC__
 struct CustomArgMaxCmp
 {
   template <typename T>
@@ -1145,6 +1146,7 @@ struct CustomArgMinMaxCmp
     return result;
   }
 };
+#endif
 
 template <typename OutputTensor, typename TensorIndexType, typename InputOperator, typename CParams = EmptyParams_t>
 class matxCubSingleArgPlan_t {
@@ -1169,7 +1171,7 @@ public:
               stream);
 #endif
   }
-  
+
   static auto GetCubParams([[maybe_unused]] OutputTensor &a_out,
                            [[maybe_unused]] TensorIndexType &aidx_out,
                            const InputOperator &a,
@@ -1266,7 +1268,7 @@ public:
     }
 #endif
   }
-  
+
   /**
    * Destructor
    *
@@ -1319,7 +1321,7 @@ public:
               stream);
 #endif
   }
-  
+
   static auto GetCubParams([[maybe_unused]] OutputTensor &a1_out,
                            [[maybe_unused]] TensorIndexType &aidx1_out,
                            [[maybe_unused]] OutputTensor &a2_out,
@@ -1774,7 +1776,7 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
 
   #ifndef MATX_DISABLE_CUB_CACHE
     auto params = cache_val_type::GetCubParams(a_out, aidx_out, a, detail::CUB_OP_SINGLE_ARG_REDUCE, stream);
-  
+
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
         detail::GetCacheIdFromType<detail::cub_cache_t>(),
         params,
@@ -1834,7 +1836,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
 
   #ifndef MATX_DISABLE_CUB_CACHE
     auto params = cache_val_type::GetCubParams(a1_out, aidx1_out, a2_out, aidx2_out, a, detail::CUB_OP_DUAL_ARG_REDUCE, stream);
-  
+
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
         detail::GetCacheIdFromType<detail::cub_cache_t>(),
         params,
@@ -1905,7 +1907,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 
   if (!done) {
     matxAlloc((void**)&out_ptr, TotalSize(a) * sizeof(a_type), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-    make_tensor(tmp_in, out_ptr, a.Shape());    
+    make_tensor(tmp_in, out_ptr, a.Shape());
     (tmp_in = a).run(exec);
   }
 
@@ -2070,8 +2072,8 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator>
 void hist_impl(OutputTensor &a_out, const InputOperator &a,
           const typename InputOperator::value_type lower,
-          const typename InputOperator::value_type upper, 
-          int num_levels, 
+          const typename InputOperator::value_type upper,
+          int num_levels,
           const cudaStream_t stream = 0)
 {
   static_assert(std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
@@ -2238,7 +2240,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
         ctype->ExecSelect(a_out, a, stream);
       }
     );
-    
+
 #else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
@@ -2339,7 +2341,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
 #ifndef MATX_DISABLE_CUB_CACHE
-  
+
   // Get cache or new Sort plan if it doesn't exist
   auto params =
       detail::matxCubPlan_t<OutputTensor,
@@ -2357,7 +2359,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
         ctype->ExecSelectIndex(a_out, a, stream);
       }
     );
-    
+
 #else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
