@@ -328,7 +328,7 @@ public:
     matxFree(iwork);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches)
+  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
   {
     if (lwork > 0) {
       matxAlloc(&work, lwork * sizeof(ValueType), MATX_HOST_MALLOC_MEMORY);
