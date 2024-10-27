@@ -61,5 +61,6 @@ foreach (pexample ${proprietary_sources})
     target_link_libraries(${exename} example_lib)
 endforeach()
 
-
-
+# Add host-compiler only example program to catch missing ifdef __CUDACC__ guards
+add_executable(test_host test_host.cpp)
+target_link_libraries(test_host matx::matx)
