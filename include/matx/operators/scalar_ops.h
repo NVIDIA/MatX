@@ -235,7 +235,20 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
     return matx::sin(v1);
   }
   else {
+    // This should go away once CCCL adds <cmath> support
+#ifdef __CUDACC__
+    if constexpr (std::is_same_v<T, float>) {
+      return ::sinf(v1);
+    }
+    else if constexpr (std::is_same_v<T, double>) {
+      return ::sin(v1);
+    }
+    else {
+      matx::sin(v1);
+    }
+#else
     return cuda::std::sin(v1);
+#endif 
   }
 }
 template <typename T> struct SinF {
@@ -250,7 +263,20 @@ template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto 
     return matx::cos(v1);
   }
   else {
+    // This should go away once CCCL adds <cmath> support
+#ifdef __CUDACC__
+    if constexpr (std::is_same_v<T, float>) {
+      return ::cosf(v1);
+    }
+    else if constexpr (std::is_same_v<T, double>) {
+      return ::cos(v1);
+    }
+    else {
+      matx::cos(v1);
+    }
+#else
     return cuda::std::cos(v1);
+#endif  
   }
 }
 template <typename T> struct CosF {
@@ -691,7 +717,8 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_isinf(T v1)
     return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
   } else {
     return cuda::std::isinf(static_cast<castType>(v1));
-  } 
+  }  
+
 }
 template <typename T>
 struct IsInf {
