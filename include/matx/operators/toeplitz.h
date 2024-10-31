@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include <cuda/std/__algorithm/transform.h>
 
 namespace matx
 {

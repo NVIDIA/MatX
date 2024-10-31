@@ -28,7 +28,7 @@ Required Third-party Dependencies
 ---------------------------------
 
 - `CPM <https://github.com/cpm-cmake/CPM.cmake>`_ (* Included in the project source and does not require a separate download)
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.4.0+
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.7.0+
 
 
 Optional Third-party Dependencies
