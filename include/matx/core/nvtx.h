@@ -90,6 +90,7 @@ inline std::map< int, nvtxRangeId_t> nvtx_eventMap;   ///< map of currently acti
 inline std::mutex                    nvtx_memory_mtx; ///< Mutex protecting updates from map
 
 inline matx_nvxtLogLevels globalNvtxLevel = matx_nvxtLogLevels::MATX_NVTX_LOG_API;
+inline nvtxDomainHandle_t matxDomain = nvtxDomainCreateA("MatX");
 
 //////  macros to ensure custom variable names for every call  ////////
 #define MATX_CONCAT(a, b) MATX_CONCAT_INNER(a, b)
@@ -297,7 +298,7 @@ class NvtxEvent
     persistent_ = false;
     
     // save the id
-    rangeId_ = nvtxRangeStartEx(&eventAttrib);
+    rangeId_ = nvtxDomainRangeStartEx(matxDomain, &eventAttrib);
     userHandle_ = registerId;
     
     // if register with global map
