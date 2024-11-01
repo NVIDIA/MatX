@@ -27,7 +27,8 @@ include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
-set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
+rapids_cpm_init()
+rapids_cpm_package_override("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
