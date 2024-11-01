@@ -35,7 +35,7 @@ The user provided json file must follow the `versions.json` format,
 which is :ref:`documented here<cpm_version_format>`  and shown in the below
 example:
 
-.. literalinclude:: /packages/example.json
+.. literalinclude:: /packages/example_all_fields.json
   :language: json
 
 By default when an override for a project is provided no local search

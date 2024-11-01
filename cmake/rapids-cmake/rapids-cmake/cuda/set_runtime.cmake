@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,10 +62,10 @@ function(rapids_cuda_set_runtime target use_static value)
   endif()
 
   if(${value})
-    set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY STATIC)
+    set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY Static)
     target_link_libraries(${target} ${mode} $<TARGET_NAME_IF_EXISTS:CUDA::cudart_static>)
   else()
-    set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY SHARED)
+    set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
     target_link_libraries(${target} ${mode} $<TARGET_NAME_IF_EXISTS:CUDA::cudart>)
   endif()
 

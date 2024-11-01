@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ function(setup_cpm_cache )
   set(CPM_SOURCE_CACHE "${CMAKE_BINARY_DIR}")
   cmake_path(APPEND_STRING CPM_SOURCE_CACHE "/cache")
 
+  set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/CPM.cmake")
+
   set(src_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/fill_cache/")
   set(build_dir "${CPM_SOURCE_CACHE}")
 
@@ -25,8 +27,11 @@ function(setup_cpm_cache )
   execute_process(COMMAND ${CMAKE_COMMAND}
       -Drapids-cmake-dir=${PROJECT_SOURCE_DIR}/../rapids-cmake
       -S ${src_dir} -B ${build_dir}
+      -DCPM_SOURCE_CACHE=${CPM_SOURCE_CACHE}
+      -DCPM_DOWNLOAD_LOCATION=${CPM_DOWNLOAD_LOCATION}
       WORKING_DIRECTORY ${src_dir}
       )
 
   set(CPM_SOURCE_CACHE "${CPM_SOURCE_CACHE}" PARENT_SCOPE)
+  set(CPM_DOWNLOAD_LOCATION "${CPM_DOWNLOAD_LOCATION}" PARENT_SCOPE)
 endfunction()

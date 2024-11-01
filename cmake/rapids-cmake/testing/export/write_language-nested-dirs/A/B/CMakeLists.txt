@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,6 @@
 
 include(${rapids-cmake-dir}/export/write_language.cmake)
 
-function(enable_nested_language file_path)
-  #replicates CPM including the file
-  include("${file_path}")
-endfunction()
-
-set(path "${CMAKE_CURRENT_BINARY_DIR}/enable_cuda_language.cmake")
-rapids_export_write_language(INSTALL CUDA "${path}")
-enable_nested_language("${path}")
+add_subdirectory(../C C)
 
 add_library(B STATIC static.cu)

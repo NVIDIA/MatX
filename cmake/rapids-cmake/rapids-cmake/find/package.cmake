@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -132,11 +132,6 @@ macro(rapids_find_package name)
   # Only record the export requirements if the package was found This allows us to handle implicit
   # OPTIONAL find packages
   if(${${name}_FOUND})
-
-    if(${name} STREQUAL "CUDAToolkit")
-      include("${rapids-cmake-dir}/cuda/patch_toolkit.cmake")
-      rapids_cuda_patch_toolkit()
-    endif()
 
     set(_rapids_extra_info)
     if(_RAPIDS_FIND_GLOBAL_TARGETS)

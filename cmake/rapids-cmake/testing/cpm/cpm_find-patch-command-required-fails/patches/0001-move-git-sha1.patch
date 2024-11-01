@@ -1,0 +1,19 @@
+From deacd3fafd7fcfee954ae3044ae3ab60d36a9f3a Mon Sep 17 00:00:00 2001
+From: Robert Maynard <rmaynard@nvidia.com>
+Date: Wed, 31 Jan 2024 15:00:47 -0500
+Subject: [PATCH 1/2] Move GIT SHA1
+
+---
+ git_file_1.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 git_file_1.txt
+
+diff --git a/git_file_1.txt b/git_file_1.txt
+new file mode 100644
+index 00000000..b242c360
+--- /dev/null
++++ b/git_file_1.txt
+@@ -0,0 +1 @@
++added file
+--
+2.43.0

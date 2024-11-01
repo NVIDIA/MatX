@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,6 +66,15 @@ function(rapids_cpm_get_proprietary_binary_url package_name version url_var)
     find_package(CUDAToolkit REQUIRED)
     set(cuda-toolkit-version ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
     set(cuda-toolkit-version-major ${CUDAToolkit_VERSION_MAJOR})
+
+    # See if we have a CUDA Toolkit version mapping entry and load it as needed
+    string(JSON cuda-toolkit-version-mapping ERROR_VARIABLE have_error_mapping GET
+           "${override_json_data}" "proprietary_binary_cuda_version_mapping"
+           "${cuda-toolkit-version-major}")
+    if(have_error_mapping)
+      string(JSON cuda-toolkit-version-mapping ERROR_VARIABLE have_error_mapping GET "${json_data}"
+             "proprietary_binary_cuda_version_mapping" "${cuda-toolkit-version-major}")
+    endif()
   endif()
 
   # Evaluate any magic placeholders in the proprietary_binary value including the

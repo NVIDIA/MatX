@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ add_library(uses_cuda SHARED ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp)
 rapids_cuda_set_runtime(uses_cuda USE_STATIC TRUE)
 
 get_target_property(runtime_state uses_cuda CUDA_RUNTIME_LIBRARY)
-if( NOT runtime_state STREQUAL "STATIC")
+if( NOT runtime_state STREQUAL "Static")
   message(FATAL_ERROR "rapids_cuda_set_runtime didn't correctly set CUDA_RUNTIME_LIBRARY")
 endif()
 

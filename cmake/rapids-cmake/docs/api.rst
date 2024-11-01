@@ -46,23 +46,9 @@ RAPIDS dependencies.
 
 These allow projects to make sure they use the same version and flags for
 dependencies as the rest of RAPIDS. The exact versions that each pre-configured
-package uses :ref:`can be found here. <cpm_versions>`
+package uses :ref:`can be found here <cpm_versions>`.
 
-.. toctree::
-   :titlesonly:
-
-   /packages/rapids_cpm_cccl
-   /packages/rapids_cpm_cuco
-   /packages/rapids_cpm_fmt
-   /packages/rapids_cpm_gbench
-   /packages/rapids_cpm_gtest
-   /packages/rapids_cpm_libcudacxx
-   /packages/rapids_cpm_nvbench
-   /packages/rapids_cpm_nvcomp
-   /packages/rapids_cpm_nvtx3
-   /packages/rapids_cpm_rmm
-   /packages/rapids_cpm_spdlog
-   /packages/rapids_cpm_thrust
+.. include:: /packages/packages.rst
 
 .. _`cython`:
 
@@ -82,29 +68,6 @@ The ``rapids-cython-core`` module allows projects to easily build cython modules
    /command/rapids_cython_core_init
    /command/rapids_cython_core_create_modules
    /command/rapids_cython_core_add_rpath_entries
-
-.. _`cython_legacy`:
-
-Cython (legacy)
-***************
-
-.. note::
-  ``rapids-cython`` is deprecated. Please switch to ``rapids-cython-core``.
-
-The `rapids_cython` functions allow projects to easily build cython modules using
-`scikit-build <https://scikit-build.readthedocs.io/en/latest/>`_.
-
-.. note::
-  Use of the rapids-cython component of rapids-cmake requires scikit-build. The behavior of the functions provided by
-  this component is undefined if they are invoked outside of a build managed by scikit-build.
-
-.. toctree::
-   :titlesonly:
-
-   /command/rapids_cython_init
-   /command/rapids_cython_create_modules
-   /command/rapids_cython_add_rpath_entries
-
 
 .. _`find`:
 
@@ -133,7 +96,6 @@ require.
 
     rapids_cuda_init_architectures </command/rapids_cuda_init_architectures>
     rapids_cuda_init_runtime </command/rapids_cuda_init_runtime>
-    rapids_cuda_patch_toolkit </command/rapids_cuda_patch_toolkit>
     rapids_cuda_set_runtime </command/rapids_cuda_set_runtime>
     rapids_cuda_set_architectures [Advanced] </command/rapids_cuda_set_architectures>
 

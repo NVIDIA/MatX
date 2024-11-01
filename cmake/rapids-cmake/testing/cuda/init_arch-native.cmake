@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 #=============================================================================
 include(${rapids-cmake-dir}/cuda/init_architectures.cmake)
 
-set(CMAKE_ERROR_DEPRECATED ON)
 set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
 rapids_cuda_init_architectures(rapids-project)
 project(rapids-project LANGUAGES CUDA)

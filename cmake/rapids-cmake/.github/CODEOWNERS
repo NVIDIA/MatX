@@ -1,12 +1,19 @@
-
 #cmake code owners
 **/CMakeLists.txt     @rapidsai/rapids-cmake-codeowners
 *.cmake               @rapidsai/rapids-cmake-codeowners
+/docs/                @rapidsai/rapids-cmake-codeowners
+/example/             @rapidsai/rapids-cmake-codeowners
+/rapids-cmake/        @rapidsai/rapids-cmake-codeowners
+/testing/             @rapidsai/rapids-cmake-codeowners
 
-#build/ops code owners
-.github/              @rapidsai/ops-codeowners
-ci/                   @rapidsai/ops-codeowners
-conda/                @rapidsai/ops-codeowners
-**/Dockerfile         @rapidsai/ops-codeowners
-**/.dockerignore      @rapidsai/ops-codeowners
-docker/               @rapidsai/ops-codeowners
+#CI code owners
+/.github/                @rapidsai/ci-codeowners
+/ci/                     @rapidsai/ci-codeowners
+/.pre-commit-config.yaml @rapidsai/ci-codeowners
+
+#packaging code owners
+/.devcontainer/    @rapidsai/packaging-codeowners
+/conda/            @rapidsai/packaging-codeowners
+/dependencies.yaml @rapidsai/packaging-codeowners
+/build.sh          @rapidsai/packaging-codeowners
+pyproject.toml     @rapidsai/packaging-codeowners

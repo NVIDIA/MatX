@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ rapids_cuda_set_runtime(uses_cuda USE_STATIC FALSE)
 
 
 get_target_property(runtime_state uses_cuda CUDA_RUNTIME_LIBRARY)
-if( NOT runtime_state STREQUAL "SHARED")
+if( NOT runtime_state STREQUAL "Shared")
   message(FATAL_ERROR "rapids_cuda_set_runtime didn't correctly set CUDA_RUNTIME_LIBRARY")
 endif()
 
 get_target_property(linked_libs uses_cuda LINK_LIBRARIES)
 if(NOT "$<TARGET_NAME_IF_EXISTS:CUDA::cudart>" IN_LIST linked_libs)
-  message(FATAL_ERROR "rapids_cuda_set_runtime didn't privately link to CUDA::cudart_static")
+  message(FATAL_ERROR "rapids_cuda_set_runtime didn't privately link to CUDA::cudart")
 endif()

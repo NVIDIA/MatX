@@ -1,0 +1,24 @@
+diff --git a/include/fmt/base.h b/include/fmt/base.h
+index 62764942..60f7483b 100644
+--- a/include/fmt/base.h
++++ b/include/fmt/base.h
+@@ -464,6 +464,9 @@ template <typename Char> FMT_CONSTEXPR auto length(const Char* s) -> size_t {
+   return len;
+ }
+ 
++#if defined(__NVCC__)
++#pragma nv_diag_suppress 128
++#endif
+ template <typename Char>
+ FMT_CONSTEXPR auto compare(const Char* s1, const Char* s2, std::size_t n)
+     -> int {
+@@ -474,6 +477,9 @@ FMT_CONSTEXPR auto compare(const Char* s1, const Char* s2, std::size_t n)
+   }
+   return 0;
+ }
++#if defined(__NVCC__)
++#pragma nv_diag_default 128
++#endif
+ 
+ namespace adl {
+ using namespace std;

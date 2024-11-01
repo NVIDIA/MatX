@@ -18,7 +18,7 @@ include(${rapids-cmake-dir}/export/export.cmake)
 include(${rapids-cmake-dir}/export/write_dependencies.cmake)
 include(${rapids-cmake-testing-dir}/utils/check_copyright_header.cmake)
 
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 project(FakEProJecT LANGUAGES CXX VERSION 3.1.4)
 
 add_library(fakeLib INTERFACE)

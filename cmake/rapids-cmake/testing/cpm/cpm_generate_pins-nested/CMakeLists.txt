@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 project(rapids-test-project LANGUAGES CXX)
 
 add_subdirectory(a)
@@ -25,4 +25,4 @@ include(${rapids-cmake-dir}/cpm/init.cmake)
 rapids_cpm_init(GENERATE_PINNED_VERSIONS)
 
 include("${rapids-cmake-testing-dir}/cpm/verify_generated_pins.cmake")
-verify_generated_pins(verify_pins PROJECTS rmm fmt spdlog CCCL)
+verify_generated_pins(verify_pins PROJECTS rmm fmt spdlog)

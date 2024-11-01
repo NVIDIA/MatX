@@ -72,7 +72,3 @@ add_cmake_config_test( write_dependencies-root-dirs.cmake )
 
 add_cmake_build_test( write_language-multiple-nested-enables )
 add_cmake_build_test( write_language-nested-dirs )
-
-set(deprecated_message [=[rapids-cmake policy [deprecated=23.12 removed=24.02]: Usage of ]=])
-add_cmake_config_test( find_package_file-deprecated.cmake SHOULD_FAIL "${deprecated_message}")
-add_cmake_config_test( find_package_root-deprecated.cmake SHOULD_FAIL "${deprecated_message}")

@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ function(rapids_test_add)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.test.add")
 
   set(options)
-  set(one_value NAME WORKING_DIRECTORY GPUS PERCENT INSTALL_COMPONENT_SET)
+  set(one_value NAME WORKING_DIRECTORY GPUS PERCENT INSTALL_COMPONENT_SET INSTALL_TARGET)
   set(multi_value COMMAND)
   cmake_parse_arguments(_RAPIDS_TEST "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
@@ -88,6 +88,18 @@ function(rapids_test_add)
   set(command ${command_or_target})
   if(TARGET ${command_or_target})
     set(command "$<TARGET_FILE:${command}>")
+  endif()
+  if(DEFINED _RAPIDS_TEST_INSTALL_TARGET)
+    if(NOT TARGET ${_RAPIDS_TEST_INSTALL_TARGET})
+      message(FATAL_ERROR "rapids_add_test given INSTALL_TARGET \"${_RAPIDS_TEST_INSTALL_TARGET}\", which does not exist"
+      )
+    endif()
+    set(target_to_install ${_RAPIDS_TEST_INSTALL_TARGET})
+  else()
+    if(NOT TARGET ${command_or_target})
+      message(VERBOSE "rapids_add_test could not infer a target to install")
+    endif()
+    set(target_to_install ${command_or_target})
   endif()
 
   if(NOT DEFINED _RAPIDS_TEST_WORKING_DIRECTORY)
@@ -120,8 +132,8 @@ function(rapids_test_add)
 
     rapids_test_record_test_component(NAME ${_RAPIDS_TEST_NAME} COMPONENT
                                       ${_RAPIDS_TEST_INSTALL_COMPONENT_SET})
-    if(TARGET ${command_or_target})
-      rapids_test_record_install(TARGET ${command_or_target} COMPONENT
+    if(TARGET ${target_to_install})
+      rapids_test_record_install(TARGET ${target_to_install} COMPONENT
                                  ${_RAPIDS_TEST_INSTALL_COMPONENT_SET})
     endif()
   endif()

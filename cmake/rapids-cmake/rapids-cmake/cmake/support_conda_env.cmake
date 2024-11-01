@@ -21,20 +21,25 @@ rapids_cmake_support_conda_env
 
 .. versionadded:: v21.06.00
 
-Establish a target that holds the CONDA include and link directories.
+Establish a target that holds the necessary compile and link information
+to properly support building in CONDA envs.
 
   .. code-block:: cmake
 
     rapids_cmake_support_conda_env( <target_name> [MODIFY_PREFIX_PATH] )
 
 Creates a global interface target called `target_name` that holds
-the CONDA include and link directories, when executed.
+the CONDA compile options, include directories, and link directories when executed.
 
 .. versionadded:: v24.06.00
 
 The include directories that `target_name` holds will be `-isystem` to match
 the behavior of conda when it builds projects.
 
+.. versionadded:: v24.08.00
+
+The `target_name` target will add the required compile flags to ensure debug builds
+are generated with `-O0` instead of the conda env default of `-O2`.
 
 Also offers the ability to modify :cmake:variable:`CMAKE_PREFIX_PATH <cmake:variable:CMAKE_PREFIX_PATH>` to
 include the following paths based on the current conda environment:
@@ -182,5 +187,10 @@ function(rapids_cmake_support_conda_env target)
         modify_cmake_prefix_path(PATHS "$ENV{CONDA_PREFIX}")
       endif()
     endif()
+
+    # The conda env will have setup `CXXFLAGS`, etc to contain `-O2` which we need to override to
+    # get proper debug information for local variables, etc. Since `target_compile_options` values
+    # are appended after `CXXFLAGS` we know that this will properly override the conda `-O2`
+    target_compile_options(${target} INTERFACE "$<$<CONFIG:Debug>:-O0>")
   endif()
 endfunction()

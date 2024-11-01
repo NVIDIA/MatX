@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,8 +27,18 @@ Does the downloading of the `CPM` module
 
   rapids_cpm_download()
 
-The CPM module will be downloaded based on the state of :cmake:variable:`CPM_SOURCE_CACHE` and
-:cmake:variable:`ENV{CPM_SOURCE_CACHE}`.
+The CPM module will be downloaded based on the following.
+
+.. versionadded:: v24.10.00
+
+If :cmake:variable:`CPM_DOWNLOAD_LOCATION` is defined that location will be used
+as the download location. If a file already exists at that location no download will occur
+
+If the :cmake:variable:`CPM_SOURCE_CACHE` or :cmake:variable:`ENV{CPM_SOURCE_CACHE}` are
+defined those will be used to compute a location for the file.
+
+If none of the above variables are defined, rapids-cmake will download the file
+to `cmake` directory under :cmake:variable:`CMAKE_BINARY_DIR`.
 
 .. note::
   Use `rapids_cpm_init` instead of this function, as this is an implementation detail
@@ -42,31 +52,33 @@ function(rapids_cpm_download)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.download")
 
   # When changing version verify no new variables needs to be propagated
-  set(CPM_DOWNLOAD_VERSION 0.38.5)
-  set(CPM_DOWNLOAD_MD5_HASH c98d14a13dfd1952e115979c095f6794)
+  set(CPM_DOWNLOAD_VERSION 0.40.0)
+  set(CPM_DOWNLOAD_MD5_HASH 6c9866a0aa0f804a36fe8c3866fb8a2c)
 
-  if(CPM_SOURCE_CACHE)
-    # Expand relative path. This is important if the provided path contains a tilde (~)
-    cmake_path(ABSOLUTE_PATH CPM_SOURCE_CACHE)
+  if(NOT DEFINED CPM_DOWNLOAD_LOCATION)
+    if(CPM_SOURCE_CACHE)
+      # Expand relative path. This is important if the provided path contains a tilde (~)
+      cmake_path(ABSOLUTE_PATH CPM_SOURCE_CACHE)
 
-    # default to the same location that cpm computes
-    set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-    if(EXISTS "${CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-      # Also support the rapids-cmake download location ( cmake/ vs cpm/ )
-      set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+      # default to the same location that cpm computes
+      set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+      if(EXISTS "${CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+        # Also support the rapids-cmake download location ( cmake/ vs cpm/ )
+        set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+      endif()
+
+    elseif(DEFINED ENV{CPM_SOURCE_CACHE})
+
+      # default to the same location that cpm computes
+      set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+      if(EXISTS "$ENV{CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+        # Also support the rapids-cmake download location ( cmake/ vs cpm/ )
+        set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+      endif()
+
+    else()
+      set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
     endif()
-
-  elseif(DEFINED ENV{CPM_SOURCE_CACHE})
-
-    # default to the same location that cpm computes
-    set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-    if(EXISTS "$ENV{CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-      # Also support the rapids-cmake download location ( cmake/ vs cpm/ )
-      set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
-    endif()
-
-  else()
-    set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
   endif()
 
   if(NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))

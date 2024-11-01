@@ -14,7 +14,7 @@
 # limitations under the License.
 #=============================================================================
 
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 project(rapids-test-project LANGUAGES CXX)
 
 set(RAPIDS_CMAKE_CPM_PINNED_VERSIONS_FILE "${CMAKE_CURRENT_BINARY_DIR}/custom_path/pinned_versions.json")
@@ -27,5 +27,5 @@ rapids_cpm_rmm()
 
 include("${rapids-cmake-testing-dir}/cpm/verify_generated_pins.cmake")
 verify_generated_pins(verify_pins
-    PROJECTS rmm fmt spdlog CCCL
+    PROJECTS rmm fmt spdlog
     PIN_FILE "${RAPIDS_CMAKE_CPM_PINNED_VERSIONS_FILE}")
