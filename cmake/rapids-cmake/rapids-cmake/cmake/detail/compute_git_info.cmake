@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,4 +49,5 @@ if(_RAPIDS_WRITE_VERSION MATCHES dirty)
   set(_RAPIDS_GIT_IS_DIRTY 1)
 endif()
 
+string(TIMESTAMP current_year "%Y" UTC)
 configure_file("${TEMPLATE_FILE}" "${FILE_TO_WRITE}" @ONLY)

@@ -27,8 +27,7 @@ include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
-rapids_cpm_init()
-rapids_cpm_package_override("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
+rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
@@ -105,8 +104,6 @@ rapids_find_package(
   CUDAToolkit REQUIRED
   BUILD_EXPORT_SET matx-exports
   INSTALL_EXPORT_SET matx-exports)
-
-rapids_cpm_init()
 
 # Create our transitive target to pass build properties to external users and our own build environment
 add_library(matx INTERFACE)

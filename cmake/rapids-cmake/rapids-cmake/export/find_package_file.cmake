@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ the associated export set.
 
   rapids_export_find_package_file( (BUILD|INSTALL)
                                    <file_path>
-                                   (<ExportSetName> | EXPORT_SET [ExportSetName])
+                                   EXPORT_SET <ExportSetName>
                                    [CONDITION <variableName>]
                                   )
 
@@ -68,14 +68,7 @@ function(rapids_export_find_package_file type file_path)
   set(one_value EXPORT_SET CONDITION)
   set(multi_value "")
   cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
-  # handle when we are given just an export set name and not `EXPORT_SET <name>`
-  if(_RAPIDS_UNPARSED_ARGUMENTS AND NOT _RAPIDS_COMPONENTS_EXPORT_SET)
-    rapids_cmake_policy(DEPRECATED_IN 23.12
-                        REMOVED_IN 24.02
-                        MESSAGE [=[Usage of `rapids_export_find_package_file` without an explicit `EXPORT_SET` key has been deprecated.]=]
-    )
-    set(_RAPIDS_EXPORT_SET ${_RAPIDS_UNPARSED_ARGUMENTS})
-  endif()
+
   # Early terminate conditions
   if(NOT _RAPIDS_EXPORT_SET OR NOT ${_RAPIDS_CONDITION})
     return()

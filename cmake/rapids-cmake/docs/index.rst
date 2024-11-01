@@ -14,6 +14,7 @@ fixes easier.
 
    api.rst
    basics.rst
+   cpm.rst
    dependency_tracking.rst
    hardware_resources_and_testing.rst
 

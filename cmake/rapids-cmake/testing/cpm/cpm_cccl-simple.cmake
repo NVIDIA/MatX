@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,37 +18,22 @@ include(${rapids-cmake-dir}/cpm/cccl.cmake)
 
 rapids_cpm_init()
 
-if(TARGET CCCL::CCCL)
-  message(FATAL_ERROR "Expected CCCL::CUB not to exist")
-endif()
-if(TARGET CCCL::CUB)
-  message(FATAL_ERROR "Expected CCCL::CUB not to exist")
-endif()
-if(TARGET CCCL::libcudacxx)
-  message(FATAL_ERROR "Expected CCCL::libcudacxx not to exist")
-endif()
-if(TARGET CCCL::Thrust)
-  message(FATAL_ERROR "Expected CCCL::Thrust not to exist")
-endif()
-if(TARGET libcudacxx::libcudacxx)
-  message(FATAL_ERROR "Expected libcudacxx::libcudacxx not to exist")
-endif()
+set(targets CCCL::CCCL CCCL::CUB CCCL::libcudacxx CCCL::Thrust)
+foreach(target IN LISTS targets)
+  if(TARGET ${target})
+    message(FATAL_ERROR "Expected ${target} not to exist")
+  endif()
+endforeach()
+
 
 rapids_cpm_cccl()
-if(NOT TARGET CCCL::CCCL)
-  message(FATAL_ERROR "Expected CCCL::CUB target to exist")
-endif()
-if(NOT TARGET CCCL::CUB)
-  message(FATAL_ERROR "Expected CCCL::CUB target to exist")
-endif()
-if(NOT TARGET CCCL::libcudacxx)
-  message(FATAL_ERROR "Expected CCCL::libcudacxx target to exist")
-endif()
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24.0 AND NOT TARGET CCCL::Thrust)
-  message(FATAL_ERROR "Expected CCCL::Thrust target to exist")
-endif()
-if(NOT TARGET libcudacxx::libcudacxx)
-  message(FATAL_ERROR "Expected libcudacxx::libcudacxx target to exist")
-endif()
+
+foreach(target IN LISTS targets)
+  if(NOT TARGET ${target})
+    message(FATAL_ERROR "Expected ${target} not to exist")
+  endif()
+endforeach()
+
+
 
 rapids_cpm_cccl()

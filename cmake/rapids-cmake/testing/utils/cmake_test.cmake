@@ -89,6 +89,9 @@ function(add_cmake_test mode source_or_dir)
   if(DEFINED CPM_SOURCE_CACHE AND NOT RAPIDS_TEST_NO_CPM_CACHE)
     list(APPEND extra_configure_flags "-DCPM_SOURCE_CACHE=${CPM_SOURCE_CACHE}")
   endif()
+  if(DEFINED CPM_DOWNLOAD_LOCATION)
+    list(APPEND extra_configure_flags "-DCPM_DOWNLOAD_LOCATION=${CPM_DOWNLOAD_LOCATION}")
+  endif()
 
   foreach(generator gen_name IN ZIP_LISTS supported_generators nice_gen_names)
 

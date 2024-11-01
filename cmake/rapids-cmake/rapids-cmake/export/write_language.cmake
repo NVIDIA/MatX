@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -115,16 +115,14 @@ include("${CMAKE_BINARY_DIR}/cmake/PropagateCMake@lang@Compiler.cmake")
 # - Each directory but the root needs to include `PropagateCMake@lang@Compiler.cmake`
 # - Since the root directory doesn't have a parent it only needs to include
 #   `CMake@lang@Information`
+set(rapids_directories "${CMAKE_CURRENT_SOURCE_DIR}")
+get_directory_property(parent_dir DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PARENT_DIRECTORY)
+while(parent_dir)
+  list(APPEND rapids_directories "${parent_dir}")
+  get_directory_property(parent_dir DIRECTORY "${parent_dir}" PARENT_DIRECTORY)
+endwhile()
 
-set(rapids_directory "${CMAKE_CURRENT_SOURCE_DIR}")
-if(DEFINED CMAKE_CURRENT_FUNCTION)
-  string(APPEND rapids_directory "/fake_dir")
-endif()
-
-set(rapids_root_directory "${CMAKE_SOURCE_DIR}")
-cmake_path(GET rapids_directory PARENT_PATH rapids_directory)
-while(NOT rapids_directory STREQUAL rapids_root_directory)
-
+foreach(rapids_directory IN LISTS rapids_directories)
   # Make sure we haven't already installed a language hook for this directory
   # Once we found a directory with an existing hook we can safely stop
   # as that means hooks exist from that point up in the graph
@@ -136,20 +134,10 @@ while(NOT rapids_directory STREQUAL rapids_root_directory)
   else()
     break()
   endif()
-
-  cmake_path(GET rapids_directory PARENT_PATH rapids_directory)
-endwhile()
-
-# Make sure we haven't already installed a language hook for this directory
-cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" GET_CALL_IDS rapids_existing_calls)
-if(NOT rapids_@lang@_hook IN_LIST rapids_existing_calls)
-  cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}"
-                 ID rapids_@lang@_hook
-                 CALL include "CMake@lang@Information")
-endif()
+endforeach()
 
 unset(rapids_existing_calls)
-unset(rapids_directory)
+unset(rapids_directories)
 unset(rapids_root_directory)
 ]=])
 

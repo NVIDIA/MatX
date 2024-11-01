@@ -1,0 +1,20 @@
+{
+  "packages": {
+    "fmt": {
+      "patches": [
+        {
+          "file": "${current_json_dir}/patches/0001-move-git-sha1.patch",
+          "issue": "Move git sha1",
+          "fixed_in": "",
+          "required": false
+        },
+        {
+          "file": "${current_json_dir}/patches/0002-bad-git-change.patch",
+          "issue": "Fail to apply git patch",
+          "fixed_in": "",
+          "required": true
+        }
+      ]
+    }
+  }
+}

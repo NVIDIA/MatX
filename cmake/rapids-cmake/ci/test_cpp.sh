@@ -35,7 +35,7 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-ctest -j20 --schedule-random --output-on-failure --no-tests=error
+ctest -j20 --schedule-random --repeat until-pass:3 --output-on-failure --no-tests=error
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
