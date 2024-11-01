@@ -105,8 +105,6 @@ rapids_find_package(
   BUILD_EXPORT_SET matx-exports
   INSTALL_EXPORT_SET matx-exports)
 
-rapids_cpm_init()
-
 # Create our transitive target to pass build properties to external users and our own build environment
 add_library(matx INTERFACE)
 add_library(matx::matx ALIAS matx)
