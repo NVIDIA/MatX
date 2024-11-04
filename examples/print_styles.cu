@@ -43,22 +43,6 @@ using namespace matx;
  * This example shows how to change the print() formatting for different styles.
  *
  */
-template < typename T>
-void concatOp(T & output, const std::vector<T> & matx_tensors, cudaStream_t stream = 0) {
-  assert(matx_tensors.size() > 0);
-  switch (matx_tensors.size()) {
-    case 3:
-      (output = matx::concat(0, matx_tensors[0], matx_tensors[1], matx_tensors[2])).run(stream);
-      break;
-    case 2:
-      (output = matx::concat(0, matx_tensors[0], matx_tensors[1])).run(stream);
-      break;
-    case 1:
-      (output = matx_tensors[0]).run(stream);
-      break;
-  }
-}
-
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
@@ -98,32 +82,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(A3);
   print(A4);
   // example-end print-example-1
-
-  // create stream
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  std::vector<float3> geo_mesh_vertices(10);
-  std::vector<float3> edge_mesh_vertices(10);
-
-  auto matx_mesh_vertices = matx::make_tensor<float3>({static_cast<matx::index_t>(geo_mesh_vertices.size()  +
-                        edge_mesh_vertices.size())}, matx::MATX_ASYNC_DEVICE_MEMORY);
-
-  // move CPU vectors to device streams asynchronously
-  std::vector<matx::tensor_t<float3, 1>> matx_meshes;
-  if (geo_mesh_vertices.size()) {
-    auto matx_geo_mesh_vertices = matx::make_tensor<float3>({static_cast<matx::index_t>(geo_mesh_vertices.size())}, matx::MATX_ASYNC_DEVICE_MEMORY);
-    cudaMemcpyAsync(matx_geo_mesh_vertices.Data(), geo_mesh_vertices.data(), sizeof(float3) * geo_mesh_vertices.size(), cudaMemcpyHostToDevice, stream);
-    matx_meshes.push_back(matx_geo_mesh_vertices);
-  }
-  if (edge_mesh_vertices.size()) {
-    auto matx_edge_mesh_vertices = matx::make_tensor<float3>({static_cast<matx::index_t>(edge_mesh_vertices.size())}, matx::MATX_ASYNC_DEVICE_MEMORY);
-    cudaMemcpyAsync(matx_edge_mesh_vertices.Data(), edge_mesh_vertices.data(), sizeof(float3) * edge_mesh_vertices.size(), cudaMemcpyHostToDevice, stream);
-    matx_meshes.push_back(matx_edge_mesh_vertices);
-  }
-
-  concatOp(matx_mesh_vertices, matx_meshes, stream);
-  cudaStreamSynchronize(stream);
 
   CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
