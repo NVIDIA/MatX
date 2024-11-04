@@ -61,7 +61,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     container:
-      image: ${{ secrets.DOCS_IMAGE }}
+      image: ghcr.io/nvidia/matx/build:12.6.2_x86_64_ubuntu22.04-amd64
       credentials:
         username: ${{ secrets.DOCS_TOKEN_NAME }}
         password: ${{ secrets.DOCS_TOKEN }}
