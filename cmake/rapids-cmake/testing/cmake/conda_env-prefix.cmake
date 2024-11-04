@@ -21,6 +21,14 @@ set(ENV{PREFIX} "/opt/local/prefix")
 set(ENV{CONDA_PREFIX} "/opt/conda/prefix")
 
 rapids_cmake_support_conda_env(conda_env)
+if(NOT TARGET conda_env)
+  message(FATAL_ERROR "Expected target conda_env to exist")
+endif()
+
+get_target_property(compile_options conda_env INTERFACE_COMPILE_OPTIONS)
+if( NOT "$<$<CONFIG:Debug>:-O0>" IN_LIST compile_options)
+  message(FATAL_ERROR "Expected $<$<CONFIG:Debug>>:-O0> to be in the compile options of `conda_env`")
+endif()
 
 get_target_property(include_dirs conda_env INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
 if( "$ENV{BUILD_PREFIX}/include" IN_LIST include_dirs)

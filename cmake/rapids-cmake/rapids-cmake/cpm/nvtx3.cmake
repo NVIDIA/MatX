@@ -52,7 +52,7 @@ function(rapids_cpm_nvtx3)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.nvtx3")
 
   set(options)
-  set(one_value USE_PROPRIETARY_BINARY BUILD_EXPORT_SET INSTALL_EXPORT_SET)
+  set(one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET)
   set(multi_value)
   cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 

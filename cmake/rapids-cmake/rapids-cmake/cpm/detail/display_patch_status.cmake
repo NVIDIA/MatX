@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,5 +39,12 @@ function(rapids_cpm_display_patch_status package_name)
         message(STATUS "${line}")
       endforeach()
     endif()
+
+    set(err_file "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/err")
+    if(EXISTS "${err_file}")
+      file(READ "${err_file}" contents)
+      message(FATAL_ERROR "${contents}")
+    endif()
+
   endif()
 endfunction()

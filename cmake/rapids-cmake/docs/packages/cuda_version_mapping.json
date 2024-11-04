@@ -1,0 +1,10 @@
+{
+  "proprietary_binary_cuda_version_mapping": {
+    "11": "11.8",
+    "12": "12.3"
+  },
+  "proprietary_binary": {
+    "aarch64-linux": "<url>/binary_${cuda-toolkit-version-mapping}.tar.gz",
+    "x86_64-linux": "<url>/binary_${cuda-toolkit-version-mapping}.tar.gz"
+  }
+}

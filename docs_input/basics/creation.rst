@@ -213,12 +213,12 @@ Descriptors (both shapes and sizes) can be used to construct tensors. This is us
 0-D Tensors
 ###########
 0-D tensors are different than higher ranks since they have no meaningful shape or strides, and therefor don't need those parameters. Empty versions of the
-``make_`` helpers existing to create these:
+``make_`` helpers existing to create these. Note the `{}` is important since the default constructor is used for an uninitialized tensor:
 
 .. code-block:: cpp
 
-    auto t0  = make_tensor<float>();
-    auto t01 = make_tensor<float>(ptr);
+    auto t0  = make_tensor<float>({});
+    auto t01 = make_tensor<float>(ptr, {});
 
 Custom Storage, Descriptors, and Allocators
 ###########################################

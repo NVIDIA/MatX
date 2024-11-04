@@ -601,7 +601,7 @@ public:
 
     params = GetSVDParams(u, s, vt, a, jobz);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size);
+    this->AllocateWorkspace(params.batch_size, false);
   }
 
   void GetWorkspaceSize() override

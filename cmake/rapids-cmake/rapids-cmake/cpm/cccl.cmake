@@ -77,10 +77,6 @@ function(rapids_cpm_cccl)
   include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
   rapids_cpm_generate_patch_command(CCCL ${version} patch_command)
 
-  # Ensure for CMake 3.24+ that the CCCL::Thrust target exists:
-  # https://github.com/NVIDIA/cccl/pull/1182
-  set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL ON)
-
   include("${rapids-cmake-dir}/cpm/find.cmake")
   rapids_cpm_find(CCCL ${version} ${ARGN}
                   GLOBAL_TARGETS CCCL CCCL::CCCL CCCL::CUB CCCL::libcudacxx
@@ -89,7 +85,9 @@ function(rapids_cpm_cccl)
                   GIT_TAG ${tag}
                   GIT_SHALLOW ${shallow} ${patch_command}
                   EXCLUDE_FROM_ALL ${exclude}
-                  OPTIONS "CCCL_ENABLE_INSTALL_RULES ${to_install}")
+                  OPTIONS "CCCL_TOPLEVEL_PROJECT OFF" # Fixes
+                                                      # https://github.com/NVIDIA/cccl/pull/2597
+                          "CCCL_ENABLE_INSTALL_RULES ${to_install}")
 
   # rapids_cpm_cccl can be called multiple times from the same scope such as from
   # cudf/CMakeLists.txt and cudf's call to find_package(rmm). In these situations, subsequent
@@ -101,28 +99,43 @@ function(rapids_cpm_cccl)
   get_property(rapids_cccl_install_rules_already_called GLOBAL
                PROPERTY rapids_cmake_cccl_install_rules SET)
   if(CCCL_SOURCE_DIR AND to_install AND NOT rapids_cccl_install_rules_already_called)
-    # CCCL does not currently correctly support installation of cub/thrust/libcudacxx. The only
-    # option that makes this work is to manually invoke the install rules until CCCL's CMake is
-    # fixed.
+
     set_property(GLOBAL PROPERTY rapids_cmake_cccl_install_rules ON)
-    set(Thrust_SOURCE_DIR "${CCCL_SOURCE_DIR}/thrust")
-    set(CUB_SOURCE_DIR "${CCCL_SOURCE_DIR}/cub")
-    set(libcudacxx_SOURCE_DIR "${CCCL_SOURCE_DIR}/libcudacxx")
+    # CCCL < 2.8 does not currently correctly support installation of cub/thrust/libcudacxx in a
+    # subdirectory
+    if(version VERSION_LESS 2.8)
+      set(Thrust_SOURCE_DIR "${CCCL_SOURCE_DIR}/thrust")
+      set(CUB_SOURCE_DIR "${CCCL_SOURCE_DIR}/cub")
+      set(libcudacxx_SOURCE_DIR "${CCCL_SOURCE_DIR}/libcudacxx")
 
-    set(Thrust_BINARY_DIR "${CCCL_BINARY_DIR}")
-    set(CUB_BINARY_DIR "${CCCL_BINARY_DIR}")
-    set(libcudacxx_BINARY_DIR "${CCCL_BINARY_DIR}")
+      set(Thrust_BINARY_DIR "${CCCL_BINARY_DIR}")
+      set(CUB_BINARY_DIR "${CCCL_BINARY_DIR}")
+      set(libcudacxx_BINARY_DIR "${CCCL_BINARY_DIR}")
 
-    set(Thrust_ENABLE_INSTALL_RULES ON)
-    set(CUB_ENABLE_INSTALL_RULES ON)
-    set(libcudacxx_ENABLE_INSTALL_RULES ON)
+      set(Thrust_ENABLE_INSTALL_RULES ON)
+      set(CUB_ENABLE_INSTALL_RULES ON)
+      set(libcudacxx_ENABLE_INSTALL_RULES ON)
 
-    include("${Thrust_SOURCE_DIR}/cmake/ThrustInstallRules.cmake")
-    include("${CUB_SOURCE_DIR}/cmake/CubInstallRules.cmake")
+      include("${Thrust_SOURCE_DIR}/cmake/ThrustInstallRules.cmake")
+      include("${CUB_SOURCE_DIR}/cmake/CubInstallRules.cmake")
 
-    # libcudacxx's install rules require inserting an extra level of nesting for the include dir.
-    set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/libcudacxx")
-    include("${libcudacxx_SOURCE_DIR}/cmake/libcudacxxInstallRules.cmake")
+      # libcudacxx's install rules require inserting an extra level of nesting for the include dir.
+      string(APPEND CMAKE_INSTALL_INCLUDEDIR "/libcudacxx")
+      include("${libcudacxx_SOURCE_DIR}/cmake/libcudacxxInstallRules.cmake")
+    else()
+      # CCCL 2.7 doesn't allow rapids-cmake to place libcudacxx headers into `include/libcudacxx` so
+      # we manually invoke `cccl_generate_install_rules`
+      set(CCCL_TOPLEVEL_PROJECT OFF) # Fixes https://github.com/NVIDIA/cccl/pull/2597
+      set(CUB_ENABLE_INSTALL_RULES ON)
+      set(Thrust_ENABLE_INSTALL_RULES ON)
+      set(libcudacxx_ENABLE_INSTALL_RULES ON)
+      include("${CCCL_SOURCE_DIR}/cmake/install/cub.cmake")
+      include("${CCCL_SOURCE_DIR}/cmake/install/thrust.cmake")
+
+      # libcudacxx's install rules require inserting an extra level of nesting for the include dir.
+      string(APPEND CMAKE_INSTALL_INCLUDEDIR "/libcudacxx")
+      include("${CCCL_SOURCE_DIR}/cmake/install/libcudacxx.cmake")
+    endif()
   endif()
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")

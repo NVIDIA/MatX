@@ -48,8 +48,14 @@ function(convert_paths_to_install_dir prop_var)
 
   get_property(install_loc GLOBAL PROPERTY ${name}_install)
   if(install_loc)
-    get_property(build_loc GLOBAL PROPERTY ${name}_build)
-    string(REPLACE "${build_loc}" "${install_loc}/${name}" install_value "${possible_build_path}")
+    get_property(build_locs GLOBAL PROPERTY ${name}_build)
+    foreach(build_loc IN LISTS build_locs)
+      if(build_loc STREQUAL possible_build_path)
+        string(REPLACE "${build_loc}" "${install_loc}/${name}" install_value
+                       "${possible_build_path}")
+        break()
+      endif()
+    endforeach()
   else()
     string(REPLACE "${_RAPIDS_BUILD_DIR}" "\${CMAKE_INSTALL_PREFIX}" install_value
                    "${possible_build_path}")
@@ -99,8 +105,13 @@ function(add_test name command)
   else()
     get_property(install_loc GLOBAL PROPERTY ${name}_install)
     if(install_loc)
-      get_property(build_loc GLOBAL PROPERTY ${name}_build)
-      string(REPLACE "${build_loc}" "${install_loc}/${name}" command "${command}")
+      get_property(build_locs GLOBAL PROPERTY ${name}_build)
+      foreach(build_loc IN LISTS build_locs)
+        if(build_loc STREQUAL command)
+          string(REPLACE "${build_loc}" "${install_loc}/${name}" command "${command}")
+          break()
+        endif()
+      endforeach()
     endif()
   endif()
 
@@ -184,24 +195,29 @@ endfunction()
 # =============================================================================
 # ============== Parse Install Location Functions         ====================
 # =============================================================================
-function(extract_install_info line)
-  # We have a problem where we want to split on spaces but only when it is between two UPPER CASE
-  # letters and not in quotes :( We can't use string(REPLACE " ") since that will split paths with
-  # spaces
+function(extract_install_info)
+  # remove the trailing `)` so that it doesn't get parsed as part of the file name
+  string(REGEX REPLACE "\\)$" "" line "${ARGN}")
 
-  # what we can do is split on quotes and make this in a list. At that point we can split all other
-  # entries again
-  string(REPLACE "\"" ";" line "${line}")
-  # item 1 is the install location item 2 is the filter if valid item 3+ are the lists of files
-  # being installed
-  list(GET line 2 type)
-  if(type MATCHES " TYPE EXECUTABLE " OR type MATCHES " TYPE SHARED_LIBRARY "
-     OR type MATCHES " TYPE STATIC_LIBRARY " OR type MATCHES " TYPE OBJECT_LIBRARY ")
-    list(GET line 1 install_loc)
-    list(GET line 3 build_loc)
-    cmake_path(GET build_loc FILENAME name)
-    set_property(GLOBAL PROPERTY ${name}_install ${install_loc})
-    set_property(GLOBAL PROPERTY ${name}_build ${build_loc})
+  # Leverate separate_arguments to parse a space-separated string into a list of items We use
+  # `UNIX_COMMAND` as that means args are separated by unquoted whitespace ( single, and double
+  # supported).
+  separate_arguments(install_contents UNIX_COMMAND "${line}")
+
+  set(options "file(INSTALL")
+  set(one_value DESTINATION TYPE)
+  set(multi_value FILES)
+  cmake_parse_arguments(_RAPIDS_TEST "${options}" "${one_value}" "${multi_value}"
+                        ${install_contents})
+  if(_RAPIDS_TEST_TYPE STREQUAL "EXECUTABLE" OR _RAPIDS_TEST_TYPE STREQUAL "SHARED_LIBRARY"
+     OR _RAPIDS_TEST_TYPE STREQUAL "STATIC_LIBRARY" OR _RAPIDS_TEST_TYPE STREQUAL "OBJECT_LIBRARY")
+    foreach(build_loc IN LISTS _RAPIDS_TEST_FILES)
+      cmake_path(GET build_loc FILENAME name)
+      set_property(GLOBAL PROPERTY ${name}_install ${_RAPIDS_TEST_DESTINATION})
+
+      # For multi-config generators we will have multiple locations
+      set_property(GLOBAL APPEND PROPERTY ${name}_build ${build_loc})
+    endforeach()
   endif()
 endfunction()
 
@@ -210,9 +226,29 @@ endfunction()
 function(determine_install_location_of_all_targets)
   file(GLOB_RECURSE install_rule_files "${_RAPIDS_PROJECT_DIR}/cmake_install.cmake")
   foreach(file IN LISTS install_rule_files)
-    file(STRINGS "${file}" contents REGEX "INSTALL DESTINATION")
+    file(STRINGS "${file}" contents)
+
+    set(parsing_file_command FALSE)
+    set(file_command_contents)
     foreach(line IN LISTS contents)
-      extract_install_info("${line}")
+      if(line MATCHES "INSTALL DESTINATION")
+        # We found the first line of `file(INSTALL`
+        set(parsing_file_command TRUE)
+      endif()
+
+      if(parsing_file_command)
+        # Continue to add the lines of `file(INSTALL` till we hit the closing `)` That allows us to
+        # support multiple line file commands
+        string(APPEND command_contents "${line}")
+        if(line MATCHES "\\)$")
+          # We have all the lines for this file command, now parse it
+          extract_install_info(${command_contents})
+
+          # Reset to empty state for next `file(INSTALL)` command
+          set(parsing_file_command FALSE)
+          unset(command_contents)
+        endif()
+      endif()
     endforeach()
   endforeach()
 endfunction()
@@ -241,6 +277,13 @@ execute_process(COMMAND ./${rapids_test_generate_exe_name} OUTPUT_FILE \"\${CTES
 if(EXISTS "${_RAPIDS_BUILD_DIR}/CTestTestfile.cmake")
   # Support multi-generators by setting the CTest config mode to be equal to the install mode
   set(CTEST_CONFIGURATION_TYPE "${CMAKE_INSTALL_CONFIG_NAME}")
+
+  # Too support tests added via gtest_discover_tests we need to tell GoogleTest we aren't in script
+  # mode. This stops GoogleTestAddTests from thinking it is being used in a POST_BUILD manner and
+  # should try and look for an undefined executable
+  include(GoogleTest)
+  set(CMAKE_SCRIPT_MODE_FILE OFF)
+
   include("${_RAPIDS_BUILD_DIR}/CTestTestfile.cmake")
 endif()
 

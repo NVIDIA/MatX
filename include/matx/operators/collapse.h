@@ -55,70 +55,51 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "lcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
         __MATX_INLINE__ LCollapseOp(const T1 &op) : op_(op)
-      {
-        static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
-        static_assert(DIM > 1, "Must collapse multiple dims");
-        static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
+        {
+          static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
+          static_assert(DIM > 1, "Must collapse multiple dims");
+          static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
-        // comptue size of collapsed dimension
-        size_ = 1;
+          // comptue size of collapsed dimension
+          size_ = 1;
 
-        // Collapse left-most dims
-#pragma unroll
-        for(int i = 0 ; i < DIM; i++) {
-          size_ *= op_.Size(i);
+          // Collapse left-most dims
+  #pragma unroll
+          for(int i = 0 ; i < DIM; i++) {
+            size_ *= op_.Size(i);
+          }
         }
-      }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            // indices coming in
-            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-            cuda::std::array<index_t, T1::Rank()> out;         // index going out
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          // indices coming in
+          cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+          cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
-            for(int i = 1; i < Rank(); i++) {
-              // copy all but first input index into out array
-              out[DIM + i - 1] = in[i];
-            }
+          for(int i = 1; i < Rank(); i++) {
+            // copy all but first input index into out array
+            out[DIM + i - 1] = in[i];
+          }
 
-            // expand first input index into DIM indices
-            auto ind = in[0];
+          // expand first input index into DIM indices
+          auto ind = in[0];
 #pragma unroll
-            for(int i = 0; i < DIM; i++) {
-              int d = DIM - i - 1;
-              out[d] = ind % op_.Size(d);
-              ind /= op_.Size(d);
-            }
+          for(int i = 0; i < DIM; i++) {
+            int d = DIM - i - 1;
+            out[d] = ind % op_.Size(d);
+            ind /= op_.Size(d);
+          }
 
-            return cuda::std::apply(op_, out);
-          }    
+          return cuda::std::apply(op_, out);
+        }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
-          {
-            // indices coming in
-            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-            cuda::std::array<index_t, T1::Rank()> out;         // index going out
-
-#pragma unroll
-            for(int i = 1; i < Rank(); i++) {
-              // copy all but first input index into out array
-              out[DIM + i - 1] = in[i];
-            }
-
-            // expand first input index into DIM indices
-            auto ind = in[0];
-#pragma unroll
-            for(int i = 0; i < DIM; i++) {
-              int d = DIM - i - 1;
-              out[d] = ind % op_.Size(d);
-              ind /= op_.Size(d);
-            }
-
-            return cuda::std::apply(op_, out);
-          }    
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return cuda::std::as_const(*this).template operator()(indices...);
+        }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -211,70 +192,51 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
         __MATX_INLINE__ RCollapseOp(const T1 op) : op_(op)
-      {
-        static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
-        static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
-        static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
+        {
+          static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
+          static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
+          static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
-        // comptue size of collapsed dimension
-        size_ = 1;
+          // comptue size of collapsed dimension
+          size_ = 1;
 
-        // Collapse right-most dims
-#pragma unroll
-        for(int i = 0 ; i < DIM; i++) {
-          size_ *= op_.Size(T1::Rank() - 1 - i);
+          // Collapse right-most dims
+  #pragma unroll
+          for(int i = 0 ; i < DIM; i++) {
+            size_ *= op_.Size(T1::Rank() - 1 - i);
+          }
         }
-      }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-          {
-            // indices coming in
-            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-            cuda::std::array<index_t, T1::Rank()> out;         // index going out
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          // indices coming in
+          cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+          cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
 #pragma unroll
-            for(int i = 0 ; i < Rank() - 1; i++) {
-              // copy all but last index into out array
-              out[i] = in[i];
-            }
+          for(int i = 0 ; i < Rank() - 1; i++) {
+            // copy all but last index into out array
+            out[i] = in[i];
+          }
 
-            // expand last index into DIM indices
-            auto ind = in[Rank() - 1];
+          // expand last index into DIM indices
+          auto ind = in[Rank() - 1];
 #pragma unroll
-            for(int i = 0; i < DIM; i++) {
-              int d = T1::Rank() - 1 - i;
-              out[d] = ind % op_.Size(d);
-              ind /= op_.Size(d);
-            }
+          for(int i = 0; i < DIM; i++) {
+            int d = T1::Rank() - 1 - i;
+            out[d] = ind % op_.Size(d);
+            ind /= op_.Size(d);
+          }
 
-            return cuda::std::apply(op_, out);
-          }    
+          return cuda::std::apply(op_, out);
+        }    
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-          {
-            // indices coming in
-            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-            cuda::std::array<index_t, T1::Rank()> out;         // index going out
-
-#pragma unroll
-            for(int i = 0 ; i < Rank() - 1; i++) {
-              // copy all but last index into out array
-              out[i] = in[i];
-            }
-
-            // expand last index into DIM indices
-            auto ind = in[Rank() - 1];
-#pragma unroll
-            for(int i = 0; i < DIM; i++) {
-              int d = T1::Rank() - 1 - i;
-              out[d] = ind % op_.Size(d);
-              ind /= op_.Size(d);
-            }
-
-            return cuda::std::apply(op_, out);
-          }    
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return cuda::std::as_const(*this).template operator()(indices...);
+        }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

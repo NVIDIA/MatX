@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23.1)
 
-set(MATX_VERSION 0.8.0)
+set(MATX_VERSION 0.9.0)
 
 # Used for config file generation
 if(NOT DEFINED PROJECT_NAME)
@@ -27,7 +27,7 @@ include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
-set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
+rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     include(rapids-cuda)
@@ -105,8 +105,6 @@ rapids_find_package(
   BUILD_EXPORT_SET matx-exports
   INSTALL_EXPORT_SET matx-exports)
 
-rapids_cpm_init()
-
 # Create our transitive target to pass build properties to external users and our own build environment
 add_library(matx INTERFACE)
 add_library(matx::matx ALIAS matx)
@@ -115,7 +113,6 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
 "$<INSTALL_INTERFACE:include/matx/kernels>")
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
-target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
 # 11.2 and above required for async allocation
 if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)

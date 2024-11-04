@@ -26,6 +26,11 @@ if(NOT TARGET conda_env)
   message(FATAL_ERROR "Expected target conda_env to exist")
 endif()
 
+get_target_property(compile_options conda_env INTERFACE_COMPILE_OPTIONS)
+if( NOT "$<$<CONFIG:Debug>:-O0>" IN_LIST compile_options)
+  message(FATAL_ERROR "Expected $<$<CONFIG:Debug>>:-O0> to be in the compile options of `conda_env`")
+endif()
+
 get_target_property(include_dirs conda_env INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
 if( NOT "$ENV{BUILD_PREFIX}/include" IN_LIST include_dirs)
   message(FATAL_ERROR "Expected env{BUILD_PREFIX} to be in the include dirs of `conda_env`")

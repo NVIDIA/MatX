@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/find/generate_module.cmake)
 
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 project(rapids-test-project LANGUAGES CXX)
 
 set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}")

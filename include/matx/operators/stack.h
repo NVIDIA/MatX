@@ -124,46 +124,31 @@ namespace matx
         }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
-        {
-          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-          cuda::std::array<index_t, RANK> indices_o;
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
+      {
+        cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+        cuda::std::array<index_t, RANK> indices_o;
 
-          // operator index
-          index_t oidx = indices[axis_];
+        // operator index
+        index_t oidx = indices[axis_];
 
-          // removing operator axis from indices
-          for(int i = 0; i < axis_; i++) {
-            indices_o[i] = indices[i];
-          } 
-          
-          for(int i = axis_; i < (int)indices_o.size(); i++) {
-            indices_o[i] = indices[i+1];
-          }
-
-          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+        // removing operator axis from indices
+        for(int i = 0; i < axis_; i++) {
+          indices_o[i] = indices[i];
+        } 
+        
+        for(int i = axis_; i < (int)indices_o.size(); i++) {
+          indices_o[i] = indices[i+1];
         }
+
+        return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
+      }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
-        {
-          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-          cuda::std::array<index_t, RANK> indices_o;
-
-          // operator index
-          index_t oidx = indices[axis_];
-
-          // removing operator axis from indices
-          for(int i = 0; i < axis_; i++) {
-            indices_o[i] = indices[i];
-          } 
-          
-          for(int i = axis_; i < (int)indices_o.size(); i++) {
-            indices_o[i] = indices[i+1];
-          } 
-
-          return GetVal<0, sizeof...(Ts)>(oidx, indices_o);
-        }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+      {
+        return cuda::std::as_const(*this).template operator()(indices...);
+      }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
       {

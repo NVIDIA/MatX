@@ -199,6 +199,14 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+**v0.9.0**:
+- *Features*
+    * Full CPU support for both ARM and x86 on all solver, BLAS, and FFT functions, including multi-threaded support
+    * New vector_norm and matrix_norm operators
+- *Bug fixes*
+    * Many host and device compiler fixes and workarounds
+    * Performance improvements in nested transforms
+
 **v0.8.0**:
 - *Features*
     * Updated cuTENSOR and cuTensorNet versions

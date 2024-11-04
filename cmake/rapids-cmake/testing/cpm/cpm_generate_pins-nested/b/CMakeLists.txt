@@ -13,16 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #=============================================================================
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 project(rapids-test-b LANGUAGES CXX)
 
 include(${rapids-cmake-dir}/cpm/init.cmake)
 rapids_cpm_init()
 
-include(${rapids-cmake-dir}/cpm/cccl.cmake)
 include(${rapids-cmake-dir}/cpm/cuco.cmake)
 include(${rapids-cmake-dir}/cpm/nvcomp.cmake)
 
-rapids_cpm_cccl()
-rapids_cpm_cuco()
-rapids_cpm_nvcomp()
+rapids_cpm_cuco(DOWNLOAD_ONLY ON)
+rapids_cpm_nvcomp(DOWNLOAD_ONLY ON)

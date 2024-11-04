@@ -21,7 +21,16 @@ enable_language(CUDA)
 enable_testing()
 rapids_test_init()
 
-rapids_test_add(NAME verify_ COMMAND ls GPUS 1 INSTALL_COMPONENT_SET testing)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/main.cu"
+[=[
+int main(int, char **)
+{
+  return 0;
+}
+]=])
+add_executable(test_verify ${CMAKE_CURRENT_BINARY_DIR}/main.cu)
+
+rapids_test_add(NAME verify_ COMMAND test_verify GPUS 1 INSTALL_COMPONENT_SET testing)
 
 rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing
                                 DESTINATION bin/testing)
@@ -52,7 +61,7 @@ string(FIND "${contents}" ${execute_process_match_string} is_found)
 if(is_found EQUAL -1)
   message(FATAL_ERROR "Failed to generate a `execute_process` with escaped CTEST_RESOURCE_SPEC_FILE")
 endif()
-set(add_test_match_string [===[add_test([=[verify_]=] "cmake" -Dcommand_to_run=ls -Dcommand_args= -P=./run_gpu_test.cmake)]===])
+set(add_test_match_string [===[add_test([=[verify_]=] "cmake" -Dcommand_to_run=${CMAKE_INSTALL_PREFIX}/bin/testing/test_verify -Dcommand_args= -P=./run_gpu_test.cmake)]===])
 string(FIND "${contents}" ${add_test_match_string} is_found)
 if(is_found EQUAL -1)
   message(FATAL_ERROR "Failed to generate an installed `add_test` for verify_")
@@ -65,6 +74,7 @@ endif()
 ]==])
 
 add_custom_target(install_testing_component ALL
-  COMMAND ${CMAKE_COMMAND} --install "${CMAKE_CURRENT_BINARY_DIR}" --component testing --prefix install/
+  COMMAND ${CMAKE_COMMAND} --install "${CMAKE_CURRENT_BINARY_DIR}" --component testing --prefix install/ --config Debug
   COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/verify_installed_CTestTestfile.cmake"
   )
+add_dependencies(install_testing_component test_verify)

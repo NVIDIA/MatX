@@ -44,7 +44,7 @@ if(is_found EQUAL -1)
 endif()
 
 set(properties_match_strings [===[PROPERTIES ENVIRONMENT "STREAM_MODE]===]
-                             [===[LD_PRELOAD=${CMAKE_INSTALL_PREFIX}/lib/libpreload]===])
+                             [===[LD_PRELOAD=${CMAKE_INSTALL_PREFIX}/lib/libpreload.so.1.1.1]===])
 foreach(to_match IN LISTS properties_match_strings)
   string(FIND "${contents}" ${to_match} is_found)
   if(is_found EQUAL -1)

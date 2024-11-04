@@ -1,0 +1,9 @@
+{
+  "packages": {
+    "new_dependency": {
+      "version": "1.2.3",
+      "git_url": "https://github.com/org/new_dependency.git",
+      "git_tag": "${version}"
+    }
+  }
+}

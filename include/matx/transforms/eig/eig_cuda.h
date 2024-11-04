@@ -115,18 +115,31 @@ public:
 
     params = GetEigParams(w, a, jobz, uplo);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size);
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)    
+    this->AllocateWorkspace(params.batch_size, true);
+#else    
+    this->AllocateWorkspace(params.batch_size, false);
+#endif    
   }
 
   void GetWorkspaceSize() override
   {
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     // Use vector mode for a larger workspace size that works for both modes
+    cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
+                    this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
+                    params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
+                    params.n, MatXTypeToCudaType<T2>(), params.W,
+                    MatXTypeToCudaType<T1>(), &this->dspace,
+                    &this->hspace, params.batch_size);
+#else
     cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), &this->dspace,
                     &this->hspace);
+#endif                    
 
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
@@ -166,9 +179,6 @@ public:
       }
     }
 
-    SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
-    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs);
-
     if (out.Data() != a.Data()) {
       (out = a).run(exec);
     }
@@ -176,8 +186,25 @@ public:
     const auto stream = exec.getStream();
     cusolverDnSetStream(this->handle, stream);
 
-    // At this time cuSolver does not have a batched 64-bit LU interface. Change
-    // this to use the batched version once available.
+#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
+    auto ret = cusolverDnXsyevBatched(
+        this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
+        out.Data(), params.n, MatXTypeToCudaType<T2>(), w.Data(),
+        MatXTypeToCudaType<T1>(),
+        reinterpret_cast<uint8_t *>(this->d_workspace), this->dspace,
+        reinterpret_cast<uint8_t *>(this->h_workspace), this->hspace,
+        this->d_info, params.batch_size);
+
+    MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError,
+      ("cusolverDnXsyevBatched failed with error " + std::to_string(ret)).c_str());
+
+    std::vector<int> h_info(params.batch_size);
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
+#else
+    SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
+    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs); 
+    
+    // Older cuSolver versions do not support batching with cusolverDnXsyevd
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       auto ret = cusolverDnXsyevd(
           this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
@@ -187,11 +214,13 @@ public:
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
           this->d_info + i);
 
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError,
+        ("cusolverDnXsyevBatched failed with error " + std::to_string(ret)).c_str());
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
     cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+#endif        
 
     // This will block. Figure this out later
     cudaStreamSynchronize(stream);

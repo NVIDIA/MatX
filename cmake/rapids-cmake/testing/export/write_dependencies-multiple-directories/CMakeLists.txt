@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 #=============================================================================
 
 #Needs to before inclusion of `cpm.cmake`
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.26.4)
 
 include(${rapids-cmake-dir}/export/cpm.cmake)
 include(${rapids-cmake-dir}/export/write_dependencies.cmake)

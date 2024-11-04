@@ -18,7 +18,7 @@ maximum performance when profiling is not needed.
 
 Enabling NVTX API and Setting Log Level
 ---------------------------------------
-To enable the NVTX Profiling API, simple compile with the ``MATX_NVTX_FLAG=ON`` enabled in the cmake command.
+To enable the NVTX Profiling API, simple compile with the ``MATX_NVTX_FLAGS=ON`` enabled in the cmake command.
 Once the flags are enabled at compile time, the project defaults to logging at the API level, which will provide NVTX
 ranges for all MatX API calls. If another logging level is desired, this can be changed using the ``matx::setNVTXLogLevel()`` call. 
 Possible log levels are defined in ``matx_nvxtLogLevels``.

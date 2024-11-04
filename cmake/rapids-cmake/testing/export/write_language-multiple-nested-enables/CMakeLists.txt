@@ -15,7 +15,7 @@
 #=============================================================================
 include(${rapids-cmake-dir}/export/write_language.cmake)
 
-cmake_minimum_required(VERSION 3.23.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
 project(write_language-multiple-nested-enable LANGUAGES NONE)
 

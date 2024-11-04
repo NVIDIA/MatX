@@ -44,8 +44,13 @@ directly.
 Result Variables
 ^^^^^^^^^^^^^^^^
 
-  ``CMAKE_CUDA_ARCHITECTURES`` will exist and set to the list of architectures
+``CMAKE_CUDA_ARCHITECTURES``
+
+  Will exist as a local variable and be set to the list of architectures
   that should be compiled for. Will overwrite any existing values.
+
+.. versionadded:: v24.08.00
+  Will be added as a cache variable if it isn't already one.
 
 #]=======================================================================]
 function(rapids_cuda_set_architectures mode)
@@ -59,9 +64,6 @@ function(rapids_cuda_set_architectures mode)
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA" AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.8.0)
     list(REMOVE_ITEM supported_archs "90")
   endif()
-
-  include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/architectures_policy.cmake)
-  rapids_cuda_architectures_policy(FROM_SET mode)
 
   if(${mode} STREQUAL "RAPIDS")
 
@@ -90,6 +92,12 @@ function(rapids_cuda_set_architectures mode)
     )
   endif()
 
+  # Need to set in the cache so we match CMake behavior of setting up as a cache variable. This
+  # ensures that on subsequent executions we use the value we computed from the first execution, and
+  # don't re-evaluate env vars which could have changed
+  set(CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}" CACHE STRING "CUDA architectures")
+
+  # Set as a local variable to maintain comp
   set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} PARENT_SCOPE)
 
 endfunction()

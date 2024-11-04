@@ -107,20 +107,7 @@ IGNORE_WARNING_POP_GCC
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-
-          // convert variadic type to tuple so we can read/update
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")         
-          cuda::std::array<index_t, Rank()> sind{indices...};
-          cuda::std::array<index_t, T::Rank()> gind;
-IGNORE_WARNING_POP_GCC
-
-          // gather indices
-          for(int i = 0; i < T::Rank(); i++) {
-            auto idx = dims_[i];
-            gind[i] = sind[idx];
-          }
-
-          return cuda::std::apply(op_, gind);
+          return cuda::std::as_const(*this).template operator()(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

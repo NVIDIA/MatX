@@ -108,27 +108,7 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          cuda::std::array<index_t, Rank()> inds{indices...};
-          cuda::std::array<index_t, T::Rank()> ninds;
-
-          index_t idx = 0;
-          index_t stride = 1;
-
-          // linearlize incoming index
-#pragma unroll
-          for(int i = Rank() - 1 ; i >= 0 ; i--) {
-            idx += stride * inds[i];
-            stride *= Size(i);
-          }
-
-          // extract new indices
-#pragma unroll
-          for(int i = T::Rank() - 1; i >= 0; i--) {
-            ninds[i] = idx % op_.Size(i);
-            idx /= op_.Size(i);
-          }
-
-          return cuda::std::apply(op_, ninds);
+          return cuda::std::as_const(*this).template operator()(indices...);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

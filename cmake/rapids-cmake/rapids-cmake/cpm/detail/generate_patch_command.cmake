@@ -75,6 +75,7 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
   # For each project cache the subset of the json
   set(patch_files_to_run)
   set(patch_issues_to_ref)
+  set(patch_required_to_apply)
 
   # Gather number of patches
   string(JSON patch_count LENGTH "${json_data}")
@@ -94,13 +95,20 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
           endif()
           list(APPEND patch_files_to_run "${file}")
           list(APPEND patch_issues_to_ref "${issue}")
+
+          set(required FALSE)
+          rapids_cpm_json_get_value(${patch_data} required)
+          list(APPEND patch_required_to_apply "${required}")
         endif()
+        unset(file)
+        unset(issue)
       endif()
     endforeach()
   endif()
 
   set(patch_script "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/patch.cmake")
   set(log_file "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/log")
+  set(err_file "${CMAKE_BINARY_DIR}/rapids-cmake/patches/${package_name}/err")
   if(patch_files_to_run)
     string(TIMESTAMP current_year "%Y" UTC)
     configure_file(${rapids-cmake-dir}/cpm/patches/command_template.cmake.in "${patch_script}"
@@ -109,6 +117,6 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
   else()
     # remove any old patch / log files that exist and are no longer needed due to a change in the
     # package version / version.json
-    file(REMOVE "${patch_script}" "${log_file}")
+    file(REMOVE "${patch_script}" "${log_file}" "${err_file}")
   endif()
 endfunction()
