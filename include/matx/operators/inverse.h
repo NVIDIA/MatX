@@ -100,7 +100,7 @@ namespace detail {
       }      
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
