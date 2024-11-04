@@ -127,7 +127,7 @@ rapids_cpm_cccl(
 )
 
 target_link_libraries(matx INTERFACE CCCL::CCCL CCCL::cudax)
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr --extended-lambda)
+set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --extended-lambda)
 
 # Set flags for compiling tests faster
 set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
