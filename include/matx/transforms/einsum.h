@@ -312,7 +312,7 @@ public:
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
     i = 0;
-    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim,
+    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())) && ...), matxInvalidDim,
         "Tensor rank must match number of einsum subscripts");
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
