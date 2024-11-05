@@ -63,10 +63,12 @@ template <typename T> constexpr bool is_matx_set_op();
       stfExecutor(cudaStream_t stream) : stream_(stream) {
           cuda::experimental::stf::async_resources_handle handle;
           ctx_ = cuda::experimental::stf::stream_ctx(stream, handle);
+          //ctx_ = cuda::experimental::stf::graph_ctx(stream, handle);
       }
       stfExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {
           cuda::experimental::stf::async_resources_handle handle;
           ctx_ = cuda::experimental::stf::stream_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
+          //ctx_ = cuda::experimental::stf::graph_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
       }
 
       /**
@@ -75,6 +77,7 @@ template <typename T> constexpr bool is_matx_set_op();
        */
       stfExecutor() : stream_(0) {
           ctx_ = cuda::experimental::stf::stream_ctx();
+          //ctx_ = cuda::experimental::stf::graph_ctx();
       }
 
       /**

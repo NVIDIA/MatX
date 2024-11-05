@@ -73,7 +73,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
+#if 0
   cudaExecutor exec{};
+#else
+  stfExecutor exec{};
+  auto ctx = exec.getCtx();
+#endif
 
   index_t signal_size = 1ULL << 16;
   index_t filter_size = 16;
@@ -117,7 +122,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Perform the FFT in-place on both signal and filter
   for (int i = 0; i < iterations; i++) {
     if (i == 1) {
+#if 0
       cudaEventRecord(start, stream);
+#else
+    cudaEventRecord(start, ctx.task_fence());
+#endif
     }    
     (sig_freq = fft(sig_time, filtered_size)).run(exec);
     (filt_freq = fft(filt_time, filtered_size)).run(exec);
@@ -129,18 +138,30 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     
   }
 
+#if 0
   cudaEventRecord(stop, stream);
+#else
+  cudaEventRecord(stop, ctx.task_fence());
+#endif
   exec.sync();
   cudaEventElapsedTime(&separate_ms, start, stop);   
 
   for (int i = 0; i < iterations; i++) {
     if (i == 1) {
-      cudaEventRecord(start, stream);
+#if 0
+        cudaEventRecord(start, stream);
+#else
+        cudaEventRecord(start, ctx.task_fence());
+#endif
     }
     (sig_freq = ifft(fft(sig_time, filtered_size) * fft(filt_time, filtered_size))).run(exec);
   }
-  
+
+#if 0
   cudaEventRecord(stop, stream);
+#else
+  cudaEventRecord(stop, ctx.task_fence());
+#endif
   exec.sync();
   cudaEventElapsedTime(&fused_ms, start, stop);  
 
@@ -153,7 +174,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
   exec.sync();
- 
+
+#if 1
+  ctx.finalize();
+#endif
+
   // Compare signals
   for (index_t b = 0; b < batches; b++) {
     for (index_t i = 0; i < filtered_size; i++) {

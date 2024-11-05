@@ -146,7 +146,7 @@ namespace matx
         }
 
         template <typename Task>
-        __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept
+        __MATX_INLINE__ void apply_dep_to_task(Task &&task, [[maybe_unused]] int perm=1) const noexcept
         {
           /* Scenario where the matvec() operator is on the RHS and op has already
              run previously. So we make tmp_out have a read permission as it will be read from */

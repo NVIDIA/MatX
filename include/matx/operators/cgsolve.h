@@ -90,8 +90,8 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          static_assert(is_cuda_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
-          cgsolve_impl(cuda::std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
+          //static_assert(is_cuda_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
+          cgsolve_impl(cuda::std::get<0>(out), a_, b_, ex, tol_, max_iters_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>
