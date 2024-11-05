@@ -91,7 +91,7 @@ public:
   using stride_container = typename Desc::stride_container;
   using desc_type = Desc; ///< Descriptor type trait
   using self_type = tensor_t<T, RANK, Storage, Desc>;
-  using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::slice<T, 1>>;
+  using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::void_interface>;
 
   /**
    * @brief Construct a new 0-D tensor t object
@@ -816,10 +816,7 @@ public:
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    printf("******* FIX ASAP: tensor.h: 819 ****************\n");
-    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
-    /* Albert : TODO. We're creating a logical data of with the type being complex and not real. Seems to be incompatible with the approach we're taking in creating an associated logical data. Will be fixed once we move to void_interace */
-    //return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data, this->stf_ldata_};
+    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data, this->stf_ldata_};
   }
 
   /**

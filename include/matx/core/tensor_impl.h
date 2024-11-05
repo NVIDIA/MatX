@@ -81,10 +81,7 @@ class tensor_impl_t {
     using stride_type = typename Desc::stride_type;
     using matxoplvalue = bool;
     using self_type = tensor_impl_t<T, RANK, Desc>;
-
-    /* TODO: convert to void_interface for the logical data.*/
-    using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::slice<T, 1>>;
-    //using stf_logicaldata_type = typename cudastf::logical_data<cudastf::void_interface>;
+    using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::void_interface>;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -1153,10 +1150,8 @@ IGNORE_WARNING_POP_GCC
             place = getDataPlace(Data());
 #endif
 
-            /* TODO: Use void_interface for logical data */
-            *stf_ldata_ = ctx.logical_data(cuda::experimental::stf::make_slice(Data(), 1));
-            //*stf_ldata_ = ctx.logical_data(cudastf::shape_of<cudastf::void_interface>());
-            stf_ldata_->value().set_write_back(false);
+            *stf_ldata_ = ctx.logical_data(cuda::experimental::stf::void_interface());
+            //stf_ldata_->value().set_write_back(false);
             stf_ldata_->value().set_symbol(this->str());
         }       
     }
