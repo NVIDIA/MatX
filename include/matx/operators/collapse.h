@@ -60,7 +60,7 @@ namespace matx
           static_assert(DIM > 1, "Must collapse multiple dims");
           static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
-          // comptue size of collapsed dimension
+          // compute size of collapsed dimension
           size_ = 1;
 
           // Collapse left-most dims
@@ -164,7 +164,7 @@ namespace matx
    *   Operator with collapsed input
    */
   template <int DIM, typename T1>
-    auto __MATX_INLINE__ lcollapse(const T1 a)
+    auto __MATX_INLINE__ lcollapse(const T1 &a)
     {
       if constexpr (DIM <= 1) {
         return a;

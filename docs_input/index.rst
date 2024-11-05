@@ -47,4 +47,5 @@ Table of Contents
     api/index.rst
     examples/index.rst
     executor_compatibility
+    developer_guide/index.rst
     version
