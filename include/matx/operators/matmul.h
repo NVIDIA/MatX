@@ -111,13 +111,45 @@ namespace matx
           return out_dims_[dim];
         }
 
+        template <typename Task>
+        __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept
+        {
+          /* Scenario where the matmul() operator is on the RHS and op has already run 
+          previously. So we make tmp_out have a read permission as it will be read from */
+          tmp_out_.apply_dep_to_task(std::forward<Task>(task), 1);
+        }
+
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
+          // stfexecutor case
+          if constexpr (!is_cuda_executor_v<Executor>) {
+              auto ctx = ex.getCtx();
+              auto tsk = ctx.task();
+              tsk.set_symbol("matmul");
+
+              auto output = cuda::std::get<0>(out);
+              output.PreRun(out_dims_, std::forward<Executor>(ex));
+              output.apply_dep_to_task(tsk, 0);
+              a_.apply_dep_to_task(tsk, 1);
+              b_.apply_dep_to_task(tsk, 1);
+
+              tsk->*[&](cudaStream_t s) {
+                  auto exec = cudaExecutor(s);
+                  if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                      matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, exec, alpha_, beta_);
+                  }
+                  else {
+                      matmul_impl(cuda::std::get<0>(out), a_, b_, exec, alpha_, beta_);
+                  }
+              };
           }
-          else {
-            matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+          else if constexpr (is_cuda_executor_v<Executor>) {
+                  if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                      matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
+                  }
+                  else {
+                      matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+                  }
           }
         }
 

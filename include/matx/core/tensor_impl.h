@@ -41,9 +41,11 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
+#include "matx/core/utils.h"
 //#include "matx_exec_kernel.h"
 #include "iterator.h"
 #include "matx/core/make_tensor.h"
+#include <cuda/experimental/stf.cuh>
 
 namespace matx {
 
@@ -80,6 +82,10 @@ class tensor_impl_t {
     using matxoplvalue = bool;
     using self_type = tensor_impl_t<T, RANK, Desc>;
 
+    /* TODO: convert to void_interface for the logical data.*/
+    using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::slice<T, 1>>;
+    //using stf_logicaldata_type = typename cudastf::logical_data<cudastf::void_interface>;
+
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
@@ -110,13 +116,15 @@ class tensor_impl_t {
 
       swap(lhs.ldata_, rhs.ldata_);
       swap(lhs.desc_, rhs.desc_);
+      swap(lhs.stf_ldata_, rhs.stf_ldata_);
     }
 
     /**
      * Constructor for a rank-0 tensor (scalar).
      */
     tensor_impl_t() {
-
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 
     /**
@@ -127,6 +135,8 @@ class tensor_impl_t {
      */
     tensor_impl_t(T *const data) : ldata_(data) {
       static_assert(RANK == 0, "tensor_impl_t with single pointer parameter must be a rank 0 tensor");
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 
     /**
@@ -139,6 +149,8 @@ class tensor_impl_t {
               std::enable_if_t<!is_tensor_view_v<remove_cvref_t<ShapeType>> && !is_matx_descriptor_v<remove_cvref_t<ShapeType>>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape) : desc_(std::forward<ShapeType>(shape))
     {
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 
     /**
@@ -153,6 +165,8 @@ class tensor_impl_t {
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape, StrideType &&strides)
         : desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 
     /**
@@ -193,6 +207,8 @@ class tensor_impl_t {
                     StrideType &&strides)
         : ldata_(ldata), desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 
 
@@ -216,8 +232,17 @@ IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
                     DescriptorType &&desc)                
         : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
     {
+      auto ldptr = new std::optional<stf_logicaldata_type>();
+      this->stf_ldata_ = ldptr;
     }
 IGNORE_WARNING_POP_GCC
+
+    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> =     true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
+                    DescriptorType &&desc, std::optional<stf_logicaldata_type > *stf_ldata)
+        : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}, stf_ldata_(stf_ldata)
+    {
+    }
 
     /**
      * Constructor for creating a view with only a descriptor
@@ -233,12 +258,15 @@ IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
     {
+        auto ldptr = new std::optional<stf_logicaldata_type>();
+        this->stf_ldata_ = ldptr;
     }
 
     __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
     {
       ldata_ = rhs.ldata_;
       desc_ = rhs.desc_;
+      stf_ldata_ = rhs.stf_ldata_;
     }
 
     /**
@@ -255,6 +283,7 @@ IGNORE_WARNING_POP_GCC
     {
       ldata_ = op.ldata_;
       desc_ = op.desc_;
+      stf_ldata_ = op.stf_ldata;
     }
 
 
@@ -770,7 +799,7 @@ IGNORE_WARNING_POP_GCC
 
       auto new_desc = CloneImpl<N>(clones);
 
-      return tensor_impl_t<T, N, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, N, decltype(new_desc)>{this->ldata_, std::move(new_desc), this->stf_ldata_};
     }
 
     __MATX_INLINE__ auto PermuteImpl(const cuda::std::array<int32_t, RANK> &dims) const
@@ -800,7 +829,7 @@ IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ auto Permute(const cuda::std::array<int32_t, RANK> &dims) const
     {
       auto new_desc = PermuteImpl(dims);
-      return tensor_impl_t<T, RANK, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, RANK, decltype(new_desc)>{this->ldata_, std::move(new_desc), this->stf_ldata_};
     }
 
     template <int N>
@@ -845,7 +874,7 @@ IGNORE_WARNING_POP_GCC
     OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
                 const cuda::std::array<typename Desc::stride_type, N> &strides) const {
       auto new_desc = OverlapViewImpl<N>(windows, strides);
-      return tensor_impl_t<T, RANK + 1, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, RANK + 1, decltype(new_desc)>{this->ldata_, std::move(new_desc), this->stf_ldata_};
     }
 
     template <typename O>
@@ -1080,9 +1109,56 @@ IGNORE_WARNING_POP_GCC
       ldata_ = data;
     }
 
+    template <typename Task>
+    __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm) const noexcept
+    {
+      auto &ld = stf_ldata_->value();
+
+      using namespace cuda::experimental::stf;
+#if 0
+      data_place place = getDataPlace(Data());
+#endif
+
+      if (perm == 0) {
+          task.add_deps(ld.write());
+      }
+      else if (perm == 1) {
+          task.add_deps(ld.read());
+      }
+      else if (perm == 2) {
+          task.add_deps(ld.rw());
+      }
+      else {
+          std::cout << "abort ...\n";
+      }
+    }
+
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
+        using namespace cuda::experimental::stf;
+        data_place place;
+
+        if constexpr (is_cuda_executor_v<Executor>) {
+            return;
+        }
+        else if constexpr (!is_cuda_executor_v<Executor>) {
+
+            /* Don't create a new logical data for a tensor if it alread had one created previously */
+            if (stf_ldata_ && stf_ldata_->has_value()) { return; }
+
+            auto ctx = ex.getCtx();
+#if 0
+            // Determine the type of memory that was allocated ie. host/managed/etc
+            place = getDataPlace(Data());
+#endif
+
+            /* TODO: Use void_interface for logical data */
+            *stf_ldata_ = ctx.logical_data(cuda::experimental::stf::make_slice(Data(), 1));
+            //*stf_ldata_ = ctx.logical_data(cudastf::shape_of<cudastf::void_interface>());
+            stf_ldata_->value().set_write_back(false);
+            stf_ldata_->value().set_symbol(this->str());
+        }       
     }
 
     template <typename ShapeType, typename Executor>
@@ -1094,6 +1170,9 @@ IGNORE_WARNING_POP_GCC
   protected:
     T *ldata_;
     Desc desc_;
+
+  public:
+    mutable std::optional<stf_logicaldata_type > *stf_ldata_;
 };
 
 }

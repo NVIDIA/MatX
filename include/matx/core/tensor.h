@@ -91,6 +91,7 @@ public:
   using stride_container = typename Desc::stride_container;
   using desc_type = Desc; ///< Descriptor type trait
   using self_type = tensor_t<T, RANK, Storage, Desc>;
+  using stf_logicaldata_type = typename cuda::experimental::stf::logical_data<cuda::experimental::stf::slice<T, 1>>;
 
   /**
    * @brief Construct a new 0-D tensor t object
@@ -107,7 +108,7 @@ public:
    * @param rhs Object to copy from
    */
   __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
-      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_}, storage_(rhs.storage_)
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_, rhs.stf_ldata_}, storage_(rhs.storage_)
       { }
 
   /**
@@ -116,7 +117,7 @@ public:
    * @param rhs Object to move from
    */
   __MATX_HOST__ tensor_t(tensor_t &&rhs) noexcept
-      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_), rhs.stf_ldata_}, storage_(std::move(rhs.storage_))
   { }
 
 
@@ -134,6 +135,7 @@ public:
     this->ldata_ = rhs.ldata_;
     storage_ = rhs.storage_;
     this->desc_ = rhs.desc_;
+    this->stf_ldata_ = rhs.stf_ldata_;
   }
 
   /** Swaps two tensors
@@ -152,6 +154,7 @@ public:
     std::swap(lhs.ldata_, rhs.ldata_);
     swap(lhs.storage_, rhs.storage_);
     swap(lhs.desc_, rhs.desc_);
+    std::swap(lhs.stf_ldata_, rhs.stf_ldata_);
   }
 
   __MATX_INLINE__  ~tensor_t() = default;
@@ -177,6 +180,32 @@ public:
     this->SetLocalData(storage_.data());
   }
 
+  template <typename S2 = Storage, typename D2 = Desc,
+            std::enable_if_t<is_matx_storage_v<typename remove_cvref<S2>::type> && is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
+  tensor_t(S2 &&s, D2 &&desc, T* ldata, std::optional<stf_logicaldata_type > *stf_ldata_) :
+    detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
+    storage_{std::forward<S2>(s)}
+  {
+    this->stf_ldata_ = stf_ldata_;
+    this->SetLocalData(storage_.data());
+  }
+
+  /**
+   * @brief Construct a new tensor t object. Used to copy an existing storage object for proper reference counting
+   *
+   * @param s
+   * @param desc
+   * @param ldata
+   */
+  template <typename D2 = Desc>
+  tensor_t(Storage s, D2 &&desc, T* ldata, std::optional<stf_logicaldata_type > *stf_ldata) :
+    detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
+    storage_{std::move(s)}
+  {
+    this->stf_ldata_ = stf_ldata;
+    this->SetLocalData(ldata);
+  }
+
   /**
    * @brief Construct a new tensor t object. Used to copy an existing storage object for proper reference counting
    *
@@ -191,7 +220,6 @@ public:
   {
     this->SetLocalData(ldata);
   }
-
 
   /**
    * Constructor for a rank-1 and above tensor.
@@ -646,7 +674,7 @@ public:
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{std::forward<Shape>(shape)};
-    return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
+    return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
   }
 
   /**
@@ -705,7 +733,7 @@ public:
        "To get a reshaped view the tensor must be compact");
 
     DefaultDescriptor<tshape.size()> desc{std::move(tshape)};
-    return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_};
+    return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_, this->stf_ldata_};
   }
 
   /**
@@ -788,7 +816,10 @@ public:
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
+    printf("******* FIX ASAP: tensor.h: 819 ****************\n");
     return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
+    /* Albert : TODO. We're creating a logical data of with the type being complex and not real. Seems to be incompatible with the approach we're taking in creating an associated logical data. Will be fixed once we move to void_interace */
+    //return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data, this->stf_ldata_};
   }
 
   /**
@@ -831,7 +862,7 @@ public:
     }
 
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
+    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data, this->stf_ldata_};
   }
 
   /**
@@ -854,7 +885,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->PermuteImpl(dims);
-    return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_};
+    return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
   }
 
 
@@ -1030,7 +1061,7 @@ public:
   OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
               const cuda::std::array<typename Desc::stride_type, N> &strides) const {
     auto new_desc = this->template OverlapViewImpl<N>(windows, strides);
-    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
+    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
   }
 
   /**
@@ -1064,7 +1095,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->template CloneImpl<N>(clones);
-    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_};
+    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
   }
 
   template <int N>
@@ -1362,7 +1393,7 @@ public:
                             [[maybe_unused]] StrideType strides) const
   {
     auto [new_desc, data] = this->template SliceImpl<N, StrideType>(firsts, ends, strides);
-    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
+    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data, this->stf_ldata_};
   }
 
   template <typename StrideType, int N = RANK>

@@ -103,6 +103,12 @@ namespace matx
       return size_[dim];
     }
 
+    template <typename Task, typename Perm>
+    __MATX_INLINE__ void apply_dep_to_task(Task &&task, Perm perm) const noexcept
+    {
+      in1_.apply_dep_to_task(std::forward<Task>(task), perm);
+    }
+
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {

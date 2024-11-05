@@ -76,6 +76,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     pipelines[s]->sync();  
   }
 
+  /* Get STF context handle */
+  auto ctx = pipelines[0]->exec.getCtx();
+
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   printf("Running test...\n");
 
@@ -114,7 +117,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (uint32_t i = 0; i < iterations; i++) {
     for (int s = 0; s < num_streams; s++) {
       if (i == 1) {
+#if 0
         cudaEventRecord(starts[s], streams[s]);
+#else
+        cudaEventRecord(starts[s], ctx.task_fence());
+#endif
       }
 
       if (ENABLE_GRAPHS) {
@@ -127,9 +134,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
 
   for (int s = 0; s < num_streams; s++) {
+#if 0
     cudaEventRecord(stops[s], streams[s]);
+#else
+    cudaEventRecord(stops[s], ctx.task_fence());
+#endif
     pipelines[s]->sync();
   }
+
+  ctx.finalize();
+
   MATX_NVTX_END_RANGE(2)
   
   MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 3)
