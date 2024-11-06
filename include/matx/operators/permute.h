@@ -74,11 +74,10 @@ namespace matx
 
             dims_[i] = dims[i];
           }
-        };
+        }
 
-
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        template <typename Op, typename Dims, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
           static_assert(sizeof...(Is)==Rank());
           static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -88,7 +87,6 @@ namespace matx
 IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
           cuda::std::array<index_t, Rank()> ind;
 IGNORE_WARNING_POP_GCC
-          //cuda::std::array<index_t, T::Rank()> ind{indices...};
 
 #if 0
     //This causes register spills but might be faster if Rank is large
@@ -102,20 +100,25 @@ IGNORE_WARNING_POP_GCC
           for(int32_t i = 0; i < Rank(); i++) {	
 #pragma unroll
             for(int32_t j = 0; j < Rank(); j++) {	
-              if(dims_[j] == i) {
+              if(dims[j] == i) {
                 ind[i] = inds[j];
               }			
             }
-    }
-#endif
+          }
+#endif         
+          return get_value(cuda::std::forward<Op>(op), ind);
+        }        
 
-          return cuda::std::apply(op_, ind);
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return get_impl(cuda::std::as_const(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

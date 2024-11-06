@@ -82,19 +82,23 @@ namespace matx
             
             // Offset either the rows or columns by k_, depending on if it's negative
             if (k_ < 0) {
-              auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-              cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
+              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+              tmp[RANK - 1] = pp_get<RANK-2>(indices...);
+              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
 IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
+              tmp[RANK - 2] -= k_;
+              //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
 IGNORE_WARNING_POP_GCC
-              return cuda::std::apply(op_, tup);
+              return get_value(op_, tmp);
             }
             else {
-              auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
+              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+              //auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
 IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
+              tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
+              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
 IGNORE_WARNING_POP_GCC
-              return cuda::std::apply(op_, tup);                
+              return get_value(op_, tmp);                
             }
           }
         }

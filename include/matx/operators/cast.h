@@ -74,13 +74,13 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return static_cast<NewType>(op_(indices...));     
+          return static_cast<NewType>(get_value(op_, indices...));     
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
         {
-          return static_cast<NewType>(op_(indices...));
+          return static_cast<NewType>(get_value(op_, indices...));
         }
 
         template <typename ShapeType, typename Executor>

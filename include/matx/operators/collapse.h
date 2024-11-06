@@ -70,8 +70,8 @@ namespace matx
           }
         }
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
           // indices coming in
           cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -88,17 +88,23 @@ namespace matx
 #pragma unroll
           for(int i = 0; i < DIM; i++) {
             int d = DIM - i - 1;
-            out[d] = ind % op_.Size(d);
-            ind /= op_.Size(d);
+            out[d] = ind % op.Size(d);
+            ind /= op.Size(d);
           }
 
-          return cuda::std::apply(op_, out);
+          return get_value(cuda::std::forward<Op>(op), out);
+        }        
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), indices...);
         }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -207,9 +213,9 @@ namespace matx
           }
         }
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-        {
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
+        {      
           // indices coming in
           cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
           cuda::std::array<index_t, T1::Rank()> out;         // index going out
@@ -225,18 +231,24 @@ namespace matx
 #pragma unroll
           for(int i = 0; i < DIM; i++) {
             int d = T1::Rank() - 1 - i;
-            out[d] = ind % op_.Size(d);
-            ind /= op_.Size(d);
+            out[d] = ind % op.Size(d);
+            ind /= op.Size(d);
           }
 
-          return cuda::std::apply(op_, out);
+          return get_value(cuda::std::forward<Op>(op), out);
+        }  
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
-        }   
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), indices...);
+        } 
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

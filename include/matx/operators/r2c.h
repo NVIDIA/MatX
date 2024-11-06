@@ -56,27 +56,19 @@ namespace matx
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
 
-        // This version of the operator returns auto rather than decltype(auto) because we need to force the 
-        // return type to be by value and not pass through references
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
-        {
-          auto tup = cuda::std::make_tuple(indices...);
+        {  
+          cuda::std::array idx{indices...};
 
           // If we're on the upper part of the spectrum, return the conjugate of the first half
-          if (cuda::std::get<Rank()-1>(tup) >= op_.Size(Rank()-1)) {
-            cuda::std::get<Rank()-1>(tup) = orig_size_ - cuda::std::get<Rank()-1>(tup);
-            return conj(cuda::std::apply(op_, tup));
+          if (idx[Rank() - 1] >= op_.Size(Rank()-1)) {
+            idx[Rank() - 1] = orig_size_ - idx[Rank() - 1];
+            return conj(get_value(op_, idx));
           }
 
-          return cuda::std::apply(op_, tup);
-        }
-
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-        {
-          return cuda::std::as_const(*this).template operator()(indices...);
-        }      
+          return get_value(op_, idx);         
+        }   
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

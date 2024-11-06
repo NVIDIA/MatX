@@ -79,9 +79,9 @@ namespace matx
           MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-        {
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const decltype(sizes_) &sizes, Is... indices)
+        {   
           cuda::std::array<index_t, Rank()> inds{indices...};
           cuda::std::array<index_t, T::Rank()> ninds;
 
@@ -92,23 +92,29 @@ namespace matx
 #pragma unroll
           for(int i = Rank() - 1 ; i >= 0 ; i--) {
             idx += stride * inds[i];
-            stride *= Size(i);
+            stride *= sizes[i];
           }
 
           // extract new indices
 #pragma unroll
           for(int i = T::Rank() - 1; i >= 0; i--) {
-            ninds[i] = idx % op_.Size(i);
-            idx /= op_.Size(i);
-          }
+            ninds[i] = idx % op.Size(i);
+            idx /= op.Size(i);
+          }   
 
-          return cuda::std::apply(op_, ninds);
+          return get_value(cuda::std::forward<Op>(op), ninds);       
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl(cuda::std::as_const(op_), sizes_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), sizes_, indices...);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

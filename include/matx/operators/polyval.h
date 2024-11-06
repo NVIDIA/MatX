@@ -65,7 +65,7 @@ namespace matx
           // Horner's method for computing polynomial
           value_type ttl{coeffs_(0)};
           for(int i = 1; i < coeffs_.Size(0); i++) {
-              ttl = ttl * op_(idx) + coeffs_(i);
+              ttl = ttl * get_value(op_, idx) + coeffs_(i);
           }
 
           return ttl;
