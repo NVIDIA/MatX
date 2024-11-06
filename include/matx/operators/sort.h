@@ -124,11 +124,9 @@ namespace detail {
  * Sort rows of an operator using a radix sort. Currently supported types are
  * float, double, ints, and long ints (both signed and unsigned). For a 1D
  * operator, a linear sort is performed. For 2D and above each row of the inner
- * dimensions are batched and sorted separately. There is currently a
- * restriction that the tensor must have contiguous data in both rows and
- * columns, but this restriction may be removed in the future.
+ * dimensions are batched and sorted separately.
  *
- * @note Temporary memory is used during the sorting process, and about 2N will
+ * @note Temporary memory may be used during the sorting process, and about 2N will
  * be allocated, where N is the length of the tensor.
  *
  * @tparam InputOperator
