@@ -197,16 +197,15 @@ namespace detail {
       if constexpr (is_complex_half_v<T2>) {
         return FFTType::C2C;
       }
-      else if constexpr (is_half_v<T2>) {
+      else if constexpr (is_half_v<T2> || is_matx_half_v<T2>) {
         return FFTType::R2C;
       }
     }
-    else if constexpr (is_half_v<T1> && is_complex_half_v<T2>) {
+    else if constexpr ((is_half_v<T1> || is_matx_half_v<T1>) && is_complex_half_v<T2>) {
       return FFTType::C2R;
     }
-    //else {
-      return FFTType::C2C;
-    //}    
+
+    return FFTType::C2C;  
   }
 }
 

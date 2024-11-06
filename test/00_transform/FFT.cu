@@ -604,45 +604,55 @@ TYPED_TEST(FFTTestComplexTypes, IFFT1D1024PadC2C)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024R2C)
+TYPED_TEST(FFTTestComplexTypes, FFT1D1024R2C)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  const index_t fft_dim = 1024;
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<rtype>(
-      "00_transforms", "fft_operators", "rfft_1d", {fft_dim, fft_dim});
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    const index_t fft_dim = 1024;
+    using rtype = typename TestType::value_type;
+    this->pb->template InitAndRunTVGenerator<rtype>(
+        "00_transforms", "fft_operators", "rfft_1d", {fft_dim, fft_dim});
 
-  tensor_t<typename TestType::value_type, 1> av{{fft_dim}};
-  tensor_t<TestType, 1> avo{{fft_dim / 2 + 1}};
-  this->pb->NumpyToTensorView(av, "a_in");
+    tensor_t<typename TestType::value_type, 1> av{{fft_dim}};
+    tensor_t<TestType, 1> avo{{fft_dim / 2 + 1}};
+    this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av)).run(this->exec);
-  this->exec.sync();
+    (avo = fft(av)).run(this->exec);
+    this->exec.sync();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadR2C)
+TYPED_TEST(FFTTestComplexTypes, FFT1D1024PadR2C)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>; 
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  const index_t fft_dim = 4;
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<rtype>(
-      "00_transforms", "fft_operators", "rfft_1d", {fft_dim, fft_dim*2});
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    const index_t fft_dim = 4;
+    using rtype = typename TestType::value_type;
+    this->pb->template InitAndRunTVGenerator<rtype>(
+        "00_transforms", "fft_operators", "rfft_1d", {fft_dim, fft_dim*2});
 
-  tensor_t<typename TestType::value_type, 1> av{{fft_dim}};
-  tensor_t<TestType, 1> avo{{fft_dim + 1}};
-  this->pb->NumpyToTensorView(av, "a_in");
+    tensor_t<typename TestType::value_type, 1> av{{fft_dim}};
+    tensor_t<TestType, 1> avo{{fft_dim + 1}};
+    this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = fft(av, fft_dim*2)).run(this->exec);
-  this->exec.sync();
+    (avo = fft(av, fft_dim*2)).run(this->exec);
+    this->exec.sync();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
@@ -710,19 +720,25 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024PadBatchedR2C)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  const index_t fft_dim = 4;
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<rtype>(
-      "00_transforms", "fft_operators", "rfft_1d_batched", {fft_dim, fft_dim, fft_dim*2});
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  tensor_t<typename TestType::value_type, 2> av{{fft_dim, fft_dim}};
-  tensor_t<TestType, 2> avo{{fft_dim, fft_dim + 1}};
-  this->pb->NumpyToTensorView(av, "a_in");
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {  
+    const index_t fft_dim = 4;
+    using rtype = typename TestType::value_type;
+    this->pb->template InitAndRunTVGenerator<rtype>(
+        "00_transforms", "fft_operators", "rfft_1d_batched", {fft_dim, fft_dim, fft_dim*2});
 
-  (avo = fft(av, fft_dim*2)).run(this->exec);
-  this->exec.sync();
+    tensor_t<typename TestType::value_type, 2> av{{fft_dim, fft_dim}};
+    tensor_t<TestType, 2> avo{{fft_dim, fft_dim + 1}};
+    this->pb->NumpyToTensorView(av, "a_in");
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    (avo = fft(av, fft_dim*2)).run(this->exec);
+    this->exec.sync();
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
@@ -875,43 +891,55 @@ TYPED_TEST(FFTTestComplexTypes, IFFT2D16x32C2C)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16R2C)
+TYPED_TEST(FFTTestComplexTypes, FFT2D16R2C)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  const index_t fft_dim = 16;
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<rtype>(
-      "00_transforms", "fft_operators", "rfft_2d", {fft_dim, fft_dim});
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  tensor_t<rtype, 2> av{{fft_dim, fft_dim}};
-  tensor_t<TestType, 2> avo{{fft_dim, fft_dim / 2 + 1}};
-  this->pb->NumpyToTensorView(av, "a_in");
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {  
+    const index_t fft_dim = 16;
+    using rtype = typename TestType::value_type;
+    this->pb->template InitAndRunTVGenerator<rtype>(
+        "00_transforms", "fft_operators", "rfft_2d", {fft_dim, fft_dim});
 
-  (avo = fft2(av)).run(this->exec);
-  this->exec.sync();
+    tensor_t<rtype, 2> av{{fft_dim, fft_dim}};
+    tensor_t<TestType, 2> avo{{fft_dim, fft_dim / 2 + 1}};
+    this->pb->NumpyToTensorView(av, "a_in");
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    (avo = fft2(av)).run(this->exec);
+    this->exec.sync();
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(FFTTestComplexNonHalfTypes, FFT2D16x32R2C)
+TYPED_TEST(FFTTestComplexTypes, FFT2D16x32R2C)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  const index_t fft_dim[] = {16, 32};
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<rtype>(
-      "00_transforms", "fft_operators", "rfft_2d", {fft_dim[0], fft_dim[1]});
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  tensor_t<rtype, 2> av{{fft_dim[0], fft_dim[1]}};
-  tensor_t<TestType, 2> avo{{fft_dim[0], fft_dim[1] / 2 + 1}};
-  this->pb->NumpyToTensorView(av, "a_in");
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {    
+    const index_t fft_dim[] = {16, 32};
+    using rtype = typename TestType::value_type;
+    this->pb->template InitAndRunTVGenerator<rtype>(
+        "00_transforms", "fft_operators", "rfft_2d", {fft_dim[0], fft_dim[1]});
 
-  (avo = fft2(av)).run(this->exec);
-  this->exec.sync();
+    tensor_t<rtype, 2> av{{fft_dim[0], fft_dim[1]}};
+    tensor_t<TestType, 2> avo{{fft_dim[0], fft_dim[1] / 2 + 1}};
+    this->pb->NumpyToTensorView(av, "a_in");
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    (avo = fft2(av)).run(this->exec);
+    this->exec.sync();
+
+    MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+  }
   MATX_EXIT_HANDLER();
 }
 
