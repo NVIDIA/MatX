@@ -45,7 +45,7 @@ namespace matx
    * being concatenated must be the same, and the new operator has dimensions equal to the original
    * operator on non-index dimension, and the sum of sizes along the index dimension.
    */
-  namespace detail {  
+  namespace detail {
     template <typename... Ts>
       class ConcatOp : public BaseOp<ConcatOp<Ts...>>
     {
@@ -96,7 +96,7 @@ namespace matx
 
           if constexpr ( I == N ) {
             // This should never happen
-            return value_type(-9999);
+            return value_type{};
             // returning this to satisfy lvalue requirements
           } else {
             const auto &op = cuda::std::get<I>(ops_);
@@ -113,7 +113,7 @@ namespace matx
             }
           }
         }
-      
+
       template <int I = 0, int N>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
 
@@ -144,7 +144,7 @@ namespace matx
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<0, sizeof...(Ts)>(indices);
         }
-      
+
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
@@ -168,17 +168,17 @@ namespace matx
 
       ~ConcatOp() = default;
       ConcatOp(const ConcatOp &rhs) = default;
-      __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-        return set(*this, rhs); 
-      }        
+      __MATX_INLINE__ auto operator=(const self_type &rhs) {
+        return set(*this, rhs);
+      }
 
-      template<typename R> 
-      __MATX_INLINE__ auto operator=(const R &rhs) { 
+      template<typename R>
+      __MATX_INLINE__ auto operator=(const R &rhs) {
         if constexpr (is_matx_transform_op<R>()) {
           return mtie(*this, rhs);
         }
-        else {          
-          return set(*this, rhs); 
+        else {
+          return set(*this, rhs);
         }
       }
 
@@ -228,19 +228,19 @@ namespace matx
 
       private:
       cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
-      index_t size_;    
+      index_t size_;
       int axis_;
     }; // end class ConcatOp
   } // end namespace detail
 
   /**
    * @brief ConcatOp multiple operators along a dimension
-   * 
+   *
    * @tparam Dim dimension to concatenate
    * @tparam Ts operator types
    * @param axis axis to operate along
    * @param ts operators
-   * @return concatenated operator 
+   * @return concatenated operator
    */
   template <typename... Ts>
     __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, const Ts&... ts)
@@ -249,5 +249,5 @@ namespace matx
       MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");
 
       return detail::ConcatOp<Ts...>{axis, ts...};
-    }  
+    }
 } // end namespace matx
