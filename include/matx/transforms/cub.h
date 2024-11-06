@@ -1380,8 +1380,8 @@ void cub_reduce_custom(OutType minDest, TensorIndexType &minIdxs, OutType maxDes
   //                                 maxIdxs.Data()
   //                                 );  
 
-  auto argmin = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp->d_minMax), {1} );
-  auto argmax = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp->d_minMax) + 1, {1} );
+  auto argmin = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp.d_minMax), {1} );
+  auto argmax = matx::make_tensor<size_t>(reinterpret_cast<size_t*>(tmp.d_minMax) + 1, {1} );
 
   auto outputOp =( 
                  minIdxs = argmin,
