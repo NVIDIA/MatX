@@ -274,12 +274,12 @@ protected:
 
   static inline constexpr cudaDataType GetInputType()
   {
-    return GetIOType<T2>();
+    return MatXTypeToCudaType<T2>();
   }
 
   static inline constexpr cudaDataType GetOutputType()
   {
-    return GetIOType<T1>();
+    return MatXTypeToCudaType<T1>();
   }
 
   static inline constexpr cudaDataType GetExecType()
@@ -298,36 +298,6 @@ protected:
     }
 
     return CUDA_C_64F;
-  }
-
-  template <typename T> static inline constexpr cudaDataType GetIOType()
-  {
-    if constexpr (std::is_same_v<T, matxFp16Complex>) {
-      return CUDA_C_16F;
-    }
-    else if constexpr (std::is_same_v<T, matxBf16Complex>) {
-      return CUDA_C_16BF;
-    }
-    if constexpr (std::is_same_v<T, matxFp16>) {
-      return CUDA_R_16F;
-    }
-    else if constexpr (std::is_same_v<T, matxBf16>) {
-      return CUDA_R_16BF;
-    }
-    if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-      return CUDA_C_32F;
-    }
-    else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-      return CUDA_C_64F;
-    }
-    if constexpr (std::is_same_v<T, float>) {
-      return CUDA_R_32F;
-    }
-    else if constexpr (std::is_same_v<T, double>) {
-      return CUDA_R_64F;
-    }
-
-    return CUDA_C_32F;
   }
 
   virtual ~matxCUDAFFTPlan_t() {
