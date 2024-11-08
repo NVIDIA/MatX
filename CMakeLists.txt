@@ -14,7 +14,11 @@ endif()
 # their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
 # directories
 if(NOT DEFINED rapids-cmake-dir)
-  add_subdirectory(cmake/rapids-cmake)
+  include(FetchContent)
+  # Tell FetchContent to just use the local copy of rapids-cmake:
+  set(FETCHCONTENT_SOURCE_DIR_RAPIDS_CMAKE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake)
+  FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
   list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
