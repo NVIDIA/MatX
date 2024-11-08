@@ -11,6 +11,6 @@
       "git_shallow" : true,
       "git_url" : "https://github.com/NVIDIA/nvbench.git",
       "git_tag" : "a171514056e5d6a7f52a035dd6c812fa301d4f4f"
-    },
+    }
   }
 }
