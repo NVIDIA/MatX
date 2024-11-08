@@ -25,6 +25,7 @@ else()
 endif()
 
 include(${rapids-cmake-dir}/cpm/cccl.cmake)
+include(${rapids-cmake-dir}/cpm/nvbench.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cuda)
@@ -363,7 +364,7 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
-    include(cmake/GetNVBench.cmake)
+    rapids_cpm_nvbench()
     add_subdirectory(bench)
 endif()
 
