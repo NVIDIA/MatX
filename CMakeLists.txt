@@ -305,8 +305,6 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ)
         check_python_libs("plotly.express")
     endif()
-else()
-    message(AUTHOR_WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
 endif()
 
 # Add in all CUDA linker dependencies
