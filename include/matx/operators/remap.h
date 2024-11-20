@@ -55,7 +55,7 @@ namespace matx
         using matxoplvalue = bool;
 
         using value_type = typename T::value_type;
-        using shape_type = std::conditional_t<has_shape_type_v<T>, typename T::shape_type, index_t>; 
+        using shape_type = index_t;
         using index_type = typename IdxType::value_type;
         using self_type = RemapOp<DIM, T, IdxType>;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");
@@ -67,7 +67,7 @@ namespace matx
 	__MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           static_assert(sizeof...(Is)==Rank());
           static_assert((std::is_convertible_v<Is, index_t> && ... ));
@@ -122,21 +122,21 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        } 
+        }
 
         ~RemapOp() = default;
         RemapOp(const RemapOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }                      
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
     };
@@ -152,10 +152,10 @@ namespace matx
    * In the applied dimension the size of the output tensor is equal to the size of the index tensor.
    * In the case of a 0-rank index tensor, the size of the output tensor in the corresponding
    * dimension is always 1.
-   * 
-   * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam DIM Dimension to apply the remap 
+   * This operator can appear as an rvalue or lvalue.
+   *
+   * @tparam DIM Dimension to apply the remap
    * @tparam T Input operator/tensor type
    * @tparam Ind Input index Operator type
    * @param t Input operator
@@ -166,7 +166,7 @@ namespace matx
     auto __MATX_INLINE__ remap(const Op &t, Ind idx)
     {
       return detail::RemapOp<DIM, Op, Ind>(t, idx);
-    };   
+    };
 
   /**
    * @brief Operator to logically remap elements of an operator based on an index array/operator.
@@ -179,10 +179,10 @@ namespace matx
    * In the applied dimension the size of the output tensor is equal to the size of the index tensor.
    * In the case of a 0-rank index tensor, the size of the output tensor in the corresponding
    * dimension is always 1.
-   * 
-   * This operator can appear as an rvalue or lvalue. 
    *
-   * @tparam DIM Dimension to apply the remap 
+   * This operator can appear as an rvalue or lvalue.
+   *
+   * @tparam DIM Dimension to apply the remap
    * @tparam DIMS... list of multiple dimensions to remap along
    * @tparam T Input operator/tensor type
    * @tparam Ind Input index Operator type
@@ -202,5 +202,5 @@ namespace matx
 
       // construct remap op
       return detail::RemapOp<DIM, decltype(op) , Ind>(op, idx);
-    };   
+    };
 } // end namespace matx
