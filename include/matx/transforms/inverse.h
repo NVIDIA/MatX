@@ -468,6 +468,9 @@ public:
       else if (backend == MatInverseLUBackend::cuSolverGetRfRs) {
         MATX_ASSERT_STR(params.batch_size == 1, matxInvalidParameter, "cuSolverGetRfRs backend only used for single batches");
 
+        // cuSolver has a bug that requires this workspace to be zeroed each time
+        cudaMemsetAsync(d_workspace, 0, this->dspace, stream);
+        
         [[maybe_unused]] cusolverStatus_t solver_ret;
         solver_ret = cusolverDnXgetrf(
             cusolver_handle,
@@ -492,10 +495,10 @@ public:
           if (h_info[i] != 0) {
             MATX_THROW(matxLUError, "inverse failed");
           }
-        }     
+        }
 
         // We're Solving Ax = b, so setting "b" to the identity matrix will give us A^-1
-        (a_inv = eye()).run(stream);
+        (a_inv = eye<typename TensorTypeA::value_type, 2>({params.n, params.n})).run(stream);
 
         solver_ret = cusolverDnXgetrs(
             cusolver_handle,
