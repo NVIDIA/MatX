@@ -1844,7 +1844,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
           return std::make_shared<cache_val_type>(a1_out, aidx1_out, a2_out, aidx2_out, a, reduce_params, stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
-          ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidex2_out, a, stream);
+          ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
         }
       );
   #else

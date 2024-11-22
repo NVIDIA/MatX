@@ -169,9 +169,7 @@ public:
 
     params.irank = i.Rank();
     params.orank = o.Rank();
-
     params.transform_type = DeduceFFTTransformType<OutTensorType, InTensorType>();
-
     params.input_type = matxCUDAFFTPlan_t<OutTensorType, InTensorType>::GetInputType();
     params.output_type = matxCUDAFFTPlan_t<OutTensorType, InTensorType>::GetOutputType();
     params.exec_type = matxCUDAFFTPlan_t<OutTensorType, InTensorType>::GetExecType();
@@ -274,12 +272,12 @@ protected:
 
   static inline constexpr cudaDataType GetInputType()
   {
-    return GetIOType<T2>();
+    return MatXTypeToCudaType<T2>();
   }
 
   static inline constexpr cudaDataType GetOutputType()
   {
-    return GetIOType<T1>();
+    return MatXTypeToCudaType<T1>();
   }
 
   static inline constexpr cudaDataType GetExecType()
@@ -298,36 +296,6 @@ protected:
     }
 
     return CUDA_C_64F;
-  }
-
-  template <typename T> static inline constexpr cudaDataType GetIOType()
-  {
-    if constexpr (std::is_same_v<T, matxFp16Complex>) {
-      return CUDA_C_16F;
-    }
-    else if constexpr (std::is_same_v<T, matxBf16Complex>) {
-      return CUDA_C_16BF;
-    }
-    if constexpr (std::is_same_v<T, matxFp16>) {
-      return CUDA_R_16F;
-    }
-    else if constexpr (std::is_same_v<T, matxBf16>) {
-      return CUDA_R_16BF;
-    }
-    if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-      return CUDA_C_32F;
-    }
-    else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-      return CUDA_C_64F;
-    }
-    if constexpr (std::is_same_v<T, float>) {
-      return CUDA_R_32F;
-    }
-    else if constexpr (std::is_same_v<T, double>) {
-      return CUDA_R_64F;
-    }
-
-    return CUDA_C_32F;
   }
 
   virtual ~matxCUDAFFTPlan_t() {
@@ -406,7 +374,7 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream
   }
   else if (this->params_.transform_type == FFTType::R2C ||
            this->params_.transform_type == FFTType::D2Z) {
-    if (is_cuda_complex_v<T2> || !is_cuda_complex_v<T1>) {
+    if (is_complex_v<T2> || !is_complex_v<T1>) {
       MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C/D2Z transform");
     }
     if (this->params_.n[0] != i.Size(InTensorType::Rank()-1) ||
@@ -534,14 +502,14 @@ public:
         this->params_.transform_type == FFTType::Z2D) {
       MATX_ASSERT((o.Size(RANK-2) * (o.Size(RANK-1) / 2 + 1)) == i.Size(RANK-1) * i.Size(RANK-2),
                   matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
+      MATX_ASSERT(!is_complex_v<T1> && is_complex_v<T2>,
                   matxInvalidType);
     }
     else if (this->params_.transform_type == FFTType::R2C ||
             this->params_.transform_type == FFTType::D2Z) {
       MATX_ASSERT(o.Size(RANK-1) * o.Size(RANK-2) == (i.Size(RANK-2) * (i.Size(RANK-1) / 2 + 1)),
                   matxInvalidSize);
-      MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
+      MATX_ASSERT(!is_complex_v<T2> && is_complex_v<T1>,
                   matxInvalidType);
     }
     else {

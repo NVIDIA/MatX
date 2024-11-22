@@ -118,10 +118,10 @@ __MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
 
 
 template <typename Op, typename Executor>
-__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
+__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec, bool force = false) {
   constexpr int RANK = Op::Rank();
 
-  bool supported = true; 
+  bool supported = !force; // If we're forcing a new tensor just make it unsupported
   if constexpr (!(is_tensor_view_v<Op>)) {
     supported = false;
   } else {
@@ -274,7 +274,7 @@ public:
       }
     }
     else {
-#endif      
+#endif 
       if (dspace > 0) {
         matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
       }

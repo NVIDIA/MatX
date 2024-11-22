@@ -211,7 +211,7 @@ namespace matx
      */
     __MATX_INLINE__ T* allocate(size_t size)
     {
-      alloc_.allocate();
+      return alloc_.allocate(size);
     }
 
     /**
@@ -587,7 +587,7 @@ namespace matx
      */
     __MATX_INLINE__ T* allocate(size_t size)
     {
-      container_.allocate();
+      return container_.allocate(size);
     }
 
     /**

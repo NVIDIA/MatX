@@ -14,13 +14,18 @@ endif()
 # their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
 # directories
 if(NOT DEFINED rapids-cmake-dir)
-  add_subdirectory(cmake/rapids-cmake)
+  include(FetchContent)
+  # Tell FetchContent to just use the local copy of rapids-cmake:
+  set(FETCHCONTENT_SOURCE_DIR_RAPIDS_CMAKE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
+  FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
   list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 endif()
 
 include(${rapids-cmake-dir}/cpm/cccl.cmake)
+include(${rapids-cmake-dir}/cpm/nvbench.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cuda)
@@ -300,8 +305,6 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ)
         check_python_libs("plotly.express")
     endif()
-else()
-    message(AUTHOR_WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
 endif()
 
 # Add in all CUDA linker dependencies
@@ -359,7 +362,7 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
-    include(cmake/GetNVBench.cmake)
+    rapids_cpm_nvbench()
     add_subdirectory(bench)
 endif()
 
