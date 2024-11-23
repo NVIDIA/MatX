@@ -177,26 +177,25 @@ struct MemTracker {
     switch (space) {
     case MATX_MANAGED_MEMORY:
       err = cudaMallocManaged(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_HOST_MEMORY:
       err = cudaMallocHost(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_HOST_MALLOC_MEMORY:
       *ptr = malloc(bytes);
       break;
     case MATX_DEVICE_MEMORY:
       err = cudaMalloc(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
       err = cudaMallocAsync(ptr, bytes, stream);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_INVALID_MEMORY:
       MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
     };
+
+    MATX_ASSERT_STR_EXP(err, cudaSuccess, matxOutOfMemory, 
+      "Failed to allocate memory. May be an asynchronous error from another CUDA call");
 
     if (*ptr == nullptr) {
       MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
