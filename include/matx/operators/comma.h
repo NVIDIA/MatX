@@ -61,10 +61,10 @@ namespace matx
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
           template <typename... Is>
-            auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
-              op1_(indices...);
-              return op2_(indices...);
-            }                       
+          auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
+            get_value(op1_, indices...);
+            return get_value(op2_, indices...);
+          }                       
 
           static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
           {

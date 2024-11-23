@@ -32,7 +32,7 @@
 
 #pragma once
 
-
+#include <cuda/std/utility>
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 
@@ -55,7 +55,7 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-	__MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
+	      __MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
         __MATX_INLINE__ HermitianTransOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }
@@ -63,11 +63,9 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          auto tup = cuda::std::make_tuple(indices...);
-          auto stl = cuda::std::get<Rank()-2>(tup);
-          cuda::std::get<Rank()-2>(tup) = cuda::std::get<Rank()-1>(tup);
-          cuda::std::get<Rank()-1>(tup) = stl;      
-          return conj(cuda::std::apply(op_, tup));
+          cuda::std::array idx{indices...};
+          cuda::std::swap(idx[Rank() - 2], idx[Rank() - 1]);
+          return conj(get_value(op_, idx));   
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -33,6 +33,7 @@
 #pragma once
 
 #include <cuda/std/tuple>
+#include <cuda/std/__algorithm/copy.h>
 #include <functional>
 
 #include "matx/core/nvtx.h"
@@ -245,37 +246,76 @@ namespace matx
      * @param indices indices
      * @return Value after broadcasting
      */
-    template <class T, typename... Is>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_matx_value(const T &i, Is... indices)
+    template <typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
     {
-      if constexpr (T::Rank() == int(sizeof...(Is)) || T::Rank() == matxNoRank) {
-        return i(indices...);
+      constexpr int RANK = remove_cvref_t<T>::Rank();
+      if constexpr (RANK == int(sizeof...(Is)) || RANK == matxNoRank) {
+        // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
+        return cuda::std::forward<T>(i)(indices...);
       }
       else
       {
-        // Construct an integer sequence of the length of the tuple, but only using the last indices
-        using seq = offset_sequence_t<sizeof...(Is) - T::Rank(), std::make_index_sequence<T::Rank()>>;
+        // Otherwise we need to broadcast by constructing a large set of indices
+        // Construct an integer sequence of the length of the tuple, but only using the last indices. We construct an offset sequence
+        // to index into the broadcasted dimensions. For example, if T is a 3D tensor and we want to index as a 5D, we take the indices
+        // {0, 1, 2} we'd normally index with, and add the difference in rank (2), to get {2, 3, 4}. Another way to think of this is it
+        // simply chops off the first sizeof...(Is) - RANK indices since they're not used for operator().
+        using seq = offset_sequence_t<sizeof...(Is) - RANK, std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
         return cuda::std::apply([&](auto... args) {
-          return i(args...);
+          return cuda::std::forward<T>(i)(args...);
         }, sliced_tup);
       }
     }
 
+    template <typename T, typename IdxType, size_t N>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, const cuda::std::array<IdxType, N> idx)
+    {
+      constexpr int RANK = remove_cvref_t<T>::Rank();
+      if constexpr (RANK == N || RANK == matxNoRank) {
+        // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
+        return cuda::std::apply(cuda::std::forward<T>(i), idx);
+        //return i(indices...);
+      }
+      else
+      {
+        cuda::std::array<index_t, RANK> nbc_idx; // non-broadcast indices
+        cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
+        return cuda::std::apply([&](auto... args) {
+          return cuda::std::forward<T>(i)(args...);
+        }, nbc_idx);
+      }
+    }    
 
-    template <class T, typename... Is>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_value(const T &i, Is... indices)
+
+    template <typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, Is... indices)
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value(i, indices...);
+        return get_matx_value(cuda::std::forward<T>(i), indices...);
       }
       else
       {
         return i;
       }
     }
+
+
+    template <typename T, typename IdxType, size_t N>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, const cuda::std::array<IdxType, N> idx)
+    {
+      if constexpr (is_matx_op<T>())
+      {
+        return get_matx_value(cuda::std::forward<T>(i), idx);
+      }
+      else
+      {
+        return i;
+      }
+    }    
 
     template <typename T> __MATX_INLINE__ std::string to_short_str() {
       if constexpr (!is_complex_v<T>) {

@@ -59,17 +59,23 @@ namespace matx
 
         __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
 
+        template <typename Op, typename Idx, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
+        {    
+          auto arrs = detail::GetIdxFromAbs(op, idx(i));
+          return get_value(op, arrs);          
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          auto arrs = detail::GetIdxFromAbs(op_, idx_(i));
-          return op_(arrs);
+          return get_impl(cuda::std::as_const(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return cuda::std::as_const(*this).template operator()(i);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), idx_, i);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

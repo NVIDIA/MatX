@@ -53,10 +53,6 @@ namespace matx
     template <int DIM, typename T1, typename T2>
       class ShiftOp : public BaseOp<ShiftOp<DIM, T1, T2>>
     {
-      private:
-        typename detail::base_type_t<T1> op_;
-        T2 shift_;
-
       public:
         using matxop = bool;
         using matxoplvalue = bool;
@@ -68,30 +64,49 @@ namespace matx
         __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
         {
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
+
+          #pragma unroll
+          for (int i = 0; i < Rank(); i++) {
+            index_t size1 = detail::get_expanded_size<Rank()>(op_, i);
+            index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);      
+            sizes_[i] = detail::matx_max(size1,size2);
+          }
+
           ASSERT_COMPATIBLE_OP_SIZES(shift_); 
-          ASSERT_COMPATIBLE_OP_SIZES(op_); 
+          ASSERT_COMPATIBLE_OP_SIZES(op_);           
         }
 
+        template <typename Op, typename Sizes, typename ShiftType, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
+            Op&& op, 
+            const Sizes &sizes, 
+            ShiftType shiftin, 
+            Is... indices)
+        {   
+          cuda::std::array idx{indices...};
+          index_t shift = -get_value(shiftin, indices...);
+
+          shift = (shift + idx[DIM]) % sizes[DIM];
+
+          if (shift < 0) { 
+            shift += sizes[DIM];
+          }
+
+          idx[DIM] = shift;
+
+          return get_value(cuda::std::forward<Op>(op), idx);
+        }
+        
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          auto tup = cuda::std::make_tuple(indices...);
-          index_t shift = -get_value(shift_, indices...);
-
-
-          shift = (shift + cuda::std::get<DIM>(tup)) % Size(DIM);
-
-          if(shift<0) shift += Size(DIM);
-
-          cuda::std::get<DIM>(tup) = shift;
-
-          return cuda::std::apply(op_, tup);
+          return get_impl(cuda::std::as_const(op_), sizes_, shift_, indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), sizes_, shift_, indices...);
         }
 
         template <typename ShapeType, typename Executor>
@@ -117,9 +132,7 @@ namespace matx
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          index_t size1 = detail::get_expanded_size<Rank()>(op_, dim);
-          index_t size2 = detail::get_expanded_size<Rank()>(shift_, dim);
-          return detail::matx_max(size1,size2);
+          return sizes_[dim];
         }
 
         ~ShiftOp() = default;
@@ -137,6 +150,11 @@ namespace matx
             return set(*this, rhs); 
           }
         }
+
+      private:
+        typename detail::base_type_t<T1> op_;
+        cuda::std::array<index_t, Rank()> sizes_;
+        typename detail::base_type_t<T2> shift_;        
     };
   }
   /**

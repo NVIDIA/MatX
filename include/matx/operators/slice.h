@@ -109,38 +109,49 @@ namespace matx
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
         };
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
-        {
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
+            Op&& op, 
+            const decltype(starts_) &starts, 
+            const decltype(strides_) &strides, 
+            const decltype(dims_) &dims, 
+            Is... indices)
+        {   
           static_assert(sizeof...(Is)==Rank());
           static_assert((std::is_convertible_v<Is, index_t> && ... ));
       
           // convert variadic type to tuple so we can read/update
-          cuda::std::array<index_t, T::Rank()> ind = starts_;
+          cuda::std::array<index_t, T::Rank()> ind = starts;
           cuda::std::array<index_t, Rank()> inds{indices...};   
 
           #pragma unroll            
           for (int32_t i = 0; i < T::Rank(); i++) {
             #pragma unroll
             for(int32_t j = 0; j < Rank(); j++) {
-              if(dims_[j] == i) {
+              if(dims[j] == i) {
                 if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                  ind[i] = starts_[j] + inds[j] * strides_[i];
+                  ind[i] = starts[j] + inds[j] * strides[i];
                 }
                 else {
-                  ind[i] = starts_[j] + inds[j];
+                  ind[i] = starts[j] + inds[j];
                 }
               }
             }
           }       
               
-          return cuda::std::apply(op_, ind);
+          return get_value(cuda::std::forward<Op>(op), ind);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
