@@ -106,8 +106,7 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
     MATX_STATIC_ASSERT_STR((std::is_same_v<T2, int64_t>), matxInavlidType, "Pivot tensor type must be int64_t");
 
-    params = GetLUParams(piv, a);
-    params.exec = exec;
+    params = GetLUParams(piv, a, exec);
     this->GetWorkspaceSize();
     this->AllocateWorkspace(params.batch_size, false, exec);
   }
@@ -123,7 +122,8 @@ public:
   }
 
   static DnLUCUDAParams_t GetLUParams(PivotTensor &piv,
-                                  const ATensor &a) noexcept
+                                      const ATensor &a,
+                                      const cudaExecutor &exec) noexcept
   {
     DnLUCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -132,7 +132,7 @@ public:
     params.A = a.Data();
     params.piv = piv.Data();
     params.dtype = TypeToInt<T1>();
-
+    params.exec = exec;
     return params;
   }
 
@@ -287,7 +287,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt);
+  auto params = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt, exec);
 
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;

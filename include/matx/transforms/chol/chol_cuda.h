@@ -103,8 +103,8 @@ public:
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "Cholesky solver does not support half precision");
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
 
-    params = GetCholParams(a, uplo);
-    params.exec = exec;
+    params = GetCholParams(a, uplo, exec);
+
     this->GetWorkspaceSize();
     this->AllocateWorkspace(params.batch_size, false, exec);
   }
@@ -120,13 +120,15 @@ public:
   }
 
   static DnCholCUDAParams_t GetCholParams(const ATensor &a,
-                                      cublasFillMode_t uplo)
+                                      cublasFillMode_t uplo,
+                                      const cudaExecutor &exec)
   {
     DnCholCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
     params.n = a.Size(RANK - 1);
     params.A = a.Data();
     params.uplo = uplo;
+    params.exec = exec;    
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -298,7 +300,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   cublasFillMode_t uplo_cusolver = (uplo == SolverFillMode::UPPER)? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>::GetCholParams(tmp_out, uplo_cusolver);
+  auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>::GetCholParams(tmp_out, uplo_cusolver, exec);
 
   using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>;
   detail::GetCache().LookupAndExec<detail::chol_cuda_cache_t>(

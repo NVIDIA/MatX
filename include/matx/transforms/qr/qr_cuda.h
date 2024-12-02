@@ -295,8 +295,7 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
-    params = GetQRParams(tau, a);
-    params.exec = exec;
+    params = GetQRParams(tau, a, exec);
     this->GetWorkspaceSize();
     this->AllocateWorkspace(params.batch_size, false, exec);
   }
@@ -311,7 +310,8 @@ public:
   }
 
   static DnQRCUDAParams_t GetQRParams(TauTensor &tau,
-                                  const ATensor &a)
+                                  const ATensor &a,
+                                  const cudaExecutor &exec)
   {
     DnQRCUDAParams_t params;
 
@@ -321,7 +321,7 @@ public:
     params.A = a.Data();
     params.tau = tau.Data();
     params.dtype = TypeToInt<T1>();
-
+    params.exec = exec;
     return params;
   }
 
@@ -468,7 +468,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt);
+  auto params = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt, exec);
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;

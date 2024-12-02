@@ -644,8 +644,7 @@ public:
     MATX_STATIC_ASSERT_STR(!is_complex_v<T3>, matxInvalidType, "S type must be real");
     MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
 
-    params        = GetSVDParams(u, s, vt, a, jobz);
-    params.exec   = exec;
+    params        = GetSVDParams(u, s, vt, a, jobz, exec);
     params.method = method;
 
     if (params.method == SVDMethod::GESVDJ_BATCHED) {
@@ -725,8 +724,8 @@ public:
 
   static DnSVDCUDAParams_t
   GetSVDParams(UTensor &u, STensor &s,
-               VtTensor &vt, const ATensor &a,
-               const char jobz = 'A')
+               VtTensor &vt, const ATensor &a, 
+               const char jobz, const cudaExecutor &exec)
   {
     DnSVDCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -738,6 +737,7 @@ public:
     params.S = s.Data();
     params.jobz = jobz;
     params.dtype = TypeToInt<T1>();
+    params.exec = exec;
     return params;
   }
 
@@ -997,7 +997,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get parameters required by these tensors
     auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>::
-      GetSVDParams(u_in, s_new, vt_in, at_col_maj, job_cusolver);
+      GetSVDParams(u_in, s_new, vt_in, at_col_maj, job_cusolver, exec);
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
@@ -1034,7 +1034,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get parameters required by these tensors
     auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>::
-        GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver);
+        GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver, exec);
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
@@ -1042,7 +1042,7 @@ void svd_impl(UTensor &&u, STensor &&s,
       detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
       params,
       [&]() {
-        return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, stream, job_cusolver);
+        return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);

@@ -115,8 +115,7 @@ public:
     MATX_STATIC_ASSERT_STR(!is_complex_v<T2>, matxInvalidType, "W type must be real");
     MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
 
-    params = GetEigParams(w, a, jobz, uplo);
-    params.exec = exec;
+    params = GetEigParams(w, a, jobz, uplo, exec);
     this->GetWorkspaceSize();
 #if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >= 2)    
     this->AllocateWorkspace(params.batch_size, true, exec);
@@ -150,7 +149,8 @@ public:
   static DnEigCUDAParams_t GetEigParams(WTensor &w,
                                     const ATensor &a,
                                     cusolverEigMode_t jobz,
-                                    cublasFillMode_t uplo)
+                                    cublasFillMode_t uplo,
+                                    const cudaExecutor &exec)
   {
     DnEigCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -159,6 +159,8 @@ public:
     params.W = w.Data();
     params.jobz = jobz;
     params.uplo = uplo;
+    params.exec = exec;    
+
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -342,7 +344,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
 
   // Get parameters required by these tensors
   auto params = detail::matxDnEigCUDAPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>::
-      GetEigParams(w_new, tv, jobz_cusolver, uplo_cusolver);
+      GetEigParams(w_new, tv, jobz_cusolver, uplo_cusolver, exec);
 
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigCUDAPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
