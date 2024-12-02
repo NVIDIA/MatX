@@ -110,7 +110,7 @@ public:
 
     params = GetQRParams(tau, a);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size);
   }
 
   void GetWorkspaceSize() override

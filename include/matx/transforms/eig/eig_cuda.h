@@ -61,6 +61,7 @@ struct DnEigCUDAParams_t {
   void *W;
   size_t batch_size;
   MatXDataType_t dtype;
+  cudaExecutor exec;
 };
 
 template <typename OutputTensor, typename WTensor, typename ATensor>
@@ -98,6 +99,7 @@ public:
    */
   matxDnEigCUDAPlan_t(WTensor &w,
                         const ATensor &a,
+                        const cudaExecutor &exec,
                         cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
                         cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
   {
@@ -114,11 +116,12 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
 
     params = GetEigParams(w, a, jobz, uplo);
+    params.exec = exec;
     this->GetWorkspaceSize();
-#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)    
-    this->AllocateWorkspace(params.batch_size, true);
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >= 2)    
+    this->AllocateWorkspace(params.batch_size, true, exec);
 #else    
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size, false, exec);
 #endif    
   }
 
@@ -258,7 +261,7 @@ private:
 struct DnEigCUDAParamsKeyHash {
   std::size_t operator()(const DnEigCUDAParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size)) + (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -269,7 +272,7 @@ struct DnEigCUDAParamsKeyHash {
 struct DnEigCUDAParamsKeyEq {
   bool operator()(const DnEigCUDAParams_t &l, const DnEigCUDAParams_t &t) const noexcept
   {
-    return l.n == t.n && l.batch_size == t.batch_size && l.dtype == t.dtype;
+    return l.n == t.n && l.batch_size == t.batch_size && l.dtype == t.dtype && l.exec.getStream() == t.exec.getStream();
   }
 };
 
@@ -347,7 +350,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
     detail::GetCacheIdFromType<detail::eig_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(w_new, tv, jobz_cusolver, uplo_cusolver);
+      return std::make_shared<cache_val_type>(w_new, tv, exec, jobz_cusolver, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tv, w_new, tv, exec, jobz_cusolver, uplo_cusolver);

@@ -245,6 +245,7 @@ struct DnQRCUDAParams_t {
   void *tau;
   size_t batch_size;
   MatXDataType_t dtype;
+  cudaExecutor exec;
 };
 
 template <typename OutTensor, typename TauTensor, typename ATensor>
@@ -280,7 +281,8 @@ public:
    *
    */
   matxDnQRCUDAPlan_t(TauTensor &tau,
-                       const ATensor &a)
+                       const ATensor &a,
+                       const cudaExecutor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -294,8 +296,9 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
     params = GetQRParams(tau, a);
+    params.exec = exec;
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size, false, exec);
   }
 
   void GetWorkspaceSize() override
@@ -396,7 +399,7 @@ struct DnQRCUDAParamsKeyHash {
   std::size_t operator()(const DnQRCUDAParams_t &k) const noexcept
   {
     return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
-           (std::hash<uint64_t>()(k.batch_size));
+           (std::hash<uint64_t>()(k.batch_size)) + (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -407,7 +410,7 @@ struct DnQRCUDAParamsKeyEq {
   bool operator()(const DnQRCUDAParams_t &l, const DnQRCUDAParams_t &t) const noexcept
   {
     return l.n == t.n && l.m == t.m && l.batch_size == t.batch_size &&
-           l.dtype == t.dtype;
+           l.dtype == t.dtype && l.exec.getStream() == t.exec.getStream();
   }
 };
 
@@ -473,7 +476,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
     detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(tau_new, tvt);
+      return std::make_shared<cache_val_type>(tau_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, tau_new, tvt, exec);

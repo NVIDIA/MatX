@@ -255,38 +255,35 @@ public:
     cusolverDnDestroy(handle);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
+  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api, const cudaExecutor &exec)
   {
-#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
+    const auto stream = exec.getStream();
     if (batched_api) {
       // Newer cuSolver
       if (dspace > 0) {
-        matxAlloc(&d_workspace, dspace, MATX_DEVICE_MEMORY);
+        matxAlloc(&d_workspace, dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
       // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex. 
       // Zero it out for all types for now.
-      cudaMemset(d_workspace, 0, dspace);
-      matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_DEVICE_MEMORY);
+      cudaMemsetAsync(d_workspace, 0, dspace, stream);
+      matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
       }
     }
     else {
-#endif 
       if (dspace > 0) {
-        matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
+        matxAlloc(&d_workspace, batches * dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
-      matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
       } 
-#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)         
     }
-#endif
   }
 
   virtual void GetWorkspaceSize() = 0;
@@ -328,7 +325,7 @@ public:
     matxFree(iwork);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
+  void AllocateWorkspace([[maybe_unused]] size_t batches)
   {
     if (lwork > 0) {
       matxAlloc(&work, lwork * sizeof(ValueType), MATX_HOST_MALLOC_MEMORY);

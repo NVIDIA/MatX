@@ -58,6 +58,7 @@ struct DnCholCUDAParams_t {
   size_t batch_size;
   cublasFillMode_t uplo;
   MatXDataType_t dtype;
+  cudaExecutor exec;
 };
 
 template <typename OutputTensor, typename ATensor>
@@ -89,8 +90,9 @@ public:
    *   Use upper or lower triangle for computation
    *
    */
-  matxDnCholCUDAPlan_t(const ATensor &a,
-                         cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
+  matxDnCholCUDAPlan_t(   const ATensor &a,
+                          const cudaExecutor &exec,
+                          cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -102,8 +104,9 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
 
     params = GetCholParams(a, uplo);
+    params.exec = exec;
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size, false, exec);
   }
 
   void GetWorkspaceSize() override
@@ -201,7 +204,9 @@ private:
 struct DnCholCUDAParamsKeyHash {
   std::size_t operator()(const DnCholCUDAParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.n)) + (std::hash<uint64_t>()(k.batch_size));
+    return  (std::hash<uint64_t>()(k.n)) + 
+            (std::hash<uint64_t>()(k.batch_size)) + 
+            (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -213,7 +218,10 @@ struct DnCholCUDAParamsKeyEq {
   bool operator()(const DnCholCUDAParams_t &l, const DnCholCUDAParams_t &t) const
       noexcept
   {
-    return l.n == t.n && l.batch_size == t.batch_size && l.dtype == t.dtype;
+    return  l.n == t.n && 
+            l.batch_size == t.batch_size && 
+            l.dtype == t.dtype &&
+            l.exec.getStream() == t.exec.getStream();
   }
 };
 
@@ -297,7 +305,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     detail::GetCacheIdFromType<detail::chol_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(tmp_out, uplo_cusolver);
+      return std::make_shared<cache_val_type>(tmp_out, exec, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver);
