@@ -53,8 +53,7 @@ template <typename T> constexpr bool is_matx_set_op();
     public:
       using matx_cuda = bool;  // signal this is a GPU executor
       using matx_executor = bool; ///< Type trait indicating this is an executor
-//using cudastf::async_resources_handle;
-//using cudastf::stream_ctx;
+
       /**
        * @brief Construct a new stfExecutor with a stream
        * 
@@ -92,10 +91,10 @@ template <typename T> constexpr bool is_matx_set_op();
       auto &getCtx() const noexcept { return ctx_; }
 
       /**
-       * @brief Synchronize the cuda executor's stream
+       * @brief Synchronize the STF executor's stream
        * 
        */
-      void sync() { cudaStreamSynchronize(stream_); }
+      void sync() { ctx.task_fence(); }
 
       /**
        * Execute an operator on a device
@@ -122,11 +121,9 @@ template <typename T> constexpr bool is_matx_set_op();
                     auto tsk = ctx.task();
                     tsk.set_symbol(op.str());
                     op.apply_dep_to_task(tsk); // recursively find the tensors from the tree to apply deps
-                    //std::cout << "Start launch task. Rank = " << Op::Rank() << " " << op.str() << '\n';
                     tsk->*[&](cudaStream_t s) { 
                         detail::matxOpT0Kernel<<<blocks, threads, 0, s>>>(op);
                     };
-                    //std::cout << "End launch task.\n";
             }
             else {
                 //std::cout << " RANK 0 not on LHS operator = " << op.str() << '\n';
