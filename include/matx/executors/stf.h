@@ -94,7 +94,7 @@ template <typename T> constexpr bool is_matx_set_op();
        * @brief Synchronize the STF executor's stream
        * 
        */
-      void sync() { ctx.task_fence(); }
+      void sync() { ctx_.task_fence(); }
 
       /**
        * Execute an operator on a device
