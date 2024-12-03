@@ -51,7 +51,7 @@ using CacheId = uint64_t;
 __attribute__ ((visibility ("default")))
 #endif
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
-inline std::shared_mutex cache_mtx; ///< Mutex protecting updates from map
+inline std::recursive_mutex cache_mtx; ///< Mutex protecting updates from map
 
 template<typename CacheType>
 __attribute__ ((visibility ("default")))
@@ -85,7 +85,7 @@ public:
    */
   template <typename CacheType>
   void Clear(const CacheId &id) {
-    [[maybe_unused]] std::unique_lock lck(cache_mtx);
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
 
     auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
@@ -95,7 +95,8 @@ public:
 
   template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun>
   void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
-    [[maybe_unused]] std::unique_lock lck(cache_mtx);
+    // This mutex should eventually be finer-grained so each transform doesn't get blocked by others
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
 
     // Create named cache if it doesn't exist
     auto el = cache.find(id);
