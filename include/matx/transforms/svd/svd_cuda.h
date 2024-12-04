@@ -543,6 +543,7 @@ struct DnSVDCUDAParams_t {
   size_t batch_size;
   MatXDataType_t dtype;
   SVDMethod method;
+  cudaExecutor exec;
 };
 
 template <typename ATensor>
@@ -626,6 +627,7 @@ public:
                         VtTensor &vt,
                         const ATensor &a,
                         SVDMethod method,
+                        const cudaExecutor &exec,
                         const char jobz = 'A')
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -642,7 +644,7 @@ public:
     MATX_STATIC_ASSERT_STR(!is_complex_v<T3>, matxInvalidType, "S type must be real");
     MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
 
-    params = GetSVDParams(u, s, vt, a, jobz);
+    params        = GetSVDParams(u, s, vt, a, jobz, exec);
     params.method = method;
 
     if (params.method == SVDMethod::GESVDJ_BATCHED) {
@@ -658,7 +660,7 @@ public:
     }
 
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, params.method == SVDMethod::GESVDJ_BATCHED);
+    this->AllocateWorkspace(params.batch_size, params.method == SVDMethod::GESVDJ_BATCHED, exec);
   }
 
   void GetWorkspaceSize() override
@@ -722,8 +724,8 @@ public:
 
   static DnSVDCUDAParams_t
   GetSVDParams(UTensor &u, STensor &s,
-               VtTensor &vt, const ATensor &a,
-               const char jobz = 'A')
+               VtTensor &vt, const ATensor &a, 
+               const char jobz, const cudaExecutor &exec)
   {
     DnSVDCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -735,6 +737,7 @@ public:
     params.S = s.Data();
     params.jobz = jobz;
     params.dtype = TypeToInt<T1>();
+    params.exec = exec;
     return params;
   }
 
@@ -882,7 +885,7 @@ struct DnSVDCUDAParamsKeyHash {
   std::size_t operator()(const DnSVDCUDAParams_t &k) const noexcept
   {
     return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
-           (std::hash<uint64_t>()(k.batch_size));
+           (std::hash<uint64_t>()(k.batch_size)) + (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -892,7 +895,11 @@ struct DnSVDCUDAParamsKeyHash {
 struct DnSVDCUDAParamsKeyEq {
   bool operator()(const DnSVDCUDAParams_t &l, const DnSVDCUDAParams_t &t) const noexcept
   {
-    return l.n == t.n && l.m == t.m && l.batch_size == t.batch_size && l.dtype == t.dtype;
+    return  l.n == t.n && 
+            l.m == t.m && 
+            l.batch_size == t.batch_size && 
+            l.dtype == t.dtype && 
+            l.exec.getStream() == t.exec.getStream();
   }
 };
 
@@ -990,7 +997,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get parameters required by these tensors
     auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>::
-      GetSVDParams(u_in, s_new, vt_in, at_col_maj, job_cusolver);
+      GetSVDParams(u_in, s_new, vt_in, at_col_maj, job_cusolver, exec);
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
@@ -998,7 +1005,7 @@ void svd_impl(UTensor &&u, STensor &&s,
       detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
       params,
       [&]() {
-        return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, method, job_cusolver);
+        return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver);
@@ -1027,7 +1034,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get parameters required by these tensors
     auto params = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>::
-        GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver);
+        GetSVDParams(u_col_maj, s_new, vt_col_maj, tvt, job_cusolver, exec);
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
@@ -1035,7 +1042,7 @@ void svd_impl(UTensor &&u, STensor &&s,
       detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
       params,
       [&]() {
-        return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, job_cusolver);
+        return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);

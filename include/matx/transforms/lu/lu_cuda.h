@@ -59,6 +59,7 @@ struct DnLUCUDAParams_t {
   void *piv;
   size_t batch_size;
   MatXDataType_t dtype;
+  cudaExecutor exec;
 };
 
 template <typename OutputTensor, typename PivotTensor, typename ATensor>
@@ -91,7 +92,8 @@ public:
    *
    */
   matxDnLUCUDAPlan_t(PivotTensor &piv,
-                       const ATensor &a)
+                       const ATensor &a,
+                       const cudaExecutor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -104,9 +106,9 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
     MATX_STATIC_ASSERT_STR((std::is_same_v<T2, int64_t>), matxInavlidType, "Pivot tensor type must be int64_t");
 
-    params = GetLUParams(piv, a);
+    params = GetLUParams(piv, a, exec);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size, false, exec);
   }
 
   void GetWorkspaceSize() override
@@ -120,7 +122,8 @@ public:
   }
 
   static DnLUCUDAParams_t GetLUParams(PivotTensor &piv,
-                                  const ATensor &a) noexcept
+                                      const ATensor &a,
+                                      const cudaExecutor &exec) noexcept
   {
     DnLUCUDAParams_t params;
     params.batch_size = GetNumBatches(a);
@@ -129,7 +132,7 @@ public:
     params.A = a.Data();
     params.piv = piv.Data();
     params.dtype = TypeToInt<T1>();
-
+    params.exec = exec;
     return params;
   }
 
@@ -212,7 +215,7 @@ struct DnLUCUDAParamsKeyHash {
   std::size_t operator()(const DnLUCUDAParams_t &k) const noexcept
   {
     return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
-           (std::hash<uint64_t>()(k.batch_size));
+           (std::hash<uint64_t>()(k.batch_size)) + (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -223,7 +226,7 @@ struct DnLUCUDAParamsKeyEq {
   bool operator()(const DnLUCUDAParams_t &l, const DnLUCUDAParams_t &t) const noexcept
   {
     return l.n == t.n && l.m == t.m && l.batch_size == t.batch_size &&
-           l.dtype == t.dtype;
+           l.dtype == t.dtype && l.exec.getStream() == t.exec.getStream();
   }
 };
 
@@ -284,7 +287,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt);
+  auto params = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>::GetLUParams(piv_new, tvt, exec);
 
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
@@ -292,7 +295,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
     detail::GetCacheIdFromType<detail::lu_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(piv_new, tvt);
+      return std::make_shared<cache_val_type>(piv_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, piv_new, tvt, exec);

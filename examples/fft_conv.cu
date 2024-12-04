@@ -73,7 +73,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
-  cudaExecutor exec{};
 
   index_t signal_size = 1ULL << 16;
   index_t filter_size = 16;
@@ -87,6 +86,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);  
+  cudaExecutor exec{stream};  
 
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});

@@ -115,7 +115,7 @@ public:
 
     params = GetEigParams(w, a, jobz, uplo);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size);
   }
 
   void GetWorkspaceSize() override
