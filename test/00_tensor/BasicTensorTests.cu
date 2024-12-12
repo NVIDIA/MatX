@@ -541,7 +541,7 @@ TYPED_TEST(BasicTensorTestsAll, DLPack)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
 
   auto t = make_tensor<TestType>({5,10,20});
-  auto dl = t.GetDLPackTensor();
+  auto dl = t.ToDlPack();
 
   ASSERT_EQ(dl->dl_tensor.ndim, 3);
   ASSERT_EQ(dl->dl_tensor.data, t.Data());
