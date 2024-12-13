@@ -747,7 +747,8 @@ auto make_tensor( TensorType &tensor,
     shape[r]   = dt.shape[r];
   }
 
-  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(dt.data, shape, strides, false);
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
+          reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
   tensor.Shallow(tmp);  
 }
 
