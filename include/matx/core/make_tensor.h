@@ -733,7 +733,7 @@ auto make_tensor( TensorType &tensor,
       break; 
     }
     case kDLBool: {
-      constexpr bool same = std::is_same_v<T, bool>;
+      [[maybe_unused]] constexpr bool same = std::is_same_v<T, bool>;
       MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
       break;
     }
