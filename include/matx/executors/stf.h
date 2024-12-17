@@ -79,6 +79,13 @@ template <typename T> constexpr bool is_matx_set_op();
           //ctx_ = cuda::experimental::stf::graph_ctx();
       }
 
+#if 0
+      ~stfExecutor() {
+        std::cout << "About to call ctx.finalize\n";
+        ctx_.finalize();
+      }
+#endif
+
       /**
        * @brief Returns stream associated with executor
       */
@@ -94,7 +101,7 @@ template <typename T> constexpr bool is_matx_set_op();
        * @brief Synchronize the STF executor's stream
        * 
        */
-      void sync() { ctx_.task_fence(); }
+      void sync() { cudaStreamSynchronize(ctx_.task_fence()); }
 
       /**
        * Execute an operator on a device
@@ -104,7 +111,6 @@ template <typename T> constexpr bool is_matx_set_op();
        **/
       template <typename Op>
         void Exec(Op &op) const {
-            //std::cout << "exec on stfexecutor -- start\n";
 #ifdef __CUDACC__      
           dim3 threads, blocks;  
 

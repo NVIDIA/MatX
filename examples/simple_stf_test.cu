@@ -52,39 +52,6 @@ using namespace matx;
  * shows the performance difference.
  */
 
-/* Custom operator */
-template <class O, class I1>
-class BlackScholes : public BaseOp<BlackScholes<O, I1>> {
-private:
-  O out_;
-  I1 V_, S_, K_, r_, T_;
-
-public:
-  BlackScholes(O out, I1 K, I1 V, I1 S, I1 r, I1 T)
-      : out_(out), K_(K), V_(V), S_(S), r_(r), T_(T)  {}
-
-  __device__ inline void operator()(index_t idx)
-  {
-    auto V = V_(idx);
-    auto K = K_(idx);
-    auto S = S_(idx);
-    auto T = T_(idx);
-    auto r = r_(idx);
-
-    auto VsqrtT = V * sqrt(T);
-    auto d1 = (log(S / K) + (r + 0.5 * V * V) * T) / VsqrtT ;
-    auto d2 = d1 - VsqrtT;
-    auto cdf_d1 = normcdf(d1);
-    auto cdf_d2 = normcdf(d2);
-    auto expRT = exp(-1 * r * T); 
-
-    out_(idx) = S * cdf_d1 - K * expRT * cdf_d2;
-  }
-
-  __host__ __device__ inline index_t Size(uint32_t i) const  { return out_.Size(i); }
-  static inline constexpr __host__ __device__ int32_t Rank() { return O::Rank(); }
-};
-
 /* Arithmetic expression */
 template<typename T1>
 void compute_black_scholes_matx(tensor_t<T1,1>& K, 
@@ -106,11 +73,6 @@ void compute_black_scholes_matx(tensor_t<T1,1>& K,
     auto cdf_d2 = normcdf(d2);
     auto expRT = exp(-1 * r * T); 
     (output = S * cdf_d1 - K * expRT * cdf_d2).run(exec);
-
-#if 0
-    (output = K + sqrt(S+V)).run(exec);
-#endif
-
     //std::cout << "Output : " << std::endl;
     //print(output);
 }
@@ -156,7 +118,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
 //print(V_tensor);
 
-  compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);  
+  //compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);  
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -182,7 +144,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventElapsedTime(&time_ms, start, stop);
 #endif
 
-  printf("Time without custom operator = %.2fms per iteration\n",
+  //  printf("Output tensor :\n");
+  //  print(output_tensor);
+  printf("Time without custom operator = %fms per iteration\n",
          time_ms / num_iterations);
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
