@@ -58,7 +58,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaExecutor exec{};
 #else
   stfExecutor exec{};
-  auto ctx = exec.getCtx();
 #endif
 
   // Simple Poisson matrix
@@ -89,6 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.sync();
 #if 1
+  auto ctx = exec.getCtx();
   ctx.finalize();
 #endif
 
