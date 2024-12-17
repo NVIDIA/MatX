@@ -11,6 +11,7 @@ set(examples
     mvdr_beamformer
     pwelch
     resample_poly_bench
+    simple_stf_test
     spectrogram
     spectrogram_graph
     spherical_harmonics
