@@ -465,11 +465,10 @@ private:
   tensor_t<typename ComplexType::value_type, 2> cfarMaskView;
 
   cudaStream_t stream;
-#if 0
-  cudaExecutor exec;
-#else
+#if 1
 public:
   stfExecutor exec;
+#else
+  cudaExecutor exec;
 #endif
-
 };

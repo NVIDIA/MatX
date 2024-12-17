@@ -36,11 +36,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   index_t numChannels = 16;
+#if 1
   index_t numPulses = 128;
   index_t numSamples = 9000;
   index_t waveformLength = 1000;
-  constexpr bool ENABLE_GRAPHS = false;
   uint32_t iterations = 100;
+#else
+  index_t numPulses = 128;
+  index_t numSamples = 1000;
+  index_t waveformLength = 1000;
+  uint32_t iterations = 20;
+#endif
+  constexpr bool ENABLE_GRAPHS = false;
   constexpr int num_streams = 1;
   cudaGraph_t graphs[num_streams];
   cudaGraphExec_t instances[num_streams];  
@@ -77,7 +84,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
 
   /* Get STF context handle */
+#if 1
   auto ctx = pipelines[0]->exec.getCtx();
+#endif
 
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   printf("Running test...\n");
@@ -142,11 +151,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     pipelines[s]->sync();
   }
 
+#if 1
   ctx.finalize();
+#endif
 
   MATX_NVTX_END_RANGE(2)
   
   MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 3)
+#if 1
   float time_ms;
   cudaEventElapsedTime(&time_ms, starts[num_streams-1], stops[num_streams-1]);
   float time_s = time_ms * .001f;
@@ -156,6 +168,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         time_ms,
          static_cast<float>(mult) / time_s,
          static_cast<float>(mult*sizeof(complex)*numSamples*8)/time_s/1e9);
+#endif
 
 for (int s = 0; s < num_streams; s++) {
     cudaEventDestroy(starts[s]);
