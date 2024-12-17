@@ -20,15 +20,15 @@ set(examples
     print_styles)
 
 
-    
-    
+
+
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
 target_link_libraries(example_lib INTERFACE matx::matx) # Transitive properties
 
 set_property(TARGET example_lib PROPERTY ENABLE_EXPORTS 1)
-    
+
 if(eigen_DIR)
     include_directories(SYSTEM ${eigen_DIR})
     add_definitions(-DUSE_EIGEN)
@@ -64,3 +64,7 @@ endforeach()
 # Add host-compiler only example program to catch missing ifdef __CUDACC__ guards
 add_executable(test_host test_host.cpp)
 target_link_libraries(test_host matx::matx)
+
+if(MATX_EN_PYBIND11)
+    add_subdirectory(python_integration_sample)
+endif()

@@ -36,6 +36,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/storage.h"
 #include "matx/core/tensor_desc.h"
+#include "matx/core/dlpack.h"
 namespace matx {
 
 /**
@@ -617,6 +618,138 @@ auto make_static_tensor() {
   raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(static_cast<size_t>(desc.TotalSize())*sizeof(T))};
   basic_storage<decltype(rp)> s{std::move(rp)};
   return tensor_t<T, desc.Rank(), decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+}
+
+template <typename TensorType,
+  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+auto make_tensor( TensorType &tensor,
+                  const DLManagedTensor dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  using T = typename TensorType::value_type;
+  const DLTensor &dt = dlp_tensor.dl_tensor;
+
+  // MatX doesn't track the memory type or device ID, so we don't need to copy it
+  MATX_ASSERT_STR_EXP(dt.ndim, TensorType::Rank(), matxInvalidDim, "DLPack rank doesn't match MatX rank!");
+
+  switch (dt.dtype.code) {
+    case kDLComplex: {
+      switch (dt.dtype.bits) {
+        case 128: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<double>>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 64: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<float>>;     
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 32: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16Complex> || std::is_same_v<T, matxBf16Complex>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid complex float size from DLPack");
+      }
+      break;
+    }
+    
+    case kDLFloat: {
+      switch (dt.dtype.bits) {
+        case 64: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, double>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 32: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, float>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }           
+        case 16: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid float size from DLPack");
+      }
+      break;      
+    }
+    case kDLInt: {
+      switch (dt.dtype.bits) {
+        case 64: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int64_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 32: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int32_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 16: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int16_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 8: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int8_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }                          
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid signed integer size from DLPack");
+      }
+      break;    
+    }
+    case kDLUInt: {
+      switch (dt.dtype.bits) {
+        case 64: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint64_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 32: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint32_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 16: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint16_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }
+        case 8: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint8_t>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          break;
+        }            
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid unsigned integer size from DLPack");
+      }
+      break; 
+    }
+    case kDLBool: {
+      [[maybe_unused]] constexpr bool same = std::is_same_v<T, bool>;
+      MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+      break;
+    }
+  }
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+
+  for (int r = 0; r < TensorType::Rank(); r++) {
+    strides[r] = dt.strides[r];
+    shape[r]   = dt.shape[r];
+  }
+
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
+          reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+  tensor.Shallow(tmp);  
 }
 
 } // namespace matx

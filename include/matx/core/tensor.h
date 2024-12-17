@@ -1441,7 +1441,7 @@ public:
    *
    * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
    */
-  DLManagedTensor *GetDLPackTensor() const {
+  DLManagedTensor *ToDlPack() const {
     auto mt = new DLManagedTensor;
     DLTensor *t = &mt->dl_tensor;
     CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
@@ -1508,7 +1508,6 @@ public:
 
     return mt;
   }
-
 
 private:
   Storage storage_;
