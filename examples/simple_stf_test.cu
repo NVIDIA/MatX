@@ -141,8 +141,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   exec.sync();
 #if 1
   ctx.finalize();
-  cudaEventElapsedTime(&time_ms, start, stop);
 #endif
+  cudaEventElapsedTime(&time_ms, start, stop);
 
   //  printf("Output tensor :\n");
   //  print(output_tensor);
