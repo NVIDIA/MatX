@@ -675,13 +675,15 @@ public:
               MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
     }
     else {
+      int i_dspace;
+
       if constexpr (std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const float *>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<const float *>(params.S), reinterpret_cast<const float *>(params.U), static_cast<int>(params.m),
                 reinterpret_cast<const float *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<double, T1>) {
         ret = cusolverDnDgesvdjBatched_bufferSize(
@@ -689,7 +691,7 @@ public:
                 reinterpret_cast<const double *>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<const double *>(params.S), reinterpret_cast<const double *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const double *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched_bufferSize(
@@ -697,7 +699,7 @@ public:
                 reinterpret_cast<const cuComplex *>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<const float *>(params.S), reinterpret_cast<const cuComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const cuComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched_bufferSize(
@@ -705,14 +707,13 @@ public:
                 reinterpret_cast<const cuDoubleComplex *>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<const double *>(params.S), reinterpret_cast<const cuDoubleComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const cuDoubleComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else {
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
       }
 
-      int dspace_tmp = *reinterpret_cast<int*>(&this->dspace);
-      this->dspace = dspace_tmp;
+      this->dspace = i_dspace;
       this->hspace = 0;
     }
 
