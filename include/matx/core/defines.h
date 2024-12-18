@@ -37,12 +37,12 @@
 
 namespace matx {
 
-#ifdef INDEX_32_BIT
+#ifdef MATX_INDEX_32_BIT
     using index_t = int32_t;
-    #define INDEX_T_FMT "d"
-#else    
+    #define MATX_INDEX_T_FMT "d"
+#else
     using index_t = long long int;
-    #define INDEX_T_FMT "lld"
+    #define MATX_INDEX_T_FMT "lld"
 #endif
 
 #ifdef __CUDACC__
@@ -53,39 +53,39 @@ namespace matx {
     #define __MATX_DEVICE__ __device__
 #endif
 
-#ifdef __GNUC__ 
+#ifdef __GNUC__
     #define __MATX_INLINE__ __attribute__((always_inline)) inline
 #elif __CUDACC__
-    #define __MATX_INLINE__ __forceinline__ 
+    #define __MATX_INLINE__ __forceinline__
 #else
     #define __MATX_INLINE__ inline
 #endif
 
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#define MATX_STRINGIFY(x) #x
+#define MATX_TOSTRING(x) MATX_STRINGIFY(x)
 
 #if defined(__clang__ )
-    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG)
-    #define IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
 
-    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG) \
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG) \
         _Pragma("clang diagnostic push") \
-        _Pragma(TOSTRING(clang diagnostic ignored WARN_MSG))
+        _Pragma(MATX_TOSTRING(clang diagnostic ignored WARN_MSG))
 
-    #define IGNORE_WARNING_POP_CLANG \
+    #define MATX_IGNORE_WARNING_POP_CLANG \
         _Pragma("clang diagnostic pop")
 #elif defined(__GNUC__)
-    #define IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
-    #define IGNORE_WARNING_POP_CLANG
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
 
-    #define IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
         _Pragma("GCC diagnostic push") \
-        _Pragma(TOSTRING(GCC diagnostic ignored WARN_MSG))
+        _Pragma(MATX_TOSTRING(GCC diagnostic ignored WARN_MSG))
 
-    #define IGNORE_WARNING_POP_GCC \
+    #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
-#endif        
+#endif
 
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))

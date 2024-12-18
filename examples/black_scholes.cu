@@ -46,8 +46,8 @@ using namespace matx;
  * instructions. While caching helps, this can have a slight performance impact when compared to native CUDA
  * kernels. To work around this problem, complex expressions can be placed in a custom operator by adding some
  * boilerplate code around the original expression. This custom operator can then be used either alone or inside
- * other arithmetic expressions, and only a single load is issues for each tensor. 
- * 
+ * other arithmetic expressions, and only a single load is issues for each tensor.
+ *
  * This example uses the Black-Scholes equtation to demonstrate the two ways to implement the equation in MatX, and
  * shows the performance difference.
  */
@@ -76,7 +76,7 @@ public:
     auto d2 = d1 - VsqrtT;
     auto cdf_d1 = normcdf(d1);
     auto cdf_d2 = normcdf(d2);
-    auto expRT = exp(-1 * r * T); 
+    auto expRT = exp(-1 * r * T);
 
     out_(idx) = S * cdf_d1 - K * expRT * cdf_d2;
   }
@@ -87,12 +87,12 @@ public:
 
 /* Arithmetic expression */
 template<typename T1>
-void compute_black_scholes_matx(tensor_t<T1,1>& K, 
-                                tensor_t<T1,1>& S, 
-                                tensor_t<T1,1>& V, 
-                                tensor_t<T1,1>& r, 
-                                tensor_t<T1,1>& T, 
-                                tensor_t<T1,1>& output, 
+void compute_black_scholes_matx(tensor_t<T1,1>& K,
+                                tensor_t<T1,1>& S,
+                                tensor_t<T1,1>& V,
+                                tensor_t<T1,1>& r,
+                                tensor_t<T1,1>& T,
+                                tensor_t<T1,1>& output,
                                 cudaExecutor& exec)
 {
     auto VsqrtT = V * sqrt(T);
@@ -100,7 +100,7 @@ void compute_black_scholes_matx(tensor_t<T1,1>& K,
     auto d2 = d1 - VsqrtT;
     auto cdf_d1 = normcdf(d1);
     auto cdf_d2 = normcdf(d2);
-    auto expRT = exp(-1 * r * T); 
+    auto expRT = exp(-1 * r * T);
 
     (output = S * cdf_d1 - K * expRT * cdf_d2).run(exec);
 }
@@ -120,13 +120,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<dtype, 1> V_tensor{{input_size}};
   tensor_t<dtype, 1> r_tensor{{input_size}};
   tensor_t<dtype, 1> T_tensor{{input_size}};
-  tensor_t<dtype, 1> output_tensor{{input_size}};  
+  tensor_t<dtype, 1> output_tensor{{input_size}};
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
   cudaExecutor exec{stream};
 
-  compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);  
+  compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -154,11 +154,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Time with custom operator = %.2fms per iteration\n",
-         time_ms / num_iterations);         
+         time_ms / num_iterations);
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
   cudaStreamDestroy(stream);
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

@@ -86,6 +86,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // example-end sync-test-1
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

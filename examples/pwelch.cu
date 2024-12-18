@@ -97,7 +97,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(Pxx);
   printf("PWelchOp avg runtime = %.3f ms\n", exec_time_ms / num_iterations);
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
   return 0;
 }

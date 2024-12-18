@@ -55,7 +55,7 @@ namespace matx {
   #define LAPACK_CALL(fn) LAPACK_##fn
 #else
   using lapack_int_t = index_t;
-#endif  
+#endif
 
 /* Parameter enums */
 
@@ -159,18 +159,18 @@ enum class BatchType {
 
 /**
  * @brief Sets batch pointers for a batched tensor of arbitrary rank.
- * 
+ *
  * Clears the given batch pointers vector and then populates it
  * with pointers to the data of the tensor for batched operations.
  * Handles both batched matrices and vectors.
- * 
+ *
  * @tparam BTYPE
  *   Whether the input is a batch of matrices or vectors
  * @tparam TensorType
  *   Type of input tensor a
  * @tparam PointerType
  *   Tensor value type
- * 
+ *
  * @param a
  *   The tensor for which batch pointers are to be set.
  * @param batch_ptrs
@@ -182,7 +182,7 @@ __MATX_INLINE__ void SetBatchPointers(const TensorType &a, std::vector<PointerTy
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   batch_ptrs.clear();
-  
+
   if constexpr (BTYPE == BatchType::VECTOR && TensorType::Rank() == 1) {
     // single vector case
     batch_ptrs.push_back(&a(0));
@@ -264,7 +264,7 @@ public:
         matxAlloc(&d_workspace, dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
-      // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex. 
+      // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex.
       // Zero it out for all types for now.
       cudaMemsetAsync(d_workspace, 0, dspace, stream);
       matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -282,7 +282,7 @@ public:
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
-      } 
+      }
     }
   }
 
@@ -303,15 +303,15 @@ protected:
 /**
  * Dense LAPACK base class that all dense host solver types inherit common methods
  * and structures from. Depending on the decomposition, it may require different
- * types of workspace arrays.  
+ * types of workspace arrays.
  *
  * @tparam ValueType
  *   Input tensor type
- * 
+ *
  */
 template <typename ValueType>
 class matxDnHostSolver_t {
-  
+
 public:
   matxDnHostSolver_t()
   {

@@ -37,15 +37,15 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/operators/base_operator.h"
 
-#define DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                        \
+#define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
-  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1)                         \
+  [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1)         \
   {                                                                 \
-    using I1Type = extract_value_type_t<I1>;                       \
+    using I1Type = extract_value_type_t<I1>;                        \
     using Op = TENSOR_OP<I1Type>;                                   \
-    const typename detail::base_type_t<I1> &base = i1;          \
-    return detail::matxUnaryOp(base, Op());                           \
+    const typename detail::base_type_t<I1> &base = i1;              \
+    return detail::matxUnaryOp(base, Op());                         \
   }
 
 
@@ -83,8 +83,8 @@ namespace matx
     {
       return cuda::std::apply([&](auto &&...args)  {
           return this->operator()(args...);
-        }, idx);      
-    }  
+        }, idx);
+    }
 
     template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -110,7 +110,7 @@ namespace matx
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept  
+    __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
       in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -337,52 +337,52 @@ namespace matx
  * @param t
  *   Input operator
  */
-  Op real(Op t) {}  
+  Op real(Op t) {}
 
  /**
  * Return imaginary components of an operator
  * @param t
  *   Input operator
  */
-  Op imag(Op t) {}  
+  Op imag(Op t) {}
 
  /**
  * Returns a truth value if operator value is NaN
  * @param t
  *   Input operator
  */
-  Op isnan(Op t) {}  
+  Op isnan(Op t) {}
 
  /**
  * Returns a truth value if operator value is infinite
   * @param x
  *   Input operator
  */
-  Op isinf( Op x) {}  
+  Op isinf( Op x) {}
 
  /**
  * Returns values from the standard normal cumulative distribution function
   * @param x
  *   Input operator
  */
-  Op normcdf( Op x) {}  
+  Op normcdf( Op x) {}
 
 #else
-  DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
-  DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
-  DEFINE_UNARY_OP(rsqrt, detail::RSqrtOp);
-  DEFINE_UNARY_OP(exp, detail::ExpOp);
-  DEFINE_UNARY_OP(expj, detail::ExpjOp);
-  DEFINE_UNARY_OP(log10, detail::Log10Op);
-  DEFINE_UNARY_OP(log2, detail::Log2Op);
-  DEFINE_UNARY_OP(log, detail::LogOp);
-  DEFINE_UNARY_OP(loge, detail::LogOp);
+  MATX_DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
+  MATX_DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
+  MATX_DEFINE_UNARY_OP(rsqrt, detail::RSqrtOp);
+  MATX_DEFINE_UNARY_OP(exp, detail::ExpOp);
+  MATX_DEFINE_UNARY_OP(expj, detail::ExpjOp);
+  MATX_DEFINE_UNARY_OP(log10, detail::Log10Op);
+  MATX_DEFINE_UNARY_OP(log2, detail::Log2Op);
+  MATX_DEFINE_UNARY_OP(log, detail::LogOp);
+  MATX_DEFINE_UNARY_OP(loge, detail::LogOp);
 #if 0
-  DEFINE_UNARY_OP(conj, detail::ConjOp);
+  MATX_DEFINE_UNARY_OP(conj, detail::ConjOp);
 #else
   // implementing without a macro so we can optimize conj(real)
-  template <typename I1,                        
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  template <typename I1,
+            typename = typename std::enable_if_t<is_matx_op<I1>()>>
   [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
     using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
@@ -395,31 +395,31 @@ namespace matx
     }
   }
 #endif
-  DEFINE_UNARY_OP(abs, detail::AbsOp);
-  DEFINE_UNARY_OP(abs2, detail::Abs2Op);
-  DEFINE_UNARY_OP(sin, detail::SinOp);
-  DEFINE_UNARY_OP(cos, detail::CosOp);
-  DEFINE_UNARY_OP(tan, detail::TanOp);
-  DEFINE_UNARY_OP(asin, detail::AsinOp);
-  DEFINE_UNARY_OP(acos, detail::AcosOp);
-  DEFINE_UNARY_OP(atan, detail::AtanOp);
-  DEFINE_UNARY_OP(sinh, detail::SinhOp);
-  DEFINE_UNARY_OP(cosh, detail::CoshOp);
-  DEFINE_UNARY_OP(tanh, detail::TanhOp);
-  DEFINE_UNARY_OP(asinh, detail::AsinhOp);
-  DEFINE_UNARY_OP(acosh, detail::AcoshOp);
-  DEFINE_UNARY_OP(atanh, detail::AtanhOp);
-  DEFINE_UNARY_OP(angle, detail::AngleOp);
-  DEFINE_UNARY_OP(floor, detail::FloorOp);
-  DEFINE_UNARY_OP(ceil, detail::CeilOp);
-  DEFINE_UNARY_OP(round, detail::RoundOp);
-  DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
+  MATX_DEFINE_UNARY_OP(abs, detail::AbsOp);
+  MATX_DEFINE_UNARY_OP(abs2, detail::Abs2Op);
+  MATX_DEFINE_UNARY_OP(sin, detail::SinOp);
+  MATX_DEFINE_UNARY_OP(cos, detail::CosOp);
+  MATX_DEFINE_UNARY_OP(tan, detail::TanOp);
+  MATX_DEFINE_UNARY_OP(asin, detail::AsinOp);
+  MATX_DEFINE_UNARY_OP(acos, detail::AcosOp);
+  MATX_DEFINE_UNARY_OP(atan, detail::AtanOp);
+  MATX_DEFINE_UNARY_OP(sinh, detail::SinhOp);
+  MATX_DEFINE_UNARY_OP(cosh, detail::CoshOp);
+  MATX_DEFINE_UNARY_OP(tanh, detail::TanhOp);
+  MATX_DEFINE_UNARY_OP(asinh, detail::AsinhOp);
+  MATX_DEFINE_UNARY_OP(acosh, detail::AcoshOp);
+  MATX_DEFINE_UNARY_OP(atanh, detail::AtanhOp);
+  MATX_DEFINE_UNARY_OP(angle, detail::AngleOp);
+  MATX_DEFINE_UNARY_OP(floor, detail::FloorOp);
+  MATX_DEFINE_UNARY_OP(ceil, detail::CeilOp);
+  MATX_DEFINE_UNARY_OP(round, detail::RoundOp);
+  MATX_DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
 #if 0
-  DEFINE_UNARY_OP(real, detail::RealOp);
+  MATX_DEFINE_UNARY_OP(real, detail::RealOp);
 #else
   // implementing without a macro so we can optimize away real on a real operator
-  template <typename I1,                        
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> 
+  template <typename I1,
+            typename = typename std::enable_if_t<is_matx_op<I1>()>>
   [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
     using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
@@ -432,10 +432,10 @@ namespace matx
     }
   }
 #endif
-  DEFINE_UNARY_OP(imag, detail::ImagOp);  
-  DEFINE_UNARY_OP(operator-, detail::SubNegOp );
-  DEFINE_UNARY_OP(isnan, detail::IsNanOp);
-  DEFINE_UNARY_OP(isinf, detail::IsInfOp);
+  MATX_DEFINE_UNARY_OP(imag, detail::ImagOp);
+  MATX_DEFINE_UNARY_OP(operator-, detail::SubNegOp );
+  MATX_DEFINE_UNARY_OP(isnan, detail::IsNanOp);
+  MATX_DEFINE_UNARY_OP(isinf, detail::IsInfOp);
 #endif
 
 } // end namespace matx
