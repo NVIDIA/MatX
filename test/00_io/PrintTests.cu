@@ -97,8 +97,9 @@ TEST_F(PrintTest, DefaultTest1)
   auto pft = get_print_format_type();
   ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
 
+  A1.set_name("A1 Matrix");
   print_checker(A1,
-      "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
+      "A1 Matrix: Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
       "000000: -9.2466e-01+9.9114e-01j \n"
       "000001: -4.2534e-01+1.0676e+00j \n"
       "000002: -2.6438e+00-6.2723e-01j \n"
@@ -192,7 +193,7 @@ TEST_F(PrintTest, DefaultTest5)
   MATX_ENTER_HANDLER();
   auto pft = get_print_format_type();
   ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
-  
+
   auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
 
   print_checker(testSlice,

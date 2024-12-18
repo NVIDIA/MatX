@@ -55,14 +55,14 @@ namespace matx
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
         {
           if constexpr (is_matx_half_v<T>) {
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
             return first_ + T(static_cast<T>((float)idx) * step_);
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
           }
           else {
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
             return first_ + T(static_cast<T>(idx) * step_);
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
           }
         }
     };

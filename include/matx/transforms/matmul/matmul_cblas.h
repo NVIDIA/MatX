@@ -354,7 +354,7 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
   #elif defined(MATX_EN_BLIS)
   bli_thread_set_num_threads(exec.GetNumThreads());
   #endif
-  
+
   total_iter *= params.batch;
   for (size_t iter = 0; iter < total_iter; iter++) {
     // Get pointers into A/B/C for this round
@@ -397,7 +397,7 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
 }
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, ThreadsMode MODE>
-__MATX_INLINE__ void matmul_dispatch(TensorTypeC &c, 
+__MATX_INLINE__ void matmul_dispatch(TensorTypeC &c,
                                      const TensorTypeA &a,
                                      const TensorTypeB &b,
                                      const float alpha,
@@ -452,7 +452,7 @@ __MATX_INLINE__ auto getCBLASSupportedTensor( const Op &in) {
       return true;
     }
   };
-  
+
   return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
 }
 
