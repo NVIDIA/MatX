@@ -210,14 +210,14 @@ class tensor_impl_t {
      *   Data type
      */
 // gcc 14.1 incorrectly reports desc as uninitialized in some contexts
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc)
         : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
     {
     }
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
 
     /**
      * Constructor for creating a view with only a descriptor
@@ -887,9 +887,9 @@ IGNORE_WARNING_POP_GCC
     template <int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
         return GetVal<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
       }
       else {
         return 0;
@@ -899,9 +899,9 @@ IGNORE_WARNING_POP_GCC
     template <int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
         return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
       }
       else {
         return 0;

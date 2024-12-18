@@ -138,7 +138,7 @@ public:
     syevd_dispatch<WorkQuery, RworkQuery>("V", &params.uplo, &params.n, nullptr, &params.n,
                     nullptr, &work_query, &this->lwork, &rwork_query,
                     &this->lrwork, &iwork_query, &this->liwork, &info);
-    
+
     MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
       ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK syevd workspace query").c_str());
 
@@ -205,7 +205,7 @@ public:
                       reinterpret_cast<T2*>(this->rwork), &this->lrwork,
                       reinterpret_cast<lapack_int_t*>(this->iwork), &this->liwork, &info);
 
-      MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero in LAPACK syevd").c_str());
     }
   }
@@ -231,7 +231,7 @@ private:
             const lapack_int_t* liwork_in, lapack_int_t* info)
   {
     // TODO: remove warning suppression once syevd is optimized in NVPL LAPACK
-IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
     if constexpr (std::is_same_v<AType, float>) {
       LAPACK_CALL(ssyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
     } else if constexpr (std::is_same_v<AType, double>) {
@@ -241,7 +241,7 @@ IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
     } else if constexpr (std::is_same_v<AType, cuda::std::complex<double>>) {
       LAPACK_CALL(zheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
     }
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
   }
 
   std::vector<T2 *> batch_w_ptrs;

@@ -58,7 +58,7 @@ namespace matx
           static_assert(T::Rank() < CRank, "Cloning rank must be higher than input operator rank");
 
           const index_t num_keep = std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; });
-          MATX_ASSERT_STR(num_keep == T::Rank(), matxInvalidParameter, 
+          MATX_ASSERT_STR(num_keep == T::Rank(), matxInvalidParameter,
             "Number of matxKeepDim in a clone must match input operator rank");
 
           // create gather list
@@ -69,9 +69,9 @@ namespace matx
                 sizes_[i] = op_.Size(d);
                 // gcc incorrectly shows an invalid access to array element [1] in a unit test here. This is not
                 // possible based on runtime checks we have. Disable the warning temporarily.
-IGNORE_WARNING_PUSH_GCC("-Warray-bounds")                
+MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
                 dims_[d++] = i;
-IGNORE_WARNING_POP_GCC           
+MATX_IGNORE_WARNING_POP_GCC
               } else {
                 sizes_[i] = shape[i];
               }
@@ -87,11 +87,11 @@ IGNORE_WARNING_POP_GCC
 
         template <typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
-        {      
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")        
+        {
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
           cuda::std::array<index_t, Rank()> sind{indices...};
           cuda::std::array<index_t, T::Rank()> gind;
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
 
           // gather indices
           for(int i = 0; i < T::Rank(); i++) {

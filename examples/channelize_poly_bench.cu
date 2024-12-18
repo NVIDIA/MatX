@@ -101,7 +101,7 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       }
       cudaEventRecord(stop, stream);
       exec.sync();
-      CUDA_CHECK_LAST_ERROR();
+      MATX_CUDA_CHECK_LAST_ERROR();
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 
       const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
@@ -112,7 +112,7 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
     printf("\n");
   }
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);

@@ -144,7 +144,7 @@ namespace matx {
       fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorTypeString<typename Op::value_type>().c_str(), op.Rank());
       for (index_t dimIdx = 0; dimIdx < op.Rank(); dimIdx++)
       {
-        fprintf(fp, "%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
+        fprintf(fp, "%" MATX_INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
           fprintf(fp, ", ");
       }
@@ -156,7 +156,7 @@ namespace matx {
         {
           for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
           {
-            fprintf(fp, "%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
+            fprintf(fp, "%" MATX_INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
             if( dimIdx < (op.Rank() - 1) )
             {
               fprintf(fp, ",");
@@ -199,7 +199,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+            fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
           }
           PrintVal(fp, op.operator()(_k));
           if (_k == (op.Size(0)-1)) {
@@ -227,7 +227,7 @@ namespace matx {
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
             if (_l == 0) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
               }
               else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                 if (_k == 0) {
@@ -288,7 +288,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "[%06" INDEX_T_FMT ",:,:]\n", _j);
+            fprintf(fp, "[%06" MATX_INDEX_T_FMT ",:,:]\n", _j);
           }
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -315,7 +315,7 @@ namespace matx {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
               if (_l == 0) {
                 if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                  fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                  fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                 }
                 else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                   if (_k == 0) {
@@ -399,7 +399,7 @@ namespace matx {
               }
             }
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-              fprintf(fp, "[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
+              fprintf(fp, "[%06" MATX_INDEX_T_FMT ",%06" MATX_INDEX_T_FMT ",:,:]\n", _i, _j);
             }
             for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -426,7 +426,7 @@ namespace matx {
               for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
                 if (_l == 0) {
                   if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                    fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                    fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                   }
                   else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                     if (_k == 0) {

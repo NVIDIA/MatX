@@ -54,18 +54,18 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-        __MATX_INLINE__ std::string str() const { return "sph2cart(" + get_type_str(theta_) + 
+        __MATX_INLINE__ std::string str() const { return "sph2cart(" + get_type_str(theta_) +
           "," + get_type_str(phi_) + "," + get_type_str(r_) + ")"; }
 
         __MATX_INLINE__ Sph2CartOp(const T1 &theta, const T2 &phi, const T3 &r) : theta_(theta), phi_(phi), r_(r)
       {
-        ASSERT_COMPATIBLE_OP_SIZES(theta);
-        ASSERT_COMPATIBLE_OP_SIZES(phi);
-        ASSERT_COMPATIBLE_OP_SIZES(r);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(theta);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(phi);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           [[maybe_unused]] auto theta = get_value(theta_, indices...);
           [[maybe_unused]] auto phi = get_value(phi_, indices...);
@@ -122,7 +122,7 @@ namespace matx
 					index_t size1 = get_expanded_size<Rank()>(theta_, dim);
 					index_t size2 = get_expanded_size<Rank()>(phi_, dim);
 					index_t size3 = get_expanded_size<Rank()>(r_, dim);
-					return detail::matx_max(size1, size2, size3);  
+					return detail::matx_max(size1, size2, size3);
         }
     };
   }
@@ -140,7 +140,7 @@ namespace matx
    *
    * @param theta
    *   Operator defining theta
-   *   
+   *
    * @param phi
    *   Operator defining phi
    *
@@ -153,7 +153,7 @@ namespace matx
   template <typename T1, typename T2, typename T3>
     auto __MATX_INLINE__ sph2cart(const T1 &theta, const T2 &phi, const T3 &r)
     {
-      return cuda::std::tuple{ 
+      return cuda::std::tuple{
         detail::Sph2CartOp<T1,T2,T3,0>(theta, phi, r),
         detail::Sph2CartOp<T1,T2,T3,1>(theta, phi, r),
         detail::Sph2CartOp<T1,T2,T3,2>(theta, phi, r)};

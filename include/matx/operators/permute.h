@@ -84,30 +84,30 @@ namespace matx
 
           // convert variadic type to tuple so we can read/update
           cuda::std::array<index_t, Rank()> inds{indices...};
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
           cuda::std::array<index_t, Rank()> ind;
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
 
 #if 0
     //This causes register spills but might be faster if Rank is large
 #pragma unroll
-          for(int32_t i = 0; i < Rank(); i++) {	
+          for(int32_t i = 0; i < Rank(); i++) {
             ind[dims_[i]] = inds[i];
           }
 #else
 #pragma unroll
     // use double loop to avoid register spills
-          for(int32_t i = 0; i < Rank(); i++) {	
+          for(int32_t i = 0; i < Rank(); i++) {
 #pragma unroll
-            for(int32_t j = 0; j < Rank(); j++) {	
+            for(int32_t j = 0; j < Rank(); j++) {
               if(dims[j] == i) {
                 ind[i] = inds[j];
-              }			
+              }
             }
           }
-#endif         
+#endif
           return get_value(cuda::std::forward<Op>(op), ind);
-        }        
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const

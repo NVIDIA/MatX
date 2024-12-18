@@ -93,7 +93,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (uint32_t i = 0; i < iterations; i++) {
     (outView = conv1d(inView, filterView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
   }
-  
+
 
   cudaEventRecord(stop, stream);
   exec.sync();
@@ -149,6 +149,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   matxPrintMemoryStatistics();
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

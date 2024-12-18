@@ -63,10 +63,10 @@ namespace matx
       __MATX_INLINE__ std::string str() const { return  "if(" + cond_.str() + ") then {" +  op_.str() + "}"; }
       /**
        * @brief Constructor for an IF statement
-       * 
+       *
        * @param cond Condition to perform the IF/ELSE on
        * @param op Operator if conditional branch is true
-       */    
+       */
       __MATX_INLINE__ IFOP(const T1 &cond, const T2 &op) : cond_(cond), op_(op)
     {
       static_assert((!is_tensor_view_v<T2>),
@@ -83,17 +83,17 @@ namespace matx
         {
           index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
           index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
-          size_[i] = detail::matx_max(size1, size2);          
+          size_[i] = detail::matx_max(size1, size2);
         }
-      
-        ASSERT_COMPATIBLE_OP_SIZES(op_);
-        ASSERT_COMPATIBLE_OP_SIZES(cond_);
+
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
       }
     }
 
       /**
        * @brief Operator() for getting values of an if operator
-       * 
+       *
        * @tparam Is Index types
        * @param indices Index values
        */
@@ -102,13 +102,13 @@ namespace matx
           if (get_value(cond_, indices...)) {
             get_value(op_, indices...);
           }
-        }   
+        }
 
       /**
        * @brief Rank of IF operator
-       * 
+       *
        * @return Rank
-       */    
+       */
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>());
@@ -116,10 +116,10 @@ namespace matx
 
       /**
        * @brief Size of dimension of operator
-       * 
+       *
        * @param dim Dimension to get size of
-       * @return Size of dimension 
-       */    
+       * @return Size of dimension
+       */
       constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
       {
         return size_[dim];
@@ -135,7 +135,7 @@ namespace matx
 
         if constexpr (is_matx_op<T1>()) {
           cond_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -143,12 +143,12 @@ namespace matx
       {
         if constexpr (is_matx_op<T2>()) {
           op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }     
+        }
 
         if constexpr (is_matx_op<T1>()) {
           cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }      
+      }
   };
 
   /**
@@ -159,7 +159,7 @@ namespace matx
    * operator must be defined for the particular type. For example, operator< on
    * two integers is okay, but the same operator on two complex numbers will give
    * a compiler error.
-   * 
+   *
    * @param t1 op1
    *
    * @param t2 op2

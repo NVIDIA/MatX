@@ -43,14 +43,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   //using AType = double;
   using AType = cuda::std::complex<float>;
-  
+
   cudaStream_t stream = 0;
   cudaExecutor exec{stream};
-  int batch = 1; 
+  int batch = 1;
 
   int m = 4;
   int n = 5;
- 
+
   auto A = make_tensor<AType>({batch, m, n});
   auto QR = make_tensor<AType>({batch, m, n});
   auto QTQ = make_tensor<AType>({batch, m, m});
@@ -73,13 +73,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (QR = matmul(Q, R)).run(exec);
   (QTQ = matmul(conj(transpose_matrix(Q)), Q)).run(exec);
   exec.sync();
-  
+
   printf("Q:\n"); print(Q);
   printf("R:\n"); print(R);
   printf("QTQ:\n"); print(QTQ);
   printf("QR:\n"); print(QR);
   printf("A:\n"); print(A);
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

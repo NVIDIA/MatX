@@ -13,9 +13,13 @@
 
 namespace matx {
 
-#ifdef __CUDACC__  
-// Tile dims for one block
-#define TILE_DIM 32
+#ifdef __CUDACC__
+
+namespace matx_transpose_detail {
+  // Tile dims for one block
+  constexpr size_t TILE_DIM = 32;
+}
+using namespace matx_transpose_detail;
 
 /* Out of place. Adapted from:
    https://developer.nvidia.com/blog/efficient-matrix-transpose-cuda-cc/. Works
@@ -26,7 +30,7 @@ __global__ void transpose_kernel_oop(OutputTensor out,
 {
   using T = typename OutputTensor::value_type;
   constexpr int RANK = OutputTensor::Rank();
-  
+
   extern __shared__ float
       tile[]; // Need to swap complex types also, so cast when needed
   T *shm_tile = reinterpret_cast<T *>(&tile[0]);

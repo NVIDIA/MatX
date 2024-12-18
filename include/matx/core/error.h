@@ -46,7 +46,7 @@ namespace matx
 
   /**
    * @brief MatX error codes
-   * 
+   *
    */
   enum matxError_t
   {
@@ -121,11 +121,11 @@ namespace matx
 
     /**
      * @brief Throw an exception and print a stack trace
-     * 
-     * @param error 
-     * @param s 
-     * @param file 
-     * @param line 
+     *
+     * @param error
+     * @param s
+     * @param file
+     * @param line
      */
     matxException(matxError_t error, const char *s, const char *file, int line)
         : e(error)
@@ -190,8 +190,8 @@ namespace matx
       std::cout << #a ": " << str << "(" << tmp << " != " << expected << ")\n";\
       MATX_THROW(error, "");  \
     }                                  \
-  }  
-  
+  }
+
 #else
   #define MATX_ASSERT(a, error) {}
   #define MATX_ASSERT_STR(a, error, str) {}
@@ -216,14 +216,14 @@ namespace matx
   }
 
 // Macro for checking cuda errors following a cuda launch or api call
-#define CUDA_CHECK_LAST_ERROR()        \
+#define MATX_CUDA_CHECK_LAST_ERROR()        \
   {                                    \
     const auto e = cudaGetLastError(); \
     MATX_CUDA_CHECK(e);                \
   }
 
 // This macro asserts compatible dimensions of current class to an operator.
-#define ASSERT_COMPATIBLE_OP_SIZES(op)                               \
+#define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                               \
   if constexpr (Rank() > 0) {                                        \
     bool compatible = true;                                          \
     _Pragma("unroll")                                                \
@@ -249,6 +249,6 @@ namespace matx
       std::cerr << ")" << std::endl; \
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
     }                   \
-  }    
+  }
 
 } // end namespace matx

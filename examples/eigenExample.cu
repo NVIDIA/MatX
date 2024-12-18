@@ -44,6 +44,8 @@
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
+  MATX_ENTER_HANDLER();
+
   int dimX = 3;
   int dimY = 3;
 
@@ -53,9 +55,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //////////////               Eigen Test Data Setup               //////////////
   ///////////////////////////////////////////////////////////////////////////////
 #ifdef USE_EIGEN
-  
+
   typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXdRowMajor; // define a custom type that is aligned to MatX row-Major.
-  
+
   Eigen::MatrixXd  a(dimX, dimY);
   MatrixXdRowMajor b(dimX, dimY);
   Eigen::RowVectorXd rowVec(dimX);
@@ -88,7 +90,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   complexMatrix(0, 1) = std::complex<double>(2.0, 3.0);
   complexMatrix(1, 0) = std::complex<double>(3.0, 4.0);
   complexMatrix(1, 1) = std::complex<double>(4.0, 5.0);
-  
+
 #else
   std::cout <<"!!!!!!!!! Eigen NOT USED in Test !!!!!!!!!" << std ::endl;
   // provide data in tensors if eigen is not used
@@ -140,18 +142,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   //
   // Data Mapping Example
-  // 
-#ifdef USE_EIGEN  
+  //
+#ifdef USE_EIGEN
   std::cout << "=================== Data Map Example ===================" << std::endl;
   double *raw_data;
   // memory could be any type of allocation, but choosing to use managed memory so it's valid on the host and device (this does cost performance)
-  cudaMallocManaged((void**)&raw_data, dimX*dimY * sizeof(double)); 
-  
+  cudaMallocManaged((void**)&raw_data, dimX*dimY * sizeof(double));
+
   for(int i=0; i < dimX * dimY; i++)
   {
     raw_data[i] = 0.1 + i * 0.1;
   }
-  
+
   // map user memory into Eigen Matrix
   Eigen::Map<MatrixXdRowMajor> mappedMatrix(raw_data, dimX, dimY);
   std::cout << "Eigen Mapped Data :\n" << mappedMatrix << std::endl;
@@ -159,24 +161,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // map user memory into Eigen Matrix
   auto mappedTensor = matx::make_tensor(raw_data, {dimX, dimY}, false); // create MatX tensor with non-owning user allocated memory
   matx::print(mappedTensor);
-  
-  // modify the data from each of the references  
+
+  // modify the data from each of the references
   raw_data[4] = 117;
   mappedMatrix(0,1) = 42;
   mappedTensor(2,1) = 87;
-  
+
   // print modified data
   std::cout << "Eigen Mapped Data After Modified :\n" << mappedMatrix << std::endl;
   matx::print(mappedTensor);
-#endif 
+#endif
 
   //
   // Basic Indexing
   //
   std::cout << "=================== Indexing ===================" << std::endl;
 #ifdef USE_EIGEN
-  std::cout << "eigen a(1,2) = " <<  a(1,2) << std::endl; 
-#endif  
+  std::cout << "eigen a(1,2) = " <<  a(1,2) << std::endl;
+#endif
 
   std::cout << "MatX  a(1,2) = " << aTensor(1,2) << std::endl;
 
@@ -186,9 +188,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Addition ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::MatrixXd addResult = a + b; 
-  std::cout << "A + B = \n" << addResult << std::endl; 
-#endif  
+  Eigen::MatrixXd addResult = a + b;
+  std::cout << "A + B = \n" << addResult << std::endl;
+#endif
 
   auto addTensor = aTensor + bTensor;
   matx::print(addTensor);
@@ -199,9 +201,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Element-Wise Multiply ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::MatrixXd elementWise = a.cwiseProduct(b); 
-  std::cout << "A .* B = \n" << elementWise << std::endl; 
-#endif  
+  Eigen::MatrixXd elementWise = a.cwiseProduct(b);
+  std::cout << "A .* B = \n" << elementWise << std::endl;
+#endif
 
   auto elementWiseTensor = aTensor*bTensor;
   matx::print(elementWiseTensor);
@@ -212,9 +214,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Element-Wise Division ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::MatrixXd divResult = a.cwiseQuotient(b); 
-  std::cout << "A / B = \n" << divResult << std::endl; 
-#endif  
+  Eigen::MatrixXd divResult = a.cwiseQuotient(b);
+  std::cout << "A / B = \n" << divResult << std::endl;
+#endif
 
   auto divResultTensor = aTensor / bTensor;
   matx::print(divResultTensor);
@@ -225,9 +227,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Continuous Slice ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::Matrix2d aSlice = a.block(0, 0, 2, 2);       
-  std::cout << "A Sliced: \n" << aSlice << std::endl; 
-#endif  
+  Eigen::Matrix2d aSlice = a.block(0, 0, 2, 2);
+  std::cout << "A Sliced: \n" << aSlice << std::endl;
+#endif
 
   auto aSliceTensor = matx::slice<2>(aTensor,{0,0},{2,2});
   matx::print(aSliceTensor);
@@ -238,7 +240,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Strided Slice ===================" << std::endl;
 #ifdef USE_EIGEN
-  std::cout << "Original matrix10x10:\n" << matrix10x10 << "\n\n"; 
+  std::cout << "Original matrix10x10:\n" << matrix10x10 << "\n\n";
   // Define the starting point, number of elements to select, and strides for both rows and columns
   // int startRow = 0, startCol = 0; // Starting index for rows and columns
   // int rowStride = 3, colStride = 2; // Stride along rows and columns
@@ -246,14 +248,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // int numCols = 3; // Grab every third item until the 8th item (0, 3, 6)
 
   // Create a Map with Stride to access the elements
-  Eigen::Map<Eigen::MatrixXf, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>                        
-  strided(matrix10x10.data() + 0 * matrix10x10.outerStride() + 0,                                                
-          5, 3,                                                                                        
-          Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>(3 * matrix10x10.outerStride(), 2));                 
+  Eigen::Map<Eigen::MatrixXf, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>
+  strided(matrix10x10.data() + 0 * matrix10x10.outerStride() + 0,
+          5, 3,
+          Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>(3 * matrix10x10.outerStride(), 2));
 
   // Print the strided matrix10x10
-  std::cout << "Strided matrix10x10:\n" << strided << "\n";  
-#endif  
+  std::cout << "Strided matrix10x10:\n" << strided << "\n";
+#endif
 
   auto slicedMat = matx::slice(matTensor10x10, {0,0}, {matx::matxEnd,9}, {2,3});
   matx::print(slicedMat);
@@ -265,9 +267,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "=================== Clone ===================" << std::endl;
 #ifdef USE_EIGEN
   // Use the replicate function to create a 5x5 matrix by replicating the 1x5 matrix
-  Eigen::MatrixXd mat = rowVec.replicate(3, 1);         
+  Eigen::MatrixXd mat = rowVec.replicate(3, 1);
   std::cout << "1D Cloned to 2D \n" << mat << std::endl;
-#endif  
+#endif
 
   auto cloned3Tensor = matx::clone<2>(tensor1D, {3, matx::matxKeepDim});
   matx::print(cloned3Tensor);
@@ -278,9 +280,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Slice Row ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::RowVector3d row = a.row(1);               
+  Eigen::RowVector3d row = a.row(1);
   std::cout << "Sliced Row \n" << row << std::endl;
-#endif  
+#endif
 
   auto rowSlice = matx::slice<1>(aTensor, {1, 0}, {matx::matxDropDim, matx::matxEnd});
   matx::print(rowSlice);
@@ -291,14 +293,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Permute Rows ===================" << std::endl;
 #ifdef USE_EIGEN
-  std::cout << "Original Matrix:\n" << a << std::endl;  
+  std::cout << "Original Matrix:\n" << a << std::endl;
   // Define a permutation a
-  Eigen::PermutationMatrix<3> perm;    
+  Eigen::PermutationMatrix<3> perm;
   perm.indices() << 2, 1, 0;  // This permutation swaps the first and third rows
   // Apply the permutation to the rows
   Eigen::Matrix3d permutedMatrix = perm * a;
   std::cout << "Permuted Matrix (Rows):\n" << permutedMatrix << std::endl;
-#endif  
+#endif
 
   // Define a permutation a
   auto permVec = matx::make_tensor<int>({dimX});
@@ -323,12 +325,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Get Real Values ===================" << std::endl;
 #ifdef USE_EIGEN
-  std::cout << "Original Complex Matrix:\n" << complexMatrix << std::endl; 
+  std::cout << "Original Complex Matrix:\n" << complexMatrix << std::endl;
 
   // Extract and output the real part of the complex matrix
-  Eigen::Matrix<double, 2, 2> realMatrix = complexMatrix.real();    
-  std::cout << "Real Part of Matrix:\n" << realMatrix << std::endl; 
-#endif  
+  Eigen::Matrix<double, 2, 2> realMatrix = complexMatrix.real();
+  std::cout << "Real Part of Matrix:\n" << realMatrix << std::endl;
+#endif
 
   auto realTensor = matx::real(complexTensor);
   matx::print(realTensor);
@@ -339,9 +341,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   std::cout << "=================== Matrix Multiply ===================" << std::endl;
 #ifdef USE_EIGEN
-  Eigen::MatrixXd multResult = a * b;                    
-  std::cout << "A * B = \n" << multResult << std::endl;  
-#endif  
+  Eigen::MatrixXd multResult = a * b;
+  std::cout << "A * B = \n" << multResult << std::endl;
+#endif
 
   auto multResultTensor=matmul(aTensor,bTensor);
   matx::print(multResultTensor);
@@ -354,7 +356,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #ifdef USE_EIGEN
   // Eigen::MatrixXd inverseMatrix = a.inverse();                                              // current bug where .run(exec) in inverse is ambiguous, so cannot be used with MatX
   // std::cout << "Inverse of the Real Part:\n" << inverseMatrix << std::endl; // current bug where .run(exec) in inverse is ambiguous, so cannot be used with MatX
-#endif  
+#endif
 
   auto invTensor = matx::inv(aTensor);
   matx::print(invTensor);
@@ -384,5 +386,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   // Unsupported by eigen
 
+  MATX_CUDA_CHECK_LAST_ERROR();
+  MATX_EXIT_HANDLER();
   return 0;
 }
