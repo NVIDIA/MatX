@@ -58,6 +58,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     {-13,  13}, {-14,  14}, {-15,  15}, {-16, 16}
   });
 
+  A1.set_name("A1 Matrix");
   auto A2 = reshape(A1, {4,4});
   auto A3 = reshape(A1, {2,2,4});
   auto A4 = reshape(A1, {2,2,2,2});

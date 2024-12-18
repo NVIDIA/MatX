@@ -92,7 +92,7 @@ class tensor_impl_t {
 
 
     const std::string str() const {
-      return std::string("T") + std::to_string(RANK) + "_" + to_short_str<T>();
+      return std::string("tensor_impl_") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 
     /** Swaps two raw_pointer_buffers
@@ -212,8 +212,8 @@ class tensor_impl_t {
 // gcc 14.1 incorrectly reports desc as uninitialized in some contexts
 IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
-    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,  
-                    DescriptorType &&desc)                
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
+                    DescriptorType &&desc)
         : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
     {
     }
@@ -663,7 +663,7 @@ IGNORE_WARNING_POP_GCC
         MATX_ASSERT_STR(first < end, matxInvalidSize, "Slice must be at least one element long");
 
         [[maybe_unused]] typename Desc::stride_type stride_mult;
-        
+
         if constexpr (std::is_same_v<StrideType, detail::NoStride>) {
           stride_mult = 1;
         }
@@ -724,7 +724,7 @@ IGNORE_WARNING_POP_GCC
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
       return Slice<N, detail::NoStride>(firsts, ends, detail::NoStride{});
-    }  
+    }
 
 
     template <int N>
@@ -761,7 +761,7 @@ IGNORE_WARNING_POP_GCC
       tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
       return new_desc;
     }
-  
+
 
     template <int N>
     __MATX_INLINE__ auto Clone(const cuda::std::array<index_t, N> &clones) const
@@ -857,7 +857,7 @@ IGNORE_WARNING_POP_GCC
       } else {
         return false;
       }
-    }    
+    }
 
     /**
      * Set the size of a dimension

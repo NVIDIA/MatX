@@ -156,8 +156,13 @@ public:
 
   __MATX_INLINE__  ~tensor_t() = default;
 
-  __MATX_INLINE__ const std::string str() const {
-    return std::string("T") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
+  const std::string str() const {
+    return name_;
+  }
+
+  void set_name(std::string name)
+  {
+    name_ = name;
   }
 
   /**
@@ -1332,7 +1337,7 @@ public:
    * more dimensions of a tensor. This includes completely dropping an unwanted
    * dimension, or simply taking a piece of a wanted dimension. Slice() is very
    * similar to indexing operations in both Python and MATLAB.
-   * 
+   *
    * *NOTE* Users should not call Slice() directly anymore. Use the slice() operator instead.
    *
    * @param firsts
@@ -1511,6 +1516,7 @@ public:
 
 private:
   Storage storage_;
+  std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
 };
 
 
