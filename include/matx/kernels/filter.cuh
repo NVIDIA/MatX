@@ -8,26 +8,23 @@
 #include <stdio.h>
 #include <vector>
 
-#define MAX_BATCHES 10000
-#define BLOCK_SIZE_RECURSIVE 1024
-#define CORR_COLS BLOCK_SIZE_RECURSIVE
-#define MAX_BLOCKS_PER_BATCH 1000
-#define RECURSIVE_VALS_PER_THREAD 8
-#define MAX_NON_RECURSIVE_COEFFS 4
-#define MAX_RECURSIVE_COEFFS 4
-#define WARP_SIZE 32
-#define COMPLEX_TYPE cuComplex
-#define RECURSIVE_CHUNK_SIZE (BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD)
-#define MAX_SIGNAL_LEN_PER_BATCH                                               \
-  (BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD * MAX_BLOCKS_PER_BATCH)
-
-#define COMPLEX_TYPE cuComplex
-
-// cuda::std::max/min isn't working on template value parameters
-#define MAX(a, b) ((a) < (b) ? (b) : (a))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
 namespace matx {
+
+namespace detail_filter {
+  constexpr size_t MAX_BATCHES = 10000;
+  constexpr size_t BLOCK_SIZE_RECURSIVE = 1024;
+  constexpr size_t CORR_COLS = BLOCK_SIZE_RECURSIVE;
+  constexpr size_t MAX_BLOCKS_PER_BATCH = 1000;
+  constexpr size_t RECURSIVE_VALS_PER_THREAD = 8;
+  constexpr size_t MAX_NON_RECURSIVE_COEFFS = 4;
+  constexpr size_t MAX_RECURSIVE_COEFFS = 4;
+  constexpr size_t WARP_SIZE = 32;
+  using COMPLEX_TYPE = cuComplex;
+  constexpr size_t RECURSIVE_CHUNK_SIZE = BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD;
+  constexpr size_t MAX_SIGNAL_LEN_PER_BATCH =
+    (BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD * MAX_BLOCKS_PER_BATCH);
+};
+using namespace detail_filter;
 
 typedef enum {
   STATUS_FLAG_INCOMPLETE = 0,
@@ -35,7 +32,7 @@ typedef enum {
   STATUS_FLAG_FULL_COMPLETE = 2,
 } STATUS_FLAGS;
 
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
 // Chunk ID assignment used for atomic incrementing between blocks
 static __device__ uint32_t cid_assign[MAX_BATCHES] = {0};
 
@@ -54,7 +51,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
   __shared__ intype_strip
       s_exch[1 + (1 + BLOCK_SIZE_RECURSIVE) *
-                     MAX(num_non_recursive - 1,
+                     cuda::std::max(num_non_recursive - 1,
                          num_recursive)]; // Data exchange between threads
   __shared__ uint32_t s_chunk_id;
   __shared__ FilterType
@@ -64,7 +61,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
                                              // since nvcc doesn't like that
   intype_strip tmp[RECURSIVE_VALS_PER_THREAD];
   intype_strip vals[RECURSIVE_VALS_PER_THREAD];
-  intype_strip r_nonr[MAX(MAX_NON_RECURSIVE_COEFFS, MAX_RECURSIVE_COEFFS)];
+  intype_strip r_nonr[cuda::std::max(MAX_NON_RECURSIVE_COEFFS, MAX_RECURSIVE_COEFFS)];
   const uint32_t lane = threadIdx.x & 31;
   const uint32_t warp_id = threadIdx.x / WARP_SIZE;
 // const index_t batch_offset = blockIdx.y * len;
@@ -259,7 +256,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
 // Load all of the values we need from other threads in the warp
 #pragma unroll
-      for (int32_t rec = 0; rec < MIN(num_recursive, wl); rec++) {
+      for (int32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
         if constexpr (is_cuda_complex_v<InType>) {
           *reinterpret_cast<uint64_t *>(&tmp[rec + 1]) =
               __shfl_sync(~0, *reinterpret_cast<uint64_t *>(&vals[r]),
@@ -274,7 +271,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
           len) { // Make sure this value is within bounds of the signal
 // Now apply those values
 #pragma unroll
-        for (int32_t rec = 0; rec < MIN(num_recursive, wl); rec++) {
+        for (int32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[r] =
                 cuCaddf(vals[r],

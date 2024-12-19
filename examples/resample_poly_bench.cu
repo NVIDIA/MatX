@@ -159,17 +159,17 @@ void ResamplePolyBench()
       }
       cudaEventRecord(stop, stream);
       exec.sync();
-      CUDA_CHECK_LAST_ERROR();
+      MATX_CUDA_CHECK_LAST_ERROR();
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 
       const double gflops = static_cast<double>(num_batches*(2*filter_len_per_phase-1)*output_len) / 1.0e9;
       const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
-      printf("Batches: %5" INDEX_T_FMT "  FilterLen: %5" INDEX_T_FMT "  InputLen: %9" INDEX_T_FMT "  OutputLen: %8" INDEX_T_FMT
-      "  Up/Down: %4" INDEX_T_FMT "/%4" INDEX_T_FMT " Elapsed Usecs: %12.1f GFLOPS: %10.3f\n",
+      printf("Batches: %5" MATX_INDEX_T_FMT "  FilterLen: %5" MATX_INDEX_T_FMT "  InputLen: %9" MATX_INDEX_T_FMT "  OutputLen: %8" MATX_INDEX_T_FMT
+      "  Up/Down: %4" MATX_INDEX_T_FMT "/%4" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f GFLOPS: %10.3f\n",
         num_batches, filter_len, input_len, output_len, up, down, avg_elapsed_us, gflops/(avg_elapsed_us/1.0e6));
   }
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);

@@ -56,24 +56,24 @@ namespace matx
     private:
       typename detail::base_type_t<C1> cond_;
       typename detail::base_type_t<T1> op1_;
-      typename detail::base_type_t<T2> op2_;    
+      typename detail::base_type_t<T2> op2_;
       cuda::std::array<index_t, detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:
       using value_type = void; ///< Scalar type for type extraction
 
-      __MATX_INLINE__ std::string str() const { 
-        return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}"; 
+      __MATX_INLINE__ std::string str() const {
+        return  "if(" + detail::get_type_str(cond_) + ") then {" +  detail::get_type_str(op1_) + "} else {" + detail::get_type_str(op2_) + "}";
       }
 
       /**
        * @brief Constructor for an IFELSE statement
-       * 
+       *
        * @param cond Condition to perform the IF/ELSE on
        * @param op1 Operator if conditional branch is true
        * @param op2 Operator if conditional branch is false
        */
-      __MATX_INLINE__ IFELSE(const C1 &cond, const T1 &op1, const T2 &op2) : 
+      __MATX_INLINE__ IFELSE(const C1 &cond, const T1 &op1, const T2 &op2) :
                               cond_(cond), op1_(op1), op2_(op2)
     {
       static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
@@ -97,14 +97,14 @@ namespace matx
         }
       }
 
-      ASSERT_COMPATIBLE_OP_SIZES(op1_);
-      ASSERT_COMPATIBLE_OP_SIZES(op2_);
-      ASSERT_COMPATIBLE_OP_SIZES(cond_);
+      MATX_ASSERT_COMPATIBLE_OP_SIZES(op1_);
+      MATX_ASSERT_COMPATIBLE_OP_SIZES(op2_);
+      MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
     }
 
       /**
        * @brief Operator() for getting values of an if/else
-       * 
+       *
        * @tparam Is Index types
        * @param indices Index values
        */
@@ -116,11 +116,11 @@ namespace matx
           else {
             get_value(op2_, indices...);
           }
-        }      
+        }
 
       /**
        * @brief Rank of IF/ELSE operator
-       * 
+       *
        * @return Rank
        */
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -137,11 +137,11 @@ namespace matx
 
         if constexpr (is_matx_op<T2>()) {
           op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
+        }
 
         if constexpr (is_matx_op<C1>()) {
           cond_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -153,18 +153,18 @@ namespace matx
 
         if constexpr (is_matx_op<T2>()) {
           op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }        
+        }
 
         if constexpr (is_matx_op<C1>()) {
           cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }        
+      }
 
       /**
        * @brief Size of dimension of operator
-       * 
+       *
        * @param dim Dimension to get size of
-       * @return Size of dimension 
+       * @return Size of dimension
        */
       constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
       {

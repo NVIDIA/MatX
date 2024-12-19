@@ -101,7 +101,7 @@ public:
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
     if constexpr (!is_mtie<T>()) {
-      ASSERT_COMPATIBLE_OP_SIZES(op);
+      MATX_ASSERT_COMPATIBLE_OP_SIZES(op);
     }
   }
 
@@ -152,18 +152,18 @@ public:
   {
     if constexpr (is_matx_op<T>()) {
       out_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-    }    
+    }
     if constexpr (is_matx_op<Op>()) {
       op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
   {
     if constexpr (is_matx_op<T>()) {
       out_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-    }     
+    }
     if constexpr (is_matx_op<Op>()) {
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }

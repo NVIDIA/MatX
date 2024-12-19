@@ -143,7 +143,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
       viz::contour(time, freqs, Sxx);
 #else
       printf("Not outputting plot since visualizations disabled\n");
-#endif            
+#endif
     }
   }
 
@@ -164,6 +164,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
   cudaStreamDestroy(stream);
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

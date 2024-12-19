@@ -58,6 +58,3 @@ namespace matx {
   using fcomplex = cuda::std::complex<float>;
   using dcomplex = cuda::std::complex<double>;
 }
-
-#define TEST_VECTOR_PATH "generated/"
-

@@ -64,7 +64,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto [phi, theta] = meshgrid(az, col);
 
   auto Plm = lcollapse<3>(legendre(l, m, cos(theta)));
- 
+
   ValueType a = (2*l+1)*factorial<ValueType>(l-m);
   ValueType b = 4*M_PI*factorial<ValueType>(l+m);
   ValueType C = cuda::std::sqrt(a/b);
@@ -85,6 +85,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #if MATX_ENABLE_VIZ
   matx::viz::surf(X, Y, Z, "test-viz.html");
 #endif
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

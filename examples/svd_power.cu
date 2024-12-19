@@ -56,7 +56,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   int k = d;  // number of singular values to find
 
 #if 0
-  int batch = 1; 
+  int batch = 1;
   auto A = make_tensor<AType>({batch, m, n});
   auto U = make_tensor<AType>({batch, m, k});
   auto VT = make_tensor<AType>({batch, k, n});
@@ -70,7 +70,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VVT = make_tensor<AType>({batch, n, n});
   auto VTV = make_tensor<AType>({batch, k, k});
   auto x0 = random<float>({batch, d}, NORMAL);
-    
+
   (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
 #else
@@ -87,7 +87,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VVT = make_tensor<AType>({n, n});
   auto VTV = make_tensor<AType>({k, k});
   auto x0 = random<float>({d}, NORMAL);
-  
+
   (A = random<float>({m, n}, NORMAL)).run(exec);
 
 #endif
@@ -99,7 +99,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   float tol = (float)1e-3;
   int iterations = 20;
-  
+
   {
 
     printf("iterations: %d\n", iterations);
@@ -157,7 +157,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     printf("A-UDVT\n");
     print(A);
   }
-  
+
   // Same as above but with svdbpi
   {
 
@@ -215,6 +215,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     print(A);
   }
 #endif
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }
