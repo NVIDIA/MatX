@@ -197,7 +197,7 @@ TEST_F(PrintTest, DefaultTest5)
   auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
 
   print_checker(testSlice,
-      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "tensor_0_f64c: Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
       "-9.2466e-01+9.9114e-01j \n");
 
   MATX_EXIT_HANDLER();
@@ -211,7 +211,7 @@ TEST_F(PrintTest, MlabTest1)
   ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
 
   print_checker(A1,
-      "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
+      "tensor_1_f64c: Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
       "[-9.2466e-01+9.9114e-01j ,\n"
       " -4.2534e-01+1.0676e+00j ,\n"
       " -2.6438e+00-6.2723e-01j ,\n"
@@ -307,7 +307,7 @@ TEST_F(PrintTest, MlabTest5)
   auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
 
   print_checker(testSlice,
-      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "tensor_0_f64c: Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
       "-9.2466e-01+9.9114e-01j \n");
 
   MATX_EXIT_HANDLER();
@@ -321,7 +321,7 @@ TEST_F(PrintTest, PythonTest1)
   ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
 
   print_checker(A1,
-      "Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
+      "tensor_1_f64c: Tensor{complex<double>} Rank: 1, Sizes:[16], Strides:[1]\n"
       "[-9.2466e-01+9.9114e-01j ,\n"
       " -4.2534e-01+1.0676e+00j ,\n"
       " -2.6438e+00-6.2723e-01j ,\n"
@@ -413,7 +413,7 @@ TEST_F(PrintTest, PythonTest5)
   auto testSlice = matx::slice<0>(A1, {0}, {matx::matxDropDim});
 
   print_checker(testSlice,
-      "Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
+      "tensor_0_f64c: Tensor{complex<double>} Rank: 0, Sizes:[], Strides:[]\n"
       "-9.2466e-01+9.9114e-01j \n");
 
   MATX_EXIT_HANDLER();
