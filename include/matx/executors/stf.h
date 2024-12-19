@@ -59,32 +59,32 @@ template <typename T> constexpr bool is_matx_set_op();
        * 
        * @param stream CUDA stream
        */
-      stfExecutor(cudaStream_t stream) : stream_(stream) {
+      stfExecutor(cudaStream_t stream, bool is_cudagraph = false) : stream_(stream) {
           cuda::experimental::stf::async_resources_handle handle;
-          ctx_ = cuda::experimental::stf::stream_ctx(stream, handle);
-          //ctx_ = cuda::experimental::stf::graph_ctx(stream, handle);
+          if (!is_cudagraph)
+              ctx_ = cuda::experimental::stf::stream_ctx(stream, handle);
+          else
+              ctx_ = cuda::experimental::stf::graph_ctx(stream, handle);
       }
-      stfExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {
+
+      stfExecutor(int stream, bool is_cudagraph = false) : stream_(reinterpret_cast<cudaStream_t>(stream)) {
           cuda::experimental::stf::async_resources_handle handle;
-          ctx_ = cuda::experimental::stf::stream_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
-          //ctx_ = cuda::experimental::stf::graph_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
+          if (!is_cudagraph)
+              ctx_ = cuda::experimental::stf::stream_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
+          else
+              ctx_ = cuda::experimental::stf::graph_ctx(reinterpret_cast<cudaStream_t>(stream), handle);
       }
 
       /**
        * @brief Construct a new stfExecutor object using the default stream
        * 
        */
-      stfExecutor() : stream_(0) {
-          ctx_ = cuda::experimental::stf::stream_ctx();
-          //ctx_ = cuda::experimental::stf::graph_ctx();
+      stfExecutor(bool is_cudagraph = false) : stream_(0) {
+          if (!is_cudagraph)
+              ctx_ = cuda::experimental::stf::stream_ctx();
+          else
+              ctx_ = cuda::experimental::stf::graph_ctx();
       }
-
-#if 0
-      ~stfExecutor() {
-        std::cout << "About to call ctx.finalize\n";
-        ctx_.finalize();
-      }
-#endif
 
       /**
        * @brief Returns stream associated with executor
