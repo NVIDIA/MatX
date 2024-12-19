@@ -77,7 +77,7 @@ namespace matx
       __MATX_INLINE__ StackOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
-        static_assert((... && (RANK == ts.Rank())), "stacked ops must have the same rank");
+        static_assert((... && (RANK == Ts::Rank())), "stacked ops must have the same rank");
 
         for (int32_t i = 0; i < RANK; i++) {
           MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)

@@ -643,7 +643,7 @@ __MATX_INLINE__ auto getCufft1DSupportedTensor( const Op &in, cudaStream_t strea
 template <typename Op>
 __MATX_INLINE__ auto getCufft2DSupportedTensor( const Op &in, cudaStream_t stream) {
   // This would be better as a templated lambda, but we don't have those in C++17 yet
-  const auto support_func = [&in]() {
+  const auto support_func = [&]() {
     if constexpr (is_tensor_view_v<Op>) {
       if ( in.Stride(Op::Rank()-2) != in.Stride(Op::Rank()-1) * in.Size(Op::Rank()-1)) {
         return false;
