@@ -1102,7 +1102,7 @@ using gemm_cuda_cache_t = std::unordered_map<MatMulCUDAParams_t, std::any,  MatM
 template <typename Op>
 __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream) {
   // This would be better as a templated lambda, but we don't have those in C++17 yet
-  const auto support_func = [&in]() {
+  const auto support_func = [&]() {
     if constexpr (is_tensor_view_v<Op>) {
       return !(
         (in.Stride(Op::Rank()-1) != (index_t)1 && in.Stride(Op::Rank()-2) != (index_t)1) ||

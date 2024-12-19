@@ -73,7 +73,7 @@ namespace matx
             tp->Exec(ex);
           }          
           else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (static_cast<const T *>(this)->IsTransformSet()) {
+            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               tp->TransformExec(tp->Shape(), ex);
             }
             else {

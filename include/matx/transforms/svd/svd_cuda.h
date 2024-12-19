@@ -551,13 +551,11 @@ static __MATX_INLINE__ SVDMethod GetCUDASVDMethod(const ATensor &a) {
   static constexpr int RANK = ATensor::Rank();  
   index_t m = a.Size(RANK - 2);
   index_t n = a.Size(RANK - 1);
-  SVDMethod method;
 
-  // This assumes the matrix sizes are fairly large, in which case gesvd should win out on speed
-  if (a.Rank() == 2) {
-    method = detail::SVDMethod::GESVD;
-  }
-  else {
+  // gesvd is a good default for non-batched
+  SVDMethod method = detail::SVDMethod::GESVD;
+
+  if (a.Rank() != 2) {
     if (a.Size(RANK-2) <= 32 && 
         a.Size(RANK-1) <= 32) {
       if constexpr (is_tensor_view_v<ATensor>) {
