@@ -1133,27 +1133,21 @@ IGNORE_WARNING_POP_GCC
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
-        using namespace cuda::experimental::stf;
-        data_place place;
-
-        if constexpr (is_cuda_executor_v<Executor>) {
-            return;
-        }
-        else if constexpr (!is_cuda_executor_v<Executor>) {
-
+        if constexpr (is_stf_executor_v<Executor>) {
+            using namespace cuda::experimental::stf;
             /* Don't create a new logical data for a tensor if it alread had one created previously */
             if (stf_ldata_ && stf_ldata_->has_value()) { return; }
 
             auto ctx = ex.getCtx();
 #if 0
             // Determine the type of memory that was allocated ie. host/managed/etc
-            place = getDataPlace(Data());
+            data_place place = getDataPlace(Data());
 #endif
 
             *stf_ldata_ = ctx.logical_data(cuda::experimental::stf::void_interface());
             //stf_ldata_->value().set_write_back(false);
             stf_ldata_->value().set_symbol(this->str());
-        }       
+        } 
     }
 
     template <typename ShapeType, typename Executor>
