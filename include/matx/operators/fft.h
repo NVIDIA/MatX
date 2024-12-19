@@ -156,7 +156,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
             // stfexecutor case
-            if constexpr (!is_cuda_executor_v<Executor>) {
+            if constexpr (is_stf_executor_v<Executor>) {
                 auto ctx = ex.getCtx();
                 auto tsk = ctx.task();
                 tsk.set_symbol("fft_task_no_perm");
@@ -185,8 +185,9 @@ namespace matx
                         }
                     }
                 };
-            }            
-            else if constexpr (is_cuda_executor_v<Executor>) {
+            }
+            // cudaExecutor or host case
+            else {
                 if constexpr (std::is_same_v<PermDims, no_permute_t>) {
                     if constexpr (std::is_same_v<FFTType, fft_t>) {
                         fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
@@ -204,9 +205,6 @@ namespace matx
                     }
                 }
             }
-            else {
-                printf("SHOULDNT BE HERE..\n");
-            }            
         }
 
         template <typename ShapeType, typename Executor>
