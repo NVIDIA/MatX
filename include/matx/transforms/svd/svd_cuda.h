@@ -666,7 +666,7 @@ public:
     cusolverStatus_t ret;
 
     // Use all mode for a larger workspace size that works for all modes
-    if (!batched) {
+    if (params.method == SVDMethod::GESVD) {
       ret = cusolverDnXgesvd_bufferSize(
               this->handle, this->dn_params, 'A', 'A', params.m, params.n,
               MatXTypeToCudaType<T1>(), params.A, params.m,
@@ -872,7 +872,6 @@ private:
   std::vector<T4 *> batch_vt_ptrs;
   gesvdjInfo_t batch_params = nullptr;
   DnSVDCUDAParams_t params;
-  bool batched;
 };
 
 /**
