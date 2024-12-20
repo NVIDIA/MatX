@@ -27,7 +27,7 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <matx/core/type_utils.h>
@@ -136,11 +136,15 @@ namespace matx {
 
     template <typename Op>
     void PrintShapeImpl(const Op& op, FILE *fp) {
-      std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";      
+      if (is_tensor_view_v<Op>) {
+        fprintf(fp, "%s: ",op.str().c_str());
+      }
+
+      std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
       fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorTypeString<typename Op::value_type>().c_str(), op.Rank());
       for (index_t dimIdx = 0; dimIdx < op.Rank(); dimIdx++)
       {
-        fprintf(fp, "%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
+        fprintf(fp, "%" MATX_INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
           fprintf(fp, ", ");
       }
@@ -152,7 +156,7 @@ namespace matx {
         {
           for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
           {
-            fprintf(fp, "%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
+            fprintf(fp, "%" MATX_INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
             if( dimIdx < (op.Rank() - 1) )
             {
               fprintf(fp, ",");
@@ -161,8 +165,8 @@ namespace matx {
         }
       }
 
-      fprintf(fp, "]\n");      
-    }    
+      fprintf(fp, "]\n");
+    }
 
 
     /**
@@ -195,7 +199,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+            fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
           }
           PrintVal(fp, op.operator()(_k));
           if (_k == (op.Size(0)-1)) {
@@ -223,7 +227,7 @@ namespace matx {
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
             if (_l == 0) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
               }
               else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                 if (_k == 0) {
@@ -284,7 +288,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "[%06" INDEX_T_FMT ",:,:]\n", _j);
+            fprintf(fp, "[%06" MATX_INDEX_T_FMT ",:,:]\n", _j);
           }
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -311,7 +315,7 @@ namespace matx {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
               if (_l == 0) {
                 if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                  fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                  fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                 }
                 else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                   if (_k == 0) {
@@ -395,7 +399,7 @@ namespace matx {
               }
             }
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-              fprintf(fp, "[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
+              fprintf(fp, "[%06" MATX_INDEX_T_FMT ",%06" MATX_INDEX_T_FMT ",:,:]\n", _i, _j);
             }
             for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -422,7 +426,7 @@ namespace matx {
               for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
                 if (_l == 0) {
                   if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                    fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                    fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                   }
                   else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                     if (_k == 0) {
@@ -506,7 +510,7 @@ namespace matx {
         PrintData(fp, tmpv, dims...);
       }
   #endif
-    }    
+    }
 
 
     /**
@@ -596,7 +600,7 @@ namespace matx {
   template <typename T>
   void print_shape(const T& op) {
     detail::PrintShapeImpl(op, stdout);
-  }  
+  }
 
   /**
    * @brief print a tensor's values to output file stream
@@ -685,19 +689,19 @@ namespace matx {
   /**
    * @brief Print a tensor's all values to stdout
    *
-   * This form of `print()` is a specialization for 0D tensors. 
+   * This form of `print()` is a specialization for 0D tensors.
    *
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op, 
+  template <typename Op,
           std::enable_if_t<(Op::Rank() == 0), bool> = true>
-  void print(const Op &op) 
+  void print(const Op &op)
   {
     fprint(stdout, op);
   }
 
-  #endif // not DOXYGEN_ONLY  
+  #endif // not DOXYGEN_ONLY
 
   /**
    * @brief Set the print() precision for floating point values
@@ -733,6 +737,6 @@ namespace matx {
    */
   __MATX_INLINE__ __MATX_HOST__ enum PrintFormatType get_print_format_type() {
     return PRINT_FORMAT_TYPE;
-  }  
+  }
 
 } // End namespace matx

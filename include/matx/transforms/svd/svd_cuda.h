@@ -75,7 +75,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
 
   auto RShape = A.Shape();
   RShape[RANK-1] = d;
-  RShape[RANK-2] = d;  
+  RShape[RANK-2] = d;
 
   cuda::std::array<index_t,RANK-2> l2NormShape;
   for(int i=0;i<RANK-2;i++) {
@@ -89,7 +89,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
   auto R = make_tensor<ATypeS>(RShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto Z = make_tensor<ATypeS>(QShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto l2Norm = make_tensor<float>(l2NormShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream); 
+  auto converged = make_tensor<int>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
   return cuda::std::tuple(AT, Q, Qold, R, Z, l2Norm, converged);
 }
 
@@ -124,7 +124,7 @@ inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
  *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
  *   Random tensor of size batches x min(n,m) is suggested.
  * @param iterations
- *   The number of power iterations to perform for each singular value.  
+ *   The number of power iterations to perform for each singular value.
  * @param exec
  *   CUDA executor
  * @param k
@@ -146,7 +146,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   auto m = A.Size(RANK-2);  // rows
   auto n = A.Size(RANK-1);  // cols
   auto d = cuda::std::min(n,m); // dim for AAT or ATA
-  
+
   // if sentinal found get all singularvalues
   if( k == -1 ) k = (int) d;
 
@@ -156,7 +156,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
     MATX_ASSERT_STR(VT.Size(i) == A.Size(i), matxInvalidDim, "svdpi:  VT and A must have the same batch sizes");
     MATX_ASSERT_STR(S.Size(i) == A.Size(i), matxInvalidDim, "svdpi:  S and A must have the same batch sizes");
   }
-  
+
   MATX_ASSERT_STR(U.Size(RANK-2) == m, matxInvalidDim, "svdpi: U must have Size(RANK-2) == m");
   MATX_ASSERT_STR(U.Size(RANK-1) == k, matxInvalidDim, "svdpi: U must have Size(RANK-1) == k");
   MATX_ASSERT_STR(VT.Size(RANK-2) == k, matxInvalidDim, "svdpi: VT must have Size(RANK-2) == k");
@@ -199,7 +199,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
   auto uv = make_tensor<ATypeS>(AShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto AT = make_tensor<ATypeS>(ATShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto xm = make_tensor<ATypeS>(xmShape, MATX_ASYNC_DEVICE_MEMORY, stream);
-  
+
   // we shouldn't need sums but cub doesn't support strided tensors so we cannot write directly at this time.
   auto sums = make_tensor<STypeS>(sumsShape, MATX_ASYNC_DEVICE_MEMORY, stream);
   auto x = slice<RANK-1>(xm, xSliceB, xSliceE);
@@ -341,7 +341,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
 
       (u = u / clone(s, sCloneShape)).run(stream);
     } // end ufirst
-    
+
     // Remove current singular vectors from matrix
     if(i < k - 1) {
 
@@ -384,7 +384,7 @@ void svdpi_impl(UType &U, SType &S, VTType &VT, AType &A, X0Type &x0, int iterat
  * @param A
  *   Input tensor or operator for tensor A input with size "batches by m by n"
  * @param max_iters
- *   The approximate maximum number of QR iterations to perform. 
+ *   The approximate maximum number of QR iterations to perform.
  * @param tol
  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
  * @param exec
@@ -466,7 +466,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
       //compute L2(Q-Qold)
       // sqrt folded into next operation
-      (l2Norm = sum(abs2(Q-Qold))).run(stream);  
+      (l2Norm = sum(abs2(Q-Qold))).run(stream);
 
       // compute if all batches have converged
       if constexpr (RANK > 2) {
@@ -474,14 +474,14 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
       } else {
         (converged = as_int(sqrt(l2Norm) < tol)).run(stream);
       }
-      
+
       // event to record when converged is ready in stream
       cudaEventRecord(event, stream);
       // wait for d2h transfer until converged is ready
       cudaStreamWaitEvent(d2h, event);
 
-      // copy convergence criteria to host.  
-      // This is in unpinned memory and cannot on most systems run asynchronously.  
+      // copy convergence criteria to host.
+      // This is in unpinned memory and cannot on most systems run asynchronously.
       // We do this here to hide the copy/sync behind prior launch latency/execution of next iteration.
       cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
     }
@@ -498,7 +498,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
     DShape[RANK-2] = m;
     auto D = clone<RANK>(S, DShape);
 
-    // normalize U by singular values 
+    // normalize U by singular values
     // IF required to avoid nans when singular value is 0
     (IF(D != STypeS(0), U = U / D)).run(stream);
 
@@ -548,7 +548,7 @@ struct DnSVDCUDAParams_t {
 
 template <typename ATensor>
 static __MATX_INLINE__ SVDMethod GetCUDASVDMethod(const ATensor &a) {
-  static constexpr int RANK = ATensor::Rank();  
+  static constexpr int RANK = ATensor::Rank();
   index_t m = a.Size(RANK - 2);
   index_t n = a.Size(RANK - 1);
 
@@ -556,16 +556,16 @@ static __MATX_INLINE__ SVDMethod GetCUDASVDMethod(const ATensor &a) {
   SVDMethod method = detail::SVDMethod::GESVD;
 
   if (a.Rank() != 2) {
-    if (a.Size(RANK-2) <= 32 && 
+    if (a.Size(RANK-2) <= 32 &&
         a.Size(RANK-1) <= 32) {
       if constexpr (is_tensor_view_v<ATensor>) {
-  #if !defined(INDEX_32_BIT)        
+  #if !defined(MATX_INDEX_32_BIT)
         if (a.Stride(0) < std::numeric_limits<int32_t>::max()) {
           method = detail::SVDMethod::GESVDJ_BATCHED;
         }
   #else
         method = detail::SVDMethod::GESVDJ_BATCHED;
-  #endif        
+  #endif
       }
       else {
         method = detail::SVDMethod::GESVDJ_BATCHED;
@@ -651,7 +651,7 @@ public:
       MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnCreateGesvdjInfo");
 
       ret = cusolverDnXgesvdjSetTolerance(batch_params, 1e-9);
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnXgesvdjSetTolerance");      
+      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnXgesvdjSetTolerance");
 
       ret = cusolverDnXgesvdjSetMaxSweeps(batch_params, 15);
       MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnXgesvdjSetMaxSweeps");
@@ -666,7 +666,7 @@ public:
     cusolverStatus_t ret;
 
     // Use all mode for a larger workspace size that works for all modes
-    if (!batched) {
+    if (params.method == SVDMethod::GESVD) {
       ret = cusolverDnXgesvd_bufferSize(
               this->handle, this->dn_params, 'A', 'A', params.m, params.n,
               MatXTypeToCudaType<T1>(), params.A, params.m,
@@ -675,44 +675,45 @@ public:
               MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
     }
     else {
+      int i_dspace;
+
       if constexpr (std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const float *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<const float *>(params.S), reinterpret_cast<const float *>(params.U), static_cast<int>(params.m), 
+                reinterpret_cast<const float *>(params.S), reinterpret_cast<const float *>(params.U), static_cast<int>(params.m),
                 reinterpret_cast<const float *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<double, T1>) {
         ret = cusolverDnDgesvdjBatched_bufferSize(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const double *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<const double *>(params.S), reinterpret_cast<const double *>(params.U), 
+                reinterpret_cast<const double *>(params.S), reinterpret_cast<const double *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const double *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched_bufferSize(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const cuComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<const float *>(params.S), reinterpret_cast<const cuComplex *>(params.U), 
+                reinterpret_cast<const float *>(params.S), reinterpret_cast<const cuComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const cuComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched_bufferSize(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const cuDoubleComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<const double *>(params.S), reinterpret_cast<const cuDoubleComplex *>(params.U), 
+                reinterpret_cast<const double *>(params.S), reinterpret_cast<const cuDoubleComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<const cuDoubleComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<int*>(&this->dspace), batch_params, static_cast<int>(params.batch_size));
+                &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
       else {
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
-      } 
+      }
 
-      int dspace_tmp = *reinterpret_cast<int*>(&this->dspace);
-      this->dspace = dspace_tmp;
+      this->dspace = i_dspace;
       this->hspace = 0;
     }
 
@@ -722,7 +723,7 @@ public:
 
   static DnSVDCUDAParams_t
   GetSVDParams(UTensor &u, STensor &s,
-               VtTensor &vt, const ATensor &a, 
+               VtTensor &vt, const ATensor &a,
                const char jobz, const cudaExecutor &exec)
   {
     DnSVDCUDAParams_t params;
@@ -773,7 +774,7 @@ public:
     SetBatchPointers<BatchType::MATRIX>(vt, this->batch_vt_ptrs);
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
-    const int64_t ldvt = vt.Size(RANK-2);    
+    const int64_t ldvt = vt.Size(RANK-2);
 
     if (params.method == SVDMethod::GESVD) {
       // At this time cuSolver does not have a batched 64-bit SVD interface. Change
@@ -797,9 +798,9 @@ public:
         ret = cusolverDnSgesvdjBatched(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<float *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<float *>(params.S), reinterpret_cast<float *>(params.U), 
+                reinterpret_cast<float *>(params.S), reinterpret_cast<float *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<float *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<float *>(this->d_workspace), static_cast<int>(this->dspace), 
+                reinterpret_cast<float *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<double, T1>) {
@@ -808,30 +809,30 @@ public:
                 reinterpret_cast<double *>(params.A), static_cast<int>(params.m),
                 reinterpret_cast<double *>(params.S), reinterpret_cast<double *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<double *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<double *>(this->d_workspace), static_cast<int>(this->dspace), 
+                reinterpret_cast<double *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<cuComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<float *>(params.S), reinterpret_cast<cuComplex *>(params.U), 
+                reinterpret_cast<float *>(params.S), reinterpret_cast<cuComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<cuComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<cuComplex *>(this->d_workspace), static_cast<int>(this->dspace), 
+                reinterpret_cast<cuComplex *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched(
                 this->handle, CUSOLVER_EIG_MODE_VECTOR, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<cuDoubleComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<double *>(params.S), reinterpret_cast<cuDoubleComplex *>(params.U), 
+                reinterpret_cast<double *>(params.S), reinterpret_cast<cuDoubleComplex *>(params.U),
                 static_cast<int>(params.m), reinterpret_cast<cuDoubleComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<cuDoubleComplex *>(this->d_workspace), static_cast<int>(this->dspace), 
+                reinterpret_cast<cuDoubleComplex *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
       else {
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
-      }         
+      }
 
       MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "cusolverDnSgesvdjBatched failed");
     }
@@ -850,10 +851,10 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgesvd").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in cuSolver Xgesvd").c_str());
       }
-    }    
+    }
   }
 
   /**
@@ -871,7 +872,6 @@ private:
   std::vector<T4 *> batch_vt_ptrs;
   gesvdjInfo_t batch_params = nullptr;
   DnSVDCUDAParams_t params;
-  bool batched;
 };
 
 /**
@@ -893,10 +893,10 @@ struct DnSVDCUDAParamsKeyHash {
 struct DnSVDCUDAParamsKeyEq {
   bool operator()(const DnSVDCUDAParams_t &l, const DnSVDCUDAParams_t &t) const noexcept
   {
-    return  l.n == t.n && 
-            l.m == t.m && 
-            l.batch_size == t.batch_size && 
-            l.dtype == t.dtype && 
+    return  l.n == t.n &&
+            l.m == t.m &&
+            l.batch_size == t.batch_size &&
+            l.dtype == t.dtype &&
             l.exec.getStream() == t.exec.getStream();
   }
 };
@@ -961,7 +961,7 @@ void svd_impl(UTensor &&u, STensor &&s,
 
   const char job_cusolver = detail::SVDModeToChar(jobz);
   const bool m_leq_n = a.Size(RANK-2) <= a.Size(RANK-1);
-  const auto method = GetCUDASVDMethod(a);  
+  const auto method = GetCUDASVDMethod(a);
 
   // The power iteration method is a custom kernel so we don't need to test the types
   if (method == detail::SVDMethod::POW_ITER) {
@@ -973,8 +973,8 @@ void svd_impl(UTensor &&u, STensor &&s,
   T1 *tp;
   auto a_shape = a.Shape();
   auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies<index_t>());
-  matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);  
-  
+  matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
+
   if (m_leq_n) {
     // get col-major AT
     auto a_new = make_tensor(tp, a_shape);
@@ -987,7 +987,7 @@ void svd_impl(UTensor &&u, STensor &&s,
     auto vt_new = getSolverSupportedTensor(vt, exec);
 
     // swap U and VT. svd(AT) = V*S*UT
-    // svd(AT) = V*S*UT 
+    // svd(AT) = V*S*UT
     // Need the tensors to appear like V and UT since that is expected based on AT view
     // inputted, although the results when read as row-major are VT and U.
     auto u_in = transpose_matrix(vt_new);

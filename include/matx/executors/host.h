@@ -39,7 +39,7 @@
 #ifdef MATX_EN_OMP
 #include <omp.h>
 #endif
-namespace matx 
+namespace matx
 {
 
 // Matches current Linux max
@@ -66,14 +66,14 @@ struct HostExecParams {
 
   private:
     int threads_;
-    cpu_set_t cpu_set_;
+    cpu_set_t cpu_set_ {0};
 };
 
 /**
  * @brief Executor for running an operator on a single or multi-threaded host
- * 
+ *
  * @tparam MODE Threading policy
- * 
+ *
  */
 template <ThreadsMode MODE = ThreadsMode::SINGLE>
 class HostExecutor {
@@ -106,13 +106,13 @@ class HostExecutor {
 
     /**
      * @brief Synchronize the host executor's threads.
-     * 
+     *
      */
     void sync() {}
 
     /**
      * @brief Execute an operator
-     * 
+     *
      * @tparam Op Operator type
      * @param op Operator to execute
      */
@@ -120,7 +120,7 @@ class HostExecutor {
     void Exec(const Op &op) const noexcept {
       if constexpr (Op::Rank() == 0) {
         op();
-      } 
+      }
       else {
         index_t size = TotalSize(op);
   #ifdef MATX_EN_OMP
@@ -130,17 +130,17 @@ class HostExecutor {
             auto idx = GetIdxFromAbs(op, i);
             cuda::std::apply([&](auto... args) {
               return op(args...);
-            }, idx);        
+            }, idx);
           }
         } else
   #endif
-        { 
+        {
           for (index_t i = 0; i < size; i++) {
             auto idx = GetIdxFromAbs(op, i);
             cuda::std::apply([&](auto... args) {
               return op(args...);
-            }, idx);        
-          }      
+            }, idx);
+          }
         }
       }
     }

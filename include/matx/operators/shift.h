@@ -40,7 +40,7 @@ namespace matx
 {
   /**
    * Shifts the indexing of an operator to move the array forward or backward by the
-   * shift amount. 
+   * shift amount.
    *
    * ShiftOp allows adjusting the relative view of a tensor to start at a
    * new offset. This may be useful to cut off part of a tensor that is
@@ -68,27 +68,27 @@ namespace matx
           #pragma unroll
           for (int i = 0; i < Rank(); i++) {
             index_t size1 = detail::get_expanded_size<Rank()>(op_, i);
-            index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);      
+            index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);
             sizes_[i] = detail::matx_max(size1,size2);
           }
 
-          ASSERT_COMPATIBLE_OP_SIZES(shift_); 
-          ASSERT_COMPATIBLE_OP_SIZES(op_);           
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(shift_);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
         }
 
         template <typename Op, typename Sizes, typename ShiftType, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
-            Op&& op, 
-            const Sizes &sizes, 
-            ShiftType shiftin, 
+            Op&& op,
+            const Sizes &sizes,
+            ShiftType shiftin,
             Is... indices)
-        {   
+        {
           cuda::std::array idx{indices...};
           index_t shift = -get_value(shiftin, indices...);
 
           shift = (shift + idx[DIM]) % sizes[DIM];
 
-          if (shift < 0) { 
+          if (shift < 0) {
             shift += sizes[DIM];
           }
 
@@ -96,12 +96,12 @@ namespace matx
 
           return get_value(cuda::std::forward<Op>(op), idx);
         }
-        
+
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl(cuda::std::as_const(op_), sizes_, shift_, indices...);
-        }    
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
@@ -123,7 +123,7 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -137,24 +137,24 @@ namespace matx
 
         ~ShiftOp() = default;
         ShiftOp(const ShiftOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }            
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
 
       private:
         typename detail::base_type_t<T1> op_;
         cuda::std::array<index_t, Rank()> sizes_;
-        typename detail::base_type_t<T2> shift_;        
+        typename detail::base_type_t<T2> shift_;
     };
   }
   /**
@@ -206,7 +206,7 @@ namespace matx
    *
    * @param s
    *   Amount to shift forward
-   * 
+   *
    * @param shifts
    *    list of shift amounts
    * @returns

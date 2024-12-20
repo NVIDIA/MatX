@@ -54,18 +54,18 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-        __MATX_INLINE__ std::string str() const { return "cart2sph(" + get_type_str(x_) + 
+        __MATX_INLINE__ std::string str() const { return "cart2sph(" + get_type_str(x_) +
           "," + get_type_str(y_) + "," + get_type_str(z_) + ")"; }
 
         __MATX_INLINE__ Cart2SphOp(const T1 &x, const T2 &y, const T3 &z) : x_(x), y_(y), z_(z)
       {
-        ASSERT_COMPATIBLE_OP_SIZES(x);
-        ASSERT_COMPATIBLE_OP_SIZES(y);
-        ASSERT_COMPATIBLE_OP_SIZES(z);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(x);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(y);
+        MATX_ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
         template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
           {
             auto x = get_value(x_, indices...);
             auto y = get_value(y_, indices...);
@@ -78,7 +78,7 @@ namespace matx
             } else {  // r
               return _internal_sqrt(x * x + y * y + z * z);
             }
-          }    
+          }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -90,7 +90,7 @@ namespace matx
 					index_t size1 = get_expanded_size<Rank()>(x_, dim);
 					index_t size2 = get_expanded_size<Rank()>(y_, dim);
 					index_t size3 = get_expanded_size<Rank()>(z_, dim);
-					return detail::matx_max(size1, size2, size3);  
+					return detail::matx_max(size1, size2, size3);
         }
 
         template <typename ShapeType, typename Executor>
@@ -123,7 +123,7 @@ namespace matx
           if constexpr (is_matx_op<T3>()) {
             z_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }        
+        }
     };
   }
   /**
@@ -139,7 +139,7 @@ namespace matx
    *
    * @param x
    *   Operator defining x
-   *   
+   *
    * @param y
    *   Operator defining y
    *
@@ -152,7 +152,7 @@ namespace matx
   template <typename T1, typename T2, typename T3>
     auto __MATX_INLINE__ cart2sph(const T1 &x, const T2 &y, const T3 &z)
     {
-      return cuda::std::tuple{ 
+      return cuda::std::tuple{
         detail::Cart2SphOp<T1, T2, T3, 0>(x, y, z),
         detail::Cart2SphOp<T1, T2, T3, 1>(x, y, z),
         detail::Cart2SphOp<T1, T2, T3, 2>(x, y, z)};

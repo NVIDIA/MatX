@@ -41,7 +41,7 @@ namespace matx
 {
 
   namespace detail {
-    template <typename Op1, typename Op2> 
+    template <typename Op1, typename Op2>
     class IsCloseOp : public BaseOp<IsCloseOp<Op1, Op2>>
     {
       public:
@@ -52,19 +52,19 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "isclose()"; }
 
-        __MATX_INLINE__ IsCloseOp(const Op1 &op1, const Op2 &op2, double rtol, double atol) : 
-          op1_(op1), op2_(op2), rtol_(static_cast<inner_type>(rtol)), atol_(static_cast<inner_type>(atol)) 
+        __MATX_INLINE__ IsCloseOp(const Op1 &op1, const Op2 &op2, double rtol, double atol) :
+          op1_(op1), op2_(op2), rtol_(static_cast<inner_type>(rtol)), atol_(static_cast<inner_type>(atol))
         {
           static_assert(Op1::Rank() == Op2::Rank(), "Operator ranks must match in isclose()");
-          ASSERT_COMPATIBLE_OP_SIZES(op1); 
-          ASSERT_COMPATIBLE_OP_SIZES(op2);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(op1);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(op2);
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const
         {
 
-          return static_cast<int>(detail::_internal_abs(get_value(op1_, indices...) - get_value(op2_, indices...)) <= 
+          return static_cast<int>(detail::_internal_abs(get_value(op1_, indices...) - get_value(op2_, indices...)) <=
               static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * detail::_internal_abs(get_value(op2_, indices...)));
         }
 
@@ -89,7 +89,7 @@ namespace matx
 
           if constexpr (is_matx_op<Op2>()) {
             op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }          
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -102,7 +102,7 @@ namespace matx
           if constexpr (is_matx_op<Op2>()) {
             op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
 
       private:
         typename detail::base_type_t<Op1> op1_;
@@ -116,9 +116,9 @@ namespace matx
   /**
    * @brief Returns an integer tensor where an element is 1 if:
    *    abs(op1 - op2) <= atol + rtol * abs(op2)
-   * 
+   *
    * or 0 otherwise
-   * 
+   *
    * @tparam Op1 First operator type
    * @tparam Op2 Second operator type
    * @param op1 First operator
