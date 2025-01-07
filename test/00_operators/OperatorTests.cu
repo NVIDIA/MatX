@@ -415,9 +415,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   auto tofrac = make_tensor<TestType>({10});
   auto toint  = make_tensor<int>({10});
 
+  (tiv0 = random<TestType>(tiv0.Shape(), NORMAL)).run(exec);
   // Create operators representing fractional and integer
   const auto [ofrac, oint] = frexp(tiv0);
-  (tiv0 = random<TestType>(tiv0.Shape(), NORMAL)).run(exec);
   (tofrac = ofrac, toint = oint).run(exec);
   // example-end frexp-test-1
 
@@ -459,8 +459,8 @@ TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, Frexpc)
   auto toint_imag  = make_tensor<int>({10});
 
   // Create operators representing fractional and integer
-  const auto [ofrac_real, oint_real, ofrac_imag, oint_imag] = frexpc(tiv0);
   (tiv0 = random<TestType>(tiv0.Shape(), NORMAL)).run(exec);
+  const auto [ofrac_real, oint_real, ofrac_imag, oint_imag] = frexpc(tiv0);
   
   ( tofrac_real = ofrac_real, 
     toint_real = oint_real,
