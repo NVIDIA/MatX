@@ -2012,6 +2012,105 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Toeplitz)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Cross)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};   
+
+  {//batched 3 x 3
+    auto a = make_tensor<TestType>({3, 3});
+    auto b = make_tensor<TestType>({3, 3});
+
+    a.SetVals({{1, 0, 0}, 
+              {0, 0.9, 0}, 
+              {0, 0, 0.8}});
+    b.SetVals({{0, 0, 0.7}, 
+              {0.6, 0, 0}, 
+              {0, 0.5, 0}});
+    auto expect = make_tensor<TestType>({3, 3});
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+          expect(i,j) = a(i, (j+1)%3) * b(i, (j+2)%3) - a(i, (j+2)%3) * b(i, (j+1)%3);
+      }
+    }
+
+    auto out1 = make_tensor<TestType>({3, 3});
+    // example-begin cross-test-1
+    (out1 = cross(a, b)).run(exec);
+    // example-end cross-test-1
+    exec.sync();
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+          ASSERT_NEAR(out1(i,j), expect(i,j), 1.0e-6);
+      }
+    }
+  }
+
+  {//non-batched 3x3
+    auto a = make_tensor<TestType>({3});
+    auto b = make_tensor<TestType>({3});
+
+    a.SetVals({1, 0.9, 0.8});
+    b.SetVals({0.7, 0.6, 0.5});
+
+    auto expect = make_tensor<TestType>({3});
+    for (int j = 0; j < 3; j++) {
+      expect(j) = a((j+1)%3) * b((j+2)%3) - a((j+2)%3) * b((j+1)%3);
+    }
+
+    auto out1 = make_tensor<TestType>({3});
+    (out1 = cross(a, b)).run(exec);
+    exec.sync();
+    for (int i = 0; i < 3; i++) {
+      ASSERT_NEAR(out1(i), expect(i), 1.0e-6);
+    }
+  }
+
+  {//non-batched 2x3
+    auto a = make_tensor<TestType>({3});
+    auto b = make_tensor<TestType>({2});
+
+    a.SetVals({1, 0.9});
+    b.SetVals({0.7, 0.6, 0.5});
+    auto expect = make_tensor<TestType>({3});
+    expect(0) = a(1) * b(2);
+    expect(1) = -a(0) * b(2);
+    expect(2) = a(0) * b(1) - a(1) * b(0);
+    
+    auto out1 = make_tensor<TestType>({3});
+    (out1 = cross(a, b)).run(exec);
+    exec.sync();
+    for (int j = 0; j < 3; j++) {
+      ASSERT_NEAR(out1(j), expect(j), 1.0e-6);
+    }
+  }
+
+  {//non-batched 2x2
+    auto a = make_tensor<TestType>({2});
+    auto b = make_tensor<TestType>({2});
+
+    a.SetVals({1, 0.9});
+    b.SetVals({0.7, 0.6});
+
+    auto expect = make_tensor<TestType>({3});
+    expect(0) = 0;
+    expect(1) = 0;
+    expect(2) = a(0) * b(1) - a(1) * b(0);
+    exec.sync();
+    
+    auto out1 = make_tensor<TestType>({3});
+    (out1 = cross(a, b)).run(exec);
+    exec.sync();
+    for (int j = 0; j < 3; j++) {
+      ASSERT_NEAR(out1(j), expect(j), 1.0e-6);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
