@@ -74,9 +74,7 @@ namespace matx
           MATX_ASSERT_STR(a_.Size(a_.Rank() - 1) == 3 || a_.Size(a_.Rank() - 1) == 2, matxInvalidSize, "Last dimension of A must have size 2 or 3.")
           MATX_ASSERT_STR(b_.Size(b_.Rank() - 1) == 3 || b_.Size(b_.Rank() - 1) == 2, matxInvalidSize, "Last dimension of B must have size 2 or 3.")
         
-          //all input vector sizes (3 x 3, 2 x 3, 3 x 2, 2 x 2) will output to a length-3 vector (plus batch dims)
-          out_dims_[0] = 3;
-          for (int32_t i = 1; i < out_rank; i++) {
+          for (int32_t i = 0; i < out_rank - 1; i++) {
             if (i < a_.Rank()){
               out_dims_[i] = a_.Size(i);
             }
@@ -84,9 +82,12 @@ namespace matx
               out_dims_[i] = b_.Size(i);
             }
           }
-        
-          //promote output to 3D
+          
+          //mimic NumPy cross as closely as possible
           if(isA2D_ && isB2D_){
+            out_dims_[out_dims_.size() - 1] = 1;
+          }
+          else{
             out_dims_[out_dims_.size() - 1] = 3;
           }
         };
@@ -114,7 +115,7 @@ namespace matx
 
           //lots of if-elses, but similar to numpy implementation
           
-          if (idxOut == 2){
+          if (idxOut == 2 || (isA2D_ && isB2D_)){
             return a0 * b1 - a1 * b0;
           }
 
@@ -136,16 +137,13 @@ namespace matx
             //idxOut == 1
             return -a0 * b2;
           }
-          else if(!isA2D_ && isB2D_){
+          else{// !isA2D_ && isB2D_, case of both 2D are covered in the first if statement
             auto a2 = get_value(a_, idx2);
             if (idxOut == 0){
                 return -a2 * b1;
             }
             //idxOut == 1
             return a2 * b0;
-          }
-          else{ //both are 2D, just need to return 0 with correct type and shape
-            return static_cast<value_type>(0)*a0;
           }
           
         }
