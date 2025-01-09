@@ -35,20 +35,21 @@
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
+#if 0
   index_t numChannels = 16;
-#if 1
   index_t numPulses = 128;
   index_t numSamples = 9000;
   index_t waveformLength = 1000;
   uint32_t iterations = 100;
 #else
+  index_t numChannels = 16;
   index_t numPulses = 128;
   index_t numSamples = 1000;
   index_t waveformLength = 1000;
-  uint32_t iterations = 20;
+  uint32_t iterations = 100;
 #endif
   constexpr bool ENABLE_GRAPHS = false;
-  constexpr int num_streams = 1;
+  constexpr int num_streams = 8;
   cudaGraph_t graphs[num_streams];
   cudaGraphExec_t instances[num_streams];  
   using complex = cuda::std::complex<float>;
@@ -85,7 +86,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   /* Get STF context handle */
 #if 1
-  auto ctx = pipelines[0]->exec.getCtx();
 #endif
 
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
@@ -129,6 +129,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #if 0
         cudaEventRecord(starts[s], streams[s]);
 #else
+        auto ctx = pipelines[s]->exec.getCtx();
         cudaEventRecord(starts[s], ctx.task_fence());
 #endif
       }
@@ -145,14 +146,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (int s = 0; s < num_streams; s++) {
 #if 0
     cudaEventRecord(stops[s], streams[s]);
+    pipelines[s]->sync();
 #else
+    auto ctx = pipelines[s]->exec.getCtx();
     cudaEventRecord(stops[s], ctx.task_fence());
 #endif
-    pipelines[s]->sync();
   }
 
 #if 1
-  ctx.finalize();
+  for (int s = 0; s < num_streams; s++) {
+      auto ctx = pipelines[s]->exec.getCtx();
+      ctx.finalize();
+  }
 #endif
 
   MATX_NVTX_END_RANGE(2)
