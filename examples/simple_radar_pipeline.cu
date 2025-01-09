@@ -48,30 +48,61 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t waveformLength = 1000;
   uint32_t iterations = 100;
 #endif
+
+#if 0
+  constexpr int numStreams = 8;
+#else
+  int numStreams = 1;
+#endif
+
+#if 1
+    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "--numChannels" && i + 1 < argc) {
+            numChannels = std::stoi(argv[++i]);
+        } else if (arg == "--numPulses" && i + 1 < argc) {
+            numPulses = std::stoi(argv[++i]);
+        } else if (arg == "--numSamples" && i + 1 < argc) {
+            numSamples = std::stoi(argv[++i]);
+        } else if (arg == "--waveformLength" && i + 1 < argc) {
+            waveformLength = std::stoi(argv[++i]);
+        } else if (arg == "--iterations" && i + 1 < argc) {
+            iterations = std::stoi(argv[++i]);
+        } else if (arg == "--numStreams" && i + 1 < argc) {
+            numStreams = std::stoi(argv[++i]);
+        } else {
+            std::cerr << "Unknown option or missing value: " << arg << std::endl;
+            return 1; // Exit with error
+        }
+    }
+#endif
+
   constexpr bool ENABLE_GRAPHS = false;
-  constexpr int num_streams = 8;
-  cudaGraph_t graphs[num_streams];
-  cudaGraphExec_t instances[num_streams];  
+  cudaGraph_t graphs[numStreams];
+  cudaGraphExec_t instances[numStreams];  
   using complex = cuda::std::complex<float>;
-  RadarPipeline<complex> *pipelines[num_streams];
+  RadarPipeline<complex> *pipelines[numStreams];
 
   std::cout << "Iterations: " << iterations << std::endl;
   std::cout << "numChannels: " << numChannels << std::endl;
   std::cout << "numPulses: " << numPulses << std::endl;
   std::cout << "numNumSamples: " << numSamples << std::endl;
   std::cout << "waveformLength: " << waveformLength << std::endl;
+  std::cout << "numStreams: " << numStreams << std::endl;
 
   // cuda stream to place work in
-  cudaStream_t streams[num_streams];
+  cudaStream_t streams[numStreams];
   
   // manually set to log all NVTX levels
   MATX_NVTX_SET_LOG_LEVEL( matx_nvxtLogLevels::MATX_NVTX_LOG_ALL );
   
   // create some events for timing
-  cudaEvent_t starts[num_streams];
-  cudaEvent_t stops[num_streams];
+  cudaEvent_t starts[numStreams];
+  cudaEvent_t stops[numStreams];
 
-  for (int s = 0; s < num_streams; s++) {
+  for (int s = 0; s < numStreams; s++) {
     cudaEventCreate(&starts[s]);
     cudaEventCreate(&stops[s]);
     cudaStreamCreate(&streams[s]);
@@ -83,10 +114,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     pipelines[s]->sync();  
   }
-
-  /* Get STF context handle */
-#if 1
-#endif
 
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
   printf("Running test...\n");
@@ -110,12 +137,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }; 
 
   // Warmup
-  for (int s = 0; s < num_streams; s++) {
+  for (int s = 0; s < numStreams; s++) {
     run_pipeline(s);
   }
 
   if (ENABLE_GRAPHS) {
-    for (int s = 0; s < num_streams; s++) {
+    for (int s = 0; s < numStreams; s++) {
       cudaStreamBeginCapture(streams[s], cudaStreamCaptureModeGlobal);
       run_pipeline(s);
       cudaStreamEndCapture(streams[s], &graphs[s]);
@@ -124,7 +151,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
   
   for (uint32_t i = 0; i < iterations; i++) {
-    for (int s = 0; s < num_streams; s++) {
+    for (int s = 0; s < numStreams; s++) {
       if (i == 1) {
 #if 0
         cudaEventRecord(starts[s], streams[s]);
@@ -143,18 +170,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-  for (int s = 0; s < num_streams; s++) {
+  for (int s = 0; s < numStreams; s++) {
 #if 0
     cudaEventRecord(stops[s], streams[s]);
     pipelines[s]->sync();
 #else
     auto ctx = pipelines[s]->exec.getCtx();
     cudaEventRecord(stops[s], ctx.task_fence());
+    pipelines[s]->sync();
 #endif
   }
 
 #if 1
-  for (int s = 0; s < num_streams; s++) {
+  for (int s = 0; s < numStreams; s++) {
       auto ctx = pipelines[s]->exec.getCtx();
       ctx.finalize();
   }
@@ -163,19 +191,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   MATX_NVTX_END_RANGE(2)
   
   MATX_NVTX_START_RANGE("Pipeline Results", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 3)
-#if 1
   float time_ms;
-  cudaEventElapsedTime(&time_ms, starts[num_streams-1], stops[num_streams-1]);
+  cudaEventElapsedTime(&time_ms, starts[numStreams-1], stops[numStreams-1]);
   float time_s = time_ms * .001f;
 
-  auto mult = iterations * numChannels * numPulses * num_streams;
+  auto mult = iterations * numChannels * numPulses * numStreams;
   printf("Pipeline finished in %.2fms, rate: %.2f pulses/channel/sec (%.2f Gbps)\n",
         time_ms,
          static_cast<float>(mult) / time_s,
          static_cast<float>(mult*sizeof(complex)*numSamples*8)/time_s/1e9);
-#endif
 
-for (int s = 0; s < num_streams; s++) {
+for (int s = 0; s < numStreams; s++) {
     cudaEventDestroy(starts[s]);
     cudaEventDestroy(stops[s]);
     cudaStreamDestroy(streams[s]);
