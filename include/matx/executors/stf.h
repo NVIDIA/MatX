@@ -86,6 +86,9 @@ template <typename T> constexpr bool is_matx_set_op();
               ctx_ = cuda::experimental::stf::graph_ctx();
       }
 
+      ~stfExecutor() {
+          //ctx_.finalize();
+      }
       /**
        * @brief Returns stream associated with executor
       */
@@ -245,7 +248,6 @@ template <typename T> constexpr bool is_matx_set_op();
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
 #endif    
-            //std::cout << "exec on stfexecutor -- stop\n";
         }
 
     private:

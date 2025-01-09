@@ -1144,8 +1144,7 @@ IGNORE_WARNING_POP_GCC
             data_place place = getDataPlace(Data());
 #endif
 
-            *stf_ldata_ = ctx.logical_data(cuda::experimental::stf::void_interface());
-            //stf_ldata_->value().set_write_back(false);
+            *stf_ldata_ = ctx.logical_token();
             stf_ldata_->value().set_symbol(this->str());
         } 
     }
