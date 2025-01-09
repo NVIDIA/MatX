@@ -35,19 +35,11 @@
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-#if 0
   index_t numChannels = 16;
   index_t numPulses = 128;
   index_t numSamples = 9000;
   index_t waveformLength = 1000;
   uint32_t iterations = 100;
-#else
-  index_t numChannels = 16;
-  index_t numPulses = 128;
-  index_t numSamples = 1000;
-  index_t waveformLength = 1000;
-  uint32_t iterations = 100;
-#endif
 
 #if 0
   constexpr int numStreams = 8;
@@ -55,7 +47,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   int numStreams = 1;
 #endif
 
-#if 1
     // Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -77,20 +68,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             return 1; // Exit with error
         }
     }
-#endif
+
+  std::cout << "Iterations: " << iterations << std::endl;
+  std::cout << "numChannels: " << numChannels << std::endl;
+  std::cout << "numPulses: " << numPulses << std::endl;
+  std::cout << "numSamples: " << numSamples << std::endl;
+  std::cout << "waveformLength: " << waveformLength << std::endl;
+  std::cout << "numStreams: " << numStreams << std::endl;
 
   constexpr bool ENABLE_GRAPHS = false;
   cudaGraph_t graphs[numStreams];
   cudaGraphExec_t instances[numStreams];  
   using complex = cuda::std::complex<float>;
   RadarPipeline<complex> *pipelines[numStreams];
-
-  std::cout << "Iterations: " << iterations << std::endl;
-  std::cout << "numChannels: " << numChannels << std::endl;
-  std::cout << "numPulses: " << numPulses << std::endl;
-  std::cout << "numNumSamples: " << numSamples << std::endl;
-  std::cout << "waveformLength: " << waveformLength << std::endl;
-  std::cout << "numStreams: " << numStreams << std::endl;
 
   // cuda stream to place work in
   cudaStream_t streams[numStreams];
@@ -153,11 +143,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (uint32_t i = 0; i < iterations; i++) {
     for (int s = 0; s < numStreams; s++) {
       if (i == 1) {
-#if 0
-        cudaEventRecord(starts[s], streams[s]);
-#else
+#ifdef USE_STF
         auto ctx = pipelines[s]->exec.getCtx();
         cudaEventRecord(starts[s], ctx.task_fence());
+#else
+        cudaEventRecord(starts[s], streams[s]);
 #endif
       }
 
@@ -171,21 +161,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
 
   for (int s = 0; s < numStreams; s++) {
-#if 0
-    cudaEventRecord(stops[s], streams[s]);
-    pipelines[s]->sync();
-#else
+#ifdef USE_STF
     auto ctx = pipelines[s]->exec.getCtx();
     cudaEventRecord(stops[s], ctx.task_fence());
-    pipelines[s]->sync();
+#else
+    cudaEventRecord(stops[s], streams[s]);
 #endif
+    pipelines[s]->sync();
   }
 
-#if 1
-  for (int s = 0; s < numStreams; s++) {
-      auto ctx = pipelines[s]->exec.getCtx();
-      ctx.finalize();
-  }
+#ifdef USE_STF
+      for (int s = 0; s < numStreams; s++) {
+          auto ctx = pipelines[s]->exec.getCtx();
+          ctx.finalize();
+      }
 #endif
 
   MATX_NVTX_END_RANGE(2)

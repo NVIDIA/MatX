@@ -35,6 +35,10 @@
 #include <memory>
 #include <stdint.h>
 
+#ifndef USE_STF
+#define USE_STF 1
+#endif
+
 using namespace matx;
 
 /**
@@ -467,7 +471,7 @@ private:
   tensor_t<typename ComplexType::value_type, 2> cfarMaskView;
 
   cudaStream_t stream;
-#if 1
+#ifdef USE_STF
 public:
   stfExecutor exec;
 #else
