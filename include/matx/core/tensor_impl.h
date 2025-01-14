@@ -1095,12 +1095,11 @@ MATX_IGNORE_WARNING_POP_GCC
     }
 
     template <typename U = TensorData>
-    auto SetSparseData(T* data, index_t nse,
+    auto SetSparseData(T* data, 
                       typename U::crd_type* crd[U::LVL], 
                       typename U::pos_type* pos[U::LVL])
         -> std::enable_if_t<is_sparse_data_v<U>, void> {
       data_.ldata_ = data;
-      data_.nse_   = nse;
       memcpy(data_.crd_, crd, U::LVL*sizeof(crd[0]));
       memcpy(data_.pos_, pos, U::LVL*sizeof(pos[0]));
     }
