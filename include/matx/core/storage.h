@@ -189,7 +189,7 @@ namespace matx
      * 
      * @return Size of allocation 
      */
-    size_t size() const
+    __MATX_INLINE__ size_t size() const
     {
       return size_;
     }

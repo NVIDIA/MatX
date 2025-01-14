@@ -44,7 +44,7 @@ template <typename T> class BaseOp; ///< Base operator type
 
 namespace detail {
 
-template <typename T, int RANK, typename Desc> class tensor_impl_t; ///< Tensor implementation type
+template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t; ///< Tensor implementation type
 
 
 /**
