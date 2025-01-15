@@ -413,6 +413,15 @@ struct matx_allocator {
   }  
 };
 
-
+inline std::string SpaceString(matxMemorySpace_t space) {
+  switch (space) {
+    case MATX_MANAGED_MEMORY: return "CUDA managed memory";
+    case MATX_HOST_MEMORY: return "CUDA host-pinned memory";
+    case MATX_HOST_MALLOC_MEMORY: return "Host memory";
+    case MATX_DEVICE_MEMORY: return "CUDA device memory";
+    case MATX_ASYNC_DEVICE_MEMORY: return "CUDA asynchronous device memory";
+    default: return "Unknown memory";
+  }
+}
 
 } // end namespace matx
