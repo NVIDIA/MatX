@@ -591,6 +591,16 @@ namespace matx
     }
 
     /**
+     * @brief Get size of container in bytes
+     *
+     * @return Size in bytes
+     */
+    __MATX_INLINE__ auto size() const
+    {
+      return container_.size();
+    }
+
+    /**
      * Get the reference count
      *
      * @returns Reference count or 0 if not tracked
