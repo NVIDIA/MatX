@@ -413,7 +413,7 @@ struct matx_allocator {
   }  
 };
 
-inline std::string SpaceString(matxMemorySpace_t space) {
+__MATX_INLINE__ std::string SpaceString(matxMemorySpace_t space) {
   switch (space) {
     case MATX_MANAGED_MEMORY: return "CUDA managed memory";
     case MATX_HOST_MEMORY: return "CUDA host-pinned memory";
