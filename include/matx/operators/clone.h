@@ -57,7 +57,7 @@ namespace matx
         __MATX_INLINE__ CloneOp(const T &op, cuda::std::array<index_t, CRank> shape) : op_(op) {
           static_assert(T::Rank() < CRank, "Cloning rank must be higher than input operator rank");
 
-          const index_t num_keep = std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; });
+          [[maybe_unused]] const index_t num_keep = std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; });
           MATX_ASSERT_STR(num_keep == T::Rank(), matxInvalidParameter,
             "Number of matxKeepDim in a clone must match input operator rank");
 

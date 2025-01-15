@@ -155,7 +155,7 @@ namespace matx
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
       using l_stride_type = index_t;
       using l_shape_type = index_t;
-      constexpr int RANK = op.Rank();
+      constexpr int RANK = Op::Rank();
       cuda::std::array<l_shape_type, RANK> indices{0};
 
       for (int idx = 0; idx < RANK - nb_dims; idx++) {

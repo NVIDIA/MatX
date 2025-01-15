@@ -58,7 +58,7 @@ enum class ThreadsMode {
 
 struct HostExecParams {
   HostExecParams(int threads = 1) : threads_(threads) {}
-  HostExecParams(cpu_set_t cpu_set) : cpu_set_(cpu_set), threads_(1) {
+  HostExecParams(cpu_set_t cpu_set) : threads_(1), cpu_set_(cpu_set) {
     MATX_ASSERT_STR(false, matxNotSupported, "CPU affinity not supported yet");
   }
 
@@ -66,7 +66,9 @@ struct HostExecParams {
 
   private:
     int threads_;
+MATX_IGNORE_WARNING_PUSH_CLANG("-Wunused-private-field")    
     cpu_set_t cpu_set_ {0};
+MATX_IGNORE_WARNING_POP_CLANG
 };
 
 /**

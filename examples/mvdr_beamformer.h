@@ -164,9 +164,9 @@ public:
   auto GetCovMatInvView() { return invCovMatView; }
 
 private:
-  index_t num_beams_;
-  index_t num_el_;
-  index_t data_len_;
+  [[maybe_unused]] index_t num_beams_;
+  [[maybe_unused]] index_t num_el_;
+  [[maybe_unused]] index_t data_len_;
   index_t snap_len_;
   cuda::std::complex<float> load_coeff_ = {0.1f, 0.f};
 

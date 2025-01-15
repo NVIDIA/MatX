@@ -128,14 +128,14 @@ public:
   {
 #if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     // Use vector mode for a larger workspace size that works for both modes
-    cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), &this->dspace,
                     &this->hspace, params.batch_size);
 #else
-    cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
@@ -192,7 +192,7 @@ public:
     cusolverDnSetStream(this->handle, stream);
 
 #if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
-    auto ret = cusolverDnXsyevBatched(
+    [[maybe_unused]] auto ret = cusolverDnXsyevBatched(
         this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
         out.Data(), params.n, MatXTypeToCudaType<T2>(), w.Data(),
         MatXTypeToCudaType<T1>(),
@@ -211,7 +211,7 @@ public:
     
     // Older cuSolver versions do not support batching with cusolverDnXsyevd
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      auto ret = cusolverDnXsyevd(
+      [[maybe_unused]] auto ret = cusolverDnXsyevd(
           this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.n, MatXTypeToCudaType<T2>(), this->batch_w_ptrs[i],
           MatXTypeToCudaType<T1>(),

@@ -967,7 +967,7 @@ public:
   Reset(T *const data, T *const ldata) noexcept
   {
     storage_.SetData(data);
-    this->SetData(data);
+    this->SetData(ldata);
   }
 
 
@@ -1074,7 +1074,7 @@ public:
 
   __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
     bool managed;
-    const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)this->Data());
+    [[maybe_unused]] const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)this->Data());
     MATX_ASSERT(retval == CUDA_SUCCESS, matxNotSupported);
     return managed;
   }
@@ -1453,7 +1453,7 @@ public:
 
     // Determine where this memory resides
     auto kind     = GetPointerKind(this->Data());
-    auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->Data()));
+    [[maybe_unused]] auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->Data()));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {

@@ -131,7 +131,6 @@ namespace detail {
         // Create a new shape where n is the size of the last dimension
         auto shape = i.Shape();
         *(shape.end() - 1) = act_fft_size;
-        auto tot = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<typename decltype(shape)::value_type>());
 
         // Make a new buffer large enough for our input
         if constexpr (is_cuda_executor_v<Executor>) {

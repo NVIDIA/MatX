@@ -55,7 +55,6 @@ namespace detail {
       const int RANK = AType::Rank();
 
       index_t m = A.Size(RANK-2);
-      index_t n = A.Size(RANK-1);
 
       cuda::std::array<index_t, RANK-1> uShape;
       for(int i = 0; i < RANK-2; i++) {
@@ -302,7 +301,7 @@ public:
 
   void GetWorkspaceSize() override
   {
-    cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
             this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
             params.A, params.m, MatXTypeToCudaType<T2>(), params.tau,
             MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
@@ -353,7 +352,7 @@ public:
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      auto ret = cusolverDnXgeqrf(
+      [[maybe_unused]] auto ret = cusolverDnXgeqrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, MatXTypeToCudaType<T2>(),
           this->batch_tau_ptrs[i], MatXTypeToCudaType<T1>(),
@@ -370,7 +369,7 @@ public:
     // This will block. Figure this out later
     cudaStreamSynchronize(stream);
 
-    for (const auto& info : h_info) {
+    for ([[maybe_unused]] const auto& info : h_info) {
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
         ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
     }
