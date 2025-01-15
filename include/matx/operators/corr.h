@@ -140,12 +140,11 @@ namespace matx
           MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct corr() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "corr: inputs and outputs must have same rank to use corr with axis parameter");
+          auto outop = cuda::std::get<0>(out);
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            corr_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
+            outop = permute(outop, perm_);
           }
-          else {
-            corr_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex);
-          }
+          corr_impl(outop, a_, b_, mode_, method_, ex);
         }
 
         template <typename ShapeType, typename Executor>

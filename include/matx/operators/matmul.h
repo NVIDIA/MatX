@@ -113,12 +113,11 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
+          auto outop = cuda::std::get<0>(out);
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
+            outop = permute(outop, perm_);
           }
-          else {
-            matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
-          }
+          matmul_impl(outop, a_, b_, ex, alpha_, beta_);
         }
 
         template <typename ShapeType, typename Executor>
