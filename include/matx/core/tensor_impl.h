@@ -54,13 +54,13 @@ struct DenseTensorData {
   using dense_data = bool;
   T *ldata_;
 };
-template <typename T, typename CRD, typename POS, int Lvl>
+
+template <typename T, typename CRD, typename POS, int L>
 struct SparseTensorData {
   using sparse_data = bool;
   using crd_type = CRD;
   using pos_type = POS;
-  static constexpr int LVL = Lvl;
-  
+  static constexpr int LVL = L;
   T *ldata_;
   CRD *crd_[LVL];
   POS *pos_[LVL];
@@ -121,7 +121,7 @@ class tensor_impl_t {
      * @param rhs
      *   Right argument
      */
-    friend void swap(tensor_impl_t<T, RANK, Desc> &lhs, tensor_impl_t<T, RANK, Desc> &rhs) noexcept
+    friend void swap(self_type &lhs, self_type &rhs) noexcept
     {
       using std::swap;
 
