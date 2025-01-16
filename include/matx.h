@@ -38,7 +38,7 @@
 
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
-#include "matx/core/file_io.h"
+#include "matx/file_io/file_io.h"
 #include "matx/core/half_complex.h"
 #include "matx/core/half.h"
 #include "matx/core/nvtx.h"
