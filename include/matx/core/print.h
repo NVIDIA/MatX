@@ -136,11 +136,17 @@ namespace matx {
 
     template <typename Op>
     void PrintShapeImpl(const Op& op, FILE *fp) {
-      if (is_tensor_view_v<Op>) {
-        fprintf(fp, "%s: ",op.str().c_str());
+      if constexpr (is_tensor_view_v<Op>) {
+        fprintf(fp, "%s: ", op.str().c_str());
       }
 
-      std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";
+      std::string type;
+      if constexpr (is_sparse_tensor_v<Op>)
+        type = "SparseTensor";
+      else if constexpr (is_tensor_view_v<Op>)
+        type = "Tensor";
+      else
+        type = "Operator";
       fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorTypeString<typename Op::value_type>().c_str(), op.Rank());
       for (index_t dimIdx = 0; dimIdx < op.Rank(); dimIdx++)
       {
@@ -149,7 +155,25 @@ namespace matx {
           fprintf(fp, ", ");
       }
 
-      if constexpr (is_tensor_view_v<Op>)
+      if constexpr (is_sparse_tensor_v<Op>)
+      {
+        // A sparse tensor has no strides, so show the level sizes instead.
+        // These are obtained by translating dims to levels using the format.
+        index_t dims[Op::Format::DIM];
+        index_t lvls[Op::Format::LVL];
+        for (int dimIdx = 0; dimIdx < Op::Format::DIM; dimIdx++) {
+          dims[dimIdx] = op.Size(dimIdx);
+        }
+	Op::Format::dim2lvl(dims, lvls, /*asSize=*/true);
+        fprintf(fp, "], Levels:[");
+        for (int lvlIdx = 0; lvlIdx < Op::Format::LVL; lvlIdx++) {
+          fprintf(fp, "%" MATX_INDEX_T_FMT, lvls[lvlIdx]);
+          if (lvlIdx < (Op::Format::LVL - 1)) {
+            fprintf(fp, ", ");
+          }
+        }
+      }
+      else if constexpr (is_tensor_view_v<Op>)
       {
         fprintf(fp, "], Strides:[");
         if constexpr (Op::Rank() > 0)
@@ -543,7 +567,37 @@ namespace matx {
 
     #ifdef __CUDACC__
       cudaDeviceSynchronize();
-      if constexpr (is_tensor_view_v<Op>) {
+      if constexpr (is_sparse_tensor_v<Op>) {
+        using Format = typename Op::Format;
+	index_t nse = op.Nse();
+        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
+        fprintf(fp, "format = ");
+	Format::print();
+        for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
+	  if (op.POSData(lvlIdx)) {
+            const index_t pend = op.posSize(lvlIdx);
+            fprintf(fp, "pos[%d] = (", lvlIdx);
+            for (index_t i = 0; i < pend; i++) {
+              PrintVal(fp, op.POSData(lvlIdx)[i]);
+            }
+            fprintf(fp, ")\n");
+          }
+          if (op.CRDData(lvlIdx)) {
+            const index_t cend = op.crdSize(lvlIdx);
+            fprintf(fp, "crd[%d] = (", lvlIdx);
+            for (index_t i = 0; i < cend; i++) {
+              PrintVal(fp, op.CRDData(lvlIdx)[i]);
+            }
+            fprintf(fp, ")\n");
+          }
+        }
+        fprintf(fp, "values = (");
+        for (index_t i = 0; i < nse; i++) {
+          PrintVal(fp, op.Data()[i]);
+        }
+        fprintf(fp, ")\nspace  = %s\n", SpaceString(GetPointerKind(op.Data())).c_str());
+      }
+      else if constexpr (is_tensor_view_v<Op>) {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
         // as if it's not const. This is because the ownership decision is done at runtime instead of compile-time,
         // so even though the lookup will never be done, the compilation path happens.
