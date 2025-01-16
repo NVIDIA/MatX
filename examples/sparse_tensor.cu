@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2025, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,58 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#ifdef __CUDACC__
-#include <cuda_runtime_api.h>
-#endif
-#include <cuda/std/ccomplex>
+#include "matx.h"
 
-#include "matx/core/defines.h"
-#include "matx/core/error.h"
-#include "matx/core/file_io.h"
-#include "matx/core/half_complex.h"
-#include "matx/core/half.h"
-#include "matx/core/nvtx.h"
-#include "matx/core/print.h"
-#include "matx/core/pybind.h"
-#include "matx/core/tensor.h"
-#include "matx/core/sparse_tensor.h"  // sparse support is experimental
-#include "matx/core/make_sparse_tensor.h"
-#include "matx/core/tie.h"
-#include "matx/core/utils.h"
-#include "matx/core/viz.h"
+using namespace matx;
 
-#include "matx/executors/executors.h"
-#include "matx/generators/generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+{
+  MATX_ENTER_HANDLER();
 
-namespace matx {
-  using fcomplex = cuda::std::complex<float>;
-  using dcomplex = cuda::std::complex<double>;
+  cudaStream_t stream = 0;
+  cudaExecutor exec{stream};
+
+  //
+  // Creates a COO matrix for the following 4x8 dense matrix with 5 nonzero
+  // elements, using the factory method that uses MatX tensors for the 1-dim
+  // buffers. The sparse matrix resides in the same memory space as its buffer
+  // constituents.
+  //
+  //   | 1, 2, 0, 0, 0, 0, 0, 0 |
+  //   | 0, 0, 0, 0, 0, 0, 0, 0 |
+  //   | 0, 0, 0, 0, 0, 0, 0, 0 |
+  //   | 0, 0, 3, 4, 0, 5, 0, 0 |
+  //
+  
+  constexpr index_t m = 4;
+  constexpr index_t n = 8;
+  constexpr index_t nse = 5;
+
+  tensor_t<float, 1> values{{nse}};
+  tensor_t<int, 1> row_idx{{nse}};
+  tensor_t<int, 1> col_idx{{nse}};
+
+  values.SetVals({ 1, 2, 3, 4, 5 });
+  row_idx.SetVals({ 0, 0, 3, 3, 3 });
+  col_idx.SetVals({ 0, 1, 2, 3, 5 });
+
+  // Note that sparse tensor support in MatX is still experimental.
+  auto Acoo = experimental::make_tensor_coo(values, row_idx, col_idx, {m, n});
+
+  //
+  // This shows:
+  //
+  // tensor_impl_2_f32: Tensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
+  // nse    = 5
+  // format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
+  // crd[0] = ( 0  0  3  3  3 )
+  // crd[1] = ( 0  1  2  3  5 )
+  // values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
+  // space  = CUDA managed memory
+  //
+  print(Acoo);
+
+  // TODO: operations on Acoo
+
+  MATX_EXIT_HANDLER();
 }
