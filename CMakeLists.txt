@@ -16,8 +16,10 @@ endif()
 if(NOT DEFINED rapids-cmake-dir)
   include(FetchContent)
   # Tell FetchContent to just use the local copy of rapids-cmake:
-  set(FETCHCONTENT_SOURCE_DIR_RAPIDS_CMAKE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
-  FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
+
+  # Tell FetchContent to download remote copy of rapids-cmake:
+  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
   FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
