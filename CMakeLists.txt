@@ -263,6 +263,16 @@ if (MATX_EN_COVERAGE)
     target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
 
+# Add nvtiff support if installed
+find_library(NVTIFF_LIBRARY nvtiff)
+if (NOT NVTIFF_LIBRARY)
+    message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
+else()
+    message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+endif()
+
+
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
     set(CUTENSORNET_VERSION 24.03.0.4)

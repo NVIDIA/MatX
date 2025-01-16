@@ -47,7 +47,7 @@
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
 
-
+#include "tiff.h"
 
 #if defined(MATX_ENABLE_FILEIO) || defined(DOXYGEN_ONLY)
 
@@ -124,7 +124,7 @@ using namespace pybind11::literals;
  * This has a startup performance hit, but CSV reading is intended to be a
  * slow-path function, so this is not a critical component to speed up. Currently
  * 1D and 2D tensors are supported only.
- * 
+ *
  * @tparam TensorType
  *   Data type of tensor
  * @param t
@@ -141,7 +141,7 @@ void read_csv(TensorType &t, const std::string fname,
              const std::string delimiter, bool skip_header = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
@@ -152,7 +152,7 @@ void read_csv(TensorType &t, const std::string fname,
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
-  
+
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
@@ -169,7 +169,7 @@ void read_csv(TensorType &t, const std::string fname,
  * This has a startup performance hit, but CSV writing is intended to be a
  * slow-path function, so this is not a critical component to speed up. Currently
  * 1D and 2D tensors are supported only.
- * 
+ *
  * @tparam TensorType
  *   Data type of tensor
  * @param t
@@ -184,7 +184,7 @@ void write_csv(const TensorType &t, const std::string fname,
               const std::string delimiter)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   if (TensorType::Rank() != 1 && TensorType::Rank() != 2) {
     MATX_THROW(matxInvalidDim,
                "CSV reading limited to tensors of rank 1 and 2");
@@ -220,15 +220,15 @@ void read_mat(TensorType &t, const std::string fname,
              const std::string var)
 {
 
- 
+
   if (!std::filesystem::exists(fname)) {
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
-    
+
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
 
   auto pb = std::make_unique<detail::MatXPybind>();
 
@@ -295,7 +295,7 @@ void write_mat(const TensorType &t, const std::string fname,
               const std::string var)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
   auto sp = pybind11::module_::import("scipy.io");
@@ -323,12 +323,12 @@ template <typename TensorType>
 void read_npy(TensorType &t, const std::string& fname)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   if (!std::filesystem::exists(fname)) {
     const std::string errorMessage = "Failed to read [" + fname + "], Does not Exist";
     MATX_THROW(matxIOError, errorMessage.c_str());
   }
-  
+
   auto pb = std::make_unique<detail::MatXPybind>();
 
   auto np = pybind11::module_::import("numpy");
@@ -339,7 +339,7 @@ void read_npy(TensorType &t, const std::string& fname)
 
 /**
  * @brief Write a NPY file from a tensor view
- * 
+ *
  * NPY files are a simple binary format for storing arrays of numbers.
  *
  * @tparam TensorType
@@ -353,7 +353,7 @@ template <typename TensorType>
 void write_npy(const TensorType &t, const std::string& fname)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   auto pb = std::make_unique<detail::MatXPybind>();
   auto np = pybind11::module_::import("numpy");
 
