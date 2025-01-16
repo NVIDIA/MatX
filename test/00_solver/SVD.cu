@@ -88,7 +88,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 100;
   constexpr index_t n = 50;
@@ -143,7 +142,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDMLeqN)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 50;
   constexpr index_t n = 100;
@@ -196,7 +194,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDReducedMode)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr cuda::std::array sizes {
@@ -255,7 +252,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDHostAlgoQR)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 100;
   constexpr index_t n = 50;
@@ -308,7 +304,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;
@@ -367,8 +362,7 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatchedSmallMGTN)
 {
   MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;   
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;
@@ -427,7 +421,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatchedSmallMEQN)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;

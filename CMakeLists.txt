@@ -134,8 +134,10 @@ rapids_cpm_cccl(
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
-# Set flags for compiling tests faster
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+# Set flags for compiling tests faster (only for nvcc)
+if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+endif()
 
 # Hack because CMake doesn't have short circult evaluation
 if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -165,9 +167,13 @@ if (NOT ${IS_NVCPP} GREATER -1)
     endif()
 endif()
 
-
-
-set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+if (CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+message((STATUS "Using Clang compiler"))
+    # Workaround for clang bug: https://github.com/llvm/llvm-project/issues/58491
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unused-command-line-argument>)
+else()
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+endif()
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
 # CUTLASS slows down compile times when used, so leave it as optional for now

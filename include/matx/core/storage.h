@@ -406,7 +406,7 @@ namespace matx
      */
     void SetData(T *const data) noexcept
     {
-      data_.reset(data_, [](auto){});
+      data_.reset(data, [](auto){});
     }
 
     /**
@@ -423,7 +423,7 @@ namespace matx
      * 
      * @param size Size in bytes to allocate
      */
-    __MATX_INLINE__ T* allocate(size_t size)
+    __MATX_INLINE__ T* allocate([[maybe_unused]] size_t size)
     {
       MATX_THROW(matxInvalidParameter, "Cannot call allocate on a smart pointer storage type");
     }

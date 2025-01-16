@@ -61,7 +61,7 @@ private:
 
 public:
   BlackScholes(O out, I1 K, I1 V, I1 S, I1 r, I1 T)
-      : out_(out), K_(K), V_(V), S_(S), r_(r), T_(T)  {}
+      : out_(out), V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
   __device__ inline void operator()(index_t idx)
   {

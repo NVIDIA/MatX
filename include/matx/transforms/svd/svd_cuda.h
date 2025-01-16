@@ -556,8 +556,8 @@ static __MATX_INLINE__ SVDMethod GetCUDASVDMethod(const ATensor &a) {
   SVDMethod method = detail::SVDMethod::GESVD;
 
   if (a.Rank() != 2) {
-    if (a.Size(RANK-2) <= 32 &&
-        a.Size(RANK-1) <= 32) {
+    if (m <= 32 &&
+        n <= 32) {
       if constexpr (is_tensor_view_v<ATensor>) {
   #if !defined(MATX_INDEX_32_BIT)
         if (a.Stride(0) < std::numeric_limits<int32_t>::max()) {
@@ -663,7 +663,7 @@ public:
 
   void GetWorkspaceSize() override
   {
-    cusolverStatus_t ret;
+    [[maybe_unused]] cusolverStatus_t ret;
 
     // Use all mode for a larger workspace size that works for all modes
     if (params.method == SVDMethod::GESVD) {
@@ -746,7 +746,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    cusolverStatus_t ret;
+    [[maybe_unused]] cusolverStatus_t ret;
 
     // Batch size checks
     for(int i = 0 ; i < RANK-2; i++) {
@@ -756,7 +756,7 @@ public:
     }
 
     // Inner size checks
-    int64_t k = cuda::std::min(params.m, params.n);
+    [[maybe_unused]] int64_t k = cuda::std::min(params.m, params.n);
     if (jobz == 'S') {
       MATX_ASSERT_STR((u.Size(RANK-1) == k) && (u.Size(RANK-2) == params.m), matxInvalidSize, "U must be ... x m x min(m,n)");
       MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == k), matxInvalidSize, "VT must be ... x min(m,n) x n");

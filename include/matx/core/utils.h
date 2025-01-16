@@ -134,9 +134,9 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
     //__half2 Y = make_half2(y.real(), y.imag());
     //__half2 Z = make_half2(z.real(), z.imag());
 
-    const __half2 &X = *reinterpret_cast<const __half2*>(&x);
-    const __half2 &Y = *reinterpret_cast<const __half2*>(&y);
-    const __half2 &Z = *reinterpret_cast<const __half2*>(&z);
+    [[maybe_unused]] const __half2 &X = *reinterpret_cast<const __half2*>(&x);
+    [[maybe_unused]] const __half2 &Y = *reinterpret_cast<const __half2*>(&y);
+    [[maybe_unused]] const __half2 &Z = *reinterpret_cast<const __half2*>(&z);
 
 #if 1
 #ifdef __CUDA_ARCH__
