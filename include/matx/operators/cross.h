@@ -189,8 +189,8 @@ namespace matx
    *  
    * @tparam OpA Type of input tensor 1
    * @tparam OpB Type of input tensor 2
-   * @param OpA Input tensor 1
-   * @param OpB Input tensor 2
+   * @param A Input tensor 1
+   * @param B Input tensor 2
    * @return cross operator 
    */
   template <typename OpA, typename OpB>
