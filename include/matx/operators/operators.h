@@ -50,6 +50,7 @@
 #include "matx/operators/comma.h"
 #include "matx/operators/corr.h"
 #include "matx/operators/cov.h"
+#include "matx/operators/cross.h"
 #include "matx/operators/cumsum.h"
 #include "matx/operators/diag.h"
 #include "matx/operators/dct.h"
