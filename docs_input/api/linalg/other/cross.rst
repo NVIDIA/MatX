@@ -1,7 +1,7 @@
 .. _cross_func:
 
 cross
-#####
+=====
 
 Cross product of two operators with last dimension 2 or 3.
 
