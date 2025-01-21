@@ -13,7 +13,7 @@ on all dimensions besides the last dimension.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_Operator/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
    :language: cpp
    :start-after: example-begin cross-test-1
    :end-before: example-end cross-test-1
