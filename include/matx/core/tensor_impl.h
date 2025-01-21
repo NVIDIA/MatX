@@ -55,12 +55,13 @@ struct DenseTensorData {
   T *ldata_;
 };
 
-template <typename T, typename CRD, typename POS, int L>
+template <typename T, typename CRD, typename POS, typename TF>
 struct SparseTensorData {
   using sparse_data = bool;
   using crd_type = CRD;
   using pos_type = POS;
-  static constexpr int LVL = L;
+  using Format = TF;
+  static constexpr int LVL = TF::LVL;
   T *ldata_;
   CRD *crd_[LVL];
   POS *pos_[LVL];
