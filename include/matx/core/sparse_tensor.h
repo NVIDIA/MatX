@@ -52,9 +52,9 @@ template <typename VAL, typename CRD, typename POS, typename TF,
           typename StorageC = DefaultStorage<CRD>,
           typename StorageP = DefaultStorage<POS>,
           typename DimDesc = DefaultDescriptor<TF::DIM>>
-class sparse_tensor_t : public detail::tensor_impl_t<
-                            VAL, TF::DIM, DimDesc,
-                            detail::SparseTensorData<VAL, CRD, POS, TF::LVL>> {
+class sparse_tensor_t
+    : public detail::tensor_impl_t<
+          VAL, TF::DIM, DimDesc, detail::SparseTensorData<VAL, CRD, POS, TF>> {
 public:
   using sparse_tensor = bool;
   static constexpr int DIM = TF::DIM;
@@ -79,7 +79,7 @@ public:
   sparse_tensor_t(const typename DimDesc::shape_type (&shape)[DIM],
                   StorageV &&vals, StorageC (&&crd)[LVL], StorageP (&&pos)[LVL])
       : detail::tensor_impl_t<VAL, DIM, DimDesc,
-                              detail::SparseTensorData<VAL, CRD, POS, LVL>>(
+                              detail::SparseTensorData<VAL, CRD, POS, TF>>(
             shape) {
     // Initialize primary and secondary storage.
     values_ = std::move(vals);
