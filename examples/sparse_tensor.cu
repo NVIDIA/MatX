@@ -42,6 +42,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaExecutor exec{stream};
 
   //
+  // Print some formats that are used for the versatile sparse tensor
+  // type. Note that common formats like COO and CSR have good library
+  // support in e.g. cuSPARSE, but MatX provides a much more general
+  // way to define the sparse tensor storage through a DSL (see doc).
+  //
+  experimental::Scalar::print();   // scalars
+  experimental::SpVec::print();    // sparse vectors
+  experimental::COO::print();      // various sparse matrix formats
+  experimental::CSR::print();
+  experimental::CSC::print();
+  experimental::DCSR::print();
+  experimental::BSR<2,2>::print(); // 2x2 blocks
+  experimental::COO4::print();     // 4-dim tensor in COO
+  experimental::CSF5::print();     // 5-dim tensor in CSF
+
+  //
   // Creates a COO matrix for the following 4x8 dense matrix with 5 nonzero
   // elements, using the factory method that uses MatX tensors for the 1-dim
   // buffers. The sparse matrix resides in the same memory space as its buffer
@@ -71,7 +87,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   // This shows:
   //
-  // tensor_impl_2_f32: Tensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
+  // tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
   // nse    = 5
   // format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
   // crd[0] = ( 0  0  3  3  3 )
