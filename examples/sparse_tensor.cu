@@ -42,6 +42,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaExecutor exec{stream};
 
   //
+  // Print some formats that are used for the versatile sparse tensor
+  // type. Note that common formats like COO and CSR have good library
+  // support in e.g. cuSPARSE, but MatX provides a much more general
+  // way to define the sparse tensor storage through a DSL (see doc).
+  //
+  experimental::Scalar::print();   // scalars
+  experimental::SpVec::print();    // sparse vectors
+  experimental::COO::print();      // various sparse matrix formats
+  experimental::CSR::print();
+  experimental::CSC::print();
+  experimental::DCSR::print();
+  experimental::BSR<2,2>::print(); // 2x2 blocks
+  experimental::COO4::print();     // 4-dim tensor in COO
+  experimental::CSF5::print();     // 5-dim tensor in CSF
+
+  //
   // Creates a COO matrix for the following 4x8 dense matrix with 5 nonzero
   // elements, using the factory method that uses MatX tensors for the 1-dim
   // buffers. The sparse matrix resides in the same memory space as its buffer
@@ -71,7 +87,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   // This shows:
   //
-  // tensor_impl_2_f32: Tensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
+  // tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
   // nse    = 5
   // format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
   // crd[0] = ( 0  0  3  3  3 )
@@ -80,6 +96,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // space  = CUDA managed memory
   //
   print(Acoo);
+
+  //
+  // A very naive way to convert the sparse matrix back to a dense
+  // matrix. Note that one should **never** use the ()-operator in
+  // performance critical code, since sparse data structures do
+  // not provide O(1) random access to their elements (compressed
+  // levels will use some form of search to determine if an element
+  // is present). Instead, conversions (and other operations) should
+  // use sparse operations that are tailored for the sparse data
+  // structure (such as scanning by row for CSR).
+  //
+  tensor_t<float, 2> Dense{{m, n}};
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      Dense(i, j) = Acoo(i, j);
+    }
+  }
+  print(Dense);
 
   // TODO: operations on Acoo
 

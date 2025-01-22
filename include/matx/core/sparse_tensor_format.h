@@ -255,42 +255,48 @@ public:
   template <typename CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
   dim2lvl(const CRD *dims, CRD *lvls, bool asSize) {
-    using ftype = std::tuple_element_t<L, LVLSPECS>;
-    if constexpr (ftype::expr::op == LvlOp::Id) {
-      lvls[L] = dims[ftype::expr::di];
-    } else if constexpr (ftype::expr::op == LvlOp::Div) {
-      lvls[L] = dims[ftype::expr::di] / ftype::expr::cj;
-    } else if constexpr (ftype::expr::op == LvlOp::Mod) {
-      lvls[L] =
-          asSize ? ftype::expr::cj : (dims[ftype::expr::di] % ftype::expr::cj);
-    }
-    if constexpr (L + 1 < LVL) {
-      dim2lvl<CRD, L + 1>(dims, lvls, asSize);
+    if constexpr (L < LVL) {
+      using ftype = std::tuple_element_t<L, LVLSPECS>;
+      if constexpr (ftype::expr::op == LvlOp::Id) {
+        lvls[L] = dims[ftype::expr::di];
+      } else if constexpr (ftype::expr::op == LvlOp::Div) {
+        lvls[L] = dims[ftype::expr::di] / ftype::expr::cj;
+      } else if constexpr (ftype::expr::op == LvlOp::Mod) {
+        lvls[L] = asSize ? ftype::expr::cj
+                         : (dims[ftype::expr::di] % ftype::expr::cj);
+      }
+      if constexpr (L + 1 < LVL) {
+        dim2lvl<CRD, L + 1>(dims, lvls, asSize);
+      }
     }
   }
 
   template <typename CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
   lvl2dim(const CRD *lvls, CRD *dims) {
-    using ftype = std::tuple_element_t<L, LVLSPECS>;
-    if constexpr (ftype::expr::op == LvlOp::Id) {
-      dims[ftype::expr::di] = lvls[L];
-    } else if constexpr (ftype::expr::op == LvlOp::Div) {
-      dims[ftype::expr::di] = lvls[L] * ftype::expr::cj;
-    } else if constexpr (ftype::expr::op == LvlOp::Mod) {
-      dims[ftype::expr::di] += lvls[L]; // update (seen second)
-    }
-    if constexpr (L + 1 < LVL) {
-      lvl2dim<CRD, L + 1>(lvls, dims);
+    if constexpr (L < LVL) {
+      using ftype = std::tuple_element_t<L, LVLSPECS>;
+      if constexpr (ftype::expr::op == LvlOp::Id) {
+        dims[ftype::expr::di] = lvls[L];
+      } else if constexpr (ftype::expr::op == LvlOp::Div) {
+        dims[ftype::expr::di] = lvls[L] * ftype::expr::cj;
+      } else if constexpr (ftype::expr::op == LvlOp::Mod) {
+        dims[ftype::expr::di] += lvls[L]; // update (seen second)
+      }
+      if constexpr (L + 1 < LVL) {
+        lvl2dim<CRD, L + 1>(lvls, dims);
+      }
     }
   }
 
   template <int L = 0> static void printLevel() {
-    using ftype = std::tuple_element_t<L, LVLSPECS>;
-    std::cout << " " << ftype::toString();
-    if constexpr (L + 1 < LVL) {
-      std::cout << ",";
-      printLevel<L + 1>();
+    if constexpr (L < LVL) {
+      using ftype = std::tuple_element_t<L, LVLSPECS>;
+      std::cout << " " << ftype::toString();
+      if constexpr (L + 1 < LVL) {
+        std::cout << ",";
+        printLevel<L + 1>();
+      }
     }
   }
 
