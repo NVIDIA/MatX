@@ -24,7 +24,8 @@ class polyval_operator:
 class cross_operator:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
-        self.dtype = dtype        
+        self.dtype = dtype
+        np.random.seed(1234)        
         pass
 
     def run(self) -> Dict[str, np.array]:

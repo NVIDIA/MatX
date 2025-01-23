@@ -335,7 +335,12 @@ template <typename T> using Abs2Op = UnOp<T, Abs2F<T>>;
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
-  return normcdf(v1);
+  if constexpr (std::is_same_v<float, T>) {
+    return normcdff(v1);
+  }
+  else {
+    return normcdf(v1);
+  }
 }
 template <typename T> struct NormCdfF {
   static __MATX_INLINE__ std::string str() { return "normcdf"; }
