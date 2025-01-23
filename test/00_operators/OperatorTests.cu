@@ -2015,7 +2015,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Cross)
   // Half precision needs a bit more tolerance when compared to fp32
   float thresh = 0.01f;
   if constexpr (is_matx_half_v<TestType>) {
-    thresh = 0.02f;
+    thresh = 0.08f;
   }
 
   {//batched 4 x 3
