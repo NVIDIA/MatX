@@ -637,7 +637,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    __MATX_INLINE__ auto Shape() const noexcept { return this->desc_.Shape(); }
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
+    auto Shape() const noexcept { return this->desc_.Shape(); }
 
     /**
      * Get the strides the tensor from the underlying data

@@ -97,6 +97,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   print(Acoo);
 
+  //
+  // A very naive way to convert the sparse matrix back to a dense
+  // matrix. Note that one should **never** use the ()-operator in
+  // performance critical code, since sparse data structures do
+  // not provide O(1) random access to their elements (compressed
+  // levels will use some form of search to determine if an element
+  // is present). Instead, conversions (and other operations) should
+  // use sparse operations that are tailored for the sparse data
+  // structure (such as scanning by row for CSR).
+  //
+  tensor_t<float, 2> Dense{{m, n}};
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      Dense(i, j) = Acoo(i, j);
+    }
+  }
+  print(Dense);
+
   // TODO: operations on Acoo
 
   MATX_EXIT_HANDLER();
