@@ -41,6 +41,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t waveformLength = 1000;
   uint32_t iterations = 100;
 
+#ifdef USE_STF
+  std::cout << "Using STF executor\n";
+#else
+  std::cout << "Using CUDA executor\n";
+#endif
+
 #if 0
   constexpr int numStreams = 8;
 #else
@@ -98,7 +104,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     cudaStreamCreate(&streams[s]);
     
     MATX_NVTX_START_RANGE("Pipeline Initialize", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 1)
+#if 0
     printf("Initializing data structures for stream %d...\n", s);
+#endif
     pipelines[s] = new RadarPipeline(numPulses, numSamples, waveformLength, numChannels, streams[s]);
     MATX_NVTX_END_RANGE(1)
 
@@ -106,7 +114,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   }
 
   MATX_NVTX_START_RANGE("Pipeline Test", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 2)
+#if 0
   printf("Running test...\n");
+#endif
 
   auto run_pipeline = [&](int s) {
     MATX_NVTX_START_RANGE("PulseCompression", matx_nvxtLogLevels::MATX_NVTX_LOG_USER, 21)
@@ -164,8 +174,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #ifdef USE_STF
     auto ctx = pipelines[s]->exec.getCtx();
     cudaEventRecord(stops[s], ctx.task_fence());
+    std::cout << "using stf 2\n";
 #else
     cudaEventRecord(stops[s], streams[s]);
+    std::cout << "using cudaexec 2\n";
 #endif
     pipelines[s]->sync();
   }

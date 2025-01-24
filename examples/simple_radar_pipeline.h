@@ -35,10 +35,6 @@
 #include <memory>
 #include <stdint.h>
 
-#ifndef USE_STF
-#define USE_STF 1
-#endif
-
 using namespace matx;
 
 /**
@@ -124,8 +120,6 @@ public:
   RadarPipeline() = delete;
   ~RadarPipeline()
   {
-      std::cout << "DTOR for radar\n";
-
   }
 
   /**
@@ -142,7 +136,6 @@ public:
       : numPulses(_numPulses), numSamples(_numSamples), waveformLength(_wfLen),
         numChannels(_numChannels), stream(_stream), exec(_stream)
   {
-      std::cout << "CTOR for pipeline\n";
     numSamplesRnd = 1;
     while (numSamplesRnd < numSamples) {
       numSamplesRnd *= 2;
