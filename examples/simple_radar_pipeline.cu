@@ -41,6 +41,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t waveformLength = 1000;
   uint32_t iterations = 100;
 
+  bool enableGraphs = false;
 #ifdef USE_STF
   std::cout << "Using STF executor\n";
 #else
@@ -69,6 +70,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             iterations = std::stoi(argv[++i]);
         } else if (arg == "--numStreams" && i + 1 < argc) {
             numStreams = std::stoi(argv[++i]);
+        } else if (arg == "--enableGraphs") {
+            enableGraphs = true;
+            ++i;
         } else {
             std::cerr << "Unknown option or missing value: " << arg << std::endl;
             return 1; // Exit with error
@@ -81,8 +85,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "numSamples: " << numSamples << std::endl;
   std::cout << "waveformLength: " << waveformLength << std::endl;
   std::cout << "numStreams: " << numStreams << std::endl;
+  std::cout << "enableGraphs: " << enableGraphs << std::endl;
 
-  constexpr bool ENABLE_GRAPHS = false;
   cudaGraph_t graphs[numStreams];
   cudaGraphExec_t instances[numStreams];  
   using complex = cuda::std::complex<float>;
@@ -141,7 +145,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     run_pipeline(s);
   }
 
-  if (ENABLE_GRAPHS) {
+  if (enableGraphs) {
     for (int s = 0; s < numStreams; s++) {
       cudaStreamBeginCapture(streams[s], cudaStreamCaptureModeGlobal);
       run_pipeline(s);
@@ -161,7 +165,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #endif
       }
 
-      if (ENABLE_GRAPHS) {
+      if (enableGraphs) {
         cudaGraphLaunch(instances[s], streams[s]);
       }
       else {
@@ -174,10 +178,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #ifdef USE_STF
     auto ctx = pipelines[s]->exec.getCtx();
     cudaEventRecord(stops[s], ctx.task_fence());
-    std::cout << "using stf 2\n";
 #else
     cudaEventRecord(stops[s], streams[s]);
-    std::cout << "using cudaexec 2\n";
 #endif
     pipelines[s]->sync();
   }
