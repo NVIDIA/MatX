@@ -55,11 +55,23 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
-  using POS = int; // no positions, although some forms use [0,nse]
+  using POS = index_t;
+  // Note that the COO API typically does not involve positions.
+  // However, under the formal DSL specifications, the top level
+  // compression should set up pos[0] = {0, nse}. This is done
+  // here, using the same memory space as the other data.
+  POS *ptr;
+  matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
+  matxAlloc((void **)&ptr, 2 * sizeof(POS), space, 0);
+  ptr[0] = 0;
+  ptr[1] = val.Size(0);
+  raw_pointer_buffer<POS, matx_allocator<POS>> topp{ptr, 2 * sizeof(POS),
+                                                    owning};
+  basic_storage<decltype(topp)> tp{std::move(topp)};
   raw_pointer_buffer<POS, matx_allocator<POS>> emptyp{nullptr, 0, owning};
   basic_storage<decltype(emptyp)> ep{std::move(emptyp)};
   return sparse_tensor_t<VAL, CRD, POS, COO>(
-      shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()}, {ep, ep});
+      shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()}, {tp, ep});
 }
 
 // Constructs a sparse matrix in CSR format directly from the values, the row
