@@ -78,17 +78,11 @@ namespace matx
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
         }
-      }
 
       /**
        * @brief Returns stream associated with executor
       */
       auto getStream() const { return stream_; }
-
-      /**
-       * @brief Synchronize the cuda executor's stream
-       * 
-       */
       void sync() { cudaStreamSynchronize(stream_); }
 
       /**
