@@ -65,7 +65,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+#ifdef USE_STF
+  std::cout << "Using STF executor\n";
+#else
+  std::cout << "Using CUDA executor\n";
+#endif
+
+
+#ifdef USE_STF
+  stfExecutor exec{stream};
+#else
   cudaExecutor exec{stream};
+#endif
 
   float fs = 10000;
   constexpr index_t N = 100000;
@@ -108,7 +119,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     if (i == 2) { // Start timer on third loop to allow generation of plot
+#if USE_STF
+      auto ctx = exec.getCtx();
+      cudaEventRecord(start, ctx.task_fence());
+#else
       cudaEventRecord(start, stream);
+#endif
     }
 
     // DFT Sample Frequencies (rfftfreq)
@@ -142,9 +158,23 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
 
   }
-
+#ifdef USE_STF
+{
+    auto ctx = exec.getCtx();
+    cudaEventRecord(stop, ctx.task_fence());
+}
+#else
   cudaEventRecord(stop, stream);
+#endif
   exec.sync();
+
+#ifdef USE_STF
+{
+  auto ctx = exec.getCtx();
+  ctx.finalize();
+}
+#endif
+
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Spectrogram Time Without Graphs = %.2fus per iteration\n",
