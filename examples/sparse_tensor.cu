@@ -107,15 +107,36 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // use sparse operations that are tailored for the sparse data
   // structure (such as scanning by row for CSR).
   //
-  tensor_t<float, 2> Dense{{m, n}};
+  tensor_t<float, 2> A{{m, n}};
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < n; j++) {
-      Dense(i, j) = Acoo(i, j);
+      A(i, j) = Acoo(i, j);
     }
   }
-  print(Dense);
+  print(A);
 
-  // TODO: operations on Acoo
+  //
+  // SpMM is implemented on COO through cuSPARSE. This is the
+  // correct way of performing an efficient sparse operation.
+  //
+  tensor_t<float, 2> B{{8, 4}};
+  tensor_t<float, 2> C{{4, 4}};
+  B.SetVals({ {  0,  1,  2,  3 },
+	      {  4,  5,  6,  7 },
+	      {  8,  9, 10, 11 },
+	      { 12, 13, 14, 15 },
+	      { 16, 17, 18, 19 },
+	      { 20, 21, 22, 23 },
+	      { 24, 25, 26, 27 },
+	      { 28, 29, 30, 31 } });
+  (C = matmul(Acoo, B)).run(exec);
+  print(C);
+
+  //
+  // Verify by computing the equivelent dense GEMM.
+  //
+  (C = matmul(A, B)).run(exec);
+  print(C);
 
   MATX_EXIT_HANDLER();
 }
