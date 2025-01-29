@@ -737,6 +737,20 @@ namespace matx {
   }
 
   /**
+   * @brief Print all a tensor's values to stdout
+   *
+   * This form of `print()` is a specialization for 1D+ tensors.
+   *
+   * @tparam Op Operator input type
+   * @param op Operator input
+   */
+  template <typename Op, typename... Args,
+            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) > 0), bool> = true>
+  void print(const Op &op, [[maybe_unused]] Args... dims) {
+    fprint(stdout, op, dims...);
+  }
+
+  /**
    * @brief Print a tensor's all values to stdout
    *
    * This form of `print()` is a specialization for 0D tensors.
