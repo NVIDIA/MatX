@@ -737,9 +737,10 @@ namespace matx {
   }
 
   /**
-   * @brief Print all a tensor's values to stdout
+   * @brief Print all of a tensor's values to stdout
    *
-   * This form of `print()` is a specialization for 1D+ tensors.
+   * This form of `print()` is a specialization for 1D+ tensors. A size of zero in
+   * dimension prints all elements in that dimension.
    *
    * @tparam Op Operator input type
    * @param op Operator input
