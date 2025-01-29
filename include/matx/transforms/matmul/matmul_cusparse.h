@@ -34,13 +34,11 @@
 
 #include <cusparse.h>
 
-#include <cstdio>
 #include <numeric>
 
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
 #include "matx/core/tensor.h"
-#include "matx/transforms/matmul/matmul_common.h"
 
 namespace matx {
 
@@ -148,7 +146,7 @@ public:
                               params_.ptrA2, params_.ptrA4, params_.ptrA0, pt,
                               ct, zb, dta);
     } else {
-      MATX_THROW(matxMatMulError, "SpMM currently only supports COO/CSR/CSC");
+      MATX_THROW(matxNotSupported, "SpMM currently only supports COO/CSR/CSC");
     }
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
 
