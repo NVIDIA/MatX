@@ -6,7 +6,7 @@ Profiling
 Profiling is a way to measure the performance of a program and to identify bottlenecks in your MatX application. Since 
 the method for profiling depends on the executor, each executor implements its own profiling mechanism. For example, 
 the CUDA executor can use events encapsulating the kernels it's profiling. The profiling is done through the executor 
-object rather than the `run` statement so that multiple `run`s can be profiled together.
+object rather than the `run` statement so that multiple `run`\s can be profiled together.
 
 Profiling is done by calling the `start_timer()` method of the executor:
 
