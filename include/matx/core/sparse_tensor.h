@@ -57,9 +57,12 @@ class sparse_tensor_t
           VAL, TF::DIM, DimDesc, detail::SparseTensorData<VAL, CRD, POS, TF>> {
 public:
   using sparse_tensor = bool;
+  using val_type = VAL;
+  using crd_type = CRD;
+  using pos_type = POS;
+  using Format = TF;
   static constexpr int DIM = TF::DIM;
   static constexpr int LVL = TF::LVL;
-  using Format = TF;
 
   //
   // Constructs a sparse tensor with given shape and contents.
