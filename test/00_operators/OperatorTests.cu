@@ -4749,7 +4749,7 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Print)
   auto r1 = ones<TestType>(t1.Shape());
   print(r1);
 
-  auto t3 = matx::make_tensor<double>({3, 2, 20});
+  auto t3 = matx::make_tensor<TestType>({3, 2, 20});
   print(matx::ones(t3.Shape()), 1, 0, 2);
 
   MATX_EXIT_HANDLER();
