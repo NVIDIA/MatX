@@ -80,6 +80,7 @@
 #include "matx/operators/matmul.h"
 #include "matx/operators/matvec.h"
 #include "matx/operators/norm.h"
+#include "matx/operators/normalize.h"
 #include "matx/operators/outer.h"
 #include "matx/operators/overlap.h"
 #include "matx/operators/percentile.h"

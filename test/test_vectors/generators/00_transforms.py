@@ -425,4 +425,12 @@ class norm_operators:
         return {
             'in_m': seq,
             'out_m': np.linalg.norm(seq, 1)
-        }       
+        }
+    
+    def normalize_maxnorm(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        # seq = np.reshape(np.arange(0,9), (3,3))
+        return {
+            'in_m': seq,
+            'out_m': seq / np.linalg.norm(seq, ord=np.inf, axis=0, keepdims=True)
+        }

@@ -72,9 +72,19 @@ class NormTestFloatTypes
     : public NormTest<TensorType> {
 };
 
+template <typename TensorType>
+class NormalizeTestFloatTypes: public NormTestFloatTypes<TensorType> {
+  using GTestType = std::tuple_element_t<0, TensorType>;
+  using GExecType = std::tuple_element_t<1, TensorType>;
+  protected:
+    // tensor_t<GTestType, 2> in_m{{3, 3}};
+    tensor_t<GTestType, 2> out_m{{a_len, a_len}};
+};
+
 
 
 TYPED_TEST_SUITE(NormTestFloatTypes, MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(NormalizeTestFloatTypes, MatXTypesFloatNonComplexAllExecs);
 
 
 TYPED_TEST(NormTestFloatTypes, VectorL1)
@@ -197,3 +207,34 @@ TYPED_TEST(NormTestFloatTypes, MatrixL2)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(NormalizeTestFloatTypes, NormalizeMaxnorm)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_maxnorm");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  print(this->in_m);
+  print(this->out_m);
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  // example-begin normalize-test-1
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM)).run(this->exec);
+  // example-end normalize-test-1
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+  
+  // (this->out_v = TestType(0)).run(this->exec);
+
+  // MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+  // auto myT = make_tensor<float>({3, 3});
+  // myT.SetVals({{0,1,2}, {3,4,5}, {6,7,8}});
+  // auto op = normalize(myT, NORMALIZE_RANGE::NORM);
+  // auto y = make_tensor<float>(myT.Shape());
+  // (y = op).run();
+  // print(y);
+
+  MATX_EXIT_HANDLER();
+}
