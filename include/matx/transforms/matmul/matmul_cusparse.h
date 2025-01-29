@@ -124,12 +124,11 @@ public:
 
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
-    cusparseStatus_t ret = cusparseCreate(&handle_);
+    [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
 
     // Create cuSPARSE handle for sparse matrix A.
     static_assert(is_sparse_tensor_v<TensorTypeA>);
-    void *val_a = a.Data();
     cusparseIndexType_t pt =
         MatXTypeToCuSparseIndexType<typename TensorTypeA::pos_type>();
     cusparseIndexType_t ct =
@@ -137,20 +136,17 @@ public:
     cusparseIndexBase_t zb = CUSPARSE_INDEX_BASE_ZERO;
     cudaDataType dta = MatXTypeToCudaType<TA>();
     if constexpr (TensorTypeA::Format::isCOO()) {
-      void *crd_i = a.CRDData(0);
-      void *crd_j = a.CRDData(1);
-      ret = cusparseCreateCoo(&matA_, params_.m, params_.k, params_.nse, crd_i,
-                              crd_j, val_a, ct, zb, dta);
+      ret = cusparseCreateCoo(&matA_, params_.m, params_.k, params_.nse,
+                              params_.ptrA3, params_.ptrA4, params_.ptrA0, ct,
+                              zb, dta);
     } else if constexpr (TensorTypeA::Format::isCSR()) {
-      void *pos = a.POSData(1);
-      void *crd_j = a.CRDData(1);
-      ret = cusparseCreateCsr(&matA_, params_.m, params_.k, params_.nse, pos,
-                              crd_j, val_a, pt, ct, zb, dta);
+      ret = cusparseCreateCsr(&matA_, params_.m, params_.k, params_.nse,
+                              params_.ptrA2, params_.ptrA4, params_.ptrA0, pt,
+                              ct, zb, dta);
     } else if constexpr (TensorTypeA::Format::isCSC()) {
-      void *pos = a.POSData(1);
-      void *crd_i = a.CRDData(1);
-      ret = cusparseCreateCsc(&matA_, params_.m, params_.k, params_.nse, pos,
-                              crd_i, val_a, pt, ct, zb, dta);
+      ret = cusparseCreateCsc(&matA_, params_.m, params_.k, params_.nse,
+                              params_.ptrA2, params_.ptrA4, params_.ptrA0, pt,
+                              ct, zb, dta);
     } else {
       MATX_THROW(matxMatMulError, "SpMM currently only supports COO/CSR/CSC");
     }
@@ -159,16 +155,14 @@ public:
     // Create cuSPARSE handle for dense matrices B and C.
     static_assert(is_tensor_view_v<TensorTypeA>);
     static_assert(is_tensor_view_v<TensorTypeB>);
-    void *val_b = b.Data();
-    void *val_c = c.Data();
     cudaDataType dtb = MatXTypeToCudaType<TB>();
     cudaDataType dtc = MatXTypeToCudaType<TC>();
     const cusparseOrder_t order = CUSPARSE_ORDER_ROW; // TODO: support col B,C?
     ret = cusparseCreateDnMat(&matB_, params_.k, params_.n, /*ld=*/params_.n,
-                              val_b, dtb, order);
+                              params_.ptrB, dtb, order);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
     ret = cusparseCreateDnMat(&matC_, params_.m, params_.n, /*ld=*/params_.n,
-                              val_c, dtc, order);
+                              params_.ptrC, dtc, order);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
 
     // Allocate a workspace for SpMM.
@@ -226,7 +220,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
     const cudaDataType comptp = MatXTypeToCudaType<TC>(); // TODO: see above
-    cusparseStatus_t ret =
+    [[maybe_unused]] cusparseStatus_t ret =
         cusparseSpMM(handle_, params_.opA, params_.opB, &params_.alpha, matA_,
                      matB_, &params_.beta, matC_, comptp, algo, workspace_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
@@ -302,6 +296,8 @@ void sparse_matmul_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
   auto a = A; // always sparse
   auto b = getCUSPARSESupportedTensor(B, stream);
   auto c = getCUSPARSESupportedTensor(C, stream);
+
+  // TODO: some more checking, supported type? on device? etc.
 
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
