@@ -53,6 +53,20 @@
 
 namespace matx {
 
+namespace detail {
+  template <int N, typename Executor, typename TupleType, typename... Ops>
+  void assign_tuple_tensors(const Executor &exec, TupleType &t, Ops... ops)
+  {
+    if constexpr (N < sizeof...(Ops)) {
+      auto in_tup = cuda::std::make_tuple(ops...);
+      if (!cuda::std::get<N>(t).isSameView(cuda::std::get<N>(in_tup))) {
+        (cuda::std::get<N>(t) = cuda::std::get<N>(in_tup)).run(exec);
+        assign_tuple_tensors<N + 1>(exec, t, ops...);
+      }
+    }
+  }
+};
+
 enum {
   matxNoRank = -1
 };
