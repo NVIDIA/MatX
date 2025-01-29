@@ -196,17 +196,6 @@ public:
 
   static_assert(DIM <= LVL);
 
-  static constexpr bool isScalar() { return LVL == 0; }
-
-  static constexpr bool isDnVec() {
-    if constexpr (LVL == 1) {
-      using first_type = std::tuple_element_t<0, LVLSPECS>;
-      return first_type::lvltype == LvlType::Dense &&
-             first_type::expr::op == LvlOp::Id && first_type::expr::di == 0;
-    }
-    return false;
-  }
-
   static constexpr bool isSpVec() {
     if constexpr (LVL == 1) {
       using first_type = std::tuple_element_t<0, LVLSPECS>;
