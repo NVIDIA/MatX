@@ -38,6 +38,7 @@ Optional Third-party Dependencies
 - `nvbench <https://github.com/NVIDIA/nvbench>`_ Commit 1a13a2e (Required to run benchmarks)
 - `cutensor <https://developer.nvidia.com/cutensor>`_ 2.0.1.2+ (Required when using `einsum`)
 - `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 24.03.0.4+ (Required when using `einsum`)
+- `cuDSS <https://developer.nvidia.com/cudss>`_ 0.4.0.2+ (Required when using `solve` on sparse matrices)
 
 Host (CPU) Support
 ------------------
