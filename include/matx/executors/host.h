@@ -113,6 +113,31 @@ class HostExecutor {
     void sync() {}
 
     /**
+     * @brief Start a timer for profiling workload
+     */
+    void start_timer() { 
+      MATX_STATIC_ASSERT_STR(MODE == ThreadsMode::SINGLE, matxNotSupported, "Timer not supported in multi-threaded mode");
+      start_ = std::chrono::high_resolution_clock::now();
+     }
+
+    /**
+     * @brief Stop a timer for profiling workload
+     */      
+    void stop_timer() { 
+      MATX_STATIC_ASSERT_STR(MODE == ThreadsMode::SINGLE, matxNotSupported, "Timer not supported in multi-threaded mode");
+      stop_ = std::chrono::high_resolution_clock::now();
+    }
+
+    /**
+     * @brief Get the time in milliseconds between start_timer and stop_timer. 
+     * This will block until the event is synchronized
+     */
+    float get_time_ms() {
+      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_ - start_);
+      return static_cast<float>(static_cast<double>(duration.count()) / 1e3);
+    }    
+
+    /**
      * @brief Execute an operator
      *
      * @tparam Op Operator type
@@ -151,6 +176,8 @@ class HostExecutor {
 
     private:
       HostExecParams params_;
+      std::chrono::time_point<std::chrono::high_resolution_clock> start_;
+      std::chrono::time_point<std::chrono::high_resolution_clock> stop_;
 };
 
 using SingleThreadedHostExecutor = HostExecutor<ThreadsMode::SINGLE>;
