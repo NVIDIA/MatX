@@ -1441,7 +1441,6 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
     
   MATX_ENTER_HANDLER();
   index_t count = 10;
-  TestType c = GenerateData<TestType>();
 
   // example-begin trace-test-1
   auto t2 = make_tensor<TestType>({count, count});

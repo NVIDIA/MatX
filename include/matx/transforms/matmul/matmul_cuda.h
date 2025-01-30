@@ -832,7 +832,7 @@ private:
       }
 
       if constexpr (RANK <= 3) {
-        auto res = cublasLtMatmul(
+        [[maybe_unused]] auto res = cublasLtMatmul(
             ltHandle, operationDesc, &salpha, (void *)a_adj.Data(), Adesc,
             (void *)b_adj.Data(), Bdesc, &sbeta, (void *)c_adj.Data(), Cdesc,
             (void *)c_adj.Data(), Cdesc, &heuristicResult.algo, workspace,

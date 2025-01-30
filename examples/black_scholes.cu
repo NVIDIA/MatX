@@ -61,7 +61,7 @@ private:
 
 public:
   BlackScholes(O out, I1 K, I1 V, I1 S, I1 r, I1 T)
-      : out_(out), K_(K), V_(V), S_(S), r_(r), T_(T)  {}
+      : out_(out), V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
   __device__ inline void operator()(index_t idx)
   {
@@ -72,11 +72,11 @@ public:
     auto r = r_(idx);
 
     auto VsqrtT = V * sqrt(T);
-    auto d1 = (log(S / K) + (r + 0.5 * V * V) * T) / VsqrtT ;
+    auto d1 = (log(S / K) + (r + 0.5f * V * V) * T) / VsqrtT ;
     auto d2 = d1 - VsqrtT;
-    auto cdf_d1 = normcdf(d1);
-    auto cdf_d2 = normcdf(d2);
-    auto expRT = exp(-1 * r * T);
+    auto cdf_d1 = normcdff(d1); // Note in a custom op we call the CUDA math function directly
+    auto cdf_d2 = normcdff(d2);
+    auto expRT = exp(-1.f * r * T);
 
     out_(idx) = S * cdf_d1 - K * expRT * cdf_d2;
   }
@@ -96,11 +96,11 @@ void compute_black_scholes_matx(tensor_t<T1,1>& K,
                                 cudaExecutor& exec)
 {
     auto VsqrtT = V * sqrt(T);
-    auto d1 = (log(S / K) + (r + 0.5 * V * V) * T) / VsqrtT ;
+    auto d1 = (log(S / K) + (r + 0.5f * V * V) * T) / VsqrtT ;
     auto d2 = d1 - VsqrtT;
     auto cdf_d1 = normcdf(d1);
     auto cdf_d2 = normcdf(d2);
-    auto expRT = exp(-1 * r * T);
+    auto expRT = exp(-1.f * r * T);
 
     (output = S * cdf_d1 - K * expRT * cdf_d2).run(exec);
 }
@@ -109,7 +109,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
-  using dtype = double;
+  using dtype = float;
 
   index_t input_size = 100000000;
   constexpr uint32_t num_iterations = 1;

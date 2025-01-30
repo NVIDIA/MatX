@@ -39,7 +39,6 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-  typedef cuda::std::complex<float> complex;
 
   uint32_t iterations = 10;
   constexpr index_t numSamples = 1638400;

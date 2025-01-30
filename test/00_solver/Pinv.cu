@@ -75,7 +75,6 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   constexpr cuda::std::array sizes {
     std::pair{100, 50},
@@ -105,7 +104,6 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvRankDeficient)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   constexpr cuda::std::array sizes {
     std::pair{100, 50},
@@ -133,7 +131,6 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvBasicBatched)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   constexpr int m = 100;
   constexpr int n = 50;
@@ -156,7 +153,6 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvBatchedRankDeficient)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   constexpr int m = 100;
   constexpr int n = 50;

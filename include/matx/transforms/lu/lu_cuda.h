@@ -113,7 +113,7 @@ public:
 
   void GetWorkspaceSize() override
   {
-    cusolverStatus_t ret = cusolverDnXgetrf_bufferSize(this->handle, this->dn_params, params.m,
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgetrf_bufferSize(this->handle, this->dn_params, params.m,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.m,
                                             MatXTypeToCudaType<T1>(), &this->dspace,
@@ -164,7 +164,7 @@ public:
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      auto ret = cusolverDnXgetrf(
+      [[maybe_unused]] auto ret = cusolverDnXgetrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, this->batch_piv_ptrs[i],
           MatXTypeToCudaType<T1>(),

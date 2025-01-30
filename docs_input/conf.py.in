@@ -194,6 +194,7 @@ epub_exclude_files = ['search.html']
 rst_epilog = f"""
 .. |ProjectVersion| replace:: {version}
 .. |ProjectRelease| replace:: {release}
+.. |CI_RUN_DATETIME| replace:: {datetime.datetime.now()}
 """
 
 ci_env_list = [

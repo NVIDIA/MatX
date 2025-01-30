@@ -290,22 +290,22 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         if (outdims[OutElemRank] <= last_elem) {
             const filter_t *h = h_start;
             output_t accum { 0 };
-            const int first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
+            const uint32_t first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
             // The footprint of samples involved in the convolution may wrap from the end
             // to the beginning of smem_input. The prologue below handles the samples from
             // the current tail to the end of smem_input and the epilogue starts back at the
             // beginning of smem_input.
-            const int prologue_count = (first_end - cached_input_ind_tail + 1);
-            const int epilogue_count = (prologue_count < filter_phase_len) ? filter_phase_len - prologue_count : 0;
+            const uint32_t prologue_count = (first_end - cached_input_ind_tail + 1);
+            const uint32_t epilogue_count = (prologue_count < filter_phase_len) ? filter_phase_len - prologue_count : 0;
             const input_t *sample = smem_input + cached_input_ind_tail * num_channels + (num_channels - 1 - chan);
             // Apply the filter h in reverse order below to flip the filter for convolution
-            for (int k = 0; k < prologue_count; k++) {
+            for (uint32_t k = 0; k < prologue_count; k++) {
                 accum += (*h) * (*sample);
                 sample += num_channels;
                 h -= num_channels;
             }
             sample = smem_input + (num_channels - 1 - chan);
-            for (int k = 0; k < epilogue_count; k++) {
+            for (uint32_t k = 0; k < epilogue_count; k++) {
                 accum += (*h) * (*sample);
                 sample += num_channels;
                 h -= num_channels;

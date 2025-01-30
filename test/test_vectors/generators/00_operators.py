@@ -21,7 +21,28 @@ class polyval_operator:
             'out': np.polyval(c, x),
         }
 
+class cross_operator:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)        
+        pass
 
+    def run(self) -> Dict[str, np.array]:
+        a = matx_common.randn_ndarray(self.size, self.dtype)
+        b = matx_common.randn_ndarray(self.size, self.dtype)
+        
+        #for the result so that the rank matches that of the MatX output
+        result = np.cross(a, b)
+        if len(result.shape) == 0:
+            result = np.expand_dims(result, axis=0)
+            
+        return {
+            'a': a,
+            'b': b,
+            'out': result
+        }    
+    
 class kron_operator:
     def __init__(self, dtype: str, size: List[int]):
         pass

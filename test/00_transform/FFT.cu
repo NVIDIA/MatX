@@ -661,7 +661,7 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DSizeChecks)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ComplexType = TestType;
-  using RealType = typename TestType::value_type;
+  //using RealType = typename TestType::value_type;
 
   const index_t N = 16;
   auto tc = make_tensor<ComplexType>({N});

@@ -40,8 +40,6 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-  using complex = cuda::std::complex<float>;
-
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
 
@@ -70,7 +68,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  using OutType = float;
   using InType = float;
   using FilterType = float;
 

@@ -11,6 +11,7 @@ set(examples
     mvdr_beamformer
     pwelch
     resample_poly_bench
+    sparse_tensor
     spectrogram
     spectrogram_graph
     spherical_harmonics

@@ -89,7 +89,6 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVWrite)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   tensor_t<TestType, 2> Avs{{10, 2}};
 
   this->pb->NumpyToTensorView(this->Av, this->small_csv.c_str());
@@ -106,7 +105,6 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   auto t = make_tensor<TestType>({1,10});
 
   // example-begin read_mat-test-1
@@ -123,7 +121,6 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
   MATX_ENTER_HANDLER();
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;     
   auto t = make_tensor<TestType>({2,3});
   auto t2 = make_tensor<TestType>({2,3});
   t.SetVals({{1,2,3},{4,5,6}});

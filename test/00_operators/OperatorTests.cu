@@ -1021,7 +1021,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, SliceAndReshape)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -1660,7 +1659,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
 TYPED_TEST(OperatorTestsNumericAllExecs, RemapRankZero)
 {
   MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   ExecType exec{};
@@ -1735,7 +1733,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, RealImagOp)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   auto tiv0 = make_tensor<TestType>({});
@@ -1763,7 +1760,6 @@ TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};
   auto tiv0 = make_tensor<TestType>({});
@@ -1864,7 +1860,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncsR2C)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   auto tiv0 = make_tensor<TestType>({});
@@ -1888,7 +1883,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
   auto tiv0 = make_tensor<TestType>({});
@@ -1953,7 +1947,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, NDOperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
 
@@ -2012,12 +2005,72 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Toeplitz)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Cross)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};   
+  auto pb = std::make_unique<detail::MatXPybind>();
+  // Half precision needs a bit more tolerance when compared to fp32
+  float thresh = 0.01f;
+  if constexpr (is_matx_half_v<TestType>) {
+    thresh = 0.08f;
+  }
+
+  {//batched 4 x 3
+    pb->InitAndRunTVGenerator<TestType>("00_operators", "cross_operator", "run", {4, 3});
+
+    auto a = make_tensor<TestType>({4, 3});
+    auto b = make_tensor<TestType>({4, 3});
+    auto out = make_tensor<TestType>({4, 3});
+
+    pb->NumpyToTensorView(a, "a");
+    pb->NumpyToTensorView(b, "b");
+
+    // example-begin cross-test-1
+    (out = cross(a, b)).run(exec);
+    // example-end cross-test-1
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, out, "out", thresh);
+  }
+
+  {//non-batched 3
+    pb->InitAndRunTVGenerator<TestType>("00_operators", "cross_operator", "run", {3});
+    auto a = make_tensor<TestType>({3});
+    auto b = make_tensor<TestType>({3});
+    auto out = make_tensor<TestType>({3});
+
+    pb->NumpyToTensorView(a, "a");
+    pb->NumpyToTensorView(b, "b");
+    
+    (out = cross(a, b)).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, out, "out", thresh);
+  }
+
+  {//non-batched 2
+    pb->InitAndRunTVGenerator<TestType>("00_operators", "cross_operator", "run", {2});
+    auto a = make_tensor<TestType>({2});
+    auto b = make_tensor<TestType>({2});
+    auto out = make_tensor<TestType>({1});
+
+    pb->NumpyToTensorView(a, "a");
+    pb->NumpyToTensorView(b, "b");
+    
+    (out = cross(a, b)).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, out, "out", thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, OperatorFuncs)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};     
   auto tiv0 = make_tensor<TestType>({});
@@ -2086,7 +2139,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncDivComplex)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};  
   auto tiv0 = make_tensor<TestType>({});
@@ -2108,7 +2160,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, IsNanInf)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
 
@@ -2160,7 +2211,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
   auto tiv0 = make_tensor<TestType>({});
@@ -2230,7 +2280,6 @@ TYPED_TEST(OperatorTestsIntegralAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};    
   auto tiv0 = make_tensor<TestType>({});
@@ -2254,7 +2303,6 @@ TYPED_TEST(OperatorTestsBooleanAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   auto tiv0 = make_tensor<TestType>({});
@@ -2308,7 +2356,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
 
@@ -2347,7 +2394,6 @@ TYPED_TEST(OperatorTestsAllExecs, Flatten)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};  
 
@@ -2378,7 +2424,6 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, AdvancedOperators)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count = 100;
@@ -2448,7 +2493,6 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AdvancedOperators)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count = 10;
@@ -2516,17 +2560,12 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count = 10;
 
   tensor_t<float, 1> fview({count});
   tensor_t<TestType, 1> dview({count});
-
-  using data_type =
-      typename std::conditional_t<is_complex_half_v<TestType>, float,
-                                  typename TestType::value_type>;
 
   // Multiply by scalar
   for (index_t i = 0; i < count; i++) {
@@ -2624,7 +2663,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -2669,7 +2707,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, NonSquareTranspose)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count = 100;
@@ -2702,7 +2739,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};     
 
@@ -2739,7 +2775,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, TransposeVsTransposeMatrix)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   // example-begin transpose-test-1
   // ExecType is an executor type (e.g. matx::cudaExecutor for executing on the GPU).
@@ -2790,7 +2825,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, CloneAndAdd)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};  
 
@@ -2852,7 +2886,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reshape)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count = 10;
@@ -2927,7 +2960,6 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, Overlap)
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -3008,7 +3040,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -3341,7 +3372,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
   index_t i, j;
@@ -3477,7 +3507,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Stack)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -3523,7 +3552,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, HermitianTranspose)
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t count0 = 100;
@@ -3560,7 +3588,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, PlanarTransform)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{};   
   index_t m = 10;
@@ -3592,7 +3619,6 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, InterleavedTransform)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -3629,7 +3655,6 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -3685,7 +3710,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Sphere2Cart)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -4011,7 +4035,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -4169,7 +4192,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 
@@ -4473,7 +4495,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   ExecType exec{}; 
 

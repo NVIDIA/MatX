@@ -11,10 +11,10 @@ Optional features of MatX that require downloading separate libraries use additi
 be explicit about their requirements.
 
 The MatX CMake build configuration is intented to help download any libraries for both the required and optional features.
-The CPM_ build system is used to help with package management and version control. By default, CPM will fetch other packages
+The CPM build system is used to help with package management and version control. By default, CPM will fetch other packages
 from the internet. Alternatively, the option ``CPM_USE_LOCAL_PACKAGES`` can be used to point to local downloads in an air-gapped
 or offline environment. Choosing local versions of packages uses the typical ``find_packages`` CMake search methods. Please see 
-the CPM_ documentation or the documentation for each package for more information.
+the CPM documentation or the documentation for each package for more information.
 
 
 System Requirements
@@ -27,8 +27,7 @@ for supported host compilers. Other requirements for optional components are lis
 Required Third-party Dependencies
 ---------------------------------
 
-- `CPM <https://github.com/cpm-cmake/CPM.cmake>`_ (* Included in the project source and does not require a separate download)
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.7.0+
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.7.0+ commit cbc6b9b or higher
 
 
 Optional Third-party Dependencies

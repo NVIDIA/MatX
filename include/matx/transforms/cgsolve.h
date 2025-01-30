@@ -94,7 +94,6 @@ namespace matx
       for(int i = 0 ; i < SRANK; i++) {
         scalar_shape[i] = X.Size(i);
       }
-      value_type N = value_type(X.Size(SRANK));
 
       // Construct temporary scalars
       auto r0r0 = make_tensor<value_type>(scalar_shape, MATX_ASYNC_DEVICE_MEMORY, stream);

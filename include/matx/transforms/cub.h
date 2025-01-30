@@ -730,7 +730,7 @@ inline void ExecSort(OutputTensor &a_out,
           return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
                                     cparams_.init, stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
     }
     else {
@@ -738,7 +738,7 @@ inline void ExecSort(OutputTensor &a_out,
         return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), cparams_.reduce_op,
                                     cparams_.init, stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Reduce");
     }
 
@@ -780,14 +780,14 @@ inline void ExecSort(OutputTensor &a_out,
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
           return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
     }
     else {
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
         return cub::DeviceReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in ub::DeviceReduce::Sum");
     }
 #endif
@@ -826,14 +826,14 @@ inline void ExecSort(OutputTensor &a_out,
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
           return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Min");
     }
     else {
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
         return cub::DeviceReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DevicdReduce::Min");
     }
 #endif
@@ -872,7 +872,7 @@ inline void ExecSort(OutputTensor &a_out,
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
           return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
       };
-      auto rv = ReduceInput(ft, out_base, in_base);
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Max");
     }
     else {
@@ -880,8 +880,7 @@ inline void ExecSort(OutputTensor &a_out,
         return cub::DeviceReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
       };
 
-      auto rv = ReduceInput(ft, out_base, in_base);
-
+      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Max");
     }
 #endif
@@ -1889,8 +1888,6 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  cudaStream_t stream = exec.getStream();
-
   using a_type = typename InputOperator::value_type;
   a_type *out_ptr = nullptr;
   detail::tensor_impl_t<a_type, InputOperator::Rank()> tmp_in;
@@ -2080,9 +2077,9 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using param_type = typename detail::HistEvenParams_t<typename InputOperator::value_type>;
   detail::HistEvenParams_t<typename InputOperator::value_type> hp{lower, upper, num_levels};
 #ifndef MATX_DISABLE_CUB_CACHE
+  using param_type = typename detail::HistEvenParams_t<typename InputOperator::value_type>;
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
@@ -2217,12 +2214,11 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
   cudaStream_t stream = exec.getStream();
 
 #ifndef MATX_DISABLE_CUB_CACHE
-
+  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
   // Get cache or new Sort plan if it doesn't exist
   auto params =
       detail::matxCubPlan_t<OutputTensor,
@@ -2337,11 +2333,10 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
 #ifndef MATX_DISABLE_CUB_CACHE
-
+  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
   // Get cache or new Sort plan if it doesn't exist
   auto params =
       detail::matxCubPlan_t<OutputTensor,
@@ -2456,10 +2451,10 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
 
   matx::sort_impl(sort_tensor, a, SORT_DIR_ASC, stream);
 
-  using param_type = typename detail::UniqueParams_t<CountTensor>;
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
 
 #ifndef MATX_DISABLE_CUB_CACHE
+  using param_type = typename detail::UniqueParams_t<CountTensor>;
   // Get cache or new Sort plan if it doesn't exist
   auto params =
       detail::matxCubPlan_t<OutputTensor,

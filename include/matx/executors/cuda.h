@@ -54,14 +54,24 @@ namespace matx
        * 
        * @param stream CUDA stream
        */
-      cudaExecutor(cudaStream_t stream) : stream_(stream) {}
-      cudaExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {}
+      cudaExecutor(cudaStream_t stream) : stream_(stream) {
+        MATX_CUDA_CHECK(cudaEventCreate(&start_));
+        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      }
+
+      cudaExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {
+        MATX_CUDA_CHECK(cudaEventCreate(&start_));
+        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      }
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
        * 
        */
-      cudaExecutor() : stream_(0) {}
+      cudaExecutor() : stream_(0) {
+        MATX_CUDA_CHECK(cudaEventCreate(&start_));
+        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      }
 
       /**
        * @brief Returns stream associated with executor
@@ -73,6 +83,27 @@ namespace matx
        * 
        */
       void sync() { cudaStreamSynchronize(stream_); }
+
+      /**
+       * @brief Start a timer for profiling workload
+       */
+      void start_timer() { cudaEventRecord(start_, stream_); }
+
+      /**
+       * @brief Stop a timer for profiling workload
+       */      
+      void stop_timer() { cudaEventRecord(stop_, stream_); }
+
+      /**
+       * @brief Get the time in milliseconds between start_timer and stop_timer. 
+       * This will block until the event is synchronized
+       */
+      float get_time_ms() {
+        float time;
+        cudaEventSynchronize(stop_);
+        cudaEventElapsedTime(&time, start_, stop_);
+        return time;
+      }
       
       /**
        * Execute an operator on a device
@@ -139,6 +170,8 @@ namespace matx
 
     private:
       cudaStream_t stream_;
+      cudaEvent_t start_;
+      cudaEvent_t stop_;
   };
 
 };

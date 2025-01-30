@@ -206,7 +206,7 @@ public:
           cuda::std::array<index_t, TensorTypeA::Rank()> a_idx{0};
           cuda::std::array<index_t, TensorTypeAInv::Rank()> a_inv_idx{0};
           constexpr int batch_offset = 2;
-          auto a_shape = a.Shape();
+
           // Get total number of batches
           for (size_t iter = 0; iter < params.batch_size; iter++) {
             if (use_input_workbuf) {

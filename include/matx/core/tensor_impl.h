@@ -49,6 +49,23 @@ namespace matx {
 
 namespace detail {
 
+template <typename T>
+struct DenseTensorData {
+  using dense_data = bool;
+  T *ldata_;
+};
+
+template <typename T, typename CRD, typename POS, typename TF>
+struct SparseTensorData {
+  using sparse_data = bool;
+  using crd_type = CRD;
+  using pos_type = POS;
+  using Format = TF;
+  static constexpr int LVL = TF::LVL;
+  T *ldata_;
+  CRD *crd_[LVL];
+  POS *pos_[LVL];
+};
 
 /**
  * @brief Bare implementation of tensor class
@@ -66,7 +83,7 @@ namespace detail {
  * @tparam T Type of tensor
  * @tparam RANK Rank of tensor
  */
-template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>>
+template <typename T, int RANK, typename Desc = DefaultDescriptor<RANK>, typename TensorData = DenseTensorData<T>>
 class tensor_impl_t {
   public:
     // Type specifier for reflection on class
@@ -75,10 +92,11 @@ class tensor_impl_t {
     using tensor_view = bool;
     using tensor_impl = bool;
     using desc_type = Desc;
+    using data_type = TensorData;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
     using matxoplvalue = bool;
-    using self_type = tensor_impl_t<T, RANK, Desc>;
+    using self_type = tensor_impl_t<T, RANK, Desc, TensorData>;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -104,11 +122,11 @@ class tensor_impl_t {
      * @param rhs
      *   Right argument
      */
-    friend void swap(tensor_impl_t<T, RANK, Desc> &lhs, tensor_impl_t<T, RANK, Desc> &rhs) noexcept
+    friend void swap(self_type &lhs, self_type &rhs) noexcept
     {
       using std::swap;
 
-      swap(lhs.ldata_, rhs.ldata_);
+      swap(lhs.data_, rhs.data_);
       swap(lhs.desc_, rhs.desc_);
     }
 
@@ -125,10 +143,10 @@ class tensor_impl_t {
      * @param data
      *   Data pointer
      */
-    tensor_impl_t(T *const data) : ldata_(data) {
+    tensor_impl_t(T *const data)  {
+      data_.ldata_ = data;
       static_assert(RANK == 0, "tensor_impl_t with single pointer parameter must be a rank 0 tensor");
     }
-
     /**
      * Constructor for a rank-1 and above tensor.
      *
@@ -152,8 +170,7 @@ class tensor_impl_t {
     template <typename ShapeType, typename StrideType>
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape, StrideType &&strides)
         : desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
-    {
-    }
+    {}
 
     /**
      * Constructor for a rank-1 and above tensor using a user pointer and shape
@@ -168,8 +185,9 @@ class tensor_impl_t {
      */
     template <typename ShapeType, std::enable_if_t<!is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
     __MATX_INLINE__ tensor_impl_t(T *const ldata, ShapeType &&shape)
-        : ldata_(ldata), desc_(std::forward<ShapeType>(shape))
+        : desc_(std::forward<ShapeType>(shape))
     {
+      data_.ldata_ = ldata;
     }
 
 
@@ -191,8 +209,9 @@ class tensor_impl_t {
     __MATX_INLINE__ tensor_impl_t(T *const ldata,
                     ShapeType &&shape,
                     StrideType &&strides)
-        : ldata_(ldata), desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
+        : desc_(std::forward<ShapeType>(shape), std::forward<StrideType>(strides))
     {
+      data_.ldata_ = ldata;
     }
 
 
@@ -214,8 +233,9 @@ MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc)
-        : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}
+        : desc_{std::forward<DescriptorType>(desc)}
     {
+      data_.ldata_ = ldata;
     }
 MATX_IGNORE_WARNING_POP_GCC
 
@@ -237,7 +257,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
     __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
     {
-      ldata_ = rhs.ldata_;
+      data_.ldata_ = rhs.Data();
       desc_ = rhs.desc_;
     }
 
@@ -253,7 +273,7 @@ MATX_IGNORE_WARNING_POP_GCC
      */
     [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto copy(const tensor_impl_t<T, RANK> &op)
     {
-      ldata_ = op.ldata_;
+      data_.ldata_ = op.Data();
       desc_ = op.desc_;
     }
 
@@ -617,7 +637,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @return
      *    A shape of the data with the appropriate dimensions set
      */
-    __MATX_INLINE__ auto Shape() const noexcept { return this->desc_.Shape(); }
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
+    auto Shape() const noexcept { return this->desc_.Shape(); }
 
     /**
      * Get the strides the tensor from the underlying data
@@ -639,7 +660,7 @@ MATX_IGNORE_WARNING_POP_GCC
       cuda::std::array<typename Desc::shape_type, N> n = {};
       cuda::std::array<typename Desc::stride_type, N> s = {};
 
-      T *data = ldata_;
+      T *tmpdata = data_.ldata_;
       int d = 0;
 
       [[maybe_unused]] int end_count = 0;
@@ -677,7 +698,7 @@ MATX_IGNORE_WARNING_POP_GCC
                         "Requested slice start index out of bounds");
 
         // offset by first
-        data += first * Stride(i);
+        tmpdata += first * Stride(i);
 
         if constexpr (N > 0) {
           if (end != matxDropDim) {
@@ -702,7 +723,7 @@ MATX_IGNORE_WARNING_POP_GCC
       MATX_ASSERT_STR(d == N, matxInvalidDim,
                       "Number of indices must match the target rank to slice to");
 
-      return cuda::std::make_tuple(tensor_desc_t<decltype(n), decltype(s), N>{std::move(n), std::move(s)}, data);
+      return cuda::std::make_tuple(tensor_desc_t<decltype(n), decltype(s), N>{std::move(n), std::move(s)}, tmpdata);
     }
 
 
@@ -770,7 +791,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
       auto new_desc = CloneImpl<N>(clones);
 
-      return tensor_impl_t<T, N, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, N, decltype(new_desc)>{this->data_.ldata_, std::move(new_desc)};
     }
 
     __MATX_INLINE__ auto PermuteImpl(const cuda::std::array<int32_t, RANK> &dims) const
@@ -800,7 +821,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ auto Permute(const cuda::std::array<int32_t, RANK> &dims) const
     {
       auto new_desc = PermuteImpl(dims);
-      return tensor_impl_t<T, RANK, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, RANK, decltype(new_desc)>{this->data_.ldata_, std::move(new_desc)};
     }
 
     template <int N>
@@ -845,7 +866,7 @@ MATX_IGNORE_WARNING_POP_GCC
     OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
                 const cuda::std::array<typename Desc::stride_type, N> &strides) const {
       auto new_desc = OverlapViewImpl<N>(windows, strides);
-      return tensor_impl_t<T, RANK + 1, decltype(new_desc)>{this->ldata_, std::move(new_desc)};
+      return tensor_impl_t<T, RANK + 1, decltype(new_desc)>{this->data_.ldata_, std::move(new_desc)};
     }
 
     template <typename O>
@@ -870,7 +891,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
-      return ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
+      return data_.ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
     }
 
     /**
@@ -922,9 +943,9 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
-      assert(ldata_ != nullptr);
+      assert(data_.ldata_ != nullptr);
 #endif
-      return *(ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+      return *(data_.ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
     }
 
     /**
@@ -942,9 +963,9 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
 #ifndef NDEBUG
-      assert(ldata_ != nullptr);
+      assert(data_.ldata_ != nullptr);
 #endif
-      return *(ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+      return *(data_.ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
     }
 
     /**
@@ -972,30 +993,6 @@ MATX_IGNORE_WARNING_POP_GCC
           return this->operator()(args...);
         }, idx);
     }
-
-
-    /**
-     * operator() setter with an array index
-     *
-     * @returns value in tensor
-     *
-     */
-    // template <int M = RANK, std::enable_if_t<M >= 1, bool> = true>
-    // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T &operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
-    // {
-    //   if constexpr (RANK == 1) {
-    //     return this->operator()(idx[0]);
-    //   }
-    //   else if constexpr (RANK == 2) {
-    //     return this->operator()(idx[0], idx[1]);
-    //   }
-    //   else if constexpr (RANK == 3) {
-    //     return this->operator()(idx[0], idx[1], idx[2]);
-    //   }
-    //   else {
-    //     return this->operator()(idx[0], idx[1], idx[2], idx[3]);
-    //   }
-    // }
 
     /**
      * Get the rank of the tensor
@@ -1057,7 +1054,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
-      return TotalSize() * sizeof(*ldata_);
+      return TotalSize() * sizeof(*data_.ldata_);
     }
 
     /**
@@ -1066,9 +1063,28 @@ MATX_IGNORE_WARNING_POP_GCC
      * @return data pointer
      */
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto Data() const noexcept {
-      return ldata_;
+      return data_.ldata_;
     }
 
+    /**
+     * @brief Set data pointer
+     *
+     * @param data Pointer to new data pointer
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  void SetData(T *data) noexcept {
+      data_.ldata_ = data;
+    }
+
+    template <typename U = TensorData, 
+          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto CRDData(int l) const noexcept {
+      return data_.crd_[l];
+    }
+    template <typename U = TensorData, 
+          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto POSData(int l) const noexcept{
+      return data_.pos_[l];
+    }
 
     /**
      * @brief Set local data pointer
@@ -1077,7 +1093,17 @@ MATX_IGNORE_WARNING_POP_GCC
      *   Data pointer to set
      */
     void SetLocalData(T* data) {
-      ldata_ = data;
+      data_.ldata_ = data;
+    }
+
+    template <typename U = TensorData>
+    auto SetSparseData(T* data, 
+                      typename U::crd_type* crd[U::LVL], 
+                      typename U::pos_type* pos[U::LVL])
+        -> std::enable_if_t<is_sparse_data_v<U>, void> {
+      data_.ldata_ = data;
+      memcpy(data_.crd_, crd, U::LVL*sizeof(crd[0]));
+      memcpy(data_.pos_, pos, U::LVL*sizeof(pos[0]));
     }
 
     template <typename ShapeType, typename Executor>
@@ -1092,7 +1118,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
 
   protected:
-    T *ldata_;
+    TensorData data_;
     Desc desc_;
 };
 

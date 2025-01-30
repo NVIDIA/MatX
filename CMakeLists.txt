@@ -16,8 +16,10 @@ endif()
 if(NOT DEFINED rapids-cmake-dir)
   include(FetchContent)
   # Tell FetchContent to just use the local copy of rapids-cmake:
-  set(FETCHCONTENT_SOURCE_DIR_RAPIDS_CMAKE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
-  FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
+
+  # Tell FetchContent to download remote copy of rapids-cmake:
+  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
   FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
@@ -132,8 +134,10 @@ rapids_cpm_cccl(
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
-# Set flags for compiling tests faster
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+# Set flags for compiling tests faster (only for nvcc)
+if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+endif()
 
 # Hack because CMake doesn't have short circult evaluation
 if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -163,9 +167,13 @@ if (NOT ${IS_NVCPP} GREATER -1)
     endif()
 endif()
 
-
-
-set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+if (CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+message((STATUS "Using Clang compiler"))
+    # Workaround for clang bug: https://github.com/llvm/llvm-project/issues/58491
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unused-command-line-argument>)
+else()
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+endif()
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
 # CUTLASS slows down compile times when used, so leave it as optional for now
@@ -254,6 +262,16 @@ if (MATX_EN_COVERAGE)
     target_compile_options(matx INTERFACE -fprofile-arcs -ftest-coverage)
     target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
+
+# Add nvtiff support if installed
+find_library(NVTIFF_LIBRARY nvtiff)
+if (NOT NVTIFF_LIBRARY)
+    message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
+else()
+    message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+endif()
+
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)

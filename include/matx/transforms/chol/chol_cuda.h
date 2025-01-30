@@ -111,7 +111,7 @@ public:
 
   void GetWorkspaceSize() override
   {
-    cusolverStatus_t ret = cusolverDnXpotrf_bufferSize(this->handle, this->dn_params, params.uplo,
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXpotrf_bufferSize(this->handle, this->dn_params, params.uplo,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.n,
                                             MatXTypeToCudaType<T1>(), &this->dspace,
@@ -158,7 +158,7 @@ public:
     // At this time cuSolver does not have a batched 64-bit cholesky interface.
     // Change this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      auto ret = cusolverDnXpotrf(
+      [[maybe_unused]] auto ret = cusolverDnXpotrf(
           this->handle, this->dn_params, uplo, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.n, MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,

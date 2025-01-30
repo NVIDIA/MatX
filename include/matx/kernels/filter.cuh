@@ -11,17 +11,17 @@
 namespace matx {
 
 namespace detail_filter {
-  constexpr size_t MAX_BATCHES = 10000;
-  constexpr size_t BLOCK_SIZE_RECURSIVE = 1024;
-  constexpr size_t CORR_COLS = BLOCK_SIZE_RECURSIVE;
-  constexpr size_t MAX_BLOCKS_PER_BATCH = 1000;
-  constexpr size_t RECURSIVE_VALS_PER_THREAD = 8;
-  constexpr size_t MAX_NON_RECURSIVE_COEFFS = 4;
-  constexpr size_t MAX_RECURSIVE_COEFFS = 4;
-  constexpr size_t WARP_SIZE = 32;
+  constexpr uint32_t MAX_BATCHES = 10000;
+  constexpr uint32_t BLOCK_SIZE_RECURSIVE = 1024;
+  constexpr uint32_t CORR_COLS = BLOCK_SIZE_RECURSIVE;
+  constexpr uint32_t MAX_BLOCKS_PER_BATCH = 1000;
+  constexpr uint32_t RECURSIVE_VALS_PER_THREAD = 8;
+  constexpr uint32_t MAX_NON_RECURSIVE_COEFFS = 4;
+  constexpr uint32_t MAX_RECURSIVE_COEFFS = 4;
+  constexpr uint32_t WARP_SIZE = 32;
   using COMPLEX_TYPE = cuComplex;
-  constexpr size_t RECURSIVE_CHUNK_SIZE = BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD;
-  constexpr size_t MAX_SIGNAL_LEN_PER_BATCH =
+  constexpr uint32_t RECURSIVE_CHUNK_SIZE = BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD;
+  constexpr uint32_t MAX_SIGNAL_LEN_PER_BATCH =
     (BLOCK_SIZE_RECURSIVE * RECURSIVE_VALS_PER_THREAD * MAX_BLOCKS_PER_BATCH);
 };
 using namespace detail_filter;
@@ -121,7 +121,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       }
     }
 
-    if (static_cast<int>(threadIdx.x) < num_non_recursive - 1) {
+    if (threadIdx.x < num_non_recursive - 1) {
       if (chunk_id == 0) {
         if constexpr (is_cuda_complex_v<InType>) {
           s_exch[threadIdx.x] = make_cuFloatComplex(0.0, 0.0);
@@ -138,7 +138,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   }
 
   // Copy all correction coefficients
-  for (int32_t i = 0; i < CORR_COLS * num_recursive; i += blockDim.x) {
+  for (uint32_t i = 0; i < CORR_COLS * num_recursive; i += blockDim.x) {
     s_corr[i + threadIdx.x] = d_corr[i + threadIdx.x];
   }
 
@@ -166,7 +166,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       }
 
       if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
-          len) { // Make sure this value is within bounds of the signal
+          static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
         if constexpr (is_cuda_complex_v<InType>) {
           vals[r] = cuCmulf(vals[r], r_nonr[0]);
         }
@@ -215,7 +215,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
 // 1->2
 #pragma unroll
-  for (int32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+  for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
     if constexpr (is_cuda_complex_v<InType>) {
       *reinterpret_cast<uint64_t *>(&tmp[0]) =
           __shfl_sync(~0, *reinterpret_cast<uint64_t *>(&vals[r]), 0, 2);
@@ -256,7 +256,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
 // Load all of the values we need from other threads in the warp
 #pragma unroll
-      for (int32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
+      for (uint32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
         if constexpr (is_cuda_complex_v<InType>) {
           *reinterpret_cast<uint64_t *>(&tmp[rec + 1]) =
               __shfl_sync(~0, *reinterpret_cast<uint64_t *>(&vals[r]),
@@ -268,10 +268,10 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       }
 
       if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
-          len) { // Make sure this value is within bounds of the signal
+          static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
 // Now apply those values
 #pragma unroll
-        for (int32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
+        for (uint32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[r] =
                 cuCaddf(vals[r],
@@ -304,7 +304,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   // while correcting
   int32_t sub_group_base;
   int32_t sub_group_idx;
-  int32_t cor_size = 32;
+  uint32_t cor_size = 32;
   int32_t dcor = 2 * cor_size - 1;
   int32_t cor_log2 = 5;
 #pragma unroll
@@ -317,9 +317,9 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     __syncthreads();
 
     // Pick off the last num_recursive threads in the block
-    if (sub_group_idx < 0 && (-sub_group_idx <= num_recursive)) {
+    if (sub_group_idx < 0 && (-sub_group_idx <= static_cast<int32_t>(num_recursive))) {
 #pragma unroll
-      for (int32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+      for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
         s_exch[num_recursive * (sub_group_base +
                                 r * (BLOCK_SIZE_RECURSIVE / 2) / cor_size) -
                sub_group_idx - 1] = vals[r];
@@ -335,7 +335,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
         if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * vpt) <
             len) { // Make sure this value is within bounds of the signal
 #pragma unroll
-          for (int32_t r = 0; r < num_recursive; r++) {
+          for (uint32_t r = 0; r < num_recursive; r++) {
             tmp[r] = s_exch[(sub_group_base +
                              vpt * ((BLOCK_SIZE_RECURSIVE / 2) / cor_size)) *
                                 num_recursive +
@@ -384,7 +384,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * block_idx) <
           len) { // Make sure this value is within bounds of the signal
 #pragma unroll
-        for (int32_t r = 0; r < num_recursive; r++) {
+        for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[block_idx] = cuCaddf(
                 vals[block_idx],
@@ -458,7 +458,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     int to_check = chunk_id - threadIdx.x - 1;
     int lstatus = STATUS_FLAG_PARTIAL_COMPLETE;
     int full_complete;
-    int last_full;
+    unsigned int last_full;
 
     if (threadIdx.x < 32) {
       // Keep looping until we have both a full carry present, and all the
@@ -481,7 +481,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       // them
       if (threadIdx.x < last_full) {
 #pragma unroll
-        for (int32_t r = 0; r < num_recursive; r++) {
+        for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             *reinterpret_cast<volatile uint64_t *>(
                 &s_exch[threadIdx.x * num_recursive + r]) =
@@ -506,7 +506,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       // value to all threads
       if (threadIdx.x == 0) {
 #pragma unroll
-        for (int32_t r = 0; r < num_recursive; r++) {
+        for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             *reinterpret_cast<volatile uint64_t *>(&tmp[r]) =
                 *reinterpret_cast<volatile uint64_t *>(
@@ -522,13 +522,13 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
         }
 
         // Reuse the non-recursive registers here to save some shared memory
-        for (int32_t r = 0; r < num_recursive; r++) {
+        for (uint32_t r = 0; r < num_recursive; r++) {
           r_nonr[r] = d_last_corrections[r];
         }
 
         // Roll up the lookback values
         for (uint32_t lookback = 0; lookback < last_full; lookback++) {
-          for (int32_t r = 0; r < num_recursive; r++) {
+          for (uint32_t r = 0; r < num_recursive; r++) {
             if constexpr (is_cuda_complex_v<InType>) {
               tmp[r] = cuCaddf(s_exch[lookback * num_recursive + r],
                                cuCmulf(tmp[r], r_nonr[r]));
@@ -540,7 +540,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
           }
         }
 
-        for (int32_t r = 0; r < num_recursive; r++) {
+        for (uint32_t r = 0; r < num_recursive; r++) {
           s_exch[num_recursive - r - 1] = tmp[r];
         }
       }
@@ -553,7 +553,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     block_idx = 0;
     do {
 #pragma unroll
-      for (int32_t r = 0; r < num_recursive; r++) {
+      for (uint32_t r = 0; r < num_recursive; r++) {
         if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) < len) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[block_idx] = cuCaddf(
