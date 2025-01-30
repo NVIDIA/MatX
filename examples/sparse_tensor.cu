@@ -32,6 +32,8 @@
 
 #include "matx.h"
 
+// Note that sparse tensor support in MatX is still experimental.
+
 using namespace matx;
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
@@ -42,7 +44,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaExecutor exec{stream};
 
   //
-  // Print some formats that are used for the versatile sparse tensor
+  // Print some formats that are used for the universal sparse tensor
   // type. Note that common formats like COO and CSR have good library
   // support in e.g. cuSPARSE, but MatX provides a much more general
   // way to define the sparse tensor storage through a DSL (see doc).
@@ -68,25 +70,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //   | 0, 0, 0, 0, 0, 0, 0, 0 |
   //   | 0, 0, 3, 4, 0, 5, 0, 0 |
   //
-  
-  constexpr index_t m = 4;
-  constexpr index_t n = 8;
-  constexpr index_t nse = 5;
-
-  tensor_t<float, 1> values{{nse}};
-  tensor_t<int, 1> row_idx{{nse}};
-  tensor_t<int, 1> col_idx{{nse}};
-
-  values.SetVals({ 1, 2, 3, 4, 5 });
-  row_idx.SetVals({ 0, 0, 3, 3, 3 });
-  col_idx.SetVals({ 0, 1, 2, 3, 5 });
-
-  // Note that sparse tensor support in MatX is still experimental.
-  auto Acoo = experimental::make_tensor_coo(values, row_idx, col_idx, {m, n});
-
-  //
-  // This shows:
-  //
   // tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
   // nse    = 5
   // format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
@@ -95,6 +78,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
   // space  = CUDA managed memory
   //
+  auto vals = make_tensor<float>({5});
+  auto idxi = make_tensor<int>({5}); 
+  auto idxj = make_tensor<int>({5});
+  vals.SetVals({1, 2, 3, 4, 5});
+  idxi.SetVals({0, 0, 3, 3, 3});
+  idxj.SetVals({0, 1, 2, 3, 5});
+  auto Acoo = experimental::make_tensor_coo(vals, idxi, idxj, {4, 8});
   print(Acoo);
 
   //
@@ -107,9 +97,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // use sparse operations that are tailored for the sparse data
   // structure (such as scanning by row for CSR).
   //
-  tensor_t<float, 2> A{{m, n}};
-  for (index_t i = 0; i < m; i++) {
-    for (index_t j = 0; j < n; j++) {
+  auto A = make_tensor<float>({4, 8});
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 8; j++) {
       A(i, j) = Acoo(i, j);
     }
   }
@@ -119,23 +109,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // SpMM is implemented on COO through cuSPARSE. This is the
   // correct way of performing an efficient sparse operation.
   //
-  tensor_t<float, 2> B{{8, 4}};
-  tensor_t<float, 2> C{{4, 4}};
-  B.SetVals({ {  0,  1,  2,  3 },
-	      {  4,  5,  6,  7 },
-	      {  8,  9, 10, 11 },
-	      { 12, 13, 14, 15 },
-	      { 16, 17, 18, 19 },
-	      { 20, 21, 22, 23 },
-	      { 24, 25, 26, 27 },
-	      { 28, 29, 30, 31 } });
+  auto B = make_tensor<float, 2>({8, 4});
+  auto C = make_tensor<float>({4, 4});
+  B.SetVals({
+    { 0,  1,  2,  3}, { 4,  5,  6,  7}, { 8,  9, 10, 11}, {12, 13, 14, 15},
+    {16, 17, 18, 19}, {20, 21, 22, 23}, {24, 25, 26, 27}, {28, 29, 30, 31} });
   (C = matmul(Acoo, B)).run(exec);
-  print(C);
-
-  //
-  // Verify by computing the equivalent dense GEMM.
-  //
-  (C = matmul(A, B)).run(exec);
   print(C);
 
   //
@@ -149,19 +128,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   // Note that X and Y are presented by reshaping a 1-dim
   // representation of the column-major storage, because the
-  // underlying library currently only supports column-major.
+  // backing library cuDSS currently only supports column-major.
   //
-  tensor_t<float, 1> coeffs{{nse}};
-  tensor_t<int, 1> rowptr{{nse}};
-  tensor_t<int, 1> colidx{{nse}};
-  coeffs.SetVals({ 1, 2, 3, 4, 5 });
-  rowptr.SetVals({ 0, 2, 3, 4, 5 });
-  colidx.SetVals({ 0, 1, 1, 2, 3 });
+  auto coeffs = make_tensor<float>({5});
+  auto rowptr = make_tensor<int>({5});
+  auto colidx = make_tensor<int>({5});
+  coeffs.SetVals({1, 2, 3, 4, 5});
+  rowptr.SetVals({0, 1, 1, 2, 3});
+  colidx.SetVals({0, 2, 3, 4, 5});
   auto Acsr = experimental::make_tensor_csr(coeffs, rowptr, colidx, {4, 4});
   print(Acsr);
-  tensor_t<float, 1> Y{{8}};
-  tensor_t<float, 1> X{{8}};
   // TODO: how to avoid the row-major/column-major issue?
+  auto X = make_tensor<float>({8});
+  auto Y = make_tensor<float>({8});
   Y.SetVals({5, 6, 12, 20, 17, 18, 28, 40}); // col-major
   (X.View({4, 2}) = solve(Acsr, Y.View({4, 2}))).run(exec);
   print(X); // col-major
