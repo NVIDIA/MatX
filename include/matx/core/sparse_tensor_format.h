@@ -38,7 +38,7 @@ namespace matx {
 namespace experimental {
 
 //
-// MatX uses a single versatile sparse tensor type that uses a tensor format
+// MatX implements a universal sparse tensor type that uses a tensor format
 // DSL (Domain Specific Language) to describe a vast space of storage formats.
 // Although the tensor format can easily define many common storage formats
 // (such as Dense, CSR, CSC, BSR), it can also define many less common storage
@@ -108,7 +108,7 @@ namespace experimental {
 //                          j : compressed,
 //                          k : compressed )
 //
-// The idea of a single versatile sparse tensor type has its roots in
+// The idea of a universal sparse tensor type has its roots in
 // sparse compilers, first pioneered for sparse linear algebra in [Bik96]
 // and formalized to sparse tensor algebra in [Kjolstad20]. The generalization
 // to higher-dimensional levels was introduced in [MLIR22].
@@ -303,8 +303,8 @@ public:
 };
 
 //
-// Predefined common tensor formats. Note that even though the tensor format
-// was introduced to define a single versatile sparse tensor type, the
+// Predefined common tensor formats. Note that even though the tensor
+// format was introduced to define the universal sparse tensor type, the
 // "all-dense" format also naturally describes dense scalars, vectors,
 // matrices, and tensors, with all d-major format variants.
 //
