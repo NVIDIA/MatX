@@ -133,10 +133,38 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(C);
 
   //
-  // Verify by computing the equivelent dense GEMM.
+  // Verify by computing the equivalent dense GEMM.
   //
   (C = matmul(A, B)).run(exec);
   print(C);
+
+  //
+  // Creates a CSR matrix which is used to solve the following
+  // system of equations AX=Y, where X is the unknown.
+  //
+  // | 1 2 0 0 |   | 1 5 |   |  5 17 |
+  // | 0 3 0 0 | x | 2 6 | = |  6 18 |
+  // | 0 0 4 0 |   | 3 7 |   | 12 28 |
+  // | 0 0 0 5 |   | 4 8 |   | 20 40 |
+  //
+  // Note that X and Y are presented by reshaping a 1-dim
+  // representation of the column-major storage, because the
+  // underlying library currently only supports column-major.
+  //
+  tensor_t<float, 1> coeffs{{nse}};
+  tensor_t<int, 1> rowptr{{nse}};
+  tensor_t<int, 1> colidx{{nse}};
+  coeffs.SetVals({ 1, 2, 3, 4, 5 });
+  rowptr.SetVals({ 0, 2, 3, 4, 5 });
+  colidx.SetVals({ 0, 1, 1, 2, 3 });
+  auto Acsr = experimental::make_tensor_csr(coeffs, rowptr, colidx, {4, 4});
+  print(Acsr);
+  tensor_t<float, 1> Y{{8}};
+  tensor_t<float, 1> X{{8}};
+  // TODO: how to avoid the row-major/column-major issue?
+  Y.SetVals({5, 6, 12, 20, 17, 18, 28, 40}); // col-major
+  (X.View({4, 2}) = solve(Acsr, Y.View({4, 2}))).run(exec);
+  print(X); // col-major
 
   MATX_EXIT_HANDLER();
 }
