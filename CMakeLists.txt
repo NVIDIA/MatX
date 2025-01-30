@@ -68,6 +68,7 @@ option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 #option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
+option(MATX_EN_CUDSS OFF)
 option(MATX_EN_FILEIO OFF)
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
@@ -78,6 +79,7 @@ option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
+set(cudss_DIR "" CACHE PATH "Directory where cuDSS is installed.")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
@@ -288,6 +290,13 @@ if (MATX_EN_CUTENSOR)
     # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+endif()
+
+if (MATX_EN_CUDSS)
+    set(cuDSS_VERSION 0.4.0.2)
+    include(cmake/FindcuDSS.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
+    target_link_libraries(matx INTERFACE cuDSS::cuDSS)
 endif()
 
 if (MATX_MULTI_GPU)

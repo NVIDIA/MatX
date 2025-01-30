@@ -36,6 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/matmul/matmul_cuda.h"
+#include "matx/transforms/matmul/matmul_cusparse.h"
 #ifdef MATX_EN_CPU_MATMUL
   #include "matx/transforms/matmul/matmul_cblas.h"
 #endif
@@ -113,7 +114,17 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          // Perform SpMM or otherwise GEMM.
+          static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
+          if constexpr (is_sparse_tensor_v<OpA>) {
+            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              sparse_matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
+            }
+            else {
+              sparse_matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+            }
+          }
+          else if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
           }
           else {

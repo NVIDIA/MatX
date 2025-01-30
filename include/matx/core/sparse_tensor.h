@@ -57,9 +57,12 @@ class sparse_tensor_t
           VAL, TF::DIM, DimDesc, detail::SparseTensorData<VAL, CRD, POS, TF>> {
 public:
   using sparse_tensor = bool;
+  using val_type = VAL;
+  using crd_type = CRD;
+  using pos_type = POS;
+  using Format = TF;
   static constexpr int DIM = TF::DIM;
   static constexpr int LVL = TF::LVL;
-  using Format = TF;
 
   //
   // Constructs a sparse tensor with given shape and contents.
@@ -105,85 +108,9 @@ public:
   __MATX_INLINE__ ~sparse_tensor_t() = default;
 
   // Size getters.
-  index_t Nse() const { return values_.size() / sizeof(VAL); }
-  index_t crdSize(int l) const { return coordinates_[l].size() / sizeof(CRD); }
-  index_t posSize(int l) const { return positions_[l].size() / sizeof(POS); }
-
-  // Locates position of an element at given indices, or returns -1 when not
-  // found.
-  template <int L = 0>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t
-  GetPos(index_t *lvlsz, index_t *lvl, index_t pos) const {
-    if constexpr (L < LVL) {
-      using ftype = std::tuple_element_t<L, typename TF::LVLSPECS>;
-      if constexpr (ftype::lvltype == LvlType::Dense) {
-        // Dense level: pos * size + i.
-        // TODO: see below, use a constexpr GetLvlSize(L) instead?
-        const index_t dpos = pos * lvlsz[L] + lvl[L];
-        if constexpr (L + 1 < LVL) {
-          return GetPos<L + 1>(lvlsz, lvl, dpos);
-        } else {
-          return dpos;
-        }
-      } else if constexpr (ftype::lvltype == LvlType::Singleton) {
-        // Singleton level: pos if crd[pos] == i and next levels match.
-        if (this->CRDData(L)[pos] == lvl[L]) {
-          if constexpr (L + 1 < LVL) {
-            return GetPos<L + 1>(lvlsz, lvl, pos);
-          } else {
-            return pos;
-          }
-        }
-      } else if constexpr (ftype::lvltype == LvlType::Compressed ||
-                           ftype::lvltype == LvlType::CompressedNonUnique) {
-        // Compressed level: scan for match on i and test next levels.
-        const CRD *c = this->CRDData(L);
-        const POS *p = this->POSData(L);
-        for (index_t pp = p[pos], hi = p[pos + 1]; pp < hi; pp++) {
-          if (c[pp] == lvl[L]) {
-            if constexpr (L + 1 < LVL) {
-              const index_t cpos = GetPos<L + 1>(lvlsz, lvl, pp);
-              if constexpr (ftype::lvltype == LvlType::Compressed) {
-                return cpos; // always end scan (unique)
-              } else if (cpos != -1) {
-                return cpos; // only end scan on success (non-unique)
-              }
-            } else {
-              return pp;
-            }
-          }
-        }
-      }
-    }
-    return -1; // not found
-  }
-
-  // Element getter (viz. "lhs = Acoo(0,0);"). Note that due to the compact
-  // nature of sparse data structures, these storage formats do not provide
-  // cheap random access to their elements. Instead, the implementation will
-  // search for a stored element at the given position (which involves a scan
-  // at each compressed level). The implicit value zero is returned when the
-  // element cannot be found. So, although functional for testing, clients
-  // should avoid using getters inside performance critial regions, since
-  // the implementation is far worse than O(1).
-  template <typename... Is>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ VAL
-  operator()(Is... indices) const noexcept {
-    static_assert(
-        sizeof...(Is) == DIM,
-        "Number of indices of operator() must match rank of sparse tensor");
-    cuda::std::array<index_t, DIM> dim{indices...};
-    cuda::std::array<index_t, LVL> lvl;
-    cuda::std::array<index_t, LVL> lvlsz;
-    TF::dim2lvl(dim.data(), lvl.data(), /*asSize=*/false);
-    // TODO: only compute once and provide a constexpr LvlSize(l) instead?
-    TF::dim2lvl(this->Shape().data(), lvlsz.data(), /*asSize=*/true);
-    const index_t pos = GetPos(lvlsz.data(), lvl.data(), 0);
-    if (pos != -1) {
-      return this->Data()[pos];
-    }
-    return static_cast<VAL>(0); // implicit zero
-  }
+  index_t Nse() const { return static_cast<index_t>(values_.size() / sizeof(VAL)); }
+  index_t crdSize(int l) const { return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD)); }
+  index_t posSize(int l) const { return static_cast<index_t>(positions_[l].size() / sizeof(POS)); }
 
 private:
   // Primary storage of sparse tensor (explicitly stored element values).

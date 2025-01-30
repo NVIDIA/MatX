@@ -127,6 +127,32 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3DOperator)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_operators", "contraction", "run", {});
+
+  auto a1 = make_tensor<TestType>({60});
+  auto b1 = make_tensor<TestType>({24});
+  auto c2 = make_tensor<TestType>({5,2});
+
+  // Perform a 3D tensor contraction
+  (c2 = cutensor::einsum("ijk,jil->kl",
+    reshape(linspace<0>(a1.Shape(), (TestType)0, static_cast<TestType>(a1.Size(0) - 1)), {3,4,5}),
+    reshape(linspace<0>(b1.Shape(), (TestType)0, static_cast<TestType>(b1.Size(0) - 1)), {4,3,2}))).run(exec);
+
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
 {
   MATX_ENTER_HANDLER();
