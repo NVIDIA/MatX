@@ -7,7 +7,7 @@ Existing host and CUDA code can interoperate seamlessly with MatX both by using 
 and transferring MatX data into other libraries. Integrating MatX into existing code is a common use case that 
 allows developers to incrementally port code into MatX without having to rewrite everything at once.
 
-This guide is not intended for developers who wish to extend MatX See :ref:`devguide` for the MatX developer guide.
+This guide is not intended for developers who wish to extend MatX. See :ref:`devguide` for the MatX developer guide.
 
 
 Passing Existing Pointers to MatX
