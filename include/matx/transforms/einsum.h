@@ -327,8 +327,10 @@ public:
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
     i = 0;
+    MATX_IGNORE_WARNING_PUSH_GCC("-Wunused-value")
     MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim,
         "Tensor rank must match number of einsum subscripts");
+    MATX_IGNORE_WARNING_POP_GCC
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
