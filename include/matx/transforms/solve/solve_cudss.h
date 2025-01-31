@@ -87,9 +87,10 @@ public:
     static_assert(RANKB == 2);
     static_assert(RANKC == 2);
 
-    MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 2), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANKC - 1) == b.Size(RANKB - 1), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANKC - 2) == a.Size(RANKA - 2), matxInvalidSize);
+    // Note: B,C transposed!
+    MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 1), matxInvalidSize);
+    MATX_ASSERT(a.Size(RANKA - 2) == b.Size(RANKB - 1), matxInvalidSize);
+    MATX_ASSERT(b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
 
     params_ = GetSolveParams(c, a, b, stream);
 
@@ -121,11 +122,11 @@ public:
     static_assert(is_tensor_view_v<TensorTypeB>);
     cudaDataType dtb = MatXTypeToCudaType<TB>();
     cudaDataType dtc = MatXTypeToCudaType<TC>();
-    cudssLayout_t layout = CUDSS_LAYOUT_COL_MAJOR; // TODO: no ROW
-    ret = cudssMatrixCreateDn(&matB_, params_.k, params_.n, /*ld=*/params_.k,
+    cudssLayout_t layout = CUDSS_LAYOUT_COL_MAJOR; // no ROW-MAJOR in cuDSS yet
+    ret = cudssMatrixCreateDn(&matB_, params_.m, params_.n, /*ld=*/params_.m,
                               params_.ptrB, dtb, layout);
     MATX_ASSERT(ret == CUDSS_STATUS_SUCCESS, matxSolverError);
-    ret = cudssMatrixCreateDn(&matC_, params_.m, params_.n, /*ld=*/params_.m,
+    ret = cudssMatrixCreateDn(&matC_, params_.k, params_.n, /*ld=*/params_.k,
                               params_.ptrC, dtc, layout);
     MATX_ASSERT(ret == CUDSS_STATUS_SUCCESS, matxSolverError);
 
@@ -161,8 +162,8 @@ public:
     // TODO: simple no-batch, row-wise, no-transpose for now
     params.nse = a.Nse();
     params.m = a.Size(TensorTypeA::Rank() - 2);
-    params.n = b.Size(TensorTypeB::Rank() - 1);
-    params.k = a.Size(TensorTypeB::Rank() - 1);
+    params.n = c.Size(TensorTypeC::Rank() - 2); // Note: B,C transposed!
+    params.k = a.Size(TensorTypeA::Rank() - 1);
     // Matrix handles in cuDSS are data specific. Therefore, the pointers
     // to the underlying buffers are part of the GEMM parameters.
     params.ptrA0 = a.Data();
@@ -240,22 +241,13 @@ using gemm_cudss_cache_t =
 template <typename Op>
 __MATX_INLINE__ auto getCUDSSSupportedTensor(const Op &in,
                                              cudaStream_t stream) {
-  const auto support_func = [&in]() {
-    if constexpr (is_tensor_view_v<Op>) {
-      // TODO: we check for row-major even though we assume
-      //       data is actually stored column-major; this is
-      //       waiting for row-major support in the cuDSS lib
-      return in.Stride(Op::Rank() - 1) == 1;
-    } else {
-      return true;
-    }
-  };
+  const auto support_func = [&in]() { return true; };
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
-                       const cudaExecutor &exec) {
+void sparse_solve_impl_trans(TensorTypeC C, const TensorTypeA A,
+                             const TensorTypeB B, const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
@@ -281,6 +273,38 @@ void sparse_solve_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b);
       });
+}
+
+// Since cuDSS currently only supports column-major storage of the dense
+// matrices (and CSR for the sparse matrix), the current implementation
+// tranposes B and C prior to entering a tranposed version for SOLVE. This
+// convoluted way of performing the solve step must be removed once cuDSS
+// supports MATX native row-major storage, which will clean up the copies from
+// and to memory.
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
+void sparse_solve_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
+                       const cudaExecutor &exec) {
+  const auto stream = exec.getStream();
+
+  // Some copying-in hacks, assumes rank 2.
+  using TB = typename TensorTypeB::value_type;
+  using TC = typename TensorTypeB::value_type;
+  TB *bptr;
+  matxAlloc(reinterpret_cast<void **>(&bptr),
+            sizeof(TB) * B.Size(0) * B.Size(1), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto bT = make_tensor(bptr, {B.Size(1), B.Size(0)});
+  (bT = transpose(B)).run(exec);
+  TC *cptr;
+  matxAlloc(reinterpret_cast<void **>(&cptr),
+            sizeof(TC) * C.Size(0) * C.Size(1), MATX_ASYNC_DEVICE_MEMORY,
+            stream);
+  auto cT = make_tensor(cptr, {C.Size(1), C.Size(0)});
+
+  sparse_solve_impl_trans(cT, A, bT, exec);
+
+  // Some copying-back hacks.
+  (C = transpose(cT)).run(exec);
 }
 
 } // end namespace matx

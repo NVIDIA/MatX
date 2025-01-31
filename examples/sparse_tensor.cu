@@ -126,24 +126,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // | 0 0 4 0 |   | 3 7 |   | 12 28 |
   // | 0 0 0 5 |   | 4 8 |   | 20 40 |
   //
-  // Note that X and Y are presented by reshaping a 1-dim
-  // representation of the column-major storage, because the
-  // backing library cuDSS currently only supports column-major.
-  //
   auto coeffs = make_tensor<float>({5});
   auto rowptr = make_tensor<int>({5});
   auto colidx = make_tensor<int>({5});
   coeffs.SetVals({1, 2, 3, 4, 5});
-  rowptr.SetVals({0, 1, 1, 2, 3});
-  colidx.SetVals({0, 2, 3, 4, 5});
+  rowptr.SetVals({0, 2, 3, 4, 5});
+  colidx.SetVals({0, 1, 1, 2, 3});
   auto Acsr = experimental::make_tensor_csr(coeffs, rowptr, colidx, {4, 4});
   print(Acsr);
-  // TODO: how to avoid the row-major/column-major issue?
-  auto X = make_tensor<float>({8});
-  auto Y = make_tensor<float>({8});
-  Y.SetVals({5, 6, 12, 20, 17, 18, 28, 40}); // col-major
-  (X.View({4, 2}) = solve(Acsr, Y.View({4, 2}))).run(exec);
-  print(X); // col-major
+  auto X = make_tensor<float>({4, 2});
+  auto Y = make_tensor<float>({4, 2});
+  Y.SetVals({ {5, 17}, {6, 18}, {12, 28}, {20, 40} });
+  (X = solve(Acsr, Y)).run(exec);
+  print(X);
 
   MATX_EXIT_HANDLER();
 }
