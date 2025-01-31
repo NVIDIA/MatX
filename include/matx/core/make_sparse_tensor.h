@@ -38,7 +38,7 @@ namespace matx {
 namespace experimental {
 
 //
-// MatX uses a single versatile sparse tensor type that uses a tensor format
+// MatX implements a universal sparse tensor type that uses a tensor format
 // DSL (Domain Specific Language) to describe a vast space of storage formats.
 // This file provides a number of convenience factory methods that construct
 // sparse tensors in well-known storage formats, like COO, CSR, and CSC,
