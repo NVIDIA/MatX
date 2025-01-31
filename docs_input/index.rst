@@ -43,6 +43,7 @@ Table of Contents
 
     quickstart
     build.rst
+    external.rst
     basics/index.rst
     api/index.rst
     examples/index.rst
