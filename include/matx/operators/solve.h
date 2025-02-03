@@ -47,8 +47,9 @@ private:
   typename detail::base_type_t<OpA> a_;
   typename detail::base_type_t<OpB> b_;
 
-  cuda::std::array<index_t, 2> out_dims_;
-  mutable detail::tensor_impl_t<typename OpA::value_type, 2> tmp_out_;
+  static constexpr int out_rank = OpB::Rank();
+  cuda::std::array<index_t, out_rank> out_dims_;
+  mutable detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
   mutable typename OpA::value_type *ptr = nullptr;
 
 public:
@@ -58,7 +59,7 @@ public:
   using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b) : a_(a), b_(b) {
-    for (int r = 0; r < Rank(); r++) {
+    for (int r = 0, rank = Rank(); r < rank; r++) {
       out_dims_[r] = b_.Size(r);
     }
   }
