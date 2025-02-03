@@ -103,7 +103,7 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape,
-                                   Executor &&ex) const noexcept {
+                                   [[maybe_unused]] Executor &&ex) const noexcept {
     static_assert(is_sparse_tensor_v<OpA>,
                  "Direct solver currently only supports sparse system");
     if constexpr (is_matx_op<OpB>()) {
@@ -113,7 +113,7 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape,
-                              Executor &&ex) const noexcept {
+                              [[maybe_unused]] Executor &&ex) const noexcept {
     InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_,
                                &ptr);
@@ -121,8 +121,8 @@ public:
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PostRun(ShapeType &&shape,
-                               Executor &&ex) const noexcept {
+  __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape,
+                               [[maybe_unused]]Executor &&ex) const noexcept {
     static_assert(is_sparse_tensor_v<OpA>,
                  "Direct solver currently only supports sparse system");
     if constexpr (is_matx_op<OpB>()) {
