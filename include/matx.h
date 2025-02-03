@@ -32,6 +32,9 @@
 
 #pragma once
 #ifdef __CUDACC__
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
+#error "MatX requires CUDA compute capability 6.0 or newer."
+#endif
 #include <cuda_runtime_api.h>
 #endif
 #include <cuda/std/ccomplex>
