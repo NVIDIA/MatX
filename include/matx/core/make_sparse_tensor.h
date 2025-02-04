@@ -38,7 +38,8 @@ namespace matx {
 namespace experimental {
 
 // Helper method to create empty storage.
-template <typename T> __MATX_INLINE__ static auto makeEmptyStorage() {
+template <typename T>
+__MATX_INLINE__ static auto makeDefaultNonOwningStorage() {
   raw_pointer_buffer<T, matx_allocator<T>> buf{nullptr, 0, /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
@@ -76,7 +77,7 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   basic_storage<decltype(topp)> tp{std::move(topp)};
   return sparse_tensor_t<VAL, CRD, POS, COO>(
       shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
-      {tp, makeEmptyStorage<POS>()});
+      {tp, makeDefaultNonOwningStorage<POS>()});
 }
 
 // Constructs a sparse matrix in CSR format directly from the values, the row
@@ -91,8 +92,9 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
-      shape, val.GetStorage(), {makeEmptyStorage<CRD>(), col.GetStorage()},
-      {makeEmptyStorage<POS>(), rowp.GetStorage()});
+      shape, val.GetStorage(),
+      {makeDefaultNonOwningStorage<CRD>(), col.GetStorage()},
+      {makeDefaultNonOwningStorage<POS>(), rowp.GetStorage()});
 }
 
 // Constructs a sparse matrix in CSC format directly from the values,
@@ -107,8 +109,9 @@ auto make_tensor_csc(ValTensor &val, CrdTensor &row, PosTensor &colp,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
-      shape, val.GetStorage(), {makeEmptyStorage<CRD>(), row.GetStorage()},
-      {makeEmptyStorage<POS>(), colp.GetStorage()});
+      shape, val.GetStorage(),
+      {makeDefaultNonOwningStorage<CRD>(), row.GetStorage()},
+      {makeDefaultNonOwningStorage<POS>(), colp.GetStorage()});
 }
 
 } // namespace experimental
