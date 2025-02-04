@@ -1126,6 +1126,9 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
   if constexpr (std::is_same_v<T, int8_t>) {
     return CUDA_R_8I;
   }
+  if constexpr (std::is_same_v<T, int>) {
+    return CUDA_R_32I;
+  }
   if constexpr (std::is_same_v<T, float>) {
     return CUDA_R_32F;
   }
