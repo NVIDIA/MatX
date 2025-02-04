@@ -99,9 +99,9 @@ namespace matx
           auto idxOut = idx[idx.size() - 1];
 
           //create references to individual slices for ease of notation
-          cuda::std::array idx0(idx);
-          cuda::std::array idx1(idx);
-          cuda::std::array idx2(idx);
+          cuda::std::array idx0{idx};
+          cuda::std::array idx1{idx};
+          cuda::std::array idx2{idx};
 
           idx0[idx0.size() - 1] = 0LL;
           idx1[idx1.size() - 1] = 1LL;
