@@ -257,9 +257,9 @@ void sparse_solve_impl_trans(TensorTypeC C, const TensorTypeA A,
 
   // TODO: some more checking, supported type? on device? etc.
 
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
+  using atype = decltype(a);
+  using btype = decltype(b);
+  using ctype = decltype(c);
 
   // Get parameters required by these tensors (for caching).
   auto params = detail::SolveCUDSSHandle_t<ctype, atype, btype>::GetSolveParams(

@@ -233,8 +233,8 @@ void sparse2dense_impl(OutputTensorType O, const InputTensorType A,
 
   // TODO: some more checking, supported type? on device? etc.
 
-  typedef decltype(o) otype;
-  typedef decltype(a) atype;
+  using atype = decltype(a);
+  using otype = decltype(o);
 
   // Get parameters required by these tensors (for caching).
   auto params =

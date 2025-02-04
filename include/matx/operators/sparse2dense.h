@@ -87,7 +87,7 @@ public:
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA>) {
       auto ref = cuda::std::get<0>(out);
-      typedef decltype(ref) Rtype;
+      using Rtype = decltype(ref);
       if constexpr (is_sparse_tensor_v<Rtype>) {
         MATX_THROW(matxNotSupported,
                    "Cannot use sparse2dense for sparse output");
