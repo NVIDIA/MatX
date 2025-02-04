@@ -47,6 +47,37 @@
 #include <functional>
 #include <optional>
 
+  #define MATX_CUFFT_ASSERT_STR_EXP(a, expected) \
+  {                                    \
+    auto tmp = a;                      \
+    if ((tmp != expected))                   \
+    {                                  \
+      std::string fft_str = "";  \
+      switch (tmp) {\
+        case CUFFT_SUCCESS: fft_str = "cuFFT: The operation was successful"; break; \
+        case CUFFT_INVALID_PLAN: fft_str = "cuFFT was passed an invalid plan handle"; break; \
+        case CUFFT_ALLOC_FAILED: fft_str = "cuFFT failed to allocate GPU or CPU memory"; break; \
+        case CUFFT_INVALID_TYPE: fft_str = "cuFFT: invalid type passed"; break; \
+        case CUFFT_INVALID_VALUE: fft_str = "cuFFT: User specified an invalid pointer or parameter"; break; \
+        case CUFFT_INTERNAL_ERROR: fft_str = "cuFFT: Driver or internal library error"; break; \
+        case CUFFT_EXEC_FAILED: fft_str = "cuFFT: Failed to execute an FFT on the GPU"; break; \
+        case CUFFT_SETUP_FAILED: fft_str = "The cuFFT library failed to initialize"; break; \
+        case CUFFT_INVALID_SIZE: fft_str = "cuFFT: User specified an invalid transform size"; break; \
+        case CUFFT_UNALIGNED_DATA: fft_str = "cuFFT: Input or output data is not aligned"; break; \
+        case CUFFT_INCOMPLETE_PARAMETER_LIST: fft_str = "cuFFT: Missing parameters in call"; break; \
+        case CUFFT_INVALID_DEVICE: fft_str = "cuFFT: Execution of a plan was on different GPU than plan creation"; break; \
+        case CUFFT_PARSE_ERROR: fft_str = "cuFFT: Internal plan database error"; break; \
+        case CUFFT_NO_WORKSPACE: fft_str = "cuFFT: No workspace has been provided prior to plan execution"; break; \
+        case CUFFT_NOT_IMPLEMENTED: fft_str = "cuFFT: Function does not implement functionality for parameters"; break; \
+        case CUFFT_LICENSE_ERROR: fft_str = "cuFFT: Used in previous versions"; break; \
+        case CUFFT_NOT_SUPPORTED: fft_str = "cuFFT: Operation is not supported for parameters"; break; \
+        default: fft_str = "cuFFT: Unknown error"; break; \
+      } \
+      std::cout << #a ": " << "(" << tmp << " != " << expected << "): " << fft_str << "\n";\
+      MATX_THROW(matxCufftError, "");  \
+    }                                  \
+  }  
+
 namespace matx {
 
 namespace detail {
@@ -267,7 +298,7 @@ protected:
     [[maybe_unused]] cufftResult res;
 
     res = cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
-    MATX_ASSERT(res == CUFFT_SUCCESS, matxCufftError);
+    MATX_CUFFT_ASSERT_STR_EXP(res, CUFFT_SUCCESS);
   }
 
   static inline constexpr cudaDataType GetInputType()
@@ -402,7 +433,7 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream
                       this->params_.output_type, this->params_.batch,
                       &workspaceSize, this->params_.exec_type);
 
-  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
+  MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
 
   matxAlloc((void **)&this->workspace_, workspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
 
@@ -415,7 +446,7 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream
       this->params_.output_type, this->params_.batch, &workspaceSize,
       this->params_.exec_type);
 
-  MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
+  MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
 }
 
 private:
@@ -526,15 +557,17 @@ public:
     size_t workspaceSize;
     cufftCreate(&this->plan_);
     [[maybe_unused]] cufftResult error;
-    cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
+    error = cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                        this->params_.istride, this->params_.idist,
                        this->params_.input_type, this->params_.onembed,
                        this->params_.ostride, this->params_.odist,
                        this->params_.output_type, this->params_.batch,
                        &workspaceSize, this->params_.exec_type);
+    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);                       
 
     matxAlloc((void **)&this->workspace_, workspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
     cufftSetWorkArea(this->plan_, this->workspace_);
+    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
 
     error = cufftXtMakePlanMany(
         this->plan_, 2, this->params_.n, this->params_.inembed,
@@ -543,7 +576,7 @@ public:
         this->params_.output_type, this->params_.batch, &workspaceSize,
         this->params_.exec_type);
 
-    MATX_ASSERT(error == CUFFT_SUCCESS, matxCufftError);
+    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
   }
 
 private:
