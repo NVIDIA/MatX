@@ -165,7 +165,7 @@ public:
     params.n = c.Size(TensorTypeC::Rank() - 2); // Note: B,C transposed!
     params.k = a.Size(TensorTypeA::Rank() - 1);
     // Matrix handles in cuDSS are data specific. Therefore, the pointers
-    // to the underlying buffers are part of the GEMM parameters.
+    // to the underlying buffers are part of the SOLVE parameters.
     params.ptrA0 = a.Data();
     params.ptrA1 = a.POSData(0);
     params.ptrA2 = a.POSData(1);

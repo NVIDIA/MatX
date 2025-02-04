@@ -90,24 +90,33 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   // A very naive way to convert the sparse matrix back to a dense
   // matrix. Note that one should **never** use the ()-operator in
-  // performance critical code, since sparse data structures do
+  // performance critical code, since sparse storage formats do
   // not provide O(1) random access to their elements (compressed
   // levels will use some form of search to determine if an element
   // is present). Instead, conversions (and other operations) should
-  // use sparse operations that are tailored for the sparse data
-  // structure (such as scanning by row for CSR).
+  // use sparse operations that are tailored for the sparse storage
+  // format (such as scanning by row for CSR).
   //
-  auto A = make_tensor<float>({4, 8});
+  auto A1 = make_tensor<float>({4, 8});
   for (index_t i = 0; i < 4; i++) {
     for (index_t j = 0; j < 8; j++) {
-      A(i, j) = Acoo(i, j);
+      A1(i, j) = Acoo(i, j);
     }
   }
-  print(A);
+  print(A1);
 
   //
-  // SpMM is implemented on COO through cuSPARSE. This is the
-  // correct way of performing an efficient sparse operation.
+  // A direct sparse2dense conversion. This is the correct way of
+  // performing the conversion, since the underlying implementation
+  // knows how to properly manipulate the sparse storage format.
+  //
+  auto A2 = make_tensor<float>({4, 8});
+  (A2 = sparse2dense(Acoo)).run(exec);
+  print(A2);
+
+  //
+  // Perform a direct SpMM. This is also the correct way of performing
+  // an efficient sparse operation.
   //
   auto B = make_tensor<float, 2>({8, 4});
   auto C = make_tensor<float>({4, 4});
