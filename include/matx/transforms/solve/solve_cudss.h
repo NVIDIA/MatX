@@ -165,7 +165,7 @@ public:
     params.n = c.Size(TensorTypeC::Rank() - 2); // Note: B,C transposed!
     params.k = a.Size(TensorTypeA::Rank() - 1);
     // Matrix handles in cuDSS are data specific. Therefore, the pointers
-    // to the underlying buffers are part of the GEMM parameters.
+    // to the underlying buffers are part of the SOLVE parameters.
     params.ptrA0 = a.Data();
     params.ptrA1 = a.POSData(0);
     params.ptrA2 = a.POSData(1);
@@ -257,9 +257,9 @@ void sparse_solve_impl_trans(TensorTypeC C, const TensorTypeA A,
 
   // TODO: some more checking, supported type? on device? etc.
 
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
+  using atype = decltype(a);
+  using btype = decltype(b);
+  using ctype = decltype(c);
 
   // Get parameters required by these tensors (for caching).
   auto params = detail::SolveCUDSSHandle_t<ctype, atype, btype>::GetSolveParams(

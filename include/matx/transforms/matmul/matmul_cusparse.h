@@ -44,23 +44,6 @@ namespace matx {
 
 namespace detail {
 
-// Translate MatXType for indices to cuSPARSE index type.
-template <typename T>
-constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
-  if constexpr (std::is_same_v<T, uint16_t>) {
-    return CUSPARSE_INDEX_16U;
-  }
-  if constexpr (std::is_same_v<T, int32_t>) {
-    return CUSPARSE_INDEX_32I;
-  }
-  if constexpr (std::is_same_v<T, int64_t>) {
-    return CUSPARSE_INDEX_64I;
-  }
-  if constexpr (std::is_same_v<T, index_t>) {
-    return CUSPARSE_INDEX_64I;
-  }
-}
-
 /**
  * Parameters needed to execute a cuSPARSE GEMM.
  */
@@ -151,11 +134,11 @@ public:
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
 
     // Create cuSPARSE handle for dense matrices B and C.
-    static_assert(is_tensor_view_v<TensorTypeA>);
     static_assert(is_tensor_view_v<TensorTypeB>);
+    static_assert(is_tensor_view_v<TensorTypeC>);
     cudaDataType dtb = MatXTypeToCudaType<TB>();
     cudaDataType dtc = MatXTypeToCudaType<TC>();
-    const cusparseOrder_t order = CUSPARSE_ORDER_ROW; // TODO: support col B,C?
+    const cusparseOrder_t order = CUSPARSE_ORDER_ROW;
     ret = cusparseCreateDnMat(&matB_, params_.k, params_.n, /*ld=*/params_.n,
                               params_.ptrB, dtb, order);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
@@ -197,7 +180,7 @@ public:
     params.nse = a.Nse();
     params.m = a.Size(TensorTypeA::Rank() - 2);
     params.n = b.Size(TensorTypeB::Rank() - 1);
-    params.k = a.Size(TensorTypeB::Rank() - 1);
+    params.k = a.Size(TensorTypeA::Rank() - 1);
     params.opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     params.opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
     // Matrix handles in cuSPARSE are data specific. Therefore, the pointers
@@ -274,13 +257,7 @@ using gemm_cusparse_cache_t =
 template <typename Op>
 __MATX_INLINE__ auto getCUSPARSESupportedTensor(const Op &in,
                                                 cudaStream_t stream) {
-  const auto support_func = [&in]() {
-    if constexpr (is_tensor_view_v<Op>) {
-      return in.Stride(Op::Rank() - 1) == 1; // TODO: more than row-wise
-    } else {
-      return true;
-    }
-  };
+  const auto support_func = [&in]() { return true; };
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
@@ -297,9 +274,9 @@ void sparse_matmul_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
 
   // TODO: some more checking, supported type? on device? etc.
 
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
+  using atype = decltype(a);
+  using btype = decltype(b);
+  using ctype = decltype(c);
 
   // Get parameters required by these tensors (for caching).
   auto params =
