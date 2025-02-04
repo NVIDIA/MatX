@@ -37,6 +37,12 @@
 namespace matx {
 namespace experimental {
 
+// Helper method to create empty storage.
+template <typename T> __MATX_INLINE__ static auto makeEmptyStorage() {
+  raw_pointer_buffer<T, matx_allocator<T>> buf{nullptr, 0, /*owning=*/false};
+  return basic_storage<decltype(buf)>{std::move(buf)};
+}
+
 //
 // MatX implements a universal sparse tensor type that uses a tensor format
 // DSL (Domain Specific Language) to describe a vast space of storage formats.
@@ -51,7 +57,7 @@ namespace experimental {
 // column. Duplicate entries should not occur. Explicit zeros may be stored.
 template <typename ValTensor, typename CrdTensor>
 auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
-                     const index_t (&shape)[2], bool owning = false) {
+                     const index_t (&shape)[2]) {
   static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
@@ -66,12 +72,11 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   ptr[0] = 0;
   ptr[1] = val.Size(0);
   raw_pointer_buffer<POS, matx_allocator<POS>> topp{ptr, 2 * sizeof(POS),
-                                                    owning};
+                                                    /*owning=*/false};
   basic_storage<decltype(topp)> tp{std::move(topp)};
-  raw_pointer_buffer<POS, matx_allocator<POS>> emptyp{nullptr, 0, owning};
-  basic_storage<decltype(emptyp)> ep{std::move(emptyp)};
   return sparse_tensor_t<VAL, CRD, POS, COO>(
-      shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()}, {tp, ep});
+      shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
+      {tp, makeEmptyStorage<POS>()});
 }
 
 // Constructs a sparse matrix in CSR format directly from the values, the row
@@ -79,18 +84,15 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
 // row, then column. Explicit zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
 auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
-                     const index_t (&shape)[2], bool owning = false) {
+                     const index_t (&shape)[2]) {
   static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 &&
                 PosTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
-  raw_pointer_buffer<CRD, matx_allocator<CRD>> emptyc{nullptr, 0, owning};
-  basic_storage<decltype(emptyc)> ec{std::move(emptyc)};
-  raw_pointer_buffer<POS, matx_allocator<POS>> emptyp{nullptr, 0, owning};
-  basic_storage<decltype(emptyp)> ep{std::move(emptyp)};
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
-      shape, val.GetStorage(), {ec, col.GetStorage()}, {ep, rowp.GetStorage()});
+      shape, val.GetStorage(), {makeEmptyStorage<CRD>(), col.GetStorage()},
+      {makeEmptyStorage<POS>(), rowp.GetStorage()});
 }
 
 // Constructs a sparse matrix in CSC format directly from the values,
@@ -98,18 +100,15 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
 // be sorted by column, then row. Explicit zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
 auto make_tensor_csc(ValTensor &val, CrdTensor &row, PosTensor &colp,
-                     const index_t (&shape)[2], bool owning = false) {
+                     const index_t (&shape)[2]) {
   static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 &&
                 PosTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
-  raw_pointer_buffer<CRD, matx_allocator<CRD>> emptyc{nullptr, 0, owning};
-  basic_storage<decltype(emptyc)> ec{std::move(emptyc)};
-  raw_pointer_buffer<POS, matx_allocator<POS>> emptyp{nullptr, 0, owning};
-  basic_storage<decltype(emptyp)> ep{std::move(emptyp)};
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
-      shape, val.GetStorage(), {ec, row.GetStorage()}, {ep, colp.GetStorage()});
+      shape, val.GetStorage(), {makeEmptyStorage<CRD>(), row.GetStorage()},
+      {makeEmptyStorage<POS>(), colp.GetStorage()});
 }
 
 } // namespace experimental
