@@ -51,7 +51,7 @@ namespace matx {
     {
       public:
         Tiff(cudaStream_t stream=0, int NUM_DECODERS=1)
-          : stream_(stream), NUM_DECODERS_(NUM_DECODERS), decoder_idx(0)
+          : NUM_DECODERS_(NUM_DECODERS), decoder_idx(0), stream_(stream)
         {
           events.resize(NUM_DECODERS_);
           tiff_streams.resize(NUM_DECODERS_);
