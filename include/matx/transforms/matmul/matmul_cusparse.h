@@ -254,37 +254,22 @@ using gemm_cusparse_cache_t =
 
 } // end namespace detail
 
-template <typename Op>
-__MATX_INLINE__ auto getCUSPARSESupportedTensor(const Op &in,
-                                                cudaStream_t stream) {
-  const auto support_func = [&in]() { return true; };
-  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
-}
-
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_matmul_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
+void sparse_matmul_impl(TensorTypeC &c, const TensorTypeA &a, const TensorTypeB &b,
                         const cudaExecutor &exec, float alpha = 1.0,
                         float beta = 0.0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  auto a = A; // always sparse
-  auto b = getCUSPARSESupportedTensor(B, stream);
-  auto c = getCUSPARSESupportedTensor(C, stream);
-
   // TODO: some more checking, supported type? on device? etc.
-
-  using atype = decltype(a);
-  using btype = decltype(b);
-  using ctype = decltype(c);
 
   // Get parameters required by these tensors (for caching).
   auto params =
-      detail::MatMulCUSPARSEHandle_t<ctype, atype, btype>::GetGemmParams(
+      detail::MatMulCUSPARSEHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>::GetGemmParams(
           c, a, b, stream, alpha, beta);
 
   // Lookup and cache.
-  using cache_val_type = detail::MatMulCUSPARSEHandle_t<ctype, atype, btype>;
+  using cache_val_type = detail::MatMulCUSPARSEHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>;
   detail::GetCache().LookupAndExec<detail::gemm_cusparse_cache_t>(
       detail::GetCacheIdFromType<detail::gemm_cusparse_cache_t>(), params,
       [&]() {

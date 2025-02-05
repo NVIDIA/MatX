@@ -215,33 +215,20 @@ using sparse2dense_cache_t =
 
 } // end namespace detail
 
-template <typename Op>
-__MATX_INLINE__ auto getSparse2DenseSupportedTensor(const Op &in,
-                                                    cudaStream_t stream) {
-  const auto support_func = [&in]() { return true; };
-  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
-}
-
 template <typename OutputTensorType, typename InputTensorType>
-void sparse2dense_impl(OutputTensorType O, const InputTensorType A,
+void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
                        const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  auto a = A; // always sparse
-  auto o = getSparse2DenseSupportedTensor(O, stream);
-
   // TODO: some more checking, supported type? on device? etc.
-
-  using atype = decltype(a);
-  using otype = decltype(o);
 
   // Get parameters required by these tensors (for caching).
   auto params =
-      detail::Sparse2DenseHandle_t<otype, atype>::GetConvParams(o, a, stream);
+      detail::Sparse2DenseHandle_t<OutputTensorType, InputTensorType>::GetConvParams(o, a, stream);
 
   // Lookup and cache.
-  using cache_val_type = detail::Sparse2DenseHandle_t<otype, atype>;
+  using cache_val_type = detail::Sparse2DenseHandle_t<OutputTensorType, InputTensorType>;
   detail::GetCache().LookupAndExec<detail::sparse2dense_cache_t>(
       detail::GetCacheIdFromType<detail::sparse2dense_cache_t>(), params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
