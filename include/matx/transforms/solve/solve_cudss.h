@@ -238,35 +238,20 @@ using gemm_cudss_cache_t =
 
 } // end namespace detail
 
-template <typename Op>
-__MATX_INLINE__ auto getCUDSSSupportedTensor(const Op &in,
-                                             cudaStream_t stream) {
-  const auto support_func = [&in]() { return true; };
-  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
-}
-
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl_trans(TensorTypeC C, const TensorTypeA A,
-                             const TensorTypeB B, const cudaExecutor &exec) {
+void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
+                             const TensorTypeB &b, const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  auto a = A; // always sparse
-  auto b = getCUDSSSupportedTensor(B, stream);
-  auto c = getCUDSSSupportedTensor(C, stream);
-
   // TODO: some more checking, supported type? on device? etc.
 
-  using atype = decltype(a);
-  using btype = decltype(b);
-  using ctype = decltype(c);
-
   // Get parameters required by these tensors (for caching).
-  auto params = detail::SolveCUDSSHandle_t<ctype, atype, btype>::GetSolveParams(
+  auto params = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>::GetSolveParams(
       c, a, b, stream);
 
   // Lookup and cache.
-  using cache_val_type = detail::SolveCUDSSHandle_t<ctype, atype, btype>;
+  using cache_val_type = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>;
   detail::GetCache().LookupAndExec<detail::gemm_cudss_cache_t>(
       detail::GetCacheIdFromType<detail::gemm_cudss_cache_t>(), params,
       [&]() { return std::make_shared<cache_val_type>(c, a, b, stream); },
@@ -282,8 +267,8 @@ void sparse_solve_impl_trans(TensorTypeC C, const TensorTypeA A,
 // supports MATX native row-major storage, which will clean up the copies from
 // and to memory.
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
-                       const cudaExecutor &exec) {
+void sparse_solve_impl(TensorTypeC &c, const TensorTypeA &a,
+                       const TensorTypeB &b, const cudaExecutor &exec) {
   const auto stream = exec.getStream();
 
   // Some copying-in hacks, assumes rank 2.
@@ -291,20 +276,20 @@ void sparse_solve_impl(TensorTypeC C, const TensorTypeA A, const TensorTypeB B,
   using TC = typename TensorTypeB::value_type;
   TB *bptr;
   matxAlloc(reinterpret_cast<void **>(&bptr),
-            sizeof(TB) * B.Size(0) * B.Size(1), MATX_ASYNC_DEVICE_MEMORY,
+            sizeof(TB) * b.Size(0) * b.Size(1), MATX_ASYNC_DEVICE_MEMORY,
             stream);
-  auto bT = make_tensor(bptr, {B.Size(1), B.Size(0)});
-  (bT = transpose(B)).run(exec);
+  auto bT = make_tensor(bptr, {b.Size(1), b.Size(0)});
+  (bT = transpose(b)).run(exec);
   TC *cptr;
   matxAlloc(reinterpret_cast<void **>(&cptr),
-            sizeof(TC) * C.Size(0) * C.Size(1), MATX_ASYNC_DEVICE_MEMORY,
+            sizeof(TC) * c.Size(0) * c.Size(1), MATX_ASYNC_DEVICE_MEMORY,
             stream);
-  auto cT = make_tensor(cptr, {C.Size(1), C.Size(0)});
+  auto cT = make_tensor(cptr, {c.Size(1), c.Size(0)});
 
-  sparse_solve_impl_trans(cT, A, bT, exec);
+  sparse_solve_impl_trans(cT, a, bT, exec);
 
   // Some copying-back hacks.
-  (C = transpose(cT)).run(exec);
+  (c = transpose(cT)).run(exec);
 }
 
 } // end namespace matx
