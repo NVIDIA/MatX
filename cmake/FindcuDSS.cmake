@@ -90,7 +90,7 @@ if(NOT cuDSS_FOUND)
     DOWNLOAD_ONLY YES 
   )
       
-  set(cuDSS_LIBRARY ${cuDSS_SOURCE_DIR}/lib/${CUDAToolkit_VERSION_MAJOR}/libcudss.so)
+  set(cuDSS_LIBRARY ${cuDSS_SOURCE_DIR}/lib/libcudss.so)
   set(cuDSS_INCLUDE_DIR ${cuDSS_SOURCE_DIR}/include) 
 
 

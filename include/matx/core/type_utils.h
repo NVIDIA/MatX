@@ -38,6 +38,7 @@
 #include <cublas_v2.h>
 #include <cuda/std/complex>
 #include <cuda/std/tuple>
+#include <cusparse.h>
 #include <type_traits>
 
 #include "cuda_fp16.h"
@@ -1126,6 +1127,9 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
   if constexpr (std::is_same_v<T, int8_t>) {
     return CUDA_R_8I;
   }
+  if constexpr (std::is_same_v<T, int>) {
+    return CUDA_R_32I;
+  }
   if constexpr (std::is_same_v<T, float>) {
     return CUDA_R_32F;
   }
@@ -1163,6 +1167,23 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
 
   return CUBLAS_COMPUTE_32F;
 }
+
+template <typename T>
+constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
+  if constexpr (std::is_same_v<T, uint16_t>) {
+    return CUSPARSE_INDEX_16U;
+  }
+  if constexpr (std::is_same_v<T, int32_t>) {
+    return CUSPARSE_INDEX_32I;
+  }
+  if constexpr (std::is_same_v<T, int64_t>) {
+    return CUSPARSE_INDEX_64I;
+  }
+  if constexpr (std::is_same_v<T, index_t>) {
+    return CUSPARSE_INDEX_64I;
+  }
+}
+
 } // end namespace detail
 
 } // end namespace matx
