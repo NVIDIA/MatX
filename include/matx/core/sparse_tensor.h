@@ -86,8 +86,6 @@ public:
   using crd_type = CRD;
   using pos_type = POS;
   using Format = TF;
-  // using self_type = sparse_tensor_t<VAL, CRD, POS, TF, StorageV, StorageC,
-  // StorageP, DimDesc>;
 
   static constexpr int DIM = TF::DIM;
   static constexpr int LVL = TF::LVL;
