@@ -36,8 +36,33 @@
 
 #include "matx/core/sparse_tensor_format.h"
 #include "matx/core/tensor_impl.h"
+#include "matx/operators/base_operator.h"
 
 namespace matx {
+
+namespace detail {
+
+//
+// A sparse_set operation. Assigning to a sparse tensor is very different
+// from all other MatX assignments, because the underlying storage and
+// buffers may have to be resized to accomodate the output. Therefore,
+// for now, we provide a customized set operation that passes a direct
+// reference to the executor.
+//
+template <typename T, typename Op>
+class sparse_set : public BaseOp<sparse_set<T, Op>> {
+private:
+  T &out_;
+  mutable typename detail::base_type_t<Op> op_;
+public:
+  inline sparse_set(T &out, const Op &op) : out_(out), op_(op) {}
+  template <typename Ex> __MATX_INLINE__ void run(Ex &&ex) {
+    op_.Exec(out_, std::forward<Ex>(ex));
+  }
+};
+
+} // end namespace detail
+
 namespace experimental {
 
 //
@@ -61,7 +86,8 @@ public:
   using crd_type = CRD;
   using pos_type = POS;
   using Format = TF;
-  using self_type = sparse_tensor_t<VAL, CRD, POS, TF, StorageV, StorageC, StorageP, DimDesc>;
+  // using self_type = sparse_tensor_t<VAL, CRD, POS, TF, StorageV, StorageC,
+  // StorageP, DimDesc>;
 
   static constexpr int DIM = TF::DIM;
   static constexpr int LVL = TF::LVL;
@@ -86,25 +112,10 @@ public:
       : detail::tensor_impl_t<VAL, DIM, DimDesc,
                               detail::SparseTensorData<VAL, CRD, POS, TF>>(
             shape) {
-    // Initialize primary and secondary storage.
     values_ = std::move(vals);
     for (int l = 0; l < LVL; l++) {
       coordinates_[l] = std::move(crd[l]);
       positions_[l] = std::move(pos[l]);
-    }
-    // Set the sparse data in tensor_impl.
-    SetSparseDataImpl();
-  }
-
-  __MATX_HOST__ sparse_tensor_t(self_type const &rhs) noexcept
-      : detail::tensor_impl_t<VAL, DIM, DimDesc,
-                              detail::SparseTensorData<VAL, CRD, POS, TF>>(rhs.Shape())
-  { 
-    printf("COPY CONSTRUCTOR IS RUNNING\n");
-    values_ = rhs.values_;
-    for (int l = 0; l < LVL; l++) {
-      coordinates_[l] = rhs.coordinates_[l];
-      positions_[l] = rhs.positions_[l];
     }
     SetSparseDataImpl();
   }
@@ -113,10 +124,7 @@ public:
   __MATX_INLINE__ ~sparse_tensor_t() = default;
 
   // Sets value storage.
-  __MATX_INLINE__ void SetVal(StorageV &&val) {
-   // values_ = std::move(val);
-    values_.SetData(val.data());
-  }
+  __MATX_INLINE__ void SetVal(StorageV &&val) { values_ = std::move(val); }
 
   // Sets coordinates storage.
   __MATX_INLINE__ void SetCrd(int l, StorageC &&crd) {
@@ -144,16 +152,22 @@ public:
     this->SetSparseData(v, c, p);
   }
 
-  // Computational graph assignment (viz. (Acoo = ...).exec();).
+  // A direct sparse tensor assignment (viz. (Acoo = ...).exec();).
   template <typename T>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T &op) {
-    return detail::set(*this, op);
+    return detail::sparse_set(*this, op);
   }
 
   // Size getters.
-  index_t Nse() const { return static_cast<index_t>(values_.size() / sizeof(VAL)); }
-  index_t crdSize(int l) const { return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD)); }
-  index_t posSize(int l) const { return static_cast<index_t>(positions_[l].size() / sizeof(POS)); }
+  index_t Nse() const {
+    return static_cast<index_t>(values_.size() / sizeof(VAL));
+  }
+  index_t crdSize(int l) const {
+    return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD));
+  }
+  index_t posSize(int l) const {
+    return static_cast<index_t>(positions_[l].size() / sizeof(POS));
+  }
 
 private:
   // Primary storage of sparse tensor (explicitly stored element values).

@@ -29,6 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 
 #include <cusparse.h>
@@ -62,11 +63,14 @@ struct Dense2SparseParams_t {
 };
 
 // Helper method to construct storage.
-template<typename T>
-__MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz, matxMemorySpace_t space, cudaStream_t stream) {
+template <typename T>
+__MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
+                                                        matxMemorySpace_t space,
+                                                        cudaStream_t stream) {
   T *ptr;
   matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T), /*owning=*/false};
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
+                                               /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
 
@@ -148,7 +152,7 @@ public:
       // Since top-level positions is not part of cuSPARSE COO,
       // the nnz is updated explicitly here before allocating
       // the new components of COO.
-      POS *pos = reinterpret_cast<POS*>(params_.ptrO1);
+      POS *pos = reinterpret_cast<POS *>(params_.ptrO1);
       pos[1] = nnz;
       matxMemorySpace_t space = GetPointerKind(pos);
       o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
@@ -157,9 +161,17 @@ public:
       o.SetSparseDataImpl();
       ret = cusparseCooSetPointers(matO_, o.CRDData(0), o.CRDData(1), o.Data());
     } else if constexpr (TensorTypeO::Format::isCSR()) {
-      //    ret = cusparseCsrSetPointers(matO_,
+      matxMemorySpace_t space = GetPointerKind(params_.ptrO2);
+      o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
+      o.SetCrd(1, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
+      o.SetSparseDataImpl();
+      ret = cusparseCsrSetPointers(matO_, o.POSData(1), o.CRDData(1), o.Data());
     } else if constexpr (TensorTypeO::Format::isCSC()) {
-      //   ret = cusparseCscSetPointers(matO_,
+      matxMemorySpace_t space = GetPointerKind(params_.ptrO2);
+      o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
+      o.SetCrd(1, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
+      o.SetSparseDataImpl();
+      ret = cusparseCscSetPointers(matO_, o.POSData(1), o.CRDData(1), o.Data());
     }
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
   }
@@ -244,7 +256,8 @@ using dense2sparse_cache_t =
 } // end namespace detail
 
 template <typename OutputTensorType, typename InputTensorType>
-void dense2sparse_impl(OutputTensorType &o, const InputTensorType &a, const cudaExecutor &exec) {
+void dense2sparse_impl(OutputTensorType &o, const InputTensorType &a,
+                       const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
@@ -252,10 +265,13 @@ void dense2sparse_impl(OutputTensorType &o, const InputTensorType &a, const cuda
 
   // Get parameters required by these tensors (for caching).
   auto params =
-      detail::Dense2SparseHandle_t<OutputTensorType, InputTensorType>::GetConvParams(o, a, stream);
+      detail::Dense2SparseHandle_t<OutputTensorType,
+                                   InputTensorType>::GetConvParams(o, a,
+                                                                   stream);
 
   // Lookup and cache.
-  using cache_val_type = detail::Dense2SparseHandle_t<OutputTensorType, InputTensorType>;
+  using cache_val_type =
+      detail::Dense2SparseHandle_t<OutputTensorType, InputTensorType>;
   detail::GetCache().LookupAndExec<detail::dense2sparse_cache_t>(
       detail::GetCacheIdFromType<detail::dense2sparse_cache_t>(), params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },

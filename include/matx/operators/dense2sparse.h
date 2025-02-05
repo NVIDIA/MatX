@@ -71,27 +71,13 @@ public:
     if constexpr (is_sparse_tensor_v<OpA>) {
       MATX_THROW(matxNotSupported, "Cannot use dense2sparse on sparse input");
     } else {
-      using Rtype = decltype(cuda::std::get<0>(out));
-      if constexpr (is_sparse_tensor_v<Rtype>) {
-	  printf("EXEC IN\n");
-	  print(cuda::std::get<0>(out));
-	  printf("<-- THIS VALUE IS ALREADY A COPY OF Acoo\n");
-        dense2sparse_impl(cuda::std::get<0>(out), a_, ex);
-	  printf("EXEC OUT\n");
-	  print(cuda::std::get<0>(out));
-	  printf("<-- THIS VALUE IS NOW A MODIFIED COPY OF Acoo\n");
+      // NOTE: sparse assignment A = dense2sparse(B) takes direct reference!
+      if constexpr (is_sparse_tensor_v<Out>) {
+        dense2sparse_impl(out, a_, ex);
       } else {
-        MATX_THROW(matxNotSupported, "Cannot use dense2sparse for dense output");
+        MATX_THROW(matxNotSupported,
+                   "Cannot use dense2sparse for dense output");
       }
-    }
-  }
-
-  template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void
-  InnerPreRun([[maybe_unused]] ShapeType &&shape,
-              [[maybe_unused]] Executor &&ex) const noexcept {
-    if constexpr (is_matx_op<OpA>()) {
-      a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   }
 };
