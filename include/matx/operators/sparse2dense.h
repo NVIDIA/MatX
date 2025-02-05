@@ -53,6 +53,7 @@ public:
   using matxop = bool;
   using matx_transform_op = bool;
   using sparse2dense_xform_op = bool;
+  using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ Sparse2DenseOp(const OpA &a) : a_(a) {
     for (int r = 0; r < Rank(); r++) {

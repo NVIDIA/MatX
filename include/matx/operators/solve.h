@@ -56,6 +56,7 @@ public:
   using matxop = bool;
   using matx_transform_op = bool;
   using solve_xform_op = bool;
+  using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b) : a_(a), b_(b) {
     for (int r = 0, rank = Rank(); r < rank; r++) {
