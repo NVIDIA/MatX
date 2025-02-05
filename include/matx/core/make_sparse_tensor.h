@@ -59,10 +59,15 @@ __MATX_INLINE__ static auto makeDefaultNonOwningStorage() {
 template <typename ValTensor, typename CrdTensor>
 auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
                      const index_t (&shape)[2]) {
-  static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
   using POS = index_t;
+  // Proper structure.
+  MATX_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && col.Rank() == 1,
+                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_ASSERT_STR(val.Size(0) == row.Size(0) && val.Size(0) == col.Size(0),
+                  matxInvalidParameter,
+                  "data arrays should have consistent length (nse)");
   // Note that the COO API typically does not involve positions.
   // However, under the formal DSL specifications, the top level
   // compression should set up pos[0] = {0, nse}. This is done
@@ -75,39 +80,54 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   raw_pointer_buffer<POS, matx_allocator<POS>> topp{ptr, 2 * sizeof(POS),
                                                     /*owning=*/false};
   basic_storage<decltype(topp)> tp{std::move(topp)};
+  // Construct COO.
   return sparse_tensor_t<VAL, CRD, POS, COO>(
       shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
       {tp, makeDefaultNonOwningStorage<POS>()});
 }
 
-// Constructs a sparse matrix in CSR format directly from the values, the row
-// positions, and column coordinates vectors. The entries should be sorted by
-// row, then column. Explicit zeros may be stored.
+// Constructs a sparse matrix in CSR format directly from the values, the
+// row positions, and column coordinates vectors. The entries should be
+// sorted by row, then column. Explicit zeros may be stored. Duplicate
+// entries should not occur. Explicit zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
 auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
                      const index_t (&shape)[2]) {
-  static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 &&
-                PosTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
+  // Proper structure.
+  MATX_ASSERT_STR(val.Rank() == 1 && rowp.Rank() == 1 && col.Rank() == 1,
+                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_ASSERT_STR(rowp.Size(0) == shape[0] + 1, matxInvalidParameter,
+                  "row positions arrays should have length #rows + 1");
+  MATX_ASSERT_STR(val.Size(0) == col.Size(0), matxInvalidParameter,
+                  "data arrays should have consistent length (nse)");
+  // Construct CSR.
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
       shape, val.GetStorage(),
       {makeDefaultNonOwningStorage<CRD>(), col.GetStorage()},
       {makeDefaultNonOwningStorage<POS>(), rowp.GetStorage()});
 }
 
-// Constructs a sparse matrix in CSC format directly from the values,
-// the row coordinates, and column position vectors. The entries should
-// be sorted by column, then row. Explicit zeros may be stored.
+// Constructs a sparse matrix in CSC format directly from the values, the
+// column positions, and row coordinates vectors. The entries should be
+// sorted by columns, then row. Explicit zeros may be stored. Duplicate
+// entries should not occur. Explicit zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
-auto make_tensor_csc(ValTensor &val, CrdTensor &row, PosTensor &colp,
+auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
                      const index_t (&shape)[2]) {
-  static_assert(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 &&
-                PosTensor::Rank() == 1);
   using VAL = typename ValTensor::value_type;
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
+  // Proper structure.
+  MATX_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && colp.Rank() == 1,
+                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_ASSERT_STR(colp.Size(0) == shape[1] + 1, matxInvalidParameter,
+                  "column positions array should have length #columns + 1");
+  MATX_ASSERT_STR(val.Size(0) == row.Size(0), matxInvalidParameter,
+                  "data arrays should have consistent length (nse)");
+  // Construct CSC.
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
       shape, val.GetStorage(),
       {makeDefaultNonOwningStorage<CRD>(), row.GetStorage()},
