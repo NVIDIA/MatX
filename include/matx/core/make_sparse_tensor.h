@@ -63,8 +63,8 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   using CRD = typename CrdTensor::value_type;
   using POS = index_t;
   // Proper structure.
-  MATX_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && col.Rank() == 1,
-                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_STATIC_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && col.Rank() == 1,
+                         matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(val.Size(0) == row.Size(0) && val.Size(0) == col.Size(0),
                   matxInvalidParameter,
                   "data arrays should have consistent length (nse)");
@@ -97,8 +97,8 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   // Proper structure.
-  MATX_ASSERT_STR(val.Rank() == 1 && rowp.Rank() == 1 && col.Rank() == 1,
-                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_STATIC_ASSERT_STR(val.Rank() == 1 && rowp.Rank() == 1 && col.Rank() == 1,
+                         matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(rowp.Size(0) == shape[0] + 1, matxInvalidParameter,
                   "row positions arrays should have length #rows + 1");
   MATX_ASSERT_STR(val.Size(0) == col.Size(0), matxInvalidParameter,
@@ -121,8 +121,8 @@ auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   // Proper structure.
-  MATX_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && colp.Rank() == 1,
-                  matxInvalidParameter, "data arrays should be rank-1");
+  MATX_STATIC_ASSERT_STR(val.Rank() == 1 && row.Rank() == 1 && colp.Rank() == 1,
+                         matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(colp.Size(0) == shape[1] + 1, matxInvalidParameter,
                   "column positions array should have length #columns + 1");
   MATX_ASSERT_STR(val.Size(0) == row.Size(0), matxInvalidParameter,
