@@ -44,6 +44,23 @@ take ownership, and defaults to *false*. By setting `owning` to *true*, MatX wil
 By default it uses its own allocator, but users can pass in their own PMR-compatible allocator if they wish. For more information 
 see :ref:`creating`.
 
+MatX does not know the "space" or "kind" of the memory when a pointer is passed in. This is by design since looking up what kind
+of pointer is passed (device, host, managed, etc) is expensive and error-prone. In addition, what can be done with a pointer of a 
+certain type is dependent on the system. For example, a Grace-Hopper system can share pointers allocated with `malloc` between the 
+the GPU and CPU, but x86 cannot. It is up to the user to make sure that all memory types used in an expression are compatible.
+
+.. code-block:: cpp
+
+  auto host_mem      = reinterpret_cast<float*>(malloc(10 * sizeof(float)));
+  auto host_tensor   = make_tensor<float>(host_mem, {10});
+  auto device_tensor = make_tensor<float>({10}, MATX_DEVICE_MEMORY);
+  (device_tensor = host_tensor).run();
+
+The code above attempts to copy memory from a malloc'd pointer on the host to device memory. This may or may not work depending 
+on the system. If unsure, it's usually safe to make a tensor with managed memory, copy data into it, then use it on both host or
+device. 
+   
+
 Passing MatX Operators to External Code/Libraries
 -------------------------------------------------
 
