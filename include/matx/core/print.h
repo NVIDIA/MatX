@@ -587,7 +587,7 @@ namespace matx {
             fprintf(fp, ")\n");
           }
         }
-        fprintf(fp, "values = (");
+        fprintf(fp, "values = ADDR=%lx (", reinterpret_cast<uint64_t>(op.Data()));
         for (index_t i = 0; i < nse; i++) {
           PrintVal(fp, op.Data()[i]);
         }

@@ -61,6 +61,8 @@ public:
   using crd_type = CRD;
   using pos_type = POS;
   using Format = TF;
+  using self_type = sparse_tensor_t<VAL, CRD, POS, TF, StorageV, StorageC, StorageP, DimDesc>;
+
   static constexpr int DIM = TF::DIM;
   static constexpr int LVL = TF::LVL;
 
@@ -91,6 +93,44 @@ public:
       positions_[l] = std::move(pos[l]);
     }
     // Set the sparse data in tensor_impl.
+    SetSparseDataImpl();
+  }
+
+  __MATX_HOST__ sparse_tensor_t(self_type const &rhs) noexcept
+      : detail::tensor_impl_t<VAL, DIM, DimDesc,
+                              detail::SparseTensorData<VAL, CRD, POS, TF>>(rhs.Shape())
+  { 
+    printf("COPY CONSTRUCTOR IS RUNNING\n");
+    values_ = rhs.values_;
+    for (int l = 0; l < LVL; l++) {
+      coordinates_[l] = rhs.coordinates_[l];
+      positions_[l] = rhs.positions_[l];
+    }
+    SetSparseDataImpl();
+  }
+
+  // Default destructor.
+  __MATX_INLINE__ ~sparse_tensor_t() = default;
+
+  // Sets value storage.
+  __MATX_INLINE__ void SetVal(StorageV &&val) {
+   // values_ = std::move(val);
+    values_.SetData(val.data());
+  }
+
+  // Sets coordinates storage.
+  __MATX_INLINE__ void SetCrd(int l, StorageC &&crd) {
+    coordinates_[l] = std::move(crd);
+  }
+
+  // Sets positions storage.
+  __MATX_INLINE__ void SetPos(int l, StorageP &&pos) {
+    positions_[l] = std::move(pos);
+  }
+
+  // Sets sparse data in tensor_impl_t. This method must be called
+  // every time changes are made to the underlying storage objects.
+  void SetSparseDataImpl() {
     VAL *v = values_.data();
     CRD *c[LVL];
     POS *p[LVL];
@@ -104,8 +144,11 @@ public:
     this->SetSparseData(v, c, p);
   }
 
-  // Default destructor.
-  __MATX_INLINE__ ~sparse_tensor_t() = default;
+  // Computational graph assignment (viz. (Acoo = ...).exec();).
+  template <typename T>
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T &op) {
+    return detail::set(*this, op);
+  }
 
   // Size getters.
   index_t Nse() const { return static_cast<index_t>(values_.size() / sizeof(VAL)); }

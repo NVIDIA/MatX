@@ -87,6 +87,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Acoo = experimental::make_tensor_coo(vals, idxi, idxj, {4, 8});
   print(Acoo);
 
+
+#if 0 // COMMENTED THIS OUT SO WE ONLY RUN THE dense2sparse
+
   //
   // A very naive way to convert the sparse matrix back to a dense
   // matrix. Note that one should **never** use the ()-operator in
@@ -148,6 +151,23 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   Y.SetVals({ {5, 17}, {6, 18}, {12, 28}, {20, 40} });
   (X = solve(Acsr, Y)).run(exec);
   print(X);
+
+#endif // COMMENTED THIS OUT SO WE ONLY RUN THE dense2sparse
+
+  //
+  // A direct dense2sparse conversion.
+  //
+  auto D = make_tensor<float, 2>({4, 8});
+  D.SetVals({
+    {0, 11,  0, 12,  0,  0,  0,  0},
+    {0,  0, 13,  0,  0,  0,  0,  0},
+    {0,  0,  0,  0,  0,  0,  0, 14},
+    {0, 15,  0,  0, 16,  0, 17,  0}});
+  (Acoo = dense2sparse(D)).run(exec);
+  printf("This is Acoo going out\n");
+  printf("It sees the change to the data inside pos that was modified\n");
+  printf("but all the storage pointers still point to original data\n");
+  print(Acoo);
 
   MATX_EXIT_HANDLER();
 }
