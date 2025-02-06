@@ -99,12 +99,12 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
 template <typename VAL, typename CRD, typename POS = index_t>
 auto make_zero_tensor_coo(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
-  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
   return sparse_tensor_t<VAL, CRD, POS, COO>(
       shape, makeDefaultNonOwningEmptyStorage<VAL>(),
       {makeDefaultNonOwningEmptyStorage<CRD>(),
        makeDefaultNonOwningEmptyStorage<CRD>()},
-      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+      {makeDefaultNonOwningZeroStorage<POS>(2, space),
+       makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
 // Constructs a sparse matrix in CSR format directly from the values, the
@@ -135,12 +135,12 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
 template <typename VAL, typename CRD, typename POS>
 auto make_zero_tensor_csr(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
-  auto rp = makeDefaultNonOwningZeroStorage<POS>(shape[0] + 1, space);
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
       shape, makeDefaultNonOwningEmptyStorage<VAL>(),
       {makeDefaultNonOwningEmptyStorage<CRD>(),
        makeDefaultNonOwningEmptyStorage<CRD>()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), rp});
+      {makeDefaultNonOwningEmptyStorage<POS>(),
+       makeDefaultNonOwningZeroStorage<POS>(shape[0] + 1, space)});
 }
 
 // Constructs a sparse matrix in CSC format directly from the values, the
@@ -171,12 +171,12 @@ auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
 template <typename VAL, typename CRD, typename POS>
 auto make_zero_tensor_csc(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
-  auto rp = makeDefaultNonOwningZeroStorage<POS>(shape[1] + 1, space);
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
       shape, makeDefaultNonOwningEmptyStorage<VAL>(),
       {makeDefaultNonOwningEmptyStorage<CRD>(),
        makeDefaultNonOwningEmptyStorage<CRD>()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), rp});
+      {makeDefaultNonOwningEmptyStorage<POS>(),
+       makeDefaultNonOwningZeroStorage<POS>(shape[1] + 1, space)});
 }
 
 } // namespace experimental
