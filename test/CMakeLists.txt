@@ -37,6 +37,7 @@ set (test_sources
     01_radar/MVDRBeamformer.cu
     01_radar/ambgfun.cu
     01_radar/dct.cu
+    sparse/Sparse.cu
     main.cu
 )
 
