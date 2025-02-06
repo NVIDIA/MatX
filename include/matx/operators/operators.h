@@ -52,6 +52,7 @@
 #include "matx/operators/cov.h"
 #include "matx/operators/cross.h"
 #include "matx/operators/cumsum.h"
+#include "matx/operators/dense2sparse.h"
 #include "matx/operators/diag.h"
 #include "matx/operators/dct.h"
 #include "matx/operators/det.h"
