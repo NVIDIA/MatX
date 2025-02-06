@@ -43,6 +43,7 @@ __MATX_INLINE__ static auto
 makeDefaultNonOwningZeroStorage(index_t sz, matxMemorySpace_t space) {
   T *ptr;
   matxAlloc((void **)&ptr, sz * sizeof(T), space, 0);
+  // TODO: introduce a more efficient matxCalloc or matxMemset?
   for (index_t i = 0; i < sz; i++) {
     ptr[i] = 0;
   }
