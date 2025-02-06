@@ -150,7 +150,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(X);
 
   //
-  // A direct dense2sparse conversion.
+  // A direct dense2sparse conversion. This is the correct way of
+  // performing an efficient sparse operation. Note, however,
+  // that assigning a right-hand-side value to a sparse tensor
+  // (viz. the lval Acoo) is an experimental operation recently
+  // added to MatX, and it is currently restricted to a direct
+  // "dense2sparse" operation at the right-hand-side.
   //
   auto D = make_tensor<float, 2>({4, 8});
   D.SetVals({
