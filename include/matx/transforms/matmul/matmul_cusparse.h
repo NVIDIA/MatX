@@ -79,10 +79,6 @@ public:
   using TB = typename TensorTypeB::value_type;
   using TC = typename TensorTypeC::value_type;
 
-  static constexpr int RANKA = TensorTypeC::Rank();
-  static constexpr int RANKB = TensorTypeC::Rank();
-  static constexpr int RANKC = TensorTypeC::Rank();
-
   /**
    * Construct a sparse GEMM handle
    *   SpMV
@@ -94,15 +90,6 @@ public:
                          const TensorTypeB &b, cudaStream_t stream, float alpha,
                          float beta) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    static_assert(RANKA == 2);
-    static_assert(RANKB == 2);
-    static_assert(RANKC == 2);
-
-    MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 2), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANKC - 1) == b.Size(RANKB - 1), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANKC - 2) == a.Size(RANKA - 2), matxInvalidSize);
-
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
     [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle_);
@@ -261,7 +248,30 @@ void sparse_matmul_impl(TensorTypeC &c, const TensorTypeA &a, const TensorTypeB 
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  // TODO: some more checking, supported type? on device? etc.
+  using TA = typename TensorTypeA::value_type;
+  using TB = typename TensorTypeB::value_type;
+  using TC = typename TensorTypeC::value_type;
+
+  static constexpr int RANKA = TensorTypeA::Rank();
+  static constexpr int RANKB = TensorTypeB::Rank();
+  static constexpr int RANKC = TensorTypeC::Rank();
+
+  // Restrictions.
+  static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
+                "tensors must have rank-2");
+  static_assert(std::is_same_v<TC, TA> &&
+		std::is_same_v<TC, TB>,
+                "tensors must have the same data type");
+  // TODO: allow MIXED-PRECISION computation!
+  static_assert(std::is_same_v<TC, float> ||
+                std::is_same_v<TC, double> ||
+                std::is_same_v<TC, cuda::std::complex<float>> ||
+                std::is_same_v<TC, cuda::std::complex<double>>,
+                "unsupported data type");
+  MATX_ASSERT(
+       a.Size(RANKA - 1) == b.Size(RANKB - 2) &&
+       c.Size(RANKC - 1) == b.Size(RANKB - 1) &&
+       c.Size(RANKC - 2) == a.Size(RANKA - 2), matxInvalidSize);
 
   // Get parameters required by these tensors (for caching).
   auto params =

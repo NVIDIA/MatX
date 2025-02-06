@@ -75,23 +75,9 @@ public:
   using TB = typename TensorTypeB::value_type;
   using TC = typename TensorTypeC::value_type;
 
-  static constexpr int RANKA = TensorTypeC::Rank();
-  static constexpr int RANKB = TensorTypeC::Rank();
-  static constexpr int RANKC = TensorTypeC::Rank();
-
   SolveCUDSSHandle_t(TensorTypeC &c, const TensorTypeA &a, const TensorTypeB &b,
                      cudaStream_t stream) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    static_assert(RANKA == 2);
-    static_assert(RANKB == 2);
-    static_assert(RANKC == 2);
-
-    // Note: B,C transposed!
-    MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 1), matxInvalidSize);
-    MATX_ASSERT(a.Size(RANKA - 2) == b.Size(RANKB - 1), matxInvalidSize);
-    MATX_ASSERT(b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
-
     params_ = GetSolveParams(c, a, b, stream);
 
     [[maybe_unused]] cudssStatus_t ret = cudssCreate(&handle_);
@@ -100,7 +86,7 @@ public:
     // Create cuDSS handle for sparse matrix A.
     static_assert(is_sparse_tensor_v<TensorTypeA>);
     MATX_ASSERT(TypeToInt<typename TensorTypeA::pos_type> ==
-                    TypeToInt<typename TensorTypeA::crd_type>,
+                TypeToInt<typename TensorTypeA::crd_type>,
                 matxNotSupported);
     cudaDataType itp = MatXTypeToCudaType<typename TensorTypeA::crd_type>();
     cudaDataType dta = MatXTypeToCudaType<TA>();
@@ -244,7 +230,29 @@ void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  // TODO: some more checking, supported type? on device? etc.
+  using TA = typename TensorTypeA::value_type;
+  using TB = typename TensorTypeB::value_type;
+  using TC = typename TensorTypeC::value_type;
+
+  static constexpr int RANKA = TensorTypeA::Rank();
+  static constexpr int RANKB = TensorTypeB::Rank();
+  static constexpr int RANKC = TensorTypeC::Rank();
+
+  // Restrictions.
+  static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
+                "tensors must have rank-2");
+  static_assert(std::is_same_v<TC, TA> &&
+		std::is_same_v<TC, TB>,
+                "tensors must have the same data type");
+  static_assert(std::is_same_v<TC, float> ||
+                std::is_same_v<TC, double> ||
+                std::is_same_v<TC, cuda::std::complex<float>> ||
+                std::is_same_v<TC, cuda::std::complex<double>>,
+                "unsupported data type");
+  MATX_ASSERT( // Note: B,C transposed!
+       a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
+       a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
+       b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
 
   // Get parameters required by these tensors (for caching).
   auto params = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>::GetSolveParams(
@@ -266,12 +274,16 @@ void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
 // convoluted way of performing the solve step must be removed once cuDSS
 // supports MATX native row-major storage, which will clean up the copies from
 // and to memory.
+//
+// TODO: remove this when cuDSS supports row-major storage
+//
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
 void sparse_solve_impl(TensorTypeC &c, const TensorTypeA &a,
                        const TensorTypeB &b, const cudaExecutor &exec) {
   const auto stream = exec.getStream();
 
-  // Some copying-in hacks, assumes rank 2.
+  // Some copying-in hacks.
+  static_assert(TensorTypeB::Rank() == 2 && TensorTypeC::Rank() == 2);
   using TB = typename TensorTypeB::value_type;
   using TC = typename TensorTypeB::value_type;
   TB *bptr;
