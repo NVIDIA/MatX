@@ -38,6 +38,7 @@ set (test_sources
     01_radar/ambgfun.cu
     01_radar/dct.cu
     00_sparse/Basic.cu
+    00_sparse/Convert.cu
     main.cu
 )
 
