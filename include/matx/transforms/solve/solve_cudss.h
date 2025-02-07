@@ -101,8 +101,8 @@ public:
     MATX_ASSERT(ret == CUDSS_STATUS_SUCCESS, matxSolverError);
 
     // Create cuDSS handle for dense matrices B and C.
-    static_assert(is_tensor_view_v<TensorTypeA>);
     static_assert(is_tensor_view_v<TensorTypeB>);
+    static_assert(is_tensor_view_v<TensorTypeC>);
     cudaDataType dtb = MatXTypeToCudaType<TB>();
     cudaDataType dtc = MatXTypeToCudaType<TC>();
     cudssLayout_t layout = CUDSS_LAYOUT_COL_MAJOR; // no ROW-MAJOR in cuDSS yet
@@ -250,6 +250,8 @@ void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
        a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
        a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
        b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
+  MATX_ASSERT(b.Stride(RANKB - 1) == 1 &&
+              c.Stride(RANKC - 1) == 1, matxInvalidParameter);
   static_assert(std::is_same_v<typename TensorTypeA::pos_type, int32_t> &&
 		std::is_same_v<typename TensorTypeA::crd_type, int32_t>, "unsupported index type");
 

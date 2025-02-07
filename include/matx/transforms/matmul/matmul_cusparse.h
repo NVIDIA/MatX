@@ -92,6 +92,20 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
+    // Properly typed alpha, beta.
+    if constexpr (std::is_same_v<TC, cuda::std::complex<float>> ||
+                  std::is_same_v<TC, cuda::std::complex<double>>) {
+      salpha_ = {alpha, 0};
+      sbeta_ = {beta, 0};
+    }
+    else if constexpr (std::is_same_v<TC, float> ||
+                       std::is_same_v<TC, double>) {
+      salpha_ = alpha;;
+      sbeta_ = beta;
+    } else {
+      MATX_THROW(matxNotSupported, "SpMM currently only supports uniform FP");
+    }
+
     [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
 
@@ -137,7 +151,7 @@ public:
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
     const cudaDataType comptp = dtc; // TODO: support separate comp type?!
     ret = cusparseSpMM_bufferSize(handle_, params_.opA, params_.opB,
-                                  &params_.alpha, matA_, matB_, &params_.beta,
+                                  &salpha_, matA_, matB_, &sbeta_,
                                   matC_, comptp, algo, &workspaceSize_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
     if (workspaceSize_) {
@@ -189,8 +203,8 @@ public:
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
     const cudaDataType comptp = MatXTypeToCudaType<TC>(); // TODO: see above
     [[maybe_unused]] cusparseStatus_t ret =
-        cusparseSpMM(handle_, params_.opA, params_.opB, &params_.alpha, matA_,
-                     matB_, &params_.beta, matC_, comptp, algo, workspace_);
+        cusparseSpMM(handle_, params_.opA, params_.opB, &salpha_, matA_,
+                     matB_, &sbeta_, matC_, comptp, algo, workspace_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
   }
 
@@ -202,6 +216,8 @@ private:
   size_t workspaceSize_ = 0;
   void *workspace_ = nullptr;
   detail::MatMulCUSPARSEParams_t params_;
+  TC salpha_;
+  TC sbeta_;
 };
 
 /**
@@ -272,6 +288,8 @@ void sparse_matmul_impl(TensorTypeC &c, const TensorTypeA &a, const TensorTypeB 
        a.Size(RANKA - 1) == b.Size(RANKB - 2) &&
        c.Size(RANKC - 1) == b.Size(RANKB - 1) &&
        c.Size(RANKC - 2) == a.Size(RANKA - 2), matxInvalidSize);
+  MATX_ASSERT(b.Stride(RANKB - 1) == 1 &&
+              c.Stride(RANKC - 1) == 1, matxInvalidParameter);
 
   // Get parameters required by these tensors (for caching).
   auto params =

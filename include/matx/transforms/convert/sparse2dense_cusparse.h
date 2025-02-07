@@ -218,19 +218,22 @@ void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
   using TA = typename InputTensorType::value_type;
   using TO = typename OutputTensorType::value_type;
 
+  static constexpr int RANKA = InputTensorType::Rank();
+  static constexpr int RANKO = OutputTensorType::Rank();
+
   // Restrictions.
-  static_assert(OutputTensorType::Rank() == InputTensorType::Rank(),
-                "tensors must have same rank");
+  static_assert(RANKA == RANKO, "tensors must have same rank");
   static_assert(std::is_same_v<TA, TO>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TA, int8_t> ||
-                std::is_same_v<TA, matx::matxFp16> ||
-                std::is_same_v<TA, matx::matxBf16> ||
-                std::is_same_v<TA, float> ||
-                std::is_same_v<TA, double> ||
-                std::is_same_v<TA, cuda::std::complex<float>> ||
-                std::is_same_v<TA, cuda::std::complex<double>>,
+  static_assert(std::is_same_v<TO, int8_t> ||
+                std::is_same_v<TO, matx::matxFp16> ||
+                std::is_same_v<TO, matx::matxBf16> ||
+                std::is_same_v<TO, float> ||
+                std::is_same_v<TO, double> ||
+                std::is_same_v<TO, cuda::std::complex<float>> ||
+                std::is_same_v<TO, cuda::std::complex<double>>,
                 "unsupported data type");
+  MATX_ASSERT(o.Stride(RANKO - 1) == 1, matxInvalidParameter);
 
   // Get parameters required by these tensors (for caching).
   auto params =
