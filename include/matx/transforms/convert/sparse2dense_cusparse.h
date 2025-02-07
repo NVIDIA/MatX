@@ -72,18 +72,12 @@ public:
   using TA = typename TensorTypeA::value_type;
   using TO = typename TensorTypeO::value_type;
 
-  static constexpr int RANKA = TensorTypeA::Rank();
-  static constexpr int RANKO = TensorTypeO::Rank();
-
   /**
    * Construct a sparse2dense handle.
    */
   Sparse2DenseHandle_t(TensorTypeO &o, const TensorTypeA &a,
                        cudaStream_t stream) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    static_assert(RANKA == RANKO);
-
     params_ = GetConvParams(o, a, stream);
 
     [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle_);
@@ -221,7 +215,22 @@ void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  // TODO: some more checking, supported type? on device? etc.
+  using TA = typename InputTensorType::value_type;
+  using TO = typename OutputTensorType::value_type;
+
+  // Restrictions.
+  static_assert(OutputTensorType::Rank() == InputTensorType::Rank(),
+                "tensors must have same rank");
+  static_assert(std::is_same_v<TA, TO>,
+                "tensors must have the same data type");
+  static_assert(std::is_same_v<TA, int8_t> ||
+                std::is_same_v<TA, matx::matxFp16> ||
+                std::is_same_v<TA, matx::matxBf16> ||
+                std::is_same_v<TA, float> ||
+                std::is_same_v<TA, double> ||
+                std::is_same_v<TA, cuda::std::complex<float>> ||
+                std::is_same_v<TA, cuda::std::complex<double>>,
+                "unsupported data type");
 
   // Get parameters required by these tensors (for caching).
   auto params =
