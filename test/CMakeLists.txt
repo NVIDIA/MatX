@@ -39,6 +39,7 @@ set (test_sources
     01_radar/dct.cu
     00_sparse/Basic.cu
     00_sparse/Convert.cu
+    00_sparse/Solve.cu
     main.cu
 )
 

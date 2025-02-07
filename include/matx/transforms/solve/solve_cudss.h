@@ -85,9 +85,6 @@ public:
 
     // Create cuDSS handle for sparse matrix A.
     static_assert(is_sparse_tensor_v<TensorTypeA>);
-    MATX_ASSERT(TypeToInt<typename TensorTypeA::pos_type> ==
-                TypeToInt<typename TensorTypeA::crd_type>,
-                matxNotSupported);
     cudaDataType itp = MatXTypeToCudaType<typename TensorTypeA::crd_type>();
     cudaDataType dta = MatXTypeToCudaType<TA>();
     cudssMatrixType_t mtp = CUDSS_MTYPE_GENERAL;
@@ -253,6 +250,8 @@ void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
        a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
        a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
        b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
+  static_assert(std::is_same_v<typename TensorTypeA::pos_type, int32_t> &&
+		std::is_same_v<typename TensorTypeA::crd_type, int32_t>, "unsupported index type");
 
   // Get parameters required by these tensors (for caching).
   auto params = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>::GetSolveParams(
