@@ -38,17 +38,13 @@
 
 using namespace matx;
 
-template <typename T> class SparseTest : public ::testing::Test { };
+template <typename T> class BasicSparseTest : public ::testing::Test { };
 
-template <typename TensorType> class SparseTestsAll : public SparseTest<TensorType> { };
+template <typename T> class BasicSparseTestsAll : public BasicSparseTest<T> { };
 
-// For all operations that run on host and device.
-TYPED_TEST_SUITE(SparseTestsAll, MatXAllTypesAllExecs);
+TYPED_TEST_SUITE(BasicSparseTestsAll, MatXAllTypesAllExecs);
 
-// For all operations that run on device only.
-TYPED_TEST_SUITE(SparseTestsAllCUDA, MatXAllTypesCUDAExec);
-
-TYPED_TEST(SparseTestsAll, MakeZeroCOO) {
+TYPED_TEST(BasicSparseTestsAll, MakeZeroCOO) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto A = experimental::make_zero_tensor_coo<TestType, index_t>({17, 33});
@@ -60,10 +56,12 @@ TYPED_TEST(SparseTestsAll, MakeZeroCOO) {
   ASSERT_EQ(A.posSize(1), 0);
   ASSERT_EQ(A.crdSize(0), 0);
   ASSERT_EQ(A.crdSize(1), 0);
+  // Element getter.
+  ASSERT_EQ(A(0, 0), static_cast<TestType>(0)); // not found
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(SparseTestsAll, MakeCOO) {
+TYPED_TEST(BasicSparseTestsAll, MakeCOO) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto vals = make_tensor<TestType>({3});
@@ -91,7 +89,7 @@ TYPED_TEST(SparseTestsAll, MakeCOO) {
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(SparseTestsAll, MakeZeroCSR) {
+TYPED_TEST(BasicSparseTestsAll, MakeZeroCSR) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto A = experimental::make_zero_tensor_csr<TestType, index_t, index_t>({17, 33});
@@ -103,10 +101,12 @@ TYPED_TEST(SparseTestsAll, MakeZeroCSR) {
   ASSERT_EQ(A.posSize(1), 18);
   ASSERT_EQ(A.crdSize(0), 0);
   ASSERT_EQ(A.crdSize(1), 0);
+  // Element getter.
+  ASSERT_EQ(A(0, 0), static_cast<TestType>(0)); // not found
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(SparseTestsAll, MakeCSR) {
+TYPED_TEST(BasicSparseTestsAll, MakeCSR) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto vals = make_tensor<TestType>({3});
@@ -134,7 +134,7 @@ TYPED_TEST(SparseTestsAll, MakeCSR) {
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(SparseTestsAll, MakeZeroCSC) {
+TYPED_TEST(BasicSparseTestsAll, MakeZeroCSC) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto A = experimental::make_zero_tensor_csc<TestType, index_t, index_t>({17, 33});
@@ -146,10 +146,12 @@ TYPED_TEST(SparseTestsAll, MakeZeroCSC) {
   ASSERT_EQ(A.posSize(1), 34);
   ASSERT_EQ(A.crdSize(0), 0);
   ASSERT_EQ(A.crdSize(1), 0);
+  // Element getter.
+  ASSERT_EQ(A(0, 0), static_cast<TestType>(0)); // not found
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(SparseTestsAll, MakeCSC) {
+TYPED_TEST(BasicSparseTestsAll, MakeCSC) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   auto vals = make_tensor<TestType>({3});
