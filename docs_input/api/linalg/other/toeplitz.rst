@@ -19,13 +19,13 @@ input as the second parameter.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/toeplitz_test.cu
    :language: cpp
    :start-after: example-begin toeplitz-test-1
    :end-before: example-end toeplitz-test-1
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/toeplitz_test.cu
    :language: cpp
    :start-after: example-begin toeplitz-test-2
    :end-before: example-end toeplitz-test-2

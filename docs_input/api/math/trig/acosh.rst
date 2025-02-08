@@ -10,7 +10,7 @@ Hyperbolic inverse cosine
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/trig_funcs_test.cu
    :language: cpp
    :start-after: example-begin acosh-test-1
    :end-before: example-end acosh-test-1

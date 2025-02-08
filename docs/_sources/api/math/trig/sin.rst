@@ -10,7 +10,7 @@ Sine in radians
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/trig_func_test.cu
    :language: cpp
    :start-after: example-begin sin-test-1
    :end-before: example-end sin-test-1

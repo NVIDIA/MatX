@@ -25,7 +25,7 @@ Examples
    :end-before: example-end max-test-2
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/operator_func_test.cu
    :language: cpp
    :start-after: example-begin max-el-test-1
    :end-before: example-end max-el-test-1

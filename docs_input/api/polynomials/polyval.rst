@@ -10,7 +10,7 @@ Evaluate a polynomial given an input sequence and coefficients
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../test/00_operators/polyval_test.cu
    :language: cpp
    :start-after: example-begin polyval-test-1
    :end-before: example-end polyval-test-1

@@ -11,7 +11,7 @@ Permute the dimensions of an operator
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/permute_test.cu
    :language: cpp
    :start-after: example-begin permute-test-1
    :end-before: example-end permute-test-1

@@ -12,7 +12,7 @@ the original size.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/reshape_test.cu
    :language: cpp
    :start-after: example-begin reshape-test-1
    :end-before: example-end reshape-test-1

@@ -12,7 +12,7 @@ than calling `permute()` since it's not lazily evaluated and can use an optimize
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/transpose_test.cu
    :language: cpp
    :start-after: example-begin transpose-test-1
    :end-before: example-end transpose-test-1
