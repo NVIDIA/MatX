@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 
+include(00_operators/CMakeLists.txt)
+list(TRANSFORM OPERATOR_TEST_FILES PREPEND "00_operators/")
+
 set (test_sources
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
@@ -7,7 +10,7 @@ set (test_sources
     00_tensor/VizTests.cu
     00_tensor/TensorCreationTests.cu
     00_tensor/EinsumTests.cu
-    00_operators/OperatorTests.cu
+    ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu
     00_operators/ReductionTests.cu
