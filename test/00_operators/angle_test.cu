@@ -6,8 +6,6 @@
 using namespace matx;
 using namespace matx::test;
 
-TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
-
 TYPED_TEST(OperatorTestsComplexTypesAllExecs, AngleOp)
 {
   MATX_ENTER_HANDLER();
