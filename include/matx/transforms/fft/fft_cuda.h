@@ -333,7 +333,11 @@ protected:
   virtual ~matxCUDAFFTPlan_t() {
     if (this->workspace_ != nullptr) {
       // Pass the default stream until we allow user-deletable caches
+      /* Albert -- Temporarily remove this free as we likely don't want to 
+                   insert the dependence on cudaStreamDefault */
+#if 0
       matxFree(workspace_, cudaStreamDefault);
+#endif
       this->workspace_ = nullptr;
     }
 
@@ -423,6 +427,11 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream
       MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
     }
   }
+
+  // Albert -Assert that the stream is in capture mode
+  cudaStreamCaptureStatus status;
+  cudaStreamIsCapturing(stream, &status);
+  MATX_ASSERT(status == cudaStreamCaptureStatusNone, matxCufftError);
 
   size_t workspaceSize;
   cufftCreate(&this->plan_);
