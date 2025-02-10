@@ -11,7 +11,7 @@ of the original operator
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/flatten_test.cu
    :language: cpp
    :start-after: example-begin flatten-test-1
    :end-before: example-end flatten-test-1

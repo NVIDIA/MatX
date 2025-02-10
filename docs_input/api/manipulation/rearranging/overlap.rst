@@ -27,7 +27,7 @@ end of the data to make the tensor rectangular.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/overlap_test.cu
    :language: cpp
    :start-after: example-begin overlap-test-1
    :end-before: example-end overlap-test-1

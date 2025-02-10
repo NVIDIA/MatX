@@ -12,7 +12,7 @@ Repeat an operator
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/repmat_test.cu
    :language: cpp
    :start-after: example-begin repmat-test-1
    :end-before: example-end repmat-test-1

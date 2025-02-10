@@ -11,7 +11,7 @@ Reverse the values of an operator along a single dimension
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/reverse_test.cu
    :language: cpp
    :start-after: example-begin reverse-test-1
    :end-before: example-end reverse-test-1

@@ -10,7 +10,7 @@ downsample a signal by dropping samples
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/updownsample_test.cu
    :language: cpp
    :start-after: example-begin downsample-test-1
    :end-before: example-end downsample-test-1

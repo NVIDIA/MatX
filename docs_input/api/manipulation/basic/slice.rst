@@ -15,25 +15,25 @@ When slicing along any given tensor dimension, the start index is treated as inc
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
    :language: cpp
    :start-after: example-begin slice-test-1
    :end-before: example-end slice-test-1
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_stride_test.cu
    :language: cpp
    :start-after: example-begin slice-test-2
    :end-before: example-end slice-test-2
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_and_reduce_test.cu
    :language: cpp
    :start-after: example-begin slice-test-3
    :end-before: example-end slice-test-3
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
    :language: cpp
    :start-after: example-begin slice-test-4
    :end-before: example-end slice-test-4

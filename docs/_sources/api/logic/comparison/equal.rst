@@ -10,7 +10,7 @@ Equality test
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/operator_func_test.cu
    :language: cpp
    :start-after: example-begin eq-test-1
    :end-before: example-end eq-test-1
