@@ -101,12 +101,31 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
     for (index_t j = 0; j < 2; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(X(i, j).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR(X(i, j).imag(), E(i,j ).imag(), this->thresh);
+        ASSERT_NEAR(X(i, j).imag(), E(i, j).imag(), this->thresh);
       }
       else {
         ASSERT_NEAR(X(i, j), E(i, j), this->thresh);
       }
+    }
+  }
 
+  // Allow dense computations (pre-/post-solve).
+  TestType C3 = static_cast<TestType>(3);
+  TestType C5 = static_cast<TestType>(5);
+  (Y = (Y - C3)).run(exec);
+  (X = solve(S, Y + C3) + C5).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR((X(i, j) - C5).real(), E(i, j).real(), this->thresh);
+        ASSERT_NEAR((X(i, j) - C5).imag(), E(i, j).imag(), this->thresh);
+      }
+      else {
+        ASSERT_NEAR(X(i, j) - C5, E(i, j), this->thresh);
+      }
     }
   }
 
