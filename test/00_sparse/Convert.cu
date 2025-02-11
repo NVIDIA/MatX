@@ -196,5 +196,17 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSC) {
     }
   }
 
+  // Allow dense computations (post-convert).
+  TestType C3 = static_cast<TestType>(3);
+  (O = sparse2dense(S) + C3).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      ASSERT_EQ(O(i, j) - C3, D(i, j));
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
