@@ -13,7 +13,7 @@ atomics are not available in hardware.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/operator_func_test.cu
    :language: cpp
    :start-after: example-begin isclose-test-1
    :end-before: example-end isclose-test-1

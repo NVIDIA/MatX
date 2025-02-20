@@ -570,16 +570,14 @@ namespace matx {
         fprintf(fp, "format = ");
 	Format::print();
         for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
-	  if (op.POSData(lvlIdx)) {
-            const index_t pend = op.posSize(lvlIdx);
+	  if (const index_t pend = op.posSize(lvlIdx)) {
             fprintf(fp, "pos[%d] = (", lvlIdx);
             for (index_t i = 0; i < pend; i++) {
               PrintVal(fp, op.POSData(lvlIdx)[i]);
             }
             fprintf(fp, ")\n");
           }
-          if (op.CRDData(lvlIdx)) {
-            const index_t cend = op.crdSize(lvlIdx);
+          if (const index_t cend = op.crdSize(lvlIdx)) {
             fprintf(fp, "crd[%d] = (", lvlIdx);
             for (index_t i = 0; i < cend; i++) {
               PrintVal(fp, op.CRDData(lvlIdx)[i]);

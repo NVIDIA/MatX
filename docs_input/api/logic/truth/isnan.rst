@@ -10,7 +10,7 @@ Returns a truth value if operator value is NaN
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/isnaninf_test.cu
    :language: cpp
    :start-after: example-begin nan-test-1
    :end-before: example-end nan-test-1

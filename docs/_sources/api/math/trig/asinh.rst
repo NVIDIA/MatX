@@ -10,7 +10,7 @@ Hyperbolic inverse sine
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/trig_func_test.cu
    :language: cpp
    :start-after: example-begin asinh-test-1
    :end-before: example-end asinh-test-1

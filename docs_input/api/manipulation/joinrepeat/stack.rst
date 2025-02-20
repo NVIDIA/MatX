@@ -11,7 +11,7 @@ a rank increase of one where the new dimension reflects the stacked operators.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/stack_test.cu
    :language: cpp
    :start-after: example-begin stack-test-1
    :end-before: example-end stack-test-1

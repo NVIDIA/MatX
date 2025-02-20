@@ -12,21 +12,25 @@ be used to drop ranks, for operations such as selecting a single row.
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
    :language: cpp
    :start-after: example-begin slice-test-1
    :end-before: example-end slice-test-1
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
    :language: cpp
    :start-after: example-begin slice-test-2
    :end-before: example-end slice-test-2
    :dedent:
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
    :language: cpp
-   :start-after: example-begin slice-test-2
-   :end-before: example-end slice-test-2
+   :start-after: example-begin slice-test-3
+   :end-before: example-end slice-test-3
    :dedent:
 
+.. literalinclude:: ../../../../test/00_operators/slice_test.cu
+   :language: cpp
+   :start-after: example-begin slice-test-4
+   :end-before: example-end slice-test-4

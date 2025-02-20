@@ -23,7 +23,7 @@ the operation is launched:
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/at_test.cu
    :language: cpp
    :start-after: example-begin at-test-1
    :end-before: example-end at-test-1

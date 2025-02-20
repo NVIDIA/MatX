@@ -10,7 +10,7 @@ Inverse tangent
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/trig_func_test.cu
    :language: cpp
    :start-after: example-begin atan-test-1
    :end-before: example-end atan-test-1

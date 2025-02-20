@@ -10,7 +10,7 @@ Flips an operator up to down
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/reverse_test.cu
    :language: cpp
    :start-after: example-begin flipud-test-1
    :end-before: example-end flipud-test-1

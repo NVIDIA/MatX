@@ -214,21 +214,12 @@ public:
                         : i.Size(RANK - 1);
 
       if (i.IsContiguous() && o.IsContiguous()) {
-        size_t freeMem, totalMem;
-        [[maybe_unused]] auto err = cudaMemGetInfo(&freeMem, &totalMem);
-        MATX_ASSERT_STR(err == cudaSuccess, matxCudaError, "Failed to get memInfo from device");
-        // Use up to 30% of free memory to batch, assuming memory use matches batch size
-        double max_for_fft_workspace = static_cast<double>(freeMem) * 0.3;
-
-        params.batch = 1;
-        for (int dim = i.Rank() - 2; dim >= 0; dim--) {
-          if (static_cast<double>(params.batch * i.Size(dim) * sizeof(typename InTensorType::value_type)) > max_for_fft_workspace) {
-            break;
-          }
-
-          params.batch_dims++;
-          params.batch *= i.Size(dim);
-        }
+        // Previously we used cudaMemGetInfo to get free memory to determine batch size. This can be very slow, 
+        // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what 
+        // they're doing and not try to batch FFTs that are too small        
+        const auto shape = i.Shape();
+        params.batch = std::accumulate(std::begin(shape), std::end(shape) - 1, 1, std::multiplies<index_t>());
+        params.batch_dims = i.Rank() - 1;
       }
       else {
         if (RANK == 1) {

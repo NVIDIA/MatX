@@ -12,7 +12,7 @@ Return Legendre polynomial coefficients at the input operator
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../test/00_operators/legendre_test.cu
    :language: cpp
    :start-after: example-begin legendre-test-1
    :end-before: example-end legendre-test-1

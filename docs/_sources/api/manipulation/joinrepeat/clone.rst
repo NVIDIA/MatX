@@ -11,7 +11,7 @@ Clone one or more dimensions of an operator to a higher rank
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/clone_test.cu
    :language: cpp
    :start-after: example-begin clone-test-1
    :end-before: example-end clone-test-1
