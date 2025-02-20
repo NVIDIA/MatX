@@ -38,13 +38,7 @@ target_include_directories(matx_bench PRIVATE "${target_inc}")
 target_include_directories(matx_bench SYSTEM PRIVATE "${system_inc}")
 
 target_include_directories(matx_bench SYSTEM PRIVATE "${pybind11_INCLUDE_DIR}" "${PYTHON_INCLUDE_DIRS}")
-target_link_libraries(  matx_bench PRIVATE
-                        cuda
-                        CUDA::nvToolsExt
-                        CUDA::cublas
-                        CUDA::cublasLt
-                        CUDA::cufft
-                        CUDA::cusolver)
+target_link_libraries(  matx_bench PRIVATE matx::matx)
 
 add_custom_target(bench
     DEPENDS matx_bench
