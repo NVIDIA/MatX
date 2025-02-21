@@ -317,13 +317,16 @@ struct RandomOperatorOutputIterator {
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorThrustIterator {
   using self_type = RandomOperatorThrustIterator<OperatorType, ConvertType>;
-  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
+  using const_strip_type = remove_cvref_t<typename OperatorType::value_type>;
+  using value_type = typename std::conditional_t<ConvertType,
+              detail::convert_matx_type_t<const_strip_type>, 
+              const_strip_type>;
   // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
-  using pointer = value_type*;
-  using reference = value_type&;
-  using const_reference = value_type&;
+  using pointer = cuda::std::remove_const_t<value_type>*;
+  using reference = cuda::std::remove_const_t<value_type>&;
+  using const_reference = cuda::std::remove_const_t<value_type>&;
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = index_t;
   using OperatorBaseType = typename detail::base_type_t<OperatorType>;
@@ -344,14 +347,14 @@ struct RandomOperatorThrustIterator {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
   {
     if constexpr (OperatorType::Rank() == 0) {
-      auto &tmp = t_.operator()();
+      auto &tmp = const_cast<const_strip_type&>(t_.operator()());
       return tmp;
     }
     else {
       auto arrs = detail::GetIdxFromAbs(t_, offset_);
 
       return cuda::std::apply([&](auto &&...args) -> reference {
-          auto &tmp = t_.operator()(args...);
+          auto &tmp = const_cast<const_strip_type&>(t_.operator()(args...));
           return tmp;
         }, arrs);    
     }
