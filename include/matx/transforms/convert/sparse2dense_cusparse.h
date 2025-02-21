@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -215,32 +215,33 @@ void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  using TA = typename InputTensorType::value_type;
-  using TO = typename OutputTensorType::value_type;
+  using atype = InputTensorType;
+  using otype = OutputTensorType;
 
-  static constexpr int RANKA = InputTensorType::Rank();
-  static constexpr int RANKO = OutputTensorType::Rank();
+  using TA = typename atype::value_type;
+  using TO = typename otype::value_type;
+
+  static constexpr int RANKA = atype::Rank();
+  static constexpr int RANKO = otype::Rank();
 
   // Restrictions.
   static_assert(RANKA == RANKO, "tensors must have same rank");
-  static_assert(std::is_same_v<TA, TO>,
-                "tensors must have the same data type");
+  static_assert(std::is_same_v<TA, TO>, "tensors must have the same data type");
   static_assert(std::is_same_v<TO, int8_t> ||
-                std::is_same_v<TO, matx::matxFp16> ||
-                std::is_same_v<TO, matx::matxBf16> ||
-                std::is_same_v<TO, float> ||
-                std::is_same_v<TO, double> ||
-                std::is_same_v<TO, cuda::std::complex<float>> ||
-                std::is_same_v<TO, cuda::std::complex<double>>,
+                    std::is_same_v<TO, matx::matxFp16> ||
+                    std::is_same_v<TO, matx::matxBf16> ||
+                    std::is_same_v<TO, float> || std::is_same_v<TO, double> ||
+                    std::is_same_v<TO, cuda::std::complex<float>> ||
+                    std::is_same_v<TO, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(o.Stride(RANKO - 1) == 1, matxInvalidParameter);
 
   // Get parameters required by these tensors (for caching).
   auto params =
-      detail::Sparse2DenseHandle_t<OutputTensorType, InputTensorType>::GetConvParams(o, a, stream);
+      detail::Sparse2DenseHandle_t<otype, atype>::GetConvParams(o, a, stream);
 
   // Lookup and cache.
-  using cache_val_type = detail::Sparse2DenseHandle_t<OutputTensorType, InputTensorType>;
+  using cache_val_type = detail::Sparse2DenseHandle_t<otype, atype>;
   detail::GetCache().LookupAndExec<detail::sparse2dense_cache_t>(
       detail::GetCacheIdFromType<detail::sparse2dense_cache_t>(), params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
