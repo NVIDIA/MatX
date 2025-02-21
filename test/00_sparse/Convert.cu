@@ -196,15 +196,21 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSC) {
     }
   }
 
-  // Allow dense computations (post-convert).
+  // Allow dense computations (pre-convert).
   TestType C3 = static_cast<TestType>(3);
-  (O = sparse2dense(S) + C3).run(exec);
+  (S = dense2sparse(D + C3)).run(exec);
+
+  ASSERT_EQ(S.Nse(), 100); // fully dense now
+
+  // Allow dense computations (post-convert).
+  TestType C5 = static_cast<TestType>(5);
+  (O = sparse2dense(S) + C5).run(exec);
 
   // Verify result.
   exec.sync();
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < n; j++) {
-      ASSERT_EQ(O(i, j) - C3, D(i, j));
+      ASSERT_EQ(O(i, j) - C5, D(i, j) + C3);
     }
   }
 
