@@ -101,7 +101,6 @@ public:
     } else if constexpr (std::is_same_v<TC, float> ||
                          std::is_same_v<TC, double>) {
       salpha_ = alpha;
-      ;
       sbeta_ = beta;
     } else {
       MATX_THROW(matxNotSupported, "SpMM currently only supports uniform FP");
