@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -219,54 +220,81 @@ using gemm_cudss_cache_t =
     std::unordered_map<SolveCUDSSParams_t, std::any, SolveCUDSSParamsKeyHash,
                        SolveCUDSSParamsKeyEq>;
 
+template <typename Op>
+__MATX_INLINE__ auto getSolveSupportedTensor(const Op &in,
+                                             cudaStream_t stream) {
+  const auto func = [&]() {
+    if constexpr (is_tensor_view_v<Op>)
+      return in.Stride(Op::Rank() - 1) == 1;
+    return true;
+  };
+  return GetSupportedTensor(in, func, MATX_ASYNC_DEVICE_MEMORY, stream);
+}
+
 } // end namespace detail
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl_trans(TensorTypeC &c, const TensorTypeA &a,
-                             const TensorTypeB &b, const cudaExecutor &exec) {
+void sparse_solve_impl_trans(TensorTypeC &C, const TensorTypeA &a,
+                             const TensorTypeB &B, const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-  using TA = typename TensorTypeA::value_type;
-  using TB = typename TensorTypeB::value_type;
-  using TC = typename TensorTypeC::value_type;
+  // Transform into supported form.
+  auto b = getSolveSupportedTensor(B, stream);
+  auto c = getSolveSupportedTensor(C, stream);
+  if (!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B)) {
+    (b = B).run(stream);
+  }
 
-  static constexpr int RANKA = TensorTypeA::Rank();
-  static constexpr int RANKB = TensorTypeB::Rank();
-  static constexpr int RANKC = TensorTypeC::Rank();
+  using atype = TensorTypeA;
+  using btype = decltype(b);
+  using ctype = decltype(c);
+
+  using TA = typename atype::value_type;
+  using TB = typename btype::value_type;
+  using TC = typename ctype::value_type;
+
+  static constexpr int RANKA = atype::Rank();
+  static constexpr int RANKB = btype::Rank();
+  static constexpr int RANKC = ctype::Rank();
 
   // Restrictions.
   static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
                 "tensors must have rank-2");
-  static_assert(std::is_same_v<TC, TA> &&
-		std::is_same_v<TC, TB>,
+  static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TC, float> ||
-                std::is_same_v<TC, double> ||
-                std::is_same_v<TC, cuda::std::complex<float>> ||
-                std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
+                    std::is_same_v<TC, cuda::std::complex<float>> ||
+                    std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT( // Note: B,C transposed!
-       a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
-       a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
-       b.Size(RANKB - 2) == c.Size(RANKC - 2), matxInvalidSize);
-  MATX_ASSERT(b.Stride(RANKB - 1) == 1 &&
-              c.Stride(RANKC - 1) == 1, matxInvalidParameter);
-  static_assert(std::is_same_v<typename TensorTypeA::pos_type, int32_t> &&
-		std::is_same_v<typename TensorTypeA::crd_type, int32_t>, "unsupported index type");
+      a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
+          a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
+          b.Size(RANKB - 2) == c.Size(RANKC - 2),
+      matxInvalidSize);
+  MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
+              matxInvalidParameter);
+  static_assert(std::is_same_v<typename atype::pos_type, int32_t> &&
+                    std::is_same_v<typename atype::crd_type, int32_t>,
+                "unsupported index type");
 
   // Get parameters required by these tensors (for caching).
-  auto params = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>::GetSolveParams(
+  auto params = detail::SolveCUDSSHandle_t<ctype, atype, btype>::GetSolveParams(
       c, a, b, stream);
 
   // Lookup and cache.
-  using cache_val_type = detail::SolveCUDSSHandle_t<TensorTypeC, TensorTypeA, TensorTypeB>;
+  using cache_val_type = detail::SolveCUDSSHandle_t<ctype, atype, btype>;
   detail::GetCache().LookupAndExec<detail::gemm_cudss_cache_t>(
       detail::GetCacheIdFromType<detail::gemm_cudss_cache_t>(), params,
       [&]() { return std::make_shared<cache_val_type>(c, a, b, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b);
       });
+
+  // Copy transformed output back.
+  if (!c.isSameView(C)) {
+    (C = c).run(stream);
+  }
 }
 
 // Since cuDSS currently only supports column-major storage of the dense
