@@ -153,7 +153,9 @@ public:
       return "d" + std::to_string(di) + " div " + std::to_string(cj);
     } else if constexpr (op == LvlOp::Mod) {
       return "d" + std::to_string(di) + " mod " + std::to_string(cj);
-    }
+    } else { // Should not happen
+      return "";
+    }     
   }
 };
 
@@ -179,7 +181,9 @@ public:
       return "compressed";
     } else if constexpr (ltype == LvlType::CompressedNonUnique) {
       return "compressed(non-unique)";
-    }
+    } else { // Should not happen
+      return "";
+    } 
   }
 };
 

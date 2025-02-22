@@ -1182,6 +1182,9 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
   if constexpr (std::is_same_v<T, index_t>) {
     return CUSPARSE_INDEX_64I;
   }
+  else { // Should not happen
+    return CUSPARSE_INDEX_32I;
+  }
 }
 
 } // end namespace detail
