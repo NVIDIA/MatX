@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "assert.h"
@@ -135,7 +136,24 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCOO) {
       else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
+    }
+  }
 
+  // Allow transforming output.
+  auto TO = make_tensor<TestType>({n, m});
+  (transpose(TO) = matmul(S, B)).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR(TO(j, i).real(), E(i, j).real(), this->thresh);
+        ASSERT_NEAR(TO(j, i).imag(), E(i,j ).imag(), this->thresh);
+      }
+      else {
+        ASSERT_NEAR(TO(j, i), E(i, j), this->thresh);
+      }
     }
   }
 
@@ -177,7 +195,6 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSR) {
       else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
-
     }
   }
 
@@ -219,7 +236,26 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
       else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
+    }
+  }
 
+  // Allow dense computations (pre-/post-matmul).
+  TestType C3 = static_cast<TestType>(3);
+  TestType C5 = static_cast<TestType>(5);
+  (B = (B - C3)).run(exec);
+  (O = matmul(S, B + C3) + C5).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR((O(i, j) - C5).real(), E(i, j).real(), this->thresh);
+        ASSERT_NEAR((O(i, j) - C5).imag(), E(i,j ).imag(), this->thresh);
+      }
+      else {
+        ASSERT_NEAR(O(i, j) - C5, E(i, j), this->thresh);
+      }
     }
   }
 
