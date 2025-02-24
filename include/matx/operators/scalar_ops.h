@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <type_traits>
 #include <cuda/std/cmath>
 
@@ -333,13 +334,33 @@ template <typename T> struct Abs2F {
 };
 template <typename T> using Abs2Op = UnOp<T, Abs2F<T>>;
 
+
+template <typename T> __MATX_INLINE__ __MATX_HOST__ custom_normcdf(T v1)
+{
+  if (std::isinf(x)) 
+  {
+      return (x > 0 ? 1.0 : 0.0);
+  }  
+
+  return static_cast<T>(0.5) * (static_cast<T>(1.0) + std::erf(v1 / static_cast<T>(2.0))); 
+}
+
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
   if constexpr (std::is_same_v<float, T>) {
-    return normcdff(v1);
+    #ifdef __CUDACC__
+        return normcdff(v1);
+    #else
+        return  0.5f * (1.0f + std::erf(v1 / std::sqrt(2.0f)));
+    #endif       
   }
   else {
-    return normcdf(v1);
+    #ifdef __CUDACC__
+        return normcdf(v1);
+    #else
+        return  0.5 * (1.0 + std::erf(v1 / std::sqrt(2.0)));
+    #endif     
+    
   }
 }
 template <typename T> struct NormCdfF {
