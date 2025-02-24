@@ -335,15 +335,14 @@ template <typename T> struct Abs2F {
 template <typename T> using Abs2Op = UnOp<T, Abs2F<T>>;
 
 
-template <typename T> __MATX_INLINE__ __MATX_HOST__ custom_normcdf(T v1)
-{
-  if (std::isinf(x)) 
-  {
-      return (x > 0 ? 1.0 : 0.0);
-  }  
-
-  return static_cast<T>(0.5) * (static_cast<T>(1.0) + std::erf(v1 / static_cast<T>(2.0))); 
-}
+// template <typename T> __MATX_INLINE__ __MATX_HOST__ custom_normcdf(T v1)
+// {
+//   if (std::isinf(v1)) 
+//   {
+//       return (v1 > 0 ? 1.0 : 0.0);
+//   }  
+//   return static_cast<T>(0.5) * (static_cast<T>(1.0) + std::erf(v1 / static_cast<T>(2.0))); 
+// }
 
 template <typename T> static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto _internal_normcdf(T v1)
 {
