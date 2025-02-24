@@ -53,6 +53,7 @@ namespace matx
        * @brief Construct a new cudaExecutor with a stream
        * 
        * @param stream CUDA stream
+       * @param profiling Whether to enable profiling
        */
       cudaExecutor(cudaStream_t stream, bool profiling = true) : stream_(stream), profiling_(profiling) {
         if (profiling_) {
@@ -105,6 +106,7 @@ namespace matx
        * This will block until the event is synchronized
        */
       float get_time_ms() {
+        MATX_ASSERT_STR(profiling_, matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
         float time;
         cudaEventSynchronize(stop_);
         cudaEventElapsedTime(&time, start_, stop_);
