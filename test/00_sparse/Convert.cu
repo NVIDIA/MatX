@@ -150,6 +150,17 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSR) {
     }
   }
 
+  // Allow transforming output.
+  (transpose(O) = sparse2dense(S)).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      ASSERT_EQ(O(j, i), D(i, j));
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
 
