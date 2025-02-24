@@ -54,23 +54,29 @@ namespace matx
        * 
        * @param stream CUDA stream
        */
-      cudaExecutor(cudaStream_t stream) : stream_(stream) {
-        MATX_CUDA_CHECK(cudaEventCreate(&start_));
-        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      cudaExecutor(cudaStream_t stream, bool profiling = true) : stream_(stream), profiling_(profiling) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
       }
 
-      cudaExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {
-        MATX_CUDA_CHECK(cudaEventCreate(&start_));
-        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      cudaExecutor(int stream, bool profiling = true) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
       }
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
        * 
        */
-      cudaExecutor() : stream_(0) {
-        MATX_CUDA_CHECK(cudaEventCreate(&start_));
-        MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+      cudaExecutor() : stream_(0), profiling_(true) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
       }
 
       /**
@@ -169,6 +175,7 @@ namespace matx
         }
 
     private:
+      bool profiling_;
       cudaStream_t stream_;
       cudaEvent_t start_;
       cudaEvent_t stop_;
