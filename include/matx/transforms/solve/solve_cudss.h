@@ -226,7 +226,8 @@ __MATX_INLINE__ auto getSolveSupportedTensor(const Op &in,
   const auto func = [&]() {
     if constexpr (is_tensor_view_v<Op>)
       return in.Stride(Op::Rank() - 1) == 1;
-    return true;
+    else
+      return true;
   };
   return GetSupportedTensor(in, func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
