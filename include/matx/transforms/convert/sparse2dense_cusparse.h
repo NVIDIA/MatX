@@ -212,7 +212,8 @@ __MATX_INLINE__ auto getS2DSupportedTensor(const Op &in, cudaStream_t stream) {
   const auto func = [&]() {
     if constexpr (is_tensor_view_v<Op>)
       return in.Stride(Op::Rank() - 1) == 1;
-    return true;
+    else
+      return true;
   };
   return GetSupportedTensor(in, func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
