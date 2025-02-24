@@ -270,6 +270,7 @@ void dense2sparse_impl(OutputTensorType &o, const InputTensorType &A,
   if (!is_matx_transform_op<InputTensorType>() && !a.isSameView(A)) {
     (a = A).run(stream);
   }
+
   using atype = decltype(a);
   using otype = OutputTensorType;
 
