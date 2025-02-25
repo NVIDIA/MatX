@@ -91,16 +91,12 @@ namespace matx
         }
       }
 
-  
-
-
       template <int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::array<index_t,RANK> &indices) const {
 
         if constexpr ( I == N ) {
           // This should never happen
           return value_type{};
-          // returning this to satisfy lvalue requirements
         } else {
           const auto &op = cuda::std::get<I>(ops_);
           auto idx = indices[axis_];
@@ -108,7 +104,7 @@ namespace matx
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return get_value(cuda::std::forward<decltype(op)>(op), indices);
+            return cuda::std::apply(op, indices);
           } else {
             // otherwise remove this operator and recurse
             indices[axis_] -= size;
@@ -116,7 +112,8 @@ namespace matx
           }
         }
       }
-      
+
+
       template <int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
 
@@ -124,7 +121,7 @@ namespace matx
           // This should never happen
           // returning this to satisfy lvalue requirements
           auto &op = cuda::std::get<I-1>(ops_);
-          return get_value(cuda::std::forward<decltype(op)>(op), indices);
+          return cuda::std::apply(op, indices);
         } else {
           auto &op = cuda::std::get<I>(ops_);
           auto idx = indices[axis_];
@@ -132,7 +129,7 @@ namespace matx
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return get_value(cuda::std::forward<decltype(op)>(op), indices);
+            return cuda::std::apply(op, indices);
           } else {
             // otherwise remove this operator and recurse
             indices[axis_] -= size;
