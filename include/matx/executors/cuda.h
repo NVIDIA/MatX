@@ -177,8 +177,8 @@ namespace matx
         }
 
     private:
-      bool profiling_;
       cudaStream_t stream_;
+      bool profiling_;
       cudaEvent_t start_;
       cudaEvent_t stop_;
   };
