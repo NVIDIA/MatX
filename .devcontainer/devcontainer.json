@@ -1,0 +1,58 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
+{
+  "name": "MatX Development Container",
+  "build": {
+    // Sets the run context to one level up instead of the .devcontainer folder.
+    "context": "..",
+    // Update the 'dockerFile' property to correct location of production Dockerfile
+    "dockerfile": "./dev.Dockerfile",
+    "args": {
+      "REMOTE_USER": "${localEnv:USER}",
+      "REMOTE_UID": "${localEnv:REMOTE_UID:1000}",
+      "REMOTE_GID": "${localEnv:REMOTE_GID:1000}"
+    }
+  },
+  "privileged": true,
+  "capAdd": [
+    "SYS_NICE",
+    "SYS_PTRACE"
+  ],
+  "hostRequirements": {
+    "gpu": "optional"
+  },
+  "securityOpt": [
+    "seccomp=unconfined"
+  ],
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  // "features": {},
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [
+    3000,
+    8888,
+    6006
+  ],
+  // Uncomment the next line to run commands after the container is created.
+  // "postCreateCommand": "cat /etc/os-release",
+  "runArgs": [
+    "--ipc=host",
+    "--gpus=all",
+    "--entrypoint",
+    "fixuid"
+  ],
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      // "extensions": [
+      //   "ms-python.python",
+      //   "ms-python.vscode-pylance",
+      //   "ms-toolsai.jupyter",
+      //   "ms-toolsai.vscode-jupyter-slideshow",
+      //   "ms-toolsai.jupyter-renderers",
+      //   "esbenp.prettier-vscode"
+      // ]
+    }
+  }
+  // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "${localEnv:USER}"
+}
