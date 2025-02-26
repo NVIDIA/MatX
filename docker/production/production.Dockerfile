@@ -95,7 +95,7 @@ RUN wget https://doxygen.nl/files/doxygen-1.9.6.src.tar.gz && \
 RUN python3 --version
 
 RUN wget https://www.fftw.org/fftw-3.3.10.tar.gz && tar -xzf fftw-3.3.10.tar.gz && \
-    cd fftw-3.3.10 && ./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp --enable-float && make && make install && \
+    cd fftw-3.3.10 && ./configure --enable-sse2 --enable-avx2 --enable-shared --enable-avx512 --enable-openmp --enable-float && make && make install && \
     ./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp && make && sudo make install
 
 RUN curl -L https://coveralls.io/coveralls-linux.tar.gz | tar -xz -C /usr/local/bin

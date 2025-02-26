@@ -19,7 +19,7 @@ RUN groupadd --gid $REMOTE_GID $REMOTE_USER \
 USER $REMOTE_USER
 
 # Copy all files in the current folder to the container
-COPY --chown=$REMOTE_USER:$REMOTE_USER . /workspaces/radar-simulation
+COPY --chown=$REMOTE_USER:$REMOTE_USER . /workspaces/MatX
 
 # Set the working directory
-WORKDIR /workspaces/radar-simulation
+WORKDIR /workspaces/MatX

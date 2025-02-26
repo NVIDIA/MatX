@@ -68,7 +68,7 @@ Stage0 += shell(commands=["wget https://doxygen.nl/files/doxygen-{}.src.tar.gz".
 Stage0 += shell(commands=["python3 --version"])
 
 Stage0 += shell(commands=[f"wget https://www.fftw.org/fftw-{FFTW_VER}.tar.gz && tar -xzf fftw-{FFTW_VER}.tar.gz",
-                          f"cd fftw-{FFTW_VER} && ./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp --enable-float && make && make install",
+                          f"cd fftw-{FFTW_VER} && ./configure --enable-sse2 --enable-avx2 --enable-shared --enable-avx512 --enable-openmp --enable-float && make && make install",
                           "./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp && make && sudo make install"])
 
 # Stage0 += shell(commands=[f"cd /tmp && wget https://github.com/OpenMathLib/OpenBLAS/releases/download/v{OPENBLAS_VER}/OpenBLAS-{OPENBLAS_VER}.tar.gz && tar -zxvf OpenBLAS-{OPENBLAS_VER}.tar.gz && cd OpenBLAS-{OPENBLAS_VER}",
