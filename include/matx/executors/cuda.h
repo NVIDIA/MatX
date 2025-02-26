@@ -174,4 +174,5 @@ namespace matx
       cudaEvent_t stop_;
   };
 
+  using CUDAExecutor = cudaExecutor; // Alias to make it consistent with host mode
 };
