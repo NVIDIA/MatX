@@ -54,5 +54,8 @@ hpccm  --recipe matx-production.py --cpu-target $CPU_TARGET --format docker > pr
 # build the container
 DOCKER_BUILDKIT=1 docker  build -f production.Dockerfile --platform $MATX_PLATFORM -t $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH .
 
+
+docker tag $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH ghcr.io/nvidia/matx/production:latest
+
 # push the container to the repository
 # docker push $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH

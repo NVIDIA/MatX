@@ -43,14 +43,13 @@
   // Configure tool-specific properties.
   "customizations": {
     "vscode": {
-      // "extensions": [
-      //   "ms-python.python",
-      //   "ms-python.vscode-pylance",
-      //   "ms-toolsai.jupyter",
-      //   "ms-toolsai.vscode-jupyter-slideshow",
-      //   "ms-toolsai.jupyter-renderers",
-      //   "esbenp.prettier-vscode"
-      // ]
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "eamodio.gitlens",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
     }
   }
   // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.

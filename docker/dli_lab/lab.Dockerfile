@@ -1,4 +1,4 @@
-FROM ghcr.io/nvidia/matx/production:v0.9.0_ubuntu22.04-amd64 as devel
+FROM ghcr.io/nvidia/matx/production:latest AS devel
 
 
 

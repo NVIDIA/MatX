@@ -1,5 +1,5 @@
 # Use the base image
-FROM ghcr.io/nvidia/matx/production:v0.9.0_ubuntu22.04-amd64
+FROM ghcr.io/nvidia/matx/production:latest
 
 ARG REMOTE_USER
 ARG REMOTE_UID

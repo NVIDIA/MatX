@@ -1,0 +1,1 @@
+docker build -f lab.Dockerfile -t ghcr.io/nvidia/matx/lab:latest .
