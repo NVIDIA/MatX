@@ -1,5 +1,6 @@
 set(examples
     simple_radar_pipeline
+    kernel_fusion
     recursive_filter
     channelize_poly_bench
     convolution
