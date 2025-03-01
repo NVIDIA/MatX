@@ -13,6 +13,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+from pathlib import Path
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 import datetime
@@ -55,7 +56,7 @@ autodoc_default_options = {
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-breathe_projects = { "MatX": "@DOXYXML_DIR@" }
+breathe_projects = { "MatX": Path("@DOXYXML_DIR@") }
 breathe_default_project = "MatX"
 
 # The suffix(es) of source filenames.
