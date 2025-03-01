@@ -1482,7 +1482,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be < Rank of input");
 
   using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
   inner_type scale = 1;
@@ -1530,7 +1530,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] 
 {
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
+  static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be < Rank of input");
   using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
