@@ -40,16 +40,16 @@
 namespace matx
 {
   namespace detail {
-    template <typename OpX, typename OpW>
-    class PWelchOp : public BaseOp<PWelchOp<OpX,OpW>>
+    template <typename OpX, typename OpW, typename fsType>
+    class PWelchOp : public BaseOp<PWelchOp<OpX,OpW,fsType>>
     {
       public:
+        static_assert(is_complex_v<typename OpX::value_type>, "pwelch() must have a complex input type");
         using matxop = bool;
         using value_type = typename OpX::value_type::value_type;
         using matx_transform_op = bool;
         using pwelch_xform_op = bool;
 
-        static_assert(is_complex_v<typename OpX::value_type>, "pwelch() must have a complex input type");
 
         __MATX_INLINE__ std::string str() const {
           return "pwelch(" + get_type_str(x_) + "," + get_type_str(w_) + ")";
@@ -62,7 +62,7 @@ namespace matx
               index_t noverlap,
               index_t nfft,
               PwelchOutputScaleMode output_scale_mode,
-              value_type fs
+              fsType fs
           ) :
               x_(x),
               w_(w),
@@ -146,7 +146,7 @@ namespace matx
         index_t noverlap_;
         index_t nfft_;
         PwelchOutputScaleMode output_scale_mode_;
-        value_type fs_;
+        fsType fs_;
         cuda::std::array<index_t, 1> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;
@@ -160,6 +160,8 @@ namespace matx
    *   Input time domain data type
    * @tparam wType
    *   Input window type
+   * @tparam fsType
+   *   Sampling frequency type
    * @param x
    *   Input time domain tensor
    * @param w
@@ -179,7 +181,10 @@ namespace matx
    *
    */
 
-  template <typename xType, typename wType>
+  template <
+      typename xType,
+      typename wType,
+      typename fsType>
     __MATX_INLINE__ auto pwelch(
         const xType& x,
         const wType& w,
@@ -187,12 +192,38 @@ namespace matx
         index_t noverlap,
         index_t nfft,
         PwelchOutputScaleMode output_scale_mode = PwelchOutputScaleMode_Spectrum,
-        typename xType::value_type::value_type fs = 1
+        fsType fs = 1
     )
   {
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
     return detail::PWelchOp(x, w, nperseg, noverlap, nfft, output_scale_mode, fs);
+  }
+
+  template <
+      typename xType,
+      typename fsType>
+    __MATX_INLINE__ auto pwelch(
+        const xType& x,
+        index_t nperseg,
+        index_t noverlap,
+        index_t nfft,
+        PwelchOutputScaleMode output_scale_mode = PwelchOutputScaleMode_Spectrum,
+        fsType fs = 1
+    )
+  {
+    return detail::PWelchOp(x, std::nullopt, nperseg, noverlap, nfft, output_scale_mode, fs);
+  }
+
+  template <typename xType, typename wType>
+    __MATX_INLINE__ auto pwelch(
+        const xType& x,
+        const wType& w,
+        index_t nperseg,
+        index_t noverlap,
+        index_t nfft,
+        PwelchOutputScaleMode output_scale_mode = PwelchOutputScaleMode_Spectrum
+    )
+  {
+    return detail::PWelchOp(x, w, nperseg, noverlap, nfft, output_scale_mode, 1.f);
   }
 
   template <typename xType>
@@ -201,10 +232,9 @@ namespace matx
         index_t nperseg,
         index_t noverlap,
         index_t nfft,
-        PwelchOutputScaleMode output_scale_mode = PwelchOutputScaleMode_Spectrum,
-        typename xType::value_type::value_type fs = 1
+        PwelchOutputScaleMode output_scale_mode = PwelchOutputScaleMode_Spectrum
     )
   {
-    return detail::PWelchOp(x, std::nullopt, nperseg, noverlap, nfft, output_scale_mode, fs);
+    return detail::PWelchOp(x, std::nullopt, nperseg, noverlap, nfft, output_scale_mode, 1.f);
   }
 }

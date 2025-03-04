@@ -69,7 +69,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (x = tmp_x).run(exec); // pre-compute x, tmp_x is otherwise lazily evaluated
 
   // Create window
-  auto w = make_tensor<complex>({nperseg});
+  auto w = make_tensor<float>({nperseg});
   (w = flattop<0>({nperseg})).run(exec);
 
   // Create output tensor

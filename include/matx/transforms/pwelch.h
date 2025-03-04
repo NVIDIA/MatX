@@ -32,74 +32,16 @@
 
 #pragma once
 
+#include "matx/kernels/pwelch.cuh"
+
 namespace matx
 {
-
-  enum PwelchOutputScaleMode {
-    PwelchOutputScaleMode_Spectrum,
-    PwelchOutputScaleMode_Density,
-    PwelchOutputScaleMode_Spectrum_dB,
-    PwelchOutputScaleMode_Density_dB
-  };
-
-  namespace detail {
-    template<PwelchOutputScaleMode OUTPUT_SCALE_MODE, typename T_IN, typename T_OUT>
-    __global__ void pwelch_kernel(const T_IN t_in, T_OUT t_out, typename T_OUT::value_type fs)
-    {
-      const index_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-      const index_t batches = t_in.Shape()[0];
-      const index_t nfft = t_in.Shape()[1];
-
-      if (tid < nfft)
-      {
-        typename T_OUT::value_type pxx = 0;
-        constexpr typename T_OUT::value_type ten = 10;
-
-        for (index_t batch = 0; batch < batches; batch++)
-        {
-          pxx += cuda::std::norm(t_in(batch, tid));
-        }
-
-        if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum)
-        {
-          t_out(tid) = pxx / batches;
-        }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density)
-        {
-          t_out(tid) = pxx / (batches * fs);
-        }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum_dB)
-        {
-          pxx /= batches;
-          if (pxx != 0)
-          {
-            t_out(tid) = ten * cuda::std::log10(pxx);
-          }
-          else
-          {
-            t_out(tid) = cuda::std::numeric_limits<typename T_OUT::value_type>::lowest();
-          }
-        }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density_dB)
-        {
-          pxx /= (batches * fs);
-          if (pxx != 0)
-          {
-            t_out(tid) = ten * cuda::std::log10(pxx);
-          }
-          else
-          {
-            t_out(tid) = cuda::std::numeric_limits<typename T_OUT::value_type>::lowest();
-          }
-        }
-      }
-    }
-  };
-
-  extern int g_pwelch_alg_mode;
-  template <typename PxxType, typename xType, typename wType>
-    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, PwelchOutputScaleMode output_scale_mode, typename PxxType::value_type fs, cudaStream_t stream=0)
-    {
+  template <typename PxxType, typename xType, typename wType, typename fsType>
+    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, PwelchOutputScaleMode output_scale_mode, fsType fs, cudaStream_t stream=0)
+  {
+    #ifndef __CUDACC__
+      MATX_THROW(matxNotSupported, "pwelch not supported on host");
+    #else
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
       MATX_ASSERT_STR(Pxx.Rank() == x.Rank(), matxInvalidDim, "pwelch:  Pxx rank must be the same as x rank");
@@ -141,6 +83,6 @@ namespace matx
       {
         detail::pwelch_kernel<PwelchOutputScaleMode_Density_dB><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
       }
-    }
-
+    #endif
+  }
 } // end namespace matx
