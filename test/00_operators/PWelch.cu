@@ -47,18 +47,23 @@ struct TestParams {
     index_t nperseg;
     index_t noverlap;
     index_t nfft;
+    PwelchOutputScaleMode output_scale_mode;
+    float fs;
     float ftone;
     float sigma;
 };
 
 const std::vector<TestParams> CONFIGS = {
-  {"none", 8, 8, 2, 8, 0., 0.},
-  {"none", 16, 8, 4, 8, 1., 0.},
-  {"none", 16, 8, 4, 8, 2., 1.},
-  {"none", 16384, 256, 64, 256, 63., 0.},
-  {"boxcar", 8, 8, 2, 8, 0., 0.},
-  {"hann", 16, 8, 4, 8, 1., 0.},
-  {"flattop", 1024, 64, 32, 128, 2., 1.},
+  {"none", 8, 8, 2, 8, PwelchOutputScaleMode_Spectrum, 1.0, 0., 0.},
+  {"none", 16, 8, 4, 8, PwelchOutputScaleMode_Spectrum, 1.0, 1., 0.},
+  {"none", 16, 8, 4, 8, PwelchOutputScaleMode_Spectrum, 1.0, 2., 1.},
+  {"none", 16384, 256, 64, 256, PwelchOutputScaleMode_Spectrum, 1.0, 63., 0.},
+  {"boxcar", 8, 8, 2, 8, PwelchOutputScaleMode_Spectrum, 1.0, 0., 0.},
+  {"hann", 16, 8, 4, 8, PwelchOutputScaleMode_Spectrum, 1.0, 1., 0.},
+  {"flattop", 1024, 64, 32, 128, PwelchOutputScaleMode_Spectrum, 2.0, 2., 1.},
+  {"flattop", 1024, 64, 32, 128, PwelchOutputScaleMode_Density, 2.0, 2., 1.},
+  {"flattop", 1024, 64, 32, 128, PwelchOutputScaleMode_Spectrum_dB, 2.0, 2., 1.},
+  {"flattop", 1024, 64, 32, 128, PwelchOutputScaleMode_Density_dB, 2.0, 2., 1.},
 };
 
 class PWelchComplexExponentialTest : public ::testing::TestWithParam<TestParams>
@@ -87,10 +92,25 @@ void helper(PWelchComplexExponentialTest& test)
     "nperseg"_a=test.params.nperseg,
     "noverlap"_a=test.params.noverlap,
     "nfft"_a=test.params.nfft,
+    "scaling"_a="spectrum",
+    "fs"_a =test.params.fs,
     "ftone"_a=test.params.ftone,
     "sigma"_a=test.params.sigma,
     "window_name"_a=test.params.window_name
   );
+
+  if (test.params.output_scale_mode == PwelchOutputScaleMode_Density)
+  {
+    cfg["scaling"] = "density";
+  }
+  else if (test.params.output_scale_mode == PwelchOutputScaleMode_Density_dB)
+  {
+    cfg["scaling"] = "density_dB";
+  }
+  else if (test.params.output_scale_mode == PwelchOutputScaleMode_Spectrum_dB)
+  {
+    cfg["scaling"] = "spectrum_dB";
+  }
 
   test.pb->template InitAndRunTVGeneratorWithCfg<TypeParam>(
       "00_operators", "pwelch_operators", "pwelch_complex_exponential", cfg);
@@ -104,7 +124,7 @@ void helper(PWelchComplexExponentialTest& test)
 
   if (test.params.window_name == "none")
   {
-    (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft)).run(exec);
+    (Pxx = pwelch(x, test.params.nperseg, test.params.noverlap, test.params.nfft, test.params.output_scale_mode, test.params.fs)).run(exec);
   }
   else
   {
@@ -125,7 +145,7 @@ void helper(PWelchComplexExponentialTest& test)
     {
       ASSERT_TRUE(false) << "Unknown window parameter name " + test.params.window_name;
     }
-    (Pxx = pwelch(x, w, test.params.nperseg, test.params.noverlap, test.params.nfft)).run(exec);
+    (Pxx = pwelch(x, w, test.params.nperseg, test.params.noverlap, test.params.nfft, test.params.output_scale_mode, test.params.fs)).run(exec);
   }
 
   exec.sync();

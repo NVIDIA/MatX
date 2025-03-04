@@ -5,8 +5,8 @@ pwelch
 
 Estimate the power spectral density of a signal using Welch's method [1]_
 
-.. doxygenfunction:: pwelch(const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft)
-.. doxygenfunction:: pwelch(const xType& x, index_t nperseg, index_t noverlap, index_t nfft)
+.. doxygenfunction:: pwelch(const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, PwelchOutputScaleMode output_scale_mode, typename xType::value_type::value_type fs)
+.. doxygenfunction:: pwelch(const xType& x, index_t nperseg, index_t noverlap, index_t nfft, PwelchOutputScaleMode output_scale_mode, typename xType::value_type::value_type fs)
 
 Examples
 ~~~~~~~~
