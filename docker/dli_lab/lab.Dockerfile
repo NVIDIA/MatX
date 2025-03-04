@@ -48,11 +48,13 @@ RUN mkdir /root/.ipython/extensions
 RUN echo "c.InteractiveShellApp.extensions = ['run_matx']" >> /root/.ipython/profile_default/ipython_config.py
 COPY ./run_matx.py /root/.ipython/extensions/
 
+ENV PYTHONPATH="${PYTHONPATH}:/root/.ipython/extensions"
+
 # Expose Jupyter port
 EXPOSE 8888
 
 # Set working directory for Jupyter
-WORKDIR /notebooks
+WORKDIR /MatX/docs_input/notebooks/gtc_lab
 
 # Start Jupyter Lab
 CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
