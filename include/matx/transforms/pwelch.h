@@ -55,32 +55,26 @@ namespace matx
       index_t batches = x_with_overlaps.Shape()[0];
       auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::value_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
 
-      if constexpr (std::is_same_v<wType, std::nullopt_t>)
-      {
+      if constexpr (std::is_same_v<wType, std::nullopt_t>) {
         (X_with_overlaps = fft(x_with_overlaps,nfft)).run(stream);
       }
-      else
-      {
+      else {
         (X_with_overlaps = fft(x_with_overlaps * w,nfft)).run(stream);
       }
 
       int tpb = 512;
       int bpk = (static_cast<int>(nfft) + tpb - 1) / tpb;
 
-      if (output_scale_mode == PwelchOutputScaleMode_Spectrum)
-      {
+      if (output_scale_mode == PwelchOutputScaleMode_Spectrum) {
         detail::pwelch_kernel<PwelchOutputScaleMode_Spectrum><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
       }
-      else if (output_scale_mode == PwelchOutputScaleMode_Density)
-      {
+      else if (output_scale_mode == PwelchOutputScaleMode_Density) {
         detail::pwelch_kernel<PwelchOutputScaleMode_Density><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
       }
-      else if (output_scale_mode == PwelchOutputScaleMode_Spectrum_dB)
-      {
+      else if (output_scale_mode == PwelchOutputScaleMode_Spectrum_dB) {
         detail::pwelch_kernel<PwelchOutputScaleMode_Spectrum_dB><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
       }
-      else //if (output_scale_mode == PwelchOutputScaleMode_Density_dB)
-      {
+      else { //if (output_scale_mode == PwelchOutputScaleMode_Density_dB)
         detail::pwelch_kernel<PwelchOutputScaleMode_Density_dB><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
       }
     #endif

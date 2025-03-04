@@ -61,35 +61,27 @@ namespace matx {
           pxx += cuda::std::norm(t_in(batch, tid));
         }
 
-        if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum)
-        {
+        if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum) {
           t_out(tid) = pxx / batches;
         }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density)
-        {
+        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density) {
           t_out(tid) = pxx / (batches * fs);
         }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum_dB)
-        {
+        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Spectrum_dB) {
           pxx /= batches;
-          if (pxx != 0)
-          {
+          if (pxx != 0) {
             t_out(tid) = ten * cuda::std::log10(pxx);
           }
-          else
-          {
+          else {
             t_out(tid) = cuda::std::numeric_limits<typename T_OUT::value_type>::lowest();
           }
         }
-        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density_dB)
-        {
+        else if constexpr (OUTPUT_SCALE_MODE == PwelchOutputScaleMode_Density_dB) {
           pxx /= (batches * fs);
-          if (pxx != 0)
-          {
+          if (pxx != 0) {
             t_out(tid) = ten * cuda::std::log10(pxx);
           }
-          else
-          {
+          else {
             t_out(tid) = cuda::std::numeric_limits<typename T_OUT::value_type>::lowest();
           }
         }
