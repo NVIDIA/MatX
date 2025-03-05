@@ -1,8 +1,6 @@
 #FROM ghcr.io/nvidia/matx/production:latest AS devel
 FROM gitlab-master.nvidia.com:5005/devtech-compute/sigx-group/container/build:12.8_x86_64_ubuntu22.04-amd64 AS devel
 
-
-
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -34,6 +32,8 @@ RUN pip3 install --no-cache-dir \
   jupyterlab \
   cmake \
   nlohmann-json==3.11.2 \
+  numpy \
+  scipy \
   xtl \
   pugixml
 
@@ -49,6 +49,9 @@ RUN echo "c.InteractiveShellApp.extensions = ['run_matx']" >> /root/.ipython/pro
 COPY ./run_matx.py /root/.ipython/extensions/
 
 ENV PYTHONPATH="${PYTHONPATH}:/root/.ipython/extensions"
+
+RUN git clone https://github.com/NVIDIA/MatX.git /MatX
+RUN cd /MatX && git checkout tylera/gtc_2025_tutorials && mkdir build && cd build && cmake .. -DMATX_EN_X86_FFTW=ON -DMATX_EN_FILEIO=ON -DMATX_EN_OPENBLAS=ON
 
 # Expose Jupyter port
 EXPOSE 8888
