@@ -23,7 +23,7 @@ Quick Start
 
 Despite the forward looking design of using the UST type, the current
 experimental support provides a few factory methods with common formats
-like COO, CSR, and CSR. The factory methods look similar to e.g. sparse
+like COO, CSR, and CSC. The factory methods look similar to e.g. sparse
 construction methods found in SciPy or torch sparse.
 
 For example, to create a COO representation of the following
