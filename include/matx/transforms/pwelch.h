@@ -32,11 +32,16 @@
 
 #pragma once
 
+#include "matx/kernels/pwelch.cuh"
+
 namespace matx
 {
-  template <typename PxxType, typename xType, typename wType>
-    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, cudaStream_t stream=0)
-    {
+  template <typename PxxType, typename xType, typename wType, typename fsType>
+    __MATX_INLINE__ void pwelch_impl(PxxType Pxx, const xType& x, const wType& w, index_t nperseg, index_t noverlap, index_t nfft, PwelchOutputScaleMode output_scale_mode, fsType fs, cudaStream_t stream=0)
+  {
+    #ifndef __CUDACC__
+      MATX_THROW(matxNotSupported, "pwelch not supported on host");
+    #else
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
       MATX_ASSERT_STR(Pxx.Rank() == x.Rank(), matxInvalidDim, "pwelch:  Pxx rank must be the same as x rank");
@@ -50,22 +55,28 @@ namespace matx
       index_t batches = x_with_overlaps.Shape()[0];
       auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::value_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
 
-      if constexpr (std::is_same_v<wType, std::nullopt_t>)
-      {
+      if constexpr (std::is_same_v<wType, std::nullopt_t>) {
         (X_with_overlaps = fft(x_with_overlaps,nfft)).run(stream);
       }
-      else
-      {
+      else {
         (X_with_overlaps = fft(x_with_overlaps * w,nfft)).run(stream);
       }
 
-      // Compute magnitude squared in-place
-      (X_with_overlaps = conj(X_with_overlaps) * X_with_overlaps).run(stream);
-      auto mag_sq_X_with_overlaps = X_with_overlaps.RealView();
+      int tpb = 512;
+      int bpk = (static_cast<int>(nfft) + tpb - 1) / tpb;
 
-      // Perform the reduction across 'batches' rows and normalize
-      auto norm_factor = static_cast<typename PxxType::value_type>(1.) / static_cast<typename PxxType::value_type>(batches);
-      (Pxx = sum(mag_sq_X_with_overlaps, {0}) * norm_factor).run(stream);
-    }
-
+      if (output_scale_mode == PwelchOutputScaleMode_Spectrum) {
+        detail::pwelch_kernel<PwelchOutputScaleMode_Spectrum><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
+      }
+      else if (output_scale_mode == PwelchOutputScaleMode_Density) {
+        detail::pwelch_kernel<PwelchOutputScaleMode_Density><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
+      }
+      else if (output_scale_mode == PwelchOutputScaleMode_Spectrum_dB) {
+        detail::pwelch_kernel<PwelchOutputScaleMode_Spectrum_dB><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
+      }
+      else { //if (output_scale_mode == PwelchOutputScaleMode_Density_dB)
+        detail::pwelch_kernel<PwelchOutputScaleMode_Density_dB><<<bpk, tpb, 0, stream>>>(X_with_overlaps, Pxx, fs);
+      }
+    #endif
+  }
 } // end namespace matx
