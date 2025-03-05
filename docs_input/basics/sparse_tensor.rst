@@ -6,8 +6,8 @@ The implementation is based on the **Universal Sparse Tensor (UST)** type
 that uses a tensor format DSL (Domain Specific Language) to describe a vast
 space of storage formats. Although the UST type can easily define many common
 storage formats (such as dense vectors and matrices, sparse vectors, sparse
-matrices in COO, CSR, CSC, or BSR format, with generalizations for sparse
-tensors), it can also define many less common storage formats.
+matrices in COO, CSR, CSC, DCSR, DCSC, or BSR format, with generalizations
+for sparse tensors), it can also define many less common storage formats.
 From MatX's perspective, the advantage of using the UST type (rather than
 various specific sparse storage formats) is that the framework code only has
 to deal with a single new sparse type (and only dispatch to specific formats
