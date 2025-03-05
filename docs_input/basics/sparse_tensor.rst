@@ -16,15 +16,15 @@ format DSL can be easily extended to include even more sparse storage formats
 in the future. From the user's perspective, the UST type provides more
 flexibility in changing storage formats by merely changing annotations in the
 type definitions, which allows for rapid experimentation with different ways
-of storing sparse tensors.
+of storing sparse tensors in a MatX computation.
 
 Quick Start
 -----------
 
 Despite the forward looking design of using the UST type, the current
-experimental support provides a few factory methods with common formats
-like COO, CSR, and CSC. The factory methods look similar to e.g. sparse
-construction methods found in SciPy or torch sparse.
+experimental support provides a few factory methods with the common
+formats COO, CSR, and CSC. The factory methods look similar to e.g.
+sparse construction methods found in SciPy sparse or torch sparse.
 
 For example, to create a COO representation of the following
 4x8 matrix with 5 nonzero elements::
@@ -35,8 +35,8 @@ For example, to create a COO representation of the following
        | 0, 0, 3, 4, 0, 5, 0, 0 |
 
 First, using a uniform memory space, set up the constituent 1-dim buffers
-that contain the value, i-index, and j-index of each nonzero element,
-respectively, as follows::
+that contain, respectively, the value, i-index, and j-index of each nonzero
+element, ordered lexicographically by row-then-column index, as follows::
   
   auto vals = make_tensor<float>({5});
   auto idxi = make_tensor<int>({5});
@@ -57,6 +57,7 @@ The result of the print statement is shown below::
   tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
   nse    = 5
   format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
+  pos[0] = ( 0  5 )
   crd[0] = ( 0  0  3  3  3 )
   crd[1] = ( 0  1  2  3  5 )
   values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
@@ -84,74 +85,78 @@ correct way of performing the conversion above is as follows::
   (A = sparse2dense(Acoo)).run(exec);
 
 The current experimental sparse support in MatX provides efficient
-operations for sparse-to-dense, dense-to-sparse, matmul, and
-solve::
+operations for sparse-to-dense, dense-to-sparse, matmul, and solve::
 
    (A = sparse2dense(Acoo)).run(exec);
    (Acoo = dense2sparse(D)).run(exec);
    (C = matmul(Acoo, B)).run(exec);
    (X = solve(Acsr, Y)).run(exec);     // CSR only
 
-We expect the assortment of sparse operations to grow if
-the experimental implementation is well-received.
+We expect the assortment of supported sparse operations and storage
+formats to grow if the experimental implementation is well-received.
 
 Matx Sparse Tensor Factory Methods
 ----------------------------------
 
-The MatX implementation of the factory methods for common
-cases of the UST type can be found in the `make_sparse_tensor.h`_ file.
+The MatX implementation of the factory methods for common cases of
+the UST type can be found in the `make_sparse_tensor.h`_ file.
 All methods build a sparse tensor storage format from constituent
 1-dim buffers similar to methods found in SciPy or torch sparse.
 A sample usage was already shown above. Currently only methods
-to construct COO, CSR, and CSC are provided (but expect this
-assortment to grow soon)::
+to construct COO, CSR, and CSC are provided::
 
   // Constructs a sparse matrix in COO format directly from the values and
   // the two coordinates vectors. The entries should be sorted by row, then
   // column. Duplicate entries should not occur. Explicit zeros may be stored.
   template <typename ValTensor, typename CrdTensor>
-  auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col, const index_t (&shape)[2]);
+  auto make_tensor_coo(ValTensor &val,
+                       CrdTensor &row,
+                       CrdTensor &col, const index_t (&shape)[2]);
 
   // Constructs a sparse matrix in CSR format directly from the values, the
   // row positions, and column coordinates vectors. The entries should be
   // sorted by row, then column. Explicit zeros may be stored. Duplicate
   // entries should not occur. Explicit zeros may be stored.
   template <typename ValTensor, typename PosTensor, typename CrdTensor>
-  auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col, const index_t (&shape)[2]);
+  auto make_tensor_csr(ValTensor &val,
+                       PosTensor &rowp,
+                       CrdTensor &col, const index_t (&shape)[2]);
 
   // Constructs a sparse matrix in CSC format directly from the values, the
   // column positions, and row coordinates vectors. The entries should be
   // sorted by columns, then row. Explicit zeros may be stored. Duplicate
   // entries should not occur. Explicit zeros may be stored.
   template <typename ValTensor, typename PosTensor, typename CrdTensor>
-  auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row, const index_t (&shape)[2]);
+  auto make_tensor_csc(ValTensor &val,
+                       PosTensor &colp,
+                       CrdTensor &row, const index_t (&shape)[2]);
 
 Matx Implementation of the UST Type
 -----------------------------------
 
-The MatX implementation of the UST type can be found in
-the `sparse_tensor.h`_ file. Similar to a dense tensor ``tensor_t``,
-the ``sparse_tensor_t`` is a memory-backed, reference-counted operator that
-contains metadata about the size, rank, and other properties, like the
-storage format. Unlike dense tensors, that consist of primary storage for
-the entires only, a sparse tensor format consists of **primary storage**
-for the nonzero values and **secondary storage** to indicate the position
-of each nonzero value. Note that this latter storage is not called metadata
-on purpose, to not confuse it with the other properties mentioned above
-(typically not stored on device).
+The MatX implementation of the UST type can be found in the `sparse_tensor.h`_
+file. Similar to a dense tensor ``tensor_t``, the ``sparse_tensor_t`` is a
+memory-backed, reference-counted operator that contains metadata about the
+size, rank, and other properties, such as thee storage format. Unlike dense
+tensors, that consist of primary storage for the elements only, a sparse tensor
+format consists of **primary storage** for the nonzero values (named ``values``
+when printed) and **secondary storage** (named ``pos[]`` and ``crd[]``,
+respectively, for each level when printed) to indicate the position of each
+nonzero value. Note that this latter storage is not called metadata on purpose,
+to not confuse it with the other metadata properties mentioned above.
 
-The type of primiary and secondary storage can be anything that is accessible
+The type of primary and secondary storage can be anything that is accessible
 to where the tensor is being used, including device memory, managed memory,
-and host memory. MatX sparse tensors are very similar to SciPy's sparse arrays.
+and host memory. MatX sparse tensors are very similar to e.g. SciPy's or
+cuPy sparse arrays.
 
 Matx Implementation of the Tensor Format DSL
 --------------------------------------------
 
-The MatX implementation of the tensor format DSL can be found in
-the `sparse_tensor_format.h`_ file. Most users do not have
-to concern themselves with the details of this DSL, but
-can directly use predefined type definitions for common tensor
-formats, like COO and CSR.
+The MatX implementation of the tensor format DSL can be found in the
+`sparse_tensor_format.h`_ file. Most users do not have to concern
+themselves with the details of this DSL, but can directly use predefined
+type definitions for common tensor formats, like COO and CSR.
 
 In the tensor format DSL, the term **dimension** is used to refer to the axes of
 the semantic tensor (as seen by the user), and the term **level** to refer to
@@ -231,11 +236,11 @@ Historical Background of the UST Type
 
 The concept of the UST type has its roots in sparse compilers, first pioneered
 for sparse linear algebra in [`B&W95`_, `Bik96`_, `Bik98`_] and formalized to
-sparse tensor algebra in [`Kjolstad20`_, `Chou22`_]. The tensor format DSL for
-the UST type, including the generalization to higher-dimensional levels, was
-introduced in [`MLIR22`_]. Please refer to this literature for a more
-extensive presentation of topics that are only briefly discussed in
-this online documentation.
+sparse tensor algebra in [`Kjolstad20`_, `Chou22`_, `Yadav22`]. The tensor
+format DSL for the UST type, including the generalization to higher-dimensional
+levels, was introduced in [`MLIR22`_, `MLIR`_]. Please refer to this literature
+for a more extensive presentation of all topics only briefly discussed in this
+online documentation.
 
 .. _B&W95: https://dl.acm.org/doi/10.1145/169627.169765
 .. _Bik96: https://theses.liacs.nl/1315
@@ -243,6 +248,8 @@ this online documentation.
 .. _Chou22: http://tensor-compiler.org/files/chou-phd-thesis-taco-formats.pdf
 .. _Kjolstad20: http://tensor-compiler.org/files/kjolstad-phd-thesis-taco-compiler.pdf
 .. _MLIR22: https://dl.acm.org/doi/10.1145/3544559
+.. _MLIR: https://developers.google.com/mlir-sparsifier
+.. _Yadav: http://tensor-compiler.org/files/yadav-pldi22-distal.pdf
 .. _make_sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/make_sparse_tensor.h
 .. _sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor.h
 .. _sparse_tensor_format.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor_format.h
