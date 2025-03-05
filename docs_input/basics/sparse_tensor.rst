@@ -137,11 +137,11 @@ Matx Implementation of the UST Type
 The MatX implementation of the UST type can be found in the `sparse_tensor.h`_
 file. Similar to a dense tensor ``tensor_t``, the ``sparse_tensor_t`` is a
 memory-backed, reference-counted operator that contains metadata about the
-size, rank, and other properties, such as thee storage format. Unlike dense
+size, rank, and other properties, such as the storage format. Unlike dense
 tensors, that consist of primary storage for the elements only, a sparse tensor
 format consists of **primary storage** for the nonzero values (named ``values``
 when printed) and **secondary storage** (named ``pos[]`` and ``crd[]``,
-respectively, for each level when printed) to indicate the position of each
+respectively, for each level, when printed) to indicate the position of each
 nonzero value. Note that this latter storage is not called metadata on purpose,
 to not confuse it with the other metadata properties mentioned above.
 
@@ -196,9 +196,11 @@ block format has 2 dimensions and 4 levels)::
 
   CSR: map = (i, j) -> ( i : dense, j : compressed )
 
+  CSC: map = (i, j) -> ( j : dense, i : compressed )  # j and i swapped!
+
   DCSR: map = (i, j) -> ( i : compressed, j : compressed )
 
-  CSC: map = (i, j) -> ( j : dense, i : compressed )
+  DCSC: map = (i, j) -> ( j : compressed, i : compressed )
 
   BSR with 2x3 blocks: map = ( i, j ) -> ( i floordiv 2 : dense,
                                            j floordiv 3 : compressed,
@@ -236,7 +238,7 @@ Historical Background of the UST Type
 
 The concept of the UST type has its roots in sparse compilers, first pioneered
 for sparse linear algebra in [`B&W95`_, `Bik96`_, `Bik98`_] and formalized to
-sparse tensor algebra in [`Kjolstad20`_, `Chou22`_, `Yadav22`]. The tensor
+sparse tensor algebra in [`Kjolstad20`_, `Chou22`_, `Yadav22`_]. The tensor
 format DSL for the UST type, including the generalization to higher-dimensional
 levels, was introduced in [`MLIR22`_, `MLIR`_]. Please refer to this literature
 for a more extensive presentation of all topics only briefly discussed in this
