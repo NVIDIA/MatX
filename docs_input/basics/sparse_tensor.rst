@@ -14,9 +14,9 @@ to deal with a single new sparse type (and only dispatch to specific formats
 when required by a high performance library implementation). Also, the tensor
 format DSL can be easily extended to include even more sparse storage formats
 in the future. From the user's perspective, the UST type provides more
-flexibility in changing storage format by merely changing annotations in the
-type definitions, which allows for rapid experimentation with different storage
-formats.
+flexibility in changing storage formats by merely changing annotations in the
+type definitions, which allows for rapid experimentation with different ways
+of storing sparse tensors.
 
 Quick Start
 -----------
@@ -100,7 +100,7 @@ Matx Sparse Tensor Factory Methods
 
 The MatX implementation of the factory methods for common
 cases of the UST type can be found in the `make_sparse_tensor.h`_ file.
-All methods build a sparse matrix storage format from constituent
+All methods build a sparse tensor storage format from constituent
 1-dim buffers similar to methods found in SciPy or torch sparse.
 A sample usage was already shown above. Currently only methods
 to construct COO, CSR, and CSC are provided (but expect this
