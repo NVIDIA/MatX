@@ -251,7 +251,7 @@ online documentation.
 .. _Kjolstad20: http://tensor-compiler.org/files/kjolstad-phd-thesis-taco-compiler.pdf
 .. _MLIR22: https://dl.acm.org/doi/10.1145/3544559
 .. _MLIR: https://developers.google.com/mlir-sparsifier
-.. _Yadav: http://tensor-compiler.org/files/yadav-pldi22-distal.pdf
+.. _Yadav22: http://tensor-compiler.org/files/yadav-pldi22-distal.pdf
 .. _make_sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/make_sparse_tensor.h
 .. _sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor.h
 .. _sparse_tensor_format.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor_format.h
