@@ -1,3 +1,5 @@
+.. _sparse_tensor_api:
+
 Sparse Tensor Type
 ##################
 
@@ -89,8 +91,8 @@ operations for sparse-to-dense, dense-to-sparse, matmul, and solve::
 
    (A = sparse2dense(Acoo)).run(exec);
    (Acoo = dense2sparse(D)).run(exec);
-   (C = matmul(Acoo, B)).run(exec);
-   (X = solve(Acsr, Y)).run(exec);     // CSR only
+   (C = matmul(Acoo, B)).run(exec); // only Sparse-Matrix x Matrix (SpMM)
+   (X = solve(Acsr, Y)).run(exec);  // only on CSR format
 
 We expect the assortment of supported sparse operations and storage
 formats to grow if the experimental implementation is well-received.
@@ -149,6 +151,32 @@ The type of primary and secondary storage can be anything that is accessible
 to where the tensor is being used, including device memory, managed memory,
 and host memory. MatX sparse tensors are very similar to e.g. SciPy's or
 cuPy sparse arrays.
+
+The implementation of the UST follows the MatX design philosophy of using
+a header-only, ``constexpr``-heavy, templated approach, which facilitates
+applications to only compile what is used, and nothing more.
+The ``sparse_tensor_t`` type is essentially the following class,
+where the tensor format ``TF`` is part of the template::
+
+  template <typename VAL, typename CRD, typename POS, typename TF, ...>
+  class sparse_tensor_t : public detail::tensor_impl_t<...> {
+    
+    static constexpr int DIM = TF::DIM;
+    static constexpr int LVL = TF::LVL;
+
+  private:
+    // Primary storage of sparse tensor (explicitly stored element values).
+    StorageV values_;
+
+    // Secondary storage of sparse tensor (coordinates and positions).
+    StorageC coordinates_[LVL];
+    StorageP positions_[LVL];
+  }
+
+Using this design, many tests (e.g. is this tensor in COO format) 
+evaluate as ``constexpr`` at compile-time, keeping the binary
+size restricted to only what is actually used in a MatX computation.
+
 
 Matx Implementation of the Tensor Format DSL
 --------------------------------------------
@@ -237,14 +265,15 @@ Historical Background of the UST Type
 -------------------------------------
 
 The concept of the UST type has its roots in sparse compilers, first pioneered
-for sparse linear algebra in [`B&W95`_, `Bik96`_, `Bik98`_] and formalized to
-sparse tensor algebra in [`Kjolstad20`_, `Chou22`_, `Yadav22`_]. The tensor
-format DSL for the UST type, including the generalization to higher-dimensional
-levels, was introduced in [`MLIR22`_, `MLIR`_]. Please refer to this literature
-for a more extensive presentation of all topics only briefly discussed in this
-online documentation.
+for sparse linear algebra in [`B&W95`_, `B&W96`_, `Bik96`_, `Bik98`_] and
+formalized to sparse tensor algebra in [`Kjolstad20`_, `Chou22`_, `Yadav22`_].
+The tensor format DSL for the UST type, including the generalization to
+higher-dimensional levels, was introduced in [`MLIR22`_, `MLIR`_]. Please
+refer to this literature for a more extensive presentation of all topics only
+briefly discussed in this online documentation.
 
-.. _B&W95: https://dl.acm.org/doi/10.1145/169627.169765
+.. _B&W95: https://dl.acm.org/doi/10.1006/jpdc.1995.1141
+.. _B&W96: https://ieeexplore.ieee.org/document/485501
 .. _Bik96: https://theses.liacs.nl/1315
 .. _Bik98: https://dl.acm.org/doi/10.1145/290200.287636
 .. _Chou22: http://tensor-compiler.org/files/chou-phd-thesis-taco-formats.pdf
