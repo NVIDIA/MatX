@@ -184,4 +184,77 @@ __MATX_INLINE__ auto qr_solver(const OpA &a) {
   return detail::SolverQROp(a);
 }
 
+
+namespace detail {
+  template<typename OpA>
+  class EconQROp : public BaseOp<EconQROp<OpA>>
+  {
+    private:
+      typename detail::base_type_t<OpA> a_;
+
+    public:
+      using matxop = bool;
+      using value_type = typename OpA::value_type;
+      using matx_transform_op = bool;
+      using qr_solver_xform_op = bool;
+
+      __MATX_INLINE__ std::string str() const { return "qr_econ()"; }
+      __MATX_INLINE__ EconQROp(const OpA &a) : a_(a) { }    
+
+      // This should never be called
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) {
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_econ(). ie: (mtie(Q, R) = qr_econ(A))");     
+
+        qr_econ_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      // Size is not relevant in qr_solver() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }
+
+  };
+}
+
+/**
+ * Perform a QR decomposition on a matrix using cuSolver or a LAPACK host library.
+ * 
+ * If rank > 2, operations are batched.
+ * 
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * 
+ * @return
+ *   Operator that produces R/householder vectors and tau tensor outputs.
+ *   - **Out** - Of shape `... x m x n`. The householder vectors are returned in the
+ *               bottom half and *R* is returned in the top half.
+ *   - **Tau** - The scalar factors *tau* of shape `... x min(m, n)`.
+ */
+template<typename OpA>
+__MATX_INLINE__ auto qr_econ(const OpA &a) {
+  return detail::EconQROp(a);
+}
+
 }

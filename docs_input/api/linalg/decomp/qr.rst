@@ -20,6 +20,22 @@ Examples
    :dedent:
 
 
+.. doxygenfunction:: qr_econ
+
+.. note::
+   This function returns an economic QR decomposition, where `Q/R` are shaped `m x k` and `k x n` respectively,
+   where `k = min(m, n)`. 
+   This function is currently not supported with host-based executors (CPU)
+
+Examples
+~~~~~~~~
+
+.. literalinclude:: ../../../../test/00_solver/QREcon.cu
+   :language: cpp
+   :start-after: example-begin qr-econ-test-1
+   :end-before: example-end qr-econ-test-1
+   :dedent:
+
 .. doxygenfunction:: qr_solver
 
 .. note::
