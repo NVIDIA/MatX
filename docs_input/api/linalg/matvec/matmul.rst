@@ -13,7 +13,7 @@ is supported for any tensor with a rank higher than 2.
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0)
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)
 
-For information on experimental sparse tensor support for Sparse-Matrix x Matrix (SpMM), please see :ref:`_sparse_tensor_api`.
+For information on experimental sparse tensor support for Sparse-Matrix x Matrix (SpMM), please see :ref:`sparse_tensor_api`.
 
 Examples
 ~~~~~~~~
