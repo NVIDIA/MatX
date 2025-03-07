@@ -8,7 +8,9 @@ Perform a QR decomposition.
 .. doxygenfunction:: qr
 
 .. note::
-   This function is currently not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU), and performs a full QR 
+   decomposition of a tensor `A` with shape `... x m x n`, where `Q` is shaped `... x m x m` and `R`
+   is shaped `... x m x n`.
 
 Examples
 ~~~~~~~~
@@ -19,13 +21,12 @@ Examples
    :end-before: example-end qr-test-1
    :dedent:
 
-
 .. doxygenfunction:: qr_econ
 
 .. note::
-   This function returns an economic QR decomposition, where `Q/R` are shaped `m x k` and `k x n` respectively,
-   where `k = min(m, n)`. 
-   This function is currently not supported with host-based executors (CPU)
+   This function is currently not supported with host-based executors (CPU). It returns an economic 
+   QR decomposition, where `Q/R` are shaped `m x k` and `k x n` respectively, where `k = min(m, n)`. 
+   This is useful when `m >> n` to save memory and computation time.
 
 Examples
 ~~~~~~~~
@@ -40,7 +41,7 @@ Examples
 
 .. note::
    This function does not return `Q` explicitly as it only runs :literal:`geqrf` from LAPACK/cuSolver.
-   For full `Q/R`, use :literal:`qr_solver` on a CUDA executor.
+   For full or economic `Q/R`, use :literal:`qr` or :literal:`qr_econ` on a CUDA executor.
 
 Examples
 ~~~~~~~~
@@ -50,3 +51,4 @@ Examples
    :start-after: example-begin qr_solver-test-1
    :end-before: example-end qr_solver-test-1
    :dedent:
+
