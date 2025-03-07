@@ -236,7 +236,7 @@ namespace detail {
 }
 
 /**
- * Perform a QR decomposition on a matrix using cuSolver or a LAPACK host library.
+ * Perform an economic QR decomposition on a matrix using cuSolver.
  * 
  * If rank > 2, operations are batched.
  * 
@@ -247,10 +247,9 @@ namespace detail {
  *   Input tensor or operator of shape `... x m x n`
  * 
  * @return
- *   Operator that produces R/householder vectors and tau tensor outputs.
- *   - **Out** - Of shape `... x m x n`. The householder vectors are returned in the
- *               bottom half and *R* is returned in the top half.
- *   - **Tau** - The scalar factors *tau* of shape `... x min(m, n)`.
+ *   Operator that produces QR outputs.
+ *   - **Q** - Of shape `... x m x min(m, n)`, the reduced orthonormal basis for the span of A.
+ *   - **R** - Upper triangular matrix of shape  `... x min(m, n) x n`.
  */
 template<typename OpA>
 __MATX_INLINE__ auto qr_econ(const OpA &a) {
