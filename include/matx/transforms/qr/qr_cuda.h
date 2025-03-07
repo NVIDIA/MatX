@@ -600,7 +600,7 @@ public:
     }
 
     // Inner size checks
-    MATX_ASSERT_STR((out.Size(RANK-2) == params.m) && (out.Size(RANK-1) == cuda::std::min(params.m, params.n)), matxInvalidSize, "Out and A shapes are not compatible");
+    MATX_ASSERT_STR((out.Size(RANK-2) == params.m) && (out.Size(RANK-1) == params.n), matxInvalidSize, "Out and A shapes do not match");
     MATX_ASSERT_STR(tau.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "Tau must be ... x min(m,n)");
     MATX_ASSERT_STR((out_r.Size(RANK-2) == cuda::std::min(params.m, params.n)) && (out_r.Size(RANK-1) == params.n), matxInvalidSize, "R and out shapes are not compatible");
 
