@@ -22,6 +22,7 @@ contains only types that are available on both the host and device, and provides
 needed for device code.
 
 For information on creating tensors, please see :ref:`creating` or :ref:`quickstart` for common usage.
+For information on experimental sparse tensor support, please see :ref:`sparse_tensor_api`.
 
 .. doxygenclass:: matx::tensor_t
     :members:

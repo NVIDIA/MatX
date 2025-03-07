@@ -8,6 +8,8 @@ to pick up the syntax quickly without understanding the underlying architecture.
 it lacks flexibility and can prevent your code from running at the highest performance possible. This document walks through the
 different ways to construct tensors, and when you should use certain methods over others.
 
+For information on creating the still experimental sparse tensors, please see :ref:`sparse_tensor_api`.
+
 A Quick Primer On MatX Types
 ----------------------------
 The basic type of tensor used in most examples and tests is the ``tensor_t`` object. ``tensor_t`` is the highest-level tensor class, and
