@@ -25,24 +25,24 @@ class cross_operator:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
         self.dtype = dtype
-        np.random.seed(1234)        
+        np.random.seed(1234)
         pass
 
     def run(self) -> Dict[str, np.array]:
         a = matx_common.randn_ndarray(self.size, self.dtype)
         b = matx_common.randn_ndarray(self.size, self.dtype)
-        
+
         #for the result so that the rank matches that of the MatX output
         result = np.cross(a, b)
         if len(result.shape) == 0:
             result = np.expand_dims(result, axis=0)
-            
+
         return {
             'a': a,
             'b': b,
             'out': result
-        }    
-    
+        }
+
 class kron_operator:
     def __init__(self, dtype: str, size: List[int]):
         pass
@@ -130,7 +130,7 @@ class contraction:
 class toeplitz:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
-        self.dtype = dtype        
+        self.dtype = dtype
         pass
 
     def run(self) -> Dict[str, np.array]:
@@ -149,7 +149,7 @@ class toeplitz:
             'out1': sl.toeplitz(c),
             'out2': sl.toeplitz(c, r),
             'out3': sl.toeplitz(c, r2)
-        }        
+        }
 
 class pwelch_operators:
     def __init__(self, dtype: str, cfg: Dict): #PWelchGeneratorCfg):
@@ -159,6 +159,8 @@ class pwelch_operators:
         self.nperseg = cfg['nperseg']
         self.noverlap = cfg['noverlap']
         self.nfft = cfg['nfft']
+        self.scaling = cfg['scaling']
+        self.fs = cfg['fs']
         self.ftone = cfg['ftone']
         self.sigma = cfg['sigma']
         self.window_name = cfg['window_name']
@@ -180,10 +182,16 @@ class pwelch_operators:
                           noverlap=self.noverlap,
                           nfft=self.nfft,
                           return_onesided=False,
-                          scaling = 'density',
+                          scaling='density',
                           detrend=False)
-        w_scale = np.sum(w*w)
-        Pxx = Pxx * w_scale
+        scale = np.sum(w*w)
+        if self.scaling == 'density' or self.scaling == 'density_dB':
+          scale = scale / self.fs
+        Pxx = Pxx * scale
+
+        if self.scaling == 'density_dB' or self.scaling == 'spectrum_dB':
+          Pxx = 10 * np.log10(Pxx)
+
         return {
             'x_in': x,
             'Pxx_out': Pxx

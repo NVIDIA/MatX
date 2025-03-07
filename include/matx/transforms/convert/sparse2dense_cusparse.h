@@ -207,16 +207,31 @@ using sparse2dense_cache_t =
     std::unordered_map<Sparse2DenseParams_t, std::any,
                        Sparse2DenseParamsKeyHash, Sparse2DenseParamsKeyEq>;
 
+template <typename Op>
+__MATX_INLINE__ auto getS2DSupportedTensor(const Op &in, cudaStream_t stream) {
+  const auto func = [&]() {
+    if constexpr (is_tensor_view_v<Op>) {
+      return in.Stride(Op::Rank() - 1) == 1;
+    } else {
+      return true;
+    }
+  };
+  return GetSupportedTensor(in, func, MATX_ASYNC_DEVICE_MEMORY, stream);
+}
+
 } // end namespace detail
 
 template <typename OutputTensorType, typename InputTensorType>
-void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
+void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
                        const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
+   // Transform into supported form.
+  auto o = getS2DSupportedTensor(O, stream);
+
   using atype = InputTensorType;
-  using otype = OutputTensorType;
+  using otype = decltype(o);
 
   using TA = typename atype::value_type;
   using TO = typename otype::value_type;
@@ -248,6 +263,11 @@ void sparse2dense_impl(OutputTensorType &o, const InputTensorType &a,
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);
       });
+
+  // Copy transformed output back.
+  if (!o.isSameView(O)) {
+    (O = o).run(stream);
+  }
 }
 
 } // end namespace matx

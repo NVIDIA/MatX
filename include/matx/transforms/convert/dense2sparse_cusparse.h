@@ -250,9 +250,11 @@ using dense2sparse_cache_t =
 template <typename Op>
 __MATX_INLINE__ auto getD2SSupportedTensor(const Op &in, cudaStream_t stream) {
   const auto func = [&]() {
-    if constexpr (is_tensor_view_v<Op>)
+    if constexpr (is_tensor_view_v<Op>) {
       return in.Stride(Op::Rank() - 1) == 1;
-    return true;
+    } else {
+      return true;
+    }
   };
   return GetSupportedTensor(in, func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
@@ -270,6 +272,7 @@ void dense2sparse_impl(OutputTensorType &o, const InputTensorType &A,
   if (!is_matx_transform_op<InputTensorType>() && !a.isSameView(A)) {
     (a = A).run(stream);
   }
+
   using atype = decltype(a);
   using otype = OutputTensorType;
 
