@@ -600,9 +600,9 @@ public:
     }
 
     // Inner size checks
-    MATX_ASSERT_STR((out.Size(RANK-2) == params.m) && (out.Size(RANK-1) == params.n), matxInvalidSize, "Out and A shapes do not match");
+    MATX_ASSERT_STR((out.Size(RANK-2) == params.m) && (out.Size(RANK-1) == cuda::std::min(params.m, params.n)), matxInvalidSize, "Out and A shapes are not compatible");
     MATX_ASSERT_STR(tau.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "Tau must be ... x min(m,n)");
-    MATX_ASSERT_STR((out_r.Size(RANK-2) == cuda::std::min(params.m, params.n)) && (out.Size(RANK-1) == params.n), matxInvalidSize, "R and out shapes are not compatible");
+    MATX_ASSERT_STR((out_r.Size(RANK-2) == cuda::std::min(params.m, params.n)) && (out_r.Size(RANK-1) == params.n), matxInvalidSize, "R and out shapes are not compatible");
 
     SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
     SetBatchPointers<BatchType::VECTOR>(tau, this->batch_tau_ptrs);
@@ -818,7 +818,6 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
   tau_shape[RANK-2] = cuda::std::min(a.Size(RANK-1), a.Size(RANK-2));
 
   auto tau_new = make_tensor<T1>(tau_shape);
-  //auto tau_new = OpToTensor(tau, exec);
   auto a_new = OpToTensor(a, exec);
   
   if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
