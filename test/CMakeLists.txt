@@ -43,6 +43,7 @@ set (test_sources
     00_sparse/Basic.cu
     00_sparse/Convert.cu
     00_sparse/Matmul.cu
+    00_sparse/Matvec.cu
     00_sparse/Solve.cu
     main.cu
 )
