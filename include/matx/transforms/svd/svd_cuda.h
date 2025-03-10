@@ -713,7 +713,7 @@ public:
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
       }
 
-      this->dspace = i_dspace;
+      this->dspace = sizeof(T1) * i_dspace;
       this->hspace = 0;
     }
 
