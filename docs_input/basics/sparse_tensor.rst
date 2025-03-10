@@ -87,10 +87,12 @@ correct way of performing the conversion above is as follows::
   (A = sparse2dense(Acoo)).run(exec);
 
 The current experimental sparse support in MatX provides efficient
-operations for sparse-to-dense, dense-to-sparse, matmul, and solve::
+operations for sparse-to-dense, dense-to-sparse, matvec, matmul,
+and solve::
 
    (A = sparse2dense(Acoo)).run(exec);
    (Acoo = dense2sparse(D)).run(exec);
+   (V = matvec(Acoo, W)).run(exec); // only Sparse-Matrix x Vector (SpMV)
    (C = matmul(Acoo, B)).run(exec); // only Sparse-Matrix x Matrix (SpMM)
    (X = solve(Acsr, Y)).run(exec);  // only on CSR format
 
