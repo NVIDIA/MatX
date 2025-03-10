@@ -91,66 +91,64 @@ namespace matx
         }
       }
 
-      template <int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::array<index_t,RANK> &indices) const {
+      template <typename OpTuple, int I = 0, int N>
+      static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(OpTuple &&ops, int axis, cuda::std::array<index_t,RANK> &indices) {
 
         if constexpr ( I == N ) {
           // This should never happen
           return value_type{};
         } else {
-          const auto &op = cuda::std::get<I>(ops_);
-          auto idx = indices[axis_];
-          auto size = op.Size(axis_);
+          const auto &op = cuda::std::get<I>(ops);
+          auto idx = indices[axis];
+          auto size = op.Size(axis);
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return cuda::std::apply(op, indices);
+            return get_value(cuda::std::forward<decltype(op)>(op), indices);
           } else {
             // otherwise remove this operator and recurse
-            indices[axis_] -= size;
-            return GetVal<I+1, N>(indices);
+            indices[axis] -= size;
+            return get_impl<OpTuple, I+1, N>(cuda::std::forward<OpTuple>(ops), axis, indices);
           }
         }
       }
 
-
-      template <int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
+      // Overload for const reference
+      template <typename OpTuple, int I = 0, int N>
+      static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(const OpTuple &ops, int axis, cuda::std::array<index_t,RANK> &indices) {
 
         if constexpr ( I == N ) {
           // This should never happen
-          // returning this to satisfy lvalue requirements
-          auto &op = cuda::std::get<I-1>(ops_);
-          return cuda::std::apply(op, indices);
+          return value_type{};
         } else {
-          auto &op = cuda::std::get<I>(ops_);
-          auto idx = indices[axis_];
-          auto size = op.Size(axis_);
+          const auto &op = cuda::std::get<I>(ops);
+          auto idx = indices[axis];
+          auto size = op.Size(axis);
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return cuda::std::apply(op, indices);
+            return get_value(op, indices);
           } else {
             // otherwise remove this operator and recurse
-            indices[axis_] -= size;
-            return GetVal<I+1, N>(indices);
+            indices[axis] -= size;
+            return get_impl<OpTuple, I+1, N>(ops, axis, indices);
           }
         }
       }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
-        {
-          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<0, sizeof...(Ts)>(indices);
-        }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
+      {
+        cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
+        return get_impl<decltype(ops_), 0, sizeof...(Ts)>(ops_, axis_, indices);
+      }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
-        {
-          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<0, sizeof...(Ts)>(indices);
-        }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
+      {
+        cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
+        return get_impl<decltype(ops_), 0, sizeof...(Ts)>(ops_, axis_, indices);
+      }
 
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
