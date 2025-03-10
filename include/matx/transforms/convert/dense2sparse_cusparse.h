@@ -67,10 +67,11 @@ template <typename T>
 __MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
                                                         matxMemorySpace_t space,
                                                         cudaStream_t stream) {
-  T *ptr;
-  matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
+  T *ptr = nullptr;
+  if (sz != 0) {
+    matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
+  }
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T), /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
 
@@ -147,8 +148,12 @@ public:
       // the nnz is updated explicitly here before allocating
       // the new components of COO.
       POS *pos = reinterpret_cast<POS *>(params_.ptrO1);
-      pos[1] = nnz;
       matxMemorySpace_t space = GetPointerKind(pos);
+      if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+        cudaMemcpy(pos + 1, &nnz, sizeof(POS), cudaMemcpyHostToDevice);
+      } else {
+        pos[1] = nnz;
+      }
       o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
       o.SetCrd(0, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
       o.SetCrd(1, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
