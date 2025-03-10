@@ -172,7 +172,7 @@ public:
     params.n = a.Size(TensorTypeA::Rank() - 1);
     params.opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     // Matrix handles in cuSPARSE are data specific. Therefore, the pointers
-    // to the underlying buffers are part of the GEMM parameters.
+    // to the underlying buffers are part of the SpMV parameters.
     params.ptrA0 = a.Data();
     params.ptrA1 = a.POSData(0);
     params.ptrA2 = a.POSData(1);
@@ -208,9 +208,9 @@ private:
 };
 
 /**
- * Crude hash on GEMM to get a reasonably good delta for collisions. This
+ * Crude hash on SpMV to get a reasonably good delta for collisions. This
  * doesn't need to be perfect, but fast enough to not slow down lookups, and
- * different enough so the common GEMM parameters change.
+ * different enough so the common SpMV parameters change.
  */
 struct MatVecCUSPARSEParamsKeyHash {
   std::size_t operator()(const MatVecCUSPARSEParams_t &k) const noexcept {
@@ -222,7 +222,7 @@ struct MatVecCUSPARSEParamsKeyHash {
 };
 
 /**
- * Test GEMM parameters for equality. Unlike the hash, all parameters must
+ * Test SpMV parameters for equality. Unlike the hash, all parameters must
  * match exactly to ensure the hashed kernel can be reused for the computation.
  */
 struct MatVecCUSPARSEParamsKeyEq {
