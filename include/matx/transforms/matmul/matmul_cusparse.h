@@ -80,6 +80,9 @@ public:
   using TB = typename TensorTypeB::value_type;
   using TC = typename TensorTypeC::value_type;
 
+  // Mixed-precision compute type.
+  using TCOMP = std::conditional_t<is_matx_half_v<TC>, float, TC>;
+
   /**
    * Construct a sparse GEMM handle
    *   SpMM        <- for now
@@ -92,12 +95,12 @@ public:
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
     // Properly typed alpha, beta.
-    if constexpr (std::is_same_v<TC, cuda::std::complex<float>> ||
-                  std::is_same_v<TC, cuda::std::complex<double>>) {
+    if constexpr (std::is_same_v<TCOMP, cuda::std::complex<float>> ||
+                  std::is_same_v<TCOMP, cuda::std::complex<double>>) {
       salpha_ = {alpha, 0};
       sbeta_ = {beta, 0};
-    } else if constexpr (std::is_same_v<TC, float> ||
-                         std::is_same_v<TC, double>) {
+    } else if constexpr (std::is_same_v<TCOMP, float> ||
+                         std::is_same_v<TCOMP, double>) {
       salpha_ = alpha;
       sbeta_ = beta;
     } else {
@@ -147,7 +150,7 @@ public:
 
     // Allocate a workspace for SpMM.
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
-    const cudaDataType comptp = dtc; // TODO: support separate comp type?!
+    const cudaDataType comptp = MatXTypeToCudaType<TCOMP>();
     ret = cusparseSpMM_bufferSize(handle_, params_.opA, params_.opB, &salpha_,
                                   matA_, matB_, &sbeta_, matC_, comptp, algo,
                                   &workspaceSize_);
@@ -199,7 +202,7 @@ public:
                             [[maybe_unused]] const TensorTypeB &b) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
-    const cudaDataType comptp = MatXTypeToCudaType<TC>(); // TODO: see above
+    const cudaDataType comptp = MatXTypeToCudaType<TCOMP>();
     [[maybe_unused]] cusparseStatus_t ret =
         cusparseSpMM(handle_, params_.opA, params_.opB, &salpha_, matA_, matB_,
                      &sbeta_, matC_, comptp, algo, workspace_);
@@ -214,8 +217,8 @@ private:
   size_t workspaceSize_ = 0;
   void *workspace_ = nullptr;
   detail::MatMulCUSPARSEParams_t params_;
-  TC salpha_;
-  TC sbeta_;
+  TCOMP salpha_;
+  TCOMP sbeta_;
 };
 
 /**
@@ -299,10 +302,12 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
                 "tensors must have rank-2");
   static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  // TODO: allow MIXED-PRECISION computation!
-  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
-                    std::is_same_v<TC, cuda::std::complex<float>> ||
-                    std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(std::is_same_v<TC, matx::matxFp16> ||
+                std::is_same_v<TC, matx::matxBf16> ||
+                std::is_same_v<TC, float> ||
+                std::is_same_v<TC, double> ||
+                std::is_same_v<TC, cuda::std::complex<float>> ||
+                std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 2) &&
                   c.Size(RANKC - 1) == b.Size(RANKB - 1) &&

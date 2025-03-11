@@ -41,11 +41,13 @@ namespace experimental {
 template <typename T>
 __MATX_INLINE__ static auto
 makeDefaultNonOwningZeroStorage(index_t sz, matxMemorySpace_t space) {
-  T *ptr;
+  T *ptr = nullptr;
+  assert(sz > 0);
   matxAlloc((void **)&ptr, sz * sizeof(T), space, 0);
-  // TODO: introduce a more efficient matxCalloc or matxMemset?
-  for (index_t i = 0; i < sz; i++) {
-    ptr[i] = 0;
+  if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+    cudaMemset(ptr, 0, sz * sizeof(T));
+  } else {
+    memset(ptr, 0, sz * sizeof(T));
   }
   raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
                                                /*owning=*/false};
