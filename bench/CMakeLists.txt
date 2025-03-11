@@ -9,6 +9,7 @@ set (bench_sources
     00_operators/operators.cu
     00_operators/reduction.cu
     01_radar/SingleChanSimplePipeline.cu
+    00_sparse/SpMM.cu
 )
 
 set(target_inc  ${CMAKE_SOURCE_DIR}/test/include
