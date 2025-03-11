@@ -78,9 +78,7 @@ public:
   using TC = typename TensorTypeC::value_type;
 
   // Mixed-precision compute type.
-  using TCOMP = std::conditional_t<
-    std::is_same_v<TC, matx::matxFp16> ||
-    std::is_same_v<TC, matx::matxBf16>, float, TC>;
+  using TCOMP = std::conditional_t<is_matx_half_v<TC>, float, TC>;
 
   /**
    * Construct a SpMV handle
