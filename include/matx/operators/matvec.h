@@ -36,6 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/matvec.h"
+#include "matx/transforms/matmul/matvec_cusparse.h"
 
 namespace matx
 {
@@ -91,7 +92,12 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          matvec_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+          static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
+          if constexpr (is_sparse_tensor_v<OpA>) {
+	    sparse_matvec_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+          } else {
+            matvec_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
+	  }
         }
 
         template <typename ShapeType, typename Executor>
