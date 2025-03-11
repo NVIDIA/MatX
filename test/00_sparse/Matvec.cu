@@ -91,7 +91,7 @@ protected:
 
 template <typename T> class MatvecSparseTestsAll : public MatvecSparseTest<T> { };
 
-TYPED_TEST_SUITE(MatvecSparseTestsAll, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(MatvecSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
 
 TYPED_TEST(MatvecSparseTestsAll, MatvecCOO) {
   MATX_ENTER_HANDLER();

@@ -99,7 +99,7 @@ protected:
 
 template <typename T> class MatmulSparseTestsAll : public MatmulSparseTest<T> { };
 
-TYPED_TEST_SUITE(MatmulSparseTestsAll, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(MatmulSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
 
 TYPED_TEST(MatmulSparseTestsAll, MatmulCOO) {
   MATX_ENTER_HANDLER();
