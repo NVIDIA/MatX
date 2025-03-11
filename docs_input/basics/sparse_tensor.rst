@@ -57,13 +57,13 @@ its constituent buffers is constructed as follows::
 The result of the print statement is shown below::
 
   tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
-  nse    = 5
   format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
+  space  = CUDA managed memory
+  nse    = 5
   pos[0] = ( 0  5 )
   crd[0] = ( 0  0  3  3  3 )
   crd[1] = ( 0  1  2  3  5 )
   values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
-  space  = CUDA managed memory
 
 Note that, like dense tensors, sparse tensors provide ()-operations
 for indexing.  However, users should **never** use the ()-operator
