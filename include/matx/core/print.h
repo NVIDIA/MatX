@@ -565,31 +565,34 @@ namespace matx {
       cudaDeviceSynchronize();
       if constexpr (is_sparse_tensor_v<Op>) {
         using Format = typename Op::Format;
-	index_t nse = op.Nse();
-        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
         fprintf(fp, "format = ");
-	Format::print();
-        for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
-	  if (const index_t pend = op.posSize(lvlIdx)) {
-            fprintf(fp, "pos[%d] = (", lvlIdx);
-            for (index_t i = 0; i < pend; i++) {
-              PrintVal(fp, op.POSData(lvlIdx)[i]);
+        Format::print();
+        const auto kind = GetPointerKind(op.Data());
+        fprintf(fp, ")\nspace  = %s\n", SpaceString(kind).c_str());
+        const auto nse = op.Nse();
+        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
+        if (HostPrintable(kind)) {
+          for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
+            if (const index_t pend = op.posSize(lvlIdx)) {
+              fprintf(fp, "pos[%d] = (", lvlIdx);
+              for (index_t i = 0; i < pend; i++) {
+                PrintVal(fp, op.POSData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
             }
-            fprintf(fp, ")\n");
+            if (const index_t cend = op.crdSize(lvlIdx)) {
+              fprintf(fp, "crd[%d] = (", lvlIdx);
+              for (index_t i = 0; i < cend; i++) {
+                PrintVal(fp, op.CRDData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
+            }
           }
-          if (const index_t cend = op.crdSize(lvlIdx)) {
-            fprintf(fp, "crd[%d] = (", lvlIdx);
-            for (index_t i = 0; i < cend; i++) {
-              PrintVal(fp, op.CRDData(lvlIdx)[i]);
-            }
-            fprintf(fp, ")\n");
+          fprintf(fp, "values = (");
+          for (index_t i = 0; i < nse; i++) {
+            PrintVal(fp, op.Data()[i]);
           }
         }
-        fprintf(fp, "values = (");
-        for (index_t i = 0; i < nse; i++) {
-          PrintVal(fp, op.Data()[i]);
-        }
-        fprintf(fp, ")\nspace  = %s\n", SpaceString(GetPointerKind(op.Data())).c_str());
       }
       else if constexpr (is_tensor_view_v<Op>) {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
