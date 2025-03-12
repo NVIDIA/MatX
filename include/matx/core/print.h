@@ -568,7 +568,7 @@ namespace matx {
         fprintf(fp, "format = ");
         Format::print();
         const auto kind = GetPointerKind(op.Data());
-        fprintf(fp, ")\nspace  = %s\n", SpaceString(kind).c_str());
+        fprintf(fp, "space  = %s\n", SpaceString(kind).c_str());
         const auto nse = op.Nse();
         fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
         if (HostPrintable(kind)) {
@@ -592,6 +592,7 @@ namespace matx {
           for (index_t i = 0; i < nse; i++) {
             PrintVal(fp, op.Data()[i]);
           }
+          fprintf(fp, ")\n");
         }
       }
       else if constexpr (is_tensor_view_v<Op>) {
