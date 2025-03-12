@@ -40,6 +40,13 @@ using namespace matx;
 
 template <typename T> class SolveSparseTest : public ::testing::Test {
 protected:
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
+  void SetUp() override {
+    if constexpr (!detail::CheckDssSolverSupport<GExecType>()) {
+      GTEST_SKIP();
+    }
+  }
   float thresh = 0.001f;
 };
 
