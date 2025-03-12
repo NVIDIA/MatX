@@ -63,6 +63,8 @@ namespace matx {
 // Sparse Solver
 #if defined(MATX_EN_CUDSS)
   #define MATX_EN_CUDSS_SOLVER 1
+#else
+  #define MATX_EN_CUDSS_SOLVER 0
 #endif
 
 template <typename Exec, typename T>
