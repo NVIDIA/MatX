@@ -47,6 +47,7 @@ template <typename T> class SolveSparseTestsAll : public SolveSparseTest<T> { };
 
 TYPED_TEST_SUITE(SolveSparseTestsAll, MatXFloatNonHalfTypesCUDAExec);
 
+#ifdef MATX_EN_CUDSS
 TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -131,3 +132,4 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
 
   MATX_EXIT_HANDLER();
 }
+#endif

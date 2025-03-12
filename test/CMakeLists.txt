@@ -45,12 +45,9 @@ set (test_sources
     00_sparse/Convert.cu
     00_sparse/Matmul.cu
     00_sparse/Matvec.cu
+    00_sparse/Solve.cu
     main.cu
 )
-
-if (cudss_DIR)
-    list(test_sources APPEND 00_sparse/Solve.cu)
-endif()
 
 # Some of <00_io> tests need csv files and binaries which all
 # are located under 'CMAKE_CURRENT_SOURCE_DIR/00_io'. When calling the test
