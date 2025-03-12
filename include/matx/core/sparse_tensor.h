@@ -155,7 +155,7 @@ public:
   // A direct sparse tensor assignment (viz. (Acoo = ...).exec();).
   template <typename T>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T &op) {
-    [[maybe_unused]] typename T::dense2sparse_xform_op valid = true;
+    [[maybe_unused]] typename T::tosparse_xform_op valid = true;
     return detail::sparse_set(*this, op);
   }
 
