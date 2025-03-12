@@ -135,7 +135,7 @@ constexpr bool CheckDssSolverSupport() {
   if constexpr (is_host_executor_v<Exec>) {
     return false;
   } else {
-    return MATX_EN_CPU_SOLVER;
+    return MATX_EN_CUDSS;
   }
 }
 
