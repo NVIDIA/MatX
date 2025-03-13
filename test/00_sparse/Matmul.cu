@@ -94,6 +94,11 @@ template <typename T> static auto makeE() {
 
 template <typename T> class MatmulSparseTest : public ::testing::Test {
 protected:
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
+  void SetUp() override {
+    CheckTestTypeSupport<GTestType>();
+  }
   float thresh = 0.001f;
 };
 
