@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -51,7 +52,6 @@ struct Dense2SparseParams_t {
   MatXDataType_t dtype;
   MatXDataType_t ptype;
   MatXDataType_t ctype;
-  int rank;
   cudaStream_t stream;
   index_t m;
   index_t n;
@@ -71,7 +71,8 @@ __MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
   if (sz != 0) {
     matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
   }
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T), /*owning=*/false};
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
+                                               /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
 
@@ -188,7 +189,6 @@ public:
     params.dtype = TypeToInt<VAL>();
     params.ptype = TypeToInt<POS>();
     params.ctype = TypeToInt<CRD>();
-    params.rank = a.Rank();
     params.stream = stream;
     // TODO: simple no-batch, row-wise, no-transpose for now
     params.m = a.Size(TensorTypeA::Rank() - 2);
@@ -235,16 +235,16 @@ struct Dense2SparseParamsKeyHash {
 };
 
 /**
- * Test SOLVE parameters for equality. Unlike the hash, all parameters must
- * match exactly to ensure the hashed kernel can be reused for the computation.
+ * Test Dense2Sparse parameters for equality. Unlike the hash, all parameters
+ * must match exactly to ensure the hashed kernel can be reused for the
+ * computation.
  */
 struct Dense2SparseParamsKeyEq {
   bool operator()(const Dense2SparseParams_t &l,
                   const Dense2SparseParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.rank == t.rank && l.stream == t.stream && l.m == t.m &&
-           l.n == t.n && l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 &&
-           l.ptrA == t.ptrA;
+           l.stream == t.stream && l.m == t.m && l.n == t.n &&
+           l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 && l.ptrA == t.ptrA;
   }
 };
 

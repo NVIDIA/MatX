@@ -47,7 +47,7 @@ private:
 public:
   using matxop = bool;
   using matx_transform_op = bool;
-  using dense2sparse_xform_op = bool;
+  using tosparse_xform_op = bool;
   using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ Dense2SparseOp(const OpA &a) : a_(a) {}
@@ -71,7 +71,7 @@ public:
     if constexpr (is_sparse_tensor_v<OpA>) {
       MATX_THROW(matxNotSupported, "Cannot use dense2sparse on sparse input");
     } else {
-      // NOTE: sparse assignment A = dense2sparse(B) takes direct reference!
+      // NOTE: sparse assignment O = dense2sparse(A) takes direct reference!
       if constexpr (is_sparse_tensor_v<Out>) {
         dense2sparse_impl(out, a_, ex);
       } else {
