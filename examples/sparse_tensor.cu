@@ -166,5 +166,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (Acoo = dense2sparse(D)).run(exec);
   print(Acoo);
 
+  //
+  // Conversions between sparse formats: COO to CSR.
+  // For speed-of-operation, the CSC output actually
+  // shares some of the buffers with COO on completion.
+  //
+  auto Acsr2 = experimental::make_zero_tensor_csr<float, int, int>({4, 8});
+  (Acsr2 = sparse2sparse(Acoo)).run(exec);
+  print(Acsr2);
+
   MATX_EXIT_HANDLER();
 }
