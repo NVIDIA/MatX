@@ -52,7 +52,6 @@ struct MatMulCUSPARSEParams_t {
   MatXDataType_t dtype;
   MatXDataType_t ptype;
   MatXDataType_t ctype;
-  int rank;
   cudaStream_t stream;
   float alpha;
   float beta;
@@ -174,7 +173,6 @@ public:
     params.dtype = TypeToInt<typename TensorTypeA::val_type>();
     params.ptype = TypeToInt<typename TensorTypeA::pos_type>();
     params.ctype = TypeToInt<typename TensorTypeA::crd_type>();
-    params.rank = c.Rank();
     params.stream = stream;
     params.alpha = alpha;
     params.beta = beta;
@@ -243,12 +241,11 @@ struct MatMulCUSPARSEParamsKeyEq {
   bool operator()(const MatMulCUSPARSEParams_t &l,
                   const MatMulCUSPARSEParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.rank == t.rank && l.stream == t.stream && l.alpha == t.alpha &&
-           l.beta == t.beta && l.nse == t.nse && l.m == t.m && l.n == t.n &&
-           l.k == t.k && l.opA == t.opA && l.opB == t.opB &&
-           l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 &&
-           l.ptrA3 == t.ptrA3 && l.ptrA4 == t.ptrA4 && l.ptrB == t.ptrB &&
-           l.ptrC == t.ptrC;
+           l.stream == t.stream && l.alpha == t.alpha && l.beta == t.beta &&
+           l.nse == t.nse && l.m == t.m && l.n == t.n && l.k == t.k &&
+           l.opA == t.opA && l.opB == t.opB && l.ptrA0 == t.ptrA0 &&
+           l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 &&
+           l.ptrA4 == t.ptrA4 && l.ptrB == t.ptrB && l.ptrC == t.ptrC;
   }
 };
 
@@ -303,11 +300,10 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
   static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
   static_assert(std::is_same_v<TC, matx::matxFp16> ||
-                std::is_same_v<TC, matx::matxBf16> ||
-                std::is_same_v<TC, float> ||
-                std::is_same_v<TC, double> ||
-                std::is_same_v<TC, cuda::std::complex<float>> ||
-                std::is_same_v<TC, cuda::std::complex<double>>,
+                    std::is_same_v<TC, matx::matxBf16> ||
+                    std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
+                    std::is_same_v<TC, cuda::std::complex<float>> ||
+                    std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 2) &&
                   c.Size(RANKC - 1) == b.Size(RANKB - 1) &&
