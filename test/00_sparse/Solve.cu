@@ -43,6 +43,7 @@ protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
   void SetUp() override {
+    CheckTestTypeSupport<GTestType>();
     if constexpr (!detail::CheckDssSolverSupport<GExecType>()) {
       GTEST_SKIP();
     }

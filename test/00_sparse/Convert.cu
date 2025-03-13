@@ -55,7 +55,14 @@ template <typename T> static auto makeD() {
   return D;
 }
 
-template <typename T> class ConvertSparseTest : public ::testing::Test { };
+template <typename T> class ConvertSparseTest : public ::testing::Test {
+protected:
+  using GTestType = cuda::std::tuple_element_t<0, T>;
+  using GExecType = cuda::std::tuple_element_t<1, T>;
+  void SetUp() override {
+    CheckTestTypeSupport<GTestType>();
+  }
+};
 
 template <typename T> class ConvertSparseTestsAll : public ConvertSparseTest<T> { };
 
