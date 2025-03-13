@@ -80,7 +80,7 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCOO) {
   const auto n = D.Size(1);
 
   // Convert dense D to sparse S.
-  auto S = experimental::make_zero_tensor_coo<TestType, index_t>({m, n});
+  auto S = experimental::make_zero_tensor_coo<TestType, int>({m, n});
   (S = dense2sparse(D)).run(exec);
   ASSERT_EQ(S.Rank(), 2);
   ASSERT_EQ(S.Size(0), m);
@@ -108,6 +108,22 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCOO) {
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < n; j++) {
       ASSERT_EQ(O(i, j), D(i, j));
+    }
+  }
+
+  // Convert sparse S to another sparse format.
+  auto Acsr = experimental::make_zero_tensor_csr<TestType, int, int>({m, n});
+  (Acsr = sparse2sparse(S)).run(exec);
+  ASSERT_EQ(Acsr.Rank(), 2);
+  ASSERT_EQ(Acsr.Size(0), m);
+  ASSERT_EQ(Acsr.Size(1), n);
+  ASSERT_EQ(Acsr.Nse(), 4);
+
+  // Getters are expensive, but fully functional!
+  exec.sync();
+  for (index_t i = 0; i < m; i++) {
+    for (index_t j = 0; j < n; j++) {
+      ASSERT_EQ(Acsr(i, j), D(i, j));
     }
   }
 
