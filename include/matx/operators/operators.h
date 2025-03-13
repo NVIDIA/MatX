@@ -101,6 +101,7 @@
 #include "matx/operators/sign.h"
 #include "matx/operators/slice.h"
 #include "matx/operators/sparse2dense.h"
+#include "matx/operators/sparse2sparse.h"
 #include "matx/operators/solve.h"
 #include "matx/operators/sort.h"
 #include "matx/operators/sph2cart.h"
