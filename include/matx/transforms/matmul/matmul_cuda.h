@@ -811,7 +811,7 @@ private:
     [[maybe_unused]] auto a_shape = a.Shape();
     [[maybe_unused]] size_t total_iter = 1;
 
-    // For rank > threshold, handle first two batch dimensions in hardware and loop over remaining
+    // For rank > threshold, we loop and process the innermost "threshold" number of dimensions at each iteration.
     if constexpr (RANK > MATMUL_BATCH_RANK_THRESHOLD) {
       // Get total number of iterations needed for dimensions beyond the first two batch dims
       [[maybe_unused]] auto c_shape = c.Shape();
