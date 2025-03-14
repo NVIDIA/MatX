@@ -1909,6 +1909,11 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
   }
 
   detail::sort_impl_inner(a_out, tmp_in, dir, exec);
+
+  if (!done) {
+    // We need to free the temporary memory allocated above if we had to make a copy
+    matxFree(out_ptr, exec.getStream());
+  }
 #endif
 }
 
