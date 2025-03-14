@@ -856,8 +856,8 @@ private:
         MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
       }
       else {
-        // For rank > threshold, we need to loop over the outer dimensions while handling
-        // the first two batch dimensions in hardware
+        // When rank exceeds threshold, we loop over the outer dimensions where each iteration
+        // of cublasLtMatMul processes the innermost 'threshold' number of dimensions        
         for (size_t iter = 0; iter < total_iter; iter++) {
           // Get pointers into A/B/C for this round
           auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
