@@ -903,8 +903,8 @@ MATX_IGNORE_WARNING_POP_GCC
     GetPos(index_t *lvlsz, index_t *lvl, index_t pos) const {
       static constexpr int LVL = TensorData::Format::LVL;
       if constexpr (L < LVL) {
-        using ftype = std::tuple_element_t<L, typename TensorData::Format::LVLSPECS>;
-        if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Dense) {
+        using lspec = std::tuple_element_t<L, typename TensorData::Format::LvlSpecs>;
+        if constexpr (lspec::Type::isDense()) {
           // Dense level: pos * size + i.
           // TODO: see below, use a constexpr GetLvlSize(L) instead?
           const index_t dpos = pos * lvlsz[L] + lvl[L];
@@ -913,7 +913,7 @@ MATX_IGNORE_WARNING_POP_GCC
           } else {
             return dpos;
           }
-        } else if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Singleton) {
+        } else if constexpr (lspec::Type::isSingleton()) {
           // Singleton level: pos if crd[pos] == i and next levels match.
           if (CRDData(L)[pos] == lvl[L]) {
             if constexpr (L + 1 < LVL) {
@@ -922,8 +922,7 @@ MATX_IGNORE_WARNING_POP_GCC
               return pos;
             }
           }
-        } else if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Compressed ||
-                            ftype::lvltype == ::matx::experimental::LvlType::CompressedNonUnique) {
+        } else if constexpr (lspec::Type::isCompressed() || lspec::Type::isCompressedNU()) {
           // Compressed level: scan for match on i and test next levels.
           const typename TensorData::crd_type *c = CRDData(L);
           const typename TensorData::pos_type *p = POSData(L);
@@ -931,7 +930,7 @@ MATX_IGNORE_WARNING_POP_GCC
             if (c[pp] == lvl[L]) {
               if constexpr (L + 1 < LVL) {
                 const index_t cpos = GetPos<L + 1>(lvlsz, lvl, pp);
-                if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Compressed) {
+                if constexpr (lspec::Type::isCompressed()) {
                   return cpos; // always end scan (unique)
                 } else if (cpos != -1) {
                   return cpos; // only end scan on success (non-unique)
