@@ -402,9 +402,11 @@ namespace matx
 
     template <typename T> constexpr DLDataType TypeToDLPackType()
     {
-      if constexpr (std::is_same_v<T, cuda::std::complex<float>>)
+      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || 
+                    std::is_same_v<T, std::complex<float>>)
         return {kDLComplex, 64, 1};
-      if constexpr (std::is_same_v<T, cuda::std::complex<double>>)
+      if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
+                    std::is_same_v<T, std::complex<double>>)
         return {kDLComplex, 128, 1};
       if constexpr (std::is_same_v<T, matxFp16>)
         return {kDLFloat, 16, 1};
