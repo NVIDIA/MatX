@@ -88,10 +88,20 @@ namespace matx
           return out_dims_[dim];
         }
 
+      template <typename Task>
+      __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept {
+        /* Albert -- Scenario where the sum() operator is on the RHS and sum has already 
+        run previously. So we make tmp_out have a read permission as it will be read from */
+        tmp_out_.apply_dep_to_task(std::forward<Task>(task), 1);
+      }
+
+
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
-          static_assert(is_cuda_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
-          cgsolve_impl(cuda::std::get<0>(out), a_, b_, tol_, max_iters_, ex.getStream());
+          //static_assert(is_cuda_executor_v<Executor>, "cgsolve() only supports the CUDA executor currently");
+            auto output = cuda::std::get<0>(out);
+          output.PreRun(out_dims_, std::forward<Executor>(ex));
+          cgsolve_impl(cuda::std::get<0>(out), a_, b_, ex, tol_, max_iters_, ex.getStream());
         }
 
         template <typename ShapeType, typename Executor>

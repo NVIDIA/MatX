@@ -126,6 +126,14 @@ MATX_IGNORE_WARNING_POP_GCC
           return op_.Size(dims_[dim]);
         }
 
+        template <typename Task>
+        __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept
+        {
+          if constexpr (is_matx_op<T>()) {
+            op_.apply_dep_to_task(std::forward<Task>(task), perm);
+          }
+        }
+
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
         {

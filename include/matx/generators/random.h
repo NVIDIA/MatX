@@ -305,7 +305,7 @@ namespace detail {
       {
         InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));          
 #ifdef __CUDACC__
-        if constexpr (is_cuda_executor_v<Executor>) {
+        if constexpr ((is_cuda_executor_v<Executor>) || (is_stf_executor_v<Executor>)) {
           if (!init_) {
             auto stream = ex.getStream();
             matxAlloc((void **)&states_,
@@ -341,7 +341,7 @@ namespace detail {
       template <typename ST, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
-        if constexpr (is_cuda_executor_v<Executor>) {
+        if constexpr ((is_cuda_executor_v<Executor>) || (is_stf_executor_v<Executor>)) {
           matxFree(states_);
         }
         else if constexpr (is_host_executor_v<Executor>) {
@@ -478,6 +478,9 @@ namespace detail {
       {
         return shape_[dim];
       }
+
+      template <typename Task>
+      __MATX_INLINE__ void apply_dep_to_task([[maybe_unused]] Task &&task, [[maybe_unused]] int perm=1) const noexcept { }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
     };

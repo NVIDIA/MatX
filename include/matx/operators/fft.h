@@ -145,24 +145,66 @@ namespace matx
           return out_dims_[dim];
         }
 
+        template <typename Task>
+        __MATX_INLINE__ void apply_dep_to_task(Task &&task, [[maybe_unused]] int perm=1) const noexcept
+        {
+          /* Scenario where the matvec() operator is on the RHS and op has already
+             run previously. So we make tmp_out have a read permission as it will be read from */
+          tmp_out_.apply_dep_to_task(std::forward<Task>(task), 1);
+        }
+
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) {
-              fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
+            // stfexecutor case
+            if constexpr (is_stf_executor_v<Executor>) {
+                auto ctx = ex.getCtx();
+                auto tsk = ctx.task();
+                tsk.set_symbol("fft_task_no_perm");
+
+                auto output = cuda::std::get<0>(out);
+                output.PreRun(out_dims_, std::forward<Executor>(ex));
+                output.apply_dep_to_task(tsk, 0);
+                a_.apply_dep_to_task(tsk, 1);
+
+                tsk->*[&](cudaStream_t s) {
+                    auto exec = cudaExecutor(s);
+                    if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+                        if constexpr (std::is_same_v<FFTType, fft_t>) {
+                            fft_impl(output, a_, fft_size_, norm_, exec);
+                        }
+                        else {
+                            ifft_impl(output, a_, fft_size_, norm_, exec);
+                        }
+                    }
+                    else {
+                        if constexpr (std::is_same_v<FFTType, fft_t>) { 
+                            fft_impl(permute(output, perm_), permute(a_, perm_), fft_size_, norm_, exec);
+                        }
+                        else {
+                            ifft_impl(permute(output, perm_), permute(a_, perm_), fft_size_, norm_, exec);
+                        }
+                    }
+                };
             }
+            // cudaExecutor or host case
             else {
-              ifft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
+                if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+                    if constexpr (std::is_same_v<FFTType, fft_t>) {
+                        fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
+                    }
+                    else {
+                        ifft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
+                    }
+                }
+                else {
+                    if constexpr (std::is_same_v<FFTType, fft_t>) { 
+                        fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+                    }
+                    else {
+                        ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+                    }
+                }
             }
-          }
-          else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
-              fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
-            }
-            else {
-              ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
-            }
-          }
         }
 
         template <typename ShapeType, typename Executor>

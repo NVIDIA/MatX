@@ -45,6 +45,7 @@
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
 #include "matx/executors/cuda.h"
+#include "matx/executors/stf.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -302,6 +303,7 @@ inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_s
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};
 template <> struct is_executor<cudaExecutor> : std::true_type {};
+template <> struct is_executor<stfExecutor> : std::true_type {};
 template <ThreadsMode MODE> struct is_executor<HostExecutor<MODE>> : std::true_type {};
 }
 
@@ -322,6 +324,11 @@ template<typename T> struct is_cuda_executor : std::false_type {};
 template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
 }
 
+namespace detail {
+template<typename T> struct is_stf_executor : std::false_type {};
+template<> struct is_stf_executor<matx::stfExecutor> : std::true_type {};
+}
+
 /**
  * @brief Determine if a type is a device executor
  * 
@@ -329,6 +336,9 @@ template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
  */
 template <typename T> 
 inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
+
+template <typename T>
+inline constexpr bool is_stf_executor_v = detail::is_stf_executor<typename remove_cvref<T>::type>::value;
 
 namespace detail {
 template<typename T> struct is_host_executor : std::false_type {};

@@ -54,7 +54,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto norm = make_tensor<TypeParam, 1>({BATCH});
   auto maxn = make_tensor<TypeParam>({});
 
+#if 0
   cudaExecutor exec{};
+#else
+  stfExecutor exec{};
+#endif
 
   // Simple Poisson matrix
   for(int b = 0; b < BATCH; b++) {
@@ -83,6 +87,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (maxn = matx::max(sqrt(norm))).run(exec);
 
   exec.sync();
+#if 1
+  auto ctx = exec.getCtx();
+  ctx.finalize();
+#endif
+
   // example-end sync-test-1
   printf ("max l2 norm: %f\n", (float)sqrt(maxn()));
 

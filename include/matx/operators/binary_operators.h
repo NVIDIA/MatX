@@ -146,6 +146,18 @@ namespace matx
         return detail::matx_max(size1,size2);
       }
 
+      template <typename Task, typename Perm>
+      __MATX_INLINE__ void apply_dep_to_task(Task &&task, Perm perm) const noexcept
+      {
+        if constexpr (is_matx_op<I1>()) {
+            in1_.apply_dep_to_task(std::forward<Task>(task), perm);
+        }
+
+        if constexpr (is_matx_op<I2>()) {
+            in2_.apply_dep_to_task(std::forward<Task>(task), perm);
+        }
+      }
+
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {

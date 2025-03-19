@@ -46,6 +46,30 @@ namespace matx {
   constexpr int PASCAL_CC = 6;
 
 namespace detail {
+
+#if 0
+__MATX_INLINE__ cuda::experimental::stf::data_place getDataPlace(void *ptr) {
+    using namespace cuda::experimental::stf;
+                auto kind = GetPointerKind(ptr);
+                switch (kind) {
+                    case MATX_MANAGED_MEMORY:
+                        return data_place::managed;
+                    case MATX_HOST_MEMORY:
+                    case MATX_HOST_MALLOC_MEMORY:
+                        return data_place::host;
+                    case MATX_DEVICE_MEMORY:
+                    case MATX_ASYNC_DEVICE_MEMORY:
+                        return data_place::current_device();
+                    case MATX_INVALID_MEMORY:
+                        //std::cout << "Data kind is invalid: assuming managed memory\n";
+                        return data_place::managed;
+                        //return data_place::invalid;
+                    default:
+                        return data_place::invalid;
+                }
+}
+#endif
+
 __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
     int val;
     int dev;

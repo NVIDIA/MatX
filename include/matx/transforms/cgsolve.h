@@ -58,8 +58,8 @@ namespace matx
    *   cuda Stream to execute on
    *
    */
-  template <typename XType, typename AType, typename BType>
-    __MATX_INLINE__ void cgsolve_impl(XType X, AType A, BType B, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
+  template <typename XType, typename AType, typename BType, typename Executor>
+    __MATX_INLINE__ void cgsolve_impl(XType X, AType A, BType B, Executor &&exec, double tol=1e-6, int max_iters=4, cudaStream_t stream=0)
     {
       using value_type = typename XType::value_type;
       const int VRANK = XType::Rank();
@@ -119,15 +119,19 @@ namespace matx
       auto pApc = clone<VRANK>(pAp, clone_shape);
     
       // A*X
-      (Ap = matvec(A, X)).run(stream);
+      //(Ap = matvec(A, X)).run(stream);
+      (Ap = matvec(A, X)).run(exec);
       // r0 = B - A*X   
       // p = r0 
-      (p = r0 = B - Ap).run(stream);  
+      //(p = r0 = B - Ap).run(stream);  
+      (p = r0 = B - Ap).run(exec);  
       
-      (r0r0 = sum(r0*r0)).run(stream);
+      //(r0r0 = sum(r0*r0)).run(stream);
+      (r0r0 = sum(r0*r0)).run(exec);
       
       if(tol>0.0f) {
-        (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
+        //(converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
+        (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(exec);
       
         cudaEventRecord(event, stream);
         cudaStreamWaitEvent(d2h, event);
@@ -136,10 +140,12 @@ namespace matx
       int i;
       for (i = 0 ; i < max_iters; i++) {
         // Ap = matvec(A, p) 
-        (Ap = matvec(A, p)).run(stream);
+        //(Ap = matvec(A, p)).run(stream);
+        (Ap = matvec(A, p)).run(exec);
 
         // pAp = dot(p,Ap)  
-        (pAp = sum(p*Ap)).run(stream);
+        //(pAp = sum(p*Ap)).run(stream);
+        (pAp = sum(p*Ap)).run(exec);
         
         // if pAp is zero then we have exactly numerically converged.
         // However, this is batched so we may iterate more.  Iterating
@@ -151,10 +157,12 @@ namespace matx
         auto updateOp = ( r1 = r0 - (r0r0c/pApc) * Ap,
              X = X + (r0r0c/pApc) * p);
 
-        (IF( pApc != value_type(0), updateOp)).run(stream);
+        //(IF( pApc != value_type(0), updateOp)).run(stream);
+        (IF( pApc != value_type(0), updateOp)).run(exec);
         
         // r1r1 = dot(r1, r1)
-        (r1r1 = sum(r1*r1)).run(stream);
+        //(r1r1 = sum(r1*r1)).run(stream);
+        (r1r1 = sum(r1*r1)).run(exec);
         
         if(tol>0.0f) {
           // copy convergence criteria to host.  
@@ -167,7 +175,8 @@ namespace matx
             break;
           }
 
-          (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
+          //(converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
+          (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(exec);
         
           cudaEventRecord(event, stream);
           cudaStreamWaitEvent(d2h, event);
@@ -175,7 +184,8 @@ namespace matx
         
         // p = r1 + b * p 
         auto updateP = ( p = r1 + (r1r1c/r0r0c) * p);
-        (IF( pApc != value_type(0), updateP)).run(stream);
+        //(IF( pApc != value_type(0), updateP)).run(stream);
+        (IF( pApc != value_type(0), updateP)).run(exec);
 
         // Advance residual
         swap(r0r0, r1r1);  
