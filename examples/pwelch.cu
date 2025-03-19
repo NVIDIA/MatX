@@ -50,18 +50,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
 
-  float exec_time_ms;
-  const int num_iterations = 100;
-  index_t signal_size = 256;
-  index_t nperseg = 32;
-  index_t nfft = nperseg;
-  index_t noverlap = 8;
-  float ftone = 3.0;
+  const int num_iterations = 500;
+  index_t signal_size = 256000;
+  index_t nperseg = 512;
+  index_t noverlap = 256;
+  index_t nfft = 65536;
+
+  float ftone = 2048.0;
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
   cudaExecutor exec{stream};
 
   // Create input signal as a complex exponential
@@ -71,33 +68,32 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto x = make_tensor<complex>({signal_size});
   (x = tmp_x).run(exec); // pre-compute x, tmp_x is otherwise lazily evaluated
 
+  // Create window
+  auto w = make_tensor<float>({nperseg});
+  (w = flattop<0>({nperseg})).run(exec);
+
   // Create output tensor
   auto Pxx  = make_tensor<typename complex::value_type>({nfft});
 
   // Run one time to pre-cache the FFT plan
-  (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(exec);
+  (Pxx = pwelch(x, w, nperseg, noverlap, nfft)).run(exec);
   exec.sync();
 
   // Start the timing
-  cudaEventRecord(start, stream);
-
-  // Start the timing
-  cudaEventRecord(start, stream);
+  exec.start_timer();
 
   for (int iteration = 0; iteration < num_iterations; iteration++) {
     // Use the PWelch operator
-    (Pxx = pwelch(x, nperseg, noverlap, nfft)).run(exec);
+    (Pxx = pwelch(x, w, nperseg, noverlap, nfft)).run(exec);
   }
-
-  cudaEventRecord(stop, stream);
   exec.sync();
-  cudaEventElapsedTime(&exec_time_ms, start, stop);
+  exec.stop_timer();
 
-  printf("Output Pxx:\n");
-  print(Pxx);
-  printf("PWelchOp avg runtime = %.3f ms\n", exec_time_ms / num_iterations);
+  printf("Pxx(0) = %f\n", Pxx(0));
+  printf("Pxx(ftone) = %f\n", Pxx(2048));
+  printf("PWelchOp avg runtime = %.3f ms\n", exec.get_time_ms() / num_iterations);
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
   return 0;
 }

@@ -53,15 +53,32 @@ namespace matx
        * @brief Construct a new cudaExecutor with a stream
        * 
        * @param stream CUDA stream
+       * @param profiling Whether to enable profiling
        */
-      cudaExecutor(cudaStream_t stream) : stream_(stream) {}
-      cudaExecutor(int stream) : stream_(reinterpret_cast<cudaStream_t>(stream)) {}
+      cudaExecutor(cudaStream_t stream, bool profiling = true) : stream_(stream), profiling_(profiling) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
+      }
+
+      cudaExecutor(int stream, bool profiling = true) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
+      }
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
        * 
        */
-      cudaExecutor() : stream_(0) {}
+      cudaExecutor() : stream_(0), profiling_(true) {
+        if (profiling_) {
+          MATX_CUDA_CHECK(cudaEventCreate(&start_));
+          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
+      }
 
       /**
        * @brief Returns stream associated with executor
@@ -73,6 +90,28 @@ namespace matx
        * 
        */
       void sync() { cudaStreamSynchronize(stream_); }
+
+      /**
+       * @brief Start a timer for profiling workload
+       */
+      void start_timer() { cudaEventRecord(start_, stream_); }
+
+      /**
+       * @brief Stop a timer for profiling workload
+       */      
+      void stop_timer() { cudaEventRecord(stop_, stream_); }
+
+      /**
+       * @brief Get the time in milliseconds between start_timer and stop_timer. 
+       * This will block until the event is synchronized
+       */
+      float get_time_ms() {
+        MATX_ASSERT_STR(profiling_, matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
+        float time;
+        cudaEventSynchronize(stop_);
+        cudaEventElapsedTime(&time, start_, stop_);
+        return time;
+      }
       
       /**
        * Execute an operator on a device
@@ -139,6 +178,10 @@ namespace matx
 
     private:
       cudaStream_t stream_;
+      bool profiling_;
+      cudaEvent_t start_;
+      cudaEvent_t stop_;
   };
 
+  using CUDAExecutor = cudaExecutor; // Alias to make it consistent with host mode
 };

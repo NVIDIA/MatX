@@ -71,7 +71,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "Using CUDA executor\n";
 #endif
 
-
 #ifdef USE_STF
   stfExecutor exec{stream};
 #else
@@ -107,11 +106,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
       .run(exec);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
-  (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(exec);
+  (modulation = 500.f * cos(2.f * static_cast<typename complex::value_type>(M_PI) * 0.25f * time)).run(exec);
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
-  (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(exec);
+  (carrier = amp * sin(2.f * static_cast<typename complex::value_type>(M_PI) * 3000.f * time + modulation)).run(exec);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(exec);
+  (noise = sqrt(0.01f * fs / 2.f) * random<float>({N}, NORMAL)).run(exec);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(exec);
   // x = carrier + noise
@@ -119,16 +118,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   for (uint32_t i = 0; i < num_iterations; i++) {
     if (i == 2) { // Start timer on third loop to allow generation of plot
-#if USE_STF
-      auto ctx = exec.getCtx();
-      cudaEventRecord(start, ctx.task_fence());
-#else
-      cudaEventRecord(start, stream);
-#endif
+      exec.start_timer();
     }
 
     // DFT Sample Frequencies (rfftfreq)
-    (freqs = (1.0 / (static_cast<float>(nfft) * 1 / fs)) *
+    (freqs = (1.0f / (static_cast<float>(nfft) * 1.f / fs)) *
                linspace<0>(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
         .run(exec);
 
@@ -158,32 +152,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
 
   }
-#ifdef USE_STF
-{
-    auto ctx = exec.getCtx();
-    cudaEventRecord(stop, ctx.task_fence());
-}
-#else
-  cudaEventRecord(stop, stream);
-#endif
+
+  exec.stop_timer();
   exec.sync();
-
-#ifdef USE_STF
-{
-  auto ctx = exec.getCtx();
-  ctx.finalize();
-}
-#endif
-
-  cudaEventElapsedTime(&time_ms, start, stop);
+  #ifdef USE_STF
+    auto ctx = exec.getCtx();
+    ctx.finalize();
+  #endif
+  time_ms = exec.get_time_ms();
 
   printf("Spectrogram Time Without Graphs = %.2fus per iteration\n",
          time_ms * 1e3 / num_iterations);
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
   cudaStreamDestroy(stream);
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

@@ -58,24 +58,19 @@ namespace matx
           static_assert(!is_complex_v<extract_value_type_t<T1>>, "Complex interleaved op only works on scalar input types");
           static_assert(Rank() > 0);
         };
+ 
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ complex_type operator()(Is... indices) const 
         {
-          auto real = op_(indices...);
+          auto real = get_value(op_, indices...);
 
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
-          auto tup = cuda::std::make_tuple(indices...);
-          cuda::std::get<rank_idx>(tup) += op_.Size(rank_idx) / 2;
+          cuda::std::array idx{indices...};
+          idx[rank_idx] += op_.Size(rank_idx) / 2;
 
-          auto imag = cuda::std::apply(op_, tup);
+          auto imag = get_value(op_, idx);
           return complex_type{real, imag};
-        }
-
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-        {
-          return cuda::std::as_const(*this).template operator()(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -55,19 +55,25 @@ namespace matx
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };
 
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
+        { 
+          cuda::std::array idx{indices...};
+          idx[Rank() - 1] = (idx[Rank() - 1] + (op.Size(Rank()-1) + 1) / 2) % op.Size(Rank()-1);
+          return get_value(cuda::std::forward<Op>(op), idx);
+        }  
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          auto tup = cuda::std::make_tuple(indices...);
-          cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
-          return cuda::std::apply(op_, tup);
-        }
+          return get_impl(cuda::std::as_const(op_), indices...);
+        }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
-        }
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), indices...);
+        }         
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

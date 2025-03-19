@@ -94,7 +94,7 @@ namespace matx
         {
           if (j > i) {
             if constexpr (is_matx_op<T2>()) {
-              auto val = op2_(j - i);
+              auto val = get_value(op2_, j - i);
               return val;
             }
             else {
@@ -104,7 +104,7 @@ namespace matx
           }
           else {
             if constexpr (is_matx_op<T1>()) {
-              auto val = op1_(i - j);
+              auto val = get_value(op1_, i - j);
               return val;
             }
             else {

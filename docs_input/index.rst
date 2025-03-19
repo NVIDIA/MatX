@@ -43,8 +43,10 @@ Table of Contents
 
     quickstart
     build.rst
+    external.rst
     basics/index.rst
     api/index.rst
     examples/index.rst
     executor_compatibility
+    developer_guide/index.rst
     version

@@ -86,14 +86,20 @@ namespace matx
           s_[0] = stride_size;
         };
 
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, index_t i0)
+        {   
+          return get_value(cuda::std::forward<Op>(op), i0);
+        }        
+
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return op_(i0*s_[0] + i1);
+          return get_impl(cuda::std::as_const(op_), i0*s_[0] + i1);
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return op_(i0*s_[0] + i1);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

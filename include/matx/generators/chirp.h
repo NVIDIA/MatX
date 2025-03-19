@@ -67,8 +67,8 @@ namespace matx
         inline __MATX_HOST__ __MATX_DEVICE__ Chirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
           sop_(sop),
           f0_(f0),
+          f1_(f1),          
           t1_(t1),
-          f1_(f1),
           method_(method)
         {}
 
@@ -109,8 +109,8 @@ namespace matx
 	inline __MATX_HOST__ __MATX_DEVICE__ ComplexChirp(SpaceOp sop, FreqType f0, space_type t1, FreqType f1, ChirpMethod method) : 
           sop_(sop),
           f0_(f0),
-          t1_(t1),
           f1_(f1),
+          t1_(t1),          
           method_(method)
         {}
 

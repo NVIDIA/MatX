@@ -515,7 +515,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator==(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return lhs == tmp;
+  return rhs == tmp;
 }
 
 /**
@@ -562,7 +562,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool
 operator!=(const T &lhs, const matxHalfComplex<T> &rhs)
 {
   matxHalfComplex<T> tmp{lhs};
-  return !(lhs == tmp);
+  return !(rhs == tmp);
 }
 
 
@@ -853,7 +853,7 @@ pow(const T &x, const matxHalfComplex<T> &y)
 {
   cuda::std::complex<float> tmp{static_cast<float>(y.real()),
                                 static_cast<float>(y.imag())};
-  tmp = cuda::std::pow(y, pow);
+  tmp = cuda::std::pow(x, pow);
   return {static_cast<T>(tmp.real()), static_cast<T>(tmp.imag())};
 }
 

@@ -12,7 +12,7 @@ If input is real the same value is returned
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/operator_func_test.cu
    :language: cpp
    :start-after: example-begin conj-test-1
    :end-before: example-end conj-test-1

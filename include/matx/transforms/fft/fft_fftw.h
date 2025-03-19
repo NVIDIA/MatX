@@ -500,7 +500,7 @@ private:
   template <typename Op>
   __MATX_INLINE__ auto getFFTW1DSupportedTensor(const Op &in) {
     // This would be better as a templated lambda, but we don't have those in C++17 yet
-    const auto support_func = [&in]() {
+    const auto support_func = [&]() {
       if constexpr (is_tensor_view_v<Op>) {
         if constexpr (Op::Rank() >= 2) {
           if (in.Stride(Op::Rank() - 2) != in.Stride(Op::Rank() - 1) * in.Size(Op::Rank() - 1)) {
@@ -527,7 +527,7 @@ private:
   template <typename Op>
   __MATX_INLINE__ auto getFFTW2DSupportedTensor( const Op &in) {
     // This would be better as a templated lambda, but we don't have those in C++17 yet
-    const auto support_func = [&in]() {
+    const auto support_func = [&]() {
       if constexpr (is_tensor_view_v<Op>) {
         if ( in.Stride(Op::Rank()-2) != in.Stride(Op::Rank()-1) * in.Size(Op::Rank()-1)) {
           return false;

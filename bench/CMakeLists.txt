@@ -9,6 +9,7 @@ set (bench_sources
     00_operators/operators.cu
     00_operators/reduction.cu
     01_radar/SingleChanSimplePipeline.cu
+    00_sparse/SpMM.cu
 )
 
 set(target_inc  ${CMAKE_SOURCE_DIR}/test/include
@@ -38,13 +39,7 @@ target_include_directories(matx_bench PRIVATE "${target_inc}")
 target_include_directories(matx_bench SYSTEM PRIVATE "${system_inc}")
 
 target_include_directories(matx_bench SYSTEM PRIVATE "${pybind11_INCLUDE_DIR}" "${PYTHON_INCLUDE_DIRS}")
-target_link_libraries(  matx_bench PRIVATE
-                        cuda
-                        CUDA::nvToolsExt
-                        CUDA::cublas
-                        CUDA::cublasLt
-                        CUDA::cufft
-                        CUDA::cusolver)
+target_link_libraries(  matx_bench PRIVATE matx::matx)
 
 add_custom_target(bench
     DEPENDS matx_bench

@@ -66,6 +66,9 @@ typedef enum {
 
 
 namespace detail {
+// Configurable tensor rank threshold for single batch operation
+static constexpr int MATMUL_BATCH_RANK_THRESHOLD = 4;
+
 typedef enum {
   MEM_ORDER_ROW_MAJOR = 0,
   MEM_ORDER_COL_MAJOR = 1,
@@ -198,10 +201,10 @@ public:
         MATX_ASSERT(b.Size(i) == c.Size(i), matxInvalidSize);
       }
     }
- 
+
     // This must come before the things below to properly set class parameters
     params_ = GetGemmParams(c, a, b);
- 
+
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
       // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
       // https://docs.nvidia.com/cuda/cublas/#cublassetworkspace
@@ -215,7 +218,7 @@ public:
 
       ConfigureCublasLt();
     }
-    
+
   }
 
   template <typename InputType>
@@ -278,10 +281,16 @@ public:
     params.bstride = 0;
     params.cstride = 0;
 
-    // If we have a 3D or above tensor, the upper dims are batch dimensions. We
-    // only batch on the third dimension and loop anything else above;
-    if constexpr (RANK >= 3) {
-      params.batch = static_cast<int32_t>(c.Size(RANK - 3));
+    // If we have a tensor with rank > 2, treat all dimensions except last 2 as batch dimensions
+    if constexpr (RANK > 2) {
+      auto c_shape = c.Shape();
+      params.batch = static_cast<int>(std::accumulate(
+          c_shape.begin() + std::max(RANK - MATMUL_BATCH_RANK_THRESHOLD, 0),
+          c_shape.begin() + (RANK - 2),
+          static_cast<size_t>(1),
+          std::multiplies<size_t>()));
+
+      // Calculate strides for A tensor if it has matching rank
       if constexpr (TensorTypeA::Rank() == RANK) {
         params.astride = a.Stride(TensorTypeA::Rank()-3);
       }
@@ -289,6 +298,7 @@ public:
         params.astride = 0;
       }
 
+      // Calculate strides for B tensor if it has matching rank
       if constexpr (TensorTypeB::Rank() == RANK) {
         params.bstride = b.Stride(TensorTypeB::Rank()-3);
       }
@@ -296,6 +306,7 @@ public:
         params.bstride = 0;
       }
 
+      // Calculate stride for C tensor
       params.cstride = c.Stride(RANK-3);
     }
 
@@ -347,7 +358,7 @@ public:
         params.k =
             static_cast<int>(a.Size(TensorTypeA::Rank() - 2)); // Gemm Problem dimensions
         params.lda = static_cast<int>(b.Stride(TensorTypeB::Rank() - 1));
-        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1)); 
+        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1));
         params.ldc = static_cast<int>(c.Stride(RANK - 1));
       }
     }
@@ -494,7 +505,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     // Reorder C/A to match cutlass API
-    
+
     MatMulDispatchA(a, b, c, stream, alpha, beta);
   }
 
@@ -525,19 +536,19 @@ private:
 
   void ConfigureCublasLt()
   {
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     ret = cublasLtCreate(&ltHandle);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  
+
     ret = cublasLtMatmulPreferenceCreate(&preference);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  
+
     ret = cublasLtMatmulDescCreate(
                     &operationDesc, MatXTypeToCudaComputeType<T1>(),
                     MatXTypeToCudaType<T1>());
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-  
+
     ret = cublasLtMatmulPreferenceSetAttribute(
                     preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                     &workspaceSize,
@@ -800,10 +811,14 @@ private:
     [[maybe_unused]] auto a_shape = a.Shape();
     [[maybe_unused]] size_t total_iter = 1;
 
-    if constexpr (RANK > 3) {
-      // Get total number of batches
+    // For rank > threshold, we loop and process the innermost "threshold" number of dimensions at each iteration.
+    if constexpr (RANK > MATMUL_BATCH_RANK_THRESHOLD) {
+      // Get total number of iterations needed for dimensions beyond the first two batch dims
       [[maybe_unused]] auto c_shape = c.Shape();
-      total_iter = std::accumulate(c_shape.begin(), c_shape.begin() + TensorTypeC::Rank() - 3, 1, std::multiplies<shape_type>());
+      total_iter = std::accumulate(c_shape.begin(),
+                                 c_shape.begin() + TensorTypeC::Rank() - MATMUL_BATCH_RANK_THRESHOLD,
+                                 static_cast<size_t>(1),
+                                 std::multiplies<size_t>());
     }
 
     // For cuBLASLt most of the parameters have already been set in the
@@ -831,8 +846,9 @@ private:
         sbeta.f64 = beta;
       }
 
-      if constexpr (RANK <= 3) {
-        auto res = cublasLtMatmul(
+      if constexpr (RANK <= MATMUL_BATCH_RANK_THRESHOLD) {
+        // For ranks up to threshold, we can handle everything in a single batch operation
+        [[maybe_unused]] auto res = cublasLtMatmul(
             ltHandle, operationDesc, &salpha, (void *)a_adj.Data(), Adesc,
             (void *)b_adj.Data(), Bdesc, &sbeta, (void *)c_adj.Data(), Cdesc,
             (void *)c_adj.Data(), Cdesc, &heuristicResult.algo, workspace,
@@ -840,12 +856,14 @@ private:
         MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
       }
       else {
+        // When rank exceeds threshold, we loop over the outer dimensions where each iteration
+        // of cublasLtMatMul processes the innermost 'threshold' number of dimensions        
         for (size_t iter = 0; iter < total_iter; iter++) {
-
           // Get pointers into A/B/C for this round
           auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
           auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
           auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
+
           [[maybe_unused]] auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
                   Adesc, (void *)bp, Bdesc, &sbeta,
@@ -855,10 +873,10 @@ private:
 
           MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-          // Update all but the last 3 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, a_idx, 3);
-          UpdateIndices<TensorTypeB, shape_type, TensorTypeB::Rank()>(b_adj, b_idx, 3);
-          UpdateIndices<TensorTypeC, shape_type, TensorTypeC::Rank()>(c_adj, c_idx, 3);
+          // Update all but the last 4 indices (2 matrix dims + 2 batch dims)
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, a_idx, MATMUL_BATCH_RANK_THRESHOLD);
+          UpdateIndices<TensorTypeB, shape_type, TensorTypeB::Rank()>(b_adj, b_idx, MATMUL_BATCH_RANK_THRESHOLD);
+          UpdateIndices<TensorTypeC, shape_type, TensorTypeC::Rank()>(c_adj, c_idx, MATMUL_BATCH_RANK_THRESHOLD);
         }
       }
     }
@@ -928,7 +946,7 @@ private:
           CutlassCOrder>; // Layout of C matrix
 #endif
 
-      if constexpr (RANK > 3) {
+      if constexpr (RANK > MATMUL_BATCH_RANK_THRESHOLD) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #ifdef MATX_ENABLE_CUTLASS
         for (size_t iter = 0; iter < total_iter; iter++) {
@@ -1102,7 +1120,7 @@ using gemm_cuda_cache_t = std::unordered_map<MatMulCUDAParams_t, std::any,  MatM
 template <typename Op>
 __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream) {
   // This would be better as a templated lambda, but we don't have those in C++17 yet
-  const auto support_func = [&in]() {
+  const auto support_func = [&]() {
     if constexpr (is_tensor_view_v<Op>) {
       return !(
         (in.Stride(Op::Rank()-1) != (index_t)1 && in.Stride(Op::Rank()-2) != (index_t)1) ||
@@ -1115,7 +1133,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
       return true;
     }
   };
-  
+
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
@@ -1183,15 +1201,15 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
-  
+
   if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(stream);
   }
-  
+
   if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
     (b = B_).run(stream);
   }
-  
+
   if(beta != 0 && !c.isSameView(C)) {
     (c = C).run(stream);
   }

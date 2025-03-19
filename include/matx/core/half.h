@@ -417,7 +417,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(const T &lhs,
                                                     const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
-  return lhs == tmp;
+  return rhs == tmp;
 }
 
 /**
@@ -464,7 +464,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(const T &lhs,
                                                     const matxHalf<T> &rhs)
 {
   matxHalf<T> tmp{lhs};
-  return !(lhs == tmp);
+  return !(rhs == tmp);
 }
 
 /**

@@ -55,7 +55,6 @@ namespace detail {
       const int RANK = AType::Rank();
 
       index_t m = A.Size(RANK-2);
-      index_t n = A.Size(RANK-1);
 
       cuda::std::array<index_t, RANK-1> uShape;
       for(int i = 0; i < RANK-2; i++) {
@@ -239,12 +238,14 @@ namespace detail {
  * factorizations mostly by the data pointer in A
  */
 struct DnQRCUDAParams_t {
+  int64_t rank;
   int64_t m;
   int64_t n;
   void *A;
   void *tau;
   size_t batch_size;
   MatXDataType_t dtype;
+  cudaExecutor exec;
 };
 
 template <typename OutTensor, typename TauTensor, typename ATensor>
@@ -280,7 +281,8 @@ public:
    *
    */
   matxDnQRCUDAPlan_t(TauTensor &tau,
-                       const ATensor &a)
+                       const ATensor &a,
+                       const cudaExecutor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -293,14 +295,14 @@ public:
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
     MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
-    params = GetQRParams(tau, a);
+    params = GetQRParams(tau, a, exec);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size, false, exec);
   }
 
   void GetWorkspaceSize() override
   {
-    cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
             this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
             params.A, params.m, MatXTypeToCudaType<T2>(), params.tau,
             MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
@@ -308,17 +310,18 @@ public:
   }
 
   static DnQRCUDAParams_t GetQRParams(TauTensor &tau,
-                                  const ATensor &a)
+                                  const ATensor &a,
+                                  const cudaExecutor &exec)
   {
     DnQRCUDAParams_t params;
-
+    params.rank = RANK;
     params.batch_size = GetNumBatches(a);
     params.m = a.Size(RANK - 2);
     params.n = a.Size(RANK - 1);
     params.A = a.Data();
     params.tau = tau.Data();
     params.dtype = TypeToInt<T1>();
-
+    params.exec = exec;
     return params;
   }
 
@@ -350,7 +353,7 @@ public:
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      auto ret = cusolverDnXgeqrf(
+      [[maybe_unused]] auto ret = cusolverDnXgeqrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, MatXTypeToCudaType<T2>(),
           this->batch_tau_ptrs[i], MatXTypeToCudaType<T1>(),
@@ -367,7 +370,7 @@ public:
     // This will block. Figure this out later
     cudaStreamSynchronize(stream);
 
-    for (const auto& info : h_info) {
+    for ([[maybe_unused]] const auto& info : h_info) {
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
         ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
     }
@@ -395,8 +398,8 @@ private:
 struct DnQRCUDAParamsKeyHash {
   std::size_t operator()(const DnQRCUDAParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
-           (std::hash<uint64_t>()(k.batch_size));
+    return (std::hash<uint64_t>()(k.rank)) + (std::hash<uint64_t>()(k.m)) + (std::hash<uint64_t>()(k.n)) +
+           (std::hash<uint64_t>()(k.batch_size)) + (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
   }
 };
 
@@ -407,7 +410,8 @@ struct DnQRCUDAParamsKeyEq {
   bool operator()(const DnQRCUDAParams_t &l, const DnQRCUDAParams_t &t) const noexcept
   {
     return l.n == t.n && l.m == t.m && l.batch_size == t.batch_size &&
-           l.dtype == t.dtype;
+           l.dtype == t.dtype && l.exec.getStream() == t.exec.getStream() &&
+           l.rank == t.rank;
   }
 };
 
@@ -465,7 +469,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
   auto tvt = tv.PermuteMatrix();
 
   // Get parameters required by these tensors
-  auto params = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt);
+  auto params = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt, exec);
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
@@ -473,7 +477,7 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
     detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(tau_new, tvt);
+      return std::make_shared<cache_val_type>(tau_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, tau_new, tvt, exec);
@@ -483,6 +487,378 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
   /* Temporary WAR
    * Copy and free async buffer for transpose */
   matx::copy(out, tv.PermuteMatrix(), exec);
+  matxFree(tp);
+}
+
+/********************************************** Economic QR
+ * *********************************************/
+
+namespace detail {
+
+template<class>
+inline constexpr bool always_false_v = false;
+
+template <typename OutTensor, typename RTensor, typename TauTensor, typename ATensor>
+class matxDnEconQRCUDAPlan_t : matxDnCUDASolver_t {
+  using OutTensor_t = remove_cvref_t<OutTensor>;
+  using RTensor_t = remove_cvref_t<RTensor>;
+  using T1 = typename ATensor::value_type;
+  using T2 = typename TauTensor::value_type;
+  static constexpr int RANK = OutTensor_t::Rank();
+  static_assert(RANK >= 2, "Input/Output tensor must be rank 2 or higher");
+
+public:
+  /**
+   * Plan for factoring A such that \f$\textbf{A} = \textbf{Q} * \textbf{R}\f$
+   *
+   * Creates a handle for factoring matrix A into the format above. QR
+   * decomposition in cuBLAS/cuSolver does not return the Q matrix directly, and
+   * it must be computed separately used the Householder reflections in the tau
+   * output, along with the overwritten A matrix input. The input and output
+   * parameters may be the same tensor. In that case, the input is destroyed and
+   * the output is stored in-place.
+   *
+   * @tparam T1
+   *  Data type of A matrix
+   * @tparam T2
+   *  Data type of Tau vector
+   * @tparam RANK
+   *  Rank of A matrix
+   *
+   * @param tau
+   *   Scaling factors for reflections
+   * @param a
+   *   Input tensor view
+   *
+   */
+  matxDnEconQRCUDAPlan_t(TauTensor &tau,
+                       const ATensor &a,
+                       const cudaExecutor &exec)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    // Dim checks
+    MATX_STATIC_ASSERT_STR(RANK-1 == TauTensor::Rank(), matxInvalidDim, "Tau tensor must be one rank less than output tensor");
+    MATX_STATIC_ASSERT_STR(RANK == ATensor::Rank(), matxInvalidDim, "Output tensor must match A tensor rank in QR");
+    MATX_STATIC_ASSERT_STR(RANK == RTensor_t::Rank(), matxInvalidDim, "Output tensor R must match A tensor rank in QR");
+
+    // Type checks
+    MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "QR solver does not support half precision");
+    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename RTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
+
+    params = GetQRParams(tau, a, exec);
+    this->GetWorkspaceSize();
+    this->AllocateWorkspace(params.batch_size, false, exec);
+  }
+
+  void GetWorkspaceSize() override
+  {
+    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
+            this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
+            params.A, params.m, MatXTypeToCudaType<T2>(), params.tau,
+            MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    int dspace_orgqr;
+
+    ret = orgqr_bufferSize_dispatch(
+      params.m, params.n, std::min(params.m, params.n),
+      params.A, params.m, params.tau, &dspace_orgqr);
+    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
+    this->dspace = std::max(this->dspace, static_cast<size_t>(dspace_orgqr));
+
+  }
+
+  static DnQRCUDAParams_t GetQRParams(TauTensor &tau,
+                                  const ATensor &a,
+                                  const cudaExecutor &exec)
+  {
+    DnQRCUDAParams_t params;
+    params.rank = RANK;
+    params.batch_size = GetNumBatches(a);
+    params.m = a.Size(RANK - 2);
+    params.n = a.Size(RANK - 1);
+    params.A = a.Data();
+    params.tau = tau.Data();
+    params.dtype = TypeToInt<T1>();
+    params.exec = exec;
+    return params;
+  }
+
+  void Exec(OutTensor &out, RTensor &out_r, TauTensor &tau,
+            const ATensor &a, const cudaExecutor &exec)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    // Batch size checks
+    for(int i = 0 ; i < RANK-2; i++) {
+      MATX_ASSERT_STR(out.Size(i) == a.Size(i), matxInvalidDim, "Out and A must have the same batch sizes");
+      MATX_ASSERT_STR(tau.Size(i) == a.Size(i), matxInvalidDim, "Tau and A must have the same batch sizes");
+      MATX_ASSERT_STR(out.Size(i) == out_r.Size(i), matxInvalidDim, "Out and R must have the same batch sizes");
+    }
+
+    // Inner size checks
+    MATX_ASSERT_STR((out.Size(RANK-2) == params.m) && (out.Size(RANK-1) == params.n), matxInvalidSize, "Out and A shapes do not match");
+    MATX_ASSERT_STR(tau.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "Tau must be ... x min(m,n)");
+    MATX_ASSERT_STR((out_r.Size(RANK-2) == cuda::std::min(params.m, params.n)) && (out_r.Size(RANK-1) == params.n), matxInvalidSize, "R and out shapes are not compatible");
+
+    SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
+    SetBatchPointers<BatchType::VECTOR>(tau, this->batch_tau_ptrs);
+
+    if (out.Data() != a.Data()) {
+      (out = a).run(exec);
+    }
+
+    const auto stream = exec.getStream();
+    cusolverDnSetStream(this->handle, stream);
+
+    // At this time cuSolver does not have a batched 64-bit LU interface. Change
+    // this to use the batched version once available.
+    for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
+      [[maybe_unused]] auto ret = cusolverDnXgeqrf(
+          this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
+          this->batch_a_ptrs[i], params.m, MatXTypeToCudaType<T2>(),
+          this->batch_tau_ptrs[i], MatXTypeToCudaType<T1>(),
+          reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
+          reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
+          this->d_info + i);
+
+      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+
+      
+    }
+
+    std::vector<int> h_info(this->batch_a_ptrs.size());
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+
+    // This will block. Figure this out later
+    cudaStreamSynchronize(stream);
+
+    for ([[maybe_unused]] const auto& info : h_info) {
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
+    }
+
+    // at this point, R is stored in the upper triangular part of out
+    // so copy it out into memory assigned by user.
+    // Per the cuSolver documentation (quoted):
+    // The matrix R is overwritten in upper triangular part of A, 
+    // including diagonal elements
+    cuda::std::array<index_t, RANK> rSliceB, rSliceE;   
+    rSliceB.fill(0); rSliceE.fill(matxEnd);
+    rSliceE[RANK-2] = matxDropDim;
+    rSliceE[RANK-1] = params.n; // taking upper triangular portion of out    
+
+    for (int i = 0; i < std::min(params.m, params.n); i++){
+      rSliceB[RANK-2] = i;
+      (slice<RANK-1>(out_r, rSliceB, rSliceE) = (index(RANK-2) >= i)*slice<RANK-1>(out, rSliceB, rSliceE)).run(exec);
+    }
+
+    // Intentionally looping AGAIN, so we can reuse h_info and d_info without 
+    // having to copy to host with each iteration of the loop
+    for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
+      [[maybe_unused]] auto ret = orgqr_dispatch(
+            params.m, std::min(params.m, params.n), std::min(params.m, params.n),
+            this->batch_a_ptrs[i], params.m, this->batch_tau_ptrs[i],
+            this->d_workspace, this->dspace, this->d_info + this->batch_a_ptrs.size() + i);
+        MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    }
+
+    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+
+    // This will block. Figure this out later
+    cudaStreamSynchronize(stream);
+
+    for ([[maybe_unused]] const auto& info : h_info) {
+      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xorgqr").c_str());
+    }
+
+  }
+
+  /**
+   * QR solver handle destructor
+   *
+   * Destroys any helper data used for provider type and any workspace memory
+   * created
+   *
+   */
+  ~matxDnEconQRCUDAPlan_t() {}
+
+private:
+  
+  cusolverStatus_t orgqr_bufferSize_dispatch(
+    int64_t m64, int64_t n64, int64_t k64,
+    void* A, int64_t lda64,
+    void* tau,
+    int* lwork){
+    
+    int m = static_cast<int>(m64);
+    int n = static_cast<int>(n64);
+    int k = static_cast<int>(k64);
+    int lda = static_cast<int>(lda64);
+
+    if constexpr (std::is_same_v<T1, float>) {
+      return cusolverDnSorgqr_bufferSize(handle, m, n, k, 
+              reinterpret_cast<T1*>(A), lda, 
+              reinterpret_cast<T1*>(tau), 
+              lwork);
+    } 
+    else if constexpr (std::is_same_v<T1, double>) {
+      return cusolverDnDorgqr_bufferSize(handle, m, n, k, 
+        reinterpret_cast<T1*>(A), lda, 
+        reinterpret_cast<T1*>(tau), 
+              lwork);
+    } 
+    else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      return cusolverDnCungqr_bufferSize(handle, m, n, k, 
+              reinterpret_cast<cuComplex*>(A), lda, 
+              reinterpret_cast<cuComplex*>(tau), 
+              lwork);
+    } 
+    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      return cusolverDnZungqr_bufferSize(handle, m, n, k, 
+        reinterpret_cast<cuDoubleComplex*>(A), lda, 
+        reinterpret_cast<cuDoubleComplex*>(tau), 
+              lwork);
+    }
+    else{
+      // should never reach here
+      static_assert(always_false_v<T1>, "Unsupported type for economic QR");
+    }
+  }
+
+  cusolverStatus_t orgqr_dispatch(
+    int64_t m64, int64_t n64, int64_t k64,
+    void* A, int64_t lda64,
+    void* tau,
+    void* work, int64_t lwork64,
+    int* info)
+  {
+    int m = static_cast<int>(m64);
+    int n = static_cast<int>(n64);
+    int k = static_cast<int>(k64);
+    int lda = static_cast<int>(lda64);
+    int lwork = static_cast<int>(lwork64);
+
+    if constexpr (std::is_same_v<T1, float>) {
+      return cusolverDnSorgqr(handle, m, n, k, 
+              reinterpret_cast<T1*>(A), lda, 
+              reinterpret_cast<T1*>(tau), 
+              reinterpret_cast<T1*>(work), lwork, info);
+    } 
+    else if constexpr (std::is_same_v<T1, double>) {
+      return cusolverDnDorgqr(handle, m, n, k, 
+              reinterpret_cast<T1*>(A), lda, 
+              reinterpret_cast<T1*>(tau), 
+              reinterpret_cast<T1*>(work), lwork, info);
+    } 
+    else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+      return cusolverDnCungqr(handle, m, n, k, 
+              reinterpret_cast<cuComplex*>(A), lda, 
+              reinterpret_cast<cuComplex*>(tau), 
+              reinterpret_cast<cuComplex*>(work), lwork, info);
+    } 
+    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      return cusolverDnZungqr(handle, m, n, k, 
+              reinterpret_cast<cuDoubleComplex*>(A), lda, 
+              reinterpret_cast<cuDoubleComplex*>(tau), 
+              reinterpret_cast<cuDoubleComplex*>(work), lwork, info);
+    }
+    else{
+      // should never reach here
+      static_assert(always_false_v<T1>, "Unsupported type for economic QR");
+    }
+  }
+
+  std::vector<T2 *> batch_tau_ptrs;
+  DnQRCUDAParams_t params;
+};
+
+
+} // end namespace detail
+
+/**
+ * Perform a QR decomposition using a cached plan
+ *
+ * See documentation of matxDnQRCUDAPlan_t for a description of how the
+ * algorithm works. This function provides a simple interface to the cuSolver
+ * library by deducing all parameters needed to perform a QR decomposition from
+ * only the matrix A. The input and output parameters may be the same tensor. In
+ * that case, the input is destroyed and the output is stored in-place.
+ *
+ * @tparam T1
+ *   Data type of matrix A
+ * @tparam RANK
+ *   Rank of matrix A
+ *
+ * @param out
+ *   Orthogonal matrix Q
+ * @param out_r
+ *   Upper triangular output matrix R
+ * @param a
+ *   Input tensor A
+ * @param exec
+ *   CUDA executor
+ */
+template <typename OutTensor, typename RTensor, typename ATensor>
+void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
+        const ATensor &a, const cudaExecutor &exec)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  using T1 = typename remove_cvref_t<OutTensor>::value_type;
+  const int RANK = ATensor::Rank();
+
+  cuda::std::array<index_t, RANK-1> tau_shape;
+  for(int i = 0; i < RANK-2; i++) {
+    tau_shape[i] = a.Size(i);
+  }
+  tau_shape[RANK-2] = cuda::std::min(a.Size(RANK-1), a.Size(RANK-2));
+
+  auto tau_new = make_tensor<T1>(tau_shape);
+  auto a_new = OpToTensor(a, exec);
+  
+  if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
+    (a_new = a).run(exec);
+  }
+
+  /* Temporary WAR
+     cuSolver doesn't support row-major layouts. Since we want to make the
+     library appear as though everything is row-major, we take a performance hit
+     to transpose in and out of the function. Eventually this may be fixed in
+     cuSolver.
+  */
+  T1 *tp;
+  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
+            exec.getStream());
+  auto tv = TransposeCopy(tp, a_new, exec);
+  auto tvt = tv.PermuteMatrix();
+
+  // Get parameters required by these tensors
+  auto params = detail::matxDnEconQRCUDAPlan_t<OutTensor, RTensor, decltype(tau_new), decltype(a_new)>::GetQRParams(tau_new, tvt, exec);
+
+  // Get cache or new QR plan if it doesn't exist
+  using cache_val_type = detail::matxDnEconQRCUDAPlan_t<OutTensor, RTensor, decltype(tau_new), decltype(a_new)>;
+  detail::GetCache().LookupAndExec<detail::qr_cuda_cache_t>(
+    detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(tau_new, tvt, exec);
+    },
+    [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->Exec(tvt, out_r, tau_new, tvt, exec);
+    }
+  );
+
+  /* Temporary WAR
+   * Copy and free async buffer for transpose */
+  cuda::std::array<index_t, RANK> rSliceB, rSliceE;   
+  rSliceB.fill(0); rSliceE.fill(matxEnd);
+  rSliceE[RANK-2] = params.m;
+  rSliceE[RANK-1] = std::min(params.m, params.n);
+  matx::copy(out, slice(tv.PermuteMatrix(), rSliceB, rSliceE), exec);
   matxFree(tp);
 }
 

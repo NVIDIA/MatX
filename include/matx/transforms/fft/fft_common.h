@@ -131,7 +131,6 @@ namespace detail {
         // Create a new shape where n is the size of the last dimension
         auto shape = i.Shape();
         *(shape.end() - 1) = act_fft_size;
-        auto tot = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<typename decltype(shape)::value_type>());
 
         // Make a new buffer large enough for our input
         if constexpr (is_cuda_executor_v<Executor>) {
@@ -197,16 +196,15 @@ namespace detail {
       if constexpr (is_complex_half_v<T2>) {
         return FFTType::C2C;
       }
-      else if constexpr (is_half_v<T2>) {
+      else if constexpr (is_half_v<T2> || is_matx_half_v<T2>) {
         return FFTType::R2C;
       }
     }
-    else if constexpr (is_half_v<T1> && is_complex_half_v<T2>) {
+    else if constexpr ((is_half_v<T1> || is_matx_half_v<T1>) && is_complex_half_v<T2>) {
       return FFTType::C2R;
     }
-    //else {
-      return FFTType::C2C;
-    //}    
+
+    return FFTType::C2C;  
   }
 }
 

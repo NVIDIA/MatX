@@ -85,7 +85,6 @@ TYPED_TEST(DetSolverTestFloatTypes, DeterminantBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   auto Av = make_tensor<TestType>({m, m});
   auto detv = make_tensor<TestType>({});
@@ -114,7 +113,6 @@ TYPED_TEST(DetSolverTestFloatTypes, DeterminantBasicBatched)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using inner_type = typename inner_op_type_t<TestType>::type;
 
   constexpr int batches = 10;
 

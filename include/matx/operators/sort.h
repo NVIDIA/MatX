@@ -1,20 +1,20 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// COpBright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2021, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above cOpBright notice, this
+// 1. Redistributions of source code must retain the above copyright notice, this
 //    list of conditions and the following disclaimer.
 //
-// 2. Redistributions in binary form must reproduce the above cOpBright notice,
+// 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
-// 3. Neither the name of the cOpBright holder nor the names of its
+// 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
 //
@@ -124,11 +124,9 @@ namespace detail {
  * Sort rows of an operator using a radix sort. Currently supported types are
  * float, double, ints, and long ints (both signed and unsigned). For a 1D
  * operator, a linear sort is performed. For 2D and above each row of the inner
- * dimensions are batched and sorted separately. There is currently a
- * restriction that the tensor must have contiguous data in both rows and
- * columns, but this restriction may be removed in the future.
+ * dimensions are batched and sorted separately.
  *
- * @note Temporary memory is used during the sorting process, and about 2N will
+ * @note Temporary memory may be used during the sorting process, and about 2N will
  * be allocated, where N is the length of the tensor.
  *
  * @tparam InputOperator

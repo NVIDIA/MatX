@@ -10,7 +10,7 @@ Element-wise division operator
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/operator_func_test.cu
    :language: cpp
    :start-after: example-begin div-test-1
    :end-before: example-end div-test-1

@@ -39,23 +39,23 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-  
+
   index_t iN = 4;
   index_t iM = 6;
- 
+
   index_t fN = 4;
   index_t fM = 2;
-  
+
   auto in = make_tensor<int>({iN,iM});
   auto filter = make_tensor<int>({fN,fM});
-  
+
   in.SetVals({ {1,2,3,4,5,6},
                {5,4,3,2,1,0},
                {3,4,5,6,7,8},
                {1,2,3,4,5,6},
                });
 
-  filter.SetVals({ {1,2}, 
+  filter.SetVals({ {1,2},
                    {3,4},
                    {5,6},
                    {7,8}});
@@ -73,9 +73,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t oM = iM - fM + 1;
   auto mode = MATX_C_MODE_VALID;
 #endif
-  
+
   auto out = make_tensor<int>({oN,oM});
-  
+
   (out = conv2d(in, filter, mode)).run();
 
   printf("in:\n");
@@ -86,6 +86,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(out);
 
 
-  CUDA_CHECK_LAST_ERROR();
+  MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();
 }

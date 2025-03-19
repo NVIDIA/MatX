@@ -10,7 +10,7 @@ Cartesian coordinates to spherical
 Examples
 ~~~~~~~~
 
-.. literalinclude:: ../../../../test/00_operators/OperatorTests.cu
+.. literalinclude:: ../../../../test/00_operators/sph2cart_test.cu
    :language: cpp
    :start-after: example-begin cart2sph-test-1
    :end-before: example-end cart2sph-test-1

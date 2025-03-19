@@ -63,24 +63,29 @@ namespace matx
 
         __MATX_INLINE__ ReverseOp(const T1 &op) : op_(op){};
 
+        template <typename Op, typename... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
+        {
+          if constexpr (Rank() == 0) {
+            return op();
+          } 
+          else {
+            cuda::std::array idx{indices...};
+            idx[DIM] = op.Size(DIM) - idx[DIM] - 1;
+            return get_value(cuda::std::forward<Op>(op), idx);
+          }            
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          if constexpr (Rank() == 0) {
-            return op_();
-          } 
-          else {
-            auto tup = cuda::std::make_tuple(indices...);
-            cuda::std::get<DIM>(tup) = Size(DIM) - cuda::std::get<DIM>(tup) - 1;
-            return cuda::std::apply(op_, tup);
-          }
+          return get_impl(cuda::std::as_const(op_), indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return cuda::std::as_const(*this).template operator()(indices...);
+          return get_impl(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

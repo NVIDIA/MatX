@@ -319,7 +319,8 @@ namespace detail {
             device_ = true;
           }
         }
-        else if constexpr (is_host_executor_v<Executor>) {
+#endif          
+        if constexpr (is_host_executor_v<Executor>) {
           if (!init_) {
             [[maybe_unused]] curandStatus_t ret;
 
@@ -335,7 +336,6 @@ namespace detail {
             device_ = false;
           }
         }
-#endif
       }
 
       template <typename ST, typename Executor>

@@ -46,12 +46,12 @@ namespace matx {
  * @tparam ShapeContainer type of sizes
  * @tparam StrideContainer type of strides
  */
-template <typename ShapeContainer, typename StrideContainer, int RANK> 
+template <typename ShapeContainer, typename StrideContainer, int RANK>
 class tensor_desc_t {
 public:
   template <typename T1, typename T2, int R1>
   using self_type = tensor_desc_t<T1, T2, R1>;
-  
+
   using shape_container = ShapeContainer;
   using stride_container = StrideContainer;
   using shape_type  = typename ShapeContainer::value_type; ///< Type trait of shape type
@@ -65,17 +65,17 @@ public:
 
   /**
    * @brief Default move constructor
-   */  
+   */
   __MATX_INLINE__  tensor_desc_t<ShapeContainer, StrideContainer, RANK>(tensor_desc_t &&) = default;
 
   /**
    * @brief Default const copy assignment constructor
-   */  
+   */
   __MATX_INLINE__  tensor_desc_t& operator=(const tensor_desc_t&) = default;
 
   /**
    * @brief Default copy assignment constructor
-   */    
+   */
   __MATX_INLINE__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
   /** Swaps two raw_pointer_buffers
@@ -87,18 +87,18 @@ public:
    * @param rhs
    *   Right argument
    */
-  friend void swap( tensor_desc_t<ShapeContainer, StrideContainer, RANK> &lhs, 
+  friend void swap( tensor_desc_t<ShapeContainer, StrideContainer, RANK> &lhs,
                     tensor_desc_t<ShapeContainer, StrideContainer, RANK> &rhs) noexcept
   {
     using std::swap;
 
     swap(lhs.shape_, rhs.shape_);
     swap(lhs.stride_, rhs.stride_);
-  }   
+  }
 
   /**
    * @brief Construct a tensor_desc_t from a generic shape and stride
-   * 
+   *
    * @tparam S Unused
    * @param shape Shape object
    * @param stride Stride object
@@ -110,35 +110,35 @@ public:
     MATX_ASSERT_STR(shape.size() == stride.size(), matxInvalidDim,
                        "Size and stride array sizes must match");
     MATX_ASSERT_STR(shape.size() == RANK, matxInvalidDim,
-                       "Rank parameter must match array size");                       
+                       "Rank parameter must match array size");
   }
 
   /**
    * @brief Construct a tensor_desc_t for a 0D tensor
-   * 
+   *
    */
   __MATX_INLINE__ __MATX_HOST__  tensor_desc_t() {
-  } 
+  }
 
   /**
    * @brief Constructor with just shape for non-C-style arrays
-   * 
+   *
    * @tparam S2 Unused
-   * @param shape 
+   * @param shape
    *   Shape of tensor
    */
   template <typename S2, std::enable_if_t<!std::is_array_v<typename remove_cvref<S2>::type> && !is_matx_descriptor_v<typename remove_cvref<S2>::type>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t(S2 &&shape) 
+  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t(S2 &&shape)
   {
     InitFromShape(std::forward<S2>(shape));
   }
 
   /**
    * @brief Constructor with just shape for C-style arrays
-   * 
-   * @tparam M 
+   *
+   * @tparam M
    *   Unused
-   * @param shape 
+   * @param shape
    *   Shape of tensor
    */
   template <int M = RANK>
@@ -146,20 +146,20 @@ public:
   {
     // Construct a new cuda::std::array. Slower, but saves duplication
     cuda::std::array<index_t, M> tshape;
-    std::move(std::begin(shape), std::end(shape), tshape.begin());    
+    std::move(std::begin(shape), std::end(shape), tshape.begin());
     InitFromShape(std::move(tshape));
-  }  
+  }
 
   /**
    * @brief Constructor with perfect-forwarded shape and C array of strides
-   * 
-   * @param shape 
+   *
+   * @param shape
    *   Shape of tensor
    * @param strides
    *   Strides of tensor
    */
   template <typename S2, std::enable_if_t<!std::is_array_v<S2>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) : 
+  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(*(shape.begin() + i) > 0, matxInvalidSize,
@@ -170,26 +170,26 @@ public:
 
   /**
    * @brief Constructor with perfect-forwarded shape and C array of strides
-   * 
-   * @param shape 
+   *
+   * @param shape
    *   Shape of tensor
    * @param strides
    *   Strides of tensor
    */
   template <std::enable_if_t<!std::is_array_v<StrideContainer>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) : 
+  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
       stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
       *(shape_.begin() + i) = shape[i];
     }
-  }  
+  }
 
   /**
    * @brief Constructor with C-style array shape and strides
-   * 
-   * @param shape 
+   *
+   * @param shape
    *   Shape of tensor
    * @param strides
    *   Strides of tensor
@@ -201,7 +201,7 @@ public:
       *(stride_.begin() + i) = strides[i];
       *(shape_.begin() + i) = shape[i];
     }
-  }    
+  }
 
   /**
    * Check if a descriptor is contiguous in memory for all elements in the view
@@ -233,16 +233,16 @@ public:
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept
   {
     // The stride_type is expected to be able to hold this without overflowing
-    stride_type size = 1; 
+    stride_type size = 1;
     for (int i = 0; i < RANK; i++) {
       size *= Size(i);
     }
     return size;
-  }  
+  }
 
   /**
    * @brief Initialize descriptor from existing shape
-   * 
+   *
    * @tparam S2 Shape type
    * @param shape Shape object
    */
@@ -262,73 +262,78 @@ public:
     #pragma unroll
     for (int i = RANK - 2; i >= 0; i--) {
       *(stride_.begin() + i) = Stride(i+1) * Size(i+1);
-    } 
-    
-  }  
+    }
+
+  }
 
   /**
    * @brief Set the Size object
-   * 
+   *
    * @param dim Dimension to size
    * @param size Size to set dimension to
-   * 
+   *
    */
   void __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ SetSize(int dim, shape_type size) { *(shape_.begin() + dim) = size; }
 
   /**
    * @brief Return size of descriptor on a single dimension
-   * 
+   *
    * @param dim Dimension to retrieve
    * @return Size of dimension
    */
-  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept { 
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const noexcept {
     if constexpr (RANK == 0) {
       return static_cast<shape_type>(1);
     }
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized") 
-    return *(shape_.begin() + dim); 
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+    return *(shape_.begin() + dim);
+MATX_IGNORE_WARNING_POP_GCC
   }
 
   /**
    * @brief Return strides contaienr of descriptor
-   * 
+   *
    * @return Strides container
    */
-  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Strides() const { 
+  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Strides() const {
     return stride_;
   }
   /**
    * @brief Return stride of descriptor on a single dimension
-   * 
+   *
    * @param dim Dimension to retrieve
    * @return Stride of dimension
    */
-  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Stride([[maybe_unused]] int dim) const { 
+  auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Stride([[maybe_unused]] int dim) const {
     if constexpr (RANK == 0) {
       return static_cast<stride_type>(0);
     }
 
     /*  In release mode with O3 on g++ seems to give incorrect warnings on this line from Clone()
         and clone(). It appears there's no valid code path that would cause this to be unitialized,
-        so we're ignoring the warning in this one spot. */
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+        so we're ignoring the warning in this one spot. gcc also incorrectly reports:
+        error: array subscript 3 is outside array bounds of. This is impossible in the case it's reporting
+        since it comes from a clone where the loop inside of clone() is a compile-time constant of 2,
+        so it can never count up to 3. */
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
     return *(stride_.begin() + dim);
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
   }
 
   /**
    * @brief Return shape object
-   * 
-   * @return Shape object 
+   *
+   * @return Shape object
    */
   auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Shape() const { return shape_; }
 
   /**
    * @brief Get rank of descriptor
-   * 
+   *
    * @return Rank of descriptor
    */
   static auto constexpr Rank() { return RANK; }
@@ -340,11 +345,11 @@ private:
 
 /**
  * @brief Tensor descriptor for compile-time descriptors
- * 
+ *
  * @tparam I First size
  * @tparam Is Parameter pack of sizes
  */
-template <index_t I, index_t... Is> 
+template <index_t I, index_t... Is>
 class static_tensor_desc_t {
 public:
   using shape_container = cuda::std::array<index_t, sizeof...(Is) + 1>;  ///< Type trait of shape type
@@ -367,7 +372,7 @@ public:
 
   /**
    * @brief Get size of dimension
-   * 
+   *
    * @param dim Dimension to retrieve
    * @return Size of dimension
    */
@@ -375,48 +380,48 @@ public:
 
   /**
    * @brief Get stride of dimension
-   * 
+   *
    * @param dim Dimension to retrieve
    * @return Stride of dimension
-   */  
+   */
   static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(int dim) { return stride_[dim]; }
 
   /**
    * @brief Return strides contaienr of descriptor
-   * 
+   *
    * @return Strides container
    */
-  static constexpr auto Strides() { 
+  static constexpr auto Strides() {
     return stride_;
-  }  
+  }
 
   /**
    * @brief Get rank of descriptor
-   * 
+   *
    * @return Descriptor rank
-   */  
+   */
   static constexpr int Rank() { return shape_.size(); }
 
   /**
    * @brief Get underlying shape object
-   * 
+   *
    * @return Shape object
-   */  
+   */
   static constexpr auto Shape() { return shape_; }
 
   /**
    * @brief Get total size of descriptor
-   * 
+   *
    * @return Product of all sizes
-   */  
+   */
   static constexpr auto TotalSize() {
       return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
-  }  
+  }
 
 private:
   static constexpr auto make_shape(){
       return cuda::std::array{I, Is...};
-  }    
+  }
 
   static constexpr auto make_strides(){
       cuda::std::array<index_t, 1 + sizeof...(Is)> m{};
@@ -430,7 +435,7 @@ private:
   }
 
   static constexpr shape_container shape_ = make_shape();
-  static constexpr stride_container stride_ = make_strides();  
+  static constexpr stride_container stride_ = make_strides();
 };
 
 /**
@@ -485,7 +490,7 @@ using tensor_desc_cr_disi_dist = tensor_desc_cr_ds_t<index_t, index_t, RANK>;
  *
  * @tparam RANK Rank of shape
  */
-#ifdef INDEX_32_BIT 
+#ifdef MATX_INDEX_32_BIT
   template <int RANK>
   using DefaultDescriptor = tensor_desc_cr_ds_32_32_t<RANK>;
 #else

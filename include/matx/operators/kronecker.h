@@ -57,32 +57,28 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
-      __MATX_INLINE__ std::string str() const { return "kron(" + op1_.str() + "," + op2_.str() + ")"; }
+        __MATX_INLINE__ std::string str() const { return "kron(" + op1_.str() + "," + op2_.str() + ")"; }
 
         __MATX_INLINE__ KronOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
-      {
-        static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
-      }
+        {
+          static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
+        }        
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          auto tup1 = cuda::std::make_tuple(indices...);
-          auto tup2 = cuda::std::make_tuple(indices...);
-          cuda::std::get<Rank() - 2>(tup2) = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
-          cuda::std::get<Rank() - 1>(tup2) = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
+          cuda::std::array idx1{indices...};
+          cuda::std::array idx2{indices...};
 
-          cuda::std::get<Rank() - 2>(tup1) = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
-          cuda::std::get<Rank() - 1>(tup1) = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
+          idx2[Rank() - 2] = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
+          idx2[Rank() - 1] = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
 
-          return cuda::std::apply(op2_, tup2) * cuda::std::apply(op1_, tup1);
+          idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
+          idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
+
+          return get_value(op2_, idx2) * get_value(op1_, idx1);
         }
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-        {
-          return cuda::std::as_const(*this).template operator()(indices...);
-        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept

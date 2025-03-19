@@ -32,19 +32,24 @@
 
 #pragma once
 #ifdef __CUDACC__
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
+#error "MatX requires CUDA compute capability 6.0 or newer."
+#endif
 #include <cuda_runtime_api.h>
 #endif
 #include <cuda/std/ccomplex>
 
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
-#include "matx/core/file_io.h"
+#include "matx/file_io/file_io.h"
 #include "matx/core/half_complex.h"
 #include "matx/core/half.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/print.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
+#include "matx/core/sparse_tensor.h"  // sparse support is experimental
+#include "matx/core/make_sparse_tensor.h"
 #include "matx/core/tie.h"
 #include "matx/core/utils.h"
 #include "matx/core/viz.h"
@@ -58,6 +63,3 @@ namespace matx {
   using fcomplex = cuda::std::complex<float>;
   using dcomplex = cuda::std::complex<double>;
 }
-
-#define TEST_VECTOR_PATH "generated/"
-

@@ -60,6 +60,13 @@ namespace matx {
   #define MATX_EN_CPU_SOLVER 0
 #endif
 
+// Sparse Solver
+#if defined(MATX_EN_CUDSS)
+  #define MATX_EN_CUDSS_SOLVER 1
+#else
+  #define MATX_EN_CUDSS_SOLVER 0
+#endif
+
 template <typename Exec, typename T>
 constexpr bool CheckFFTSupport() {
   if constexpr (is_host_executor_v<Exec>) {
@@ -127,6 +134,15 @@ constexpr bool CheckSolverSupport() {
     return MATX_EN_CPU_SOLVER;
   } else {
     return true;
+  }
+}
+
+template <typename Exec>
+constexpr bool CheckDssSolverSupport() {
+  if constexpr (is_host_executor_v<Exec>) {
+    return false;
+  } else {
+    return MATX_EN_CUDSS_SOLVER;
   }
 }
 

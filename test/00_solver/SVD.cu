@@ -88,7 +88,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 100;
   constexpr index_t n = 50;
@@ -143,7 +142,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDMLeqN)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 50;
   constexpr index_t n = 100;
@@ -196,7 +194,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDReducedMode)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr cuda::std::array sizes {
@@ -255,7 +252,6 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDHostAlgoQR)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
   constexpr index_t m = 100;
   constexpr index_t n = 50;
@@ -308,12 +304,128 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatched)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;      
   using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 10;
   constexpr index_t m = 100;
   constexpr index_t n = 50;
+
+  auto Av = make_tensor<TestType>({batches, m, n});
+  auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
+  auto Uv = make_tensor<TestType>({batches, m, m});
+  auto VTv = make_tensor<TestType>({batches, n, n});
+
+  auto Dv = make_tensor<value_type>({batches, m, n});
+  auto UDVTv = make_tensor<TestType>({batches, m, n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {batches, m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+
+  (mtie(Uv, Sv, VTv) = svd(Av)).run(this->exec);
+
+  this->exec.sync();
+
+  // Since SVD produces a solution that's not necessarily unique, we cannot
+  // compare against Python output. Instead, we just make sure that A = U*S*V'.
+
+  // Construct batched diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>(Dv.Shape())).run(this->exec);
+  this->exec.sync();
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < Sv.Size(1); i++) {
+      Dv(b, i, i) = Sv(b, i);
+    }
+  }
+
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
+  this->exec.sync();
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < Av.Size(1); i++) {
+      for (index_t j = 0; j < Av.Size(2); j++) {
+        if constexpr (is_complex_v<TestType>) {
+          ASSERT_NEAR(Av(b, i, j).real(), UDVTv(b, i, j).real(), this->thresh) << i << " " << j;
+          ASSERT_NEAR(Av(b, i, j).imag(), UDVTv(b, i, j).imag(), this->thresh) << i << " " << j;
+        }
+        else {
+          ASSERT_NEAR(Av(b, i, j), UDVTv(b, i, j), this->thresh) << i << " " << j;
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatchedSmallMGTN)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;   
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batches = 10;
+  constexpr index_t m = 8;
+  constexpr index_t n = 4;
+
+  auto Av = make_tensor<TestType>({batches, m, n});
+  auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
+  auto Uv = make_tensor<TestType>({batches, m, m});
+  auto VTv = make_tensor<TestType>({batches, n, n});
+
+  auto Dv = make_tensor<value_type>({batches, m, n});
+  auto UDVTv = make_tensor<TestType>({batches, m, n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "svd", "run", {batches, m, n});
+  this->pb->NumpyToTensorView(Av, "A");
+
+  (mtie(Uv, Sv, VTv) = svd(Av)).run(this->exec);
+
+  this->exec.sync();
+
+  // Since SVD produces a solution that's not necessarily unique, we cannot
+  // compare against Python output. Instead, we just make sure that A = U*S*V'.
+
+  // Construct batched diagonal matrix D from the vector of singular values S
+  (Dv = zeros<value_type>(Dv.Shape())).run(this->exec);
+  this->exec.sync();
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < Sv.Size(1); i++) {
+      Dv(b, i, i) = Sv(b, i);
+    }
+  }
+
+  (UDVTv = matmul(matmul(Uv, Dv), VTv)).run(this->exec); // (U * S) * V'
+  this->exec.sync();
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < Av.Size(1); i++) {
+      for (index_t j = 0; j < Av.Size(2); j++) {
+        if constexpr (is_complex_v<TestType>) {
+          ASSERT_NEAR(Av(b, i, j).real(), UDVTv(b, i, j).real(), this->thresh) << i << " " << j;
+          ASSERT_NEAR(Av(b, i, j).imag(), UDVTv(b, i, j).imag(), this->thresh) << i << " " << j;
+        }
+        else {
+          ASSERT_NEAR(Av(b, i, j), UDVTv(b, i, j), this->thresh) << i << " " << j;
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatchedSmallMEQN)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batches = 10;
+  constexpr index_t m = 32;
+  constexpr index_t n = 32;
 
   auto Av = make_tensor<TestType>({batches, m, n});
   auto Sv = make_tensor<value_type>({batches, std::min(m, n)});
@@ -605,6 +717,7 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   ASSERT_NEAR( mdiffA(), SType(0), .00001);
   
   exec.sync();
+
 }
 
 TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPI)

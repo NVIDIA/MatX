@@ -132,7 +132,7 @@ public:
 
     params = GetSVDParams(u, s, vt, a, jobz, algo);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false);
+    this->AllocateWorkspace(params.batch_size);
   }
 
   void GetWorkspaceSize() override
@@ -184,7 +184,7 @@ public:
       // the real part of the first elem of work holds the optimal lwork.
       if constexpr (is_complex_v<WorkQuery>) {
         this->lwork = static_cast<lapack_int_t>(work_query.real());
-        
+
         lapack_int_t mnthr = (mn * 5) / 3;
         if (mx >= mnthr) { // mx >> mn condition in LAPACK
           this->lrwork = 5*mn*mn + 5*mn;
@@ -263,7 +263,7 @@ public:
                         reinterpret_cast<T3*>(this->rwork), &info);
 
 
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in LAPACK").c_str());
       }
     } else if (params.algo == SVDHostAlgo::DC) {
@@ -277,7 +277,7 @@ public:
                         reinterpret_cast<T3*>(this->rwork),
                         reinterpret_cast<lapack_int_t*>(this->iwork), &info);
 
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "gesdd error in LAPACK");     
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "gesdd error in LAPACK");
       }
     }
   }
@@ -300,7 +300,7 @@ private:
                       const lapack_int_t *lwork_in, [[maybe_unused]] T3 *rwork_in, lapack_int_t *info)
   {
     // TODO: remove warning suppression once gesvd is optimized in NVPL LAPACK
-IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
+MATX_IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
     if constexpr (std::is_same_v<T1, float>) {
       LAPACK_CALL(sgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
     } else if constexpr (std::is_same_v<T1, double>) {
@@ -310,7 +310,7 @@ IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
     } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
     }
-IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_GCC
   }
 
   /**
@@ -332,7 +332,7 @@ IGNORE_WARNING_POP_GCC
       LAPACK_CALL(zgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, iwork_in, info);
     }
   }
-  
+
   std::vector<T2 *> batch_u_ptrs;
   std::vector<T3 *> batch_s_ptrs;
   std::vector<T4 *> batch_vt_ptrs;
@@ -427,7 +427,7 @@ void svd_impl([[maybe_unused]] UTensor &&u,
      equivalent to col-major AT, and swapping the inputs U and VT.
   */
 
-  // LAPACK destroys the input, so we need to make a copy of A regardless  
+  // LAPACK destroys the input, so we need to make a copy of A regardless
   auto a_copy = make_tensor<T1>(a.Shape(), MATX_HOST_MALLOC_MEMORY);
   (a_copy = a).run(exec);
   auto at_col_maj = transpose_matrix(a_copy);

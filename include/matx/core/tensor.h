@@ -108,7 +108,7 @@ public:
    * @param rhs Object to copy from
    */
   __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
-      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, rhs.desc_, rhs.stf_ldata_}, storage_(rhs.storage_)
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.Data(), rhs.desc_, rhs.stf_ldata_}, storage_(rhs.storage_)
       { }
 
   /**
@@ -117,7 +117,7 @@ public:
    * @param rhs Object to move from
    */
   __MATX_HOST__ tensor_t(tensor_t &&rhs) noexcept
-      : detail::tensor_impl_t<T, RANK, Desc>{rhs.ldata_, std::move(rhs.desc_), rhs.stf_ldata_}, storage_(std::move(rhs.storage_))
+      : detail::tensor_impl_t<T, RANK, Desc>{rhs.Data(), std::move(rhs.desc_), rhs.stf_ldata_}, storage_(std::move(rhs.storage_))
   { }
 
 
@@ -132,7 +132,7 @@ public:
    */
   __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
   {
-    this->ldata_ = rhs.ldata_;
+    this->SetData(rhs.Data());
     storage_ = rhs.storage_;
     this->desc_ = rhs.desc_;
     this->stf_ldata_ = rhs.stf_ldata_;
@@ -151,7 +151,9 @@ public:
   {
     using std::swap;
 
-    std::swap(lhs.ldata_, rhs.ldata_);
+    auto tmpdata = lhs.Data();
+    lhs.SetData(rhs.Data());
+    rhs.SetData(tmpdata);
     swap(lhs.storage_, rhs.storage_);
     swap(lhs.desc_, rhs.desc_);
     std::swap(lhs.stf_ldata_, rhs.stf_ldata_);
@@ -159,8 +161,13 @@ public:
 
   __MATX_INLINE__  ~tensor_t() = default;
 
-  __MATX_INLINE__ const std::string str() const {
-    return std::string("T") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
+  const std::string str() const {
+    return name_;
+  }
+
+  void set_name(std::string name)
+  {
+    name_ = name;
   }
 
   /**
@@ -674,7 +681,7 @@ public:
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{std::forward<Shape>(shape)};
-    return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
+    return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->Data(), this->stf_ldata_};
   }
 
   /**
@@ -733,7 +740,7 @@ public:
        "To get a reshaped view the tensor must be compact");
 
     DefaultDescriptor<tshape.size()> desc{std::move(tshape)};
-    return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->ldata_, this->stf_ldata_};
+    return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->Data(), this->stf_ldata_};
   }
 
   /**
@@ -762,7 +769,7 @@ public:
 
     int dev;
     cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), dev, stream);
+    cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), dev, stream);
   }
 
   /**
@@ -779,7 +786,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    cudaMemPrefetchAsync(this->ldata_, this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
+    cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   }
 
@@ -799,7 +806,7 @@ public:
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
-    Type *data = reinterpret_cast<Type *>(this->ldata_);
+    Type *data = reinterpret_cast<Type *>(this->Data());
     cuda::std::array<typename Desc::stride_type, RANK> strides;
 
 #pragma unroll
@@ -844,7 +851,7 @@ public:
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
-    Type *data = reinterpret_cast<Type *>(this->ldata_) + 1;
+    Type *data = reinterpret_cast<Type *>(this->Data()) + 1;
     cuda::std::array<stride_type, RANK> strides;
 #pragma unroll
     for (int i = 0; i < RANK; i++) {
@@ -882,7 +889,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->PermuteImpl(dims);
-    return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
+    return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->Data(), this->stf_ldata_};
   }
 
 
@@ -928,14 +935,6 @@ public:
   }
 
   /**
-   * Get the underlying local data pointer from the view
-   *
-   * @returns Underlying data pointer of type T
-   *
-   */
-  __MATX_HOST__ __MATX_INLINE__ T *Data() const noexcept { return this->ldata_; }
-
-  /**
    * Set the underlying data pointer from the view
    *
    * Decrements any reference-counted memory and potentially frees before
@@ -956,7 +955,7 @@ public:
   {
     this->desc_.InitFromShape(std::forward<ShapeType>(shape));
     storage_.SetData(data);
-    this->ldata_ = data;
+    this->SetData(data);
   }
 
   /**
@@ -976,7 +975,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     storage_.SetData(data);
-    this->ldata_ = data;
+    this->SetData(data);
   }
 
   /**
@@ -996,7 +995,7 @@ public:
   Reset(T *const data, T *const ldata) noexcept
   {
     storage_.SetData(data);
-    this->ldata_ = ldata;
+    this->SetData(ldata);
   }
 
 
@@ -1058,7 +1057,7 @@ public:
   OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
               const cuda::std::array<typename Desc::stride_type, N> &strides) const {
     auto new_desc = this->template OverlapViewImpl<N>(windows, strides);
-    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
+    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->Data(), this->stf_ldata_};
   }
 
   /**
@@ -1092,7 +1091,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->template CloneImpl<N>(clones);
-    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->ldata_, this->stf_ldata_};
+    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->Data(), this->stf_ldata_};
   }
 
   template <int N>
@@ -1103,7 +1102,7 @@ public:
 
   __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
     bool managed;
-    const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)Data());
+    [[maybe_unused]] const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)this->Data());
     MATX_ASSERT(retval == CUDA_SUCCESS, matxNotSupported);
     return managed;
   }
@@ -1360,7 +1359,7 @@ public:
    * more dimensions of a tensor. This includes completely dropping an unwanted
    * dimension, or simply taking a piece of a wanted dimension. Slice() is very
    * similar to indexing operations in both Python and MATLAB.
-   * 
+   *
    * *NOTE* Users should not call Slice() directly anymore. Use the slice() operator instead.
    *
    * @param firsts
@@ -1469,7 +1468,7 @@ public:
    *
    * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
    */
-  DLManagedTensor *GetDLPackTensor() const {
+  DLManagedTensor *ToDlPack() const {
     auto mt = new DLManagedTensor;
     DLTensor *t = &mt->dl_tensor;
     CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
@@ -1477,12 +1476,12 @@ public:
     int dev_ord;
     void *data[2]       = {&mem_type, &dev_ord};
 
-    t->data             = static_cast<void*>(this->ldata_);
+    t->data             = static_cast<void*>(this->Data());
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    auto kind     = GetPointerKind(this->ldata_);
-    auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->ldata_));
+    auto kind     = GetPointerKind(this->Data());
+    [[maybe_unused]] auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->Data()));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {
@@ -1537,9 +1536,9 @@ public:
     return mt;
   }
 
-
 private:
   Storage storage_;
+  std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
 };
 
 

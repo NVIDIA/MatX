@@ -177,26 +177,25 @@ struct MemTracker {
     switch (space) {
     case MATX_MANAGED_MEMORY:
       err = cudaMallocManaged(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_HOST_MEMORY:
       err = cudaMallocHost(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_HOST_MALLOC_MEMORY:
       *ptr = malloc(bytes);
       break;
     case MATX_DEVICE_MEMORY:
       err = cudaMalloc(ptr, bytes);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
       err = cudaMallocAsync(ptr, bytes, stream);
-      MATX_ASSERT(err == cudaSuccess, matxOutOfMemory);
       break;
     case MATX_INVALID_MEMORY:
       MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
     };
+
+    MATX_ASSERT_STR_EXP(err, cudaSuccess, matxOutOfMemory, 
+      "Failed to allocate memory. May be an asynchronous error from another CUDA call");
 
     if (*ptr == nullptr) {
       MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
@@ -259,7 +258,7 @@ __MATX_INLINE__ MemTracker &GetAllocMap() {
  * @param mem Memory space
  * @return True is pointer can be printed from the host
  */
-inline bool HostPrintable(matxMemorySpace_t mem)
+__MATX_INLINE__ bool HostPrintable(matxMemorySpace_t mem)
 {
   return (mem == MATX_MANAGED_MEMORY || mem == MATX_HOST_MEMORY || mem == MATX_HOST_MALLOC_MEMORY);
 }
@@ -272,7 +271,7 @@ inline bool HostPrintable(matxMemorySpace_t mem)
  * @param mem Memory space
  * @return True is pointer can be printed from the device
  */
-inline bool DevicePrintable(matxMemorySpace_t mem)
+__MATX_INLINE__ bool DevicePrintable(matxMemorySpace_t mem)
 {
   return (mem == MATX_MANAGED_MEMORY || mem == MATX_DEVICE_MEMORY ||
           mem == MATX_ASYNC_DEVICE_MEMORY);
@@ -285,7 +284,7 @@ inline bool DevicePrintable(matxMemorySpace_t mem)
  * @param total Total memory usage
  * @param max Maximum memory usage
  */
-inline void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
+__MATX_INLINE__ void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
 {
   // std::shared_lock lck(memory_mtx);
   *current = matxMemoryStats.currentBytesAllocated;
@@ -299,7 +298,7 @@ inline void matxGetMemoryStats(size_t *current, size_t *total, size_t *max)
  * @param ptr Pointer
  * @return True if allocator
  */
-inline bool IsAllocated(void *ptr) {
+__MATX_INLINE__ bool IsAllocated(void *ptr) {
   return GetAllocMap().is_allocated(ptr);
 }
 
@@ -315,7 +314,7 @@ inline bool IsAllocated(void *ptr) {
  *also offset in a positive direction from the base, and generally if you're in
  *a specific address range the type of pointer is obvious anyways.
  **/
-inline matxMemorySpace_t GetPointerKind(void *ptr)
+__MATX_INLINE__ matxMemorySpace_t GetPointerKind(void *ptr)
 {
   return GetAllocMap().get_pointer_kind(ptr);
 }
@@ -324,7 +323,7 @@ inline matxMemorySpace_t GetPointerKind(void *ptr)
  * @brief Print memory statistics to stdout
  * 
  */
-inline void matxPrintMemoryStatistics()
+__MATX_INLINE__ void matxPrintMemoryStatistics()
 {
   size_t current, total, max;
 
@@ -346,7 +345,7 @@ inline void matxPrintMemoryStatistics()
  * @param space Memory space
  * @param stream CUDA stream (for stream allocations)
  */
-inline void matxAlloc(void **ptr, size_t bytes,
+__MATX_INLINE__ void matxAlloc(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0)
 {
@@ -356,7 +355,7 @@ inline void matxAlloc(void **ptr, size_t bytes,
 }
 
 
-inline void matxFree(void *ptr)
+__MATX_INLINE__ void matxFree(void *ptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
@@ -364,7 +363,7 @@ inline void matxFree(void *ptr)
 }
 
 
-inline void matxFree(void *ptr, cudaStream_t stream)
+__MATX_INLINE__ void matxFree(void *ptr, cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   return GetAllocMap().deallocate(ptr, stream);
@@ -375,7 +374,7 @@ inline void matxFree(void *ptr, cudaStream_t stream)
   memory that was allocated in stream A inside of stream B. The caller must ensure that the pointer
   and stream being used are valid.
 */
-inline void update_stream(void *ptr, cudaStream_t stream)
+__MATX_INLINE__ void update_stream(void *ptr, cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   GetAllocMap().update_stream(ptr, stream);
@@ -395,7 +394,7 @@ struct matx_allocator {
    * @param size Size of allocation in bytes
    * @return Pointer to allocated memory, or nullptr on error
    */
-  inline T* allocate(size_t size)
+  __MATX_INLINE__ T* allocate(size_t size)
   {
     T *tmp;
     matxAlloc(reinterpret_cast<void**>(&tmp), size);
@@ -408,12 +407,21 @@ struct matx_allocator {
    * @param ptr Pointer to allocated data
    * @param size Size of previously-allocated memory in bytes
    */
-  inline void deallocate(void *ptr, [[maybe_unused]] size_t size)
+  __MATX_INLINE__ void deallocate(void *ptr, [[maybe_unused]] size_t size)
   {
     matxFree(ptr);
   }  
 };
 
-
+__MATX_INLINE__ std::string SpaceString(matxMemorySpace_t space) {
+  switch (space) {
+    case MATX_MANAGED_MEMORY: return "CUDA managed memory";
+    case MATX_HOST_MEMORY: return "CUDA host-pinned memory";
+    case MATX_HOST_MALLOC_MEMORY: return "Host memory";
+    case MATX_DEVICE_MEMORY: return "CUDA device memory";
+    case MATX_ASYNC_DEVICE_MEMORY: return "CUDA asynchronous device memory";
+    default: return "Unknown memory";
+  }
+}
 
 } // end namespace matx

@@ -55,7 +55,7 @@ namespace matx {
   #define LAPACK_CALL(fn) LAPACK_##fn
 #else
   using lapack_int_t = index_t;
-#endif  
+#endif
 
 /* Parameter enums */
 
@@ -118,10 +118,10 @@ __MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
 
 
 template <typename Op, typename Executor>
-__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec) {
+__MATX_INLINE__ auto getSolverSupportedTensor(const Op &in, const Executor &exec, bool force = false) {
   constexpr int RANK = Op::Rank();
 
-  bool supported = true; 
+  bool supported = !force; // If we're forcing a new tensor just make it unsupported
   if constexpr (!(is_tensor_view_v<Op>)) {
     supported = false;
   } else {
@@ -159,18 +159,18 @@ enum class BatchType {
 
 /**
  * @brief Sets batch pointers for a batched tensor of arbitrary rank.
- * 
+ *
  * Clears the given batch pointers vector and then populates it
  * with pointers to the data of the tensor for batched operations.
  * Handles both batched matrices and vectors.
- * 
+ *
  * @tparam BTYPE
  *   Whether the input is a batch of matrices or vectors
  * @tparam TensorType
  *   Type of input tensor a
  * @tparam PointerType
  *   Tensor value type
- * 
+ *
  * @param a
  *   The tensor for which batch pointers are to be set.
  * @param batch_ptrs
@@ -182,7 +182,7 @@ __MATX_INLINE__ void SetBatchPointers(const TensorType &a, std::vector<PointerTy
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   batch_ptrs.clear();
-  
+
   if constexpr (BTYPE == BatchType::VECTOR && TensorType::Rank() == 1) {
     // single vector case
     batch_ptrs.push_back(&a(0));
@@ -255,38 +255,35 @@ public:
     cusolverDnDestroy(handle);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
+  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api, const cudaExecutor &exec)
   {
-#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
+    const auto stream = exec.getStream();
     if (batched_api) {
       // Newer cuSolver
       if (dspace > 0) {
-        matxAlloc(&d_workspace, dspace, MATX_DEVICE_MEMORY);
+        matxAlloc(&d_workspace, dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
-      // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex. 
+      // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex.
       // Zero it out for all types for now.
-      cudaMemset(d_workspace, 0, dspace);
-      matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_DEVICE_MEMORY);
+      cudaMemsetAsync(d_workspace, 0, dspace, stream);
+      matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
       }
     }
     else {
-#endif      
       if (dspace > 0) {
-        matxAlloc(&d_workspace, batches * dspace, MATX_DEVICE_MEMORY);
+        matxAlloc(&d_workspace, batches * dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
-      matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
-      } 
-#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)         
+      }
     }
-#endif
   }
 
   virtual void GetWorkspaceSize() = 0;
@@ -306,15 +303,15 @@ protected:
 /**
  * Dense LAPACK base class that all dense host solver types inherit common methods
  * and structures from. Depending on the decomposition, it may require different
- * types of workspace arrays.  
+ * types of workspace arrays.
  *
  * @tparam ValueType
  *   Input tensor type
- * 
+ *
  */
 template <typename ValueType>
 class matxDnHostSolver_t {
-  
+
 public:
   matxDnHostSolver_t()
   {
@@ -328,7 +325,7 @@ public:
     matxFree(iwork);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api)
+  void AllocateWorkspace([[maybe_unused]] size_t batches)
   {
     if (lwork > 0) {
       matxAlloc(&work, lwork * sizeof(ValueType), MATX_HOST_MALLOC_MEMORY);

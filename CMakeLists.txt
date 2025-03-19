@@ -14,13 +14,20 @@ endif()
 # their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
 # directories
 if(NOT DEFINED rapids-cmake-dir)
-  add_subdirectory(cmake/rapids-cmake)
+  include(FetchContent)
+  # Tell FetchContent to just use the local copy of rapids-cmake:
+  FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
+
+  # Tell FetchContent to download remote copy of rapids-cmake:
+  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
   list(APPEND CMAKE_MODULE_PATH "${rapids-cmake-dir}")
 endif()
 
 include(${rapids-cmake-dir}/cpm/cccl.cmake)
+include(${rapids-cmake-dir}/cpm/nvbench.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cuda)
@@ -61,6 +68,7 @@ option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 #option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
+option(MATX_EN_CUDSS OFF)
 option(MATX_EN_FILEIO OFF)
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
@@ -71,6 +79,7 @@ option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
+set(cudss_DIR "" CACHE PATH "Directory where cuDSS is installed.")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
@@ -129,8 +138,10 @@ rapids_cpm_cccl(
 target_link_libraries(matx INTERFACE CCCL::CCCL CCCL::cudax)
 set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr --extended-lambda)
 
-# Set flags for compiling tests faster
-set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+# Set flags for compiling tests faster (only for nvcc)
+if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+endif()
 
 # Hack because CMake doesn't have short circult evaluation
 if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -160,9 +171,13 @@ if (NOT ${IS_NVCPP} GREATER -1)
     endif()
 endif()
 
-
-
-set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+if (CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
+message((STATUS "Using Clang compiler"))
+    # Workaround for clang bug: https://github.com/llvm/llvm-project/issues/58491
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unused-command-line-argument>)
+else()
+    set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
+endif()
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
 # CUTLASS slows down compile times when used, so leave it as optional for now
@@ -182,10 +197,10 @@ if (MATX_NVTX_FLAGS)
     target_compile_definitions(matx INTERFACE MATX_NVTX_FLAGS)
 endif()
 if (MATX_BUILD_32_BIT)
-    set(INT_TYPE "lp64")
-    target_compile_definitions(matx INTERFACE INDEX_32_BIT)
+    set(MATX_NVPL_INT_TYPE "lp64")
+    target_compile_definitions(matx INTERFACE MATX_INDEX_32_BIT)
 else()
-    set(INT_TYPE "ilp64")
+    set(MATX_NVPL_INT_TYPE "ilp64")
 endif()
 
 # Host support
@@ -208,13 +223,13 @@ if (MATX_EN_NVPL OR MATX_EN_X86_FFTW OR MATX_EN_BLIS OR MATX_EN_OPENBLAS)
     endif()
 
     if (MATX_EN_NVPL)
-        message(STATUS "Enabling NVPL library support for ARM CPUs with ${INT_TYPE} interface")
+        message(STATUS "Enabling NVPL library support for ARM CPUs with ${MATX_NVPL_INT_TYPE} interface")
         find_package(nvpl REQUIRED COMPONENTS fft blas lapack HINTS ${blas_DIR})
         if (NOT MATX_BUILD_32_BIT)
             target_compile_definitions(matx INTERFACE NVPL_ILP64)
         endif()
         target_compile_definitions(matx INTERFACE NVPL_LAPACK_COMPLEX_CUSTOM)
-        target_link_libraries(matx INTERFACE nvpl::fftw nvpl::blas_${INT_TYPE}_omp nvpl::lapack_${INT_TYPE}_omp)
+        target_link_libraries(matx INTERFACE nvpl::fftw nvpl::blas_${MATX_NVPL_INT_TYPE}_omp nvpl::lapack_${MATX_NVPL_INT_TYPE}_omp)
         target_compile_definitions(matx INTERFACE MATX_EN_NVPL)
     else()
         # FFTW
@@ -252,6 +267,16 @@ if (MATX_EN_COVERAGE)
     target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
 
+# Add nvtiff support if installed
+find_library(NVTIFF_LIBRARY nvtiff)
+if (NOT NVTIFF_LIBRARY)
+    message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
+else()
+    message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
+    target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+endif()
+
+
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
     set(CUTENSORNET_VERSION 24.03.0.4)
@@ -267,6 +292,13 @@ if (MATX_EN_CUTENSOR)
     # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+endif()
+
+if (MATX_EN_CUDSS)
+    set(cuDSS_VERSION 0.4.0.2)
+    include(cmake/FindcuDSS.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
+    target_link_libraries(matx INTERFACE cuDSS::cuDSS)
 endif()
 
 if (MATX_MULTI_GPU)
@@ -302,8 +334,6 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
         target_compile_definitions(matx INTERFACE MATX_ENABLE_VIZ)
         check_python_libs("plotly.express")
     endif()
-else()
-    message(AUTHOR_WARNING "pybind11 support disabled. Visualizations and file IO will be disabled")
 endif()
 
 # Add in all CUDA linker dependencies
@@ -361,7 +391,7 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
-    include(cmake/GetNVBench.cmake)
+    rapids_cpm_nvbench()
     add_subdirectory(bench)
 endif()
 

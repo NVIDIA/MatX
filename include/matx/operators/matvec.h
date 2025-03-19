@@ -1,20 +1,20 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// COpBright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2021, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above cOpBright notice, this
+// 1. Redistributions of source code must retain the above copyright notice, this
 //    list of conditions and the following disclaimer.
 //
-// 2. Redistributions in binary form must reproduce the above cOpBright notice,
+// 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
-// 3. Neither the name of the cOpBright holder nor the names of its
+// 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
 //
@@ -36,6 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/matvec.h"
+#include "matx/transforms/matmul/matvec_cusparse.h"
 
 namespace matx
 {
@@ -99,6 +100,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
+            static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
             // stfexecutor case
             auto output = cuda::std::get<0>(out);
             if constexpr (!is_cuda_executor_v<Executor>) {
@@ -111,12 +113,20 @@ namespace matx
                 b_.apply_dep_to_task(tsk, 1);
                 tsk->*[&](cudaStream_t s) {
                     auto exec = cudaExecutor(s);
-                    matvec_impl(output, a_, b_, exec, alpha_, beta_);
+                    if constexpr (is_sparse_tensor_v<OpA>) {
+	                    sparse_matvec_impl(output, a_, b_, exec, alpha_, beta_);
+                    } else {
+                      matvec_impl(output, a_, b_, exec, alpha_, beta_);
+	                  }   
                 };
             }
             // cudaExecutor case
             else if constexpr (is_cuda_executor_v<Executor>) {
-                    matvec_impl(output, a_, b_, ex, alpha_, beta_);
+              if constexpr (is_sparse_tensor_v<OpA>) {
+	              sparse_matvec_impl(output, a_, b_, ex, alpha_, beta_);
+              } else {
+                matvec_impl(output, a_, b_, ex, alpha_, beta_);
+	            }             
             }
         }
 

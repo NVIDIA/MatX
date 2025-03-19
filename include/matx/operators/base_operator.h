@@ -73,7 +73,7 @@ namespace matx
             tp->Exec(ex);
           }          
           else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (static_cast<const T *>(this)->IsTransformSet()) {
+            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               tp->TransformExec(tp->Shape(), ex);
             }
             else {
@@ -109,7 +109,7 @@ namespace matx
         __MATX_INLINE__ void run(cudaStream_t stream = 0)
         {
           MATX_NVTX_START(detail::get_type_str(*static_cast<T *>(this)), matx::MATX_NVTX_LOG_API)
-          run(cudaExecutor{stream});
+          run(cudaExecutor{stream, false});
         }
 
         /**
@@ -122,7 +122,7 @@ namespace matx
         {
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
 
-          run(cudaExecutor{stream});
+          run(cudaExecutor{stream, false});
           cudaEventRecord(ev, stream);
         }
 

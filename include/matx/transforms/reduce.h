@@ -190,6 +190,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __n
   unsigned int *address_as_other;
   int offset;
 
+  MATX_IGNORE_WARNING_PUSH_CLANG("-Wcast-align")
   // We need to move our pointer back
   if ((uintptr_t)addr & 0x10) {
     address_as_other = (unsigned int *)(reinterpret_cast<uint8_t*>(addr) - 2);
@@ -199,6 +200,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __n
     address_as_other = (unsigned int *)(addr);
     offset = 0;
   }
+  MATX_IGNORE_WARNING_POP_CLANG
 
   unsigned short assumed;
   old.i = *address_as_other;
@@ -249,6 +251,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
   unsigned int *address_as_other;
   int offset;
 
+  MATX_IGNORE_WARNING_PUSH_CLANG("-Wcast-align")
   // We need to move our pointer back to align to a 2b boundary
   if ((uintptr_t)addr & 0x10) {
     address_as_other = (unsigned int *)(reinterpret_cast<uint8_t*>(addr) - 2);
@@ -258,6 +261,7 @@ __MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
     address_as_other = (unsigned int *)(addr);
     offset = 0;
   }
+  MATX_IGNORE_WARNING_POP_CLANG
 
   unsigned short assumed;
   old.i = *address_as_other;
@@ -366,7 +370,6 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(float *addr, float val)
 {
   unsigned int *address_as_uint = (unsigned int *)addr;
   unsigned int old = *address_as_uint, assumed;
-  unsigned int val_uint = __float_as_uint(val);
 
   // nan should be ok here but should verify
   while (val == 0.0 && old != 0.0) {
@@ -1046,7 +1049,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
   extern __shared__ char smemc_[];
   value_type *smem_ = reinterpret_cast<value_type *>(smemc_);
 
-  int s2_size, soff;
+  unsigned int s2_size, soff;
   value_type *smem;
 
   // if blockDim.x > 32 we need a 2 stage reduction
@@ -1118,7 +1121,7 @@ __global__ void matxReduceKernel(OutType dest, const InType in,
 
   // Compute offset index based on rank difference
   #pragma unroll
-  for (int r = 0; r < InType::Rank() - DRANK; r++) {
+  for (int r = 0; r < (int)(InType::Rank() - DRANK); r++) {
     indices[InType::Rank() - r - 1] = indices[InType::Rank() - (DRANK + 1 + r)];
   }
 
@@ -1529,7 +1532,6 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] 
 
   static_assert(OutType::Rank() < InType::Rank(), "reduction dimensions must be <= Rank of input");
   using inner_type = typename inner_op_type_t<typename InType::value_type>::type;
-  inner_type scale = 1;
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
@@ -2031,7 +2033,6 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] c
     }
     else {
       const index_t BATCHES = TotalSize(dest);
-      const index_t els = lend[0] - lbegin[0];
       for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]);
       }
@@ -2110,7 +2111,6 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
     }
     else {
       const index_t BATCHES = TotalSize(dest);
-      const index_t els = lend[0] - lbegin[0];
       for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
       }
@@ -2180,7 +2180,6 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] c
     }
     else {
       const index_t BATCHES = TotalSize(dest);
-      const index_t els = lend[0] - lbegin[0];
       for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]);
       }
@@ -2262,7 +2261,6 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
     }
     else {
       const index_t BATCHES = TotalSize(dest);
-      const index_t els = lend[0] - lbegin[0];
       for (index_t b = 0; b < BATCHES; b++) {
         lout[b] = cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
       }

@@ -63,11 +63,6 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
-  using input_t = typename InType::value_type;
-  using filter_t = typename FilterType::value_type;
-  
-  index_t filter_len = filter.Size(FilterType::Rank()-1);
 
   const index_t num_channels = o.Size(OutType::Rank()-1);
   const index_t nout_per_channel = o.Size(OutType::Rank()-2);
@@ -92,7 +87,6 @@ inline size_t matxChannelizePoly1DInternal_SmemSizeBytes(const OutType &o, const
   index_t filter_len = filter.Size(FilterType::Rank()-1);
 
   const index_t num_channels = o.Size(OutType::Rank()-1);
-  const index_t nout_per_channel = o.Size(OutType::Rank()-2);
   const index_t filter_phase_len = (filter_len + num_channels - 1) / num_channels;
 
   size_t smem_size = sizeof(filter_t)*(num_channels)*(filter_phase_len) +
@@ -126,11 +120,6 @@ inline void matxChannelizePoly1DInternal_Smem(OutType o, const InType &i, const 
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  using input_t = typename InType::value_type;
-  using filter_t = typename FilterType::value_type;
-
-  index_t filter_len = filter.Size(FilterType::Rank()-1);
-
   const index_t num_channels = o.Size(OutType::Rank()-1);
   const index_t nout_per_channel = o.Size(OutType::Rank()-2);
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
@@ -153,11 +142,6 @@ inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
-  using input_t = typename InType::value_type;
-  using filter_t = typename FilterType::value_type;
-  
-  index_t filter_len = filter.Size(FilterType::Rank()-1);
 
   const index_t num_channels = o.Size(OutType::Rank()-1);
   const index_t nout_per_channel = o.Size(OutType::Rank()-2);
@@ -260,7 +244,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     MATX_ASSERT_STR(out.Size(i) == in.Size(i), matxInvalidDim, "channelize_poly: input/output must have matched batch sizes");
   }
 
-  const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + num_channels - 1) / num_channels;
+  [[maybe_unused]] const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + num_channels - 1) / num_channels;
 
   MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-1 mismatch");

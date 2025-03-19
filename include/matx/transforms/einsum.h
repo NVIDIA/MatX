@@ -71,6 +71,21 @@ struct EinsumParams_t {
   cudaStream_t stream;
 };
 
+template <typename Op>
+__MATX_INLINE__ auto getEinsumSupportedTensor( const Op &in, cudaStream_t stream) {
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = [&in]() {
+    if constexpr (is_tensor_view_v<Op>) {
+      return true;
+    }
+    else {
+      return true;
+    }
+  };
+  
+  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
+}
+
 template <typename OutputTensor, typename... InT>
 class matxEinsumHandle_t {
 public:
@@ -312,8 +327,10 @@ public:
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
     i = 0;
-    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())) && ...), matxInvalidDim,
+    MATX_IGNORE_WARNING_PUSH_GCC("-Wunused-value")
+    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim,
         "Tensor rank must match number of einsum subscripts");
+    MATX_IGNORE_WARNING_POP_GCC
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
@@ -460,7 +477,6 @@ struct EinsumParamsKeyEq {
 
 namespace matx {
 namespace cutensor {
-
   /**
    * @brief Evaluates the Einstein summation on the operands
    *
@@ -489,22 +505,44 @@ namespace cutensor {
 #ifdef MATX_EN_CUTENSOR
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    auto out_n = detail::cutensor::getEinsumSupportedTensor(out, stream);
+    auto in_t = cuda::std::make_tuple(detail::cutensor::getEinsumSupportedTensor(tensors, stream)...);
+
+    using einsum_cache_t = std::unordered_map<
+      detail::cutensor::EinsumParams_t<decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>,
+      std::any,
+      detail::cutensor::EinsumParamsKeyHash<decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>,
+      detail::cutensor::EinsumParamsKeyEq<decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>
+    >;
+
+    detail::assign_tuple_tensors<0, cudaStream_t>(stream, in_t, tensors...); 
+
+    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<decltype(out_n), 
+            decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>;
+
     // Get parameters required by these tensors
-    auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
+    auto params = cuda::std::apply(
+        [&](auto&&... args) {
+            return cache_val_type::GetEinsumParams(out_n, subscripts, args...);
+        },
+        in_t
+    );    
+
     params.stream = stream;
 
-    using einsum_cache_t = std::unordered_map<detail::cutensor::EinsumParams_t<InT...>, std::any, detail::cutensor::EinsumParamsKeyHash<InT...>, detail::cutensor::EinsumParamsKeyEq<InT...>>;
-    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
     detail::GetCache().LookupAndExec<einsum_cache_t>(
-      detail::GetCacheIdFromType<einsum_cache_t>(),
-      params,
-      [&]() {
-        auto tmp = std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);
-        return tmp;
-      },
-      [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->Exec(out, stream, tensors...);
-      }
+        detail::GetCacheIdFromType<einsum_cache_t>(),
+        params,
+        [&]() {
+            return cuda::std::apply([&](auto&&... args) {
+                return std::make_shared<cache_val_type>(out_n, subscripts, stream, args...);
+            }, in_t);
+        },
+        [&](std::shared_ptr<cache_val_type> ctype) {
+            cuda::std::apply([&](auto&&... args) {
+                ctype->Exec(out_n, stream, args...);
+            }, in_t);
+        }
     );
 #else
     MATX_THROW(matxNotSupported, "einsum() currently requires MATX_EN_CUTENSOR=ON but MATX_EN_CUTENSOR=OFF");

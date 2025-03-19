@@ -39,7 +39,7 @@
 #ifdef MATX_EN_OMP
 #include <omp.h>
 #endif
-namespace matx 
+namespace matx
 {
 
 // Matches current Linux max
@@ -58,7 +58,7 @@ enum class ThreadsMode {
 
 struct HostExecParams {
   HostExecParams(int threads = 1) : threads_(threads) {}
-  HostExecParams(cpu_set_t cpu_set) : cpu_set_(cpu_set), threads_(1) {
+  HostExecParams(cpu_set_t cpu_set) : threads_(1), cpu_set_(cpu_set) {
     MATX_ASSERT_STR(false, matxNotSupported, "CPU affinity not supported yet");
   }
 
@@ -66,14 +66,16 @@ struct HostExecParams {
 
   private:
     int threads_;
-    cpu_set_t cpu_set_;
+MATX_IGNORE_WARNING_PUSH_CLANG("-Wunused-private-field")    
+    cpu_set_t cpu_set_ {0};
+MATX_IGNORE_WARNING_POP_CLANG
 };
 
 /**
  * @brief Executor for running an operator on a single or multi-threaded host
- * 
+ *
  * @tparam MODE Threading policy
- * 
+ *
  */
 template <ThreadsMode MODE = ThreadsMode::SINGLE>
 class HostExecutor {
@@ -106,13 +108,38 @@ class HostExecutor {
 
     /**
      * @brief Synchronize the host executor's threads.
-     * 
+     *
      */
     void sync() {}
 
     /**
+     * @brief Start a timer for profiling workload
+     */
+    void start_timer() { 
+      MATX_STATIC_ASSERT_STR(MODE == ThreadsMode::SINGLE, matxNotSupported, "Timer not supported in multi-threaded mode");
+      start_ = std::chrono::high_resolution_clock::now();
+     }
+
+    /**
+     * @brief Stop a timer for profiling workload
+     */      
+    void stop_timer() { 
+      MATX_STATIC_ASSERT_STR(MODE == ThreadsMode::SINGLE, matxNotSupported, "Timer not supported in multi-threaded mode");
+      stop_ = std::chrono::high_resolution_clock::now();
+    }
+
+    /**
+     * @brief Get the time in milliseconds between start_timer and stop_timer. 
+     * This will block until the event is synchronized
+     */
+    float get_time_ms() {
+      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_ - start_);
+      return static_cast<float>(static_cast<double>(duration.count()) / 1e3);
+    }    
+
+    /**
      * @brief Execute an operator
-     * 
+     *
      * @tparam Op Operator type
      * @param op Operator to execute
      */
@@ -120,7 +147,7 @@ class HostExecutor {
     void Exec(const Op &op) const noexcept {
       if constexpr (Op::Rank() == 0) {
         op();
-      } 
+      }
       else {
         index_t size = TotalSize(op);
   #ifdef MATX_EN_OMP
@@ -130,17 +157,17 @@ class HostExecutor {
             auto idx = GetIdxFromAbs(op, i);
             cuda::std::apply([&](auto... args) {
               return op(args...);
-            }, idx);        
+            }, idx);
           }
         } else
   #endif
-        { 
+        {
           for (index_t i = 0; i < size; i++) {
             auto idx = GetIdxFromAbs(op, i);
             cuda::std::apply([&](auto... args) {
               return op(args...);
-            }, idx);        
-          }      
+            }, idx);
+          }
         }
       }
     }
@@ -149,6 +176,8 @@ class HostExecutor {
 
     private:
       HostExecParams params_;
+      std::chrono::time_point<std::chrono::high_resolution_clock> start_;
+      std::chrono::time_point<std::chrono::high_resolution_clock> stop_;
 };
 
 using SingleThreadedHostExecutor = HostExecutor<ThreadsMode::SINGLE>;

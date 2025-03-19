@@ -59,11 +59,11 @@ namespace matx
         using value_type = typename T1::value_type;
 
         __MATX_INLINE__ std::string str() const { return "diag(" + op_.str() + ")"; }
- 
+
         __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) { }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
           using tt = cuda::std::tuple_element_t<0, cuda::std::tuple<Is...>>;
@@ -79,22 +79,26 @@ namespace matx
           }
           else {
             static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer op() index than rank of operator");
-            
+
             // Offset either the rows or columns by k_, depending on if it's negative
             if (k_ < 0) {
-              auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-              cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
-IGNORE_WARNING_POP_GCC
-              return cuda::std::apply(op_, tup);
+              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+              tmp[RANK - 1] = pp_get<RANK-2>(indices...);
+              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+              tmp[RANK - 2] -= k_;
+              //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
+MATX_IGNORE_WARNING_POP_GCC
+              return get_value(op_, tmp);
             }
             else {
-              auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
-IGNORE_WARNING_POP_GCC
-              return cuda::std::apply(op_, tup);                
+              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+              //auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+              tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
+              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
+MATX_IGNORE_WARNING_POP_GCC
+              return get_value(op_, tmp);
             }
           }
         }
@@ -162,13 +166,13 @@ IGNORE_WARNING_POP_GCC
    *   Diagonal to pull (0 is the main diagonal). Only used for 2D tensors and above
    */
 #ifdef DOXYGEN_ONLY
-  auto __MATX_INLINE__ diag(const T1 &t, index_t k = 0) { 
+  auto __MATX_INLINE__ diag(const T1 &t, index_t k = 0) {
 #else
   template <typename T1, std::enable_if_t<is_matx_op<T1>(), bool> = true>
-    auto __MATX_INLINE__ diag(T1 t, index_t k = 0) { 
-#endif      
-      MATX_ASSERT_STR(T1::Rank() != 1 || k == 0, matxInvalidParameter, 
+    auto __MATX_INLINE__ diag(T1 t, index_t k = 0) {
+#endif
+      MATX_ASSERT_STR(T1::Rank() != 1 || k == 0, matxInvalidParameter,
           "k parameter in diag() can only be used for 2D tensors and above");
-      return detail::DiagOp<T1, T1::Rank()>(t, k); 
-    } 
+      return detail::DiagOp<T1, T1::Rank()>(t, k);
+    }
 } // end namespace matx

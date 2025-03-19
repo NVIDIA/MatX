@@ -109,7 +109,7 @@ namespace detail {
 
       // Size is not relevant in einsum() since there are multiple return values and it
       // is not allowed to be called in larger expressions
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
       {
         return 0;
       }

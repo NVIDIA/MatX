@@ -27,7 +27,7 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <matx/core/type_utils.h>
@@ -136,23 +136,47 @@ namespace matx {
 
     template <typename Op>
     void PrintShapeImpl(const Op& op, FILE *fp) {
-      std::string type = (is_tensor_view_v<Op>) ? "Tensor" : "Operator";      
+      if constexpr (is_tensor_view_v<Op>) {
+        fprintf(fp, "%s: ", op.str().c_str());
+      }
+
+      std::string type;
+      if constexpr (is_sparse_tensor_v<Op>)
+        type = "SparseTensor";
+      else if constexpr (is_tensor_view_v<Op>)
+        type = "Tensor";
+      else
+        type = "Operator";
       fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorTypeString<typename Op::value_type>().c_str(), op.Rank());
       for (index_t dimIdx = 0; dimIdx < op.Rank(); dimIdx++)
       {
-        fprintf(fp, "%" INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
+        fprintf(fp, "%" MATX_INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
         if( dimIdx < (op.Rank() - 1) )
           fprintf(fp, ", ");
       }
 
-      if constexpr (is_tensor_view_v<Op>)
+      if constexpr (is_sparse_tensor_v<Op>)
+      {
+        // A sparse tensor has no strides, so show the level sizes instead.
+        // These are obtained by translating dims to levels using the format.
+        cuda::std::array<index_t, Op::Format::LVL> lvlsz;
+        Op::Format::dim2lvl(op.Shape().data(), lvlsz.data(), /*asSize=*/true);
+        fprintf(fp, "], Levels:[");
+        for (int lvlIdx = 0; lvlIdx < Op::Format::LVL; lvlIdx++) {
+          fprintf(fp, "%" MATX_INDEX_T_FMT, lvlsz[lvlIdx]);
+          if (lvlIdx < (Op::Format::LVL - 1)) {
+            fprintf(fp, ", ");
+          }
+        }
+      }
+      else if constexpr (is_tensor_view_v<Op>)
       {
         fprintf(fp, "], Strides:[");
         if constexpr (Op::Rank() > 0)
         {
           for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
           {
-            fprintf(fp, "%" INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
+            fprintf(fp, "%" MATX_INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
             if( dimIdx < (op.Rank() - 1) )
             {
               fprintf(fp, ",");
@@ -161,8 +185,8 @@ namespace matx {
         }
       }
 
-      fprintf(fp, "]\n");      
-    }    
+      fprintf(fp, "]\n");
+    }
 
 
     /**
@@ -195,7 +219,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+            fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
           }
           PrintVal(fp, op.operator()(_k));
           if (_k == (op.Size(0)-1)) {
@@ -223,7 +247,7 @@ namespace matx {
           for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
             if (_l == 0) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
               }
               else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                 if (_k == 0) {
@@ -284,7 +308,7 @@ namespace matx {
             }
           }
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "[%06" INDEX_T_FMT ",:,:]\n", _j);
+            fprintf(fp, "[%06" MATX_INDEX_T_FMT ",:,:]\n", _j);
           }
           for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -311,7 +335,7 @@ namespace matx {
             for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
               if (_l == 0) {
                 if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                  fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                  fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                 }
                 else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                   if (_k == 0) {
@@ -395,7 +419,7 @@ namespace matx {
               }
             }
             if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-              fprintf(fp, "[%06" INDEX_T_FMT ",%06" INDEX_T_FMT ",:,:]\n", _i, _j);
+              fprintf(fp, "[%06" MATX_INDEX_T_FMT ",%06" MATX_INDEX_T_FMT ",:,:]\n", _i, _j);
             }
             for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
@@ -422,7 +446,7 @@ namespace matx {
               for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
                 if (_l == 0) {
                   if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                    fprintf(fp, "%06" INDEX_T_FMT ": ", _k);
+                    fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
                   }
                   else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
                     if (_k == 0) {
@@ -506,7 +530,7 @@ namespace matx {
         PrintData(fp, tmpv, dims...);
       }
   #endif
-    }    
+    }
 
 
     /**
@@ -539,7 +563,39 @@ namespace matx {
 
     #ifdef __CUDACC__
       cudaDeviceSynchronize();
-      if constexpr (is_tensor_view_v<Op>) {
+      if constexpr (is_sparse_tensor_v<Op>) {
+        using Format = typename Op::Format;
+        fprintf(fp, "format = ");
+        Format::print();
+        const auto kind = GetPointerKind(op.Data());
+        fprintf(fp, "space  = %s\n", SpaceString(kind).c_str());
+        const auto nse = op.Nse();
+        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
+        if (HostPrintable(kind)) {
+          for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
+            if (const index_t pend = op.posSize(lvlIdx)) {
+              fprintf(fp, "pos[%d] = (", lvlIdx);
+              for (index_t i = 0; i < pend; i++) {
+                PrintVal(fp, op.POSData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
+            }
+            if (const index_t cend = op.crdSize(lvlIdx)) {
+              fprintf(fp, "crd[%d] = (", lvlIdx);
+              for (index_t i = 0; i < cend; i++) {
+                PrintVal(fp, op.CRDData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
+            }
+          }
+          fprintf(fp, "values = (");
+          for (index_t i = 0; i < nse; i++) {
+            PrintVal(fp, op.Data()[i]);
+          }
+          fprintf(fp, ")\n");
+        }
+      }
+      else if constexpr (is_tensor_view_v<Op>) {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
         // as if it's not const. This is because the ownership decision is done at runtime instead of compile-time,
         // so even though the lookup will never be done, the compilation path happens.
@@ -596,7 +652,7 @@ namespace matx {
   template <typename T>
   void print_shape(const T& op) {
     detail::PrintShapeImpl(op, stdout);
-  }  
+  }
 
   /**
    * @brief print a tensor's values to output file stream
@@ -649,7 +705,7 @@ namespace matx {
    */
   template <typename Op, typename... Args,
             std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-  void fprint(FILE* fp, const Op &op, Args... dims) {
+  void fprint(FILE* fp, const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
     auto tp = cuda::std::tuple_cat(arr);
     cuda::std::apply([&](auto &&...args) { fprint(fp, op, args...); }, tp);
@@ -683,21 +739,36 @@ namespace matx {
   }
 
   /**
-   * @brief Print a tensor's all values to stdout
+   * @brief Print all of a tensor's values to stdout
    *
-   * This form of `print()` is a specialization for 0D tensors. 
+   * This form of `print()` is a specialization for 1D+ tensors. A size of zero in
+   * dimension prints all elements in that dimension.
    *
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op, 
+  template <typename Op, typename... Args,
+            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) > 0), bool> = true>
+  void print(const Op &op, [[maybe_unused]] Args... dims) {
+    fprint(stdout, op, dims...);
+  }
+
+  /**
+   * @brief Print a tensor's all values to stdout
+   *
+   * This form of `print()` is a specialization for 0D tensors.
+   *
+   * @tparam Op Operator input type
+   * @param op Operator input
+   */
+  template <typename Op,
           std::enable_if_t<(Op::Rank() == 0), bool> = true>
-  void print(const Op &op) 
+  void print(const Op &op)
   {
     fprint(stdout, op);
   }
 
-  #endif // not DOXYGEN_ONLY  
+  #endif // not DOXYGEN_ONLY
 
   /**
    * @brief Set the print() precision for floating point values
@@ -733,6 +804,6 @@ namespace matx {
    */
   __MATX_INLINE__ __MATX_HOST__ enum PrintFormatType get_print_format_type() {
     return PRINT_FORMAT_TYPE;
-  }  
+  }
 
 } // End namespace matx

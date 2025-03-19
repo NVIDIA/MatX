@@ -132,8 +132,6 @@ namespace matx {
 
     template <typename Op, typename ValidFunc>
     __MATX_INLINE__ auto GetSupportedTensor(const Op &in, const ValidFunc &fn, matxMemorySpace_t space, cudaStream_t stream = 0) {
-      constexpr int RANK = Op::Rank();
-
       if constexpr (is_matx_transform_op<Op>()) {
         // We can assume that if a transform is passed to the input then PreRun has already completed
         // on the transform and we can use the internal pointer

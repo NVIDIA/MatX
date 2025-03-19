@@ -382,7 +382,6 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
   MATX_ENTER_HANDLER();
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   const index_t a_len = 2500;
@@ -421,7 +420,6 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
   MATX_ENTER_HANDLER();
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using InnerType = typename test_types::inner_type<TestType>::type;
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   cudaStream_t stream = 0;

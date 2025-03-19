@@ -77,7 +77,7 @@ namespace matx
       __MATX_INLINE__ StackOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
-        static_assert((... && (RANK == ts.Rank())), "stacked ops must have the same rank");
+        static_assert((... && (RANK == Ts::Rank())), "stacked ops must have the same rank");
 
         for (int32_t i = 0; i < RANK; i++) {
           MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
@@ -86,42 +86,42 @@ namespace matx
       }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
 
-          if constexpr ( I == N ) {
-            // This should never happen
-            return value_type(-9999);
+        if constexpr ( I == N ) {
+          // This should never happen
+          return value_type(-9999);
+        } else {
+          if ( I < oidx ) {
+            // this is not the correct operator, recurse
+            return GetVal<I+1, N>(oidx, indices);
           } else {
-            if ( I < oidx ) {
-              // this is not the correct operator, recurse
-              return GetVal<I+1, N>(oidx, indices);
-            } else {
-              // this is the correct operator, return it's value
-              auto &op = cuda::std::get<I>(ops_);
-              return cuda::std::apply(op, indices);
-            }
+            // this is the correct operator, return it's value
+            auto &op = cuda::std::get<I>(ops_);
+            return get_value(op, indices);
           }
         }
+      }
 
       template <int I = 0, int N>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
 
-          if constexpr ( I == N ) {
-            // This should never happen
-            auto &op = cuda::std::get<I-1>(ops_);
-            return cuda::std::apply(op, indices);
+        if constexpr ( I == N ) {
+          // This should never happen
+          auto &op = cuda::std::get<I-1>(ops_);
+          return get_value(op, indices);
 
+        } else {
+          if ( I < oidx ) {
+            // this is not the correct operator, recurse
+            return GetVal<I+1, N>(oidx, indices);
           } else {
-            if ( I < oidx ) {
-              // this is not the correct operator, recurse
-              return GetVal<I+1, N>(oidx, indices);
-            } else {
-              // this is the correct operator, return it's value
-              auto &op = cuda::std::get<I>(ops_);
-              return cuda::std::apply(op, indices);
-            }
+            // this is the correct operator, return it's value
+            auto &op = cuda::std::get<I>(ops_);
+            return get_value(op, indices);
           }
         }
+      }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const

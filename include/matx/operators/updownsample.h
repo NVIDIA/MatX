@@ -78,7 +78,7 @@ namespace matx
           cuda::std::array<index_t, Rank()> ind{indices...};
           if ((ind[dim_] % n_) == 0) {
             ind[dim_] /= n_;
-            return cuda::std::apply(op_, ind);
+            return get_value(op_, ind);
           }
 
           return static_cast<typename decltype(op_)::value_type>(0);

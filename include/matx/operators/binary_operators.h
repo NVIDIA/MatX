@@ -36,7 +36,7 @@
 #include "matx/operators/base_operator.h"
 #include "matx/operators/scalar_ops.h"
 
-#define DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
+#define MATX_DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
   template <typename I1, typename I2,                                \
             typename = typename std::enable_if_t<is_matx_op<I1>() or \
                                                  is_matx_op<I2>()>>  \
@@ -54,7 +54,7 @@ namespace matx
 {
   /**
    * @brief Utility operator for multiplying scalars by a complex value
-   * 
+   *
    * @tparam T Complex type
    * @tparam S Scalar type
    * @param n Scalar value
@@ -72,7 +72,7 @@ namespace matx
 
   /**
    * @brief Utility operator for multiplying scalars by a complex value
-   * 
+   *
    * @tparam T Complex type
    * @tparam S Scalar type
    * @param n Scalar value
@@ -112,8 +112,8 @@ namespace matx
       {
         if constexpr (Rank() > 0)
         {
-          ASSERT_COMPATIBLE_OP_SIZES(in1_);
-          ASSERT_COMPATIBLE_OP_SIZES(in2_);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(in1_);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(in2_);
         }
       }
 
@@ -130,8 +130,8 @@ namespace matx
       {
         return cuda::std::apply([&](auto &&...args)  {
             return this->operator()(args...);
-          }, idx);      
-      }        
+          }, idx);
+      }
 
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -171,7 +171,7 @@ namespace matx
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept  
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<I1>()) {
           in1_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -180,7 +180,7 @@ namespace matx
         if constexpr (is_matx_op<I2>()) {
           in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }      
+      }
     };
   }
 
@@ -365,7 +365,7 @@ namespace matx
    * @param t2
    *   RHS tensor or operator input
    */
-  Op operator|(Op t, Op t2) {}  
+  Op operator|(Op t, Op t2) {}
 
   /**
    * Compute t ^ t2 (bitwise XOR) of two operators or tensors
@@ -374,7 +374,7 @@ namespace matx
    * @param t2
    *   RHS tensor or operator input
    */
-  Op operator^(Op t, Op t2) {}    
+  Op operator^(Op t, Op t2) {}
 
   /**
    * Compute the arctangent of two inputs
@@ -383,31 +383,31 @@ namespace matx
    * @param t2
    *   Y value of input
    */
-  Op atan2(Op t, Op t2) {}  
+  Op atan2(Op t, Op t2) {}
 #else
-  DEFINE_BINARY_OP(operator+, detail::AddOp);
-  DEFINE_BINARY_OP(operator-, detail::SubOp);
-  DEFINE_BINARY_OP(operator*, detail::MulOp);
-  DEFINE_BINARY_OP(mul, detail::MulOp);
-  DEFINE_BINARY_OP(operator/, detail::DivOp);
-  DEFINE_BINARY_OP(operator%, detail::ModOp);
-  DEFINE_BINARY_OP(fmod, detail::FModOp);
-  DEFINE_BINARY_OP(operator|, detail::OrOp);
-  DEFINE_BINARY_OP(operator&, detail::AndOp);
-  DEFINE_BINARY_OP(operator^, detail::XorOp);
-  DEFINE_BINARY_OP(pow, detail::PowOp);
-  DEFINE_BINARY_OP(max, detail::MaximumOp);
-  DEFINE_BINARY_OP(atan2, detail::Atan2Op);
-  DEFINE_BINARY_OP(min, detail::MinimumOp);
-  DEFINE_BINARY_OP(operator<, detail::LTOp);
-  DEFINE_BINARY_OP(operator>, detail::GTOp);
-  DEFINE_BINARY_OP(operator<=, detail::LTEOp);
-  DEFINE_BINARY_OP(operator>=, detail::GTEOp);
-  DEFINE_BINARY_OP(operator==, detail::EQOp);
-  DEFINE_BINARY_OP(operator!=, detail::NEOp);
-  DEFINE_BINARY_OP(operator&&, detail::AndAndOp);
-  DEFINE_BINARY_OP(operator||, detail::OrOrOp);
-  DEFINE_UNARY_OP(operator!, detail::NotOp);
+  MATX_DEFINE_BINARY_OP(operator+, detail::AddOp);
+  MATX_DEFINE_BINARY_OP(operator-, detail::SubOp);
+  MATX_DEFINE_BINARY_OP(operator*, detail::MulOp);
+  MATX_DEFINE_BINARY_OP(mul, detail::MulOp);
+  MATX_DEFINE_BINARY_OP(operator/, detail::DivOp);
+  MATX_DEFINE_BINARY_OP(operator%, detail::ModOp);
+  MATX_DEFINE_BINARY_OP(fmod, detail::FModOp);
+  MATX_DEFINE_BINARY_OP(operator|, detail::OrOp);
+  MATX_DEFINE_BINARY_OP(operator&, detail::AndOp);
+  MATX_DEFINE_BINARY_OP(operator^, detail::XorOp);
+  MATX_DEFINE_BINARY_OP(pow, detail::PowOp);
+  MATX_DEFINE_BINARY_OP(max, detail::MaximumOp);
+  MATX_DEFINE_BINARY_OP(atan2, detail::Atan2Op);
+  MATX_DEFINE_BINARY_OP(min, detail::MinimumOp);
+  MATX_DEFINE_BINARY_OP(operator<, detail::LTOp);
+  MATX_DEFINE_BINARY_OP(operator>, detail::GTOp);
+  MATX_DEFINE_BINARY_OP(operator<=, detail::LTEOp);
+  MATX_DEFINE_BINARY_OP(operator>=, detail::GTEOp);
+  MATX_DEFINE_BINARY_OP(operator==, detail::EQOp);
+  MATX_DEFINE_BINARY_OP(operator!=, detail::NEOp);
+  MATX_DEFINE_BINARY_OP(operator&&, detail::AndAndOp);
+  MATX_DEFINE_BINARY_OP(operator||, detail::OrOrOp);
+  MATX_DEFINE_UNARY_OP(operator!, detail::NotOp);
 #endif
 
 } // end namespace matx
