@@ -12,6 +12,7 @@ set(examples
     pwelch
     resample_poly_bench
     sparse_tensor
+    simple_stf_test
     spectrogram
     spectrogram_graph
     spherical_harmonics
@@ -19,9 +20,6 @@ set(examples
     qr
     black_scholes
     print_styles)
-
-
-
 
 add_library(example_lib INTERFACE)
 target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
@@ -53,6 +51,21 @@ foreach( example ${examples} )
     add_executable( ${example} ${file} )
     target_link_libraries(${example} example_lib)
 endforeach()
+
+# Compile all examples with CUDASTF and append their name with _stf
+foreach( example ${examples} )
+    string( CONCAT file ${example} ".cu" )
+
+    set(output_name "${example}_stf")
+    add_executable( ${output_name} ${file} )
+
+    # Add the -DUSE_STF compilation flag
+    target_compile_definitions(${output_name} PRIVATE USE_STF)
+
+    target_link_libraries(${output_name} example_lib)
+endforeach()
+
+
 
 # Build proprietary examples
 file (GLOB_RECURSE proprietary_sources CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/proprietary/*/examples/*.cu)

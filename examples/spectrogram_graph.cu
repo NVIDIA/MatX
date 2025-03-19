@@ -62,11 +62,21 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  cudaExecutor exec{stream};
-
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
+
+#ifdef USE_STF
+  std::cout << "Using STF executor\n";
+#else
+  std::cout << "Using CUDA executor\n";
+#endif
+
+#ifdef USE_STF
+  stfExecutor exec{stream};
+#else
+  cudaExecutor exec{stream};
+#endif
 
   float fs = 10000;
   index_t N = 100000;
@@ -147,15 +157,33 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
-
   exec.sync();
   // Time graph execution of same kernels
-  cudaEventRecord(start, stream);
+#if USE_STF
+      auto ctx = exec.getCtx();
+      cudaEventRecord(start, ctx.task_fence());
+#else
+      cudaEventRecord(start, stream);
+#endif
+
   for (uint32_t i = 0; i < 10; i++) {
     cudaGraphLaunch(instance, stream);
   }
+#ifdef USE_STF
+{
+    cudaEventRecord(stop, ctx.task_fence());
+}
+#else
   cudaEventRecord(stop, stream);
+#endif
   exec.sync();
+
+#ifdef USE_STF
+{
+  ctx.finalize();
+}
+#endif
+
   cudaEventElapsedTime(&time_ms, start, stop);
 
   printf("Spectrogram Time With Graphs = %.2fus per iteration\n",

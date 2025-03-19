@@ -120,7 +120,6 @@ public:
   RadarPipeline() = delete;
   ~RadarPipeline()
   {
-
   }
 
   /**
@@ -465,5 +464,10 @@ private:
   tensor_t<typename ComplexType::value_type, 2> cfarMaskView;
 
   cudaStream_t stream;
+#ifdef USE_STF
+public:
+  stfExecutor exec;
+#else
   cudaExecutor exec;
+#endif
 };

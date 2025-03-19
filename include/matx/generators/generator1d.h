@@ -54,6 +54,9 @@ namespace matx
             return f_(pp_get<Dim>(indices...));
           }
 
+        template <typename Task>
+        __MATX_INLINE__ void apply_dep_to_task([[maybe_unused]] Task &&task, [[maybe_unused]] int perm=1) const noexcept { }
+
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
         {
           return *(s_.begin() + dim);
