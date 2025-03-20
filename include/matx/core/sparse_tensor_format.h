@@ -39,6 +39,32 @@ namespace matx {
 namespace experimental {
 
 //
+// A level expression consists of an expression in terms of dimension
+// variables (e.g. di, di div 2, or di mod 2).
+//
+enum class LvlOp { Id, Div, Mod };
+template <LvlOp o, int d, int c> class LvlExpr {
+public:
+  static constexpr LvlOp op = o;
+  static constexpr int di = d;
+  static constexpr int cj = c;
+
+  static constexpr bool isId(int i) { return op == LvlOp::Id && di == i; }
+
+  static std::string toString() {
+    if constexpr (op == LvlOp::Id) {
+      return "d" + std::to_string(di);
+    } else if constexpr (op == LvlOp::Div) {
+      return "d" + std::to_string(di) + " div " + std::to_string(cj);
+    } else if constexpr (op == LvlOp::Mod) {
+      return "d" + std::to_string(di) + " mod " + std::to_string(cj);
+    } else { // Should not happen
+      return "?";
+    }
+  }
+};
+
+//
 // A level type consists of a level format together with a set of
 // level properties (unique and ordered by default).
 //
@@ -77,32 +103,6 @@ public:
       return "compressed(non-unique)";
     } else if constexpr (isSingleton()) {
       return "singleton";
-    } else { // Should not happen
-      return "?";
-    }
-  }
-};
-
-//
-// A level expression consists of an expression in terms of dimension
-// variables (e.g. di, di div 2, or di mod 2).
-//
-enum class LvlOp { Id, Div, Mod };
-template <LvlOp o, int d, int c> class LvlExpr {
-public:
-  static constexpr LvlOp op = o;
-  static constexpr int di = d;
-  static constexpr int cj = c;
-
-  static constexpr bool isId(int i) { return op == LvlOp::Id && di == i; }
-
-  static std::string toString() {
-    if constexpr (op == LvlOp::Id) {
-      return "d" + std::to_string(di);
-    } else if constexpr (op == LvlOp::Div) {
-      return "d" + std::to_string(di) + " div " + std::to_string(cj);
-    } else if constexpr (op == LvlOp::Mod) {
-      return "d" + std::to_string(di) + " mod " + std::to_string(cj);
     } else { // Should not happen
       return "?";
     }
