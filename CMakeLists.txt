@@ -77,6 +77,7 @@ option(MATX_EN_OPENBLAS OFF "Enable OpenBLAS (BLAS + LAPACK) support")
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
+option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -143,7 +144,7 @@ if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # Hack because CMake doesn't have short circult evaluation
-if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR MATX_EN_CUDA_LINEINFO)
     set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -lineinfo)
 endif()
 

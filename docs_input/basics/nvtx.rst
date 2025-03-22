@@ -1,3 +1,5 @@
+.. _nvtx-profiling:
+
 NVTX Profiling
 ##############
 

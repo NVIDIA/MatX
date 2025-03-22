@@ -66,9 +66,9 @@ is available in the :ref:`Executor Compatibility <executor_compatibility>` secti
 .. _FFTW: http://www.fftw.org/
 .. _BLIS: https://github.com/flame/blis
 
-Build Options
+Build Targets
 =============
-MatX provides 5 primary options for builds, and each can be configured independently:
+MatX provides 4 primary targets for builds, and each can be configured independently:
 
 .. list-table::
   :widths: 60 40
@@ -84,9 +84,6 @@ MatX provides 5 primary options for builds, and each can be configured independe
     - ``-DMATX_BUILD_EXAMPLES=ON`` 
   * - Documentation
     - ``-DMATX_BUILD_DOCS=ON``             
-  * - NVTX Flags
-    - ``-DMATX_NVTX_FLAGS=ON``    
-
 
 Everything but documentation requires building MatX source code, and all requirements in the first section of this document apply.
 Building documentation will be covered later in this document.
@@ -156,6 +153,93 @@ directory ``build/docs_input/sphinx`` will be created containing all documentati
 to browse the documentation. Note that the most recent version of the documentation is also hosted at:
 
 https://nvidia.github.io/MatX/
+
+Additional Build Options
+========================
+
+There are several additional build options to control code generation or other instrumentation.
+By default, all of these options are OFF.
+
+.. list-table::
+  :widths: 60 40
+  :header-rows: 1
+
+  * - Type
+    - CMake Option
+  * - NVTX Flags
+    - ``-DMATX_NVTX_FLAGS=ON``
+  * - 32-bit Indices
+    - ``-DMATX_BUILD_32_BIT=ON``
+  * - File I/O Support
+    - ``-DMATX_EN_FILEIO=ON``
+  * - Code Coverage
+    - ``-DMATX_EN_COVERAGE=ON``
+  * - Complex Operations NaN/Inf Handling
+    - ``-DMATX_EN_COMPLEX_OP_NAN_CHECKS=ON``
+  * - CUDA Line Info
+    - ``-DMATX_EN_CUDA_LINEINFO=ON``
+
+NVTX Flags
+----------
+
+Enabling NVTX flags adds NVTX ranges for existing MatX operations and enables users to add NVTX ranges to their own code
+using the provided MatX NVTX macros. See :ref:`nvtx-profiling` for more information.
+
+32-bit Indices
+--------------
+
+Enabling 32-bit indices utilizes 32-bit signed integers as the ``index_t`` data type in MatX.
+This data type is used for sizing tensors and for indexing into tensors. By default, ``index_t``
+is a 64-bit signed integer type, which allows for tensors exceeding 2\ :sup:`31`-1 in size.
+If all of the tensors in your application will be less than 2\ :sup:`31`-1 elements, then using
+a 32-bit index type improves performance for some operations.
+
+File I/O Support
+----------------
+
+Enables support to read and write data from/to csv, npy, and mat files.
+This option adds pybind11 as a dependency. See :ref:`io` for more information on the available I/O functions.
+
+Code Coverage
+-------------
+
+Adds compiler and linker arguments (e.g., ``-fprofile-arcs -ftest-coverage``) to support use of code coverage tools like gcov.
+
+Complex Operations NaN/Inf Handling
+-----------------------------------
+
+Complex multiplication using the ``cuda::std::complex<T>`` types can be directly implemented via:
+
+.. code-block:: cpp
+
+  const cuda::std::complex<float> prod(
+    x.real() * y.real() - x.imag() * y.imag(),
+    x.real() * y.imag() + x.imag() * y.real());
+
+With this implementation, typical propagation of NaNs and infinite values will apply. For example, the
+following direct complex multiplication implementation
+
+.. code-block:: cpp
+
+  const cuda::std::complex<float> x(
+    cuda::std::numeric_limits<float>::infinity(), cuda::std::numeric_limits<float>::infinity());
+  const cuda::std::complex<float> y(std::nan(""), 1.0f);
+
+will yield ``NaN`` for both the real and imaginary components.
+Annex G of the C11 Standard introduces different handling for such cases so that, for example, the
+above case yields positive or negative infinity in each of the components. The CCCL library used by MatX for
+the ``cuda::std::complex`` implementation supports this extra handling for multiplication and division
+(specifically, ``operator*()`` and ``operator/()``) of the complex type, but MatX disables it by default and
+yields the semantics of the direct implementation above.
+Using the ``-DMATX_EN_COMPLEX_OP_NAN_CHECKS=ON`` CMake option or otherwise defining the ``MATX_EN_COMPLEX_OP_NAN_CHECKS``
+macro will enable these additional checks. Enabling this option introduces extra cost in complex multiplication and division.
+
+CUDA Line Info
+--------------
+
+Using the ``-DMATX_EN_CUDA_LINEINFO=ON`` CMake command-line argument will enable CUDA kernel line information in the
+produced libraries or executables. This is equivalent to using the ``-lineinfo`` option with NVCC. Line information is
+useful when using the debugger or profiler (e.g., when using the ``--import-source=yes`` option with Nsight Compute).
 
 MatX Library Linking
 ====================
