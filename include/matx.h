@@ -37,8 +37,9 @@
 #endif
 #include <cuda_runtime_api.h>
 #endif
-#include <cuda/std/ccomplex>
 
+// defines.h should always be included first. Its definitions may impact
+// the behavior of other headers.
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
 #include "matx/file_io/file_io.h"
@@ -59,6 +60,7 @@
 #include "matx/operators/operators.h"
 #include "matx/transforms/transforms.h"
 
+#include <cuda/std/complex>
 namespace matx {
   using fcomplex = cuda::std::complex<float>;
   using dcomplex = cuda::std::complex<double>;
