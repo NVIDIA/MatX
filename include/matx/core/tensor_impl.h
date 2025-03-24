@@ -262,8 +262,9 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> =     true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc, std::optional<stf_logicaldata_type > *stf_ldata)
-        : ldata_(ldata), desc_{std::forward<DescriptorType>(desc)}, stf_ldata_(stf_ldata)
+        : desc_{std::forward<DescriptorType>(desc)}, stf_ldata_(stf_ldata)
     {
+        data_.ldata_ = ldata;
     }
 
     /**
