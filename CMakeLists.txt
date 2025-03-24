@@ -136,7 +136,9 @@ rapids_cpm_cccl(
 )
 
 target_link_libraries(matx INTERFACE CCCL::CCCL CCCL::cudax)
-set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr --extended-lambda)
+target_compile_options(matx INTERFACE
+  $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --extended-lambda>
+)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
