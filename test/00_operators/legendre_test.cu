@@ -55,7 +55,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
     // example-begin legendre-test-1
     auto n = range<0, 1, int>({order}, 0, 1);
     auto m = range<0, 1, int>({order}, 0, 1);
-    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
+    auto x = as_type<TestType>(linspace(TestType(0), TestType(1), size));
 
     auto out = make_tensor<TestType>({order, order, size});
 
@@ -80,7 +80,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
  
   { // constant for n
     auto m = range<0, 1, int>({order}, 0, 1);
-    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
+    auto x = as_type<TestType>(linspace(TestType(0), TestType(1), size));
 
     auto out = make_tensor<TestType>({order, size});
 
@@ -101,7 +101,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
   }
 
   { // taking a constant for m and n;
-    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
+    auto x = as_type<TestType>(linspace(TestType(0), TestType(1), size));
 
     auto out = make_tensor<TestType>({size});
 
@@ -120,7 +120,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
   }
   
   { // taking a rank0 tensor for m and constant for n
-    auto x = as_type<TestType>(linspace<0>({size}, TestType(0), TestType(1)));
+    auto x = as_type<TestType>(linspace(TestType(0), TestType(1), size));
     auto m = make_tensor<int>({});
     auto out = make_tensor<TestType>({size});
     m() = order;

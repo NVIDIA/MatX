@@ -16,8 +16,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceAndReduceOp)
 
   tensor_t<TestType, 2> t2t{{20, 10}};
   tensor_t<TestType, 3> t3t{{30, 20, 10}};
-  (t2t = linspace<1>(t2t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
-  (t3t = linspace<2>(t3t.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  (t2t = clone<2>(linspace((inner_type)0, (inner_type)10, 10), {t2t.Size(0), matxKeepDim})).run(exec);
+  (t3t = clone<3>(linspace((inner_type)0, (inner_type)10, 10), {t3t.Size(0), t3t.Size(1), matxKeepDim})).run(exec);
   exec.sync();
 
   {
