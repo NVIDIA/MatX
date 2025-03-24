@@ -853,7 +853,7 @@ public:
    * @param dims
    *   Dimensions of tensor
    *
-   * @returns tensor view of only imaginary-valued components
+   * @returns permuted tensor view
    *
    */
   __MATX_INLINE__ auto Permute(const cuda::std::array<int32_t, RANK> &dims) const
@@ -877,7 +877,7 @@ public:
    * @param dims
    *   Dimensions of tensor
    *
-   * @returns tensor view of only imaginary-valued components
+   * @returns permuted tensor view
    *
    */
   __MATX_INLINE__ auto Permute(const int32_t (&dims)[RANK]) const
