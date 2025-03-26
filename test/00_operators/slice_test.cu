@@ -20,9 +20,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   auto t3 = make_tensor<TestType>({30, 20, 10});
   auto t4 = make_tensor<TestType>({40, 30, 20, 10});
 
-  (t2 = linspace<1>(t2.Shape(), (inner_type)0, (inner_type)10)).run(exec);
-  (t3 = linspace<2>(t3.Shape(), (inner_type)0, (inner_type)10)).run(exec);
-  (t4 = linspace<3>(t4.Shape(), (inner_type)0, (inner_type)10)).run(exec);
+  (t2 = clone<2>(linspace((inner_type)0, (inner_type)10, 10), {t2.Size(0), matxKeepDim})).run(exec);
+  (t3 = clone<3>(linspace((inner_type)0, (inner_type)10, 10), {t3.Size(0), t3.Size(1), matxKeepDim})).run(exec);
+  (t4 = clone<4>(linspace((inner_type)0, (inner_type)10, 10), {t4.Size(0), t4.Size(1), t4.Size(2), matxKeepDim})).run(exec);
   exec.sync();
 
   // Slice with different start and end points in each dimension

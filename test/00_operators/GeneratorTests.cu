@@ -300,8 +300,8 @@ TEST(OperatorTests, MeshGrid)
   auto xv = make_tensor<dtype>({yd, xd});
   auto yv = make_tensor<dtype>({yd, xd});
 
-  auto x = linspace<0>({xd}, 1, xd);
-  auto y = linspace<0>({yd}, 1, yd);
+  auto x = linspace(1, xd, xd);
+  auto y = linspace(1, yd, yd);
 
   // Create a mesh grid with "x" as x extents and "y" as y extents and assign it to "xv"/"yv"
   auto [xx, yy] = meshgrid(x, y);
@@ -476,21 +476,62 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
   ExecType exec{};   
 
-  // example-begin linspace-gen-test-1
-  index_t count = 100;
-  auto t1 = make_tensor<TestType>({count});
+  {
+    // example-begin linspace-gen-test-1
+    index_t count = 100;
+    auto t1 = make_tensor<TestType>({count});
 
-  // Create a set of linearly-spaced numbers starting at 1, ending at 100, and 
-  // with `count` points in between
-  (t1 = linspace<0>(t1.Shape(), (TestType)1, (TestType)100)).run(exec);
-  // example-end linspace-gen-test-1
-  exec.sync();
+    // Create a set of linearly-spaced numbers starting at 1, ending at 100, and 
+    // with `count` points in between
+    (t1 = linspace((TestType)1, (TestType)100, count)).run(exec);
+    // example-end linspace-gen-test-1
+    exec.sync();
 
-  for (index_t i = 0; i < count; i++) {
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), i + 1));
+    for (index_t i = 0; i < count; i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), i + 1));
+    }
   }
 
   {
+    // example-begin linspace-gen-test-2
+    const TestType starts[] = {(TestType)0, (TestType)1};
+    const TestType stops[] = {(TestType)1, (TestType)3};
+    const index_t count = 10;
+
+    // Create a 2D operator with 10 rows and 2 columns with linearly-spaced columns
+    auto ls = linspace(starts, stops, count);
+    // example-end linspace-gen-test-2
+
+    for (int row = 0; row < ls.Size(0); row++) {
+      for (int col = 0; col < ls.Size(1); col++) {
+        TestType step = (stops[col] - starts[col]) / (count - 1);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+      }
+    }
+  }
+
+  {
+    // example-begin linspace-gen-test-3
+    const TestType starts[] = {(TestType)0, (TestType)1};
+    const TestType stops[] = {(TestType)1, (TestType)3};
+    const index_t count = 10;
+
+    // Create a 2D operator with 2 rows and 10 columns with linearly-spaced rows
+    auto ls = linspace(starts, stops, count, 1);
+    // example-end linspace-gen-test-3
+
+    for (int row = 0; row < ls.Size(0); row++) {
+      for (int col = 0; col < ls.Size(1); col++) {
+        TestType step = (stops[row] - starts[row]) / (count - 1);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[row] + step * col));
+      }
+    }
+  }    
+
+  {
+    index_t count = 100;
+    auto t1 = make_tensor<TestType>({count});
+    (t1 = linspace((TestType)1, (TestType)100, count)).run(exec);
     (t1 = t1 + t1).run(exec);
     exec.sync();
 
@@ -500,21 +541,27 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
   }
 
   {
+    index_t count = 100;
+    auto t1 = make_tensor<TestType>({count});
+    (t1 = linspace((TestType)1, (TestType)100, count)).run(exec);
     (t1 = (TestType)1 + t1).run(exec);
     exec.sync();
 
     for (index_t i = 0; i < count; i++) {
       EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t1(i), (i + 1.0f) + (i + 1.0f) + 1.0f));
+          MatXUtils::MatXTypeCompare(t1(i), (i + 1) + 1));
     }
   }
 
   {
+    index_t count = 100;
+    auto t1 = make_tensor<TestType>({count});
+    (t1 = linspace((TestType)1, (TestType)100, count)).run(exec);
     (t1 = t1 + (TestType)2).run(exec);
     exec.sync();
 
     for (index_t i = 0; i < count; i++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (i + 1) + (i + 1) + 1 + 2));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (i + 1) + 2));
     }
   }
 

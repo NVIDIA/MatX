@@ -72,9 +72,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 
-  cuda::std::array<index_t, 1> num_samps{N};
-  cuda::std::array<index_t, 1> half_win{nfft / 2 + 1};
-  cuda::std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
 
   auto time = make_tensor<float>({N});
   auto modulation = make_tensor<float>({N});
@@ -88,7 +85,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
-  (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
+  (time = linspace(0.0f, static_cast<float>(N) - 1.0f, N) / fs)
       .run(exec);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
   (modulation = 500.f * cos(2.f * static_cast<typename complex::value_type>(M_PI) * 0.25f * time)).run(exec);
@@ -108,7 +105,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     // DFT Sample Frequencies (rfftfreq)
     (freqs = (1.0f / (static_cast<float>(nfft) * 1.f / fs)) *
-               linspace<0>(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
+               linspace(0.0f, static_cast<float>(nfft) / 2.0f, nfft / 2 + 1))
         .run(exec);
 
     // Create overlapping matrix of segments.
@@ -122,8 +119,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
 
     // Spectral time axis
-    (s_time = linspace<0>(s_time_shape, static_cast<float>(nperseg) / 2.0f,
-                           static_cast<float>(N - nperseg) / 2.0f + 1) /
+    (s_time = linspace(static_cast<float>(nperseg) / 2.0f,
+                           static_cast<float>(N - nperseg) / 2.0f + 1, (N - noverlap) / nstep) /
                 fs)
         .run(exec);
 
