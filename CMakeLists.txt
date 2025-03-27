@@ -316,7 +316,6 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     set(MATX_EN_PYBIND11 ON)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO)
-    target_compile_options(matx INTERFACE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
 
     include(cmake/GetPyBind11.cmake)
     find_package(Python3  REQUIRED COMPONENTS Interpreter Development)
