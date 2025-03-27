@@ -39,6 +39,9 @@
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 #include <optional>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace matx {
 
@@ -94,7 +97,8 @@ public:
       }
     }
 
-    AddPath(std::string(MATX_ROOT) + GENERATORS_PATH);
+    const auto current_dir = fs::path(__FILE__).parent_path();
+    AddPath((current_dir.string() + "/../../..") + GENERATORS_PATH);
   }
 
   void AddPath(const std::string &path)
