@@ -130,13 +130,17 @@ if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
     message(FATAL_ERROR "MatX requires CUDA 11.5 or higher. Please update before using.")
 endif()
 
+set(CCCL_ENABLE_UNSTABLE ON)
 message(STATUS "Finding CCCL...")
 rapids_cpm_cccl(
     BUILD_EXPORT_SET matx-exports
     INSTALL_EXPORT_SET matx-exports
 )
 
-target_link_libraries(matx INTERFACE CCCL::CCCL)
+target_link_libraries(matx INTERFACE CCCL::CCCL CCCL::cudax)
+target_compile_options(matx INTERFACE
+  $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr --extended-lambda>
+)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")

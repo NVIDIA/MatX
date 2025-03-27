@@ -147,6 +147,20 @@ public:
     return res;
   }
 
+  template <typename Task>
+  __MATX_INLINE__ void apply_dep_to_task(Task &&task, [[maybe_unused]] int perm=0) const noexcept                                                                   
+  {
+    // LHS
+    if constexpr (is_matx_op<T>()) {
+      out_.apply_dep_to_task(std::forward<Task>(task), 0);
+    }
+    // RHS
+    if constexpr (is_matx_op<Op>()) {
+      op_.apply_dep_to_task(std::forward<Task>(task), 1);
+    }
+  }
+
+
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
   {

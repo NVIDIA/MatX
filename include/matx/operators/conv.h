@@ -149,16 +149,45 @@ namespace matx
           return out_dims_[dim];
         }
 
+        template <typename Task>
+        __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept
+        {
+            tmp_out_.apply_dep_to_task(std::forward<Task>(task), 1);
+        }
+ 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
+          if constexpr (!is_cuda_executor_v<Executor>) {
+              auto ctx = ex.getCtx();
+              auto tsk = ctx.task();
+              tsk.set_symbol("conv_task");
+
+              auto output = cuda::std::get<0>(out);
+              output.PreRun(out_dims_, std::forward<Executor>(ex));
+              output.apply_dep_to_task(tsk, 0);
+              a_.apply_dep_to_task(tsk, 1);
+              b_.apply_dep_to_task(tsk, 1);
+
+              tsk->*[&](cudaStream_t s) {
+                  auto exec = cudaExecutor(s);
+                  if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                      conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, exec);
+                  }
+                  else {
+                      conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, exec);
+                  }
+              };
           }
-          else {
-            conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex);
+          else if constexpr (is_cuda_executor_v<Executor>) {
+              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                  conv1d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
+              }
+              else {
+                  conv1d_impl(cuda::std::get<0>(out), a_, b_, mode_, method_, ex);
+              }
           }
         }
 
@@ -343,14 +372,36 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
+        //static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
+        if constexpr (!is_cuda_executor_v<Executor>) {
+            auto ctx = ex.getCtx();
+            auto tsk = ctx.task();
+            tsk.set_symbol("conv_task");
 
-        if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
-        }
-        else {
-          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex.getStream());
-        }
+            auto output = cuda::std::get<0>(out);
+            output.PreRun(out_dims_, std::forward<Executor>(ex));
+            output.apply_dep_to_task(tsk, 0);
+            a_.apply_dep_to_task(tsk, 1);
+            b_.apply_dep_to_task(tsk, 1);
+
+            tsk->*[&](cudaStream_t s) {
+                auto exec = cudaExecutor(s);
+                if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                    conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, exec.getStream());
+                }
+                else {
+                    conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, exec.getStream());
+                }
+            };
+          }
+          else if constexpr (is_cuda_executor_v<Executor>) {
+              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                  conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
+              }
+              else {
+                  conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex.getStream());
+              }
+          }
       }
 
       template <typename ShapeType, typename Executor>

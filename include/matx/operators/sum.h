@@ -72,9 +72,35 @@ namespace detail {
         return tmp_out_(indices...);
       }
 
+      template <typename Task>
+      __MATX_INLINE__ void apply_dep_to_task(Task &&task, int perm=1) const noexcept {
+        /* Albert -- Scenario where the sum() operator is on the RHS and sum has already 
+        run previously. So we make tmp_out have a read permission as it will be read from */
+        tmp_out_.apply_dep_to_task(std::forward<Task>(task), 1);
+      }
+
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        sum_impl(cuda::std::get<0>(out), a_, ex);
+        auto output = cuda::std::get<0>(out);
+        // stfexecutor case
+        if constexpr (!is_cuda_executor_v<Executor>) {
+            auto ctx = ex.getCtx();
+            auto tsk = ctx.task();
+            tsk.set_symbol("sum_task");
+
+            output.PreRun(out_dims_, std::forward<Executor>(ex));
+            output.apply_dep_to_task(tsk, 0);
+            a_.apply_dep_to_task(tsk, 1);
+
+            tsk->*[&](cudaStream_t s) {
+                auto exec = cudaExecutor(s);
+                sum_impl(output, a_, exec);
+            };
+        }
+        // cudaExecutor case
+        else if constexpr (is_cuda_executor_v<Executor>) {
+            sum_impl(output, a_, ex);
+        }
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

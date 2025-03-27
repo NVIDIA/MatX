@@ -55,6 +55,9 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ T operator()(Is...) const { 
           return v_; };
 
+      template <typename Task>
+      __MATX_INLINE__ void apply_dep_to_task([[maybe_unused]] Task &&task, [[maybe_unused]] int perm) const noexcept { }
+
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const {
         if constexpr (!is_noshape_v<ShapeType>) {
           return *(s_.begin() + dim);
