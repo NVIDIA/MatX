@@ -231,7 +231,8 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     const uint32_t smem_input_height = filter_phase_len + by - 1;
 
     const index_t start_elem = blockIdx.x * elems_per_channel_per_cta;
-    const index_t last_elem = cuda::std::min(output_len_per_channel-1, (blockIdx.x+1) * elems_per_channel_per_cta - 1);
+    const index_t last_elem_this_block = static_cast<index_t>(blockIdx.x) * elems_per_channel_per_cta + (elems_per_channel_per_cta - 1);
+    const index_t last_elem = cuda::std::min(output_len_per_channel-1, last_elem_this_block);
     auto indims = BlockToIdx(input, blockIdx.z, 1);
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = chan;
