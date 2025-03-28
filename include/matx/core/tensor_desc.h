@@ -36,6 +36,7 @@
 
 #include <cuda/std/array>
 #include <type_traits>
+#include <cstdint>
 #include "matx/core/error.h"
 
 namespace matx {

@@ -153,7 +153,7 @@ public:
       if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
         cudaMemcpy(pos + 1, &nnz, sizeof(POS), cudaMemcpyHostToDevice);
       } else {
-        pos[1] = nnz;
+        pos[1] = static_cast<POS>(nnz);
       }
       o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
       o.SetCrd(0, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));

@@ -17,7 +17,7 @@ TEST(OperatorTests, ComplexCastExceptions)
   cudaExecutor exec{};
 
   const int N = 3;
-  cuda::std::array<long long, N> real_dims, imag_dims;
+  cuda::std::array<index_t, N> real_dims, imag_dims;
   real_dims.fill(5);
   imag_dims.fill(5);
 

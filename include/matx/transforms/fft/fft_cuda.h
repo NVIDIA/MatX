@@ -689,7 +689,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const Op &in, cudaStream_t strea
 
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-         uint64_t fft_size, FFTNorm norm, const cudaExecutor &exec)
+         index_t fft_size, FFTNorm norm, const cudaExecutor &exec)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");
@@ -735,7 +735,7 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 
 template <typename OutputTensor, typename InputTensor>
 __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const cudaExecutor &exec)
+          index_t fft_size, FFTNorm norm, const cudaExecutor &exec)
 {
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
     "Input and output tensor ranks must match");

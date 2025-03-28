@@ -1156,8 +1156,8 @@ public:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    for (size_t i = 0; i < vals.size(); i++) {
-      for (size_t j = 0; j < (vals.begin() + i)->size(); j++) {
+    for (index_t i = 0; i < static_cast<index_t>(vals.size()); i++) {
+      for (index_t j = 0; j < static_cast<index_t>((vals.begin() + i)->size()); j++) {
         if constexpr (is_cuda_complex_v<T>) {
           typename T::value_type real =
               ((vals.begin() + i)->begin() + j)->real();
