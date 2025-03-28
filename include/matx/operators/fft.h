@@ -241,7 +241,7 @@ namespace matx
    *   Normalization to apply to FFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto fft(const OpA &a, const index_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
     return detail::FFTOp(a, fft_size_, perm, detail::fft_t{}, norm);
@@ -293,7 +293,7 @@ namespace matx
    *   Normalization to apply to IFFT
    */
   template<typename OpA>
-  __MATX_INLINE__ auto ifft(const OpA &a, const index_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+  __MATX_INLINE__ auto ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
     return detail::FFTOp(a, fft_size_, perm, detail::ifft_t{}, norm);
