@@ -571,7 +571,7 @@ private:
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft1d_dispatch(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
@@ -678,7 +678,7 @@ private:
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  
@@ -696,7 +696,7 @@ private:
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");  

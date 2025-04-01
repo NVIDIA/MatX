@@ -58,9 +58,11 @@ void conv1d_direct_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
   cudaExecutor exec{0};
-  auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
-  auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
-  auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
+  const index_t signal_size = static_cast<index_t>(state.get_int64("Signal Size"));
+  const index_t filter_size = static_cast<index_t>(state.get_int64("Filter Size"));
+  auto at = make_tensor<ValueType>({signal_size});
+  auto bt = make_tensor<ValueType>({filter_size});
+  auto out = make_tensor<ValueType>({signal_size + filter_size - 1});
 
   out.PrefetchDevice(0);
   at.PrefetchDevice(0);
@@ -82,9 +84,11 @@ void conv1d_fft_large(nvbench::state &state,
                             nvbench::type_list<ValueType>)
 {
   cudaExecutor exec{0};
-  auto at = make_tensor<ValueType>({state.get_int64("Signal Size")});
-  auto bt = make_tensor<ValueType>({state.get_int64("Filter Size")});
-  auto out = make_tensor<ValueType>({at.Size(at.Rank()-1) + bt.Size(bt.Rank()-1) - 1});
+  const index_t signal_size = static_cast<index_t>(state.get_int64("Signal Size"));
+  const index_t filter_size = static_cast<index_t>(state.get_int64("Filter Size"));
+  auto at = make_tensor<ValueType>({signal_size});
+  auto bt = make_tensor<ValueType>({filter_size});
+  auto out = make_tensor<ValueType>({signal_size + filter_size - 1});
 
   (out = conv1d(at, bt, MATX_C_MODE_FULL, MATX_C_METHOD_FFT)).run(exec);
 

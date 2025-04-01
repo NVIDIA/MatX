@@ -60,7 +60,7 @@ namespace detail {
     
   template <typename OutputTensor, typename InputTensor, typename Executor>
   __MATX_INLINE__ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
-                      const InputTensor &i, uint64_t fft_size,
+                      const InputTensor &i, index_t fft_size,
                       [[maybe_unused]] const Executor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)

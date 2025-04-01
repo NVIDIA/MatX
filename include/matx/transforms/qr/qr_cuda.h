@@ -238,9 +238,9 @@ namespace detail {
  * factorizations mostly by the data pointer in A
  */
 struct DnQRCUDAParams_t {
-  int64_t rank;
-  int64_t m;
-  int64_t n;
+  index_t rank;
+  index_t m;
+  index_t n;
   void *A;
   void *tau;
   size_t batch_size;
