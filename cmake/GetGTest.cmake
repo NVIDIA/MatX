@@ -40,7 +40,7 @@ function(find_and_configure_gtest VERSION)
     CPMFindPackage(NAME GTest
         VERSION         ${VERSION}
         GIT_REPOSITORY  https://github.com/google/googletest.git
-        GIT_TAG         release-${VERSION}
+        GIT_TAG         v${VERSION}
         GIT_SHALLOW     TRUE
         OPTIONS         "INSTALL_GTEST ON"
         # googletest >= 1.10.0 provides a cmake config file -- use it if it exists
@@ -66,6 +66,6 @@ function(find_and_configure_gtest VERSION)
     # fix_cmake_global_defaults(GTest::gmock_main)
 endfunction()
 
-set(CUDF_MIN_VERSION_GTest 1.11.0)
+set(CUDF_MIN_VERSION_GTest 1.16.0)
 
 find_and_configure_gtest(${CUDF_MIN_VERSION_GTest})
