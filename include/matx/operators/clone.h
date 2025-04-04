@@ -144,13 +144,13 @@ MATX_IGNORE_WARNING_POP_GCC
 
 
   /**
-   * @brief Operator to clone an operator or tensor acorss dimensions
+   * @brief Operator to clone an operator or tensor across dimensions
    *
    * @tparam Rank the rank of the cloned operator
    * @tparam T source operator/tensor type
    * @param t source operator/tensor
    * @param shape the shape of the cloned operator/tensor.
-   * Each element is either the size of the cloned dimension or matxKeepDim to be from the source tensor
+   * Each element is either the size of the cloned dimension or `matxKeepDim` to be from the source tensor
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>

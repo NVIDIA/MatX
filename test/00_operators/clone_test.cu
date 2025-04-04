@@ -25,7 +25,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 
     tiv() = 3;
 
-    // Clone "tiv" from a 1D tensor to a 3D tensor
+    // Clone "tiv" from a 0D tensor to a 3D tensor
     auto op = clone<3>(tiv, {N, M, K});
     // example-end clone-test-1
 
@@ -54,6 +54,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
   }    
 
   { // clone from 1D
+    // example-begin clone-test-2
     auto tiv = make_tensor<TestType>({K});
     auto tov = make_tensor<TestType>({N,M,K});
 
@@ -61,7 +62,10 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
       tiv(k) = static_cast<typename inner_op_type_t<TestType>::type>(k);
     }
 
+    // Clone "tiv" from a 1D tensor to a 3D tensor
+    // matxKeepDim is used to indicate where the 1D tensor should be placed in the 3D tensor
     auto op = clone<3>(tiv, {N, M, matxKeepDim});
+    // example-end clone-test-2
 
     ASSERT_EQ(op.Size(0), N);
     ASSERT_EQ(op.Size(1), M);
