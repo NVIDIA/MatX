@@ -49,7 +49,14 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "linspace"; }
 
-        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return NUM_RC; }  
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+          if constexpr (NUM_RC == 1) {
+            return 1; 
+          }
+          else {
+            return 2;
+          }
+        }  
 
         inline LinspaceOp(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis) 
         {
