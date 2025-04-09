@@ -55,14 +55,14 @@ namespace matx
        * @param stream CUDA stream
        * @param profiling Whether to enable profiling
        */
-      cudaExecutor(cudaStream_t stream, bool profiling = true) : stream_(stream), profiling_(profiling) {
+      cudaExecutor(cudaStream_t stream, bool profiling = false) : stream_(stream), profiling_(profiling) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
         }
       }
 
-      cudaExecutor(int stream, bool profiling = true) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
+      cudaExecutor(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
@@ -73,10 +73,17 @@ namespace matx
        * @brief Construct a new cudaExecutor object using the default stream
        * 
        */
-      cudaExecutor() : stream_(0), profiling_(true) {
+      cudaExecutor() : stream_(0), profiling_(false) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
+        }
+      }
+
+      ~cudaExecutor() {
+        if (profiling_) {
+          cudaEventDestroy(start_);
+          cudaEventDestroy(stop_);
         }
       }
 
