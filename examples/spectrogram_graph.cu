@@ -62,11 +62,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  cudaExecutor exec{stream};
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  cudaExecutor exec{stream, true}; // Enable profiling
 
   float fs = 10000;
   index_t N = 100000;
@@ -146,19 +142,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.sync();
   // Time graph execution of same kernels
-  cudaEventRecord(start, stream);
+  exec.start_timer();
   for (uint32_t i = 0; i < 10; i++) {
     cudaGraphLaunch(instance, stream);
   }
-  cudaEventRecord(stop, stream);
+  exec.stop_timer();
   exec.sync();
-  cudaEventElapsedTime(&time_ms, start, stop);
+  time_ms = exec.get_time_ms();
 
   printf("Spectrogram Time With Graphs = %.2fus per iteration\n",
          time_ms * 1e3 / num_iterations);
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
   cudaStreamDestroy(stream);
   MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();

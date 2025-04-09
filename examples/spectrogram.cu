@@ -60,7 +60,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-  cudaExecutor exec{stream};
+  cudaExecutor exec{stream, true}; // Enable profiling
 
   float fs = 10000;
   constexpr index_t N = 100000;
