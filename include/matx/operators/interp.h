@@ -65,7 +65,9 @@ namespace matx {
         v_(v),
         xq_(xq),
         method_(method) 
-      {}
+      {
+        MATX_ASSERT_STR(x_.Size(0) == v_.Size(0), matxInvalidSize, "interp: sample points and values must have the same size");
+      }
       
 
       template <typename... Is>
