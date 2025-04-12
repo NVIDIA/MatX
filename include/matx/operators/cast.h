@@ -44,6 +44,8 @@ namespace matx
   template<> __MATX_INLINE__ std::string as_type_str<double>() { return "as_double"; }
   template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<double>>() { return "cuda::std::complex<double>"; }
   template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<float>>() { return "cuda::std::complex<float>"; }
+  template<> __MATX_INLINE__ std::string as_type_str<int64_t>() { return "as_int64_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<uint64_t>() { return "as_uint64_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<int32_t>() { return "as_int32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<uint32_t>() { return "as_uint32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<int16_t>() { return "as_int16_t"; }
@@ -69,16 +71,16 @@ namespace matx
         using value_type = NewType;
 
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
-        __MATX_INLINE__ CastOp(const T &op) : op_(op){};  
+        __MATX_INLINE__ CastOp(const T &op) : op_(op){};
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));     
+          return static_cast<NewType>(get_value(op_, indices...));
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return static_cast<NewType>(get_value(op_, indices...));
         }
@@ -97,7 +99,7 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }            
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -183,11 +185,11 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to a different type
-   * 
+   *
    * @tparam T Input type
    * @tparam NewType Casted type
    * @param t Input operator
-   * @return Operator output casted to NewType 
+   * @return Operator output casted to NewType
    */
   template <typename NewType, typename T>
     auto __MATX_INLINE__ as_type(T t)
@@ -198,7 +200,7 @@ namespace matx
       } else {
         return detail::CastOp<T, NewType>(t);
       }
-    };   
+    };
 
   /**
    * @brief Helper function to cast a pair of input operators to a complex type.
@@ -218,29 +220,29 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to an int
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int 
+   * @return Operator output casted to int
    */
   template <typename T>
     auto __MATX_INLINE__ as_int(const T &t)
     {
       return as_type<int>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to an float
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to float 
+   * @return Operator output casted to float
    */
   template <typename T>
     auto __MATX_INLINE__ as_float(const T &t)
     {
       return as_type<float>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to a cuda::std::complex<float>
@@ -287,16 +289,16 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to an double
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to double 
+   * @return Operator output casted to double
    */
   template <typename T>
     auto __MATX_INLINE__ as_double(const T &t)
     {
       return as_type<double>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to a cuda::std::complex<double>
@@ -312,81 +314,107 @@ namespace matx
     };
 
   /**
-   * @brief Helper function to cast an input operator to an uint32_t
-   * 
+   * @brief Helper function to cast an input operator to an uint64_t
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint32_t 
+   * @return Operator output casted to uint64_t
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_uint64(const T &t)
+    {
+      return as_type<uint64_t>(t);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to an int64_t
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to int64_t
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_int64(const T &t)
+    {
+      return as_type<int64_t>(t);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to an uint32_t
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to uint32_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint32(const T &t)
     {
       return as_type<uint32_t>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int32_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int32_t 
+   * @return Operator output casted to int32_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int32(const T &t)
     {
       return as_type<int32_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int16_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int16_t 
+   * @return Operator output casted to int16_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int16(const T &t)
     {
       return as_type<int16_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an uint16_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint16_t 
+   * @return Operator output casted to uint16_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint16(const T &t)
     {
       return as_type<uint16_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int8_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int8_t 
+   * @return Operator output casted to int8_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int8(const T &t)
     {
       return as_type<int8_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an uint8_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint8_t 
+   * @return Operator output casted to uint8_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint8(const T &t)
     {
       return as_type<uint8_t>(t);
-    }; 
+    };
 
 } // end namespace matx
