@@ -37,58 +37,58 @@
 
 namespace matx {
 
-  enum class InterpMethod {
-    INTERP_METHOD_LINEAR,
-    INTERP_METHOD_NEAREST,
-    INTERP_METHOD_NEXT,
-    INTERP_METHOD_PREV
-  };
+  // Base interpolation method tag
+  struct InterpMethodBase {};
+
+  // Specific interpolation method tags
+  struct InterpMethodLinear : public InterpMethodBase {};
+  struct InterpMethodNearest : public InterpMethodBase {};
+  struct InterpMethodNext : public InterpMethodBase {};
+  struct InterpMethodPrev : public InterpMethodBase {};
 
   namespace detail {
-  template <typename OpX, typename OpV, typename OpXQ>
-  class InterpolateOp : public BaseOp<InterpolateOp<OpX, OpV, OpXQ>> {
+  template <typename OpX, typename OpV, typename OpXQ, typename Method>
+  class InterpolateOp : public BaseOp<InterpolateOp<OpX, OpV, OpXQ, Method>> {
+    public:
+      using matxop = bool;
+      using domain_type = typename OpX::value_type;
+      using value_type = typename OpV::value_type;
+      using method_type = Method;
+
     private:
       typename detail::base_type_t<OpX> x_;    // Sample points
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
 
-    public:
-      using matxop = bool;
-      using domain_type = typename OpX::value_type;
-      using value_type = typename OpV::value_type;
-      InterpMethod method_;
-
-      __MATX_INLINE__ std::string str() const { return "interp()"; }
-
-      __MATX_INLINE__ InterpolateOp(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method) : 
-        x_(x), 
-        v_(v),
-        xq_(xq),
-        method_(method) 
-      {
-        MATX_ASSERT_STR(x_.Size(0) == v_.Size(0), matxInvalidSize, "interp: sample points and values must have the same size");
-      }
-      
-
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
-      {
-        auto x_query = xq_(indices...);
-        
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) searchsorted(const domain_type x_query) const
+      {        
+        // Binary search to find the interval containing the query point
+
+        // if x_query < x(0), idx_low = n, idx_high = 0
+        // if x_query > x(n-1), idx_low = n-1, idx_high = n
+        // else x(idx_low) <= x_query <= x(idx_high)
+
         index_t idx_low, idx_high, idx_mid;
         domain_type x_low, x_high, x_mid;
 
         idx_low = 0;
         idx_high = x_.Size(0) - 1;
         x_low = x_(idx_low);
-        if (x_query <= x_low) {
-          value_type v = v_(idx_low);
-          return v;
+        if (x_query < x_low) {
+          idx_low = x_.Size(0);
+          idx_high = 0;
+          return cuda::std::make_tuple(idx_low, idx_high);
+        } else if (x_query == x_low) {
+          return cuda::std::make_tuple(idx_low, idx_low);
         }
         x_high = x_(idx_high);
-        if (x_query >= x_high) {
-          value_type v = v_(idx_high);
-          return v;
+        if (x_query > x_high) {
+          idx_low = x_.Size(0) - 1;
+          idx_high = x_.Size(0);
+          return cuda::std::make_tuple(idx_low, idx_high);
+        } else if (x_query == x_high) {
+          return cuda::std::make_tuple(idx_high, idx_high);
         }
 
         // Find the interval containing the query point
@@ -96,8 +96,7 @@ namespace matx {
           idx_mid = (idx_low + idx_high) / 2;
           x_mid = x_(idx_mid);
           if (x_query == x_mid) {
-            value_type v = v_(idx_mid);
-            return v;
+            return cuda::std::make_tuple(idx_mid, idx_mid);
           } else if (x_query < x_mid) {
             idx_high = idx_mid;
             x_high = x_mid;
@@ -106,35 +105,83 @@ namespace matx {
             x_low = x_mid;
           }
         }
-        if (method_ == InterpMethod::INTERP_METHOD_LINEAR)
-        {
+        return cuda::std::make_tuple(idx_low, idx_high);
+      }
+      
+      // Linear interpolation implementation
+      template <typename M = Method,
+                std::enable_if_t<std::is_same_v<M, InterpMethodLinear>, bool> = true>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
+        value_type v;
+
+        if (idx_high == 0 || idx_low == idx_high) { // x_query <= x(0) or x_query == x(idx_low) == x(idx_high)
+          v = v_(idx_high);
+        } else if (idx_low == x_.Size(0) - 1) { // x_query > x(n-1)
+          v = v_(idx_low);
+        } else {
+          domain_type x_low = x_(idx_low);
+          domain_type x_high = x_(idx_high);
           value_type v_low = v_(idx_low);
           value_type v_high = v_(idx_high);
-          return v_low + (x_query - x_low) * (v_high - v_low) / (x_high - x_low);
+          v = v_low + (x_query - x_low) * (v_high - v_low) / (x_high - x_low);
         }
-        else if (method_ == InterpMethod::INTERP_METHOD_NEAREST)
-        {
-          if (x_query - x_low < x_high - x_query) {
-            value_type v = v_(idx_low);
-            return v;
-          }
-          else {
-            value_type v = v_(idx_high);
-            return v;
-          }
-        }
-        else if (method_ == InterpMethod::INTERP_METHOD_NEXT)
-        {
-          value_type v = v_(idx_high);
-          return v;
-        }
-        else // if (method_ == InterpMethod::INTERP_METHOD_PREV)
-        {
-          value_type v = v_(idx_low);
-          return v;
-        }
+        return v;
       }
 
+      // Nearest neighbor interpolation implementation
+      template <typename M = Method,
+                std::enable_if_t<std::is_same_v<M, InterpMethodNearest>, bool> = true>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
+        if (idx_low == x_.Size(0)) { // x_query < x(0)
+          idx_low = 0;
+        } else if (idx_high == x_.Size(0)) { // x_query > x(n-1)
+          idx_high = x_.Size(0) - 1;
+        }
+        domain_type x_low = x_(idx_low);
+        domain_type x_high = x_(idx_high);
+        index_t idx_nearest = (x_query - x_low < x_high - x_query) ? idx_low : idx_high;
+        value_type v = v_(idx_nearest);
+        return v;
+      }
+
+
+      // Next value interpolation implementation
+      template <typename M = Method,
+                std::enable_if_t<std::is_same_v<M, InterpMethodNext>, bool> = true>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate([[maybe_unused]] const domain_type x_query, [[maybe_unused]] index_t idx_low, index_t idx_high) const {
+        if (idx_high == x_.Size(0)) { // x_query > x(n-1)
+          idx_high = x_.Size(0) - 1;
+        }
+        value_type v = v_(idx_high);
+        return v;
+      }
+
+      // Previous value interpolation implementation
+      template <typename M = Method,
+                std::enable_if_t<std::is_same_v<M, InterpMethodPrev>, bool> = true>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate([[maybe_unused]] const domain_type x_query, index_t idx_low, [[maybe_unused]] index_t idx_high) const {
+        if (idx_low == x_.Size(0)) { // x_query < x(0)
+          idx_low = 0;
+        }
+        value_type v = v_(idx_low);
+        return v;
+      }
+
+    public:
+      __MATX_INLINE__ std::string str() const { return "interp()"; }
+
+      __MATX_INLINE__ InterpolateOp(const OpX &x, const OpV &v, const OpXQ &xq) : 
+        x_(x), 
+        v_(v),
+        xq_(xq)
+      {
+        MATX_ASSERT_STR(x_.Size(0) == v_.Size(0), matxInvalidSize, "interp: sample points and values must have the same size");
+      }
+      
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() 
       { 
         return OpXQ::Rank(); 
@@ -144,10 +191,22 @@ namespace matx {
       {
         return xq_.Size(dim);
       }
+      
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        auto x_query = xq_(indices...);
+        auto [idx_low, idx_high] = searchsorted(x_query);
+
+        return interpolate(x_query, idx_low, idx_high);
+      }
+
     };
   } // namespace detail
+
+
 /**
- * Linear interpolation operator
+ * Interpolation operator with specified method
  *
  * @tparam OpX
  *   Type of sample points vector
@@ -155,6 +214,8 @@ namespace matx {
  *   Type of values vector
  * @tparam OpXQ
  *   Type of query points
+ * @tparam Method
+ *   Interpolation method type (InterpMethodLinear, InterpMethodNearest, InterpMethodNext, InterpMethodPrev)
  * @param x
  *   Sample points (must be sorted in ascending order)
  * @param v
@@ -163,37 +224,12 @@ namespace matx {
  *   Query points where to interpolate
  * @returns Operator that interpolates values at query points
  */
-template <typename OpX, typename OpV, typename OpXQ>
+template <typename Method = InterpMethodLinear, typename OpX, typename OpV, typename OpXQ>
 auto interp(const OpX &x, const OpV &v, const OpXQ &xq) {
   static_assert(OpX::Rank() == 1, "interp: sample points must be 1D");
   static_assert(OpV::Rank() == 1, "interp: values must be 1D");
-  return detail::InterpolateOp<OpX, OpV, OpXQ>(x, v, xq, InterpMethod::INTERP_METHOD_LINEAR);
-}
-
-/**
- * Linear interpolation operator
- *
- * @tparam OpX
- *   Type of sample points vector
- * @tparam OpV
- *   Type of values vector
- * @tparam OpXQ
- *   Type of query points
- * @param x
- *   Sample points (must be sorted in ascending order)
- * @param v
- *   Values at sample points
- * @param xq
- *   Query points where to interpolate
- * @param method
- *   Interpolation method (INTERP_METHOD_LINEAR, INTERP_METHOD_NEAREST, INTERP_METHOD_NEXT, INTERP_METHOD_PREV)
- * @returns Operator that interpolates values at query points
- */
-template <typename OpX, typename OpV, typename OpXQ>
-auto interp(const OpX &x, const OpV &v, const OpXQ &xq, const InterpMethod method) {
-  static_assert(OpX::Rank() == 1, "interp: sample points must be 1D");
-  static_assert(OpV::Rank() == 1, "interp: values must be 1D");
-  return detail::InterpolateOp<OpX, OpV, OpXQ>(x, v, xq, method);
+  static_assert(std::is_base_of_v<InterpMethodBase, Method>, "interp: Method must be a valid interpolation method type");
+  return detail::InterpolateOp<OpX, OpV, OpXQ, Method>(x, v, xq);
 }
 
 } // namespace matx 

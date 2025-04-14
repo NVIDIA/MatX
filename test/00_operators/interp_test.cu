@@ -39,7 +39,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
 
   // example-begin interp-test-2
   auto out_nearest = make_tensor<TestType>({xq.Size(0)});
-  (out_nearest = interp(x, v, xq, InterpMethod::INTERP_METHOD_NEAREST)).run(exec);
+  (out_nearest = interp<InterpMethodNearest>(x, v, xq)).run(exec);
   // example-end interp-test-2
   exec.sync();
 
@@ -51,7 +51,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
   ASSERT_EQ(out_nearest(5), 4.0);
 
   auto out_next = make_tensor<TestType>({xq.Size(0)});
-  (out_next = interp(x, v, xq, InterpMethod::INTERP_METHOD_NEXT)).run(exec);
+  (out_next = interp<InterpMethodNext>(x, v, xq)).run(exec);
   exec.sync();
 
   ASSERT_EQ(out_next(0), 0.0);
@@ -62,7 +62,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
   ASSERT_EQ(out_next(5), 4.0);
 
   auto out_prev = make_tensor<TestType>({xq.Size(0)});
-  (out_prev = interp(x, v, xq, InterpMethod::INTERP_METHOD_PREV)).run(exec);
+  (out_prev = interp<InterpMethodPrev>(x, v, xq)).run(exec);
   exec.sync();
 
   ASSERT_EQ(out_prev(0), 0.0);
