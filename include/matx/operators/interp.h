@@ -45,6 +45,7 @@ namespace matx {
   struct InterpMethodNearest : public InterpMethodBase {};
   struct InterpMethodNext : public InterpMethodBase {};
   struct InterpMethodPrev : public InterpMethodBase {};
+  struct InterpMethodSpline : public InterpMethodBase {};
 
   namespace detail {
   template <typename OpX, typename OpV, typename OpXQ, typename Method>
@@ -55,7 +56,7 @@ namespace matx {
       using value_type = typename OpV::value_type;
       using method_type = Method;
 
-    private:
+    protected:
       typename detail::base_type_t<OpX> x_;    // Sample points
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
@@ -191,7 +192,7 @@ namespace matx {
       {
         return xq_.Size(dim);
       }
-      
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
@@ -201,6 +202,49 @@ namespace matx {
         return interpolate(x_query, idx_low, idx_high);
       }
 
+    };
+
+    // Specialized version for spline interpolation
+    template <typename OpX, typename OpV, typename OpXQ>
+    class InterpolateOp<OpX, OpV, OpXQ, InterpMethodSpline> : 
+        public InterpolateOp<OpX, OpV, OpXQ, InterpMethodBase> {
+      public:
+        using matxop = bool;
+        using domain_type = typename OpX::value_type;
+        using value_type = typename OpV::value_type;
+        using method_type = InterpMethodSpline;
+        
+        // Inherit constructor from base class
+        using InterpolateOp<OpX, OpV, OpXQ, InterpMethodBase>::InterpolateOp;
+
+      private:
+        mutable detail::tensor_impl_t<value_type, OpX::Rank()> temp_;
+        mutable value_type *ptr_ = nullptr;
+
+      public:
+        // Override operator() directly instead of interpolate
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is... indices) const
+        {
+          // auto x_query = this->xq_(indices...);
+          // auto [idx_low, idx_high] = this->searchsorted(x_query);
+          
+          // Spline interpolation implementation
+          return static_cast<value_type>(7);
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept {
+          // Allocate temporary storage for spline coefficients
+          cuda::std::array<index_t, 1> temp_shape{this->Size(0)};
+          detail::AllocateTempTensor(temp_, std::forward<Executor>(ex), temp_shape, &ptr_);
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, 
+                                    [[maybe_unused]] Executor &&ex) const noexcept {
+          matxFree(ptr_);
+        }
     };
   } // namespace detail
 

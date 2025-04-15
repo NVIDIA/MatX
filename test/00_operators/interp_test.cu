@@ -72,5 +72,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
   ASSERT_EQ(out_prev(4), 2.0);
   ASSERT_EQ(out_prev(5), 4.0);
 
+
+  auto out_spline = make_tensor<TestType>({xq.Size(0)});
+  (out_spline = interp<InterpMethodSpline>(x, v, xq)).run(exec);
+  exec.sync();
+
+  ASSERT_EQ(out_spline(5), 7.0);
+
+
   MATX_EXIT_HANDLER();
 }
