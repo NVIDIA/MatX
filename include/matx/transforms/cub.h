@@ -1540,6 +1540,16 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
 #endif
 }
 
+template <typename Op>
+__MATX_INLINE__ auto getCubArgReduceSupportedTensor( const Op &in, cudaStream_t stream) {
+  // This would be better as a templated lambda, but we don't have those in C++17 yet
+  const auto support_func = []() {
+    return true;
+  };
+
+  return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
+}
+
 }
 
 
@@ -1771,25 +1781,47 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  using cache_val_type = detail::matxCubSingleArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>;
+  // converts operators to tensors (if necessary)
+  auto a_out_supported = getCubArgReduceSupportedTensor(a_out, stream);
+  auto aidx_out_supported = getCubArgReduceSupportedTensor(aidx_out, stream);
+  auto a_supported = getCubArgReduceSupportedTensor(a, stream);
+
+  if(!a_supported.isSameView(a)) {
+    (a_supported = a).run(stream);
+  }
+
+  using cache_val_type = detail::matxCubSingleArgPlan_t<
+      decltype(a_out_supported),
+      decltype(aidx_out_supported),
+      decltype(a_supported),
+      CParams>;
 
   #ifndef MATX_DISABLE_CUB_CACHE
-    auto params = cache_val_type::GetCubParams(a_out, aidx_out, a, detail::CUB_OP_SINGLE_ARG_REDUCE, stream);
+    auto params = cache_val_type::GetCubParams(a_out_supported, aidx_out_supported, a_supported, detail::CUB_OP_SINGLE_ARG_REDUCE, stream);
 
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
         detail::GetCacheIdFromType<detail::cub_cache_t>(),
         params,
         [&]() {
-          return std::make_shared<cache_val_type>(a_out, aidx_out, a, reduce_params, stream);
+          return std::make_shared<cache_val_type>(a_out_supported, aidx_out_supported, a_supported, reduce_params, stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
-          ctype->ExecArgReduce(a_out, aidx_out, a, stream);
+          ctype->ExecArgReduce(a_out_supported, aidx_out_supported, a_supported, stream);
         }
       );
   #else
-    auto tmp = cache_val_type{a_out, aidx_out, a, detail::CUB_OP_SINGLE_ARG_REDUCE, reduce_params, stream};
-    tmp.ExecArgReduce(a_out, aidx_out, a, stream);
+    auto tmp = cache_val_type{a_out_supported, aidx_out_supported, a_supported, detail::CUB_OP_SINGLE_ARG_REDUCE, reduce_params, stream};
+    tmp.ExecArgReduce(a_out_supported, aidx_out_supported, a_supported, stream);
   #endif
+
+  // Copy output tensors back to operators (if necessary)
+  if(!a_out_supported.isSameView(a_out)) {
+    (a_out = a_out_supported).run(stream);
+  }
+
+  if(!aidx_out_supported.isSameView(aidx_out)) {
+    (aidx_out = aidx_out_supported).run(stream);
+  }
 #endif
 }
 
