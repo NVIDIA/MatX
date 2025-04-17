@@ -1227,43 +1227,62 @@ public:
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    const auto a_iter = matx::RandomOperatorThrustIterator{a};
-    const auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
-    const auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+    // Define lambda function to handle common logic for tensor and operator inputs
+    auto arg_reduce_lambda = [&](const auto &a_iter)
+    {
+      const auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
+      const auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
 
-    if constexpr (OutputTensor::Rank() > 0) {
-      const int BATCHES = static_cast<int>(TotalSize(a_out));
-      const int N = static_cast<int>(TotalSize(a)) / BATCHES;
+      if constexpr (OutputTensor::Rank() > 0) {
+        const int BATCHES = static_cast<int>(TotalSize(a_out));
+        const int N = static_cast<int>(TotalSize(a)) / BATCHES;
 
-      const auto r0 = matx::range<0>({BATCHES},0,N);
-      const auto r0_iter = matx::RandomOperatorIterator{r0};
-      const auto r1 = matx::range<0>({BATCHES},N,N);
-      const auto r1_iter = matx::RandomOperatorIterator{r1};
+        const auto r0 = matx::range<0>({BATCHES},0,N);
+        const auto r0_iter = matx::RandomOperatorIterator{r0};
+        const auto r1 = matx::range<0>({BATCHES},N,N);
+        const auto r1_iter = matx::RandomOperatorIterator{r1};
 
-      cub::DeviceSegmentedReduce::Reduce(
-        d_temp,
-        temp_storage_bytes,
-        zipped_input,
-        zipped_output,
-        BATCHES,
-        r0_iter,
-        r1_iter,
-        cparams_.reduce_op,
-        cparams_.init,
-        stream);
+        cub::DeviceSegmentedReduce::Reduce(
+          d_temp,
+          temp_storage_bytes,
+          zipped_input,
+          zipped_output,
+          BATCHES,
+          r0_iter,
+          r1_iter,
+          cparams_.reduce_op,
+          cparams_.init,
+          stream);
+      }
+      else {
+        const int N = static_cast<int>(TotalSize(a));
+
+        cub::DeviceReduce::Reduce(
+          d_temp,
+          temp_storage_bytes,
+          zipped_input,
+          zipped_output,
+          N,
+          cparams_.reduce_op,
+          cparams_.init,
+          stream);
+      }
+    };
+
+    if constexpr (is_tensor_impl_v<InputOperator>) {
+      const auto a_iter = matx::RandomOperatorThrustIterator{a};
+      arg_reduce_lambda(a_iter);
     }
-    else {
-      const int N = static_cast<int>(TotalSize(a));
-
-      cub::DeviceReduce::Reduce(
-        d_temp,
-        temp_storage_bytes,
-        zipped_input,
-        zipped_output,
-        N,
-        cparams_.reduce_op,
-        cparams_.init,
-        stream);
+    else
+    {
+      // For a non-tensor input, such as matxBinaryOp, we need to make a temporary tensor
+      // and copy the input into it. Otherwise, we will get an error
+      // "error: expression must be an lvalue"
+      // from the matx::RandomOperatorThrustIterator operator*() const reference returning method.
+      auto tmp_a = make_tensor<typename InputOperator::value_type>(a.Shape());
+      (tmp_a = a).run(stream);
+      const auto a_iter = matx::RandomOperatorThrustIterator{tmp_a};
+      arg_reduce_lambda(a_iter);
     }
 #endif
   }
