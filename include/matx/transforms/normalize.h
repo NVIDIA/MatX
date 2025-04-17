@@ -7,7 +7,9 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
-#include "matx/operators/sum.h"
+#include "matx/operators/max.h"
+#include "matx/operators/mean.h"
+#include "matx/operators/stdd.h"
 
 namespace matx
 {
@@ -34,6 +36,11 @@ namespace matx
       const auto absOp = abs(in);
       auto norm_factor = max<decltype(absOp), 1>(absOp, {norm_dim});
       (out = in / norm_factor).run(ex);
+    }
+    else if (method == NORMALIZE_RANGE::ZSCORE) {
+      auto mu = mean(in, {norm_dim});
+      auto sigma = stdd(in, {norm_dim});
+      (out = (in-mu)/sigma).run(ex);
     }
   }
 }
