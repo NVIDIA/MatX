@@ -61,6 +61,9 @@ namespace matx {
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
 
+      mutable detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)
+      mutable value_type *ptr_m_ = nullptr;
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) searchsorted(const domain_type x_query) const
       {        
@@ -172,6 +175,51 @@ namespace matx {
         return v;
       }
 
+      // Spline interpolation implementation
+      template <typename M = Method,
+                std::enable_if_t<std::is_same_v<M, InterpMethodSpline>, bool> = true>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate([[maybe_unused]] const domain_type x_query, index_t idx_low,  index_t idx_high) const {
+        if (idx_low == x_.Size(0)) { // x_query < x(0)
+          idx_low = 0;
+          idx_high = 1;
+        } else if (idx_high == x_.Size(0)) { // x_query > x(n-1)
+          idx_high = x_.Size(0) - 1;
+          idx_low = x_.Size(0) - 2;
+        }
+
+        // Hermite cubic interpolation 
+
+        // sample points
+        domain_type x_low = x_(idx_low);
+        domain_type x_high = x_(idx_high);
+
+        // values at the sample points
+        value_type v_low = v_(idx_low);
+        value_type v_high = v_(idx_high);
+        value_type v_diff = v_high - v_low;
+
+
+        // derivatives at the sample points
+        value_type m_low = m_(idx_low);
+        value_type m_high = m_(idx_high);
+
+
+        value_type h = x_high - x_low;
+        value_type h_low = x_query - x_low;
+        value_type h_high = x_high - x_query;
+        
+        value_type t = h_low / h;
+        value_type s = h_high / h;
+
+        value_type v = s * v_low \
+          + t * v_high \
+          + (h  * (m_low * s - m_high * t) + v_diff * (t - s)) * t * s;
+
+        return v;
+      }
+
+
     public:
       __MATX_INLINE__ std::string str() const { return "interp()"; }
 
@@ -193,6 +241,33 @@ namespace matx {
         return xq_.Size(dim);
       }
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept {
+        // Allocate temporary storage for spline coefficients
+        cuda::std::array<index_t, OpX::Rank()> m_shape{x_.Size(0)};
+        detail::AllocateTempTensor(m_, std::forward<Executor>(ex), m_shape, &ptr_m_);
+
+        (m_ = static_cast<value_type>(0)).run(ex);
+
+        // // Create tensors for tridiagonal system
+        // tensor_t<value_type, 1> d_tensor{{x_.Size(0)}};
+        // tensor_t<value_type, 1> dl_tensor{{x_.Size(0)}};
+        // tensor_t<value_type, 1> du_tensor{{x_.Size(0)}};
+        // tensor_t<value_type, 1> b_tensor{{x_.Size(0)}};
+        
+        // // Fill tridiagonal system via custom operator
+        // fill_tridiagonal_system(d_tensor, dl_tensor, du_tensor, b_tensor, v_, x_, xq_, ex);
+
+        // // Solve tridiagonal system
+        // solve_tridiagonal(d_tensor, dl_tensor, du_tensor, b_tensor, ex);
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, 
+                                  [[maybe_unused]] Executor &&ex) const noexcept {
+        matxFree(ptr_m_);
+      }
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
@@ -202,49 +277,6 @@ namespace matx {
         return interpolate(x_query, idx_low, idx_high);
       }
 
-    };
-
-    // Specialized version for spline interpolation
-    template <typename OpX, typename OpV, typename OpXQ>
-    class InterpolateOp<OpX, OpV, OpXQ, InterpMethodSpline> : 
-        public InterpolateOp<OpX, OpV, OpXQ, InterpMethodBase> {
-      public:
-        using matxop = bool;
-        using domain_type = typename OpX::value_type;
-        using value_type = typename OpV::value_type;
-        using method_type = InterpMethodSpline;
-        
-        // Inherit constructor from base class
-        using InterpolateOp<OpX, OpV, OpXQ, InterpMethodBase>::InterpolateOp;
-
-      private:
-        mutable detail::tensor_impl_t<value_type, OpX::Rank()> temp_;
-        mutable value_type *ptr_ = nullptr;
-
-      public:
-        // Override operator() directly instead of interpolate
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is... indices) const
-        {
-          // auto x_query = this->xq_(indices...);
-          // auto [idx_low, idx_high] = this->searchsorted(x_query);
-          
-          // Spline interpolation implementation
-          return static_cast<value_type>(7);
-        }
-
-        template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept {
-          // Allocate temporary storage for spline coefficients
-          cuda::std::array<index_t, 1> temp_shape{this->Size(0)};
-          detail::AllocateTempTensor(temp_, std::forward<Executor>(ex), temp_shape, &ptr_);
-        }
-
-        template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, 
-                                    [[maybe_unused]] Executor &&ex) const noexcept {
-          matxFree(ptr_);
-        }
     };
   } // namespace detail
 

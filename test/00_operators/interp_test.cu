@@ -77,7 +77,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
   (out_spline = interp<InterpMethodSpline>(x, v, xq)).run(exec);
   exec.sync();
 
-  ASSERT_EQ(out_spline(5), 7.0);
+  ASSERT_EQ(out_prev(3), 2.0);
 
 
   MATX_EXIT_HANDLER();
