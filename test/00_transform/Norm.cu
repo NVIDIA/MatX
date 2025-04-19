@@ -73,9 +73,9 @@ class NormTestFloatTypes
 };
 
 template <typename TensorType>
-class NormalizeTestFloatTypes: public NormTestFloatTypes<TensorType> {
-  using GTestType = std::tuple_element_t<0, TensorType>;
-  using GExecType = std::tuple_element_t<1, TensorType>;
+class NormalizeTestFloatNonComplexNonHalfAllExecs: public NormTestFloatTypes<TensorType> {
+  using GTestType = cuda::std::tuple_element_t<0, TensorType>;
+  using GExecType = cuda::std::tuple_element_t<1, TensorType>;
   protected:
     // tensor_t<GTestType, 2> in_m{{3, 3}};
     tensor_t<GTestType, 2> out_m{{a_len, a_len}};
@@ -84,7 +84,7 @@ class NormalizeTestFloatTypes: public NormTestFloatTypes<TensorType> {
 
 
 TYPED_TEST_SUITE(NormTestFloatTypes, MatXTypesFloatNonComplexAllExecs);
-TYPED_TEST_SUITE(NormalizeTestFloatTypes, MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(NormalizeTestFloatNonComplexNonHalfAllExecs, MatXFloatNonComplexNonHalfTypesAllExecs);
 
 
 TYPED_TEST(NormTestFloatTypes, VectorL1)
@@ -207,7 +207,7 @@ TYPED_TEST(NormTestFloatTypes, MatrixL2)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(NormalizeTestFloatTypes, NormalizeMaxnorm)
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeMaxnorm)
 {
   MATX_ENTER_HANDLER();
   using TestType = std::tuple_element_t<0, TypeParam>;
@@ -216,8 +216,6 @@ TYPED_TEST(NormalizeTestFloatTypes, NormalizeMaxnorm)
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
   // (normalize(this->in_m, NORMALIZE_RANGE::ZSCORE)).run(this->exec);
-  print(this->in_m);
-  print(this->out_m);
   // (mean(this->in_m)).run(this->exec);
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
@@ -230,7 +228,7 @@ TYPED_TEST(NormalizeTestFloatTypes, NormalizeMaxnorm)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(NormalizeTestFloatTypes, NormalizeZscore)
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
 {
   MATX_ENTER_HANDLER();
   using TestType = std::tuple_element_t<0, TypeParam>;

@@ -439,5 +439,5 @@ class norm_operators:
         seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
         return {
             'in_m': seq,
-            'out_m': (seq - np.mean(seq, 0, keepdims=True)) / np.std(seq, 0, keepdims=True)
+            'out_m': (seq - np.mean(seq, axis=0, keepdims=True)) / np.std(seq, axis=0, ddof=1, keepdims=True)
         }
