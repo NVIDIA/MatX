@@ -115,13 +115,11 @@ namespace matx
 
 
       template <int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(cuda::std::array<index_t,RANK> &indices) {
 
         if constexpr ( I == N ) {
           // This should never happen
-          // returning this to satisfy lvalue requirements
-          auto &op = cuda::std::get<I-1>(ops_);
-          return cuda::std::apply(op, indices);
+          return value_type{};
         } else {
           auto &op = cuda::std::get<I>(ops_);
           auto idx = indices[axis_];
