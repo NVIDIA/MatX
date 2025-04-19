@@ -48,6 +48,86 @@ namespace matx {
   struct InterpMethodSpline : public InterpMethodBase {};
 
   namespace detail {
+    template <class O, class OpX, class OpV>
+    class InterpSplineTridiagonalFillOp : public BaseOp<InterpSplineTridiagonalFillOp<O, OpX, OpV>> {
+    private:
+      O d_, dl_, du_, b_;
+      OpX x_;
+      OpV v_;
+
+    public:
+      InterpSplineTridiagonalFillOp(O d, O dl, O du, O b, OpX x, OpV v)
+          : d_(d), dl_(dl), du_(du), b_(b), x_(x), v_(v)  {}
+
+      __device__ inline void operator()(index_t idx) const
+      {
+      
+        if (idx == 0) {
+          typename OpX::value_type x0 = x_(idx);
+          typename OpX::value_type x1 = x_(idx + 1);
+          typename OpX::value_type x2 = x_(idx + 2);
+          typename OpX::value_type h0 = x1 - x0;
+          typename OpX::value_type h1 = x2 - x1;
+
+          typename OpV::value_type v0 = v_(idx);
+          typename OpV::value_type v1 = v_(idx + 1);
+          typename OpV::value_type v2 = v_(idx + 2);
+
+          typename OpV::value_type delta0 = (v1 - v0) / h0;
+          typename OpV::value_type delta1 = (v2 - v1) / h1;
+
+          dl_(idx) = static_cast<typename O::value_type>(0);
+          d_(idx) = h1;
+          du_(idx) = h1 + h0;
+          b_(idx) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
+        }
+        else if (idx == x_.Size(0) - 1) {
+          typename OpX::value_type x0 = x_(idx - 2);
+          typename OpX::value_type x1 = x_(idx - 1);
+          typename OpX::value_type x2 = x_(idx);
+          typename OpX::value_type h0 = x1 - x0;
+          typename OpX::value_type h1 = x2 - x1;
+
+          typename OpV::value_type v0 = v_(idx - 2);
+          typename OpV::value_type v1 = v_(idx - 1);
+          typename OpV::value_type v2 = v_(idx);
+
+          typename OpV::value_type delta0 = (v1 - v0) / h0;
+          typename OpV::value_type delta1 = (v2 - v1) / h1;
+
+
+          dl_(idx) = h0 + h1;
+          d_(idx) = h0;
+          du_(idx) = static_cast<typename O::value_type>(0);
+          b_(idx) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
+        }
+        else {
+          typename OpX::value_type x0 = x_(idx - 1);
+          typename OpX::value_type x1 = x_(idx);
+          typename OpX::value_type x2 = x_(idx + 1);
+          typename OpX::value_type h0 = x1 - x0;
+          typename OpX::value_type h1 = x2 - x1;
+
+          typename OpV::value_type v0 = v_(idx - 1);
+          typename OpV::value_type v1 = v_(idx);
+          typename OpV::value_type v2 = v_(idx + 1);
+
+          typename OpV::value_type delta0 = (v1 - v0) / h0;
+          typename OpV::value_type delta1 = (v2 - v1) / h1;
+
+          dl_(idx) = h1;
+          d_(idx) = 2*(h0 + h1);
+          du_(idx) = h0;          
+          b_(idx) = 3 * (delta1 * h0 + delta0 * h1);
+        }
+      }
+
+      __host__ __device__ inline index_t Size(uint32_t i) const  { return d_.Size(i); }
+      static inline constexpr __host__ __device__ int32_t Rank() { return O::Rank(); }
+    };
+
+
+
   template <typename OpX, typename OpV, typename OpXQ, typename Method>
   class InterpolateOp : public BaseOp<InterpolateOp<OpX, OpV, OpXQ, Method>> {
     public:
@@ -180,7 +260,10 @@ namespace matx {
                 std::enable_if_t<std::is_same_v<M, InterpMethodSpline>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate([[maybe_unused]] const domain_type x_query, index_t idx_low,  index_t idx_high) const {
-        if (idx_low == x_.Size(0)) { // x_query < x(0)
+        if (idx_high == idx_low) {
+          value_type v = v_(idx_low);
+          return v;
+        } else if (idx_low == x_.Size(0)) { // x_query < x(0)
           idx_low = 0;
           idx_high = 1;
         } else if (idx_high == x_.Size(0)) { // x_query > x(n-1)
@@ -242,31 +325,108 @@ namespace matx {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept {
-        // Allocate temporary storage for spline coefficients
-        cuda::std::array<index_t, OpX::Rank()> m_shape{x_.Size(0)};
-        detail::AllocateTempTensor(m_, std::forward<Executor>(ex), m_shape, &ptr_m_);
-
-        (m_ = static_cast<value_type>(0)).run(ex);
-
-        // // Create tensors for tridiagonal system
-        // tensor_t<value_type, 1> d_tensor{{x_.Size(0)}};
-        // tensor_t<value_type, 1> dl_tensor{{x_.Size(0)}};
-        // tensor_t<value_type, 1> du_tensor{{x_.Size(0)}};
-        // tensor_t<value_type, 1> b_tensor{{x_.Size(0)}};
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const {
         
-        // // Fill tridiagonal system via custom operator
-        // fill_tridiagonal_system(d_tensor, dl_tensor, du_tensor, b_tensor, v_, x_, xq_, ex);
+        // Allocate temporary storage for spline coefficients
+        if constexpr (std::is_same_v<Method, InterpMethodSpline>) {
+          static_assert(is_cuda_executor_v<Executor>, "cubic spline interpolation only supports the CUDA executor currently"); 
 
-        // // Solve tridiagonal system
-        // solve_tridiagonal(d_tensor, dl_tensor, du_tensor, b_tensor, ex);
+          cuda::std::array<index_t, OpX::Rank()> m_shape{x_.Size(0)};
+          detail::AllocateTempTensor(m_, std::forward<Executor>(ex), m_shape, &ptr_m_);
+
+          detail::tensor_impl_t<value_type, 1> d_tensor, dl_tensor, du_tensor; // Derivatives at sample points (spline only)
+          value_type *ptr_d_ = nullptr;
+          value_type *ptr_dl_ = nullptr;
+          value_type *ptr_du_ = nullptr;
+
+          detail::AllocateTempTensor(d_tensor, std::forward<Executor>(ex), m_shape, &ptr_d_);
+          detail::AllocateTempTensor(dl_tensor, std::forward<Executor>(ex), m_shape, &ptr_dl_);
+          detail::AllocateTempTensor(du_tensor, std::forward<Executor>(ex), m_shape, &ptr_du_);
+
+          
+          // Fill tridiagonal system via custom operator
+          InterpSplineTridiagonalFillOp(d_tensor, dl_tensor, du_tensor, m_, x_, v_).run(std::forward<Executor>(ex));
+
+          // Solve tridiagonal system using cuSPARSE
+          cudaStream_t stream = ex.getStream();
+
+          cusparseHandle_t handle = nullptr;
+          cusparseStatus_t status = cusparseCreate(&handle);
+          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          status = cusparseSetStream(handle, stream);
+          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+
+          int n = static_cast<int>(x_.Size(0));
+
+          size_t workspace_size = 0;
+          void* workspace = nullptr;
+          if constexpr (std::is_same_v<value_type, float>) {
+            status = cusparseSgtsv2_bufferSizeExt(
+              handle, 
+              n,  // n
+              1, // batch_count
+              ptr_dl_, 
+              ptr_d_, 
+              ptr_du_, 
+              ptr_m_, 
+              n, // batch_stride
+              &workspace_size);
+          } else if constexpr (std::is_same_v<value_type, double>) {
+            status = cusparseDgtsv2_bufferSizeExt(
+              handle, 
+              n,  // n
+              1, // batch_count
+              ptr_dl_, 
+              ptr_d_, 
+              ptr_du_, 
+              ptr_m_, 
+              n, // batch_stride
+              &workspace_size);
+          }
+          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          cudaError_t err = cudaMallocAsync(&workspace, workspace_size, stream);
+          MATX_ASSERT(err == cudaSuccess, matxCudaError);
+
+          if constexpr (std::is_same_v<value_type, float>) {
+            status = cusparseSgtsv2(
+              handle,              // cuSPARSE handle
+              n,  // Size of the system
+              1,           // Batch count
+              ptr_dl_,                // Sub-diagonal
+              ptr_d_,                 // Main diagonal
+              ptr_du_,                // Super-diagonal
+              ptr_m_,                 // Right-hand side and solution
+              n, // batch_stride
+              workspace);         // Workspace buffer
+          } else if constexpr (std::is_same_v<value_type, double>) {
+            status = cusparseDgtsv2(
+              handle,              // cuSPARSE handle
+              n,  // Size of the system
+              1,           // Batch count
+              ptr_dl_,                // Sub-diagonal
+              ptr_d_,                 // Main diagonal
+              ptr_du_,                // Super-diagonal
+              ptr_m_,                 // Right-hand side and solution
+              n, // batch_stride
+              workspace);         // Workspace buffer
+          }
+          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+
+          matxFree(ptr_d_);
+          matxFree(ptr_dl_);
+          matxFree(ptr_du_);
+        }
+
       }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, 
                                   [[maybe_unused]] Executor &&ex) const noexcept {
-        matxFree(ptr_m_);
+        if constexpr (std::is_same_v<Method, InterpMethodSpline>) {
+          matxFree(ptr_m_);
+        }
       }
+
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const

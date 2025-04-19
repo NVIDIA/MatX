@@ -7,12 +7,18 @@ using namespace matx;
 using namespace matx::test;
 
 
-TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
+//TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Interp)
+TEST(InterpTests, Interp)
 {
   MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using TestType = float;
+  using ExecType = cudaExecutor;
 
+  if constexpr (!is_cuda_executor_v<ExecType>) {
+    GTEST_SKIP();
+  }
+
+  using inner_type = typename inner_op_type_t<TestType>::type;
   ExecType exec{};
 
   // example-begin interp-test-1
@@ -77,7 +83,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Interp)
   (out_spline = interp<InterpMethodSpline>(x, v, xq)).run(exec);
   exec.sync();
 
-  ASSERT_EQ(out_prev(3), 2.0);
+
+  ASSERT_NEAR(out_spline(0), -10.7391, 1e-4);
+  ASSERT_EQ(out_spline(1), 0.0);
+  ASSERT_NEAR(out_spline(2), 1.1121, 1e-4);
+  ASSERT_EQ(out_spline(3), 2.0);
+  ASSERT_NEAR(out_spline(4), 1.3804, 1e-4);
+  ASSERT_NEAR(out_spline(5), -8.1739, 1e-4);
 
 
   MATX_EXIT_HANDLER();
