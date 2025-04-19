@@ -741,7 +741,14 @@ public:
 
     int dev;
     cudaGetDevice(&dev);
+  #if CUDA_VERSION <= 12000
     cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), dev, stream);
+  #else
+    cudaMemLocation loc;
+    loc.id = dev;
+    loc.type = cudaMemLocationTypeDevice;
+    cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), loc, 0, stream);
+  #endif
   }
 
   /**
@@ -758,8 +765,15 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+  #if CUDA_VERSION <= 12000
     cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
+  #else
+    cudaMemLocation loc;
+    loc.id = cudaCpuDeviceId;
+    loc.type = cudaMemLocationTypeHost;
+    cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), loc, 0, stream);
+  #endif
   }
 
   /**
