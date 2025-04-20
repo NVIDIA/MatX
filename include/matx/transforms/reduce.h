@@ -2671,6 +2671,9 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
  *   Input data to reduce
  * @param exec
  *   Executor type
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
