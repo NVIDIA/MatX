@@ -178,7 +178,10 @@ TYPED_TEST(ReductionTestsComplexNonHalfTypesAllExecs, VarianceStdComplex)
   MATX_TEST_ASSERT_COMPARE(pb, t0, "var_ml", 0.01);    
 
   (t0 = stdd(t1)).run(exec);
-  MATX_TEST_ASSERT_COMPARE(pb, t0, "std", 0.01);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "std_ub", 0.01);
+
+  (t0 = stdd(t1, 0)).run(exec);
+  MATX_TEST_ASSERT_COMPARE(pb, t0, "std_ml", 0.01);
 
   MATX_EXIT_HANDLER();
 }
