@@ -2671,16 +2671,19 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
  *   Input data to reduce
  * @param exec
  *   Executor type
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
 template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
-void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec)
+void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec, int ddof = 1)
 {
   MATX_NVTX_START("stdd_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  var_impl(dest, in, exec, 1);
+  var_impl(dest, in, exec, ddof);
   (dest = sqrt(dest)).run(exec);
 }
 

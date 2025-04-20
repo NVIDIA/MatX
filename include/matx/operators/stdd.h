@@ -48,6 +48,7 @@ namespace detail {
   {
     private:
       typename detail::base_type_t<OpA> a_;
+      int ddof_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;   
@@ -59,7 +60,7 @@ namespace detail {
       using stdd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(const OpA &a) : a_(a) { 
+      __MATX_INLINE__ StddOp(const OpA &a, int ddof) : a_(a),  ddof_(ddof) { 
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }
@@ -74,7 +75,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        stdd_impl(cuda::std::get<0>(out), a_, ex);
+        stdd_impl(cuda::std::get<0>(out), a_, ex, ddof_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -133,15 +134,18 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @param ddof
+ *   ddof – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of standard deviation computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D], int ddof = 1)
 {
   static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop, ddof);
 }
 
 /**
@@ -155,11 +159,14 @@ __MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
  *
  * @param in
  *   Input data to reduce
+ * @param ddof
+ *   ddof – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of standard deviation computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto stdd(const InType &in, int ddof = 1)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::StddOp<decltype(in), 0>(in, ddof);
 }
 
 }
