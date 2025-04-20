@@ -110,12 +110,12 @@ public:
   {
     if constexpr (is_matx_half_v<T> &&
                   std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
-      auto &&out = static_cast<float>(detail::get_value(op_, indices...));
-      out_(indices...) = out;
+      auto &&out = out_(indices...);
+      out = static_cast<float>(detail::get_value(op_, indices...));
     }
     else {
-      auto &&out = detail::get_value(op_, indices...);
-      out = out_(indices...);
+      auto &&out = out_(indices...);
+      out = detail::get_value(op_, indices...);
     }
 
     return out_(indices...);
