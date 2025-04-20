@@ -2677,10 +2677,10 @@ template <typename OutType, typename InType, typename Executor, std::enable_if_t
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
-void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec)
+void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec, int ddof = 1)
 {
   MATX_NVTX_START("stdd_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  var_impl(dest, in, exec, 1);
+  var_impl(dest, in, exec, ddof);
   (dest = sqrt(dest)).run(exec);
 }
 
