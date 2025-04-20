@@ -101,15 +101,17 @@ class stats:
 
     def run(self) -> Dict[str, np.array]:
         x = np.random.rand(self.size[0])
-        var_ub = np.var(x)
-        var_ml = np.var(x, ddof = 0)
-        std = np.std(x)
+        var_ub = np.var(x, ddof = 1)
+        var_ml = np.var(x)
+        std_ub = np.std(x, ddof = 1)
+        std_ml = np.std(x)
 
         return {
             'x': x,
             'var_ub': var_ub,
             'var_ml': var_ml,
-            'std': std
+            'std_ub': std_ub,
+            'std_ml': std_ml
         }
 
 class contraction:
