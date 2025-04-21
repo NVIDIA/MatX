@@ -236,9 +236,13 @@ struct MemTracker {
   }
 
   ~MemTracker() {
+#if 0
     while (allocationMap.size()) {
       deallocate(allocationMap.begin()->first);
     }
+#else
+    std::cout << "TODO: Fix me allocator.h\n";
+#endif
   }
 };
 
