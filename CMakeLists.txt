@@ -168,8 +168,7 @@ if (NOT ${IS_NVCPP} GREATER -1)
             -Wmisleading-indentation
             -Wduplicated-cond
             -Wduplicated-branches
-            -Wlogical-op
-            -Wnull-dereference)
+            -Wlogical-op)
     endif()
 endif()
 
