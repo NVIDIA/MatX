@@ -50,19 +50,23 @@ namespace matx {
   namespace detail {
     template <class O, class OpX, class OpV>
     class InterpSplineTridiagonalFillOp : public BaseOp<InterpSplineTridiagonalFillOp<O, OpX, OpV>> {
+      // this is a custom operator that fills a tridiagonal system
+      // for cubic spline interpolation
+
+      using matxop = bool;
     private:
-      O d_, dl_, du_, b_;
+      O dl_, d_, du_, b_;
       OpX x_;
       OpV v_;
 
     public:
-      InterpSplineTridiagonalFillOp(O d, O dl, O du, O b, OpX x, OpV v)
-          : d_(d), dl_(dl), du_(du), b_(b), x_(x), v_(v)  {}
+      InterpSplineTridiagonalFillOp(O dl, O d, O du, O b, OpX x, OpV v)
+          : dl_(dl), d_(d), du_(du), b_(b), x_(x), v_(v)  {}
 
       __device__ inline void operator()(index_t idx) const
       {
       
-        if (idx == 0) {
+        if (idx == 0) { // left boundary condition
           typename OpX::value_type x0 = x_(idx);
           typename OpX::value_type x1 = x_(idx + 1);
           typename OpX::value_type x2 = x_(idx + 2);
@@ -81,7 +85,7 @@ namespace matx {
           du_(idx) = h1 + h0;
           b_(idx) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
         }
-        else if (idx == x_.Size(0) - 1) {
+        else if (idx == x_.Size(0) - 1) { // right boundary condition
           typename OpX::value_type x0 = x_(idx - 2);
           typename OpX::value_type x1 = x_(idx - 1);
           typename OpX::value_type x2 = x_(idx);
@@ -101,7 +105,7 @@ namespace matx {
           du_(idx) = static_cast<typename O::value_type>(0);
           b_(idx) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
         }
-        else {
+        else { // interior points
           typename OpX::value_type x0 = x_(idx - 1);
           typename OpX::value_type x1 = x_(idx);
           typename OpX::value_type x2 = x_(idx + 1);
@@ -129,7 +133,7 @@ namespace matx {
 
 
   template <typename OpX, typename OpV, typename OpXQ, typename Method>
-  class InterpolateOp : public BaseOp<InterpolateOp<OpX, OpV, OpXQ, Method>> {
+  class Interp1Op : public BaseOp<Interp1Op<OpX, OpV, OpXQ, Method>> {
     public:
       using matxop = bool;
       using domain_type = typename OpX::value_type;
@@ -256,6 +260,7 @@ namespace matx {
       }
 
       // Spline interpolation implementation
+      // Hermite cubic interpolation 
       template <typename M = Method,
                 std::enable_if_t<std::is_same_v<M, InterpMethodSpline>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
@@ -271,8 +276,6 @@ namespace matx {
           idx_low = x_.Size(0) - 2;
         }
 
-        // Hermite cubic interpolation 
-
         // sample points
         domain_type x_low = x_(idx_low);
         domain_type x_high = x_(idx_high);
@@ -282,11 +285,9 @@ namespace matx {
         value_type v_high = v_(idx_high);
         value_type v_diff = v_high - v_low;
 
-
         // derivatives at the sample points
         value_type m_low = m_(idx_low);
         value_type m_high = m_(idx_high);
-
 
         value_type h = x_high - x_low;
         value_type h_low = x_query - x_low;
@@ -304,9 +305,9 @@ namespace matx {
 
 
     public:
-      __MATX_INLINE__ std::string str() const { return "interp()"; }
+      __MATX_INLINE__ std::string str() const { return "interp1()"; }
 
-      __MATX_INLINE__ InterpolateOp(const OpX &x, const OpV &v, const OpXQ &xq) : 
+      __MATX_INLINE__ Interp1Op(const OpX &x, const OpV &v, const OpXQ &xq) : 
         x_(x), 
         v_(v),
         xq_(xq)
@@ -331,57 +332,55 @@ namespace matx {
         if constexpr (std::is_same_v<Method, InterpMethodSpline>) {
           static_assert(is_cuda_executor_v<Executor>, "cubic spline interpolation only supports the CUDA executor currently"); 
 
-          cuda::std::array<index_t, OpX::Rank()> m_shape{x_.Size(0)};
+          int n = static_cast<int>(x_.Size(0)); // number of sample points
+
+          cuda::std::array<index_t, OpX::Rank()> m_shape{n};
           detail::AllocateTempTensor(m_, std::forward<Executor>(ex), m_shape, &ptr_m_);
 
           detail::tensor_impl_t<value_type, 1> d_tensor, dl_tensor, du_tensor; // Derivatives at sample points (spline only)
-          value_type *ptr_d_ = nullptr;
           value_type *ptr_dl_ = nullptr;
+          value_type *ptr_d_ = nullptr;
           value_type *ptr_du_ = nullptr;
 
-          detail::AllocateTempTensor(d_tensor, std::forward<Executor>(ex), m_shape, &ptr_d_);
           detail::AllocateTempTensor(dl_tensor, std::forward<Executor>(ex), m_shape, &ptr_dl_);
+          detail::AllocateTempTensor(d_tensor, std::forward<Executor>(ex), m_shape, &ptr_d_);
           detail::AllocateTempTensor(du_tensor, std::forward<Executor>(ex), m_shape, &ptr_du_);
 
-          
           // Fill tridiagonal system via custom operator
-          InterpSplineTridiagonalFillOp(d_tensor, dl_tensor, du_tensor, m_, x_, v_).run(std::forward<Executor>(ex));
+          InterpSplineTridiagonalFillOp(dl_tensor,d_tensor, du_tensor, m_, x_, v_).run(std::forward<Executor>(ex));
 
           // Solve tridiagonal system using cuSPARSE
           cudaStream_t stream = ex.getStream();
-
           cusparseHandle_t handle = nullptr;
           cusparseStatus_t cusparse_status = cusparseCreate(&handle);
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           cusparse_status = cusparseSetStream(handle, stream);
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
 
-          int n = static_cast<int>(x_.Size(0));
-
           size_t workspace_size = 0;
           void* workspace = nullptr;
           if constexpr (std::is_same_v<value_type, float>) {
             cusparse_status = cusparseSgtsv2_bufferSizeExt(
-              handle, 
-              n,  // n
-              1, // batch_count
-              ptr_dl_, 
-              ptr_d_, 
-              ptr_du_, 
-              ptr_m_, 
-              n, // batch_stride
-              &workspace_size);
+              handle,             // cuSPARSE handle
+              n,                  // n
+              1,                  // batch_count
+              ptr_dl_,            // sub-diagonal
+              ptr_d_,             // main-diagonal
+              ptr_du_,            // super-diagonal
+              ptr_m_,             // right-hand side and solution
+              n,                  // batch_stride
+              &workspace_size);   // workspace size
           } else if constexpr (std::is_same_v<value_type, double>) {
             cusparse_status = cusparseDgtsv2_bufferSizeExt(
-              handle, 
-              n,  // n
-              1, // batch_count
-              ptr_dl_, 
-              ptr_d_, 
-              ptr_du_, 
-              ptr_m_, 
-              n, // batch_stride
-              &workspace_size);
+              handle,             // cuSPARSE handle
+              n,                  // n
+              1,                  // batch_count
+              ptr_dl_,            // sub-diagonal
+              ptr_d_,             // main-diagonal
+              ptr_du_,            // super-diagonal
+              ptr_m_,             // right-hand side and solution
+              n,                  // batch_stride
+              &workspace_size);   // workspace size
           }
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           cudaError_t err = cudaMallocAsync(&workspace, workspace_size, stream);
@@ -389,26 +388,26 @@ namespace matx {
 
           if constexpr (std::is_same_v<value_type, float>) {
             cusparse_status = cusparseSgtsv2(
-              handle,              // cuSPARSE handle
-              n,  // Size of the system
-              1,           // Batch count
-              ptr_dl_,                // Sub-diagonal
-              ptr_d_,                 // Main diagonal
-              ptr_du_,                // Super-diagonal
-              ptr_m_,                 // Right-hand side and solution
-              n, // batch_stride
-              workspace);         // Workspace buffer
+              handle,       // cuSPARSE handle
+              n,            // Size of the system
+              1,            // Batch count
+              ptr_dl_,      // Sub-diagonal
+              ptr_d_,       // Main diagonal
+              ptr_du_,      // Super-diagonal
+              ptr_m_,       // Right-hand side and solution
+              n,            // batch_stride
+              workspace);   // Workspace buffer
           } else if constexpr (std::is_same_v<value_type, double>) {
             cusparse_status = cusparseDgtsv2(
-              handle,              // cuSPARSE handle
-              n,  // Size of the system
-              1,           // Batch count
-              ptr_dl_,                // Sub-diagonal
-              ptr_d_,                 // Main diagonal
-              ptr_du_,                // Super-diagonal
-              ptr_m_,                 // Right-hand side and solution
-              n, // batch_stride
-              workspace);         // Workspace buffer
+              handle,       // cuSPARSE handle
+              n,            // Size of the system
+              1,            // Batch count
+              ptr_dl_,      // Sub-diagonal
+              ptr_d_,       // Main diagonal
+              ptr_du_,      // Super-diagonal
+              ptr_m_,       // Right-hand side and solution
+              n,            // batch_stride
+              workspace);   // Workspace buffer
           }
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           // cleanup
@@ -451,7 +450,7 @@ namespace matx {
  * @tparam OpX
  *   Type of sample points vector
  * @tparam OpV
- *   Type of values vector
+ *   Type of sample values vector
  * @tparam OpXQ
  *   Type of query points
  * @tparam Method
@@ -459,17 +458,17 @@ namespace matx {
  * @param x
  *   Sample points (must be sorted in ascending order)
  * @param v
- *   Values at sample points
+ *   Sample values (must be the same size as x)
  * @param xq
  *   Query points where to interpolate
  * @returns Operator that interpolates values at query points
  */
 template <typename Method = InterpMethodLinear, typename OpX, typename OpV, typename OpXQ>
-auto interp(const OpX &x, const OpV &v, const OpXQ &xq) {
+auto interp1(const OpX &x, const OpV &v, const OpXQ &xq) {
   static_assert(OpX::Rank() == 1, "interp: sample points must be 1D");
   static_assert(OpV::Rank() == 1, "interp: values must be 1D");
   static_assert(std::is_base_of_v<InterpMethodBase, Method>, "interp: Method must be a valid interpolation method type");
-  return detail::InterpolateOp<OpX, OpV, OpXQ, Method>(x, v, xq);
+  return detail::Interp1Op<OpX, OpV, OpXQ, Method>(x, v, xq);
 }
 
 } // namespace matx 
