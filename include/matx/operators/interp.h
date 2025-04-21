@@ -39,15 +39,18 @@
 
 namespace matx {
 
-  // Base interpolation method tag
-  struct InterpMethodBase {};
-
-  // Specific interpolation method tags
-  struct InterpMethodLinear : public InterpMethodBase {};
-  struct InterpMethodNearest : public InterpMethodBase {};
-  struct InterpMethodNext : public InterpMethodBase {};
-  struct InterpMethodPrev : public InterpMethodBase {};
-  struct InterpMethodSpline : public InterpMethodBase {};
+  /**
+   * @brief Interpolation method enumeration
+   * 
+   * Specifies the algorithm to use when performing interpolation between sample points.
+   */
+  enum class InterpMethod {
+    LINEAR,  ///< Linear interpolation between adjacent points
+    NEAREST, ///< Uses the value at the nearest sample point
+    NEXT,    ///< Uses the value at the next sample point
+    PREV,    ///< Uses the value at the previous sample point
+    SPLINE   ///< Cubic spline interpolation, using not-a-knot boundary conditions
+  };
 
   namespace detail {
     template <class O, class OpX, class OpV>
@@ -68,7 +71,7 @@ namespace matx {
       InterpSplineTridiagonalFillOp(const O& dl, const O& d, const O& du, const O& b, const OpX& x, const OpV& v)
           : dl_(dl), d_(d), du_(du), b_(b), x_(x), v_(v)  {}
 
-      __device__ inline void operator()(index_t idx) const
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ void operator()(index_t idx) const
       {
       
         if (idx == 0) { // left boundary condition
@@ -137,18 +140,18 @@ namespace matx {
 
 
 
-  template <typename OpX, typename OpV, typename OpXQ, typename Method>
-  class Interp1Op : public BaseOp<Interp1Op<OpX, OpV, OpXQ, Method>> {
+  template <typename OpX, typename OpV, typename OpXQ>
+  class Interp1Op : public BaseOp<Interp1Op<OpX, OpV, OpXQ>> {
     public:
       using matxop = bool;
       using domain_type = typename OpX::value_type;
       using value_type = typename OpV::value_type;
-      using method_type = Method;
 
     private:
       typename detail::base_type_t<OpX> x_;    // Sample points
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
+      InterpMethod method_;                    // Interpolation method
 
       mutable detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)
       mutable value_type *ptr_m_ = nullptr;
@@ -202,10 +205,8 @@ namespace matx {
       }
       
       // Linear interpolation implementation
-      template <typename M = Method,
-                std::enable_if_t<std::is_same_v<M, InterpMethodLinear>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
-      value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
+      value_type interpolate_linear(const domain_type x_query, index_t idx_low, index_t idx_high) const {
         value_type v;
 
         if (idx_high == 0 || idx_low == idx_high) { // x_query <= x(0) or x_query == x(idx_low) == x(idx_high)
@@ -223,10 +224,8 @@ namespace matx {
       }
 
       // Nearest neighbor interpolation implementation
-      template <typename M = Method,
-                std::enable_if_t<std::is_same_v<M, InterpMethodNearest>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
-      value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
+      value_type interpolate_nearest(const domain_type x_query, index_t idx_low, index_t idx_high) const {
         if (idx_low == x_.Size(0)) { // x_query < x(0)
           idx_low = 0;
         } else if (idx_high == x_.Size(0)) { // x_query > x(n-1)
@@ -241,10 +240,8 @@ namespace matx {
 
 
       // Next value interpolation implementation
-      template <typename M = Method,
-                std::enable_if_t<std::is_same_v<M, InterpMethodNext>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
-      value_type interpolate([[maybe_unused]] const domain_type x_query, [[maybe_unused]] index_t idx_low, index_t idx_high) const {
+      value_type interpolate_next([[maybe_unused]] const domain_type x_query, [[maybe_unused]] index_t idx_low, index_t idx_high) const {
         if (idx_high == x_.Size(0)) { // x_query > x(n-1)
           idx_high = x_.Size(0) - 1;
         }
@@ -253,10 +250,8 @@ namespace matx {
       }
 
       // Previous value interpolation implementation
-      template <typename M = Method,
-                std::enable_if_t<std::is_same_v<M, InterpMethodPrev>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
-      value_type interpolate([[maybe_unused]] const domain_type x_query, index_t idx_low, [[maybe_unused]] index_t idx_high) const {
+      value_type interpolate_prev([[maybe_unused]] const domain_type x_query, index_t idx_low, [[maybe_unused]] index_t idx_high) const {
         if (idx_low == x_.Size(0)) { // x_query < x(0)
           idx_low = 0;
         }
@@ -266,10 +261,8 @@ namespace matx {
 
       // Spline interpolation implementation
       // Hermite cubic interpolation 
-      template <typename M = Method,
-                std::enable_if_t<std::is_same_v<M, InterpMethodSpline>, bool> = true>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
-      value_type interpolate([[maybe_unused]] const domain_type x_query, index_t idx_low,  index_t idx_high) const {
+      value_type interpolate_spline([[maybe_unused]] const domain_type x_query, index_t idx_low,  index_t idx_high) const {
         if (idx_high == idx_low) {
           value_type v = v_(idx_low);
           return v;
@@ -308,14 +301,35 @@ namespace matx {
         return v;
       }
 
+      // Dispatch to appropriate interpolation method based on enum
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
+      value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
+        switch (method_) {
+          case InterpMethod::LINEAR:
+            return interpolate_linear(x_query, idx_low, idx_high);
+          case InterpMethod::NEAREST:
+            return interpolate_nearest(x_query, idx_low, idx_high);
+          case InterpMethod::NEXT:
+            return interpolate_next(x_query, idx_low, idx_high);
+          case InterpMethod::PREV:
+            return interpolate_prev(x_query, idx_low, idx_high);
+          case InterpMethod::SPLINE:
+            return interpolate_spline(x_query, idx_low, idx_high);
+          default:
+            // Default to linear interpolation
+            return interpolate_linear(x_query, idx_low, idx_high);
+        }
+      }
+
 
     public:
       __MATX_INLINE__ std::string str() const { return "interp1()"; }
 
-      __MATX_INLINE__ Interp1Op(const OpX &x, const OpV &v, const OpXQ &xq) : 
+      __MATX_INLINE__ Interp1Op(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = InterpMethod::LINEAR) : 
         x_(x), 
         v_(v),
-        xq_(xq)
+        xq_(xq),
+        method_(method)
       {
         MATX_ASSERT_STR(x_.Size(0) == v_.Size(0), matxInvalidSize, "interp: sample points and values must have the same size");
       }
@@ -334,7 +348,7 @@ namespace matx {
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const {
         
         // Allocate temporary storage for spline coefficients
-        if constexpr (std::is_same_v<Method, InterpMethodSpline>) {
+        if (method_ == InterpMethod::SPLINE) {
           static_assert(is_cuda_executor_v<Executor>, "cubic spline interpolation only supports the CUDA executor currently"); 
 
           int n = static_cast<int>(x_.Size(0)); // number of sample points
@@ -430,7 +444,7 @@ namespace matx {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, 
                                   [[maybe_unused]] Executor &&ex) const noexcept {
-        if constexpr (std::is_same_v<Method, InterpMethodSpline>) {
+        if (method_ == InterpMethod::SPLINE) {
           matxFree(ptr_m_);
         }
       }
@@ -458,22 +472,21 @@ namespace matx {
  *   Type of sample values vector
  * @tparam OpXQ
  *   Type of query points
- * @tparam Method
- *   Interpolation method type (InterpMethodLinear, InterpMethodNearest, InterpMethodNext, InterpMethodPrev)
  * @param x
  *   Sample points (must be sorted in ascending order)
  * @param v
  *   Sample values (must be the same size as x)
  * @param xq
  *   Query points where to interpolate
+ * @param method
+ *   Interpolation method (LINEAR, NEAREST, NEXT, PREV, SPLINE)
  * @returns Operator that interpolates values at query points
  */
-template <typename Method = InterpMethodLinear, typename OpX, typename OpV, typename OpXQ>
-auto interp1(const OpX &x, const OpV &v, const OpXQ &xq) {
+template <typename OpX, typename OpV, typename OpXQ>
+auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = InterpMethod::LINEAR) {
   static_assert(OpX::Rank() == 1, "interp: sample points must be 1D");
   static_assert(OpV::Rank() == 1, "interp: values must be 1D");
-  static_assert(std::is_base_of_v<InterpMethodBase, Method>, "interp: Method must be a valid interpolation method type");
-  return detail::Interp1Op<OpX, OpV, OpXQ, Method>(x, v, xq);
+  return detail::Interp1Op<OpX, OpV, OpXQ>(x, v, xq, method);
 }
 
 } // namespace matx 

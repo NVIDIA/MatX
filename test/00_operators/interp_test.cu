@@ -32,7 +32,7 @@ TEST(InterpTests, Interp)
   xq.SetVals({-1.0, 0.0, 0.25, 1.0, 1.5, 5.0});
 
   auto out_linear = make_tensor<TestType>({xq.Size(0)});
-  (out_linear = interp1<InterpMethodLinear>(x, v, xq)).run(exec);
+  (out_linear = interp1(x, v, xq, InterpMethod::LINEAR)).run(exec);
   // example-end interp-test-1
   exec.sync();
 
@@ -45,7 +45,7 @@ TEST(InterpTests, Interp)
 
   // example-begin interp-test-2
   auto out_nearest = make_tensor<TestType>({xq.Size(0)});
-  (out_nearest = interp1<InterpMethodNearest>(x, v, xq)).run(exec);
+  (out_nearest = interp1(x, v, xq, InterpMethod::NEAREST)).run(exec);
   // example-end interp-test-2
   exec.sync();
 
@@ -57,7 +57,7 @@ TEST(InterpTests, Interp)
   ASSERT_EQ(out_nearest(5), 4.0);
 
   auto out_next = make_tensor<TestType>({xq.Size(0)});
-  (out_next = interp1<InterpMethodNext>(x, v, xq)).run(exec);
+  (out_next = interp1(x, v, xq, InterpMethod::NEXT)).run(exec);
   exec.sync();
 
   ASSERT_EQ(out_next(0), 0.0);
@@ -68,7 +68,7 @@ TEST(InterpTests, Interp)
   ASSERT_EQ(out_next(5), 4.0);
 
   auto out_prev = make_tensor<TestType>({xq.Size(0)});
-  (out_prev = interp1<InterpMethodPrev>(x, v, xq)).run(exec);
+  (out_prev = interp1(x, v, xq, InterpMethod::PREV)).run(exec);
   exec.sync();
 
   ASSERT_EQ(out_prev(0), 0.0);
@@ -80,7 +80,7 @@ TEST(InterpTests, Interp)
 
 
   auto out_spline = make_tensor<TestType>({xq.Size(0)});
-  (out_spline = interp1<InterpMethodSpline>(x, v, xq)).run(exec);
+  (out_spline = interp1(x, v, xq, InterpMethod::SPLINE)).run(exec);
   exec.sync();
 
 

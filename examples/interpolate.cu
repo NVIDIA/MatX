@@ -56,7 +56,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // Execute the interpolation
   auto vq = make_tensor<float>({out_count});
-  (vq = interp1<InterpMethodLinear>(x, v, xq)).run(exec);
+  (vq = interp1(x, v, xq, InterpMethod::LINEAR)).run(exec);
   exec.sync();
 
   // Print the results

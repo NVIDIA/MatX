@@ -3,18 +3,27 @@
 interp1
 =======
 
-Piecewise linear or nearest-neighbor interpolation.
+Piecewise interpolation with various methods (linear, nearest, next, previous, spline).
 
-.. doxygenfunction:: interp1(const OpX &x, const OpV &v, const OpXQ &xq)
+.. doxygenfunction:: interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method)
+
+Interpolation Methods
+~~~~~~~~~~~~~~~~~~~~~
+
+.. doxygenenum:: matx::InterpMethod
 
 Examples
 ~~~~~~~~
+
+Linear Interpolation (default):
 
 .. literalinclude:: ../../../../test/00_operators/interp_test.cu
    :language: cpp
    :start-after: example-begin interp-test-1
    :end-before: example-end interp-test-1
    :dedent:
+
+Nearest Neighbor Interpolation:
 
 .. literalinclude:: ../../../../test/00_operators/interp_test.cu
    :language: cpp
