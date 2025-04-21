@@ -1,12 +1,11 @@
 .. _interp_func:
 
-interp
+interp1
 =======
 
 Piecewise linear or nearest-neighbor interpolation.
 
-.. doxygenfunction:: interp(const OpX &x, const OpV &v, const OpXQ &xq)
-.. doxygenfunction:: interp(const OpX &x, const OpV &v, const OpXQ &xq, const InterpMethod method)
+.. doxygenfunction:: interp1(const OpX &x, const OpV &v, const OpXQ &xq)
 
 Examples
 ~~~~~~~~
