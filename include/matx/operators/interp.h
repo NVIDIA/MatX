@@ -351,17 +351,17 @@ namespace matx {
           cudaStream_t stream = ex.getStream();
 
           cusparseHandle_t handle = nullptr;
-          cusparseStatus_t status = cusparseCreate(&handle);
-          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
-          status = cusparseSetStream(handle, stream);
-          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          cusparseStatus_t cusparse_status = cusparseCreate(&handle);
+          MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          cusparse_status = cusparseSetStream(handle, stream);
+          MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
 
           int n = static_cast<int>(x_.Size(0));
 
           size_t workspace_size = 0;
           void* workspace = nullptr;
           if constexpr (std::is_same_v<value_type, float>) {
-            status = cusparseSgtsv2_bufferSizeExt(
+            cusparse_status = cusparseSgtsv2_bufferSizeExt(
               handle, 
               n,  // n
               1, // batch_count
@@ -372,7 +372,7 @@ namespace matx {
               n, // batch_stride
               &workspace_size);
           } else if constexpr (std::is_same_v<value_type, double>) {
-            status = cusparseDgtsv2_bufferSizeExt(
+            cusparse_status = cusparseDgtsv2_bufferSizeExt(
               handle, 
               n,  // n
               1, // batch_count
@@ -383,12 +383,12 @@ namespace matx {
               n, // batch_stride
               &workspace_size);
           }
-          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           cudaError_t err = cudaMallocAsync(&workspace, workspace_size, stream);
           MATX_ASSERT(err == cudaSuccess, matxCudaError);
 
           if constexpr (std::is_same_v<value_type, float>) {
-            status = cusparseSgtsv2(
+            cusparse_status = cusparseSgtsv2(
               handle,              // cuSPARSE handle
               n,  // Size of the system
               1,           // Batch count
@@ -399,7 +399,7 @@ namespace matx {
               n, // batch_stride
               workspace);         // Workspace buffer
           } else if constexpr (std::is_same_v<value_type, double>) {
-            status = cusparseDgtsv2(
+            cusparse_status = cusparseDgtsv2(
               handle,              // cuSPARSE handle
               n,  // Size of the system
               1,           // Batch count
@@ -410,8 +410,12 @@ namespace matx {
               n, // batch_stride
               workspace);         // Workspace buffer
           }
-          MATX_ASSERT(status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
-
+          MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+          // cleanup
+          err = cudaFreeAsync(workspace, stream);
+          MATX_ASSERT(err == cudaSuccess, matxCudaError); 
+          cusparse_status = cusparseDestroy(handle);
+          MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           matxFree(ptr_d_);
           matxFree(ptr_dl_);
           matxFree(ptr_du_);
