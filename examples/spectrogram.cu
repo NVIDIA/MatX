@@ -65,17 +65,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-#ifdef USE_STF
-  std::cout << "Using STF executor\n";
-#else
-  std::cout << "Using CUDA executor\n";
-#endif
-
-#ifdef USE_STF
-  stfExecutor exec{stream};
-#else
   cudaExecutor exec{stream};
-#endif
 
   float fs = 10000;
   constexpr index_t N = 100000;
@@ -155,10 +145,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.stop_timer();
   exec.sync();
-  #ifdef USE_STF
-    auto ctx = exec.getCtx();
-    ctx.finalize();
-  #endif
   time_ms = exec.get_time_ms();
 
   printf("Spectrogram Time Without Graphs = %.2fus per iteration\n",
