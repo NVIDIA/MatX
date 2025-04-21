@@ -80,13 +80,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "Using CUDA executor\n";
 #endif
 
-#ifdef USE_STF
-  stfExecutor exec{};
-  auto ctx = exec.getCtx();
-#else
-  cudaExecutor exec{};
-#endif
-  
+ 
   index_t signal_size = 1ULL << 16;
   index_t filter_size = 16;
   index_t batches = 8;
@@ -99,8 +93,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-  cudaExecutor exec{stream};
 
+#ifdef USE_STF
+  stfExecutor exec{stream};
+  auto ctx = exec.getCtx();
+#else
+  cudaExecutor exec{stream};
+#endif
+ 
   // Create time domain buffers
   auto sig_time  = make_tensor<complex>({batches, signal_size});
   auto filt_time = make_tensor<complex>({batches, filter_size});
@@ -135,6 +135,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 #else
         cudaEventRecord(start, stream);
 #endif
+    }
     (sig_freq = fft(sig_time, filtered_size)).run(exec);
     (filt_freq = fft(filt_time, filtered_size)).run(exec);
 
