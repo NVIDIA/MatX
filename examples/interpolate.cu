@@ -48,18 +48,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
 
   index_t in_count = 10;
-  auto x = make_tensor<float>({in_count});
-  auto v = make_tensor<float>({in_count});
   index_t out_count = 100;
-  auto xq = make_tensor<float>({out_count});
-  auto vq = make_tensor<float>({out_count});
 
-  (x = linspace<0>(x.Shape(), 0.0f, 1.0f)).run(exec);
-  (v = sin(x)).run(exec);
-  (xq = linspace<0>(xq.Shape(), 0.0f, 1.0f)).run(exec);
+  auto x = linspace(0.0f, 1.0f, in_count);
+  auto v = sin(x);
+  auto xq = linspace(0.0f, 1.0f, out_count);
 
   // Execute the interpolation
-  (vq = interp(x, v, xq)).run(exec);
+  auto vq = make_tensor<float>({out_count});
+  (vq = interp1<InterpMethodLinear>(x, v, xq)).run(exec);
   exec.sync();
 
   // Print the results

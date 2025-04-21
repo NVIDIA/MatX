@@ -58,27 +58,30 @@ namespace matx {
       O dl_, d_, du_, b_;
       OpX x_;
       OpV v_;
+      using x_val_type = typename OpX::value_type;
+      using v_val_type = typename OpV::value_type;
+
 
     public:
-      InterpSplineTridiagonalFillOp(O dl, O d, O du, O b, OpX x, OpV v)
+      InterpSplineTridiagonalFillOp(const O& dl, const O& d, const O& du, const O& b, const OpX& x, const OpV& v)
           : dl_(dl), d_(d), du_(du), b_(b), x_(x), v_(v)  {}
 
       __device__ inline void operator()(index_t idx) const
       {
       
         if (idx == 0) { // left boundary condition
-          typename OpX::value_type x0 = x_(idx);
-          typename OpX::value_type x1 = x_(idx + 1);
-          typename OpX::value_type x2 = x_(idx + 2);
-          typename OpX::value_type h0 = x1 - x0;
-          typename OpX::value_type h1 = x2 - x1;
+          x_val_type x0 = x_(idx);
+          x_val_type x1 = x_(idx + 1);
+          x_val_type x2 = x_(idx + 2);
+          x_val_type h0 = x1 - x0;
+          x_val_type h1 = x2 - x1;
 
-          typename OpV::value_type v0 = v_(idx);
-          typename OpV::value_type v1 = v_(idx + 1);
-          typename OpV::value_type v2 = v_(idx + 2);
+          v_val_type v0 = v_(idx);
+          v_val_type v1 = v_(idx + 1);
+          v_val_type v2 = v_(idx + 2);
 
-          typename OpV::value_type delta0 = (v1 - v0) / h0;
-          typename OpV::value_type delta1 = (v2 - v1) / h1;
+          v_val_type delta0 = (v1 - v0) / h0;
+          v_val_type delta1 = (v2 - v1) / h1;
 
           dl_(idx) = static_cast<typename O::value_type>(0);
           d_(idx) = h1;
@@ -86,18 +89,18 @@ namespace matx {
           b_(idx) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
         }
         else if (idx == x_.Size(0) - 1) { // right boundary condition
-          typename OpX::value_type x0 = x_(idx - 2);
-          typename OpX::value_type x1 = x_(idx - 1);
-          typename OpX::value_type x2 = x_(idx);
-          typename OpX::value_type h0 = x1 - x0;
-          typename OpX::value_type h1 = x2 - x1;
+          x_val_type x0 = x_(idx - 2);
+          x_val_type x1 = x_(idx - 1);
+          x_val_type x2 = x_(idx);
+          x_val_type h0 = x1 - x0;
+          x_val_type h1 = x2 - x1;
 
-          typename OpV::value_type v0 = v_(idx - 2);
-          typename OpV::value_type v1 = v_(idx - 1);
-          typename OpV::value_type v2 = v_(idx);
+          v_val_type v0 = v_(idx - 2);
+          v_val_type v1 = v_(idx - 1);
+          v_val_type v2 = v_(idx);
 
-          typename OpV::value_type delta0 = (v1 - v0) / h0;
-          typename OpV::value_type delta1 = (v2 - v1) / h1;
+          v_val_type delta0 = (v1 - v0) / h0;
+          v_val_type delta1 = (v2 - v1) / h1;
 
 
           dl_(idx) = h0 + h1;
@@ -106,18 +109,18 @@ namespace matx {
           b_(idx) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
         }
         else { // interior points
-          typename OpX::value_type x0 = x_(idx - 1);
-          typename OpX::value_type x1 = x_(idx);
-          typename OpX::value_type x2 = x_(idx + 1);
-          typename OpX::value_type h0 = x1 - x0;
-          typename OpX::value_type h1 = x2 - x1;
+          x_val_type x0 = x_(idx - 1);
+          x_val_type x1 = x_(idx);
+          x_val_type x2 = x_(idx + 1);
+          x_val_type h0 = x1 - x0;
+          x_val_type h1 = x2 - x1;
 
-          typename OpV::value_type v0 = v_(idx - 1);
-          typename OpV::value_type v1 = v_(idx);
-          typename OpV::value_type v2 = v_(idx + 1);
+          v_val_type v0 = v_(idx - 1);
+          v_val_type v1 = v_(idx);
+          v_val_type v2 = v_(idx + 1);
 
-          typename OpV::value_type delta0 = (v1 - v0) / h0;
-          typename OpV::value_type delta1 = (v2 - v1) / h1;
+          v_val_type delta0 = (v1 - v0) / h0;
+          v_val_type delta1 = (v2 - v1) / h1;
 
           dl_(idx) = h1;
           d_(idx) = 2*(h0 + h1);
@@ -140,7 +143,7 @@ namespace matx {
       using value_type = typename OpV::value_type;
       using method_type = Method;
 
-    protected:
+    private:
       typename detail::base_type_t<OpX> x_;    // Sample points
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
