@@ -152,7 +152,7 @@ namespace matx {
       mutable value_type *ptr_m_ = nullptr;
 
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) searchsorted(const domain_type x_query) const
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto searchsorted(const domain_type x_query) const
       {        
         // Binary search to find the interval containing the query point
 
