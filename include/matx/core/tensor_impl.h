@@ -1265,7 +1265,7 @@ MATX_IGNORE_WARNING_POP_GCC
             data_place place = getDataPlace(Data());
 #endif
 
-            *stf_ldata_ = ctx.logical_token();
+            *stf_ldata_ = ctx.token();
             stf_ldata_->value().set_symbol(this->str());
         } 
     }
