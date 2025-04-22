@@ -8,6 +8,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/operators/max.h"
+#include "matx/operators/min.h"
 #include "matx/operators/mean.h"
 #include "matx/operators/stdd.h"
 
@@ -39,8 +40,22 @@ namespace matx
     }
     else if (method == NORMALIZE_RANGE::ZSCORE) {
       auto mu = mean(in, {norm_dim});
-      auto sigma = stdd(in, {norm_dim});
+      auto sigma = stdd(in, {norm_dim}, 1);
       (out = (in-mu)/sigma).run(ex);
+    }
+    else if (method == NORMALIZE_RANGE::RANGE) {
+      // rescale in range a=0 to b=1
+      float a = 0.0;
+      float b = 1.0;
+      auto min_in = min(in, {norm_dim});
+      auto max_in = max(in, {norm_dim});
+      auto scale_factor = (in - min_in) / (max_in - min_in);
+      (out = a + scale_factor*(b-a)).run(ex);
+    }
+    else if (method == NORMALIZE_RANGE::SCALE) {
+      // scale data to have standard deviation 1
+      auto scale_factor = stdd(in, {norm_dim}, 1);
+      (out = in / scale_factor).run(ex);
     }
   }
 }

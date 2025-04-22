@@ -441,3 +441,23 @@ class norm_operators:
             'in_m': seq,
             'out_m': (seq - np.mean(seq, axis=0, keepdims=True)) / np.std(seq, axis=0, ddof=1, keepdims=True)
         }
+    
+    def normalize_range(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        a = 0.0
+        b = 1.0
+        seq_min = np.min(seq, 0, keepdims=True)
+        seq_max = np.max(seq, 0, keepdims=True)
+        return {
+            'in_m': seq,
+            'out_m': a + (seq - seq_min) / (seq_max - seq_min) * (b - a)
+        }
+    
+    def normalize_scale(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        seq_std = np.std(seq, axis=0, ddof=1, keepdims=True)
+        return {
+            'in_m': seq,
+            'seq_std': seq_std,
+            'scaled_std': np.array(1.0)
+        }

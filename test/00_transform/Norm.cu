@@ -237,8 +237,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
 
-  print(this->in_m);
-  print(this->out_m);
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-2
@@ -246,6 +244,46 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
   // example-end normalize-test-2
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeRange)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_range");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  // example-begin normalize-test-3
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE)).run(this->exec);
+  // example-end normalize-test-3
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeScale)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_scale");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+
+  // example-begin normalize-test-scale
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::SCALE)).run(this->exec);
+  // example-end normalize-test-scale
+
+  auto out_m_std = make_tensor<double>({});
+  (out_m_std = stdd(this->out_m)).run(this->exec); 
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, out_m_std, "scaled_std", 0.1);
 
   MATX_EXIT_HANDLER();
 }
