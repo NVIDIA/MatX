@@ -7,6 +7,7 @@ set(examples
     cgsolve
     eigenExample
     fft_conv
+    interpolate
     resample
     mvdr_beamformer
     pwelch
