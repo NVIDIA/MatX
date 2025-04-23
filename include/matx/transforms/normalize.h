@@ -24,7 +24,9 @@ namespace matx
 
   template <typename OutputOp, typename InputOp, int DIM, typename Executor>
   __MATX_INLINE__ void normalize_impl(OutputOp out, const InputOp &in, 
-                                    const NORMALIZE_RANGE method, Executor &&ex) {
+                                    const NORMALIZE_RANGE method, 
+                                    const float p,
+                                    Executor &&ex) {
     int norm_dim = 0;
     if (DIM != -1) {
       norm_dim = DIM;
@@ -40,9 +42,17 @@ namespace matx
 
     if (method == NORMALIZE_RANGE::NORM) {
       // max norm
-      const auto absOp = abs(in);
-      auto norm_factor = max<decltype(absOp), 1>(absOp, {norm_dim});
-      (out = in / norm_factor).run(ex);
+      if (p < 0.0f) {
+        const auto absOp = abs(in);
+        auto norm_factor = max<decltype(absOp), 1>(absOp, {norm_dim});
+        (out = in / norm_factor).run(ex);
+      }
+      else {
+        MATX_ASSERT_STR(p > 0.0f, matxInvalidParameter, "p should be positive non zero");
+        auto absOp = abs(in);
+        auto norm_factor = pow(sum(pow(absOp, p), {norm_dim}), 1/p);
+        (out = in / norm_factor).run(ex);
+      }
     }
     else if (method == NORMALIZE_RANGE::ZSCORE) {
       auto mu = mean(in, {norm_dim});

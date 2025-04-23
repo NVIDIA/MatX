@@ -435,6 +435,13 @@ class norm_operators:
             'out_m': seq / np.linalg.norm(seq, ord=np.inf, axis=0, keepdims=True)
         }
     
+    def normalize_lpnorm(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
+        return {
+            'in_m': seq,
+            'out_m': seq / np.linalg.norm(seq, ord=2, axis=0, keepdims=True)
+        }
+    
     def normalize_zscore(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray((self.size[0],self.size[1]), self.dtype)
         return {

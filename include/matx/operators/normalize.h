@@ -15,11 +15,21 @@ namespace matx
         typename detail::base_type_t<OpA> op_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         NORMALIZE_RANGE normalize_method;
+        float p_ = -1.0f;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                       typename OpA::value_type, 
                                       typename scalar_to_complex<typename OpA::value_type>::ctype>;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+
+        __MATX_INLINE__ void InitNormalize() {
+          static_assert(DIM <= OpA::Rank(), "Normalize DIM must be less than the rank of operator");
+          static_assert(DIM >= -1, "Normalize DIM must be non-negative or -1 for normalizing first non-singular dimension");
+          for (int r = 0; r < OpA::Rank(); r++) {
+            out_dims_[r] = op_.Size(r);
+          }
+        }
+
       public:
         using matxop = bool;
         using matx_transform_op = bool; 
@@ -28,11 +38,12 @@ namespace matx
         using self_type = NormalizeOp<OpA, DIM>;
 
         __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method): op_(op), normalize_method(method) {
-          static_assert(DIM <= OpA::Rank(), "Normalize DIM must be less than the rank of operator");
-          static_assert(DIM >= -1, "Normalize DIM must be non-negative or -1 for normalizing first non-singular dimension");
-          for (int r = 0; r < OpA::Rank(); r++) {
-            out_dims_[r] = op_.Size(r);
-          }
+          InitNormalize();
+        }
+
+        __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method, const float p): op_(op), normalize_method(method),  p_(p){
+          MATX_ASSERT_STR(normalize_method == NORMALIZE_RANGE::NORM, matxInvalidParameter, "p value can be specified for only p-norm");
+          InitNormalize();
         }
 
         __MATX_INLINE__ std::string str() const { return "normalize(" + op_.str() + ")"; }
@@ -51,7 +62,9 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          normalize_impl<typename cuda::std::tuple_element<0, Out>::type, detail::base_type_t<OpA>, DIM, Executor>(cuda::std::get<0>(out), op_, normalize_method, ex);
+          normalize_impl<typename cuda::std::tuple_element<0, Out>::type, detail::base_type_t<OpA>, DIM, Executor>(
+            cuda::std::get<0>(out), op_, normalize_method, p_, ex
+          );
         }
 
         template <typename ShapeType, typename Executor>
@@ -98,5 +111,22 @@ namespace matx
   __MATX_INLINE__ auto normalize(const OpA &op, const NORMALIZE_RANGE normalize_method) {
     MATX_NVTX_START("normalize(" + get_type_str(op) + ")", matx::MATX_NVTX_LOG_API)
     return detail::NormalizeOp<OpA, DIM>(op, normalize_method);
+  }
+
+  /**
+   * @brief Normalize operates along the first dimension of A whose size does not equal 1.
+   *
+   * For a matrix, it normalizes along the column by default
+   *
+   * @tparam OpA Type of input value to normalize
+   * @param op Input value to evaluate
+   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE
+   * @param p for method="NORM" specify p for Lp-norm, if unspecified max norm (infinite norm) is applied
+   * @return normalized operator
+   */
+  template<int DIM=-1, typename OpA>
+  __MATX_INLINE__ auto normalize(const OpA &op, const NORMALIZE_RANGE normalize_method, const float p) {
+    MATX_NVTX_START("normalize(" + get_type_str(op) + ")", matx::MATX_NVTX_LOG_API)
+    return detail::NormalizeOp<OpA, DIM>(op, normalize_method, p);
   }
 }
