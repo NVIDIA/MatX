@@ -280,7 +280,7 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeRange)
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-3
-  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE)).run(this->exec);
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE, 0.0f, 1.0f)).run(this->exec);
   // example-end normalize-test-3
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);

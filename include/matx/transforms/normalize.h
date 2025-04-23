@@ -26,6 +26,8 @@ namespace matx
   __MATX_INLINE__ void normalize_impl(OutputOp out, const InputOp &in, 
                                     const NORMALIZE_RANGE method, 
                                     const float p,
+                                    const float a,
+                                    const float b,
                                     Executor &&ex) {
     int norm_dim = 0;
     if (DIM != -1) {
@@ -61,8 +63,6 @@ namespace matx
     }
     else if (method == NORMALIZE_RANGE::RANGE) {
       // rescale in range a=0 to b=1
-      float a = 0.0;
-      float b = 1.0;
       auto min_in = min(in, {norm_dim});
       auto max_in = max(in, {norm_dim});
       auto scale_factor = (in - min_in) / (max_in - min_in);

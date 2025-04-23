@@ -16,6 +16,8 @@ namespace matx
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         NORMALIZE_RANGE normalize_method;
         float p_ = -1.0f;
+        float a_ = 0.0f;
+        float b_ = 1.0f;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                       typename OpA::value_type, 
                                       typename scalar_to_complex<typename OpA::value_type>::ctype>;
@@ -46,6 +48,11 @@ namespace matx
           InitNormalize();
         }
 
+        __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method, const float a, const float b): op_(op), normalize_method(method),  a_(a), b_(b){
+          MATX_ASSERT_STR(normalize_method == NORMALIZE_RANGE::RANGE, matxInvalidParameter, "a and b values specify the range for range normalize method");
+          InitNormalize();
+        }
+
         __MATX_INLINE__ std::string str() const { return "normalize(" + op_.str() + ")"; }
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
@@ -63,7 +70,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           normalize_impl<typename cuda::std::tuple_element<0, Out>::type, detail::base_type_t<OpA>, DIM, Executor>(
-            cuda::std::get<0>(out), op_, normalize_method, p_, ex
+            cuda::std::get<0>(out), op_, normalize_method, p_, a_, b_, ex
           );
         }
 
@@ -128,5 +135,23 @@ namespace matx
   __MATX_INLINE__ auto normalize(const OpA &op, const NORMALIZE_RANGE normalize_method, const float p) {
     MATX_NVTX_START("normalize(" + get_type_str(op) + ")", matx::MATX_NVTX_LOG_API)
     return detail::NormalizeOp<OpA, DIM>(op, normalize_method, p);
+  }
+
+  /**
+   * @brief Normalize operates along the first dimension of A whose size does not equal 1.
+   *
+   * For a matrix, it normalizes along the column by default
+   *
+   * @tparam OpA Type of input value to normalize
+   * @param op Input value to evaluate
+   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE
+   * @param a start interval for range
+   * @param b end interval for range
+   * @return normalized operator
+   */
+  template<int DIM=-1, typename OpA>
+  __MATX_INLINE__ auto normalize(const OpA &op, const NORMALIZE_RANGE normalize_method, const float a, const float b) {
+    MATX_NVTX_START("normalize(" + get_type_str(op) + ")", matx::MATX_NVTX_LOG_API)
+    return detail::NormalizeOp<OpA, DIM>(op, normalize_method, a, b);
   }
 }
