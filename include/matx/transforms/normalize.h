@@ -18,17 +18,23 @@ namespace matx
     ZSCORE,
     NORM,
     SCALE,
-    RANGE
+    RANGE,
+    CENTER
   };
 
-  template <typename OutputOp, typename InputOp, typename Executor>
+  template <typename OutputOp, typename InputOp, int DIM, typename Executor>
   __MATX_INLINE__ void normalize_impl(OutputOp out, const InputOp &in, 
                                     const NORMALIZE_RANGE method, Executor &&ex) {
     int norm_dim = 0;
-    for(int dim=0; dim<in.Rank(); ++dim) {
-      if (in.Size(dim) != 1) {
-        norm_dim = dim;
-        break;
+    if (DIM != -1) {
+      norm_dim = DIM;
+    }
+    else {
+      for(int dim=0; dim<in.Rank(); ++dim) {
+        if (in.Size(dim) != 1) {
+          norm_dim = dim;
+          break;
+        }
       }
     }
 
@@ -56,6 +62,10 @@ namespace matx
       // scale data to have standard deviation 1
       auto scale_factor = stdd(in, {norm_dim}, 1);
       (out = in / scale_factor).run(ex);
+    }
+    else if (method == NORMALIZE_RANGE::CENTER) {
+      auto offset = mean(in, {norm_dim});
+      (out = in - offset).run(ex);
     }
   }
 }

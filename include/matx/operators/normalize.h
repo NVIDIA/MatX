@@ -51,7 +51,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          normalize_impl(cuda::std::get<0>(out), op_, normalize_method, ex);
+          normalize_impl<typename cuda::std::tuple_element<0, Out>::type, detail::base_type_t<OpA>, DIM, Executor>(cuda::std::get<0>(out), op_, normalize_method, ex);
         }
 
         template <typename ShapeType, typename Executor>
