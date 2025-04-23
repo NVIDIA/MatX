@@ -287,3 +287,23 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeScale)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeCenter)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_center");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  // example-begin normalize-test-3
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::CENTER)).run(this->exec);
+  // example-end normalize-test-3
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
