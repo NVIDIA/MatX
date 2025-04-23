@@ -111,7 +111,7 @@ namespace matx
    *
    * @tparam OpA Type of input value to normalize
    * @param op Input value to evaluate
-   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE
+   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE, CENTER
    * @return normalized operator
    */
   template<int DIM=-1, typename OpA>
@@ -127,7 +127,7 @@ namespace matx
    *
    * @tparam OpA Type of input value to normalize
    * @param op Input value to evaluate
-   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE
+   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE, CENTER
    * @param p for method="NORM" specify p for Lp-norm, if unspecified max norm (infinite norm) is applied
    * @return normalized operator
    */
@@ -144,7 +144,7 @@ namespace matx
    *
    * @tparam OpA Type of input value to normalize
    * @param op Input value to evaluate
-   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE
+   * @param normalize_method Method of normalization to use: ZSCORE, NORM, SCALE, RANGE, CENTER
    * @param a start interval for range
    * @param b end interval for range
    * @return normalized operator

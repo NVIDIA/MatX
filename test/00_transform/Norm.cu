@@ -77,7 +77,6 @@ class NormalizeTestFloatNonComplexNonHalfAllExecs: public NormTestFloatTypes<Ten
   using GTestType = cuda::std::tuple_element_t<0, TensorType>;
   using GExecType = cuda::std::tuple_element_t<1, TensorType>;
   protected:
-    // tensor_t<GTestType, 2> in_m{{3, 3}};
     tensor_t<GTestType, 2> out_m{{a_len, a_len}};
 };
 
@@ -215,13 +214,11 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeMaxnorm)
   this->pb->RunTVGenerator("normalize_maxnorm");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
-  // (normalize(this->in_m, NORMALIZE_RANGE::ZSCORE)).run(this->exec);
-  // (mean(this->in_m)).run(this->exec);
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
-  // example-begin normalize-test-1
+  // example-begin normalize-test-maxnorm
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM)).run(this->exec);
-  // example-end normalize-test-1
+  // example-end normalize-test-maxnorm
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
@@ -259,9 +256,9 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
-  // example-begin normalize-test-2
+  // example-begin normalize-test-zscore
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::ZSCORE)).run(this->exec);
-  // example-end normalize-test-2
+  // example-end normalize-test-zscore
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
@@ -279,9 +276,9 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeRange)
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
-  // example-begin normalize-test-3
+  // example-begin normalize-test-range
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE, 0.0f, 1.0f)).run(this->exec);
-  // example-end normalize-test-3
+  // example-end normalize-test-range
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
@@ -319,9 +316,9 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeCenter)
 
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
-  // example-begin normalize-test-3
+  // example-begin normalize-test-center
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::CENTER)).run(this->exec);
-  // example-end normalize-test-3
+  // example-end normalize-test-center
   
   MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 

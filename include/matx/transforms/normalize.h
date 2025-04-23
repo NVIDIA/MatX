@@ -43,8 +43,8 @@ namespace matx
     }
 
     if (method == NORMALIZE_RANGE::NORM) {
-      // max norm
       if (p < 0.0f) {
+        // max norm
         const auto absOp = abs(in);
         auto norm_factor = max<decltype(absOp), 1>(absOp, {norm_dim});
         (out = in / norm_factor).run(ex);
@@ -62,7 +62,7 @@ namespace matx
       (out = (in-mu)/sigma).run(ex);
     }
     else if (method == NORMALIZE_RANGE::RANGE) {
-      // rescale in range a=0 to b=1
+      // rescale in range [a, b]; by default [0.0, 1.0]
       auto min_in = min(in, {norm_dim});
       auto max_in = max(in, {norm_dim});
       auto scale_factor = (in - min_in) / (max_in - min_in);
