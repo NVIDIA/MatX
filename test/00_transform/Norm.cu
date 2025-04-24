@@ -214,7 +214,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeMaxnorm)
   this->pb->RunTVGenerator("normalize_maxnorm");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-maxnorm
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM)).run(this->exec);
@@ -233,8 +232,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeLpnorm)
   this->pb->RunTVGenerator("normalize_lpnorm");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
-  
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-lpnorm
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM, 2.0)).run(this->exec);
@@ -254,8 +251,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
-
   // example-begin normalize-test-zscore
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::ZSCORE)).run(this->exec);
   // example-end normalize-test-zscore
@@ -273,8 +268,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeRange)
   this->pb->RunTVGenerator("normalize_range");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
-
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-range
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE, 0.0f, 1.0f)).run(this->exec);
@@ -313,8 +306,6 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeCenter)
   this->pb->RunTVGenerator("normalize_center");
   this->pb->NumpyToTensorView(this->in_m, "in_m");
   this->pb->NumpyToTensorView(this->out_m, "out_m");
-
-  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
 
   // example-begin normalize-test-center
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::CENTER)).run(this->exec);
