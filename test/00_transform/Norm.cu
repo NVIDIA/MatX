@@ -290,10 +290,10 @@ TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeScale)
   (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::SCALE)).run(this->exec);
   // example-end normalize-test-scale
 
-  auto out_m_std = make_tensor<double>({});
-  (out_m_std = stdd(this->out_m)).run(this->exec); 
+  auto out_m_std = make_tensor<double>({a_len});
+  (out_m_std = stdd(this->out_m, {0}, 1)).run(this->exec); 
   
-  MATX_TEST_ASSERT_COMPARE(this->pb, out_m_std, "scaled_std", 0.1);
+  MATX_TEST_ASSERT_COMPARE(this->pb, out_m_std, "scaled_std", this->thresh);
 
   MATX_EXIT_HANDLER();
 }

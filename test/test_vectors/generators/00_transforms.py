@@ -465,7 +465,7 @@ class norm_operators:
         return {
             'in_m': seq,
             'seq_std': seq_std,
-            'scaled_std': np.array(1.0)
+            'scaled_std': np.ones(self.size[1], dtype=self.dtype)
         }
     
     def normalize_center(self) -> Dict[str, np.ndarray]:
