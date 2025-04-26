@@ -402,7 +402,7 @@ namespace matx {
               &workspace_size);   // workspace size
           }
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
-          cudaError_t err = cudaMallocAsync(&workspace, workspace_size, stream);
+          [[maybe_unused]] cudaError_t err = cudaMallocAsync(&workspace, workspace_size, stream);
           MATX_ASSERT(err == cudaSuccess, matxCudaError);
 
           if constexpr (std::is_same_v<value_type, float>) {
