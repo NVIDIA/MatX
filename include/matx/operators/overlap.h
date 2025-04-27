@@ -47,10 +47,10 @@ namespace matx
     {
       public:
         using value_type = typename T::value_type;
-        using shape_type = index_t;
         using self_type = OverlapOp<DIM, T>;
 
       private:
+        using shape_type = index_t;
         typename detail::base_type_t<T> op_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, DIM+1> n_;

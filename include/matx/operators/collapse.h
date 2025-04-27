@@ -49,7 +49,6 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
-        using shape_type = index_t;
         using matxoplvalue = bool;
         using self_type = LCollapseOp<DIM, T1>;
 
@@ -191,7 +190,6 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
-        using shape_type = index_t;
         using matxlvalue = bool;
         using self_type = RCollapseOp<DIM, T1>;
 

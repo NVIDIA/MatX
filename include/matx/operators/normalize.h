@@ -68,7 +68,6 @@ namespace matx
         using matxop = bool;
         using matx_transform_op = bool; 
         using value_type = typename OpA::value_type;
-        using shape_type = index_t;
         using self_type = NormalizeOp<OpA, DIM>;
 
         __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method): op_(op), normalize_method(method) {

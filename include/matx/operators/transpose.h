@@ -54,7 +54,6 @@ namespace detail {
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
-      using shape_type = std::conditional_t<has_shape_type_v<OpA>, typename OpA::shape_type, index_t>; 
       using matx_transform_op = bool;
       using matxoplvalue = bool;
       using transpose_xform_op = bool;

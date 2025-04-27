@@ -189,7 +189,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   using strip_input_t = typename InType::value_type;
   using strip_filter_t = typename FilterType::value_type;
-  using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>;
 
   size_t filter_len = filter.Size(filter.Rank()-1);
 
@@ -202,7 +201,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   size_t shmsize = filter_shm + signal_shm;
 
-  shape_type sig_len = i.Size(OutputType::Rank() - 1);
+  const index_t sig_len = i.Size(OutputType::Rank() - 1);
   int work_per_block = CONV1D_ELEMENTS_PER_BLOCK;
   unsigned int num_blocks = (unsigned int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
 
