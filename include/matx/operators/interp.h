@@ -371,7 +371,7 @@ namespace matx {
           // Solve tridiagonal system using cuSPARSE
           cudaStream_t stream = ex.getStream();
           cusparseHandle_t handle = nullptr;
-          cusparseStatus_t cusparse_status = cusparseCreate(&handle);
+          [[maybe_unused]] cusparseStatus_t cusparse_status = cusparseCreate(&handle);
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
           cusparse_status = cusparseSetStream(handle, stream);
           MATX_ASSERT(cusparse_status == CUSPARSE_STATUS_SUCCESS, matxCudaError);
