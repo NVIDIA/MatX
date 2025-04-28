@@ -58,7 +58,6 @@ namespace matx
       public:
       using matxop = bool;
       using matxoplvalue = bool;
-      using shape_type = index_t;
 
       // Scalar type of operation
       using value_type = first_value_type;

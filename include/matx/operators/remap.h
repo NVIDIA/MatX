@@ -55,7 +55,6 @@ namespace matx
         using matxoplvalue = bool;
 
         using value_type = typename T::value_type;
-        using shape_type = index_t;
         using index_type = typename IdxType::value_type;
         using self_type = RemapOp<DIM, T, IdxType>;
         static_assert(std::is_integral<index_type>::value, "RemapOp: Type for index operator must be integral");

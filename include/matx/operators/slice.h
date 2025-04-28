@@ -48,10 +48,10 @@ namespace matx
     {
       public: 
         using value_type = typename T::value_type;
-        using shape_type = index_t; 
         using self_type = SliceOp<DIM, T, StrideType>;
 
       private:
+        using shape_type = index_t;
         typename detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
