@@ -312,7 +312,17 @@ template <typename T> struct ExpjF {
       return matxHalfComplex<T>{_internal_cos(v1), _internal_sin(v1)};
     }
     else {
-      return cuda::std::complex<T>{_internal_cos(v1), _internal_sin(v1)};
+      if constexpr (std::is_same_v<T, double>) {
+        double sinx, cosx;
+        sincos(v1, &sinx, &cosx);
+        return cuda::std::complex<T>{cosx, sinx};
+      } else if constexpr (std::is_same_v<T, float>) {
+        float sinx, cosx;
+        sincosf(v1, &sinx, &cosx);
+        return cuda::std::complex<T>{cosx, sinx};
+      } else {
+        return cuda::std::complex<T>{_internal_cos(v1), _internal_sin(v1)};
+      }
     }
   }
 };
