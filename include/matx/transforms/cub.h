@@ -1611,7 +1611,8 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
     int64_t num_items = _num_items;
 #else
     if (_num_items > std::numeric_limits<int>::max()) {
-      MATX_THROW(matxInvalidSize, "Sorting is not supported for tensors with more than 2^31 items");
+      std::string err_msg = "Sorting is not supported for tensors with more than 2^" + std::to_string(std::numeric_limits<int>::digits) + " items";
+      MATX_THROW(matxInvalidSize, err_msg);
     }
     int num_segments = static_cast<int>(_num_segments);
     int num_items = static_cast<int>(_num_items);
