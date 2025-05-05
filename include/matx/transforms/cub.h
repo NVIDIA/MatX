@@ -2132,16 +2132,16 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
     }
   }
   if (!use_a) {
-    matxAlloc((void**)&a_ptr, TotalSize(a) * sizeof(a_type), MATX_MANAGED_MEMORY, exec.getStream());
+    matxAlloc((void**)&a_ptr, TotalSize(a) * sizeof(a_type), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
     make_tensor(tmp_a, a_ptr, a.Shape());
     (tmp_a = a).run(exec);
   }
 
   // also requires a temporary for output values and input indices
-  matxAlloc((void**)&a_out_ptr, TotalSize(a) * sizeof(a_type), MATX_MANAGED_MEMORY, exec.getStream());
+  matxAlloc((void**)&a_out_ptr, TotalSize(a) * sizeof(a_type), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
   make_tensor(tmp_a_out, a_out_ptr, a.Shape());
 
-  matxAlloc((void**)&idx_in_ptr, TotalSize(idx_out) * sizeof(index_t), MATX_MANAGED_MEMORY, exec.getStream());
+  matxAlloc((void**)&idx_in_ptr, TotalSize(idx_out) * sizeof(index_t), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
   make_tensor(tmp_idx_in, idx_in_ptr, idx_out.Shape());
   (tmp_idx_in = range<RANK-1>(idx_out.Shape(), 0, 1)).run(exec);
 
