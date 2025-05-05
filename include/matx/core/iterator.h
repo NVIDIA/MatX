@@ -291,7 +291,23 @@ struct RandomOperatorOutputIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator==(const self_type &a, const self_type &b)
   {
     return a.offset_ == b.offset_;
-  }    
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator<(const self_type &a, const self_type &b) {
+    return a.offset_ < b.offset_;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator>(const self_type &a, const self_type &b) {
+    return a.offset_ > b.offset_;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator<=(const self_type &a, const self_type &b) {
+    return a.offset_ <= b.offset_;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ friend bool operator>=(const self_type &a, const self_type &b) {
+    return a.offset_ >= b.offset_;
+  }
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
     return OperatorType::Rank();

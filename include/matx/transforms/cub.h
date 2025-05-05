@@ -1540,6 +1540,134 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
 #endif
 }
 
+
+/**
+ * Inner function for the public argsort_impl(). argsort_impl() allocates a temporary
+ * tensor that is contiguous, and can be mutated.
+ */
+template <typename OutputIndexTensor, typename InputIndexTensor, typename OutputKeyTensor,  typename InputKeyTensor>
+void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &idx_in,
+          OutputKeyTensor &a_out, const InputKeyTensor &a_in,
+          const SortDirection_t dir,
+          [[maybe_unused]] cudaExecutor exec = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  static constexpr int RANK = OutputIndexTensor::Rank();
+  using T1 = typename InputKeyTensor::value_type;
+  using T2 = typename OutputIndexTensor::value_type;
+
+  cudaStream_t stream = exec.getStream();
+  void *d_temp = nullptr;
+  size_t temp_storage_bytes = 0;
+
+  if constexpr (RANK == 1) {  
+    if (dir == SORT_DIR_ASC) {
+      // First call to get size
+      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes, 
+                                a_in.Data(), a_out.Data(),
+                                idx_in.Data(), idx_out.Data(),
+                                a_in.Size(0), 0, sizeof(T1) * 8, stream);
+      matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+                stream);
+                      
+      // Run sort
+      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes, 
+                                a_in.Data(), a_out.Data(),
+                                idx_in.Data(), idx_out.Data(),
+                                     a_in.Size(0), 0, sizeof(T1) * 8, stream);
+
+      matxFree(d_temp, stream);
+    }
+    else {
+      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes, 
+                                a_in.Data(), a_out.Data(),
+                                idx_in.Data(), idx_out.Data(),
+                                     a_in.Size(0), 0, sizeof(T1) * 8, stream);
+      
+      // Allocate temporary storage
+      matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+                stream);
+                      
+      // Run sort
+      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes, 
+                                a_in.Data(), a_out.Data(),
+                                idx_in.Data(), idx_out.Data(),
+                                     a_in.Size(0), 0, sizeof(T1) * 8, stream);
+
+      matxFree(d_temp, stream);
+    }
+  }
+  else {
+    // CUB added support for large items and segments in https://github.com/NVIDIA/cccl/pull/3308
+    int64_t _num_segments = 1;
+    for (int i = 0; i < RANK - 1; i++) {
+      _num_segments *= a_in.Size(i);
+    }
+    int64_t _num_items = _num_segments * a_in.Size(RANK - 1);
+#if 0  // TODO: add conditional on CUB_MAJOR_VERSION once released
+    int64_t num_segments = _num_segments;
+    int64_t num_items = _num_items;
+#else
+    if (_num_items > std::numeric_limits<int>::max()) {
+      std::string err_msg = "Sorting is not supported for tensors with more than 2^" + std::to_string(std::numeric_limits<int>::digits) + " items";
+      MATX_THROW(matxInvalidSize, err_msg);
+    }
+    int num_segments = static_cast<int>(_num_segments);
+    int num_items = static_cast<int>(_num_items);
+#endif
+    if (dir == SORT_DIR_ASC)
+      {
+        cub::DeviceSegmentedSort::SortPairs(
+            d_temp, temp_storage_bytes,
+            a_in.Data(), a_out.Data(),
+            idx_in.Data(), idx_out.Data(),
+            num_items,
+            num_segments,
+            BeginOffset{a_in}, EndOffset{a_in}, stream);
+
+        matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+                stream);  
+
+        cub::DeviceSegmentedSort::SortPairs(
+            d_temp, temp_storage_bytes,
+            a_in.Data(), a_out.Data(),
+            idx_in.Data(), idx_out.Data(),
+            num_items,
+            num_segments,
+            BeginOffset{a_in}, EndOffset{a_in}, stream);
+
+        matxFree(d_temp, stream);
+      }
+      else
+      {
+        cub::DeviceSegmentedSort::SortPairsDescending(
+            d_temp, temp_storage_bytes,
+            a_in.Data(), a_out.Data(),
+            idx_in.Data(), idx_out.Data(),
+            num_items,
+            num_segments,
+            BeginOffset{a_in}, EndOffset{a_in}, stream);
+            
+        matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
+                stream);  
+
+        cub::DeviceSegmentedSort::SortPairsDescending(
+            d_temp, temp_storage_bytes,
+            a_in.Data(), a_out.Data(),
+            idx_in.Data(), idx_out.Data(),
+            num_items,
+            num_segments,
+            BeginOffset{a_in}, EndOffset{a_in}, stream);
+
+        matxFree(d_temp, stream);
+      }
+    }
+#endif
+}
+
+
 template <typename Op>
 __MATX_INLINE__ auto getCubArgReduceSupportedTensor( const Op &in, cudaStream_t stream) {
   // This would be better as a templated lambda, but we don't have those in C++17 yet
@@ -1947,6 +2075,127 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
     matxFree(out_ptr, exec.getStream());
   }
 #endif
+}
+
+
+
+/**
+ * Sort rows of a tensor
+ *
+ * Sort rows of a tensor using a radix sort. Currently supported types are
+ * float, double, ints, and long ints (both signed and unsigned). For a 1D
+ * tensor, a linear sort is performed. For 2D and above each row of the inner
+ * dimensions are batched and sorted separately. There is currently a
+ * restriction that the tensor must have contiguous data in both rows and
+ * columns, but this restriction may be removed in the future.
+ *
+ * @note Temporary memory is used during the sorting process, and about 2N will
+ * be allocated, where N is the length of the tensor.
+ *
+ * @tparam T1
+ *   Type of data to sort
+ * @tparam RANK
+ *   Rank of tensor
+ * @param idx_out
+ *   Indices of sorted tensor
+ * @param a
+ *   Input operator
+ * @param dir
+ *   Direction to sort (either SORT_DIR_ASC or SORT_DIR_DESC)
+ * @param exec
+ *   CUDA executor
+ */
+template <typename OutputTensor, typename InputOperator>
+void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
+          const SortDirection_t dir,
+          cudaExecutor exec = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  static constexpr int RANK = OutputTensor::Rank();
+
+  using a_type = typename InputOperator::value_type;
+  a_type *a_ptr = nullptr;
+  a_type *a_out_ptr = nullptr;
+  index_t *idx_in_ptr = nullptr;
+  detail::tensor_impl_t<a_type, InputOperator::Rank()> tmp_a;
+  detail::tensor_impl_t<a_type, InputOperator::Rank()> tmp_a_out;
+  detail::tensor_impl_t<index_t, InputOperator::Rank()> tmp_idx_in;
+    
+  // sorting currently requires a contiguous tensor view, so allocate a temporary
+  // tensor to copy the input if necessary.
+  bool use_a = false;
+  if constexpr (is_tensor_view_v<InputOperator>) {
+    if (a.IsContiguous()) {
+      make_tensor(tmp_a, a.Data(), a.Shape());
+      use_a = true;
+    }
+  }
+  if (!use_a) {
+    matxAlloc((void**)&a_ptr, TotalSize(a) * sizeof(a_type), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    make_tensor(tmp_a, a_ptr, a.Shape());
+    (tmp_a = a).run(exec);
+  }
+
+  // also requires a temporary for output values and input indices
+  matxAlloc((void**)&a_out_ptr, TotalSize(a) * sizeof(a_type), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  make_tensor(tmp_a_out, a_out_ptr, a.Shape());
+
+  matxAlloc((void**)&idx_in_ptr, TotalSize(idx_out) * sizeof(index_t), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  make_tensor(tmp_idx_in, idx_in_ptr, idx_out.Shape());
+  (tmp_idx_in = range<RANK-1>(idx_out.Shape(), 0, 1)).run(exec);
+
+  detail::sort_pairs_impl_inner(idx_out, tmp_idx_in, tmp_a_out, tmp_a, dir, exec);
+
+  if (!use_a) {
+    // We need to free the temporary memory allocated above if we had to make a copy
+    matxFree(a_ptr, exec.getStream());
+  }
+  matxFree(a_out_ptr, exec.getStream());
+  matxFree(idx_in_ptr, exec.getStream());
+#endif
+}
+
+template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
+void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
+          const SortDirection_t dir,
+          [[maybe_unused]] const HostExecutor<MODE> &exec)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  static constexpr int RANK = OutputTensor::Rank();
+  (idx_out = range<RANK-1>(idx_out.Shape(), 0, 1)).run(exec);
+  typename detail::base_type_t<OutputTensor>  out_base = idx_out;
+  auto lout = matx::RandomOperatorOutputIterator{out_base};
+
+  if constexpr (RANK == 1) {    
+    if (dir == SORT_DIR_ASC) {
+      std::sort(
+          lout, lout + idx_out.Size(0),
+          [&a](index_t i, index_t j) { return a(i) < a(j); });
+    }
+    else {
+      std::sort(
+          lout, lout + idx_out.Size(0),
+          [&a](index_t i, index_t j) { return a(i) > a(j); });
+    }
+  }
+  else if constexpr (RANK == 2) {
+    for (index_t b = 0; b < lout.Size(0); b++) {
+      if (dir == SORT_DIR_ASC) {
+        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1), 
+                  [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
+      }
+      else {
+        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1), 
+                  [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
+      }
+    }
+  }
+  else {
+    MATX_ASSERT_STR(false, matxInvalidDim, "Only 1 and 2D argsort supported on host");
+  }
 }
 
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>

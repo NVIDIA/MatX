@@ -129,3 +129,4 @@
 #include "matx/operators/argminmax.h"
 #include "matx/operators/all.h"
 #include "matx/operators/any.h"
+#include "matx/operators/argsort.h"
