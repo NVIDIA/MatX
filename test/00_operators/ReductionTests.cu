@@ -615,6 +615,23 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
     (t0 = any(t1)).run(exec);
     exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
+
+    // test partial reduction
+    (t2 = any(t4, {2, 3})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(0)));
+      }
+    }
+
+    (t2 = any(t3, {2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(i == 1 && j == 1)));
+      }
+    }
   }
 
   MATX_EXIT_HANDLER();
@@ -695,6 +712,23 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, All)
     (t0 = all(t1)).run(exec);
     exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(0)));
+
+    // test partial reduction
+    (t2 = all(t4, {2, 3})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(1)));
+      }
+    }
+
+    (t2 = all(t3, {2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(i != 1 || j != 1)));
+      }
+    }
   }
 
   MATX_EXIT_HANDLER();

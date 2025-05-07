@@ -378,6 +378,14 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(float *addr, float val)
   }
 };
 
+__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(bool *addr, bool val)
+{
+  // not strictly atomic, but we only need to write to the location if val is false
+  if (!val) {
+    *addr = false;
+  }
+};
+
 __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
 {
   int assumed;
@@ -804,27 +812,32 @@ public:
 template <typename T> class reduceOpAny {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
   {
     return (v1 != 0) || (v2 != 0);
   }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(0); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
 
 /**
- * Operator for performing an all reduction
+ * Operator for performing an any reduction
  *
- * Performs a reduction of two values of type T by returning 1 if all
+ * Performs a reduction of two values of type T by returning 1 if either
  * of the values are non-zero.
  */
 template <typename T> class reduceOpAll {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
   {
     return (v1 != 0) && (v2 != 0);
   }
+
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
+  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
 /**
