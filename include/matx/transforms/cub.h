@@ -437,107 +437,40 @@ public:
 #ifdef __CUDACC__
   if constexpr (is_tensor_view_v<InputOperator>)
   {
-
-    //////////////////////////////////////////////////////
-    //////           Rank 1 Tensors               ////////
-    //////////////////////////////////////////////////////
-    if (RANK == 1)
-    {
-      if (dir == SORT_DIR_ASC)
-      {
-        cub::DeviceSegmentedSort::SortKeys(
-            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Size(RANK-1)),
-            1,
-            BeginOffset{a}, EndOffset{a},
-            stream);
-      }
-      else
-      {
-
-        cub::DeviceSegmentedSort::SortKeysDescending(
-            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Size(RANK-1)),
-            1,
-            BeginOffset{a}, EndOffset{a},
-            stream);
-      }
+     // CUB added support for large items and segments in https://github.com/NVIDIA/cccl/pull/3308
+    int64_t _num_segments = 1;
+    for (int i = 0; i < RANK - 1; i++) {
+      _num_segments *= a.Size(i);
     }
-
-    //////////////////////////////////////////////////////
-    //////           Rank 2 Tensors               ////////
-    //////////////////////////////////////////////////////
-    else if (RANK == 2 || d_temp == nullptr)
-    {
-      if (dir == SORT_DIR_ASC)
-      {
-        cub::DeviceSegmentedSort::SortKeys(
-            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
-            static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream);
-      }
-      else
-      {
-        cub::DeviceSegmentedSort::SortKeysDescending(
-            d_temp, temp_storage_bytes, a.Data(), a_out.Data(),
-            static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)),
-            static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream);
-      }
+    int64_t _num_items = _num_segments * a.Size(RANK - 1);
+#if 0  // TODO: add conditional on CUB_MAJOR_VERSION once released
+    int64_t num_segments = _num_segments;
+    int64_t num_items = _num_items;
+#else
+    if (_num_items > std::numeric_limits<int>::max()) {
+      std::string err_msg = "Sorting is not supported for tensors with more than 2^" + std::to_string(std::numeric_limits<int>::digits) + " items";
+      MATX_THROW(matxInvalidSize, err_msg);
     }
-
-    //////////////////////////////////////////////////////
-    //////    Batching for Higher Rank Tensors    ////////
-    //////////////////////////////////////////////////////
+    int num_segments = static_cast<int>(_num_segments);
+    int num_items = static_cast<int>(_num_items);
+#endif
+    if (dir == SORT_DIR_ASC)
+    {
+      cub::DeviceSegmentedSort::SortKeys(
+          d_temp, temp_storage_bytes,
+          a.Data(), a_out.Data(),
+          num_items,
+          num_segments,
+          BeginOffset{a}, EndOffset{a}, stream);
+    }
     else
     {
-      constexpr int batch_offset = 2;
-      using shape_type = index_t;
-      size_t total_iter = 1;
-      for (int i = 0; i < InputOperator::Rank() - batch_offset; i++)
-      {
-        total_iter *= a.Size(i);
-      }
-
-      cuda::std::array<shape_type, InputOperator::Rank()> idx{0};
-
-      if (dir == SORT_DIR_ASC)
-      {
-        auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeys(p...); };
-
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream);
-
-        for (size_t iter = 0; iter < total_iter; iter++)
-        {
-          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-          f(ap, aop);
-
-          // Update all but the last batch_offset indices
-          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-        }
-
-      }
-      else
-      {
-        auto ft = [&](auto ...p){ cub::DeviceSegmentedSort::SortKeysDescending(p...); };
-        auto f = std::bind(ft, d_temp, temp_storage_bytes, std::placeholders::_1, std::placeholders::_2, static_cast<int>(a.Size(RANK-1)*a.Size(RANK-2)), static_cast<int>(a.Size(RANK - 2)),
-            BeginOffset{a}, EndOffset{a}, stream);
-
-        for (size_t iter = 0; iter < total_iter; iter++)
-        {
-          auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
-          auto aop = cuda::std::apply([&a_out](auto... param) { return a_out.GetPointer(param...); }, idx);
-
-          f(ap, aop);
-
-          // Update all but the last batch_offset indices
-          UpdateIndices<InputOperator, shape_type, InputOperator::Rank()>(a, idx, batch_offset);
-        }
-      }
+      cub::DeviceSegmentedSort::SortKeysDescending(
+          d_temp, temp_storage_bytes,
+          a.Data(), a_out.Data(),
+          num_items,
+          num_segments,
+          BeginOffset{a}, EndOffset{a}, stream);
     }
   }
 #endif // end CUDACC
