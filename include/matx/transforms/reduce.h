@@ -822,9 +822,9 @@ public:
 };
 
 /**
- * Operator for performing an any reduction
+ * Operator for performing an all reduction
  *
- * Performs a reduction of two values of type T by returning 1 if either
+ * Performs a reduction of two values of type T by returning 1 if all
  * of the values are non-zero.
  */
 template <typename T> class reduceOpAll {
