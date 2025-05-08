@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <functional>
 #include <optional>
+#include <mutex>
 
   #define MATX_CUFFT_ASSERT_STR_EXP(a, expected) \
   {                                    \
@@ -286,8 +287,13 @@ protected:
 
   inline void InternalExec(const void *idata, void *odata, int dir)
   {
+    // We reuse plans across streams if the plan is identical. This mutex prevents the plan from colliding across streams.
+    std::lock_guard<std::mutex> lock(mutex_);
     [[maybe_unused]] cufftResult res;
+    auto workspace = GetCache().GetStreamAlloc(params_.stream, this->workspaceSize);
+    MATX_ASSERT_STR(workspace != nullptr, matxCudaError, "Failed to get workspace for stream");
 
+    cufftSetWorkArea(this->plan_, workspace);
     res = cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
     MATX_CUFFT_ASSERT_STR_EXP(res, CUFFT_SUCCESS);
   }
@@ -321,19 +327,15 @@ protected:
   }
 
   virtual ~matxCUDAFFTPlan_t() {
-    if (this->workspace_ != nullptr) {
-      // Pass the default stream until we allow user-deletable caches
-      matxFree(workspace_, cudaStreamDefault);
-      this->workspace_ = nullptr;
-    }
-
     cufftDestroy(this->plan_);
   }
 
   cufftHandle plan_;
   FftCUDAParams_t params_;
   void *workspace_;
+  size_t workspaceSize;  
   int fftrank_ = 0;
+  std::mutex mutex_;
 };
 
 /**
@@ -374,7 +376,7 @@ public:
  *   CUDA stream in which device memory allocations may be made
  *
  * */
-matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream = 0)
+matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -414,27 +416,26 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream
     }
   }
 
-  size_t workspaceSize;
   cufftCreate(&this->plan_);
+
+  // We allocate our own workspace
+  cufftSetAutoAllocation(this->plan_, false);
+
   [[maybe_unused]] cufftResult error;
   error = cufftXtGetSizeMany(this->plan_, 1, this->params_.n, this->params_.inembed,
                       this->params_.istride, this->params_.idist,
                       this->params_.input_type, this->params_.onembed,
                       this->params_.ostride, this->params_.odist,
                       this->params_.output_type, this->params_.batch,
-                      &workspaceSize, this->params_.exec_type);
+                      &this->workspaceSize, this->params_.exec_type);
 
   MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
-
-  matxAlloc((void **)&this->workspace_, workspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
-
-  cufftSetWorkArea(this->plan_, this->workspace_);
 
   error = cufftXtMakePlanMany(
       this->plan_, 1, this->params_.n, this->params_.inembed,
       this->params_.istride, this->params_.idist, this->params_.input_type,
       this->params_.onembed, this->params_.ostride, this->params_.odist,
-      this->params_.output_type, this->params_.batch, &workspaceSize,
+      this->params_.output_type, this->params_.batch, &this->workspaceSize,
       this->params_.exec_type);
 
   MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
@@ -508,7 +509,7 @@ public:
    *   Input view
    *
    * */
-  matxCUDAFFTPlan2D_t(OutTensorType &o, const InTensorType &i, cudaStream_t stream = 0)
+  matxCUDAFFTPlan2D_t(OutTensorType &o, const InTensorType &i)
   {
     static_assert(RANK >= 2, "2D FFTs require a rank-2 tensor or higher");
 
@@ -545,26 +546,25 @@ public:
       MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
     }
 
-    size_t workspaceSize;
     cufftCreate(&this->plan_);
+
+    // We allocate our own workspace
+    cufftSetAutoAllocation(this->plan_, false);
+        
     [[maybe_unused]] cufftResult error;
     error = cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                        this->params_.istride, this->params_.idist,
                        this->params_.input_type, this->params_.onembed,
                        this->params_.ostride, this->params_.odist,
                        this->params_.output_type, this->params_.batch,
-                       &workspaceSize, this->params_.exec_type);
+                       &this->workspaceSize, this->params_.exec_type);
     MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);                       
-
-    matxAlloc((void **)&this->workspace_, workspaceSize, MATX_ASYNC_DEVICE_MEMORY, stream);
-    cufftSetWorkArea(this->plan_, this->workspace_);
-    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
 
     error = cufftXtMakePlanMany(
         this->plan_, 2, this->params_.n, this->params_.inembed,
         this->params_.istride, this->params_.idist, this->params_.input_type,
         this->params_.onembed, this->params_.ostride, this->params_.odist,
-        this->params_.output_type, this->params_.batch, &workspaceSize,
+        this->params_.output_type, this->params_.batch, &this->workspaceSize,
         this->params_.exec_type);
 
     MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
@@ -629,8 +629,7 @@ struct FftCUDAParamsKeyHash {
     return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
            (std::hash<uint64_t>()(k.fft_rank)) +
            (std::hash<uint64_t>()(k.exec_type)) +
-           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
-           (std::hash<uint64_t>()((uint64_t)k.stream));
+           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride));
   }
 };
 
@@ -641,7 +640,7 @@ struct FftCUDAParamsKeyEq {
   bool operator()(const FftCUDAParams_t &l, const FftCUDAParams_t &t) const noexcept
   {
     return l.n[0] == t.n[0] && l.n[1] == t.n[1] && l.batch == t.batch &&
-           l.fft_rank == t.fft_rank && l.stream == t.stream &&
+           l.fft_rank == t.fft_rank &&
            l.inembed[0] == t.inembed[0] && l.inembed[1] == t.inembed[1] &&
            l.onembed[0] == t.onembed[0] && l.onembed[1] == t.onembed[1] &&
            l.istride == t.istride && l.ostride == t.ostride &&
@@ -720,7 +719,7 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
     detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(out, in, stream);
+      return std::make_shared<cache_val_type>(out, in);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Forward(out, in, stream, norm);
@@ -765,7 +764,7 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
     detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(out, in, stream);
+      return std::make_shared<cache_val_type>(out, in);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Inverse(out, in, stream, norm);
@@ -805,7 +804,7 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
     detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(out, in, stream);
+      return std::make_shared<cache_val_type>(out, in);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Forward(out, in, stream, norm);
@@ -846,7 +845,7 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm nor
     detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
     params,
     [&]() {
-      return std::make_shared<cache_val_type>(out, in, stream);
+      return std::make_shared<cache_val_type>(out, in);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Inverse(out, in, stream, norm);
