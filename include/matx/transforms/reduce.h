@@ -378,14 +378,6 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(float *addr, float val)
   }
 };
 
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(bool *addr, bool val)
-{
-  // not strictly atomic, but we only need to write to the location if val is false
-  if (!val) {
-    *addr = false;
-  }
-};
-
 __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
 {
   int assumed;
@@ -812,13 +804,11 @@ public:
 template <typename T> class reduceOpAny {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
   {
     return (v1 != 0) || (v2 != 0);
   }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAny(addr, val); }
 };
 
 /**
@@ -830,14 +820,11 @@ public:
 template <typename T> class reduceOpAll {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2)
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2)
   {
     return (v1 != 0) && (v2 != 0);
   }
-
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return Reduce(v1, v2); }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return (T)(1); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicAll(addr, val); }
 };
 
 /**
@@ -1455,10 +1442,8 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
-  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
+  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp>) {
     cub_reduce<OutType, InType, ReduceOp>(dest, in, op.Init(), stream);
   }
   else { // Fall back to the slow path of custom implementation
