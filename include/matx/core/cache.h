@@ -62,6 +62,11 @@ CacheId GetCacheIdFromType()
   return id;
 }
 
+struct StreamAllocation {
+  void* ptr;
+  size_t size;
+};
+
 /**
  * Generic caching object for caching parameters. This class is used for
  * creating handles/plans on-the-fly and caching them to remove the need for
@@ -117,8 +122,38 @@ public:
     }
   }
 
+  void* GetStreamAlloc(cudaStream_t stream, size_t size) {
+    void *ptr = nullptr;
+
+    auto el = stream_alloc_cache.find(stream);
+    if (el == stream_alloc_cache.end()) {
+      StreamAllocation alloc;
+
+      // We allocate at least 2MB for workspace so we don't keep reallocating from small sizes
+      size = std::max(size, (size_t)(1ULL << 21));
+      matxAlloc(&ptr, size, MATX_ASYNC_DEVICE_MEMORY, stream);
+
+      alloc.size = size;
+      alloc.ptr = ptr;
+      stream_alloc_cache[stream] = alloc;
+    }
+    else if (el->second.size < size) {
+      // Free the old allocation and allocate a new one
+      matxFree(el->second.ptr);
+      matxAlloc(&ptr, size, MATX_ASYNC_DEVICE_MEMORY, stream);
+      el->second.size = size;
+      el->second.ptr = ptr;
+    }
+    else {
+      ptr = el->second.ptr;
+    }
+
+    return ptr;
+  }
+
 private:
   std::unordered_map<CacheId, std::any> cache;
+  std::unordered_map<cudaStream_t, StreamAllocation> stream_alloc_cache;
 };
 
 /**
