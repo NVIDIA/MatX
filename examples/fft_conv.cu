@@ -117,35 +117,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Now the sig_freq view contains the full convolution result. Verify against
   // a direct convolution. The conv1d function only accepts a 1D filter, so we
   // create a sliced view here.
-  constexpr int zero_pad = 1;
-  // Create a new tensor with the padded size
-  auto sig_time_pad = make_tensor<complex>({sig_time.Size(0), sig_time.Size(1) + zero_pad});
-  
-  // Copy the original data
-  (sig_time_pad = sig_time).run(exec);
-  
-  // Set the padding to zero
-  auto pad_slice = slice<1>(sig_time_pad, {0, sig_time.Size(1)}, {matxDropDim, matxEnd});
-  (pad_slice = complex{0.0f, 0.0f}).run(exec);
-
   auto filt1 = slice<1>(filt_time, {0,0}, {matxDropDim, matxEnd});
-  (time_out = conv1d(sig_time_pad, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
+  (time_out = conv1d(sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
 
   exec.sync();
 
-  // // Compare signals
-  // for (index_t b = 0; b < batches; b++) {
-  //   for (index_t i = 0; i < filtered_size; i++) {
-  //     if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
-  //         fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
-  //       std::cout <<
-  //           "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
-  //           sig_freq(b,i).real() << " " <<
-  //           sig_freq(b,i).imag() << "\n";
-  //       return -1;
-  //     }
-  //   }
-  // }
+  // Compare signals
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < filtered_size; i++) {
+      if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
+          fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
+        std::cout <<
+            "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
+            sig_freq(b,i).real() << " " <<
+            sig_freq(b,i).imag() << "\n";
+        return -1;
+      }
+    }
+  }
 
   std::cout << "Verification successful" << std::endl;
 
