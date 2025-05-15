@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/det.h"
+#ifndef JITIFY
+  #include "matx/transforms/det.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -44,7 +46,7 @@ namespace detail {
   {
     private:
       typename detail::base_type_t<OpA> a_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
@@ -55,8 +57,6 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "det()"; }
       __MATX_INLINE__ DetOp(const OpA &a) : a_(a) { }
-
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       // This should never be called
       template <typename... Is>
@@ -77,7 +77,8 @@ namespace detail {
       {
         return OpA::Rank();
       }
-
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
@@ -110,7 +111,7 @@ namespace detail {
       {
         return a_.Size(dim);
       }
-
+#endif
   };
 }
 

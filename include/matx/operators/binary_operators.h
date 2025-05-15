@@ -108,7 +108,8 @@ namespace matx
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
+
+      __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {
@@ -117,7 +118,7 @@ namespace matx
         }
       }
 
-      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         auto i1 = get_value<EPT>(in1_, indices...);
@@ -125,7 +126,7 @@ namespace matx
         return op_.template operator()<EPT>(i1, i2);
       }
 
-      template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
@@ -184,6 +185,31 @@ namespace matx
         if constexpr (is_matx_op<I2>()) {
           in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
+        // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+        bool self_has_cap = false;
+        if (cap == OperatorCapability::SUPPORTS_JIT) {
+          // Example: If this specific binary op (e.g., a custom fused op like "fused_add_mul")
+          // is always JIT-able, set self_has_cap = true.
+          // For a generic binary op, it might depend on the types I1, I2, or the Op functor.
+          // For instance, if Op is a specific JIT-able functor type:
+          // if constexpr (is_jit_functor_v<Op>) { self_has_cap = true; }
+        }
+        // Add other direct capability checks for matxBinaryOp itself if needed.
+
+        // 2. Get capabilities of children by calling their PUBLIC has_capability.
+        bool lhs_child_cap = detail::get_operand_capability(in1_, cap);
+        bool rhs_child_cap = detail::get_operand_capability(in2_, cap);
+        // If your binary op functor 'op_' (of type Op) could also be an operator:
+        // bool func_child_cap = detail::get_operand_capability(op_, cap); // If relevant
+
+        // 3. Use the helper to combine.
+        // If func_child_cap is relevant, add it to the list.
+        return combine_capabilities(cap, self_has_cap, lhs_child_cap, rhs_child_cap);
+        // Or if op_ is also queried:
+        // return combine_capabilities(cap, self_has_cap, lhs_child_cap, rhs_child_cap, func_child_cap);
       }
     };
   }

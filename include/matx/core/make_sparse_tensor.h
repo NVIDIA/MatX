@@ -30,7 +30,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef JITIFY
 #pragma once
 
 #include "matx/core/sparse_tensor.h"
@@ -237,3 +237,4 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
 
 } // namespace experimental
 } // namespace matx
+#endif

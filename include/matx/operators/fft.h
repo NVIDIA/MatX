@@ -32,32 +32,39 @@
 
 #pragma once
 
-
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/fft/fft_cuda.h"
-#ifdef MATX_EN_CPU_FFT
-  #include "matx/transforms/fft/fft_fftw.h"
-#endif  
+#include "matx/core/operator_options.h"
+
+#ifndef JITIFY
+  #include "matx/transforms/fft/fft_cuda.h"
+  #ifdef MATX_EN_CPU_FFT
+    #include "matx/transforms/fft/fft_fftw.h"
+  #endif  
+#endif
+
+#ifdef MATX_EN_MATHDX
+  #include "matx/transforms/fft/fft_cufftdx.h"
+#endif
 
 namespace matx
 {
   namespace detail {
-    template <typename OpA, typename PermDims, typename FFTType>
-    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTType>>
+    template <typename OpA, typename PermDims, typename FFTDirection>
+    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTDirection>>
     {
       private:
         typename detail::base_type_t<OpA> a_;
         index_t fft_size_;
         PermDims perm_;
-        FFTType type_;
+        FFTDirection direction_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr = nullptr;                                           
 
       public:
@@ -69,7 +76,7 @@ namespace matx
         using fft_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
+          if constexpr (std::is_same_v<FFTDirection, detail::fft_t>) {
             return "fft(" + get_type_str(a_) + ")";
           }
           else {
@@ -77,8 +84,9 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTType t, FFTNorm norm) : 
-            a_(a), fft_size_(size),  perm_(perm), type_(t), norm_(norm) {
+
+        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTDirection direction, FFTNorm norm) : 
+            a_(a), fft_size_(size),  perm_(perm), direction_(direction), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }
@@ -127,8 +135,6 @@ namespace matx
             }
           }
         }
-
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
                   
         template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -139,7 +145,20 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
+#ifdef __CUDA_ARCH__
+          __syncthreads();
+
+          using FFT = decltype(cufftdx::Block() + cufftdx::Size<16>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
+                       cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
+                       cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<1>());
+          cufftComplex thread_data;
+          extern __shared__ __align__(alignof(float2)) cufftComplex shared_mem[];
+          thread_data = a_(indices...);
+          FFT().execute(thread_data, shared_mem);
+          return thread_data;
+#else
           return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+#endif
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -151,17 +170,45 @@ namespace matx
           return out_dims_[dim];
         }
 
+
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_));
+          }
+          else {
+            // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+          }
         }
+
+
+// #ifndef JITIFY  
+//         __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
+//           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+//           if (cap == OperatorCapability::SUPPORTS_JIT) {
+// #ifndef MATX_EN_MATHDX            
+//             return combine_capabilities(cap, true, detail::get_operand_capability(a_, cap));
+// #else
+//             // We need to determine if the particular FFT combination is supported by the cuFFTDx
+//             // library
+//             int cc = detail::GetComputeCapability();  
+//             printf("%d ttt\n", IsDxBlockFFTSupported<typename OpA::value_type>(cc, fft_size_, FFTType::C2C));
+//             return combine_capabilities(cap,  
+//                           IsDxBlockFFTSupported<typename OpA::value_type>(cc, fft_size_, FFTType::C2C), 
+//                           detail::get_operand_capability(a_, cap));
+// #endif
+//           }
+//           return false;
+//         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) {
+            if constexpr (std::is_same_v<FFTDirection, fft_t>) {
               fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
@@ -169,13 +216,13 @@ namespace matx
             }
           }
           else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (std::is_same_v<FFTDirection, fft_t>) { 
               fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
             else {
               ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
-          }
+          }        
         }
 
         template <typename ShapeType, typename Executor>
@@ -205,10 +252,11 @@ namespace matx
 
           matxFree(ptr); 
         }
+#endif          
     };
   }
 
-
+#ifndef JITIFY
   /**
    * Run a 1D FFT with a cached plan
    *
@@ -311,6 +359,7 @@ namespace matx
     const index_t fft_size_ = static_cast<index_t>(fft_size);
     return detail::FFTOp(a, fft_size_, perm, detail::ifft_t{}, norm);
   }  
+#endif
 
 
   namespace detail {
@@ -327,7 +376,7 @@ namespace matx
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
+        mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
         mutable ttype *ptr = nullptr;                                                
 
       public:
@@ -362,7 +411,7 @@ namespace matx
           }  
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        
 
         template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -382,6 +431,9 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -436,11 +488,12 @@ namespace matx
           }
 
           matxFree(ptr);           
-        }        
+        }    
+#endif
     };    
   }
 
-
+#ifndef JITIFY
 /**
  * Run a 2D FFT with a cached plan
  *
@@ -523,5 +576,6 @@ namespace matx
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
     return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
   }  
-
+#endif
 }
+

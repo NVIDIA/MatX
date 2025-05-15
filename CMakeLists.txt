@@ -78,6 +78,7 @@ option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
+option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -296,6 +297,14 @@ if (MATX_EN_CUTENSOR)
     # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+endif()
+
+if (MATX_EN_MATHDX)
+    set(MathDx_VERSION 25.01)
+    set(MathDx_NANO 1)
+    include(cmake/FindMathDx.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
 endif()
 
 if (MATX_EN_CUDSS)

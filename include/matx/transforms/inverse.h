@@ -41,16 +41,6 @@
 
 namespace matx {
 
-/**
- * @brief Algorithm to use for matrix inverse
- *
- */
-typedef enum {
-  MAT_INVERSE_ALGO_LU,
-} MatInverseAlgo_t;
-
-
-
 namespace detail {
 /**
  * Parameters needed to execute a matrix inverse. Since the matrix inverse

@@ -35,12 +35,13 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/matmul/matmul_cuda.h"
-#include "matx/transforms/matmul/matmul_cusparse.h"
-#ifdef MATX_EN_CPU_MATMUL
-  #include "matx/transforms/matmul/matmul_cblas.h"
+#ifndef JITIFY
+  #include "matx/transforms/matmul/matmul_cuda.h"
+  #include "matx/transforms/matmul/matmul_cusparse.h"
+  #ifdef MATX_EN_CPU_MATMUL
+    #include "matx/transforms/matmul/matmul_cblas.h"
+  #endif
 #endif
-
 namespace matx
 {
   namespace detail {
@@ -56,7 +57,7 @@ namespace matx
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
@@ -94,8 +95,6 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -124,6 +123,9 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -180,6 +182,7 @@ namespace matx
 
           matxFree(ptr);         
         }
+#endif
     };
   }
 

@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/cub.h"
+#endif
 
 namespace matx {
 
@@ -51,7 +53,7 @@ namespace detail {
       typename OpA::value_type upper_;
       int num_levels_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
       mutable int *ptr = nullptr;  
 
     public:
@@ -88,16 +90,22 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
-
-        hist_impl(cuda::std::get<0>(out), a_, lower_, upper_, num_levels_, ex.getStream());
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return OpA::Rank();
+      }
+
+#ifndef JITIFY
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const {
+        static_assert(is_cuda_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
+
+        hist_impl(cuda::std::get<0>(out), a_, lower_, upper_, num_levels_, ex.getStream());
       }
 
       template <typename ShapeType, typename Executor>
@@ -127,12 +135,7 @@ namespace detail {
 
         matxFree(ptr);
       }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
+#endif
   };
 }
 

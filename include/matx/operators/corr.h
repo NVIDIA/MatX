@@ -53,7 +53,7 @@ namespace matx
         matxConvCorrMethod_t method_;
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
-        mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr; 
 
       public:

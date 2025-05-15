@@ -379,6 +379,7 @@ MATX_UNARY_OP_GEN_NOFUNC(subneg, SubNeg);
 
 // Binary Operators
 
+
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_not(T v1) {
   return !v1;

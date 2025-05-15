@@ -34,29 +34,7 @@
 
 namespace matx {
 
-enum class FFTNorm {
-  BACKWARD, /// fft is unscaled, ifft is 1/N
-  FORWARD, /// fft is scaled 1/N, ifft is not scaled
-  ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
-};
-
 namespace detail {
-
-  static constexpr int MAX_FFT_RANK = 2;
-
-  enum class FFTType {
-    C2C,
-    R2C,
-    C2R,
-    Z2Z,
-    D2Z,
-    Z2D
-  };
-
-  enum class FFTDirection {
-    FORWARD,
-    BACKWARD
-  };
     
   template <typename OutputTensor, typename InputTensor, typename Executor>
   __MATX_INLINE__ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
@@ -208,5 +186,6 @@ namespace detail {
     return FFTType::C2C;  
   }
 }
+
 
 };

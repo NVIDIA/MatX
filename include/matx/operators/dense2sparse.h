@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/convert/dense2sparse_cusparse.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -73,6 +75,7 @@ public:
     return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
   }
 
+#ifndef JITIFY
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA>) {
@@ -87,6 +90,7 @@ public:
       }
     }
   }
+#endif
 };
 
 } // end namespace detail

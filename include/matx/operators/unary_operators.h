@@ -37,6 +37,7 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/operators/base_operator.h"
 
+
 #define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
@@ -86,14 +87,14 @@ namespace matx
         }, idx);
     }
 
-    template <ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <ElementsPerThread EPT, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       auto i1 = get_value<EPT>(in1_, indices...);
       return op_.template operator()<EPT>(i1);
     }
 
-    template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       return this->template operator()<detail::ElementsPerThread::ONE>(indices...);

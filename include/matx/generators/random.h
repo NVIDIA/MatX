@@ -522,7 +522,7 @@ namespace detail {
    * @return Random number operator
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
   __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
@@ -578,7 +578,7 @@ namespace detail {
    * @return Random number operator
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
   __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(

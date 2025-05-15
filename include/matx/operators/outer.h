@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/outer.h"
+
+#ifndef JITIFY
+  #include "matx/transforms/outer.h"
+#endif
 
 namespace matx
 {
@@ -50,7 +53,7 @@ namespace matx
         float beta_;
         static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
         cuda::std::array<index_t, RANK> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
@@ -80,13 +83,12 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return tmp_out_.template operator()<EPT>(indices...);
         }
+
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -112,6 +114,9 @@ namespace matx
           return out_dims_[dim];
         }
 
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           outer_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
@@ -151,7 +156,8 @@ namespace matx
           } 
 
           matxFree(ptr);
-        }           
+        }      
+#endif
     };
   }
 

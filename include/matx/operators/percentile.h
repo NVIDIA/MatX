@@ -35,7 +35,9 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
+#ifndef JITIFY
 #include "matx/transforms/percentile.h"
+#endif
 
 namespace matx {
 
@@ -49,7 +51,7 @@ namespace detail {
       uint32_t q_;
       PercentileMethod method_;
       cuda::std::array<index_t, ORank> out_dims_; 
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
@@ -64,8 +66,6 @@ namespace detail {
           out_dims_[r]    = (r == ORank - 1) ? 1 : a_.Size(r);
         }
       }
-
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -82,6 +82,14 @@ namespace detail {
         auto self_has_cap = capability_attributes<Cap>::default_value;
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }
+      
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -120,12 +128,7 @@ namespace detail {
 
         matxFree(ptr);
       }             
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
+#endif
   };
 }
 

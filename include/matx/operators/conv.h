@@ -34,8 +34,11 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_options.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/conv.h"
+#endif
 
 namespace matx
 {
@@ -53,7 +56,7 @@ namespace matx
         matxConvCorrMethod_t method_;
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
-        mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr; 
 
         static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
@@ -132,8 +135,6 @@ namespace matx
                           "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
         template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -165,6 +166,8 @@ namespace matx
         {
           return out_dims_[dim];
         }
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -214,6 +217,7 @@ namespace matx
 
           matxFree(ptr);
         }  
+#endif
     };
   }
 
@@ -275,7 +279,7 @@ namespace detail {
       matxConvCorrMode_t mode_;
       PermDims perm_;
       cuda::std::array<index_t, max_rank> out_dims_;
-      mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
       mutable out_t *ptr = nullptr; 
 
     public:
@@ -341,7 +345,6 @@ namespace detail {
         }
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <detail::ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -376,6 +379,8 @@ namespace detail {
       {
         return out_dims_[dim];
       }
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -423,7 +428,8 @@ namespace detail {
         } 
 
         matxFree(ptr);
-      }       
+      }     
+#endif  
     };
   }
 

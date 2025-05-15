@@ -37,6 +37,7 @@
 #include "matx/core/error.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/capabilities.h"
 
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
@@ -72,9 +73,12 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
+#ifndef JITIFY
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
+#endif
+
 
   auto &get_lhs() {
     return out_;
@@ -104,6 +108,23 @@ public:
       MATX_ASSERT_COMPATIBLE_OP_SIZES(op);
     }
   }
+
+
+  // template <typename... Is>
+  // __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
+  // {
+  //   if constexpr (is_matx_half_v<T> &&
+  //                 std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
+  //     auto &&out = out_(indices...);
+  //     out = static_cast<float>(detail::get_value(op_, indices...));
+  //   }
+  //   else {
+  //     auto &&out = out_(indices...);
+  //     out = detail::get_value(op_, indices...);
+  //   }
+
+  //   return out_(indices...);
+  // }
 
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.

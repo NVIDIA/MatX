@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/cub.h"
+#endif
 
 namespace matx {
 
@@ -67,16 +69,24 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+      // Size is not relevant in unique() since there are multiple return values and it
+      // is not allowed to be called in larger expressions
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }      
+
+#ifndef JITIFY
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on unique(). ie: (mtie(O, num_found) = unique(A))");     
 
         unique_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
-      }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
       }
 
       template <typename ShapeType, typename Executor>
@@ -94,14 +104,7 @@ namespace detail {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
-
-      // Size is not relevant in unique() since there are multiple return values and it
-      // is not allowed to be called in larger expressions
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return a_.Size(dim);
-      }
-
+#endif
   };
 }
 

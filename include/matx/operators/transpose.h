@@ -35,8 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/operators/permute.h"
 #include "matx/transforms/transpose.h"
+#endif
 
 namespace matx {
 
@@ -48,7 +50,7 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
 
     public:
@@ -70,8 +72,6 @@ namespace detail {
           }
         }        
       }
-
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -99,9 +99,9 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        transpose_matrix_impl(cuda::std::get<0>(out), a_, ex);
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -109,6 +109,14 @@ namespace detail {
         return OpA::Rank();
       }
 
+
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const {
+        transpose_matrix_impl(cuda::std::get<0>(out), a_, ex);
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -132,11 +140,6 @@ namespace detail {
         matxFree(ptr);
       }
 
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
       TransposeMatrixOp(const TransposeMatrixOp &rhs) = default;
       __MATX_INLINE__ auto operator=(const self_type &rhs) { 
         return set(*this, rhs); 
@@ -151,7 +154,7 @@ namespace detail {
           return set(*this, rhs); 
         }
       }
-
+#endif
   };
 }
 

@@ -29,7 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef JITIFY
 #pragma once
 
 #include <cstdint>
@@ -132,3 +132,4 @@ void dct(OutputTensor &out, const InputTensor &in,
 }
 
 }; // namespace matx
+#endif

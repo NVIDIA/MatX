@@ -29,6 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 /////////////////////////////////////////////////////////////////////////////////
+#ifndef JITIFY
 
 #pragma once
 
@@ -118,7 +119,7 @@ namespace matx {
     // Used inside of transforms to allocate temporary output
     template <typename TensorType, typename Executor, typename ShapeType> 
     __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::value_type **ptr) {
-      const auto ttl_size = std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
+      const auto ttl_size = cuda::std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
                                   std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -180,3 +181,4 @@ namespace matx {
     }
   }
 }; 
+#endif

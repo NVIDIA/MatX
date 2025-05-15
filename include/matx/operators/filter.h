@@ -36,7 +36,9 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
+#ifndef JITIFY
 #include "matx/transforms/filter.h"
+#endif
 
 namespace matx
 {
@@ -50,7 +52,7 @@ namespace detail {
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
@@ -69,7 +71,10 @@ namespace detail {
         }              
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }      
 
       // This should never be called - but updated to follow pattern
       template <ElementsPerThread EPT, typename... Is>
@@ -88,6 +93,8 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
@@ -127,12 +134,7 @@ namespace detail {
 
         matxFree(ptr);
       }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return a_.Size(dim);
-      }
-
+#endif
   };
 }
 

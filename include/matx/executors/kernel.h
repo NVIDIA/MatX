@@ -222,6 +222,28 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
     }      
   }
 }
+
+#ifdef MATX_EN_MATHDX
+static const char *matxOpT1JITKernelStr = "\n\
+#include \"matx.h\"\n\
+namespace matx {\n\
+  namespace detail {\n\
+    template <class Op>\n\
+    __global__ void matxOpT1Kernel(Op op, matx::index_t size0) {\n\
+      matx::index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;\n\
+      if (idx < size0) {\n\
+        if constexpr (std::is_pointer_v<Op>) {\n\
+          (*op)(idx);\n\
+        } else {\n\
+          op(idx);\n\
+        }\n\
+      }\n\
+    }\n\
+  }\n\
+}";
+#endif
+
+
 #endif
 }
 

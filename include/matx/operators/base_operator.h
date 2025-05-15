@@ -37,6 +37,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
 #include "matx/core/capabilities.h"
+
 namespace matx
 {
 
@@ -71,22 +72,17 @@ namespace matx
           // async allocation we'd normally have to do
           if constexpr (is_mtie<T>() ) {
             tp->Exec(ex);
+            return;
           }          
-          else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
-              tp->TransformExec(tp->Shape(), ex);
-            }
-            else {
-              if constexpr (is_matx_op<T>()) {
-                tp->PreRun(tp->Shape(), ex);
-              }
+          else if constexpr (is_matx_set_op<T>() && is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
+            // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
+            tp->TransformExec(tp->Shape(), ex);
+            return;
+          }
 
-              ex.Exec(*tp);
-
-              if constexpr (is_matx_op<T>()) {
-                tp->PostRun(tp->Shape(), ex);
-              }              
-            }
+          printf("%d HERE \n", tp->has_capability(OperatorCapability::SUPPORTS_JIT));
+          if (tp->has_capability(OperatorCapability::SUPPORTS_JIT)) {
+            ex.Exec(*tp);
           }
           else {
             if constexpr (is_matx_op<T>()) {
@@ -97,8 +93,8 @@ namespace matx
 
             if constexpr (is_matx_op<T>()) {
               tp->PostRun(tp->Shape(), ex);
-            }
-          }
+            } 
+          }             
         }
 
         /**
@@ -174,6 +170,24 @@ namespace matx
             size *= static_cast<const T*>(this)->Size(i);
           }
           return size;
+        }
+
+        // Default implementation for getting an operator's intrinsic capability.
+        // Derived classes should override this to declare their specific capabilities.
+        // By default, an operator has NO specific capabilities.
+        __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
+          // Default: this specific operator does not inherently have the requested capability.
+          return false; 
+        }
+
+        // Public interface to check if the operator (sub-expression) has a given capability.
+        // This calls the derived class's specific implementation (get_capability_impl)
+        // and combines it with the capabilities of its children based on the query type.
+        __MATX_INLINE__ __MATX_HOST__ bool has_capability(OperatorCapability cap) const {
+          // Get the capability of the current operator node itself
+          // The derived class's get_capability_impl will handle the specific logic for that operator type,
+          // including querying children if it's a composite operator.
+          return static_cast<const T*>(this)->get_capability_impl(cap);
         }
 
         /* This must be in derived class.  Copy paste line below to derived case if it is an lvalue

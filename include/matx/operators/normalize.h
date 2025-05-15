@@ -53,7 +53,7 @@ namespace matx
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                       typename OpA::value_type, 
                                       typename scalar_to_complex<typename OpA::value_type>::ctype>;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
 
         __MATX_INLINE__ void InitNormalize() {

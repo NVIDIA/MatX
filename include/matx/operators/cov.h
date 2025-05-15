@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+
+#ifndef JITIFY
 #include "matx/transforms/cov.h"
+#endif
 
 namespace matx
 {
@@ -46,7 +49,7 @@ namespace matx
       private:
         typename detail::base_type_t<OpA> a_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:
@@ -66,8 +69,6 @@ namespace matx
             out_dims_[r] = a_.Size(r);
           }
         }
-
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -96,6 +97,8 @@ namespace matx
           return out_dims_[dim];
         }
 
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "cov() only supports the CUDA executor currently");
@@ -129,6 +132,7 @@ namespace matx
 
           matxFree(ptr);
         }          
+#endif
     };
   }
 

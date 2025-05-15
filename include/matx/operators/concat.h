@@ -265,6 +265,7 @@ namespace matx
     }; // end class ConcatOp
   } // end namespace detail
 
+#ifndef JITIFY
   /**
    * @brief ConcatOp multiple operators along a dimension
    *
@@ -282,4 +283,5 @@ namespace matx
 
       return detail::ConcatOp<Ts...>{axis, ts...};
     }
+#endif
 } // end namespace matx

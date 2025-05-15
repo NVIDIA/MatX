@@ -35,7 +35,11 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/core/operator_options.h"
+
+#ifndef JITIFY
 #include "matx/transforms/ambgfun.h"
+#endif
 
 namespace matx
 {
@@ -51,7 +55,7 @@ namespace matx
         AMBGFunCutType_t cut_;
         float cut_val_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;         
 
       public:
@@ -90,7 +94,6 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -119,6 +122,9 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -161,7 +167,8 @@ namespace matx
           }
 
           matxFree(ptr); 
-        }            
+        }
+#endif              
     };
   }
 
@@ -202,7 +209,7 @@ __MATX_INLINE__ auto ambgfun(const XTensor &x,
                     float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  return detail::AmbgFunOp(x, std::make_optional(y), fs, cut, cut_val);
+  return detail::AmbgFunOp(x, y, fs, cut, cut_val);
 }
 
 /**
@@ -235,7 +242,7 @@ __MATX_INLINE__ auto ambgfun(const XTensor &x,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  std::optional<XTensor> nil = std::nullopt;
+  detail::EmptyY nil;
   return detail::AmbgFunOp(x, nil, fs, cut, cut_val);
 }
 

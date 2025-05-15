@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-
+#ifndef JITIFY
 #include <cstdio>
 #include <shared_mutex>
 #include <mutex>
@@ -425,3 +425,5 @@ __MATX_INLINE__ std::string SpaceString(matxMemorySpace_t space) {
 }
 
 } // end namespace matx
+
+#endif // JITIFY

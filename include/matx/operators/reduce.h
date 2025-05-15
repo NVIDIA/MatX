@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/conv.h"
+#ifndef JITIFY
+#include "matx/transforms/reduce.h"
+#endif
 
 namespace matx
 {
@@ -50,7 +52,7 @@ namespace matx
         ReductionOp reduction_op_;
         bool init_;
         cuda::std::array<index_t, ORank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:

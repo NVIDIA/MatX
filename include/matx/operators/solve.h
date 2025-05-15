@@ -50,7 +50,7 @@ private:
 
   static constexpr int out_rank = OpB::Rank();
   cuda::std::array<index_t, out_rank> out_dims_;
-  mutable detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
+  mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
   mutable typename OpA::value_type *ptr = nullptr;
 
 public:

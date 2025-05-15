@@ -42,7 +42,7 @@
 #include "matx/core/tensor.h"
 #include "matx/transforms/fft/fft_common.h"
 #include "matx/transforms/copy.h"
-
+#include "matx/core/operator_options.h"
 #include <cstdio>
 #include <functional>
 #include <optional>

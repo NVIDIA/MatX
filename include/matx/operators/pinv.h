@@ -35,9 +35,12 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/pinv.h"
+#endif
 
 namespace matx {
+  
 namespace detail {
   template<typename OpA>
   class PinvOp : public BaseOp<PinvOp<OpA>>
@@ -46,7 +49,7 @@ namespace detail {
       typename detail::base_type_t<OpA> a_;
       float rcond_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:
@@ -66,8 +69,6 @@ namespace detail {
           }
         } 
       }
-
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -96,6 +97,9 @@ namespace detail {
       {
         return out_dims_[dim];
       }
+
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const{
@@ -129,8 +133,22 @@ namespace detail {
 
         matxFree(ptr);
       }
-
+#endif
   };
+}
+
+/**
+ * Returns an appropriate rcond based on the inner type. This is slightly
+ * higher than the machine epsilon, as these work better to mask small/zero singular
+ * values in singular or ill-conditioned matrices.
+ */
+template <typename T>
+__MATX_INLINE__ constexpr float get_default_rcond() {
+  if constexpr (is_fp32_inner_type_v<T>) {
+    return 1e-6f;
+  } else {
+    return 1e-15f;
+  }
 }
 
 /**
