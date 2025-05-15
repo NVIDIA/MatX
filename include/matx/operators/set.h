@@ -72,9 +72,12 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
+#ifndef JITIFY
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
+#endif
+
 
   auto &get_lhs() {
     return out_;

@@ -798,6 +798,56 @@ struct permute_rank<T1, no_permute_t> {
 
 
 
+template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
+// Traits for casting down to impl tensor conditionally
+template <typename T, typename = void> 
+struct base_type {
+  using type = T;
+};
+
+template <typename T> 
+struct base_type<T, typename std::enable_if_t<is_tensor_t_v<T>>> {
+  using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type, typename T::data_type>;
+};
+
+template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+
 }
+
+namespace detail {
+template <typename T, typename = void>
+struct is_sparse_data : std::false_type {
+};
+template <typename T>
+struct is_sparse_data<T, std::void_t<typename T::sparse_data>>
+    : std::true_type {
+};
+}
+
+
+/**
+ * @brief Determine if a type is a MatX sparse data type
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool is_sparse_data_v = detail::is_sparse_data<typename remove_cvref<T>::type>::value;
+namespace detail {
+template <typename T, typename = void>
+struct is_sparse_tensor : std::false_type {
+};
+template <typename T>
+struct is_sparse_tensor<T, std::void_t<typename T::sparse_tensor>>
+    : std::true_type {
+};
+}
+/**
+ * @brief Determine if a type is a MatX sparse tensor type
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool is_sparse_tensor_v = detail::is_sparse_tensor<typename remove_cvref<T>::type>::value;
 
 } // end namespace matx
