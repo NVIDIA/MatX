@@ -635,4 +635,9 @@ namespace matx
   using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
 };
 
+#else
+template <typename T>
+class null_storage {};
+template <typename T>
+using DefaultStorage = null_storage<T>;
 #endif // JITIFY

@@ -126,7 +126,7 @@ class tensor_impl_t {
      */
     friend void swap(self_type &lhs, self_type &rhs) noexcept
     {
-      using std::swap;
+      using cuda::std::swap;
 
       swap(lhs.data_, rhs.data_);
       swap(lhs.desc_, rhs.desc_);
@@ -257,6 +257,7 @@ MATX_IGNORE_WARNING_POP_GCC
     {
     }
 
+#ifndef JITIFY
     __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
     {
       data_.ldata_ = rhs.Data();
@@ -632,6 +633,8 @@ MATX_IGNORE_WARNING_POP_GCC
       const typename detail::base_type_t<T2> &op_base = op;
         return set(*this, *this % op_base);
     }
+
+#endif    
 
     /**
      * Get the shape the tensor from the underlying data
@@ -1044,7 +1047,7 @@ MATX_IGNORE_WARNING_POP_GCC
      *
      */
     template <int M = RANK, typename... Is,
-      std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       if constexpr (!is_sparse_data_v<TensorData>) {
@@ -1143,10 +1146,12 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.Size(Rank() - 1);
     }
 
+#ifndef JITIFY
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
       return TotalSize() * sizeof(*data_.ldata_);
     }
+#endif
 
     /**
      * @brief Get data pointer
