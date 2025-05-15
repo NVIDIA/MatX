@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-
 #include <cstdio>
 #include <shared_mutex>
 #include <mutex>
@@ -121,7 +120,6 @@ struct MemTracker {
     }
 
     size_t bytes = iter->second.size;
-
     matxMemoryStats.currentBytesAllocated -= bytes;
 
     switch (iter->second.kind) {

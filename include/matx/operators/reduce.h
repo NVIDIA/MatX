@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/conv.h"
+#ifndef __CUDACC_RTC__
+#include "matx/transforms/reduce.h"
+#endif
 
 namespace matx
 {
@@ -73,23 +75,29 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          // reduction_op_ is a type/tag, not an operator with capabilities
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

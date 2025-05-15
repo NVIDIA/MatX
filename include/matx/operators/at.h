@@ -55,30 +55,39 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "at()"; }
         __MATX_INLINE__ AtOp(const Op &op, Is... is) : op_(op), idx_{is...} {};
 
-        template <ElementsPerThread EPT, typename... Is2>
+        template <typename CapType, typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          // Only support EPT == ONE for now
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            return op_.template operator()<EPT>(idx_);
-          } else {
-            return Vector<value_type, static_cast<size_t>(EPT)>();
+#ifdef __CUDA_ARCH__          
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= op_.Size(op_.Rank() - 1)) {
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
+          }
+#endif
+
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            return op_.template operator()<CapType>(idx_);
+          }
+          else {
+            return Vector<value_type, static_cast<size_t>(CapType::ept)>();
           }
         }
 
         template <typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx_);
+          return this->operator()<DefaultCapabilities>(idx_);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(idx_, in));
           }
         }
 

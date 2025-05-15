@@ -64,13 +64,20 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            auto x = get_value<EPT>(x_, indices...);
-            auto y = get_value<EPT>(y_, indices...);
-            [[maybe_unused]] auto z = get_value<EPT>(z_, indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            auto x = get_value<CapType>(x_, indices...);
+            auto y = get_value<CapType>(y_, indices...);
+            [[maybe_unused]] auto z = get_value<CapType>(z_, indices...);
 
             if constexpr (WHICH==0) { // theta
               return scalar_internal_atan2(y, x);
@@ -81,29 +88,32 @@ namespace matx
             }
           }
           else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           // No specific capabilities enforced
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, 
+              detail::get_operator_capability<Cap>(x_, in), 
+              detail::get_operator_capability<Cap>(y_, in), 
+              detail::get_operator_capability<Cap>(z_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(self_has_cap, 
-              detail::get_operator_capability<Cap>(x_), 
-              detail::get_operator_capability<Cap>(y_), 
-              detail::get_operator_capability<Cap>(z_));
+              detail::get_operator_capability<Cap>(x_, in), 
+              detail::get_operator_capability<Cap>(y_, in), 
+              detail::get_operator_capability<Cap>(z_, in));
           }
-
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

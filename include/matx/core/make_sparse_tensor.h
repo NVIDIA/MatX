@@ -30,7 +30,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef __CUDACC_RTC__
 #pragma once
 
 #include "matx/core/sparse_tensor.h"
@@ -326,3 +326,4 @@ auto make_tensor_uniform_batched_tri_dia(ValTensor &val,
 
 } // namespace experimental
 } // namespace matx
+#endif

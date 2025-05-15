@@ -37,6 +37,7 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/operators/base_operator.h"
 
+
 #define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \
@@ -86,25 +87,30 @@ namespace matx
         }, idx);
     }
 
-    template <ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value<EPT>(in1_, indices...);
-      return op_.template operator()<EPT>(i1);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+      auto i1 = get_value<CapType>(in1_, indices...);
+      return op_.template operator()<CapType>(i1);
     }
 
-    template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+      return this->template operator()<DefaultCapabilities>(indices...);
     }
 
-    template <OperatorCapability Cap>
-    __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    template <OperatorCapability Cap, typename InType>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
       auto self_has_cap = capability_attributes<Cap>::default_value;
-      // The scalar op_ itself has default capability (doesn't restrict input EPT)
-      // So we only care about the input operator in1_
-      return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_), detail::get_operator_capability<Cap>(op_));
+      return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_, in));
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

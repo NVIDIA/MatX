@@ -60,15 +60,22 @@ namespace matx
 
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
-          template <ElementsPerThread EPT, typename... Is>
+          template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-            get_value<EPT>(op1_, indices...);
-            return get_value<EPT>(op2_, indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, typename Op2::value_type>();
+          }
+        }
+#endif
+            get_value<CapType>(op1_, indices...);
+            return get_value<CapType>(op2_, indices...);
           }
 
           template <typename... Is>
           __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-            return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+            return this->operator()<DefaultCapabilities>(indices...);
           }
 
           static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
@@ -105,13 +112,13 @@ namespace matx
             }
           }       
 
-          template <OperatorCapability Cap>
-          __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          template <OperatorCapability Cap, typename InType>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-              detail::get_operator_capability<Cap>(op1_),
-              detail::get_operator_capability<Cap>(op2_)
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in)
             );
           }
 

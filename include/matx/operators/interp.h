@@ -76,10 +76,10 @@ namespace matx {
       InterpSplineTridiagonalFillOp(const O& dl, const O& d, const O& du, const O& b, const OpX& x, const OpV& v)
           : dl_(dl), d_(d), du_(du), b_(b), x_(x), v_(v)  {}
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array idx{indices...};
           index_t idxInterp = idx[AXIS];
 
@@ -92,15 +92,15 @@ namespace matx {
             idx1[AXIS] = idxInterp + 1;
             idx2[AXIS] = idxInterp + 2;
 
-            x_val_type x0 = get_value<EPT>(x_, idx0);
-            x_val_type x1 = get_value<EPT>(x_, idx1);
-            x_val_type x2 = get_value<EPT>(x_, idx2);
+            x_val_type x0 = get_value<CapType>(x_, idx0);
+            x_val_type x1 = get_value<CapType>(x_, idx1);
+            x_val_type x2 = get_value<CapType>(x_, idx2);
             x_val_type h0 = x1 - x0;
             x_val_type h1 = x2 - x1;
 
-            v_val_type v0 = get_value<EPT>(v_, idx0);
-            v_val_type v1 = get_value<EPT>(v_, idx1);
-            v_val_type v2 = get_value<EPT>(v_, idx2);
+            v_val_type v0 = get_value<CapType>(v_, idx0);
+            v_val_type v1 = get_value<CapType>(v_, idx1);
+            v_val_type v2 = get_value<CapType>(v_, idx2);
 
             v_val_type delta0 = (v1 - v0) / h0;
             v_val_type delta1 = (v2 - v1) / h1;
@@ -115,15 +115,15 @@ namespace matx {
             idx1[AXIS] = idxInterp - 1;
             idx2[AXIS] = idxInterp;
 
-            x_val_type x0 = get_value<EPT>(x_, idx0);
-            x_val_type x1 = get_value<EPT>(x_, idx1);
-            x_val_type x2 = get_value<EPT>(x_, idx2);
+            x_val_type x0 = get_value<CapType>(x_, idx0);
+            x_val_type x1 = get_value<CapType>(x_, idx1);
+            x_val_type x2 = get_value<CapType>(x_, idx2);
             x_val_type h0 = x1 - x0;
             x_val_type h1 = x2 - x1;
 
-            v_val_type v0 = get_value<EPT>(v_, idx0);
-            v_val_type v1 = get_value<EPT>(v_, idx1);
-            v_val_type v2 = get_value<EPT>(v_, idx2);
+            v_val_type v0 = get_value<CapType>(v_, idx0);
+            v_val_type v1 = get_value<CapType>(v_, idx1);
+            v_val_type v2 = get_value<CapType>(v_, idx2);
 
             v_val_type delta0 = (v1 - v0) / h0;
             v_val_type delta1 = (v2 - v1) / h1;
@@ -138,15 +138,15 @@ namespace matx {
             idx1[AXIS] = idxInterp;
             idx2[AXIS] = idxInterp + 1;
 
-            x_val_type x0 = get_value<EPT>(x_, idx0);
-            x_val_type x1 = get_value<EPT>(x_, idx1);
-            x_val_type x2 = get_value<EPT>(x_, idx2);
+            x_val_type x0 = get_value<CapType>(x_, idx0);
+            x_val_type x1 = get_value<CapType>(x_, idx1);
+            x_val_type x2 = get_value<CapType>(x_, idx2);
             x_val_type h0 = x1 - x0;
             x_val_type h1 = x2 - x1;
 
-            v_val_type v0 = get_value<EPT>(v_, idx0);
-            v_val_type v1 = get_value<EPT>(v_, idx1);
-            v_val_type v2 = get_value<EPT>(v_, idx2);
+            v_val_type v0 = get_value<CapType>(v_, idx0);
+            v_val_type v1 = get_value<CapType>(v_, idx1);
+            v_val_type v2 = get_value<CapType>(v_, idx2);
 
 
             v_val_type delta0 = (v1 - v0) / h0;
@@ -162,14 +162,26 @@ namespace matx {
 
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ void operator()(index_t idx) const
       {
-        return operator()<detail::ElementsPerThread::ONE>(idx);
+        return operator()<DefaultCapabilities>(idx);
       }
 
-      template <detail::OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <detail::OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return my_cap;
         } else {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return self_has_cap;
+        }
+      }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return my_cap;
+        } else {        
           auto self_has_cap = detail::capability_attributes<Cap>::default_value;
           return self_has_cap;
         }
@@ -204,7 +216,7 @@ namespace matx {
       constexpr static int AXIS_X = OpX::Rank() - 1;
       constexpr static int AXIS_V = OpV::Rank() - 1;
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto searchsorted(const cuda::std::array<index_t, RANK> idx, const domain_type x_query) const
       {
         // Binary search to find the interval containing the query point
@@ -221,7 +233,7 @@ namespace matx {
 
         domain_type x_low, x_high, x_mid;
 
-        x_low = get_value<EPT>(x_, idx_low);
+        x_low = get_value<CapType>(x_, idx_low);
         if (x_query < x_low) {
           idx_low[AXIS] = x_.Size(AXIS_X);
           idx_high[AXIS] = 0;
@@ -230,7 +242,7 @@ namespace matx {
           return cuda::std::make_tuple(idx_low, idx_low);
         }
         
-        x_high = get_value<EPT>(x_, idx_high);
+        x_high = get_value<CapType>(x_, idx_high);
         if (x_query > x_high) {
           idx_low[AXIS] = x_.Size(AXIS_X) - 1;
           idx_high[AXIS] = x_.Size(AXIS_X);
@@ -242,7 +254,7 @@ namespace matx {
         // Find the interval containing the query point
         while (idx_high[AXIS] - idx_low[AXIS] > 1) {
           idx_mid[AXIS] = (idx_low[AXIS] + idx_high[AXIS]) / 2;
-          x_mid = get_value<EPT>(x_, idx_mid);
+          x_mid = get_value<CapType>(x_, idx_mid);
           if (x_query == x_mid) {
             return cuda::std::make_tuple(idx_mid, idx_mid);
           } else if (x_query < x_mid) {
@@ -257,41 +269,41 @@ namespace matx {
       }
 
       // Linear interpolation implementation
-      template <ElementsPerThread EPT>
+      template <typename CapType>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_linear(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
 
         if (idx_high[AXIS] == 0 || idx_low[AXIS] == idx_high[AXIS]) { // x_query <= x(0) or x_query == x(idx_low) == x(idx_high)
-          v = get_value<EPT>(v_, idx_high);
+          v = get_value<CapType>(v_, idx_high);
         } else if (idx_low[AXIS] == x_.Size(AXIS_X) - 1) { // x_query > x(n-1)
-          v = get_value<EPT>(v_, idx_low);
+          v = get_value<CapType>(v_, idx_low);
         } else {
-          domain_type x_low = get_value<EPT>(x_, idx_low);
-          domain_type x_high = get_value<EPT>(x_, idx_high);
-          value_type v_low = get_value<EPT>(v_, idx_low);
-          value_type v_high = get_value<EPT>(v_, idx_high);
+          domain_type x_low = get_value<CapType>(x_, idx_low);
+          domain_type x_high = get_value<CapType>(x_, idx_high);
+          value_type v_low = get_value<CapType>(v_, idx_low);
+          value_type v_high = get_value<CapType>(v_, idx_high);
           v = v_low + (x_query - x_low) * (v_high - v_low) / (x_high - x_low);
         }
         return v;
       }
 
       // Nearest neighbor interpolation implementation
-      template <ElementsPerThread EPT>
+      template <typename CapType>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_nearest(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
         if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
-          v = get_value<EPT>(v_, idx_high);
+          v = get_value<CapType>(v_, idx_high);
         } else if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
-          v = get_value<EPT>(v_, idx_low);
+          v = get_value<CapType>(v_, idx_low);
         } else {
-          domain_type x_low = get_value<EPT>(x_, idx_low);
-          domain_type x_high = get_value<EPT>(x_, idx_high);
+          domain_type x_low = get_value<CapType>(x_, idx_low);
+          domain_type x_high = get_value<CapType>(x_, idx_high);
           if (x_query - x_low < x_high - x_query) {
-            v = get_value<EPT>(v_, idx_low);
+            v = get_value<CapType>(v_, idx_low);
           } else {
-            v = get_value<EPT>(v_, idx_high);
+            v = get_value<CapType>(v_, idx_high);
           }
         }
         return v;
@@ -299,38 +311,38 @@ namespace matx {
 
 
       // Next value interpolation implementation
-      template <ElementsPerThread EPT>
+      template <typename CapType>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_next([[maybe_unused]] const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
         if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
-          v = get_value<EPT>(v_, idx_low);
+          v = get_value<CapType>(v_, idx_low);
         } else {
-          v = get_value<EPT>(v_, idx_high);
+          v = get_value<CapType>(v_, idx_high);
         }
         return v;
       }
 
       // Previous value interpolation implementation
-      template <ElementsPerThread EPT>      
+      template <typename CapType>      
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_prev([[maybe_unused]] const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
         if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
-          v = get_value<EPT>(v_, idx_high);
+          v = get_value<CapType>(v_, idx_high);
         } else {
-          v = get_value<EPT>(v_, idx_low);
+          v = get_value<CapType>(v_, idx_low);
         }
         return v;
       }
 
       // Spline interpolation implementation
       // Hermite cubic interpolation
-      template <ElementsPerThread EPT>        
+      template <typename CapType>        
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_spline(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         if (idx_high[AXIS] == idx_low[AXIS]) {
-          value_type v = get_value<EPT>(v_, idx_low);
+          value_type v = get_value<CapType>(v_, idx_low);
           return v;
         } else if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
           idx_low[AXIS] = 0;
@@ -340,16 +352,16 @@ namespace matx {
           idx_low[AXIS] = x_.Size(AXIS_X) - 2;
         }
         // sample points
-        domain_type x_low = get_value<EPT>(x_, idx_low);
-        domain_type x_high = get_value<EPT>(x_, idx_high);
+        domain_type x_low = get_value<CapType>(x_, idx_low);
+        domain_type x_high = get_value<CapType>(x_, idx_high);
 
         // values at the sample points
-        value_type v_low = get_value<EPT>(v_, idx_low);
-        value_type v_high = get_value<EPT>(v_, idx_high);
+        value_type v_low = get_value<CapType>(v_, idx_low);
+        value_type v_high = get_value<CapType>(v_, idx_high);
         value_type v_diff = v_high - v_low;
 
-        value_type m_low = get_value<EPT>(m_, idx_low);
-        value_type m_high = get_value<EPT>(m_, idx_high);
+        value_type m_low = get_value<CapType>(m_, idx_low);
+        value_type m_high = get_value<CapType>(m_, idx_high);
 
         value_type h = x_high - x_low;
         value_type h_low = x_query - x_low;
@@ -366,23 +378,23 @@ namespace matx {
       }
 
       // Dispatch to appropriate interpolation method based on enum
-      template <ElementsPerThread EPT>      
+      template <typename CapType>      
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         switch (method_) {
           case InterpMethod::LINEAR:
-            return interpolate_linear<EPT>(x_query, idx_low, idx_high);
+            return interpolate_linear<CapType>(x_query, idx_low, idx_high);
           case InterpMethod::NEAREST:
-            return interpolate_nearest<EPT>(x_query, idx_low, idx_high);
+            return interpolate_nearest<CapType>(x_query, idx_low, idx_high);
           case InterpMethod::NEXT:
-            return interpolate_next<EPT>(x_query, idx_low, idx_high);
+            return interpolate_next<CapType>(x_query, idx_low, idx_high);
           case InterpMethod::PREV:
-            return interpolate_prev<EPT>(x_query, idx_low, idx_high);
+            return interpolate_prev<CapType>(x_query, idx_low, idx_high);
           case InterpMethod::SPLINE:
-            return interpolate_spline<EPT>(x_query, idx_low, idx_high);
+            return interpolate_spline<CapType>(x_query, idx_low, idx_high);
           default:
             // Default to linear interpolation
-            return interpolate_linear<EPT>(x_query, idx_low, idx_high);
+            return interpolate_linear<CapType>(x_query, idx_low, idx_high);
         }
       }
 
@@ -480,32 +492,40 @@ namespace matx {
 
 
       // Only one element per thread supported
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array idx{indices...};
           auto x_query = xq_(indices...);
-          auto [idx_low, idx_high] = searchsorted<EPT>(idx, x_query);
+          auto [idx_low, idx_high] = searchsorted<CapType>(idx, x_query);
 
-          return interpolate<EPT>(x_query, idx_low, idx_high);
+          return interpolate<CapType>(x_query, idx_low, idx_high);
         } else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }
 
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, 
+                                           detail::get_operator_capability<Cap>(x_, in),
+                                           detail::get_operator_capability<Cap>(v_, in),
+                                           detail::get_operator_capability<Cap>(xq_, in));
         } else {
           auto self_has_cap = detail::capability_attributes<Cap>::default_value;
           // Note: m_ is a temporary internal tensor, not an input operator passed to constructor
-          return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(x_),
-                                           detail::get_operator_capability<Cap>(v_),
-                                           detail::get_operator_capability<Cap>(xq_));
+          return self_has_cap;
         }
       }
 
