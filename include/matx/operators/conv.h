@@ -34,8 +34,11 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_options.h"
 #include "matx/operators/base_operator.h"
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/conv.h"
+#endif
 
 namespace matx
 {
@@ -53,7 +56,7 @@ namespace matx
         matxConvCorrMethod_t method_;
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
-        mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr; 
 
         static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
@@ -132,30 +135,47 @@ namespace matx
                           "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }     
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType&) const {
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
           }
           else {
             return capability_attributes<Cap>::default_value;
           }
-        }              
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {        
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -165,6 +185,8 @@ namespace matx
         {
           return out_dims_[dim];
         }
+#ifndef __CUDACC_RTC__
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -214,6 +236,7 @@ namespace matx
 
           matxFree(ptr);
         }  
+#endif
     };
   }
 
@@ -275,7 +298,7 @@ namespace detail {
       matxConvCorrMode_t mode_;
       PermDims perm_;
       cuda::std::array<index_t, max_rank> out_dims_;
-      mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
       mutable out_t *ptr = nullptr; 
 
     public:
@@ -341,30 +364,43 @@ namespace detail {
         }
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      template <detail::ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
         return tmp_out_(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          auto a_cap = detail::get_operator_capability<Cap>(a_, in);
+          auto b_cap = detail::get_operator_capability<Cap>(b_, in);
+          return combine_capabilities<Cap>(my_cap, a_cap, b_cap);
+        }
+        
         auto self_has_cap = capability_attributes<Cap>::default_value;
         // NOTE: Conv2D is FFT only, which can support different EPTs. 
         // However, the underlying FFTs are currently called without EPT.
         // For now, let's assume it inherits, but this might need refinement
         // if specific EPT > 1 is to be plumbed through conv2d's FFTs.
         
-        auto a_cap = detail::get_operator_capability<Cap>(a_);
-        auto b_cap = detail::get_operator_capability<Cap>(b_);
+        auto a_cap = detail::get_operator_capability<Cap>(a_, in);
+        auto b_cap = detail::get_operator_capability<Cap>(b_, in);
         return combine_capabilities<Cap>(self_has_cap, a_cap, b_cap);
       }
 
@@ -376,6 +412,8 @@ namespace detail {
       {
         return out_dims_[dim];
       }
+#ifndef __CUDACC_RTC__
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -423,7 +461,8 @@ namespace detail {
         } 
 
         matxFree(ptr);
-      }       
+      }     
+#endif  
     };
   }
 
