@@ -72,16 +72,28 @@ namespace matx
           method_(method)
         {}
 
-        template <detail::OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-          return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_));
-        }
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return detail::combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(sop_, in));
+          } else {        
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_, in));
+          }
+        }        
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, FreqType>([this](index_t idx) { 
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
               return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
             }
@@ -92,7 +104,7 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
@@ -128,16 +140,28 @@ namespace matx
           method_(method)
         {}
 
-        template <detail::OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-          return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_));
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return detail::combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(sop_, in));
+          } else {        
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_, in));
+          }
         }
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, value_type>([this](index_t idx) { 
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
               FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
               FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx) + 90.0/360.0));
@@ -150,7 +174,7 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const

@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/resample_poly.h"
+#endif
 
 namespace matx {
 
@@ -53,7 +55,7 @@ namespace detail {
       index_t up_;
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
       mutable out_t *ptr = nullptr;       
 
     public:
@@ -76,26 +78,45 @@ namespace detail {
         out_dims_[OpA::Rank() - 1] = b_len;
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       // Const versions
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
         return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(a_),
-                                           detail::get_operator_capability<Cap>(f_));
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(f_, in));
       }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }      
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+
+#ifndef __CUDACC_RTC__
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -103,12 +124,6 @@ namespace detail {
 
         resample_poly_impl(cuda::std::get<0>(out), a_, f_, up_, down_, ex.getStream());
       }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
-      }
-
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept {
@@ -144,12 +159,7 @@ namespace detail {
 
         matxFree(ptr);       
       }             
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
+#endif
   };
 }
 

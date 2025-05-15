@@ -49,24 +49,35 @@ namespace matx
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
-        template <detail::OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          if constexpr (RANK != 1) { // Vectorization not supported yet
-            return detail::ElementsPerThread::ONE;
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            if constexpr (RANK != 1) { // Vectorization not supported yet
+              return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+            }
+            else {
+              return detail::capability_attributes<Cap>::default_value;
+            }
           } else {          
-            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-            return self_has_cap;
+            return detail::capability_attributes<Cap>::default_value;
           }
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-          return f_.template operator()<EPT>(pp_get<Dim>(indices...));
+#ifdef __CUDA_ARCH__
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
+          }
+#endif
+          return f_.template operator()<CapType>(pp_get<Dim>(indices...));
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const

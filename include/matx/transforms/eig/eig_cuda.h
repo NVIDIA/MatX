@@ -32,8 +32,8 @@
 
 #pragma once
 
-#include "cublas_v2.h"
-#include "cusolverDn.h"
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"

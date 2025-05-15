@@ -53,7 +53,7 @@ namespace detail {
       return cuda::std::FUNC(v1);    \
     } \
   } \
-  template <typename T, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \
+  template <typename T> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T v1) { \
     if constexpr (is_vector_v<T>) {    \
       return UnaryVecFunc(scalar_internal_##FUNC<typename T::value_type>, v1); \
@@ -64,16 +64,16 @@ namespace detail {
   } \
   template <typename T> struct OPNAME##Op {                                     \
     static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
-    template <matx::detail::ElementsPerThread EPT, typename T1V> \
+    template <typename CapType, typename T1V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
   };
 
 // Unary operator with a custom function
 #define MATX_UNARY_OP_GEN_NOFUNC(FUNC, OPNAME)                                        \
-  template <typename T, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \
+  template <typename T> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T v1) { \
     if constexpr (is_vector_v<T>) {    \
       return UnaryVecFunc(scalar_internal_##FUNC<typename T::value_type>, v1); \
@@ -84,12 +84,12 @@ namespace detail {
   } \
   template <typename T> struct OPNAME##Op {                                     \
     static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
-    template <matx::detail::ElementsPerThread EPT, typename T1V> \
+    template <typename CapType, typename T1V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
-  };
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
+  };  
 
 // Standard binary function
 #define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
@@ -102,7 +102,7 @@ namespace detail {
       return cuda::std::FUNC(v1, v2);    \
     } \
   } \
-  template <typename T1, typename T2, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \
+  template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
       return BinVecFunc(scalar_internal_##FUNC<typename T1::value_type, typename T2::value_type>, v1, v2); \
@@ -113,11 +113,11 @@ namespace detail {
   } \
   template <typename T1, typename T2> struct OPNAME##Op {                                     \
     static __MATX_INLINE__ std::string str(const std::string &in1, const std::string &in2) { return std::string(#FUNC) + "(" + in1 + "," + in2 + ")"; } \
-    template <matx::detail::ElementsPerThread EPT, typename T1V, typename T2V> \
+    template <typename CapType, typename T1V, typename T2V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1, T2V v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
   };
 
 #define MATX_BINARY_OP_GEN_OPERATOR(FUNC, OPNAME, OPSYM)                                       \
@@ -125,7 +125,7 @@ namespace detail {
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_##FUNC(T1 v1, T2 v2) { \
     return v1 OPSYM v2; \
   } \
-  template <typename T1, typename T2, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \
+  template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
       return BinVecFunc(scalar_internal_##FUNC<typename T1::value_type, typename T2::value_type>, v1, v2); \
@@ -136,16 +136,16 @@ namespace detail {
   } \
   template <typename T1, typename T2> struct OPNAME##Op {                   \
     static __MATX_INLINE__ std::string str(const std::string &in1, const std::string &in2) { return std::string(#FUNC) + "(" + in1 + "," + in2 + ")"; } \
-    template <matx::detail::ElementsPerThread EPT, typename T1V, typename T2V> \
+    template <typename CapType, typename T1V, typename T2V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1V &v1, const T2V &v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
   };
 
 // Binary operator with a custom function
 #define MATX_BINARY_OP_NOFUNC(FUNC, OPNAME)                                       \
-  template <typename T1, typename T2, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \
+  template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
       return BinVecFunc(scalar_internal_##FUNC<typename T1::value_type, typename T2::value_type>, v1, v2); \
@@ -156,12 +156,12 @@ namespace detail {
   } \
   template <typename T1, typename T2> struct OPNAME##Op {                                     \
     static __MATX_INLINE__ std::string str(const std::string &in1, const std::string &in2) { return std::string(#FUNC) + "(" + in1 + "," + in2 + ")"; } \
-    template <matx::detail::ElementsPerThread EPT, typename T1V, typename T2V> \
+    template <typename CapType, typename T1V, typename T2V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1, T2V v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
-  };
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+  };  
 
 
   // Helper function to apply a callable binary operator onto two inputs. There are many compile-time
@@ -378,6 +378,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_subneg
 MATX_UNARY_OP_GEN_NOFUNC(subneg, SubNeg);
 
 // Binary Operators
+
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_not(T v1) {

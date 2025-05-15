@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#ifndef __CUDACC_RTC__
+
 #pragma once
 
 #include "matx/core/type_utils.h"
@@ -632,3 +634,20 @@ namespace matx
   template <typename T>
   using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
 };
+
+#else
+  /* These classes are part of the type that's passed to the kernel, but they're unused once in the kernel. Create
+     stub types so NVRTC compiles */
+  namespace matx {
+  template <typename T>
+  class basic_storage {};
+
+  template <typename T>
+  struct matx_allocator { };
+
+  template <typename T, typename Allocator>
+  class raw_pointer_buffer  {};
+  template <typename T>
+  using DefaultStorage = basic_storage<T>;
+}
+#endif // JITIFY

@@ -37,6 +37,8 @@
 #include "matx/core/error.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/capabilities.h"
+#include "matx/core/operator_utils.h"
 
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
@@ -72,9 +74,13 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
+
+#ifndef __CUDACC_RTC__
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
+#endif
+
 
   auto &get_lhs() {
     return out_;
@@ -105,49 +111,73 @@ public:
     }
   }
 
+
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
-  template <ElementsPerThread EPT, typename... Ts>
+  template <typename CapType, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    auto r = detail::get_value<EPT>(op_, args...);
+    auto r = detail::get_value<CapType>(op_, args...);
     out_(args...) = r;
     return r;
   }
 
-  template <ElementsPerThread EPT, typename ShapeType>
+  template <typename CapType, typename ShapeType>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
-        return _internal_mapply<EPT>(args...);
+        return _internal_mapply<CapType>(args...);
       }, idx
     );
 
     return res;
   }
 
-  template <ElementsPerThread EPT, typename... Is>
+  template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
-    //auto &&out = out_(indices...);
-    //out = detail::get_value<EPT>(op_, indices...);
-    const auto in_val = detail::get_value<EPT>(op_, indices...);
-    using out_type = decltype(out_.template operator()<EPT>(indices...));
-    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(EPT)> vec{in_val};
-      out_.template operator()<EPT>(indices...) = vec;
-    }
-    else {
-      out_.template operator()<EPT>(indices...) = in_val;
-    }
-    return in_val;
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+    const auto in_val = detail::get_value<CapType>(op_, indices...);
+    using out_type = decltype(out_.template operator()<CapType>(indices...));
 
-    //return out_(indices...);
+#ifdef __CUDA_ARCH__    
+    // If we get a scalar on the input and a vector output, construct a vector of these scalars to write out
+    if constexpr (CapType::jit) {
+      if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {
+        if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+          Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+          out_.template operator()<CapType>(indices...) = vec;
+        }
+        else {
+          out_.template operator()<CapType>(indices...) = in_val;
+        }
+      }
+      return in_val;      
+    }
+    else 
+#endif    
+    {
+      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+        Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+        out_.template operator()<CapType>(indices...) = vec;
+      }
+      else {
+        out_.template operator()<CapType>(indices...) = in_val;
+      }
+      return in_val;
+    }
   }  
+
 
   template <typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  
   {
-    return (*this).template operator()<detail::ElementsPerThread::ONE>(indices...);
+    return (*this).template operator()<DefaultCapabilities>(indices...);
   }
 
   template <typename ShapeType, typename Executor>
@@ -172,13 +202,13 @@ public:
     }
   }
 
-  template <detail::OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
     auto self_has_cap = capability_attributes<Cap>::default_value;
     return combine_capabilities<Cap>(self_has_cap, 
-                                      detail::get_operator_capability<Cap>(out_),
-                                      detail::get_operator_capability<Cap>(op_));
-  }  
+                                      detail::get_operator_capability<Cap>(out_, in),
+                                      detail::get_operator_capability<Cap>(op_, in));
+  }
 
   // Used as a shortcut where the RHS is an executor and LHS is a tensor. In this case we
   // want to avoid the RHS from allocating any temporary output memory, so we call
@@ -218,8 +248,12 @@ public:
    */
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    static_assert(T::Rank() >= 1, "Size function only works on tensors of rank 1 and higher");
-    return out_.Size(dim);
+    if constexpr (T::Rank() == 0) {
+      return 1;
+    }
+    else {
+      return out_.Size(dim);
+    }
   }
 };
 

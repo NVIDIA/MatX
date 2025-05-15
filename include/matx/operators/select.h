@@ -59,39 +59,46 @@ namespace matx
 
         __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
 
-        template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
+        template <typename CapType, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
         {    
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            auto arrs = detail::GetIdxFromAbs(op, get_value<EPT>(idx, i));
-            return get_value<EPT>(op, arrs);          
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= idx.Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            auto arrs = detail::GetIdxFromAbs(op, get_value<CapType>(idx, i));
+            return get_value<CapType>(op, arrs);          
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), idx_, i);
+          return get_impl<CapType>(cuda::std::as_const(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
         }
 
-        template <typename... Is>
+        template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -127,16 +134,21 @@ namespace matx
           }          
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+            detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(idx_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-            detail::get_operator_capability<Cap>(op_),
-              detail::get_operator_capability<Cap>(idx_)
+            detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(idx_, in)
             );
           }
         }

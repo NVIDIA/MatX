@@ -35,6 +35,8 @@
 #pragma once
 
 #include <cuda/std/array>
+#include <cuda/std/__algorithm/copy.h>
+#include <cuda/std/__algorithm/move.h>
 #include <type_traits>
 #include <cstdint>
 #include "matx/core/error.h"
@@ -91,7 +93,7 @@ public:
   friend void swap( tensor_desc_t<ShapeContainer, StrideContainer, RANK> &lhs,
                     tensor_desc_t<ShapeContainer, StrideContainer, RANK> &rhs) noexcept
   {
-    using std::swap;
+    using cuda::std::swap;
 
     swap(lhs.shape_, rhs.shape_);
     swap(lhs.stride_, rhs.stride_);
@@ -104,8 +106,8 @@ public:
    * @param shape Shape object
    * @param stride Stride object
    */
-  template <typename S = ShapeContainer, std::enable_if_t<!std::is_array_v<ShapeContainer> && !std::is_array_v<StrideContainer>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(ShapeContainer &&shape, StrideContainer &&stride)
+  template <typename S = ShapeContainer, std::enable_if_t<!cuda::std::is_array_v<ShapeContainer> && !cuda::std::is_array_v<StrideContainer>, bool> = true>
+  __MATX_INLINE__  __MATX_DEVICE__ __MATX_HOST__ tensor_desc_t(ShapeContainer &&shape, StrideContainer &&stride)
       : shape_(std::forward<ShapeContainer>(shape)),
         stride_(std::forward<StrideContainer>(stride)) {
     MATX_ASSERT_STR(shape.size() == stride.size(), matxInvalidDim,
@@ -118,7 +120,7 @@ public:
    * @brief Construct a tensor_desc_t for a 0D tensor
    *
    */
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t() {
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t() {
   }
 
   /**
@@ -128,8 +130,8 @@ public:
    * @param shape
    *   Shape of tensor
    */
-  template <typename S2, std::enable_if_t<!std::is_array_v<typename remove_cvref<S2>::type> && !is_matx_descriptor_v<typename remove_cvref<S2>::type>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__  tensor_desc_t(S2 &&shape)
+  template <typename S2, std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<S2>::type> && !is_matx_descriptor_v<typename remove_cvref<S2>::type>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape)
   {
     InitFromShape(std::forward<S2>(shape));
   }
@@ -143,12 +145,14 @@ public:
    *   Shape of tensor
    */
   template <int M = RANK>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const index_t (&shape)[M])
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const index_t (&shape)[M])
   {
+    #ifndef __CUDACC_RTC__
     // Construct a new cuda::std::array. Slower, but saves duplication
     cuda::std::array<index_t, M> tshape;
-    std::move(std::begin(shape), std::end(shape), tshape.begin());
-    InitFromShape(std::move(tshape));
+    cuda::std::move(cuda::std::begin(shape), cuda::std::end(shape), tshape.begin());
+    InitFromShape(cuda::std::move(tshape));
+    #endif
   }
 
   /**
@@ -159,8 +163,8 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename S2, std::enable_if_t<!std::is_array_v<S2>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
+  template <typename S2, std::enable_if_t<!cuda::std::is_array_v<S2>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(*(shape.begin() + i) > 0, matxInvalidSize,
@@ -177,8 +181,8 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <std::enable_if_t<!std::is_array_v<StrideContainer>, bool> = true>
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
+  template <std::enable_if_t<!cuda::std::is_array_v<StrideContainer>, bool> = true>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
       stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
@@ -195,7 +199,7 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  __MATX_INLINE__ __MATX_HOST__ tensor_desc_t(const shape_type (&shape)[RANK], const stride_type (&strides)[RANK]) {
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], const stride_type (&strides)[RANK]) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
@@ -248,7 +252,7 @@ public:
    * @param shape Shape object
    */
   template <typename S2>
-  void __MATX_INLINE__ __MATX_HOST__ InitFromShape(S2 &&shape) {
+  void __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ InitFromShape(S2 &&shape) {
     shape_ = std::forward<S2>(shape);
 
     for (int i = 0; i < RANK; i++) {
@@ -416,7 +420,7 @@ public:
    * @return Product of all sizes
    */
   static constexpr auto TotalSize() {
-      return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
+      return cuda::std::accumulate(shape_.begin(), shape_.end(), 1, cuda::std::multiplies<index_t>());
   }
 
 private:

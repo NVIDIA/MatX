@@ -35,7 +35,13 @@
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 #error "MatX requires CUDA compute capability 6.0 or newer."
 #endif
+#ifndef __CUDACC_RTC__  
 #include <cuda_runtime_api.h>
+#endif
+#endif
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+#include <cufftdx.hpp>
 #endif
 
 // defines.h should always be included first. Its definitions may impact

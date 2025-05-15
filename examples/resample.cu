@@ -64,9 +64,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<complex, 1> sigViewComplex({num_samp / 2 + 1});
   tensor_t<float, 1> resampView({num_samp_resamp});
 
-  (sigView = random<float>({num_samp}, NORMAL)).run(exec);
+  // (sigView = random<float>({num_samp}, NORMAL)).run(exec);
 
-  (sigViewComplex = fft(sigView)).run(exec);
+  // (sigViewComplex = fft(sigView)).run(exec);
 
   // Slice
   auto sliceView = slice(sigViewComplex, {0}, {nyq});
@@ -76,16 +76,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   cudaEventRecord(start, stream);
 
-  for (uint32_t i = 0; i < num_iterations; i++) {
-    // Launch 1D FFT
-    (sigViewComplex = fft(sigView)).run(exec);
+  // for (uint32_t i = 0; i < num_iterations; i++) {
+  //   // Launch 1D FFT
+  //   (sigViewComplex = fft(sigView)).run(exec);
 
-    // Slice
-    auto sv = slice(sigViewComplex, {0}, {nyq});
+  //   // Slice
+  //   auto sv = slice(sigViewComplex, {0}, {nyq});
 
-    // Inverse Transform - FFT size based on output
-    (resampView = ifft(sv)).run(exec);
-  }
+  //   // Inverse Transform - FFT size based on output
+  //   (resampView = ifft(sv)).run(exec);
+  // }
 
   cudaEventRecord(stop, stream);
   exec.sync();

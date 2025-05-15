@@ -29,6 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
+#ifndef __CUDACC_RTC__
 
 #pragma once
 #include <type_traits>
@@ -186,3 +187,5 @@ using SelectThreadsHostExecutor  = HostExecutor<ThreadsMode::SELECT>;
 using AllThreadsHostExecutor     = HostExecutor<ThreadsMode::ALL>;
 
 }
+
+#endif // JITIFY

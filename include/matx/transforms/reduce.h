@@ -34,15 +34,21 @@
 
 #include <cfloat>
 
-#include "matx/core/cache.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
-#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
+#include <cuda/std/complex>
+#ifndef __CUDACC_RTC__
+#include "matx/core/cache.h"
+#include "matx/core/nvtx.h"
 #include "matx/transforms/cub.h"
 #include "matx/transforms/copy.h"
+#endif
+#include "matx/core/reduce_utils.h"
 #include "matx/core/half.h"
 
 union HalfBits {
@@ -187,7 +193,7 @@ public:
 
 } // namespace detail
 
-
+#ifndef __CUDACC_RTC__
 /**
  * Perform a reduction
  *
@@ -1518,5 +1524,7 @@ void __MATX_INLINE__ trace_impl(OutType dest, const InType &in, int stream = 0)
 {
   return trace(dest, in, cudaExecutor{stream});
 }
+
+#endif
 
 } // end namespace matx

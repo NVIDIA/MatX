@@ -31,6 +31,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
+#ifndef __CUDACC_RTC__
+
 #pragma once
 
 #include "matx/core/nvtx.h"
@@ -753,3 +755,5 @@ auto make_tensor( TensorType &tensor,
 }
 
 } // namespace matx
+
+#endif // JITIFY

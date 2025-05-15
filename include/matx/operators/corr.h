@@ -53,7 +53,7 @@ namespace matx
         matxConvCorrMethod_t method_;
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
-        mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr; 
 
       public:
@@ -120,28 +120,35 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           // Similar to Conv1DOp, there's a method_ field. Assuming similar logic might apply for EPT capability.
           // However, the reference example for conv1d had direct EPT=1 for direct method.
           // For now, using the standard combine for a_ and b_.
           // If specific EPT handling for method_ (direct/FFT) is needed, it can be added.
           return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(a_),
-                                           detail::get_operator_capability<Cap>(b_));
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(b_, in));
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

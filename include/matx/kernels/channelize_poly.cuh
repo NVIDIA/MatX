@@ -35,10 +35,8 @@
 #include <complex>
 #include <cuda.h>
 #include <iomanip>
-#include <memory>
 #include <stdint.h>
 #include <stdio.h>
-#include <vector>
 
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"

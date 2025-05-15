@@ -34,7 +34,6 @@
 
 // This file is intended to contain simple defines that don't rely on any other
 // MatX headers. It must be usable on both host and device compilers
-#include <cstdint>
 #include <cuda/std/limits>
 
 namespace matx {
@@ -98,6 +97,11 @@ namespace matx {
 
     #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
+#else
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
 #endif
 
 // std::ceil is not constexpr until C++23

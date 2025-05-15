@@ -41,7 +41,8 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
     auto c0 = make_tensor<ComplexType>({});
     (c0 = at(fft(t1), 0)).run(exec);
     exec.sync();
-
+print(c0);
+print(fft(t1));
     // The first component of the FFT output (DC) is the sum of all elements, so
     // 10+20+...+100 = 550. The imaginary component should be 0.
     ASSERT_NEAR(c0().real(), static_cast<TestType>(550.0), static_cast<TestType>(1.0e-6));

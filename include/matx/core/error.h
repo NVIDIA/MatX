@@ -32,6 +32,8 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
+
 #include <cstdio>
 #include <exception>
 #include <sstream>
@@ -40,6 +42,7 @@
 #endif
 
 #include "matx/core/stacktrace.h"
+#endif
 
 namespace matx
 {
@@ -112,6 +115,7 @@ namespace matx
     return "Unknown";
   }
 
+#ifndef __CUDACC_RTC__
   namespace detail {
   struct matxException : public std::exception
   {
@@ -165,7 +169,7 @@ namespace matx
     throw matx::detail::matxException(e, str, __FILE__, __LINE__); \
   }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(__CUDA_ARCH__)
   #define MATX_ASSERT(a, error) \
   {                           \
     if ((a) != true)          \
@@ -207,6 +211,7 @@ namespace matx
   {                                           \
     static_assert((a), #error ": " #str);     \
   }
+
 
 #define MATX_CUDA_CHECK(e)                                      \
   do {                                                          \
@@ -252,6 +257,22 @@ namespace matx
       std::cerr << ")" << std::endl; \
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
     } \
+  }
+#else
+  // If we have code trying to assert on the device (like in a constructor), do nothing here
+  #define MATX_ASSERT(a, error) {}
+  #define MATX_ASSERT_STR(a, error, str) {}
+  #define MATX_ASSERT_STR_EXP(a, expected, error, str) {}  
+#endif // JITIFY
+
+#define MATX_STATIC_ASSERT(a, error)    \
+  {                                     \
+    static_assert((a), #error ": " #a); \
+  }
+
+#define MATX_STATIC_ASSERT_STR(a, error, str) \
+  {                                           \
+    static_assert((a), #error ": " #str);       \
   }
 
 } // end namespace matx

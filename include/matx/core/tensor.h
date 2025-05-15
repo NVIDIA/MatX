@@ -32,13 +32,13 @@
 
 #pragma once
 
-#include <cinttypes>
+//#ifndef __CUDACC_RTC__
+
 #include <cstdint>
-#include <atomic>
 #include <iomanip>
-#include <numeric>
-#include <memory>
 #include <type_traits>
+#include <cuda/std/numeric>
+//#endif // JITIFY
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
@@ -48,6 +48,8 @@
 #include "matx/core/dlpack.h"
 #include "matx/core/tie.h"
 #include "matx/kernels/utility.cuh"
+
+
 
 // forward declare
 namespace matx {
@@ -75,6 +77,7 @@ template <typename T,
           typename Storage = DefaultStorage<T>,
           typename Desc = DefaultDescriptor<RANK>>
 class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
+#ifndef __CUDACC_RTC__  
 public:
   // Type specifier for reflection on class
   using type = T; ///< Type of traits
@@ -274,7 +277,7 @@ public:
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
   {
     const typename detail::base_type_t<T2> &op_base = op;
-    return detail::set(*this, op_base);
+    return detail::set(static_cast<detail::tensor_impl_t<T, RANK, Desc>&>(*this), op_base);
   }
 
   /**
@@ -640,7 +643,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
+    [[maybe_unused]] stride_type prod = cuda::std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
         sizeof(M) * prod <= storage_.Bytes(), matxInvalidSize,
@@ -701,7 +704,7 @@ public:
     cuda::std::array<index_t, NRANK> tshape;
     std::move(std::begin(shape), std::end(shape), tshape.begin());
 
-    [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
+    [[maybe_unused]] stride_type prod = cuda::std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<stride_type>());
     MATX_ASSERT_STR(
         sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
@@ -915,8 +918,8 @@ MATX_LOOP_UNROLL
 
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     int32_t tdims[RANK];
-    std::iota(std::begin(tdims), std::end(tdims), 0);
-    std::swap(tdims[RANK - 2], tdims[RANK - 1]);
+    cuda::std::iota(std::begin(tdims), std::end(tdims), 0);
+    cuda::std::swap(tdims[RANK - 2], tdims[RANK - 1]);
     return Permute(tdims);
   }
 
@@ -1525,6 +1528,7 @@ MATX_LOOP_UNROLL
 private:
   Storage storage_;
   std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
+#endif  
 };
 
 

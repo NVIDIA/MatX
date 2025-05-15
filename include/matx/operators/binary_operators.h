@@ -108,7 +108,8 @@ namespace matx
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
+
+      __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {
@@ -117,37 +118,41 @@ namespace matx
         }
       }
 
-      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        auto i1 = get_value<EPT>(in1_, indices...);
-        auto i2 = get_value<EPT>(in2_, indices...);
-        return op_.template operator()<EPT>(i1, i2);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+        auto i1 = get_value<CapType>(in1_, indices...);
+        auto i2 = get_value<CapType>(in2_, indices...);
+        return op_.template operator()<CapType>(i1, i2);
       }
 
-      template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->template operator()<DefaultCapabilities>(indices...);
       }      
 
-      template <ElementsPerThread EPT, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <typename CapType, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()<EPT>(args...);
+            return this->operator()<CapType>(args...);
           }, idx);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-
-        auto lhs_child_cap = detail::get_operator_capability<Cap>(in1_);
-        auto rhs_child_cap = detail::get_operator_capability<Cap>(in2_);
-
-        return combine_capabilities<Cap>(self_has_cap, lhs_child_cap, rhs_child_cap);
+        return combine_capabilities<Cap>(self_has_cap, 
+                                          detail::get_operator_capability<Cap>(in1_, in),
+                                          detail::get_operator_capability<Cap>(in2_, in));
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -185,6 +190,7 @@ namespace matx
           in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
     };
   }
 
