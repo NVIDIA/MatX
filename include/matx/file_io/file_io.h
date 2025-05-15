@@ -32,6 +32,7 @@
 
 #pragma once
 
+#ifndef JITIFY
 #include <cstdio>
 #include <filesystem>
 #include <iterator>
@@ -365,4 +366,5 @@ void write_npy(const TensorType &t, const std::string& fname)
 }; // namespace io
 }; // namespace matx
 
+#endif // JITIFY
 #endif

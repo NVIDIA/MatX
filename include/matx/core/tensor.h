@@ -32,13 +32,13 @@
 
 #pragma once
 
-#include <cinttypes>
+//#ifndef JITIFY
+
 #include <cstdint>
-#include <atomic>
 #include <iomanip>
-#include <numeric>
-#include <memory>
 #include <type_traits>
+
+//#endif // JITIFY
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
@@ -48,6 +48,8 @@
 #include "matx/core/dlpack.h"
 #include "matx/core/tie.h"
 #include "matx/kernels/utility.cuh"
+
+
 
 // forward declare
 namespace matx {

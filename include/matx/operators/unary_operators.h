@@ -37,6 +37,7 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/operators/base_operator.h"
 
+
 #define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
   template <typename I1,                                            \
             typename = typename std::enable_if_t<is_matx_op<I1>()>> \

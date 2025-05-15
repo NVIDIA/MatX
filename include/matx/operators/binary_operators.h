@@ -108,7 +108,8 @@ namespace matx
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
+
+      __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {

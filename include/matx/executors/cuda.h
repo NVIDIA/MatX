@@ -35,7 +35,7 @@
 #include "matx/core/defines.h"
 #include "matx/executors/host.h"
 #include "matx/executors/kernel.h"
-
+#include "matx/core/nvrtc.h"
 namespace matx
 {
 
@@ -150,7 +150,11 @@ namespace matx
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
 
             if constexpr (Op::Rank() == 1) {
+#ifdef MATX_EN_MATHDX
+              nvrtc_compile_and_run(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0]);
+#else
               detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+#endif
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {

@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
+
+#ifndef JITIFY
 #include <functional>
 #include <map>
 #include <mutex>
@@ -359,3 +361,5 @@ class NvtxEvent
 }
 
 } // end matx namespace
+
+#endif // JITIFY

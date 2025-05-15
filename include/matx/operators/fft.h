@@ -77,6 +77,7 @@ namespace matx
           }
         }
 
+
         __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTType t, FFTNorm norm) : 
             a_(a), fft_size_(size),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {

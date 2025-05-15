@@ -34,7 +34,6 @@
 
 // This file is intended to contain simple defines that don't rely on any other
 // MatX headers. It must be usable on both host and device compilers
-#include <cstdint>
 #include <cuda/std/limits>
 
 namespace matx {
@@ -112,5 +111,6 @@ enum {
   // If adding a new marker adjust this to the last element above
   matxIdxSentinel = matxKeepStride - 1,
 };
+
 
 }

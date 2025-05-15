@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#ifndef JITIFY
+
 #pragma once
 
 #include "matx/core/type_utils.h"
@@ -632,3 +634,5 @@ namespace matx
   template <typename T>
   using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
 };
+
+#endif // JITIFY
