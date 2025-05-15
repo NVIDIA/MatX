@@ -56,10 +56,17 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ FlatTop(index_t size) : size_(size){};
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) {
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) {
             return  a0  
               - a1 * cuda::std::cos(2*M_PI*idx / (size_ - 1))
               + a2 * cuda::std::cos(4*M_PI*idx / (size_ - 1))
@@ -70,7 +77,7 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
@@ -98,7 +105,7 @@ namespace matx
    * Returns values for a Flattop window across the selected dimension.
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto flattop(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

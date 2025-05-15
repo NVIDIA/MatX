@@ -33,6 +33,7 @@
 #pragma once
 
 #include <type_traits>
+#include <string>
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
@@ -40,10 +41,10 @@
 
 namespace matx {
 
-  constexpr int HOPPER_CC = 9;
-  constexpr int AMPERE_CC = 8;
-  constexpr int VOLTA_CC = 7;
-  constexpr int PASCAL_CC = 6;
+constexpr int HOPPER_CC = 9;
+constexpr int AMPERE_CC = 8;
+constexpr int VOLTA_CC = 7;
+constexpr int PASCAL_CC = 6;
 
 namespace detail {
 __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
@@ -58,6 +59,14 @@ __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
 
 __MATX_INLINE__ int GetComputeCapabilityMajor() {
     return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+}
+
+__MATX_INLINE__ int GetComputeCapabilityMinor() {
+    return GetDeviceAttr(cudaDevAttrComputeCapabilityMinor);
+}
+
+__MATX_INLINE__ int GetComputeCapability() {
+    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor();
 }
 
 __MATX_INLINE__ bool IsHopperOrAbove() {
@@ -82,6 +91,45 @@ bool SizesMatch(const Op1 &op1, const Op2 &op2) {
 
   return true;
 }
+
+
+template <int RANK, typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type>, bool> = true>
+auto __MATX_INLINE__ getPermuteDims(T dims) {
+  constexpr auto D = dims.size();
+  cuda::std::array<int, RANK> perm;
+  cuda::std::array<bool, RANK> visited;
+
+  visited.fill(false);
+
+  // construct permutation array by moving fastest changing dims to end
+  int j = RANK-1;
+  MATX_LOOP_UNROLL
+  for(int i = D-1; i>= 0; i--) {
+    int a = dims[i];
+    MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");
+    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
+
+    visited[a] = true;
+
+    perm[j--] = a;
+  }
+
+  // now add remaning dims to front
+  j = 0;
+  for(int i = 0; i < RANK;  i++) {
+    if(!visited[i]) {
+      perm[j++] = i;
+    }
+  }
+
+  return perm;
+}
+
+template <int RANK, int D>
+auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
+  return getPermuteDims<RANK>(detail::to_array(dims));
+}
+
 
 template <typename T1, typename T2, typename T3>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &y, const T3 &z) {
@@ -171,44 +219,6 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
 }
 
 
-
-template <int RANK, typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type>, bool> = true>
-auto __MATX_INLINE__ getPermuteDims(T dims) {
-  constexpr auto D = dims.size();
-  cuda::std::array<int, RANK> perm;
-  cuda::std::array<bool, RANK> visited;
-
-  visited.fill(false);
-
-  // construct permutation array by moving fastest changing dims to end
-  int j = RANK-1;
-  MATX_LOOP_UNROLL
-  for(int i = D-1; i>= 0; i--) {
-    int a = dims[i];
-    MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");
-    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
-
-    visited[a] = true;
-
-    perm[j--] = a;
-  }
-
-  // now add remaning dims to front
-  j = 0;
-  for(int i = 0; i < RANK;  i++) {
-    if(!visited[i]) {
-      perm[j++] = i;
-    }
-  }
-
-  return perm;
-}
-
-template <int RANK, int D>
-auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
-  return getPermuteDims<RANK>(detail::to_array(dims));
-}
-
 template <int RANK>
 auto __MATX_INLINE__ invPermute(const cuda::std::array<int, RANK> &perm) {
   cuda::std::array<int, RANK> inv_perm;
@@ -217,5 +227,136 @@ auto __MATX_INLINE__ invPermute(const cuda::std::array<int, RANK> &perm) {
   }
   return inv_perm;
 }
-};
-};
+
+template <typename Container>
+__MATX_INLINE__ std::string array_to_string(const Container& container) {
+  std::string s;
+  for (size_t i = 0; i < container.size(); ++i) {
+    if (i != 0) s += ", ";
+    s += std::to_string(container[i]);
+  }
+  return s;
+}
+
+template <typename T, size_t N>
+__MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr) {
+  std::string s;
+  for (size_t i = 0; i < N; ++i) {
+    if (i != 0) s += ", ";
+    s += std::to_string(arr[i]);
+  }
+  return s;
+}
+
+
+template <typename T>
+__MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
+{
+  // Handle standard POD types
+  if constexpr (std::is_same_v<T, float>) {
+    return "float";
+  }
+  else if constexpr (std::is_same_v<T, double>) {
+    return "double";
+  }
+  else if constexpr (std::is_same_v<T, int>) {
+    return "int";
+  }
+  else if constexpr (std::is_same_v<T, unsigned int>) {
+    return "unsigned int";
+  }
+  else if constexpr (std::is_same_v<T, long>) {
+    return "long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long>) {
+    return "unsigned long";
+  }
+  else if constexpr (std::is_same_v<T, long long>) {
+    return "long long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long long>) {
+    return "unsigned long long";
+  }
+  else if constexpr (std::is_same_v<T, short>) {
+    return "short";
+  }
+  else if constexpr (std::is_same_v<T, unsigned short>) {
+    return "unsigned short";
+  }
+  else if constexpr (std::is_same_v<T, char>) {
+    return "char";
+  }
+  else if constexpr (std::is_same_v<T, unsigned char>) {
+    return "unsigned char";
+  }
+  else if constexpr (std::is_same_v<T, bool>) {
+    return "bool";
+  }
+  else if constexpr (std::is_same_v<T, __half>) {
+    return "__half";
+  }
+  else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    return "__nv_bfloat16";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16>) {
+    return "matxFp16";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16>) {
+    return "matxBf16";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+    return "matxFp16Complex";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+    return "matxBf16Complex";
+  }
+  // CCCL complex types
+  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+    return "cuda::std::complex<float>";
+  }
+  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+    return "cuda::std::complex<double>";
+  }
+  else if constexpr (std::is_same_v<T, index_t>) {
+    return "index_t";
+  }
+  // fallback: use typeid if available, or unknown
+  else {
+    return "unknown";
+  }
+}
+
+// Unique type names compatible with C naming conventions
+template <typename T>
+__MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
+{
+  if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+    return "cuda_std_complex_float";
+  }
+  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+    return "cuda_std_complex_double";
+  }
+  else {
+    return type_to_string<T>();
+  }
+}
+
+
+template <typename T>
+auto get_jit_class_or_pod_name(const T& op)
+{
+  if constexpr (is_matx_op<T>()) {
+    return op.get_jit_class_name();
+  }
+  else {
+    return type_to_string<T>();
+  }
+}
+
+
+
+}
+}
+
+
+

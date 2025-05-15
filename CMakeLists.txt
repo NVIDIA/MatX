@@ -78,7 +78,11 @@ option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
+<<<<<<< HEAD
 option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
+=======
+option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
+>>>>>>> 83a39233b (Beginning of getting RTC to work)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -96,9 +100,9 @@ if (MATX_BUILD_DOCS)
     add_subdirectory(docs_input)
 endif()
 
-# MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set(CMAKE_CXX_STANDARD 17)
-set(CUDA_CXX_STANDARD 17)
+# MatX requires C++20 to build. Enforce on all libraries pulled in as well
+set(CMAKE_CXX_STANDARD 20)
+set(CUDA_CXX_STANDARD 20)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
@@ -124,6 +128,8 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
 "$<INSTALL_INTERFACE:include/matx/kernels>")
+
+                           
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 
 # 11.2 and above required for async allocation
@@ -141,7 +147,7 @@ target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 --extended-lambda)
 endif()
 
 # Hack because CMake doesn't have short circult evaluation
@@ -302,6 +308,31 @@ if (MATX_EN_CUTENSOR)
     # CUDA toolkit and most accompanying libraries like cuTENSOR use the old rpath instead of RUNPATH.
     # We switch to that format here for compatibility
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
+endif()
+
+if (MATX_EN_MATHDX)
+    set(MathDx_VERSION 25.06)
+    set(MathDx_NANO 0)
+    include(cmake/FindMathDx.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_compile_definitions(matx INTERFACE MATX_EN_JIT)
+    
+    # Add NVRTC configuration as compiler definitions
+    list(GET CMAKE_CUDA_ARCHITECTURES 0 NVRTC_CUDA_ARCH)
+    # Strip -real or -virt postfix if present
+    string(REGEX REPLACE "-real$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    string(REGEX REPLACE "-virtual$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    
+    # Link libmathdx if available
+    if(TARGET libmathdx::libmathdx)
+        target_link_libraries(matx INTERFACE libmathdx::libmathdx)
+        message(STATUS "Linked libmathdx to matx target")
+    endif()
+    
+    # Link mathdx components
+    target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
 endif()
 
 if (MATX_EN_CUDSS)

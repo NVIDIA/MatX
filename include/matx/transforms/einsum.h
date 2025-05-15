@@ -527,7 +527,6 @@ struct EinsumParamsKeyEq {
 } // end namespace cutensor
 } // end namespace detail
 } // end namespace matx
-#endif
 
 namespace matx {
 namespace cutensor {
@@ -607,3 +606,5 @@ namespace cutensor {
 }
 
 } // end namespace matx
+
+#endif

@@ -32,13 +32,23 @@
 
 #pragma once
 
-
+#include <unordered_map>
+#include <string>
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/core/operator_options.h"
+
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
   #include "matx/transforms/fft/fft_fftw.h"
 #endif  
+
+#ifdef MATX_EN_MATHDX
+  #include "cuComplex.h"
+  #include "matx/transforms/fft/fft_cufftdx.h"
+#endif
+
 
 namespace matx
 {
@@ -58,16 +68,30 @@ namespace matx
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr = nullptr;
-        mutable bool prerun_done_ = false;                                       
+        mutable bool prerun_done_ = false;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        mutable cuFFTDxHelper<typename OpA::value_type> dx_fft_helper_;
+#endif
 
       public:
         using matxop = bool;
-        using value_type = std::conditional_t<is_complex_v<typename OpA::value_type>,
-          typename OpA::value_type,
-          typename scalar_to_complex<typename OpA::value_type>::ctype>;
+        using input_type = typename OpA::value_type;        
+        using value_type = std::conditional_t<is_complex_v<input_type>,
+          input_type,
+          typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
-        using fft_xform_op = bool;
+        using fft_xform_op = bool;    
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(a_)};
+        }
+#endif             
+        
         __MATX_INLINE__ std::string str() const { 
           if constexpr (Direction == detail::FFTDirection::FORWARD) {
             return "fft(" + get_type_str(a_) + ")";
@@ -146,20 +170,91 @@ namespace matx
               }              
             }
           }
+
+          #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+            int major = 0;
+            int minor = 0;
+            int device;
+            cudaGetDevice(&device);            
+            cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+            cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+            int cc = major * 100 + minor;          
+            dx_fft_helper_.set_fft_size(fft_size_);
+            dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
+            dx_fft_helper_.set_direction(Direction);
+            dx_fft_helper_.set_cc(cc);
+
+            bool contiguous = false;
+            if constexpr (is_tensor_view_v<OpA>) {
+              contiguous = a_.IsContiguous();
+            }
+            dx_fft_helper_.set_contiguous_input(contiguous);
+          #endif
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-                  
-        template <detail::ElementsPerThread EPT, typename... Is>
+#ifdef MATX_EN_MATHDX
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string symbol_name = "JITFFTOp_";
+          symbol_name += std::to_string(fft_size_);
+          symbol_name += "_T";
+          symbol_name += std::to_string(static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()));
+          symbol_name += "_D";
+          symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
+
+          return symbol_name;
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          const std::string class_name = get_jit_class_name();
+
+          const std::string fft_func_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + dx_fft_helper_.GetSymbolName();
+         
+          return cuda::std::make_tuple(
+             class_name, 
+             std::string(
+                 " extern \"C\" __device__ void " + fft_func_name + "(" + detail::type_to_string<input_type>() + "*);\n" +
+                 " template <typename OpA> struct " + class_name + "  {\n" +
+                 "  using input_type = typename OpA::value_type;\n" +
+                 "  using matxop = bool;\n" +
+                 "  using value_type = cuda::std::conditional_t<is_complex_v<input_type>, input_type, typename scalar_to_complex<input_type>::ctype>;\n" +
+                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
+                 "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
+                 detail::array_to_string(out_dims_) + " };\n" +             
+                 "  template <typename CapType, typename... Is>\n" +
+                 "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+                 "  {\n" +
+                 "    " + dx_fft_helper_.GetFuncStr(fft_func_name, static_cast<int>(norm_)) + "\n" +
+                 "  }\n" +
+                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                 "  {\n" +
+                 "    return OpA::Rank();\n" +
+                 "  }\n" +
+                 "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                 "  {\n" +
+                 "    return out_dims_[dim];\n " +
+                 "  }\n" +    
+                 "};\n")
+          );
+        }     
+#endif
+
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
+          }
+#endif
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -171,12 +266,119 @@ namespace matx
           return out_dims_[dim];
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+#if defined(MATX_EN_MATHDX)
+          // Branch with cuFFTDx support
+          if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return combine_capabilities<Cap>(dx_fft_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            bool supported = true;
+            if (((fft_size_ & (fft_size_ - 1)) != 0 || fft_size_ == 0) // Only support power-of-2 FFT sizes for JIT support
+                || is_complex_half_v<typename OpA::value_type>  // No half support in MatX for fusion yet
+                || !is_complex_v<typename OpA::value_type>) // Only support C2C for JIT support
+            {
+              supported = false;
+            } 
+            else {
+              supported = dx_fft_helper_.IsSupported();
+            }
+
+            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+            // Get the capability string and add to map
+            const auto [key, value] = get_jit_op_str();
+      
+            // Insert into the map if the key doesn't exist
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            
+            // Also handle child operators
+            detail::get_operator_capability<Cap>(a_, in);
+
+            // Always return true for now
+            return true;
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            if (in.jit) {
+              // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
+              // try other EPT values that yield different SHM values.
+              if (dx_fft_helper_.IsSupported()) {
+                return combine_capabilities<Cap>(dx_fft_helper_.GetEPTs(), detail::get_operator_capability<Cap>(a_, in));
+              }
+              else {
+                // If we're asking for JIT and the parameters aren't supported, return invalid EPT
+                const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::INVALID, ElementsPerThread::INVALID};
+                return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));                
+              }
+            }
+            else {
+              return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            }
+          }
+          else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
+            const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
+            cuda::std::array<int, 2> groups_per_block = {ffts_per_block, ffts_per_block};
+            return combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::SET_ELEMENTS_PER_THREAD) {
+            dx_fft_helper_.set_current_elements_per_thread(in.ept);
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK) {
+            dx_fft_helper_.set_ffts_per_block(in.groups_per_block);
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
+            return combine_capabilities<Cap>(dx_fft_helper_.GetBlockDim(), detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
+            return combine_capabilities<Cap>(
+                dx_fft_helper_.GenerateLTOIR(in.ltoir_symbols), 
+                detail::get_operator_capability<Cap>(a_, in));
+          }    
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            // No need to use combine_capabilities here since we're just returning a string.
+            const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
+            return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+          }
+          else if constexpr (Cap == OperatorCapability::ASYNC_LOADS_REQUESTED) {
+            // If this is a contiguous tensor input we want to do an async load so that we decrease register pressure. 
+            // and increase bandwidth on newer architectures
+            bool async_loads_requested = false;
+            if constexpr (is_tensor_view_v<OpA>) {
+              if (a_.IsContiguous()) {
+                async_loads_requested = true;
+              }
+            }
+            return combine_capabilities<Cap>(async_loads_requested, detail::get_operator_capability<Cap>(a_, in));
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          }
+#else
+          // Branch without cuFFTDx support
+          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            bool supported = false;
+            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
+          } 
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            return "";
+          }                
+          else {
+            // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          }
+#endif
         }
+
+        __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -195,7 +397,7 @@ namespace matx
             else {
               ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
-          }
+          }        
         }
 
         template <typename ShapeType, typename Executor>
@@ -216,7 +418,6 @@ namespace matx
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
-
           prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -496,18 +697,25 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+          return tmp_out_.template operator()<DefaultCapabilities>(indices...);
         }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
@@ -516,6 +724,9 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
           return out_dims_[dim];
         }
+
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -537,12 +748,12 @@ namespace matx
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
-        }        
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -575,10 +786,9 @@ namespace matx
           }
 
           matxFree(ptr);           
-        }        
+        }    
     };    
   }
-
 
 /**
  * Run a 2D FFT with a cached plan
@@ -666,81 +876,82 @@ namespace matx
     return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, fft_type>(a, perm, norm);
   }  
 
-/**
- * Run a 2D RFFT (real-to-complex FFT)
- *
- * Performs a 2D RFFT.
- *
- * @tparam OpA
- *   Input tensor or operator type (must be real-valued)
- * @param a
- *   Input tensor or operator
- * @param norm
- *   Normalization to apply to FFT
- */
-template<typename OpA>
-__MATX_INLINE__ auto rfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-  static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
-  return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, detail::no_permute_t{}, norm);
-}
 
-/**
- * Run a 2D RFFT (real-to-complex FFT) along specified axes
- *
- * Performs a 2D RFFT along the given axes.
- *
- * @tparam OpA
- *   Input tensor or operator type (must be real-valued)
- * @param a
- *   Input tensor or operator
- * @param axis
- *   Axes to perform FFT along
- * @param norm
- *   Normalization to apply to FFT
- */
-template<typename OpA>
-__MATX_INLINE__ auto rfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
-  static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
-  auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-  return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, perm, norm);
-}
+  /**
+  * Run a 2D RFFT (real-to-complex FFT)
+  *
+  * Performs a 2D RFFT.
+  *
+  * @tparam OpA
+  *   Input tensor or operator type (must be real-valued)
+  * @param a
+  *   Input tensor or operator
+  * @param norm
+  *   Normalization to apply to FFT
+  */
+  template<typename OpA>
+  __MATX_INLINE__ auto rfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
+    return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, detail::no_permute_t{}, norm);
+  }
 
-/**
- * Run a 2D IRFFT (complex-to-real inverse FFT)
- *
- * Performs a 2D IRFFT.
- *
- * @tparam OpA
- *   Input tensor or operator type (must be complex-valued)
- * @param a
- *   Input tensor or operator
- * @param norm
- *   Normalization to apply to IFFT
- */
-template<typename OpA>
-__MATX_INLINE__ auto irfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-  static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
-  return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, detail::no_permute_t{}, norm);
-}
+  /**
+  * Run a 2D RFFT (real-to-complex FFT) along specified axes
+  *
+  * Performs a 2D RFFT along the given axes.
+  *
+  * @tparam OpA
+  *   Input tensor or operator type (must be real-valued)
+  * @param a
+  *   Input tensor or operator
+  * @param axis
+  *   Axes to perform FFT along
+  * @param norm
+  *   Normalization to apply to FFT
+  */
+  template<typename OpA>
+  __MATX_INLINE__ auto rfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+    return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, perm, norm);
+  }
 
-/**
- * Run a 2D IRFFT (complex-to-real inverse FFT) along specified axes
- *
- * Performs a 2D IRFFT along the given axes.
- *
- * @tparam OpA
- *   Input tensor or operator type (must be complex-valued)
- * @param a
- *   Input tensor or operator
- * @param axis
- *   Axes to perform IFFT along
- * @param norm
- *   Normalization to apply to IFFT
- */
-template<typename OpA>
-__MATX_INLINE__ auto irfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
-  static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
-  auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-  return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, perm, norm);
-}
+  /**
+  * Run a 2D IRFFT (complex-to-real inverse FFT)
+  *
+  * Performs a 2D IRFFT.
+  *
+  * @tparam OpA
+  *   Input tensor or operator type (must be complex-valued)
+  * @param a
+  *   Input tensor or operator
+  * @param norm
+  *   Normalization to apply to IFFT
+  */
+  template<typename OpA>
+  __MATX_INLINE__ auto irfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
+    return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, detail::no_permute_t{}, norm);
+  }
+
+  /**
+  * Run a 2D IRFFT (complex-to-real inverse FFT) along specified axes
+  *
+  * Performs a 2D IRFFT along the given axes.
+  *
+  * @tparam OpA
+  *   Input tensor or operator type (must be complex-valued)
+  * @param a
+  *   Input tensor or operator
+  * @param axis
+  *   Axes to perform IFFT along
+  * @param norm
+  *   Normalization to apply to IFFT
+  */
+  template<typename OpA>
+  __MATX_INLINE__ auto irfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+    return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, perm, norm);
+  }
 }

@@ -70,8 +70,8 @@ public:
   BlackScholes(I1 K, I1 V, I1 S, I1 r, I1 T)
       : V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
-  template <detail::ElementsPerThread EPT>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t idx) const
+  template <typename CapType>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void operator()(index_t idx) const
   {
     auto V = V_(idx);
     auto K = K_(idx);
@@ -90,29 +90,34 @@ public:
   }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  void operator()(index_t idx) {
-    return this->operator()<detail::ElementsPerThread::ONE>(idx);
+    return this->operator()<detail::DefaultCapabilities>(idx);
   }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t i) const  { return V_.Size(i); }
   static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return I1::Rank(); }
 
-  template <detail::OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {  
-    // Don't support vectorization yet
-    if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-      return detail::ElementsPerThread::ONE;
-    } else {    
-      auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return detail::combine_capabilities<Cap>(my_cap, 
+        detail::get_operator_capability<Cap>(V_, in), 
+        detail::get_operator_capability<Cap>(S_, in), 
+        detail::get_operator_capability<Cap>(K_, in), 
+        detail::get_operator_capability<Cap>(r_, in), 
+        detail::get_operator_capability<Cap>(T_, in));    
+    }
+    else {
       return detail::combine_capabilities<Cap>(
-          self_has_cap,
-        detail::get_operator_capability<Cap>(V_),
-        detail::get_operator_capability<Cap>(S_),
-        detail::get_operator_capability<Cap>(K_),
-        detail::get_operator_capability<Cap>(r_),
-        detail::get_operator_capability<Cap>(T_)
+        detail::get_operator_capability<Cap>(V_, in),
+        detail::get_operator_capability<Cap>(S_, in),
+        detail::get_operator_capability<Cap>(K_, in),
+        detail::get_operator_capability<Cap>(r_, in),
+        detail::get_operator_capability<Cap>(T_, in)
       );
     }
-  }
+  }  
 };
 
 /* Arithmetic expression */
@@ -141,7 +146,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   using dtype = float;
 
-  index_t input_size = 100000000;
+  index_t input_size = 100'000'000;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
 

@@ -104,11 +104,24 @@ namespace matx
         using value_type = typename Op::value_type;
         using self_type = matxBinaryOp<I1, I2, Op>;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(in2_), detail::to_jit_storage(op_)};
+        }        
+#endif        
+
       __MATX_INLINE__ const std::string str() const {
         return op_.str(get_type_str(in1_), get_type_str(in2_));
       }
 
-        __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
+
+      __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
         if constexpr (Rank() > 0)
         {
@@ -117,40 +130,131 @@ namespace matx
         }
       }
 
-      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
+      template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        // Bind operands as const to ensure RHS value-return semantics for composite ops
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+
         const auto &lhs = in1_;
         const auto &rhs = in2_;
-        const auto i1 = get_value<EPT>(lhs, indices...);
-        const auto i2 = get_value<EPT>(rhs, indices...);
-        return op_.template operator()<EPT>(i1, i2);
+        const auto i1 = get_value<CapType>(lhs, indices...);
+        const auto i2 = get_value<CapType>(rhs, indices...);
+
+        return op_.template operator()<CapType>(i1, i2);
       }
 
-      template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
-      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const
+      template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->template operator()<DefaultCapabilities>(indices...);
       }      
 
-      template <ElementsPerThread EPT, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <typename CapType, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()<EPT>(args...);
+            return this->operator()<CapType>(args...);
           }, idx);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        // 1. Determine if the binary operation ITSELF intrinsically has this capability.
-        auto self_has_cap = capability_attributes<Cap>::default_value;
+#ifdef MATX_EN_JIT
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        std::string symbol_name = "JITBinOp";
+        return symbol_name;
+      }
 
-        auto lhs_child_cap = detail::get_operator_capability<Cap>(in1_);
-        auto rhs_child_cap = detail::get_operator_capability<Cap>(in2_);
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        cuda::std::array<index_t, Rank()> out_dims_;
+        for (int i = 0; i < Rank(); ++i) {
+          out_dims_[i] = Size(i);
+        }
+        const std::string func_name = get_jit_class_name();
+        return cuda::std::make_tuple(
+           func_name, 
+           std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") + 
+               "  using value_type = typename Op::value_type;\n" +
+               "  using matxop = bool;\n" +
+               "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
+               detail::array_to_string(out_dims_) + " };\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
+               "  template <typename CapType, typename... Is>\n" +
+               "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+               "  {\n" +
+               "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
+               "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+               "    }\n" +
+               "    auto i1 = get_value<CapType>(in1_, indices...);\n" + 
+               "    auto i2 = get_value<CapType>(in2_, indices...);\n" +
+               "    return op_.template operator()<CapType>(i1, i2);\n" + 
+               "  }\n" +
+               "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+               "  {\n" +
+               "    return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());\n" +
+               "  }\n" +
+               "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+               "  {\n" +
+               "    return out_dims_[dim];\n " +
+               "  }\n" +          
+               "};\n"
+        );
+      }      
+#endif
 
-        return combine_capabilities<Cap>(self_has_cap, lhs_child_cap, rhs_child_cap);
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          // No need to use combine_capabilities here since we're just returning a string.
+          const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
+          const auto rhs_jit_name = detail::get_operator_capability<Cap>(in2_, in);
+          const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+
+          return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + "," + op_jit_name + ">";
+#else
+          return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          // Get the key/value pair from get_jit_op_str()
+          const auto [key, value] = get_jit_op_str();
+          
+          // Insert into the map if the key doesn't exist
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          
+          // Also handle child operators
+          detail::get_operator_capability<Cap>(in1_, in);
+          detail::get_operator_capability<Cap>(in2_, in);
+          detail::get_operator_capability<Cap>(op_, in);
+          
+          // Always return true for now
+          return true;
+#else
+          return false;
+#endif
+        }    
+        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+          // The dynamic shmem size is the sum of the dynamic shmem sizes of the two operands.
+          return 
+            detail::get_operator_capability<Cap>(in1_, in) +
+            detail::get_operator_capability<Cap>(in2_, in);
+        }     
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+                                        detail::get_operator_capability<Cap>(in1_, in),
+                                        detail::get_operator_capability<Cap>(in2_, in));
+        }
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -188,6 +292,7 @@ namespace matx
           in2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
     };
   }
 

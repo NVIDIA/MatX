@@ -19,6 +19,8 @@ set(examples
     svd_power
     qr
     black_scholes
+    cub_demo1
+    cub_demo2
     print_styles)
 
 

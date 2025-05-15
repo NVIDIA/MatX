@@ -49,19 +49,6 @@
 
 namespace matx {
 
-/**
- * Returns an appropriate rcond based on the inner type. This is slightly
- * higher than the machine epsilon, as these work better to mask small/zero singular
- * values in singular or ill-conditioned matrices.
- */
-template <typename T>
-__MATX_INLINE__ constexpr float get_default_rcond() {
-  if constexpr (is_fp32_inner_type_v<T>) {
-    return 1e-6f;
-  } else {
-    return 1e-15f;
-  }
-}
 
 /**
  * Compute the Moore-penrose pseudo-inverse of a matrix
@@ -89,7 +76,7 @@ template <typename OutputTensor, typename InputTensor, typename Executor>
 void pinv_impl(OutputTensor &out,
               const InputTensor &a,
               const Executor &exec,
-              float rcond = get_default_rcond<typename InputTensor::value_type>())
+              float rcond)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   MATX_ASSERT_STR(!(is_host_executor_v<Executor> && !MATX_EN_CPU_SOLVER), matxInvalidExecutor,
@@ -156,7 +143,8 @@ void pinv_impl(OutputTensor &out,
     make_tensor(s_mask, sShape, MATX_HOST_MALLOC_MEMORY);
     make_tensor(ut, utShape, MATX_HOST_MALLOC_MEMORY);
   }
-
+printf("here\n");
+print(transpose_matrix(conj(a)));
   svd_impl(v, s, ut, transpose_matrix(conj(a)), exec, SVDMode::REDUCED);
 
   // discard small singular values

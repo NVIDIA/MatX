@@ -68,7 +68,8 @@ is available in the :ref:`Executor Compatibility <executor_compatibility>` secti
 
 Build Targets
 =============
-MatX provides 4 primary targets for builds, and each can be configured independently:
+MatX provides 4 primary targets for builds, and each can be configured independently. These targets are not required to 
+use MatX, and only intended as a way to run the included tests, benchmarks, and examples. The build targets are:
 
 .. list-table::
   :widths: 60 40
@@ -157,7 +158,7 @@ https://nvidia.github.io/MatX/
 Additional Build Options
 ========================
 
-There are several additional build options to control code generation or other instrumentation.
+There are several additional build options to control MatX options and enable additional features.
 By default, all of these options are OFF.
 
 .. list-table::
@@ -168,8 +169,10 @@ By default, all of these options are OFF.
     - CMake Option
   * - NVTX Flags
     - ``-DMATX_NVTX_FLAGS=ON``
-  * - 32-bit Indices
+  * - 32-bit Indices for indexing
     - ``-DMATX_BUILD_32_BIT=ON``
+  * - Visualization Support
+    - ``-DMATX_EN_VISUALIZATION=ON``    
   * - File I/O Support
     - ``-DMATX_EN_FILEIO=ON``
   * - Code Coverage
@@ -178,6 +181,28 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_COMPLEX_OP_NAN_CHECKS=ON``
   * - CUDA Line Info
     - ``-DMATX_EN_CUDA_LINEINFO=ON``
+  * - cuTENSOR Support
+    - ``-DMATX_EN_CUTENSOR=ON``
+  * - cuDSS Support
+    - ``-DMATX_EN_CUDSS=ON``
+  * - FFTW Support
+    - ``-DMATX_EN_X86_FFTW=ON``
+  * - NVPL Support
+    - ``-DMATX_EN_NVPL=ON``
+  * - BLIS Support
+    - ``-DMATX_EN_BLIS=ON``
+  * - OpenBLAS Support
+    - ``-DMATX_EN_OPENBLAS=ON``
+  * - Multi-GPU Support
+    - ``-DMATX_MULTI_GPU=ON``
+  * - Disable CUB Caching
+    - ``-DMATX_DISABLE_CUB_CACHE=ON``
+  * - Enable MathDx Support
+    - ``-DMATX_EN_MATHDX=ON``
+  * - Enable NVIDIA MathDx support for kernel fusion
+    - ``-DMATX_EN_PYBIND11=ON``
+  * - Enable pybind11 Support. This option is usually not explicitly set, but is enabled by other options.
+
 
 NVTX Flags
 ----------
@@ -240,6 +265,52 @@ CUDA Line Info
 Using the ``-DMATX_EN_CUDA_LINEINFO=ON`` CMake command-line argument will enable CUDA kernel line information in the
 produced libraries or executables. This is equivalent to using the ``-lineinfo`` option with NVCC. Line information is
 useful when using the debugger or profiler (e.g., when using the ``--import-source=yes`` option with Nsight Compute).
+
+cuTENSOR Support
+----------------
+
+Enabling cuTENSOR support will enable the use of cuTENSOR for tensor contractions. This is required when using the ``einsum`` operator.
+
+cuDSS Support
+-------------
+
+Enabling cuDSS support will enable the use of cuDSS for sparse matrix operations. This is required when using the ``solve`` operator on sparse matrices.
+
+FFTW Support
+------------
+
+Enabling FFTW support will enable the use of FFTW for FFT operations on the CPU. This is required for `fft` support on an x86 host.
+
+NVPL Support
+-------------
+
+Enabling NVPL support will enable the use of NVPL for FFT, BLAS, and LAPACK operations on the NVIDIA CPUs (Grace, Vera). This is required for `fft`, `chol`, `qr`, `svd`, and other operations on an NVIDIA CPU host.
+
+BLIS Support
+------------
+
+Enabling BLIS support will enable the use of BLIS for BLAS operations on the CPU. This is required for `matmul`, `outer`, and `matvec` operations on an x86 host.
+
+OpenBLAS Support
+-----------------
+
+Enabling OpenBLAS support will enable the use of OpenBLAS for BLAS and LAPACK operations on the CPU. This is required for `chol`, `qr`, `svd`, and other operations on an x86 host.
+
+JIT Preprocessing
+------------------
+
+Enabling JIT preprocessing will enable the use of JIT preprocessing for MatX operators. See :ref:`fusion` for more information.
+
+Disable CUB Caching
+--------------------
+
+Enabling this option will disable the caching of CUB allocations. This is useful for debugging or profiling.
+
+MathDx Support
+--------------
+
+Enabling MathDx support will enable the use of MathDx for CUDA kernel fusion. See :ref:`fusion` for more information.
+
 
 MatX Library Linking
 ====================

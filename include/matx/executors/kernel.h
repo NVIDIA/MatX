@@ -31,87 +31,86 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <type_traits>
+#include <cuda/std/type_traits>
 
-#include "matx/core/error.h"
-#include "matx/core/get_grid_dims.h"
-#include "matx/core/capabilities.h"
 namespace matx {
 namespace detail {
 
-#ifdef __CUDACC__
-template <class Op> __global__ void matxOpT0Kernel(Op op) {
-  if constexpr (std::is_pointer_v<Op>) {
-    (*op)();
+
+#ifdef __CUDACC__  
+template <typename CapType, class Op> 
+__global__ void matxOpT0Kernel(Op op) { 
+  if constexpr (cuda::std::is_pointer_v<Op>) {
+    (*op).template operator()<CapType>(); 
   }
   else {
-    op();
+    op.template operator()<CapType>();
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT1Kernel(Op op, index_t size0) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (idx * static_cast<index_t>(EPT) < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idx);
+  if (idx * static_cast<index_t>(CapType::ept) < size0) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
+      (*op).template operator()<CapType>(idx); 
     }
     else {
-      op.template operator()<EPT>(idx);
+      op.template operator()<CapType>(idx);
     }
   }
 }
 
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-  if (idx * static_cast<index_t>(EPT) < size1 && idy < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idy, idx);
+  if (idx * static_cast<index_t>(CapType::ept) < size1 && idy < size0) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
+      (*op).template operator()<CapType>(idy, idx); 
     }
     else {
-      op.template operator()<EPT>(idy, idx);
-    }
+      op.template operator()<CapType>(idy, idx);
+    }    
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
 
   for(index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
       idy < size0;
       idy += blockDim.y * gridDim.y) {
     for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-        idx * static_cast<index_t>(EPT) < size1;
+        idx * static_cast<index_t>(CapType::ept) < size1;
         idx += blockDim.x * gridDim.x) {
-      if constexpr (std::is_pointer_v<Op>) {
-        (*op).template operator()<EPT>(idy, idx);
+      if constexpr (cuda::std::is_pointer_v<Op>) {
+        (*op).template operator()<CapType>(idy, idx); 
       }
       else {
-        op.template operator()<EPT>(idy, idx);
-      }
+        op.template operator()<CapType>(idy, idx);
+      }    
     }
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size2) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-  if (idx * static_cast<index_t>(EPT) < size2 && idy < size1 && idz < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idz, idy, idx);
+  if (idx * static_cast<index_t>(CapType::ept) < size2 && idy < size1 && idz < size0) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
+      (*op).template operator()<CapType>(idz, idy, idx); 
     }
     else {
-      op.template operator()<EPT>(idz, idy, idx);
-    }
+      op.template operator()<CapType>(idz, idy, idx);
+    }      
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_t size2) {
 
   for(index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
@@ -121,37 +120,37 @@ __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_
         idy < size1;
         idy += blockDim.y * gridDim.y) {
       for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-          idx * static_cast<index_t>(EPT) < size2;
+          idx * static_cast<index_t>(CapType::ept) < size2;
           idx += blockDim.x * gridDim.x) {
-        if constexpr (std::is_pointer_v<Op>) {
-          (*op).template operator()<EPT>(idz, idy, idx);
+        if constexpr (cuda::std::is_pointer_v<Op>) {
+          (*op).template operator()<CapType>(idz, idy, idx); 
         }
         else {
-          op.template operator()<EPT>(idz, idy, idx);
-        }
+          op.template operator()<CapType>(idz, idy, idx);
+        }      
       }
     }
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idy = nmy % size2;
   index_t idz = nmy / size2;
   index_t idw = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-  if (idx * static_cast<index_t>(EPT) < size3 && idy < size2 && idz < size1 && idw < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idw, idz, idy, idx);
+  if (idx * static_cast<index_t>(CapType::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
+      (*op).template operator()<CapType>(idw, idz, idy, idx); 
     }
     else {
-      op.template operator()<EPT>(idw, idz, idy, idx);
-    }
+      op.template operator()<CapType>(idw, idz, idy, idx);
+    }      
   }
 }
 
-template <ElementsPerThread EPT, class Op>
+template <typename CapType, class Op>
 __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
 
   for(index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
@@ -164,14 +163,14 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
           idw < size0;
           idw += blockDim.z * gridDim.z) {
         for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-            idx * static_cast<index_t>(EPT) < size3;
+            idx * static_cast<index_t>(CapType::ept) < size3;
             idx += blockDim.x * gridDim.x) {
 
-          if constexpr (std::is_pointer_v<Op>) {
-            (*op).template operator()<EPT>(idw, idz, idy, idx);
+          if constexpr (cuda::std::is_pointer_v<Op>) {
+            (*op).template operator()<CapType>(idw, idz, idy, idx); 
           }
           else {
-            op.template operator()<EPT>(idw, idz, idy, idx);
+            op.template operator()<CapType>(idw, idz, idy, idx);
           }
         }
       }
@@ -210,7 +209,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
     }
     indices[Op::Rank()-1] = x_abs / mult;
 
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       cuda::std::apply([&](auto... args){
         (*op)(args...);
       }, indices);
@@ -223,8 +222,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
   }
 }
 #endif
+
+constexpr int CUDA_MAX_VAL_PARAM = 32764; ///< Parameter size limit for single kernel
 }
-
-constexpr int CUDA_MAX_VAL_PARAM = 4096; ///< Parameter size limit for single kernel
-
-} // end namespace matx
+}

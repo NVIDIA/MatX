@@ -34,8 +34,9 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/type_utils_both.h"
 #include "matx/operators/base_operator.h"
-
+#include "matx/core/operator_options.h"
 namespace matx
 {
   /**
@@ -109,18 +110,28 @@ namespace matx
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
         };
 
-        template <detail::ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
             Op&& op,
             const decltype(starts_) &starts,
             const decltype(strides_) &strides,
             const decltype(dims_) &dims,
             Is... indices)
-        {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+        {   
+#ifdef __CUDA_ARCH__
+          // If this is a CUDA kernel we can potentially pass more threads through to inner operators than we need to return. 
+          // It's UB to not return a value from all threads, so we return a sentinel value for inactive threads.
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= op.Size(op.Rank() - 1)) {                    
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
+          }
+#endif
+          
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
-
+            static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
+        
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, T::Rank()> ind = starts;
             cuda::std::array<index_t, Rank()> inds{indices...};
@@ -130,7 +141,7 @@ namespace matx
               MATX_LOOP_UNROLL
               for(int32_t j = 0; j < Rank(); j++) {
                 if(dims[j] == i) {
-                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
+                  if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
                     ind[i] = starts[j] + inds[j] * strides[i];
                   }
                   else {
@@ -138,46 +149,50 @@ namespace matx
                   }
                 }
               }
-            }
-
-            return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+            }       
+                
+            return get_value<CapType>(cuda::std::forward<Op>(op), ind);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
-        template <detail::OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-            return detail::ElementsPerThread::ONE;
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          // Just support 1 EPT in slice for now to get this thing out the door. Later on the logic should be similar
+          // to the tensor's EPT logic if the input is a tensor
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));          
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
-        }
+          return this->operator()<DefaultCapabilities>(indices...);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -250,7 +265,7 @@ namespace matx
   __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
-      detail::NoStride strides)
+      ::matx::detail::NoStride strides)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.Slice(starts, ends, strides);
@@ -335,7 +350,7 @@ namespace matx
     __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
-      [[maybe_unused]] detail::NoStride no_stride)
+      [[maybe_unused]] ::matx::detail::NoStride no_stride)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template Slice<N>(starts, ends);

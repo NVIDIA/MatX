@@ -34,9 +34,10 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/operators/base_operator.h"
+#ifndef __CUDACC_RTC__
 #include "matx/operators/permute.h"
 #include "matx/transforms/transpose.h"
+#endif
 
 namespace matx {
 
@@ -48,7 +49,7 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
       mutable bool prerun_done_ = false;
 
@@ -72,37 +73,49 @@ namespace detail {
         }        
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)  {
-        return tmp_out_.template operator()<EPT>(indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)  {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }      
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        transpose_matrix_impl(cuda::std::get<0>(out), a_, ex);
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -110,6 +123,15 @@ namespace detail {
         return OpA::Rank();
       }
 
+
+#ifndef __CUDACC_RTC__
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const {
+        printf("*************transpose exec\n");
+        transpose_matrix_impl(cuda::std::get<0>(out), a_, ex);
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -138,11 +160,6 @@ namespace detail {
         matxFree(ptr);
       }
 
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
       TransposeMatrixOp(const TransposeMatrixOp &rhs) = default;
 
       __MATX_INLINE__ auto operator=(const self_type &rhs) {
@@ -153,7 +170,7 @@ namespace detail {
       __MATX_INLINE__ auto operator=(const R &rhs) { 
         return set(*this, rhs); 
       }
-
+#endif
   };
 }
 

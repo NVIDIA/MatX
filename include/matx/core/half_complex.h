@@ -31,10 +31,9 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <complex>
 #include <cuda/std/complex>
 #include <cuda/std/cmath>
-#include <type_traits>
+#include <cuda/std/type_traits>
 
 #include "cuComplex.h"
 #include "matx/core/half.h"
@@ -101,8 +100,8 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
    * @param x_ Real value
    * @param y_ Imaginary value
    */
-  template <typename T2, std::enable_if_t<std::is_same_v<std::decay<T2>, matxFp16> || 
-                                          std::is_same_v<std::decay<T2>, matxBf16>, bool> = true>
+  template <typename T2, cuda::std::enable_if_t<cuda::std::is_same_v<cuda::std::decay<T2>, matxFp16> || 
+                                          cuda::std::is_same_v<cuda::std::decay<T2>, matxBf16>, bool> = true>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(T2 &&x_, T2 &&y_) noexcept
       : x(static_cast<T>(x_)), 
         y(static_cast<T>(y_))
@@ -168,8 +167,8 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
    * @param rhs Value to copy from
    * @return Reference to copied object
    */
-  template <typename X, std::enable_if_t< std::is_same_v<std::decay<X>, cuda::std::complex<float>> || 
-                                          std::is_same_v<std::decay<X>, cuda::std::complex<double>>, bool> = true>
+  template <typename X, cuda::std::enable_if_t< cuda::std::is_same_v<cuda::std::decay<X>, cuda::std::complex<float>> || 
+                                          cuda::std::is_same_v<cuda::std::decay<X>, cuda::std::complex<double>>, bool> = true>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex<T> &
   operator=(X rhs)
   {

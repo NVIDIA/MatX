@@ -63,17 +63,24 @@ namespace matx
 
         __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) { }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+#ifdef __CUDA_ARCH__
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
+          }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
             using tt = typename cuda::std::common_type_t<Is...>;
 
             if constexpr (RANK == 1) {
               static_assert(sizeof...(Is) == 2, "Indexing of diag() on a 1D input must be 2 indices");
               if (((pp_get<0>(indices...) == indices) && ...)) {
-                return get_value<EPT>(op_, pp_get<0>(indices...));
+                return get_value<CapType>(op_, pp_get<0>(indices...));
               }
               else {
                 return (value_type)(0);
@@ -91,7 +98,7 @@ namespace matx
                 tmp[RANK - 2] -= k_;
                 //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
   MATX_IGNORE_WARNING_POP_GCC
-                return get_value<EPT>(op_, tmp);
+                return get_value<CapType>(op_, tmp);
               }
               else {
                 cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
@@ -100,28 +107,29 @@ namespace matx
                 tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
                 //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
   MATX_IGNORE_WARNING_POP_GCC
-                return get_value<EPT>(op_, tmp);
+                return get_value<CapType>(op_, tmp);
               }
             }
           }
           else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 

@@ -58,11 +58,18 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};
 
-        template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            auto v = get_value<EPT>(op_,indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            auto v = get_value<CapType>(op_,indices...);
 
             auto set_val = [this](auto vl) {
               if constexpr (is_complex_v<value_type> ) {
@@ -81,35 +88,36 @@ namespace matx
               }
             };
 
-            if constexpr (EPT == ElementsPerThread::ONE) {
+            if constexpr (CapType::ept == ElementsPerThread::ONE) {
               return set_val(v);
             }
             else {
-              Vector<value_type, static_cast<int>(EPT)> ret;
+              Vector<value_type, static_cast<int>(CapType::ept)> ret;
               MATX_LOOP_UNROLL
-              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              for (int e = 0; e < static_cast<int>(CapType::ept); ++e) {
                 ret.data[e] = set_val(GetVectorVal(v, e));
               }
               return ret;
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 
