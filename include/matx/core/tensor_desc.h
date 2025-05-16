@@ -420,7 +420,7 @@ public:
    * @return Product of all sizes
    */
   static constexpr auto TotalSize() {
-      return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
+      return cuda::std::accumulate(shape_.begin(), shape_.end(), 1, cuda::std::multiplies<index_t>());
   }
 
 private:

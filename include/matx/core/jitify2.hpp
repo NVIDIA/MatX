@@ -4287,22 +4287,18 @@ static const char* const jitsafe_header_preinclude_h =
 #endif
     ;
 
-#define JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(name, header, std_and_global_impl, \
-                                           std_only_impl)                     \
-  static const char* const jitsafe_header_##name##_h =                        \
-      "#pragma once\n" header "\n" std_and_global_impl;                       \
-  static const char* const jitsafe_header_c##name =                           \
-      "#pragma once\n" header                                                 \
-      "\n"                                                                    \
-      "namespace std {\n" std_only_impl std_and_global_impl                   \
-      "}  // namespace std\n" std_and_global_impl
+static const char* const jitsafe_header_assert_h = R"(
+#pragma once
+// Note: NVRTC defines the assert() macro.
+)";
 
-#define JITIFY_DEFINE_C_AND_CXX_HEADERS(name, header, std_and_global_impl) \
-  JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(name, header, std_and_global_impl, "")
+static const char* const jitsafe_header_cassert = R"(
+#pragma once
+#include <assert.h>
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS(assert, "", "");
-
-JITIFY_DEFINE_C_AND_CXX_HEADERS(float, R"(
+static const char* const jitsafe_header_float_h = R"(
+#pragma once
 #define FLT_RADIX       2
 #define FLT_MANT_DIG    24
 #define DBL_MANT_DIG    53
@@ -4327,10 +4323,23 @@ JITIFY_DEFINE_C_AND_CXX_HEADERS(float, R"(
 #define FLT_EVAL_METHOD 0
 #define DECIMAL_DIG     21
 #endif
-)",
-                                "");
+#if defined __cplusplus && __cplusplus >= 201703L
+#define FLT_DECIMAL_DIG 9
+#define DBL_DECIMAL_DIG 17
+#define FLT_TRUE_MIN    1.40129846432481707092372958328991613e-45f
+#define DBL_TRUE_MIN    4.94065645841246544176568792868221372e-324
+#define FLT_HAS_SUBNORM 1
+#define DBL_HAS_SUBNORM 1
+#endif
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS(limits, R"(
+static const char* const jitsafe_header_cfloat = R"(
+#pragma once
+#include <float.h>
+)";
+
+static const char* const jitsafe_header_limits_h = R"(
+#pragma once
 #if defined _WIN32 || defined _WIN64
  #define __WORDSIZE 32
 #else
@@ -4377,41 +4386,52 @@ JITIFY_DEFINE_C_AND_CXX_HEADERS(limits, R"(
 #define LLONG_MIN  (-LLONG_MAX - 1)
 #endif
 #ifndef ULLONG_MAX
-#define ULLONG_MAX 0xffffffffffffffffULL
+#define ULLONG_MAX 0xffffffffffffffffUL
 #endif
-)",
-                                "");
+)";
 
-// Note: Global namespace already includes CUDA math funcs
-JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(math, "#define M_PI 3.14159265358979323846",
-                                   "", R"(
+static const char* const jitsafe_header_climits = R"(
+#pragma once
+#include <limits.h>
+)";
+
+static const char* const jitsafe_header_math_h = R"(
+#pragma once
+#define M_PI 3.14159265358979323846
+// Note: Global namespace already includes CUDA math funcs.
+)";
+
+static const char* const jitsafe_header_cmath = R"(
+#pragma once
+#include <math.h>
+namespace std {
 #if __cplusplus >= 201103L
-#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f)                       \
+#define JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(f)                \
   inline double f(double x) { return ::f(x); }                  \
   inline float f##f(float x) { return ::f(x); }                 \
   /*inline long double f##l(long double x) { return ::f(x); }*/ \
   inline float f(float x) { return ::f(x); }                    \
   /*inline long double f(long double x)    { return ::f(x); }*/
 #else
-#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f)       \
-  inline double f(double x) { return ::f(x); }  \
-  inline float f##f(float x) { return ::f(x); } \
+#define JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(f) \
+  inline double f(double x) { return ::f(x); }   \
+  inline float f##f(float x) { return ::f(x); }  \
   /*inline long double f##l(long double x) { return ::f(x); }*/
 #endif
-DEFINE_MATH_UNARY_FUNC_WRAPPER(cos)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(sin)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(tan)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(acos)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(asin)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(atan)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(cos)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(sin)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(tan)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(acos)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(asin)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(atan)
 template <typename T>
 inline T atan2(T y, T x) {
   return ::atan2(y, x);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(cosh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(sinh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(tanh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(exp)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(cosh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(sinh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(tanh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(exp)
 template <typename T>
 inline T frexp(T x, int* exp) {
   return ::frexp(x, exp);
@@ -4420,8 +4440,8 @@ template <typename T>
 inline T ldexp(T x, int exp) {
   return ::ldexp(x, exp);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(log)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(log10)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(log)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(log10)
 template <typename T>
 inline T modf(T x, T* intpart) {
   return ::modf(x, intpart);
@@ -4430,31 +4450,31 @@ template <typename T>
 inline T pow(T x, T y) {
   return ::pow(x, y);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(sqrt)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(ceil)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(floor)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(sqrt)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(ceil)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(floor)
 template <typename T>
 inline T fmod(T n, T d) {
   return ::fmod(n, d);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(fabs)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(fabs)
 template <typename T>
 inline T abs(T x) {
   return ::abs(x);
 }
 #if __cplusplus >= 201103L
-DEFINE_MATH_UNARY_FUNC_WRAPPER(acosh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(asinh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(atanh)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(exp2)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(expm1)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(acosh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(asinh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(atanh)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(exp2)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(expm1)
 template <typename T>
 inline int ilogb(T x) {
   return ::ilogb(x);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(log1p)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(log2)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(logb)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(log1p)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(log2)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(logb)
 template <typename T>
 inline T scalbn(T x, int n) {
   return ::scalbn(x, n);
@@ -4463,17 +4483,17 @@ template <typename T>
 inline T scalbln(T x, long n) {
   return ::scalbn(x, n);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(cbrt)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(cbrt)
 template <typename T>
 inline T hypot(T x, T y) {
   return ::hypot(x, y);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(erf)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(erfc)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(tgamma)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(lgamma)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(trunc)
-DEFINE_MATH_UNARY_FUNC_WRAPPER(round)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(erf)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(erfc)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(tgamma)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(lgamma)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(trunc)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(round)
 template <typename T>
 inline long lround(T x) {
   return ::lround(x);
@@ -4482,7 +4502,7 @@ template <typename T>
 inline long long llround(T x) {
   return ::llround(x);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(rint)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(rint)
 template <typename T>
 inline long lrint(T x) {
   return ::lrint(x);
@@ -4491,15 +4511,19 @@ template <typename T>
 inline long long llrint(T x) {
   return ::llrint(x);
 }
-DEFINE_MATH_UNARY_FUNC_WRAPPER(nearbyint)
+JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER(nearbyint)
 // TODO: remainder, remquo, copysign, nan, nextafter, nexttoward, fdim,
 // fmax, fmin, fma
 #endif  // __cplusplus >= 201103L
-#undef DEFINE_MATH_UNARY_FUNC_WRAPPER
-)");
+#undef JITIFY_DEFINE_MATH_UNARY_FUNC_WRAPPER
+}  // namespace std
+)";
 
+static const char* const jitsafe_header_stddef_h = R"(
+#pragma once
+#define NULL 0
 // TODO: offsetof
-JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(stddef, "#include <climits>", R"(
+// Note: NVRTC provides built-in definitions of ::size_t, ::ptrdiff_t, and ::wchar_t.
 #if __cplusplus >= 201103L
 typedef decltype(nullptr) nullptr_t;
 #if defined(_MSC_VER)
@@ -4516,18 +4540,31 @@ typedef decltype(nullptr) nullptr_t;
   } max_align_t;
 #endif
 #endif  // __cplusplus >= 201103L
-#if __cplusplus >= 201703L
-enum class byte : unsigned char {};
-#endif  // __cplusplus >= 201703L
-)",
-                                   R"(
-// NVRTC provides built-in definitions of ::size_t and ::ptrdiff_t.
+)";
+
+static const char* const jitsafe_header_cstddef = R"(
+#pragma once
+#include <stddef.h>
+namespace std {
 using ::size_t;
 using ::ptrdiff_t;
-)");
+// Note: NVRTC defines wchar_t as a macro, so we can't define std::wchar_t.
+#if __cplusplus >= 201103L
+using ::nullptr_t;
+using ::max_align_t;
+#endif  // __cplusplus >= 201103L
+#if __cplusplus >= 201703L
+enum class byte : unsigned char {};
+// TODO: byte operators.
+template <class I>
+constexpr I to_integer(byte b) noexcept;
+#endif  // __cplusplus >= 201703L
+}  // namespace std
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS(stdint, R"(
-#include <climits>
+static const char* const jitsafe_header_stdint_h = R"(
+#pragma once
+#include <limits.h>
 #define INT8_MIN SCHAR_MIN
 #define INT16_MIN SHRT_MIN
 #define INT32_MIN INT_MIN
@@ -4556,8 +4593,7 @@ JITIFY_DEFINE_C_AND_CXX_HEADERS(stdint, R"(
 #define WCHAR_MAX                                                              \
     (sizeof(wchar_t) == 2 ? _JITIFY_WCHAR_T_IS_UNSIGNED ? USHRT_MAX : SHRT_MAX \
                           : _JITIFY_WCHAR_T_IS_UNSIGNED ? UINT_MAX : INT_MAX)
-)",
-                                R"(
+static_assert(INT8_MIN == SCHAR_MIN, "");  // Sanity test that both are defined
 typedef signed char int8_t;
 typedef signed short int16_t;
 typedef signed int int32_t;
@@ -4586,41 +4622,115 @@ typedef unsigned long long uint_least64_t;
 typedef unsigned long long uintmax_t;
 typedef int64_t intptr_t;  // optional
 typedef uint64_t uintptr_t;  // optional
-)");
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(stdio, "#include <cstddef>", R"(
+static const char* const jitsafe_header_cstdint = R"(
+#pragma once
+#include <stdint.h>
+namespace std {
+using ::int8_t;
+using ::int16_t;
+using ::int32_t;
+using ::int64_t;
+using ::int_fast8_t;
+using ::int_fast16_t;
+using ::int_fast32_t;
+using ::int_fast64_t;
+using ::int_least8_t;
+using ::int_least16_t;
+using ::int_least32_t;
+using ::int_least64_t;
+using ::intmax_t;
+using ::uint8_t;
+using ::uint16_t;
+using ::uint32_t;
+using ::uint64_t;
+using ::uint_fast8_t;
+using ::uint_fast16_t;
+using ::uint_fast32_t;
+using ::uint_fast64_t;
+using ::uint_least8_t;
+using ::uint_least16_t;
+using ::uint_least32_t;
+using ::uint_least64_t;
+using ::uintmax_t;
+using ::intptr_t;  // optional
+using ::uintptr_t;  // optional
+}  // namespace std
+)";
+
+static const char* const jitsafe_header_stdio_h = R"(
+#pragma once
+#define NULL 0
 using FILE = int;
 int fflush(FILE* stream);
 int fprintf(FILE* stream, const char* format, ...);
-)",
-                                   R"(
-// NVRTC provides a built-in definition of ::size_t.
+)";
+
+static const char* const jitsafe_header_cstdio = R"(
+#pragma once
+#include <stdio.h>
+namespace std {
 using ::size_t;
-)");
+using ::FILE;
+using ::fflush;
+using ::fprintf;
+}  // namespace std
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS(stdlib, "#include <cstddef>", "");
+static const char* const jitsafe_header_stdlib_h = R"(
+#pragma once
+#define NULL 0
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(string, "", R"(
-//#include <cstddef>
+static const char* const jitsafe_header_cstdlib = R"(
+#pragma once
+#include <stdlib.h>
+namespace std {
+using ::size_t;
+}  // namespace std
+)";
+
+static const char* const jitsafe_header_string_h = R"(
+#pragma once
+#define NULL 0
 char* strcpy(char* destination, const char* source);
 int strcmp(const char* str1, const char* str2);
 char* strerror(int errnum);
 char* strcat(char* dest, const char* src);
-)",
-                                   R"(
-// NVRTC provides a built-in definition of ::size_t.
+)";
+
+static const char* const jitsafe_header_cstring = R"(
+#pragma once
+#include <string.h>
+namespace std {
 using ::size_t;
-)");
+using ::strcpy;
+using ::strcmp;
+using ::strerror;
+using ::strcat;
+}  // namespace std
+)";
 
-// va_start, va_arg etc. are predefined by NVRTC, but we still need a header.
-JITIFY_DEFINE_C_AND_CXX_HEADERS(stdarg, "", "");
+static const char* const jitsafe_header_stdarg_h = R"(
+#pragma once
+// Note: va_start, va_arg etc. are predefined by NVRTC.
+)";
 
-JITIFY_DEFINE_C_AND_CXX_HEADERS_EX(time, R"(
+static const char* const jitsafe_header_cstdarg = R"(
+#pragma once
+#include <stdarg.h>
+namespace std {
+using ::va_list;
+}  // namespace std
+)";
+
+static const char* const jitsafe_header_time_h = R"(
+#pragma once
 #define NULL 0
 #define CLOCKS_PER_SEC 1000000
-)",
-                                   R"(
 typedef long time_t;
+// Note: NVRTC provides built-in definitions of ::size_t and ::clock_t.
 struct tm {
   int tm_sec;
   int tm_min;
@@ -4638,15 +4748,21 @@ struct timespec {
   long tv_nsec;
 };
 #endif
-)",
-                                   R"(
-// NVRTC provides built-in definitions of ::size_t and ::clock_t.
+)";
+
+static const char* const jitsafe_header_ctime = R"(
+#pragma once
+#include <time.h>
+namespace std {
+using ::time_t;
 using ::size_t;
 using ::clock_t;
-)");
-
-#undef JITIFY_DEFINE_C_AND_CXX_HEADERS
-#undef JITIFY_DEFINE_C_AND_CXX_HEADERS_EX
+using ::tm;
+#if __cplusplus >= 201703L
+using ::timespec;
+#endif
+}  // namespace std
+)";
 
 static const char* const jitsafe_header_algorithm = R"(
 #pragma once
@@ -4674,7 +4790,8 @@ JITIFY_CXX14_CONSTEXPR const T& min(const T& a, const T& b) {
 static const char* const jitsafe_header_array = R"(
 #pragma once
 namespace std {
-template <class T, std::size_t N>
+using ::size_t;
+template <class T, size_t N>
 class array {
   T data_[N];
 
@@ -5056,7 +5173,8 @@ static const char* const jitsafe_header_tuple = R"(
 namespace std {
 template <class... Types> class tuple;
 
-template <size_t I, class T>
+// Note: T is variadic only so that it matches libcudacxx's definition.
+template <size_t I, class... T>
 struct tuple_element;
 // Recursive case.
 template <size_t I, class Head, class... Tail>
@@ -5561,10 +5679,11 @@ template <typename... Ts> using void_t = typename __jitify_make_void<Ts...>::typ
 
 static const char* const jitsafe_header_utility = R"(
 #pragma once
-#include <cstring>  // For std::size_t
 #include <type_traits>
 
 namespace std {
+
+using ::size_t;
 
 template <class T1, class T2>
 struct pair {
@@ -5602,16 +5721,16 @@ class integer_sequence {
  public:
   using type = integer_sequence;  // Needed by make_index_sequence
   using value_type = T;
-  static constexpr std::size_t size() noexcept { return sizeof...(Ints); }
+  static constexpr size_t size() noexcept { return sizeof...(Ints); }
 };
 
-template <std::size_t... Ints>
-using index_sequence = std::integer_sequence<std::size_t, Ints...>;
+template <size_t... Ints>
+using index_sequence = std::integer_sequence<size_t, Ints...>;
 
 namespace __jitify_detail {
-template <std::size_t Sequence1Length, class Sequence1, class Sequence2>
+template <size_t Sequence1Length, class Sequence1, class Sequence2>
 struct concat_integer_sequence;
-template <std::size_t Sequence1Length, typename T, T... Ints1, T... Ints2>
+template <size_t Sequence1Length, typename T, T... Ints1, T... Ints2>
 struct concat_integer_sequence<Sequence1Length, integer_sequence<T, Ints1...>,
                                integer_sequence<T, Ints2...>>
     : integer_sequence<T, Ints1..., (Sequence1Length + Ints2)...> {};
@@ -5641,8 +5760,8 @@ JITIFY_DEFINE_MAKE_INTEGER_SEQUENCE_TYPE(long long)
 JITIFY_DEFINE_MAKE_INTEGER_SEQUENCE_TYPE(unsigned long long)
 #undef JITIFY_DEFINE_MAKE_INTEGER_SEQUENCE_TYPE
 
-template <std::size_t N>
-using make_index_sequence = std::make_integer_sequence<std::size_t, N>;
+template <size_t N>
+using make_index_sequence = std::make_integer_sequence<size_t, N>;
 
 template <class... T>
 using index_sequence_for = std::make_index_sequence<sizeof...(T)>;
@@ -5738,6 +5857,9 @@ namespace std {
 // even with nvcc.
 static const char* const jitsafe_header_typeinfo = R"(
 #pragma once
+namespace std {
+using ::size_t;
+}  // namespace std
 // WAR for typeid being builtin but not supported in device code.
 #define typeid(x) type_info{}
 class type_info {
@@ -6838,11 +6960,13 @@ class CppParserIterator {
     return true;
   }
 
+  bool peek_identifier(const char* name) {
+    return current_->type() == Token::Type::kIdentifier &&
+           current_->token_string() == name;
+  }
+
   bool match_identifier(const char* name) {
-    if (current_->type() != Token::Type::kIdentifier ||
-        current_->token_string() != name) {
-      return false;
-    }
+    if (!peek_identifier(name)) return false;
     ++(*this);
     return true;
   }
@@ -6861,6 +6985,8 @@ class CppParserIterator {
     for (token_iterator it = first_to_erase.base(); it != current_; ++it) {
       previous_tokens_.pop();
     }
+    // Note: The ++ here advances to the next _base_ token (because we don't
+    // want to jump over subsequent comment or whitespace tokens).
     current_ = token_container->erase(first_to_erase.base(), ++current_);
     skip_whitespace_and_comments();
     return *this;
@@ -7142,21 +7268,16 @@ inline bool replace_pragma_once_with_ifndef(const std::string& unique_source_id,
   bool found = false;
   for (auto iter = make_cpp_parser_iterator(tokens->begin(), tokens->end());
        iter;) {
-    auto start_iter = iter;
     if (iter.match(Tt::kHash)) {
-      if (iter.match_identifier("pragma") && iter.match_identifier("once")) {
-        iter.advance_to(Tt::kEndOfDirective);
-        if (!iter) break;
-        // Note: The ++ here advances to the next _base_ token (because we don't
-        // want to jump over subsequent comment or whitespace tokens).
+      auto start_iter = iter;
+      if (iter.match_identifier("pragma") && iter.peek_identifier("once")) {
+        // Erase "pragma ... once", leaving "#\n".
         iter.erase_back_to(tokens, start_iter);
         found = true;
-        // Note: There can be more than one #pragma once.
-        continue;
-      } else {
-        iter.advance_to(Tt::kEndOfDirective);
-        if (!iter) break;
+        // Note: There can be more than one #pragma once, so we don't break out.
       }
+      iter.advance_to(Tt::kEndOfDirective);
+      if (!iter) break;
     }
     ++iter;
   }

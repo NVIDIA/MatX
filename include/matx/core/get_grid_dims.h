@@ -32,7 +32,7 @@
 
 #pragma once
 #include "matx/core/defines.h"
-#include <numeric>
+#include <cuda/std/numeric>
 
 namespace matx {
 namespace detail {
@@ -149,7 +149,7 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
     }
   }  
   else {
-    size_t dims = std::accumulate(std::begin(sizes), std::end(sizes), 1, std::multiplies<index_t>());
+    size_t dims = cuda::std::accumulate(cuda::std::begin(sizes), cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
     threads.x = std::min(((int)dims + 31)/32 * 32, max_cta_size);
 
     // launch as many blocks as necessary

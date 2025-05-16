@@ -29,13 +29,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef JITIFY
 #pragma once
 
 #include "matx/core/defines.h"
 #include "matx/executors/host.h"
 #include "matx/executors/kernel.h"
 #include "matx/core/nvrtc.h"
+#include "matx/core/get_grid_dims.h"
+
 namespace matx
 {
 
@@ -178,7 +180,7 @@ namespace matx
               }
             }        
             else {
-              index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
+              index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
               detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
             } 
           }
@@ -196,3 +198,4 @@ namespace matx
 
   using CUDAExecutor = cudaExecutor; // Alias to make it consistent with host mode
 };
+#endif

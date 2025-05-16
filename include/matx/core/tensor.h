@@ -77,6 +77,7 @@ template <typename T,
           typename Storage = DefaultStorage<T>,
           typename Desc = DefaultDescriptor<RANK>>
 class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
+#ifndef JITIFY  
 public:
   // Type specifier for reflection on class
   using type = T; ///< Type of traits
@@ -1539,6 +1540,7 @@ public:
 private:
   Storage storage_;
   std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
+#endif  
 };
 
 

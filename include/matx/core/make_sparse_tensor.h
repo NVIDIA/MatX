@@ -29,7 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef JITIFY
 #pragma once
 
 #include "matx/core/sparse_tensor.h"
@@ -184,3 +184,4 @@ auto make_zero_tensor_csc(const index_t (&shape)[2],
 
 } // namespace experimental
 } // namespace matx
+#endif
