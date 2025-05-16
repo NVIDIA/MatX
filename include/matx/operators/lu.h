@@ -35,11 +35,12 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/lu/lu_cuda.h"
-#ifdef MATX_EN_CPU_SOLVER
-  #include "matx/transforms/lu/lu_lapack.h"
+#ifndef JITIFY
+  #include "matx/transforms/lu/lu_cuda.h"
+  #ifdef MATX_EN_CPU_SOLVER
+    #include "matx/transforms/lu/lu_lapack.h"
+  #endif
 #endif
-
 
 namespace matx {
 namespace detail {
@@ -47,7 +48,7 @@ namespace detail {
   class LUOp : public BaseOp<LUOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -62,6 +63,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
+#ifndef JITIFY
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on lu(). ie: (mtie(O, piv) = lu(A))");     
@@ -81,7 +83,7 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
-
+#endif
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

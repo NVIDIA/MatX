@@ -32,7 +32,7 @@
 
 #pragma once
 
-
+#include "matx/core/operator_options.h"
 #include "matx/core/type_utils_both.h"
 
 #ifndef JITIFY

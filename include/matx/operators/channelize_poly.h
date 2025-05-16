@@ -49,13 +49,13 @@ namespace detail {
       // type cuda::std::complex<float> and the filter has type double, out_t
       // will be cuda::std::complex<double>.
       using out_t = cuda::std::common_type_t<
-        complex_from_scalar_t<typename OpA::value_type>, complex_from_scalar_t<typename FilterType::value_type>>;
-      typename detail::base_type_t<OpA> a_;
+        ::matx::detail::complex_from_scalar_t<typename OpA::value_type>, ::matx::detail::complex_from_scalar_t<typename FilterType::value_type>>;
+      typename ::matx::detail::base_type_t<OpA> a_;
       FilterType f_;
       index_t num_channels_;
       index_t decimation_factor_;
       cuda::std::array<index_t, OpA::Rank() + 1> out_dims_;
-      mutable detail::tensor_impl_t<out_t, OpA::Rank() + 1> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<out_t, OpA::Rank() + 1> tmp_out_;
       mutable out_t *ptr = nullptr;       
 
     public:
@@ -78,23 +78,24 @@ namespace detail {
         out_dims_[Rank() - 1] = num_channels;
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
         return tmp_out_(indices...);
       }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank() + 1;
+      }
+
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
 
         channelize_poly_impl(cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
-      }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank() + 1;
       }
 
       template <typename ShapeType, typename Executor>
@@ -137,7 +138,7 @@ namespace detail {
       {
         return out_dims_[dim];
       }
-
+#endif
   };
 }
 

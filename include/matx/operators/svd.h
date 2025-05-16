@@ -35,11 +35,12 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/svd/svd_cuda.h"
-#ifdef MATX_EN_CPU_SOLVER
-  #include "matx/transforms/svd/svd_lapack.h"
+#ifndef JITIFY
+  #include "matx/transforms/svd/svd_cuda.h"
+  #ifdef MATX_EN_CPU_SOLVER
+    #include "matx/transforms/svd/svd_lapack.h"
+  #endif
 #endif
-
 namespace matx {
 
 
@@ -48,7 +49,7 @@ namespace detail {
   class SVDOp : public BaseOp<SVDOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
       SVDMode jobz_;
       SVDHostAlgo algo_;
 
@@ -65,6 +66,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
+#ifndef JITIFY
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -76,11 +78,6 @@ namespace detail {
         }
       }
 
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
-      }
-
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
@@ -88,7 +85,12 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+#endif
 
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
       // Size is not relevant in svd() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

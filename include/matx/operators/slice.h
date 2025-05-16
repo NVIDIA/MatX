@@ -34,8 +34,9 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/type_utils_both.h"
 #include "matx/operators/base_operator.h"
-
+#include "matx/core/operator_options.h"
 namespace matx
 {
   /**
@@ -52,7 +53,7 @@ namespace matx
 
       private:
         using shape_type = index_t;
-        typename detail::base_type_t<T> op_;
+        typename ::matx::detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
@@ -229,7 +230,7 @@ namespace matx
   __MATX_INLINE__ auto slice( const OpType &op, 
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
-      detail::NoStride strides)
+      ::matx::detail::NoStride strides)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.Slice(starts, ends, strides);
@@ -314,7 +315,7 @@ namespace matx
     __MATX_INLINE__ auto slice( const OpType &op, 
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
-      [[maybe_unused]] detail::NoStride no_stride)
+      [[maybe_unused]] ::matx::detail::NoStride no_stride)
   {
     if constexpr (is_tensor_view_v<OpType>) {
       return op.template Slice<N>(starts, ends);
