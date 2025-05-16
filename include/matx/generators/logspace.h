@@ -107,7 +107,7 @@ namespace matx
    * @return Operator with log10-spaced values 
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto logspace(ShapeType &&s, T first, T last)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

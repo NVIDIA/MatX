@@ -72,7 +72,7 @@ namespace matx
    * Returns values for a Hanning window across the selected dimension.
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto hanning(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

@@ -103,7 +103,7 @@ namespace matx
    * @param val Value to return
    *
    */
-  template <typename T = int, std::enable_if_t<std::is_arithmetic_v<T>, bool> = true>
+  template <typename T = int, std::enable_if_t<cuda::std::is_arithmetic_v<T>, bool> = true>
   inline auto diag(T val)
   {
     return detail::Diag<T, detail::NoShape>(detail::NoShape{}, T(val));
@@ -121,7 +121,7 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type> &&
+  std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type> &&
                    !is_matx_op<ShapeType>(), bool> = true>
   inline auto diag(ShapeType &&s, T val)
   {
@@ -160,7 +160,7 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
   inline auto eye(ShapeType &&s)
   {
     return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
