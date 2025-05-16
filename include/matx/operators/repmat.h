@@ -52,7 +52,7 @@ namespace matx
       class RepMatOp : public BaseOp<RepMatOp<T1, DIM>>
     {
       private:
-        typename detail::base_type_t<T1> op_;
+        typename ::matx::detail::base_type_t<T1> op_;
         index_t reps_[T1::Rank()];
 
       public:

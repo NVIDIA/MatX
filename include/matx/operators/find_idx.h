@@ -46,7 +46,7 @@ namespace detail {
   class FindIdxOp : public BaseOp<FindIdxOp<OpA, SelectType>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
       SelectType sel_;
 
     public:

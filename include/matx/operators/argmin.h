@@ -47,7 +47,7 @@ namespace detail {
   class ArgMinOp : public BaseOp<ArgMinOp<OpA, ORank>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;

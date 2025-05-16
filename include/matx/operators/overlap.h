@@ -51,7 +51,7 @@ namespace matx
 
       private:
         using shape_type = index_t;
-        typename detail::base_type_t<T> op_;
+        typename ::matx::detail::base_type_t<T> op_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, DIM+1> n_;
         cuda::std::array<shape_type, DIM+1> s_;

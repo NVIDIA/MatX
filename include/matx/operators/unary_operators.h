@@ -45,7 +45,7 @@
   {                                                                 \
     using I1Type = extract_value_type_t<I1>;                        \
     using Op = TENSOR_OP<I1Type>;                                   \
-    const typename detail::base_type_t<I1> &base = i1;              \
+    const typename ::matx::detail::base_type_t<I1> &base = i1;              \
     return detail::matxUnaryOp(base, Op());                         \
   }
 
@@ -58,8 +58,8 @@ namespace matx
   class matxUnaryOp :  public BaseOp<matxUnaryOp<I1,Op>>
   {
   private:
-    typename detail::base_type_t<I1> in1_;
-    typename detail::base_type_t<Op> op_;
+    typename ::matx::detail::base_type_t<I1> in1_;
+    typename ::matx::detail::base_type_t<Op> op_;
     cuda::std::array<index_t, detail::get_rank<I1>()> size_;
 
   public:
@@ -388,7 +388,7 @@ namespace matx
     using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
       using Op = detail::ConjOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
+      const typename ::matx::detail::base_type_t<I1> &base = i1;
       return detail::matxUnaryOp(base, Op());
     } else {
       // real type conj is a no-op so return original op.
@@ -425,7 +425,7 @@ namespace matx
     using I1Type = extract_value_type_t<I1>;
     if constexpr (is_complex_v<I1Type>) {
       using Op = detail::RealOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
+      const typename ::matx::detail::base_type_t<I1> &base = i1;
       return detail::matxUnaryOp(base, Op());
     } else {
       // already real just return i1

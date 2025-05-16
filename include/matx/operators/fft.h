@@ -50,7 +50,7 @@ namespace matx
     class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTType>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpA> a_;
         index_t fft_size_;
         PermDims perm_;
         FFTType type_;
@@ -60,7 +60,7 @@ namespace matx
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr = nullptr;                                           
 
       public:
@@ -313,7 +313,7 @@ namespace matx
     class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpA> a_;
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;
@@ -322,7 +322,7 @@ namespace matx
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
+        mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
         mutable ttype *ptr = nullptr;                                                
 
       public:

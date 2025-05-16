@@ -44,7 +44,7 @@ namespace matx
     {
       static_assert(CRank > T::Rank(), "Clone rank must be higher than input rank");
       private:
-        mutable typename detail::base_type_t<T> op_;
+        mutable typename ::matx::detail::base_type_t<T> op_;
         cuda::std::array<index_t, CRank> sizes_;         // size of each dimension after cloning
         cuda::std::array<index_t, T::Rank()> dims_;      // gather map for computing operator() indices
       public:

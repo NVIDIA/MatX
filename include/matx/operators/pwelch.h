@@ -139,8 +139,8 @@ namespace matx
         }
 
       private:
-        typename detail::base_type_t<OpX> x_;
-        typename detail::base_type_t<OpW> w_;
+        typename ::matx::detail::base_type_t<OpX> x_;
+        typename ::matx::detail::base_type_t<OpW> w_;
 
         index_t nperseg_;
         index_t noverlap_;
@@ -148,7 +148,7 @@ namespace matx
         PwelchOutputScaleMode output_scale_mode_;
         fsType fs_;
         cuda::std::array<index_t, 1> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;
     };
   }

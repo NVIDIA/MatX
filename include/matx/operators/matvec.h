@@ -45,13 +45,13 @@ namespace matx
     class MatVecOp : public BaseOp<MatVecOp<OpA, OpB>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
-        typename detail::base_type_t<OpB> b_;
+        typename ::matx::detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         static constexpr int RANK = remove_cvref_t<OpB>::Rank();
         cuda::std::array<index_t, RANK> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, RANK> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:

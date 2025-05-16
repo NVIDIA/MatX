@@ -47,8 +47,8 @@ namespace matx
       class TopelitzOp : public BaseOp<TopelitzOp<T1, T2>>
     {
       private:
-        typename detail::base_type_t<T1> op1_;
-        typename detail::base_type_t<T2> op2_;
+        typename ::matx::detail::base_type_t<T1> op1_;
+        typename ::matx::detail::base_type_t<T2> op2_;
 
       public:
         using matxop = bool;

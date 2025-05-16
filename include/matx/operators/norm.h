@@ -45,11 +45,11 @@ namespace matx
     {
       private:
         using out_type = typename inner_op_type_t<typename remove_cvref_t<OpA>::value_type>::type;
-        typename detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpA> a_;
         NormOrder order_;
         static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:

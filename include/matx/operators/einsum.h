@@ -48,7 +48,7 @@ namespace detail {
   class EinsumOp : public BaseOp<EinsumOp<OpA...>>
   {
     private:
-      cuda::std::tuple<typename detail::base_type_t<OpA> ...> a_;
+      cuda::std::tuple<typename ::matx::detail::base_type_t<OpA> ...> a_;
       std::string subscripts_;
 
     public:

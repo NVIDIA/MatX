@@ -55,7 +55,7 @@ namespace matx
         AMBGFunCutType_t cut_;
         float cut_val_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;         
 
       public:
@@ -112,7 +112,7 @@ namespace matx
 
 #ifndef JITIFY
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
-        
+
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "ambgfun() only supports the CUDA executor currently");

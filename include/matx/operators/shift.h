@@ -152,9 +152,9 @@ namespace matx
         }
 
       private:
-        typename detail::base_type_t<T1> op_;
+        typename ::matx::detail::base_type_t<T1> op_;
         cuda::std::array<index_t, Rank()> sizes_;
-        typename detail::base_type_t<T2> shift_;
+        typename ::matx::detail::base_type_t<T2> shift_;
     };
   }
   /**

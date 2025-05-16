@@ -42,11 +42,11 @@ namespace detail {
 template <typename OpA>
 class Sparse2DenseOp : public BaseOp<Sparse2DenseOp<OpA>> {
 private:
-  typename detail::base_type_t<OpA> a_;
+  typename ::matx::detail::base_type_t<OpA> a_;
 
   static constexpr int out_rank = OpA::Rank();
   cuda::std::array<index_t, out_rank> out_dims_;
-  mutable detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
+  mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
   mutable typename OpA::value_type *ptr = nullptr;
 
 public:

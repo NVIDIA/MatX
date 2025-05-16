@@ -49,7 +49,7 @@ namespace matx
       class SelfOp : public BaseOp<SelfOp<T1, DIM>>
     {
       private:
-        typename detail::base_type_t<T1> op_;
+        typename ::matx::detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;

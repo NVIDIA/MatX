@@ -62,8 +62,8 @@ template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_
 template <typename T, typename Op>
 class set : public BaseOp<set<T, Op>> {
 private:
-  mutable typename detail::base_type_t<T> out_;
-  mutable typename detail::base_type_t<Op> op_;
+  mutable typename ::matx::detail::base_type_t<T> out_;
+  mutable typename ::matx::detail::base_type_t<Op> op_;
 
 public:
   // Type specifier for reflection on class

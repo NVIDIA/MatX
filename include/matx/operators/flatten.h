@@ -44,7 +44,7 @@ namespace matx
       class FlattenOp : public BaseOp<FlattenOp<T1>>
     {
       private:
-        typename detail::base_type_t<T1> op1_;
+        typename ::matx::detail::base_type_t<T1> op1_;
 
       public:
         using matxop = bool;

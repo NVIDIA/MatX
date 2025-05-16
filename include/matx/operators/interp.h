@@ -148,12 +148,12 @@ namespace matx {
       using value_type = typename OpV::value_type;
 
     private:
-      typename detail::base_type_t<OpX> x_;    // Sample points
-      typename detail::base_type_t<OpV> v_;    // Values at sample points
-      typename detail::base_type_t<OpXQ> xq_;  // Query points
+      typename ::matx::detail::base_type_t<OpX> x_;    // Sample points
+      typename ::matx::detail::base_type_t<OpV> v_;    // Values at sample points
+      typename ::matx::detail::base_type_t<OpXQ> xq_;  // Query points
       InterpMethod method_;                    // Interpolation method
 
-      mutable detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)
+      mutable ::matx::detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)
       mutable value_type *ptr_m_ = nullptr;
 
       template <typename... Is>
@@ -356,7 +356,7 @@ namespace matx {
           cuda::std::array<index_t, OpX::Rank()> m_shape{n};
           detail::AllocateTempTensor(m_, std::forward<Executor>(ex), m_shape, &ptr_m_);
 
-          detail::tensor_impl_t<value_type, 1> d_tensor, dl_tensor, du_tensor; // Derivatives at sample points (spline only)
+          ::matx::detail::tensor_impl_t<value_type, 1> d_tensor, dl_tensor, du_tensor; // Derivatives at sample points (spline only)
           value_type *ptr_dl_ = nullptr;
           value_type *ptr_d_ = nullptr;
           value_type *ptr_du_ = nullptr;

@@ -46,12 +46,12 @@ namespace detail {
   class HistOp : public BaseOp<HistOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
       typename OpA::value_type lower_;
       typename OpA::value_type upper_;
       int num_levels_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
       mutable int *ptr = nullptr;  
 
     public:

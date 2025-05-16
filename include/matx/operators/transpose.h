@@ -46,9 +46,9 @@ namespace detail {
   class TransposeMatrixOp : public BaseOp<TransposeMatrixOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      typename ::matx::detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
-      mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
 
     public:

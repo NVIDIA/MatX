@@ -45,8 +45,8 @@ namespace detail {
   class InvOp : public BaseOp<InvOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
+      typename ::matx::detail::base_type_t<OpA> a_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
     public:

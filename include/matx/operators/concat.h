@@ -224,7 +224,7 @@ namespace matx
       }
 
       private:
-      cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
+      cuda::std::tuple<typename ::matx::detail::base_type_t<Ts> ...> ops_;
       index_t size_;
       int axis_;
     }; // end class ConcatOp

@@ -48,15 +48,15 @@ namespace matx
     class MatMulOp : public BaseOp<MatMulOp<OpA, OpB, PermDims>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
-        typename detail::base_type_t<OpB> b_;
+        typename ::matx::detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         PermDims perm_; 
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
-        mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
 
       public:

@@ -43,7 +43,7 @@ namespace matx
       class ComplexInterleavedOp : public BaseOp<ComplexInterleavedOp<T1>>
     {
       private:
-        typename detail::base_type_t<T1> op_;
+        typename ::matx::detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;

@@ -53,8 +53,8 @@ namespace matx
     class IFOP : public BaseOp<IFOP<T1, T2>>
   {
     private:
-      typename detail::base_type_t<T1> cond_;
-      typename detail::base_type_t<T2> op_;
+      typename ::matx::detail::base_type_t<T1> cond_;
+      typename ::matx::detail::base_type_t<T2> op_;
       cuda::std::array<index_t, detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cuComplex.h"
+#include "matx/core/operator_options.h"
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
@@ -21,16 +22,6 @@ namespace matx_conv1d_detail {
 };
 using namespace matx_conv1d_detail;
 
-typedef enum {
-  MATX_C_MODE_FULL, // Default. Keep all elements of ramp up/down
-  MATX_C_MODE_SAME, // Only keep elements where entire filter was present
-  MATX_C_MODE_VALID
-} matxConvCorrMode_t;
-
-typedef enum {
-  MATX_C_METHOD_DIRECT,
-  MATX_C_METHOD_FFT
-} matxConvCorrMethod_t;
 
 #ifdef __CUDACC__
 template <int THREADS, int EPT, typename OutType, typename InType, typename FilterType>

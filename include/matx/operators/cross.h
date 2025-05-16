@@ -46,8 +46,8 @@ namespace matx
     class CrossOp : public BaseOp<CrossOp<OpA, OpB>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
-        typename detail::base_type_t<OpB> b_;
+        typename ::matx::detail::base_type_t<OpA> a_;
+        typename ::matx::detail::base_type_t<OpB> b_;
 
         static constexpr int32_t out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         static constexpr int32_t min_rank = cuda::std::min(OpA::Rank(), OpB::Rank());

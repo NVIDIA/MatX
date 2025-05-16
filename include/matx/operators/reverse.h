@@ -51,7 +51,7 @@ namespace matx
       class ReverseOp : public BaseOp<ReverseOp<DIM, T1>>
     {
       private:
-        typename detail::base_type_t<T1> op_;
+        typename ::matx::detail::base_type_t<T1> op_;
 
       public:
         using matxop = bool;

@@ -64,7 +64,7 @@ namespace matx
       class CastOp : public BaseOp<CastOp<T, NewType>>
     {
       private:
-        typename detail::base_type_t<T> op_;
+        typename ::matx::detail::base_type_t<T> op_;
 
       public:
         using matxop = bool;
@@ -115,8 +115,8 @@ namespace matx
       class ComplexCastOp : public BaseOp<ComplexCastOp<T1, T2, NewType>>
     {
       private:
-        typename detail::base_type_t<T1> real_op_;
-        typename detail::base_type_t<T2> imag_op_;
+        typename ::matx::detail::base_type_t<T1> real_op_;
+        typename ::matx::detail::base_type_t<T2> imag_op_;
 
       public:
         using matxop = bool;

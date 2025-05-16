@@ -42,7 +42,7 @@ namespace detail {
 template <typename OpA>
 class Dense2SparseOp : public BaseOp<Dense2SparseOp<OpA>> {
 private:
-  typename detail::base_type_t<OpA> a_;
+  typename ::matx::detail::base_type_t<OpA> a_;
 
 public:
   using matxop = bool;
