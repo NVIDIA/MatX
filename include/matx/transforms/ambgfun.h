@@ -34,7 +34,6 @@
 
 #include <cstdint>
 #include <type_traits>
-#include <optional>
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
@@ -46,15 +45,9 @@
 #include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
-typedef enum {
-  AMBGFUN_CUT_TYPE_2D,
-  AMBGFUN_CUT_TYPE_DELAY,
-  AMBGFUN_CUT_TYPE_DOPPLER,
-} AMBGFunCutType_t;
-};
-
-namespace matx {
 namespace detail {
+
+struct EmptyY {};
 
 
 template <class O, class I1, class I2>
@@ -159,9 +152,9 @@ public:
   }
 };
 
-template <typename AMFTensor, typename XTensor>
+template <typename AMFTensor, typename XTensor, typename YTensor>
 void ambgfun_impl(AMFTensor &amf, XTensor &x,
-                     std::optional<XTensor> &y,
+                     YTensor &y,
                      [[maybe_unused]] double fs, ::matx::AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
@@ -183,7 +176,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
 
   auto y_normdiv_v = x_normdiv_v.View();
 
-  if (y) {
+  if constexpr (!std::is_same_v<YTensor, EmptyY>) {
     ry.Reset(y.value().Data(), y.value().Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
     auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);

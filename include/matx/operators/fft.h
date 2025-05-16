@@ -35,11 +35,14 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/core/operator_options.h"
+
+#ifndef JITIFY
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
   #include "matx/transforms/fft/fft_fftw.h"
 #endif  
-
+#endif
 namespace matx
 {
   namespace detail {
@@ -128,8 +131,6 @@ namespace matx
             }
           }
         }
-
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
                   
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -145,6 +146,10 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY  
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -163,7 +168,7 @@ namespace matx
             else {
               ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
-          }
+          }        
         }
 
         template <typename ShapeType, typename Executor>
@@ -193,10 +198,11 @@ namespace matx
 
           matxFree(ptr); 
         }
+#endif          
     };
   }
 
-
+#ifndef JITIFY
   /**
    * Run a 1D FFT with a cached plan
    *
@@ -299,6 +305,7 @@ namespace matx
     const index_t fft_size_ = static_cast<index_t>(fft_size);
     return detail::FFTOp(a, fft_size_, perm, detail::ifft_t{}, norm);
   }  
+#endif
 
 
   namespace detail {
@@ -350,7 +357,7 @@ namespace matx
           }  
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
@@ -363,6 +370,9 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -410,11 +420,12 @@ namespace matx
           }
 
           matxFree(ptr);           
-        }        
+        }    
+#endif
     };    
   }
 
-
+#ifndef JITIFY
 /**
  * Run a 2D FFT with a cached plan
  *
@@ -499,3 +510,4 @@ namespace matx
   }  
 
 }
+#endif

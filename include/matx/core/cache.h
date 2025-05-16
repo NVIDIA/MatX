@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-
+#ifndef JITIFY
 #pragma once
 
 #include <functional>
@@ -184,3 +184,4 @@ __MATX_INLINE__ matxCache_t &GetCache() {
 
 }  // namespace detail
 }; // namespace matx
+#endif
