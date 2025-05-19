@@ -132,7 +132,7 @@ namespace matx
 /**
  * Perform a reduction
  *
- * Performs a reduction from tensor "in" ingo a 0D operator using reduction
+ * Performs a reduction from tensor "in" into a 0D operator using reduction
  * operation ReduceOp. Without axes, reductions are performed over the entire
  * input operator.
  *
@@ -159,7 +159,7 @@ __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
 /**
  * Perform a reduction
  *
- * Performs a reduction from tensor "in" ingo a 0D operator using reduction
+ * Performs a reduction from tensor "in" into a 0D operator using reduction
  * operation ReduceOp. In general, the reductions are performed over the
  * innermost dimensions, where the number of dimensions is the difference
  * between the input and number of axes. For example, when axes is the same as the

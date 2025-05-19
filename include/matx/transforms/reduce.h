@@ -707,10 +707,8 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  // example-begin reduce-1
   // Reduce "in" into "dest" using a product operation as the reduction type
   reduce(dest, in, detail::reduceOpProd<typename OutType::value_type>(), stream, true);
-  // example-end reduce-1
 #endif
 }
 
