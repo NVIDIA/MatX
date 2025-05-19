@@ -109,11 +109,7 @@ public:
    *
    * @param rhs Object to copy from
    */
-#ifndef JITIFY
   __MATX_HOST__ tensor_t(tensor_t const &rhs) noexcept
-#else
-  __MATX_DEVICE__ tensor_t(tensor_t const &rhs) noexcept
-#endif
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.Data(), rhs.desc_}, storage_(rhs.storage_)
       { }
 
@@ -122,11 +118,7 @@ public:
    *
    * @param rhs Object to move from
    */
-#ifndef JITIFY  
   __MATX_HOST__ tensor_t(tensor_t &&rhs) noexcept
-#else
-  __MATX_DEVICE__ tensor_t(tensor_t &&rhs) noexcept
-#endif
       : detail::tensor_impl_t<T, RANK, Desc>{rhs.Data(), std::move(rhs.desc_)}, storage_(std::move(rhs.storage_))
   { }
 
@@ -140,11 +132,7 @@ public:
    * @param rhs
    *   Tensor to copy from
    */
-#ifndef JITIFY
   __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
-#else
-  __MATX_DEVICE__ void Shallow(const self_type &rhs) noexcept
-#endif
   {
     this->SetData(rhs.Data());
     storage_ = rhs.storage_;

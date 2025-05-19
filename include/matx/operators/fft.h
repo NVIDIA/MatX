@@ -38,10 +38,10 @@
 #include "matx/core/operator_options.h"
 
 #ifndef JITIFY
-#include "matx/transforms/fft/fft_cuda.h"
-#ifdef MATX_EN_CPU_FFT
-  #include "matx/transforms/fft/fft_fftw.h"
-#endif  
+  #include "matx/transforms/fft/fft_cuda.h"
+  #ifdef MATX_EN_CPU_FFT
+    #include "matx/transforms/fft/fft_fftw.h"
+  #endif  
 #endif
 namespace matx
 {
@@ -149,7 +149,6 @@ namespace matx
 
 #ifndef JITIFY  
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -508,6 +507,6 @@ namespace matx
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
     return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
   }  
-
-}
 #endif
+}
+

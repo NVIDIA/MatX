@@ -83,7 +83,7 @@ union PascalHalfBits {
  *   Value shuffled*
  */
 __MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
-                                        ::cuda::std::complex<float> var,
+                                        cuda::std::complex<float> var,
                                         unsigned int delta)
 {
   var.real(__shfl_down_sync(mask, var.real(), delta));
