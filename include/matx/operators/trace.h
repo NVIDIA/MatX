@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/cub.h"
+#endif
 
 namespace matx {
 
@@ -66,14 +68,20 @@ namespace detail {
         return tmp_out_(indices...);
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        trace_impl(cuda::std::get<0>(out), a_, ex);
-      }
-
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return 0;
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+      {
+        return 1;
+      }
+
+#ifndef JITIFY
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const {
+        trace_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       template <typename ShapeType, typename Executor>
@@ -103,12 +111,7 @@ namespace detail {
 
         matxFree(ptr);
       }
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
-      {
-        return 1;
-      }
-
+#endif
   };
 }
 

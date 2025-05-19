@@ -328,8 +328,6 @@ namespace detail {
         }
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
@@ -344,6 +342,8 @@ namespace detail {
       {
         return out_dims_[dim];
       }
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -391,7 +391,8 @@ namespace detail {
         } 
 
         matxFree(ptr);
-      }       
+      }     
+#endif  
     };
   }
 

@@ -34,15 +34,20 @@
 
 #include <cfloat>
 
-#include "matx/core/cache.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
-#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
+#include <cuda/std/complex>
+#ifndef JITIFY
+#include "matx/core/cache.h"
+#include "matx/core/nvtx.h"
 #include "matx/transforms/cub.h"
 #include "matx/transforms/copy.h"
+#endif
 #include "matx/core/half.h"
 
 union HalfBits {
@@ -78,7 +83,7 @@ union PascalHalfBits {
  *   Value shuffled*
  */
 __MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
-                                        cuda::std::complex<float> var,
+                                        ::cuda::std::complex<float> var,
                                         unsigned int delta)
 {
   var.real(__shfl_down_sync(mask, var.real(), delta));
@@ -1314,6 +1319,8 @@ __global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, 
 
 } // namespace detail
 
+
+#ifndef JITIFY
 /**
  * Perform a reduction and preserves indices
  *
@@ -2740,5 +2747,7 @@ void __MATX_INLINE__ trace_impl(OutType dest, const InType &in, int stream = 0)
 {
   return trace(dest, in, cudaExecutor{stream});
 }
+
+#endif
 
 } // end namespace matx
