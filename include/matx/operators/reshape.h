@@ -168,7 +168,7 @@ namespace matx
    * @return reshaped operator
    */
   template <int RANK, typename T, typename ShapeType,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
   {
     return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));

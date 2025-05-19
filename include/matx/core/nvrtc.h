@@ -33,8 +33,9 @@
 #pragma once
 
 #include <cuda.h>
-
-#define JITIFY_VERBOSE_ERRORS 1
+#define NVRTC_GET_TYPE_NAME 1
+#include <nvrtc.h>
+//#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
 #include "matx/core/jitify2.hpp"
@@ -69,6 +70,9 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
   //       ->configure(1, 1)
   //       ->launch(op, size0);
   // }
+  std::string tmp;
+  nvrtcGetTypeName<Op>(&tmp);
+  std::cout << "type name: " << tmp << std::endl;
       jitify2::Program(name, src)
           // Preprocess source code and load all included headers.
           ->preprocess({"-DJITIFY", 
@@ -77,7 +81,9 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
                       "-no-system-headers-workaround",
                       "-arch=sm_80","-std=c++17"})
           // Compile, link, and load the program, and obtain the loaded kernel.
-          ->get_kernel("matx::detail::matxOpT1Kernel<Op>")
+          //->get_kernel(std::string("matx::detail::matxOpT1Kernel<") + typeid(Op).name() + ">")
+          //->get_kernel(std::string("matx::detail::matxOpT1Kernel<") + tmp+ ">")
+          ->get_kernel(jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Op>())
           // Configure the kernel launch.
           ->configure(grid, block)
           // Launch the kernel.

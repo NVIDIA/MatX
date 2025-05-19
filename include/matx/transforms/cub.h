@@ -50,12 +50,6 @@
 
 namespace matx {
 
-/**
- * @brief Direction for sorting
- *
- */
-typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
-
 // define of dimension size for when the cub segemented sort
 // is outperformed by the radixSort
 constexpr index_t cubSegmentCuttoff = 8192;

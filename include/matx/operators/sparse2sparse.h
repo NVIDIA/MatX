@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/convert/sparse2sparse_cusparse.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -67,6 +69,7 @@ public:
     return a_.Size(dim);
   }
 
+#ifndef JITIFY
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA> && is_sparse_tensor_v<Out>) {
@@ -76,6 +79,7 @@ public:
       MATX_THROW(matxNotSupported, "Cannot use sparse2sparse on dense operands");
     }
   }
+#endif
 };
 
 } // end namespace detail

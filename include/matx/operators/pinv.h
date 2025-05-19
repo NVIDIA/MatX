@@ -40,6 +40,7 @@
 #endif
 
 namespace matx {
+  
 namespace detail {
   template<typename OpA>
   class PinvOp : public BaseOp<PinvOp<OpA>>
@@ -122,6 +123,20 @@ namespace detail {
       }
 #endif
   };
+}
+
+/**
+ * Returns an appropriate rcond based on the inner type. This is slightly
+ * higher than the machine epsilon, as these work better to mask small/zero singular
+ * values in singular or ill-conditioned matrices.
+ */
+template <typename T>
+__MATX_INLINE__ constexpr float get_default_rcond() {
+  if constexpr (is_fp32_inner_type_v<T>) {
+    return 1e-6f;
+  } else {
+    return 1e-15f;
+  }
 }
 
 /**

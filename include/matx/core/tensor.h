@@ -277,7 +277,7 @@ public:
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T2 &op)
   {
     const typename detail::base_type_t<T2> &op_base = op;
-    return detail::set(*this, op_base);
+    return detail::set(static_cast<detail::tensor_impl_t<T, RANK, Desc>&>(*this), op_base);
   }
 
   /**

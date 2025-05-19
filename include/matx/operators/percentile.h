@@ -35,7 +35,9 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
+#ifndef JITIFY
 #include "matx/transforms/percentile.h"
+#endif
 
 namespace matx {
 
@@ -64,13 +66,18 @@ namespace detail {
           out_dims_[r]    = (r == ORank - 1) ? 1 : a_.Size(r);
         }
       }
-
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
         return tmp_out_(indices...);
       }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }
+      
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -109,12 +116,7 @@ namespace detail {
 
         matxFree(ptr);
       }             
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
+#endif
   };
 }
 

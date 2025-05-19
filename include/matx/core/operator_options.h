@@ -59,6 +59,24 @@ typedef enum {
   MATX_C_METHOD_FFT
 } matxConvCorrMethod_t;
 
+  enum class PercentileMethod {
+    LINEAR,
+    LOWER,
+    HIGHER,
+    HAZEN,
+    WEIBULL,
+    MEDIAN_UNBIASED,
+    NORMAL_UNBIASED,
+    MIDPOINT,
+    NEAREST
+  }; 
+
+/**
+ * @brief Direction for sorting
+ *
+ */
+typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
+
 /* Solver parameter enums */
 
 /**

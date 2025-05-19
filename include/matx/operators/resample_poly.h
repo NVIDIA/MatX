@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/resample_poly.h"
+#endif
 
 namespace matx {
 
@@ -76,12 +78,24 @@ namespace detail {
         out_dims_[OpA::Rank() - 1] = b_len;
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
         return tmp_out_(indices...);
       }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }      
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -89,12 +103,6 @@ namespace detail {
 
         resample_poly_impl(cuda::std::get<0>(out), a_, f_, up_, down_, ex.getStream());
       }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
-      }
-
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept {
@@ -130,12 +138,7 @@ namespace detail {
 
         matxFree(ptr);       
       }             
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
+#endif
   };
 }
 

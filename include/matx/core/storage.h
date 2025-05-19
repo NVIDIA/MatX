@@ -636,8 +636,10 @@ namespace matx
 };
 
 #else
-template <typename T>
-class null_storage {};
-template <typename T>
-using DefaultStorage = null_storage<T>;
+  namespace matx {
+  template <typename T>
+  class basic_storage {};
+  template <typename T>
+  using DefaultStorage = basic_storage<T>;
+}
 #endif // JITIFY
