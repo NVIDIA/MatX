@@ -139,8 +139,8 @@ namespace matx
         }
 
       private:
-        typename ::matx::detail::base_type_t<OpX> x_;
-        typename ::matx::detail::base_type_t<OpW> w_;
+        typename detail::base_type_t<OpX> x_;
+        typename detail::base_type_t<OpW> w_;
 
         index_t nperseg_;
         index_t noverlap_;

@@ -47,8 +47,8 @@ namespace matx
         using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
               typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
-        typename ::matx::detail::base_type_t<OpA> a_;
-        typename ::matx::detail::base_type_t<OpB> b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         matxConvCorrMode_t mode_;
         matxConvCorrMethod_t method_;
         PermDims perm_;

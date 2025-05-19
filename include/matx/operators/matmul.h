@@ -35,12 +35,13 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/matmul/matmul_cuda.h"
-#include "matx/transforms/matmul/matmul_cusparse.h"
-#ifdef MATX_EN_CPU_MATMUL
-  #include "matx/transforms/matmul/matmul_cblas.h"
+#ifndef JITIFY
+  #include "matx/transforms/matmul/matmul_cuda.h"
+  #include "matx/transforms/matmul/matmul_cusparse.h"
+  #ifdef MATX_EN_CPU_MATMUL
+    #include "matx/transforms/matmul/matmul_cblas.h"
+  #endif
 #endif
-
 namespace matx
 {
   namespace detail {
@@ -48,8 +49,8 @@ namespace matx
     class MatMulOp : public BaseOp<MatMulOp<OpA, OpB, PermDims>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> a_;
-        typename ::matx::detail::base_type_t<OpB> b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         PermDims perm_; 
@@ -94,8 +95,6 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -111,6 +110,9 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -167,6 +169,7 @@ namespace matx
 
           matxFree(ptr);         
         }
+#endif
     };
   }
 

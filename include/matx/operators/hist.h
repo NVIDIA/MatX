@@ -48,7 +48,7 @@ namespace detail {
   class HistOp : public BaseOp<HistOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       typename OpA::value_type lower_;
       typename OpA::value_type upper_;
       int num_levels_;

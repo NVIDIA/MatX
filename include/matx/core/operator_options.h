@@ -62,6 +62,14 @@ typedef enum {
 /* Solver parameter enums */
 
 /**
+ * @brief Algorithm to use for matrix inverse
+ *
+ */
+typedef enum {
+  MAT_INVERSE_ALGO_LU,
+} MatInverseAlgo_t;
+
+/**
  * @enum SolverFillMode
  *   Indicates which part (lower or upper) of the dense matrix was filled
  *   and should be used by the function.

@@ -34,7 +34,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/convert/sparse2dense_cusparse.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -42,7 +44,7 @@ namespace detail {
 template <typename OpA>
 class Sparse2DenseOp : public BaseOp<Sparse2DenseOp<OpA>> {
 private:
-  typename ::matx::detail::base_type_t<OpA> a_;
+  typename detail::base_type_t<OpA> a_;
 
   static constexpr int out_rank = OpA::Rank();
   cuda::std::array<index_t, out_rank> out_dims_;
@@ -65,8 +67,6 @@ public:
     return "sparse2dense(" + get_type_str(a_) + ")";
   }
 
-  __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto)
   operator()(Is... indices) const {
@@ -82,6 +82,9 @@ public:
   Size(int dim) const {
     return out_dims_[dim];
   }
+
+#ifndef JITIFY
+  __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
@@ -122,6 +125,7 @@ public:
                   "Cannot use sparse2dense on dense input");
     matxFree(ptr);
   }
+#endif
 };
 
 } // end namespace detail

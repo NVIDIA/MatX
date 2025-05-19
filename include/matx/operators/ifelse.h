@@ -54,9 +54,9 @@ namespace matx
     class IFELSE : public BaseOp<IFELSE<C1, T1, T2>>
   {
     private:
-      typename ::matx::detail::base_type_t<C1> cond_;
-      typename ::matx::detail::base_type_t<T1> op1_;
-      typename ::matx::detail::base_type_t<T2> op2_;
+      typename detail::base_type_t<C1> cond_;
+      typename detail::base_type_t<T1> op1_;
+      typename detail::base_type_t<T2> op2_;
       cuda::std::array<index_t, detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:

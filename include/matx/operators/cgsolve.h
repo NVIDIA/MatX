@@ -44,8 +44,8 @@ namespace matx
     class CGSolveOp : public BaseOp<CGSolveOp<OpA, OpB>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> a_;
-        typename ::matx::detail::base_type_t<OpB> b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         double tol_;
         int max_iters_;
         cuda::std::array<index_t, 2> out_dims_;

@@ -34,7 +34,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#ifndef JITIFY
 #include "matx/transforms/convert/dense2sparse_cusparse.h"
+#endif
 
 namespace matx {
 namespace detail {
@@ -42,7 +44,7 @@ namespace detail {
 template <typename OpA>
 class Dense2SparseOp : public BaseOp<Dense2SparseOp<OpA>> {
 private:
-  typename ::matx::detail::base_type_t<OpA> a_;
+  typename detail::base_type_t<OpA> a_;
 
 public:
   using matxop = bool;
@@ -66,6 +68,7 @@ public:
     return a_.Size(dim);
   }
 
+#ifndef JITIFY
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA>) {
@@ -80,6 +83,7 @@ public:
       }
     }
   }
+#endif
 };
 
 } // end namespace detail

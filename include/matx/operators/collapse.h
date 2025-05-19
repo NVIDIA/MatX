@@ -43,7 +43,7 @@ namespace matx
       class LCollapseOp : public BaseOp<LCollapseOp<DIM, T1>>
     {
       private:
-        typename ::matx::detail::base_type_t<T1> op_;
+        typename detail::base_type_t<T1> op_;
         index_t size_;  // size of collapsed dim
 
       public:
@@ -184,7 +184,7 @@ namespace matx
       class RCollapseOp : public BaseOp<RCollapseOp<DIM, T1>>
     {
       private:
-        typename ::matx::detail::base_type_t<T1> op_;
+        typename detail::base_type_t<T1> op_;
         index_t size_;  // size of collapsed dim
 
       public:

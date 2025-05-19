@@ -44,7 +44,7 @@ namespace matx
     class NormalizeOp: public BaseOp<NormalizeOp<OpA, DIM>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> op_;
+        typename detail::base_type_t<OpA> op_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         NORMALIZE_RANGE normalize_method;
         float p_ = -1.0f;
@@ -100,7 +100,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          normalize_impl<typename cuda::std::tuple_element<0, Out>::type, ::matx::detail::base_type_t<OpA>, DIM, Executor>(
+          normalize_impl<typename cuda::std::tuple_element<0, Out>::type, detail::base_type_t<OpA>, DIM, Executor>(
             cuda::std::get<0>(out), op_, normalize_method, p_, a_, b_, ex
           );
         }

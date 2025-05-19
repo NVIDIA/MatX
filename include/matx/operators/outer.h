@@ -35,7 +35,10 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/outer.h"
+
+#ifndef JITIFY
+  #include "matx/transforms/outer.h"
+#endif
 
 namespace matx
 {
@@ -44,8 +47,8 @@ namespace matx
     class OuterOp : public BaseOp<OuterOp<OpA, OpB>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> a_;
-        typename ::matx::detail::base_type_t<OpB> b_;
+        typename detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
         static constexpr int RANK = cuda::std::max(remove_cvref_t<OpA>::Rank(), remove_cvref_t<OpB>::Rank()) + 1;
@@ -80,8 +83,6 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -98,6 +99,9 @@ namespace matx
           return out_dims_[dim];
         }
 
+#ifndef JITIFY
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex)  const{
           outer_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
@@ -137,7 +141,8 @@ namespace matx
           } 
 
           matxFree(ptr);
-        }           
+        }      
+#endif
     };
   }
 

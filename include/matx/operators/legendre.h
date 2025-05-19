@@ -49,9 +49,9 @@ namespace matx
       class LegendreOp : public BaseOp<LegendreOp<T1,T2,T3>>
     {
       private:
-        typename ::matx::detail::base_type_t<T1> n_;
-        typename ::matx::detail::base_type_t<T2> m_;
-        typename ::matx::detail::base_type_t<T3> in_;
+        typename detail::base_type_t<T1> n_;
+        typename detail::base_type_t<T2> m_;
+        typename detail::base_type_t<T3> in_;
 
         cuda::std::array<int,2> axis_;
 

@@ -532,10 +532,12 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(double *addr, double val)
  * @param val
  *   Value to compare against
  */
+#ifndef JITIFY
 __MATX_DEVICE__ __MATX_INLINE__ void atomicMin(int64_t *addr, int64_t val)
 {
   atomicMin(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
-};
+}
+
 
 /**
  * Atomic max version for int64_t
@@ -551,7 +553,7 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicMax(int64_t *addr, int64_t val)
 {
   atomicMax(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
 };
-
+#endif
 
 /**
  * Atomic all version for int64_t
@@ -585,10 +587,11 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int64_t *addr, int64_t val)
  * @param val
  *   Value to compare against
  */
+#ifndef JITIFY
 __MATX_DEVICE__ __MATX_INLINE__ void atomicMin(uint64_t *addr, uint64_t val)
 {
   atomicMin(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
-};
+};  
 
 /**
  * Atomic max version for uint64_t
@@ -604,7 +607,7 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicMax(uint64_t *addr, uint64_t val)
 {
   atomicMax(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
 };
-
+#endif
 
 /**
  * Atomic all version for uint64_t
@@ -651,13 +654,14 @@ __MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(int64_t *addr,
  * @param val
  *   Value to add
  */
+#ifndef JITIFY
 __MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(uint64_t *addr,
                                  uint64_t val)
 {
   unsigned long long int *addri = reinterpret_cast<unsigned long long int *>(addr);
   atomicAdd(addri, (unsigned long long int)val);
 }
-
+#endif
 /**
  * Atomic add for complex floats
  *

@@ -47,7 +47,7 @@ namespace matx
       class SignOp : public BaseOp<SignOp<T>>
     {
       private:
-        typename ::matx::detail::base_type_t<T> op_;
+        typename detail::base_type_t<T> op_;
 
       public:
         using matxop = bool;

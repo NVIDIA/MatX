@@ -34,7 +34,7 @@
 
 #include <cuda.h>
 
-//#define JITIFY_VERBOSE_ERRORS 1
+#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
 #include "matx/core/jitify2.hpp"

@@ -51,7 +51,7 @@ namespace detail {
   class EigOp : public BaseOp<EigOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       EigenMode jobz_;
       SolverFillMode uplo_;
 

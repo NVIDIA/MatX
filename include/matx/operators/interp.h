@@ -148,9 +148,9 @@ namespace matx {
       using value_type = typename OpV::value_type;
 
     private:
-      typename ::matx::detail::base_type_t<OpX> x_;    // Sample points
-      typename ::matx::detail::base_type_t<OpV> v_;    // Values at sample points
-      typename ::matx::detail::base_type_t<OpXQ> xq_;  // Query points
+      typename detail::base_type_t<OpX> x_;    // Sample points
+      typename detail::base_type_t<OpV> v_;    // Values at sample points
+      typename detail::base_type_t<OpXQ> xq_;  // Query points
       InterpMethod method_;                    // Interpolation method
 
       mutable ::matx::detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)

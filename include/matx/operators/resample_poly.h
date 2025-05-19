@@ -48,8 +48,8 @@ namespace detail {
     private:
       using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
             typename FilterType::value_type, typename FilterType::value_type>;          
-      typename ::matx::detail::base_type_t<OpA> a_;
-      typename ::matx::detail::base_type_t<FilterType> f_;
+      typename detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<FilterType> f_;
       index_t up_;
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;

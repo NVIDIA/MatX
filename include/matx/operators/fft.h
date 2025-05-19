@@ -50,7 +50,7 @@ namespace matx
     class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTType>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpA> a_;
         index_t fft_size_;
         PermDims perm_;
         FFTType type_;
@@ -312,7 +312,7 @@ namespace matx
     class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType>>
     {
       private:
-        typename ::matx::detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpA> a_;
         PermDims perm_;
         FFTType type_;
         FFTNorm norm_;

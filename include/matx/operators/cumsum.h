@@ -48,7 +48,7 @@ namespace detail {
   class CumSumOp : public BaseOp<CumSumOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;  

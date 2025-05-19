@@ -48,7 +48,7 @@ namespace detail {
   class ArgsortOp : public BaseOp<ArgsortOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       SortDirection_t dir_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable ::matx::detail::tensor_impl_t<index_t, OpA::Rank()> tmp_out_;

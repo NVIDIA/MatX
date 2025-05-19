@@ -50,7 +50,7 @@ namespace detail {
       // will be cuda::std::complex<double>.
       using out_t = cuda::std::common_type_t<
         ::matx::detail::complex_from_scalar_t<typename OpA::value_type>, ::matx::detail::complex_from_scalar_t<typename FilterType::value_type>>;
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       FilterType f_;
       index_t num_channels_;
       index_t decimation_factor_;

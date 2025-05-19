@@ -49,7 +49,7 @@ namespace detail {
   class SVDOp : public BaseOp<SVDOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       SVDMode jobz_;
       SVDHostAlgo algo_;
 
@@ -147,8 +147,8 @@ namespace detail {
   class SVDPIOp : public BaseOp<SVDPIOp<OpA,OpX>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
-      typename ::matx::detail::base_type_t<OpX> x_;
+      typename detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpX> x_;
       int iterations_;
       index_t k_;
 
@@ -227,7 +227,7 @@ namespace detail {
   class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       int max_iters_;
       float tol_;
 

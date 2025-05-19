@@ -46,7 +46,7 @@ namespace matx
       class UpsampleOp : public BaseOp<UpsampleOp<T>>
     {
       private:
-        typename ::matx::detail::base_type_t<T> op_;
+        typename detail::base_type_t<T> op_;
         int32_t dim_;
         index_t n_;
 

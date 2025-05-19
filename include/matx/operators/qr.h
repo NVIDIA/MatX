@@ -49,7 +49,7 @@ namespace detail {
   class QROp : public BaseOp<QROp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -120,7 +120,7 @@ namespace detail {
   class SolverQROp : public BaseOp<SolverQROp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;
@@ -193,7 +193,7 @@ namespace detail {
   class EconQROp : public BaseOp<EconQROp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;

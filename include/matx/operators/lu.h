@@ -48,7 +48,7 @@ namespace detail {
   class LUOp : public BaseOp<LUOp<OpA>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
 
     public:
       using matxop = bool;

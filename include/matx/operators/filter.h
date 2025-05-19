@@ -36,7 +36,9 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
+#ifndef JITIFY
 #include "matx/transforms/filter.h"
+#endif
 
 namespace matx
 {
@@ -46,7 +48,7 @@ namespace detail {
   class FilterOp : public BaseOp<FilterOp<OpA, FilterType, NR, NNR>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
@@ -69,7 +71,10 @@ namespace detail {
         }              
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return a_.Size(dim);
+      }      
 
       // This should never be called
       template <typename... Is>
@@ -77,6 +82,8 @@ namespace detail {
         return tmp_out_(indices...);
       }
 
+#ifndef JITIFY
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "filter() only supports the CUDA executor currently");   
@@ -116,12 +123,7 @@ namespace detail {
 
         matxFree(ptr);
       }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return a_.Size(dim);
-      }
-
+#endif
   };
 }
 

@@ -35,7 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/conv.h"
+#ifndef JITIFY
+#include "matx/transforms/reduce.h"
+#endif
 
 namespace matx
 {
@@ -45,7 +47,7 @@ namespace matx
     {
       private:
         static constexpr int ORank = permute_rank<OpA, PermDims, ReductionOp>::rank;
-        typename ::matx::detail::base_type_t<OpA> a_;
+        typename detail::base_type_t<OpA> a_;
         PermDims perm_;
         ReductionOp reduction_op_;
         bool init_;

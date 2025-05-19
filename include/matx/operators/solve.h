@@ -45,8 +45,8 @@ namespace detail {
 template <typename OpA, typename OpB>
 class SolveOp : public BaseOp<SolveOp<OpA, OpB>> {
 private:
-  typename ::matx::detail::base_type_t<OpA> a_;
-  typename ::matx::detail::base_type_t<OpB> b_;
+  typename detail::base_type_t<OpA> a_;
+  typename detail::base_type_t<OpB> b_;
 
   static constexpr int out_rank = OpB::Rank();
   cuda::std::array<index_t, out_rank> out_dims_;

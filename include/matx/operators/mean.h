@@ -47,7 +47,7 @@ namespace detail {
   class MeanOp : public BaseOp<MeanOp<OpA, ORank>>
   {
     private:
-      typename ::matx::detail::base_type_t<OpA> a_;
+      typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;     
