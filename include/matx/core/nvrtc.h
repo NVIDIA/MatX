@@ -33,8 +33,7 @@
 #pragma once
 
 #include <cuda.h>
-#define NVRTC_GET_TYPE_NAME 1
-#include <nvrtc.h>
+
 //#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
@@ -46,8 +45,7 @@
 namespace matx {
 
 template <typename Op>
-auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op op, index_t size0) {
-  dim3 grid(1), block(1);
+auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op op, index_t size0, dim3 &blocks, dim3 &threads) {
 
   // jitify2::PreprocessedProgram preprog =
   //     jitify2::Program(name, src)
@@ -73,21 +71,30 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
   std::string tmp;
   nvrtcGetTypeName<Op>(&tmp);
   std::cout << "type name: " << tmp << std::endl;
-      jitify2::Program(name, src)
+      jitify2::PreprocessedProgram preprog = jitify2::Program(name, src)
           // Preprocess source code and load all included headers.
           ->preprocess({"-DJITIFY", 
           "-I/repro/tmp/MatX/include", "-I/repro/tmp/MatX/include/matx/kernels", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/thrust/../../../thrust", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/libcudacxx/../../../libcudacxx/include", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/cub/../../../cub", "-I/repro/tmp/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/tmp/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/include", "-I/repro/tmp/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/external/cutlass/include", "-I/usr/local/cuda/include",
           //"-no-preinclude-workarounds",
                       "-no-system-headers-workaround",
-                      "-arch=sm_80","-std=c++17"})
-          // Compile, link, and load the program, and obtain the loaded kernel.
-          //->get_kernel(std::string("matx::detail::matxOpT1Kernel<") + typeid(Op).name() + ">")
-          //->get_kernel(std::string("matx::detail::matxOpT1Kernel<") + tmp+ ">")
-          ->get_kernel(jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Op>())
-          // Configure the kernel launch.
-          ->configure(grid, block)
-          // Launch the kernel.
-          ->launch(op, size0);
+                      "-arch=sm_80","-std=c++17"});
+
+          
+      auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Op>();
+      std::cout << "kernel name: " << kernel_name << std::endl;
+      if (!preprog) {
+        std::cerr << preprog.error() << std::endl;
+        *preprog;
+      } else {
+        jitify2::PreprocessedProgramData preprog_data = *preprog;
+        jitify2::CompiledProgram compiled = preprog->compile(kernel_name);
+        printf("Compiled program\n");
+        compiled->link()
+        ->load()
+        ->get_kernel(kernel_name)
+        ->configure(blocks, threads)
+        ->launch(op, size0);
+      }
 }
 
 }

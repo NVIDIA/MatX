@@ -226,7 +226,6 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
 #ifdef MATX_EN_MATHDX
 static const char *matxOpT1JITKernelStr = "\n\
 #include \"matx.h\"\n\
-#include <cuda/std/complex>\n\
 namespace matx {\n\
   namespace detail {\n\
     template <class Op>\n\

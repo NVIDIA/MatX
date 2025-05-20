@@ -111,7 +111,8 @@ public:
     return op(v1, v2);
   }
 
-  using value_type = decltype(op(std::declval<T1>(), std::declval<T2>()));
+  using value_type = cuda::std::invoke_result_t<decltype(op), T1, T2>;
+  //using value_type = decltype(op(std::declval<T1>(), std::declval<T2>()));
 };
 
 template <typename T1, typename T2, typename T3, typename F> class TerOp {
@@ -418,18 +419,18 @@ template <typename T1, typename T2> struct AddF {
                     v1.imag() );
       }
       else {
-        return (T1)(v1.real() + static_cast<typename T1::value_type>(v2),
-                    v1.imag() );
+        return T1{v1.real() + static_cast<typename T1::value_type>(v2),
+                    v1.imag() };
       }
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2)(static_cast<typename T2::value_type>(static_cast<float>(v1)) + v2.real(),
-                    v2.imag() );
+        return T2{static_cast<typename T2::value_type>(static_cast<float>(v1)) + v2.real(),
+                    v2.imag() };
       }
       else {
-        return (T2)(static_cast<typename T2::value_type>(v1) + v2.real(),
-                    v2.imag() );
+        return T2{static_cast<typename T2::value_type>(v1) + v2.real(),
+                    v2.imag() };
       }
     }
     else {
@@ -447,22 +448,22 @@ template <typename T1, typename T2> struct SubF {
   {
     if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
       if constexpr (is_complex_half_v<T1>) {
-        return (T1)(v1.real() - static_cast<typename T1::value_type>(static_cast<float>(v2)),
-                    v1.imag() );
+        return (T1){v1.real() - static_cast<typename T1::value_type>(static_cast<float>(v2)),
+                    v1.imag() };
       }
       else {
-        return (T1)(v1.real() - static_cast<typename T1::value_type>(v2),
-                    v1.imag() );
+        return (T1){v1.real() - static_cast<typename T1::value_type>(v2),
+                    v1.imag() };
       }
     }
     else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
       if constexpr (is_complex_half_v<T2>) {
-        return (T2)(static_cast<typename T2::value_type>(static_cast<float>(v1) - static_cast<float>(v2.real()) ),
-                    -v2.imag() );
+        return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1) - static_cast<float>(v2.real()) ),
+                    -v2.imag() };
       }
       else {
-        return (T2)(static_cast<typename T2::value_type>(v1) - v2.real(),
-                    -v2.imag() );
+        return (T2){static_cast<typename T2::value_type>(v1) - v2.real(),
+                    -v2.imag() };
       }
     }
     else {

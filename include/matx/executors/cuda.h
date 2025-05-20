@@ -153,7 +153,7 @@ namespace matx
 
             if constexpr (Op::Rank() == 1) {
 #ifdef MATX_EN_MATHDX
-              nvrtc_compile_and_run(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0]);
+              nvrtc_compile_and_run(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
 #else
               detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
 #endif
