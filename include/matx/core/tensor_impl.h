@@ -1212,6 +1212,13 @@ MATX_IGNORE_WARNING_POP_GCC
     {
     }
 
+    __MATX_INLINE__ __MATX_HOST__ bool has_capability([[maybe_unused]] OperatorCapability cap) const {
+      // Get the capability of the current operator node itself
+      // The derived class's get_capability_impl will handle the specific logic for that operator type,
+      // including querying children if it's a composite operator.
+      return false; 
+    } 
+
 
   protected:
     TensorData data_;

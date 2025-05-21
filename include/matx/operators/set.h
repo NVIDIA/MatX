@@ -37,6 +37,7 @@
 #include "matx/core/error.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/capabilities.h"
 
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
@@ -106,6 +107,12 @@ public:
     if constexpr (!is_mtie<T>()) {
       MATX_ASSERT_COMPATIBLE_OP_SIZES(op);
     }
+  }
+
+
+  __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
+    // A 'set' operation's capability is determined by its right-hand side operand.
+    return detail::get_operand_capability(op_, cap);
   }
 
   template <typename... Is>

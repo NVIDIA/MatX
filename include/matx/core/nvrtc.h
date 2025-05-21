@@ -68,9 +68,7 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
   //       ->configure(1, 1)
   //       ->launch(op, size0);
   // }
-  std::string tmp;
-  nvrtcGetTypeName<Op>(&tmp);
-  std::cout << "type name: " << tmp << std::endl;
+
       jitify2::PreprocessedProgram preprog = jitify2::Program(name, src)
           // Preprocess source code and load all included headers.
           ->preprocess({"-DJITIFY", 

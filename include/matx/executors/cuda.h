@@ -32,6 +32,7 @@
 #ifndef JITIFY
 #pragma once
 
+#include "matx/core/capabilities.h"
 #include "matx/core/defines.h"
 #include "matx/executors/host.h"
 #include "matx/executors/kernel.h"
@@ -153,7 +154,9 @@ namespace matx
 
             if constexpr (Op::Rank() == 1) {
 #ifdef MATX_EN_MATHDX
+              printf("Operator supports JIT\n");
               nvrtc_compile_and_run(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
+
 #else
               detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
 #endif

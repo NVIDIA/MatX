@@ -40,6 +40,8 @@
 #endif
 #endif
 
+#include <cufftdx.hpp>
+
 // defines.h should always be included first. Its definitions may impact
 // the behavior of other headers.
 #include "matx/core/defines.h"

@@ -62,6 +62,14 @@ __MATX_INLINE__ int GetComputeCapabilityMajor() {
     return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
 }
 
+__MATX_INLINE__ int GetComputeCapabilityMinor() {
+    return GetDeviceAttr(cudaDevAttrComputeCapabilityMinor);
+}
+
+__MATX_INLINE__ int GetComputeCapability() {
+    return GetComputeCapabilityMajor() * 10 + GetComputeCapabilityMinor();
+}
+
 __MATX_INLINE__ bool IsHopperOrAbove() {
     return GetComputeCapabilityMajor() >= HOPPER_CC;
 }
