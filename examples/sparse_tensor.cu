@@ -55,6 +55,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   experimental::CSR::print();
   experimental::CSC::print();
   experimental::DCSR::print();
+  experimental::DIA::print();
+  experimental::SkewDIA::print();
   experimental::BSR<2,2>::print(); // 2x2 blocks
   experimental::COO4::print();     // 4-dim tensor in COO
   experimental::CSF5::print();     // 5-dim tensor in CSF

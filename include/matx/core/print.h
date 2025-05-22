@@ -160,7 +160,7 @@ namespace matx {
         // A sparse tensor has no strides, so show the level sizes instead.
         // These are obtained by translating dims to levels using the format.
         cuda::std::array<index_t, Op::Format::LVL> lvlsz;
-        Op::Format::dim2lvl(op.Shape().data(), lvlsz.data(), /*asSize=*/true);
+        Op::Format::template dim2lvl<true>(op.Shape().data(), lvlsz.data());
         fprintf(fp, "], Levels:[");
         for (int lvlIdx = 0; lvlIdx < Op::Format::LVL; lvlIdx++) {
           fprintf(fp, "%" MATX_INDEX_T_FMT, lvlsz[lvlIdx]);
