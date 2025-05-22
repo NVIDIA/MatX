@@ -904,7 +904,7 @@ MATX_IGNORE_WARNING_POP_GCC
       static constexpr int LVL = TensorData::Format::LVL;
       if constexpr (L < LVL) {
         using lspec = std::tuple_element_t<L, typename TensorData::Format::LvlSpecs>;
-        if constexpr (lspec::Type::isDense()) {
+        if constexpr (lspec::Type::isDense() || lspec::Type::isRange()) {
           // Dense level: pos * size + i.
           // TODO: see below, use a constexpr GetLvlSize(L) instead?
           const index_t dpos = pos * lvlsz[L] + lvl[L];
@@ -940,6 +940,8 @@ MATX_IGNORE_WARNING_POP_GCC
               }
             }
           }
+        } else {
+          static_assert(L != L); // unimplemented case
         }
       }
       return -1; // not found
@@ -963,9 +965,9 @@ MATX_IGNORE_WARNING_POP_GCC
       cuda::std::array<index_t, DIM> dim{indices...};
       cuda::std::array<index_t, LVL> lvl;
       cuda::std::array<index_t, LVL> lvlsz;
-      TensorData::Format::dim2lvl(dim.data(), lvl.data(), /*asSize=*/false);
+      TensorData::Format::template dim2lvl<false>(dim.data(), lvl.data());
       // TODO: only compute once and provide a constexpr LvlSize(l) instead?
-      TensorData::Format::dim2lvl(Shape().data(), lvlsz.data(), /*asSize=*/true);
+      TensorData::Format::template dim2lvl<true>(Shape().data(), lvlsz.data());
       const index_t pos = GetPos(lvlsz.data(), lvl.data(), 0);
       if (pos != -1) {
         const typename TensorData::value_type tmp = Data()[pos];

@@ -40,20 +40,26 @@ namespace experimental {
 
 //
 // A level expression consists of an expression in terms of dimension
-// variables (e.g. di, di div 2, or di mod 2).
+// variables (e.g. d0, d0 + d1, d1 - d0, d0 div 2, or d0 mod 2).
 //
-enum class LvlOp { Id, Div, Mod };
-template <LvlOp O, int D, int C = 0> class LvlExpr {
+// TODO: more elegant to have Var(i) and Const(c) in type "syntax"
+//
+enum class LvlOp { Id, Add, Sub, Div, Mod };
+template <LvlOp O, int I, int J = 0> class LvlExpr {
 public:
   static constexpr LvlOp op = O;
-  static constexpr int di = D;
-  static constexpr int cj = C;
+  static constexpr int di = I; // dim var
+  static constexpr int cj = J; // dim var or const
 
   static constexpr bool isId(int d) { return op == LvlOp::Id && di == d; }
 
   static std::string toString() {
     if constexpr (op == LvlOp::Id) {
       return "d" + std::to_string(di);
+    } else if constexpr (op == LvlOp::Add) {
+      return "d" + std::to_string(di) + " + d" + std::to_string(cj);
+    } else if constexpr (op == LvlOp::Sub) {
+      return "d" + std::to_string(di) + " - d" + std::to_string(cj);
     } else if constexpr (op == LvlOp::Div) {
       return "d" + std::to_string(di) + " div " + std::to_string(cj);
     } else if constexpr (op == LvlOp::Mod) {
@@ -68,7 +74,7 @@ public:
 // A level type consists of a level format together with a set of
 // level properties (unique and ordered by default).
 //
-enum class LvlFormat { Dense, Compressed, Singleton };
+enum class LvlFormat { Dense, Compressed, Singleton, Range };
 template <LvlFormat F, bool U = true, bool O = true> class LvlType {
 public:
   static constexpr LvlFormat format = F;
@@ -95,6 +101,11 @@ public:
     return format == LvlFormat::Singleton;
   }
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isRange() {
+    return format == LvlFormat::Range;
+  }
+
   static std::string toString() {
     if constexpr (isDense()) {
       return "dense";
@@ -104,6 +115,8 @@ public:
       return "compressed(non-unique)";
     } else if constexpr (isSingleton()) {
       return "singleton";
+    } else if constexpr (isRange()) {
+      return "range";
     } else { // Should not happen
       return "?";
     }
@@ -174,23 +187,38 @@ public:
     return false;
   }
 
-  template <class CRD, int L = 0>
+  template <bool SZ, class CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
-  dim2lvl(const CRD *dims, CRD *lvls, bool asSize) {
+  dim2lvl(const CRD *dims, CRD *lvls) {
     if constexpr (L < LVL) {
       using ftype = cuda::std::tuple_element_t<L, LvlSpecs>;
       static_assert(ftype::Expr::di < DIM);
       if constexpr (ftype::Expr::op == LvlOp::Id) {
         lvls[L] = dims[ftype::Expr::di];
+      } else if constexpr (ftype::Expr::op == LvlOp::Add) {
+        static_assert(ftype::Expr::cj < DIM);
+        if constexpr (SZ) // range [0:M+N-2]
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
+        else
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj];
+      } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
+        static_assert(ftype::Expr::cj < DIM);
+        if constexpr (SZ) // range [-M+1:N-1]
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
+        else
+          lvls[L] = dims[ftype::Expr::di] - dims[ftype::Expr::cj];
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         lvls[L] = dims[ftype::Expr::di] / ftype::Expr::cj;
-      } else if constexpr (ftype::Expr::op == LvlOp::Mod && asSize) {
-        lvls[L] = ftype::Expr::cj;
-      } else if constexpr (ftype::Expr::op == LvlOp::Mod && !asSize) {
-        lvls[L] = dims[ftype::Expr::di] % ftype::Expr::cj;
+      } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
+        if constexpr (SZ) // range [0:i % C]
+          lvls[L] = ftype::Expr::cj;
+        else
+          lvls[L] = dims[ftype::Expr::di] % ftype::Expr::cj;
+      } else {
+        static_assert(L != L); // unimplemented case
       }
       if constexpr (L + 1 < LVL) {
-        dim2lvl<CRD, L + 1>(dims, lvls, asSize);
+        dim2lvl<SZ, CRD, L + 1>(dims, lvls);
       }
     }
   }
@@ -203,10 +231,16 @@ public:
       static_assert(ftype::Expr::di < DIM);
       if constexpr (ftype::Expr::op == LvlOp::Id) {
         dims[ftype::Expr::di] = lvls[L];
+      } else if constexpr (ftype::Expr::op == LvlOp::Add) {
+        dims[ftype::Expr::cj] = lvls[L + 1] + lvls[L];
+      } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
+        dims[ftype::Expr::cj] = lvls[L + 1] - lvls[L]; // order!
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         dims[ftype::Expr::di] = lvls[L] * ftype::Expr::cj;
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
         dims[ftype::Expr::di] += lvls[L]; // update (seen second)
+      } else {
+        static_assert(L != L); // unimplemented case
       }
       if constexpr (L + 1 < LVL) {
         lvl2dim<CRD, L + 1>(lvls, dims);
@@ -254,14 +288,17 @@ using D3 = LvlExpr<LvlOp::Id, 3>;
 using D4 = LvlExpr<LvlOp::Id, 4>;
 
 // Operation short-cuts.
-template <int D, int C> using Div = LvlExpr<LvlOp::Div, D, C>;
-template <int D, int C> using Mod = LvlExpr<LvlOp::Mod, D, C>;
+template <int I, int J> using Add = LvlExpr<LvlOp::Add, I, J>;
+template <int I, int J> using Sub = LvlExpr<LvlOp::Sub, I, J>;
+template <int I, int J> using Div = LvlExpr<LvlOp::Div, I, J>;
+template <int I, int J> using Mod = LvlExpr<LvlOp::Mod, I, J>;
 
 // Level type short-cuts.
 using Dense = LvlType<LvlFormat::Dense>;
 using Compressed = LvlType<LvlFormat::Compressed>;
 using CompressedNU = LvlType<LvlFormat::Compressed, false>;
 using Singleton = LvlType<LvlFormat::Singleton>;
+using Range = LvlType<LvlFormat::Range>;
 
 // Scalars.
 using Scalar = SparseTensorFormat<0>;
@@ -285,6 +322,10 @@ using DCSC =
     SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Compressed>>;
 using CROW = SparseTensorFormat<2, LvlSpec<D0, Compressed>, LvlSpec<D1, Dense>>;
 using CCOL = SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Dense>>;
+using DIA =
+    SparseTensorFormat<2, LvlSpec<Sub<1, 0>, Compressed>, LvlSpec<D1, Range>>;
+using SkewDIA =
+    SparseTensorFormat<2, LvlSpec<Add<1, 0>, Compressed>, LvlSpec<D1, Range>>;
 
 // Sparse Block Matrices.
 template <int M, int N>
