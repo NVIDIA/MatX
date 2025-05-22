@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -80,7 +81,7 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   using CRD = typename CrdTensor::value_type;
   using POS = index_t;
   // Proper structure.
-  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 && CrdTensor::Rank() == 1,
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1,
                          matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(val.Size(0) == row.Size(0) && val.Size(0) == col.Size(0),
                   matxInvalidParameter,
@@ -112,8 +113,8 @@ auto make_zero_tensor_coo(const index_t (&shape)[2],
 
 // Constructs a sparse matrix in CSR format directly from the values, the
 // row positions, and column coordinates vectors. The entries should be
-// sorted by row, then column. Explicit zeros may be stored. Duplicate
-// entries should not occur. Explicit zeros may be stored.
+// sorted by row, then column. Duplicate entries should not occur. Explicit
+// zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
 auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
                      const index_t (&shape)[2]) {
@@ -121,7 +122,8 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   // Proper structure.
-  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && PosTensor::Rank() == 1 && CrdTensor::Rank() == 1,
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && PosTensor::Rank() == 1 &&
+                             CrdTensor::Rank() == 1,
                          matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(rowp.Size(0) == shape[0] + 1, matxInvalidParameter,
                   "row positions arrays should have length #rows + 1");
@@ -148,8 +150,8 @@ auto make_zero_tensor_csr(const index_t (&shape)[2],
 
 // Constructs a sparse matrix in CSC format directly from the values, the
 // column positions, and row coordinates vectors. The entries should be
-// sorted by columns, then row. Explicit zeros may be stored. Duplicate
-// entries should not occur. Explicit zeros may be stored.
+// sorted by columns, then row. Duplicate entries should not occur. Explicit
+// zeros may be stored.
 template <typename ValTensor, typename PosTensor, typename CrdTensor>
 auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
                      const index_t (&shape)[2]) {
@@ -157,7 +159,8 @@ auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
   using CRD = typename CrdTensor::value_type;
   using POS = typename PosTensor::value_type;
   // Proper structure.
-  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1 && PosTensor::Rank() == 1,
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && PosTensor::Rank() == 1 &&
+                             CrdTensor::Rank() == 1,
                          matxInvalidParameter, "data arrays should be rank-1");
   MATX_ASSERT_STR(colp.Size(0) == shape[1] + 1, matxInvalidParameter,
                   "column positions array should have length #columns + 1");
@@ -180,6 +183,35 @@ auto make_zero_tensor_csc(const index_t (&shape)[2],
        makeDefaultNonOwningEmptyStorage<CRD>()},
       {makeDefaultNonOwningEmptyStorage<POS>(),
        makeDefaultNonOwningZeroStorage<POS>(shape[1] + 1, space)});
+}
+
+// Constructs a sparse matrix in DIA format directly from the values and the
+// offset vectors. For an m x n matrix, this format uses a linearized storage
+// where each diagonal has n entries, padded with zeros on the right for the
+// lower triangular part and padded with zeros on the left for the upper
+// triagonal part. This format is most efficient for matrices with only a
+// few nonzero diagonals that are close to the main diagonal.
+template <typename ValTensor, typename CrdTensor>
+auto make_tensor_dia(ValTensor &val, CrdTensor &off,
+                     const index_t (&shape)[2]) {
+  using VAL = typename ValTensor::value_type;
+  using CRD = typename CrdTensor::value_type;
+  using POS = index_t;
+  // Proper structure.
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1,
+                         matxInvalidParameter, "data arrays should be rank-1");
+  // Note that the DIA API typically does not involve positions.
+  // However, under the formal DSL specifications, the top level
+  // compression should set up pos[0] = {0, nse}. This is done
+  // here, using the same memory space as the other data.
+  matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
+  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  tp.data()[1] = val.Size(0);
+  // Construct DIA.
+  return sparse_tensor_t<VAL, CRD, POS, DIA>(
+      shape, val.GetStorage(),
+      {makeDefaultNonOwningEmptyStorage<CRD>(), off.GetStorage()},
+      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
 } // namespace experimental
