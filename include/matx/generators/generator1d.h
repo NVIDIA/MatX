@@ -49,10 +49,25 @@ namespace matx
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-            return f_(pp_get<Dim>(indices...));
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (RANK != 1) { // Vectorization not supported yet
+            return detail::ElementsPerThread::ONE;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
           }
+        }
+
+        template <detail::ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+          return f_.template operator()<EPT>(pp_get<Dim>(indices...));
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
         {

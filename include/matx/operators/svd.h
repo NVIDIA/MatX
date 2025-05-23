@@ -65,6 +65,12 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+      }
+
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -116,7 +122,7 @@ namespace detail {
  *   Compute all, part, or none of matrices *U* and *VT*
  * @param algo
  *   For Host SVD calls, whether to use more efficient divide-and-conquer based
- *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
+ *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
  *   can run significantly faster, especially for large matrices. However, `gesdd`
  *   requires \f$ O(\min(M,N) ^ 2) \f$ memory as compared to \f$ O(\max(M,N)) \f$ for
  *   `gesvd`, and it can have poorer accuracy in some cases.
@@ -163,6 +169,19 @@ namespace detail {
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return ElementsPerThread::ONE;
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(a_),
+                                           detail::get_operator_capability<Cap>(x_));
+        }
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
@@ -242,6 +261,17 @@ namespace detail {
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return ElementsPerThread::ONE;
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        }
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {

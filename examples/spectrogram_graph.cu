@@ -89,11 +89,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (time = linspace(0.0f, static_cast<float>(N) - 1.0f, N) / fs)
       .run(exec);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
-  (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(exec);
+  (modulation = 500.f * cos(2.f * static_cast<float>(M_PI) * 0.25f * time)).run(exec);
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
-  (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(exec);
+  (carrier = amp * sin(2.f * static_cast<float>(M_PI) * 3000.f * time + modulation)).run(exec);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(exec);
+  (noise = sqrt(0.01f * fs / 2.f) * random<float>({N}, NORMAL)).run(exec);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(exec);
   // x = carrier + noise
@@ -106,7 +106,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
 
     // DFT Sample Frequencies (rfftfreq)
-    (freqs = (1.0 / (static_cast<float>(nfft) * 1 / fs)) *
+    (freqs = (1.0f / (static_cast<float>(nfft) * 1.0f / fs)) *
                linspace(0.0f, static_cast<float>(nfft) / 2.0f, nfft / 2 + 1))
         .run(exec);
 
@@ -122,7 +122,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     // Spectral time axis
     (s_time = linspace(static_cast<float>(nperseg) / 2.0f,
-                           static_cast<float>(N - nperseg) / 2.0f + 1, (N - noverlap) / nstep) /
+                           static_cast<float>(N - nperseg) / 2.0f + 1.0f, (N - noverlap) / nstep) /
                 fs)
         .run(exec);
 

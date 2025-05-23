@@ -59,23 +59,39 @@ namespace matx
 
         __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
 
-        template <typename Op, typename Idx, typename... Is>
+        template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
         {    
-          auto arrs = detail::GetIdxFromAbs(op, idx(i));
-          return get_value(op, arrs);          
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            auto arrs = detail::GetIdxFromAbs(op, get_value<EPT>(idx, i));
+            return get_value<EPT>(op, arrs);          
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
+        {
+          return get_impl<EPT>(cuda::std::as_const(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          return get_impl(cuda::std::as_const(op_), idx_, i);
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
+        {
+          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), idx_, i);
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -109,7 +125,21 @@ namespace matx
           if constexpr (is_matx_op<IdxType>()) {
             idx_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }          
-        }        
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+            detail::get_operator_capability<Cap>(op_),
+              detail::get_operator_capability<Cap>(idx_)
+            );
+          }
+        }
     };
   }   
 

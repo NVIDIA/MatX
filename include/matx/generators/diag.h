@@ -58,15 +58,31 @@ namespace matx
         }
       };
 
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-          if (((pp_get<0>(indices...) == indices) && ...)) {
-            return T(val_);
-          }
-          else {
-            return T(0.0f);
-          }
+      template <detail::OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return ElementsPerThread::ONE;
+        } else {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return self_has_cap;
         }
+      }
+
+      // Does not support vectorization yet
+      template <detail::ElementsPerThread EPT, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+        if (((pp_get<0>(indices...) == indices) && ...)) {
+          return T(val_);
+        }
+        else {
+          return T(0.0f);
+        }
+      }
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+      }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
       {

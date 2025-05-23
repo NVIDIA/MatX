@@ -105,48 +105,49 @@ public:
     }
   }
 
-  template <typename... Is>
-  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
-  {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, indices...))>) {
-      auto &&out = out_(indices...);
-      out = static_cast<float>(detail::get_value(op_, indices...));
-    }
-    else {
-      auto &&out = out_(indices...);
-      out = detail::get_value(op_, indices...);
-    }
-
-    return out_(indices...);
-  }
-
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
-  template <typename... Ts>
+  template <ElementsPerThread EPT, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    if constexpr (is_matx_half_v<T> &&
-                  std::is_integral_v<decltype(detail::get_value(op_, args...))>) {
-      auto r = static_cast<float>(detail::get_value(op_, args...));
-      out_(args...) = r;
-      return r;
-    }
-    else {
-      auto r = detail::get_value(op_, args...);
-      out_(args...) = r;
-      return r;
-    }
+    auto r = detail::get_value<EPT>(op_, args...);
+    out_(args...) = r;
+    return r;
   }
 
-  template <typename ShapeType>
+  template <ElementsPerThread EPT, typename ShapeType>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
-        return _internal_mapply(args...);
+        return _internal_mapply<EPT>(args...);
       }, idx
     );
 
     return res;
+  }
+
+  template <ElementsPerThread EPT, typename... Is>
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
+  {
+    //auto &&out = out_(indices...);
+    //out = detail::get_value<EPT>(op_, indices...);
+    const auto in_val = detail::get_value<EPT>(op_, indices...);
+    using out_type = decltype(out_.template operator()<EPT>(indices...));
+    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(EPT)> vec{in_val};
+      out_.template operator()<EPT>(indices...) = vec;
+    }
+    else {
+      out_.template operator()<EPT>(indices...) = in_val;
+    }
+    return in_val;
+
+    //return out_(indices...);
+  }  
+
+  template <typename... Is>
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  
+  {
+    return (*this).template operator()<detail::ElementsPerThread::ONE>(indices...);
   }
 
   template <typename ShapeType, typename Executor>
@@ -170,6 +171,14 @@ public:
       op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
   }
+
+  template <detail::OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+                                      detail::get_operator_capability<Cap>(out_),
+                                      detail::get_operator_capability<Cap>(op_));
+  }  
 
   // Used as a shortcut where the RHS is an executor and LHS is a tensor. In this case we
   // want to avoid the RHS from allocating any temporary output memory, so we call

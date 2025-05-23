@@ -49,8 +49,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStream_t stream = 0;
   cudaExecutor exec{stream};
 
-  int m = 5;
-  int n = 4;
+  int m = 16;
+  int n = 16;
 
   int d = std::min(m,n);
   int k = d;  // number of singular values to find
@@ -88,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VTV = make_tensor<AType>({k, k});
   auto x0 = random<float>({d}, NORMAL);
 
-  (A = random<float>({m, n}, NORMAL)).run(exec);
+  (A = random<float>({m, n}, NORMAL) * 10000.f).run(exec);
 
 #endif
   cuda::std::array<index_t, U.Rank()> Dshape;
@@ -97,7 +97,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // cloning D across
   auto D = clone<U.Rank()>(S, Dshape);
 
-  float tol = (float)1e-3;
+  [[maybe_unused]]float tol = (float)1e-3;
   int iterations = 20;
 
   {

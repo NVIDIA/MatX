@@ -37,7 +37,7 @@
 namespace matx
 {
   namespace detail {
-    template <class T> class FFTFreqOp {
+    template <class T> class FFTFreqOp : public BaseOp<FFTFreqOp<T>> {
       private:
         index_t n_;
         float d_;
@@ -54,10 +54,23 @@ namespace matx
           d_ = d;
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const {
-          index_t offset = idx >= (n_+1)/2 ? -n_ : 0;
-          return static_cast<T>(idx + offset) / (d_*(T)n_);
+        template <detail::ElementsPerThread EPT>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t i) {
+            index_t offset = i >= (n_+1)/2 ? -n_ : 0;
+            return static_cast<T>(i + offset) / (d_*(T)n_);
+          }, idx);
         }
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
+          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return n_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

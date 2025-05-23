@@ -62,8 +62,8 @@ namespace matx {
     #define __MATX_HOST__ __host__
     #define __MATX_DEVICE__ __device__
 #else
-    #define __MATX_HOST__  __host__
-    #define __MATX_DEVICE__ __device__
+    #define __MATX_HOST__
+    #define __MATX_DEVICE__
 #endif
 
 #ifdef __GNUC__
@@ -112,5 +112,8 @@ enum {
   // If adding a new marker adjust this to the last element above
   matxIdxSentinel = matxKeepStride - 1,
 };
+
+// Do this on a per-architecture basis in the future
+static constexpr int MAX_VEC_WIDTH_BYTES = 16;
 
 }

@@ -33,25 +33,39 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <typename T> class Hanning {
+    template <typename T> class Hanning : public BaseOp<Hanning<T>> {
       private:
         index_t size_;
 
       public:
         using value_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "hanning"; }
 
         inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){};
 
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))); }, i);
+        }
+
         inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
         {
-          return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1)));
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
         }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

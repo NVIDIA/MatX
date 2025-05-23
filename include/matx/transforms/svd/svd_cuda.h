@@ -56,6 +56,7 @@ enum class SVDMethod {
   POW_ITER,
 };
 
+
 template<typename AType>
 inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
   using ATypeS = typename AType::value_type;
@@ -965,7 +966,8 @@ void svd_impl(UTensor &&u, STensor &&s,
 
   // The power iteration method is a custom kernel so we don't need to test the types
   if (method == detail::SVDMethod::POW_ITER) {
-    svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
+    MATX_THROW(matxInvalidType, "Power iteration method not implemented");
+    //svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
     return;
   }
 

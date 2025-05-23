@@ -39,6 +39,7 @@
 
 namespace matx
 {
+  namespace detail {
   /**
    * Conditionally execute an operator, otherwise execute a different operator
    *
@@ -51,7 +52,7 @@ namespace matx
    *
    */
   template <typename C1, typename T1, typename T2>
-    class IFELSE : public BaseOp<IFELSE<C1, T1, T2>>
+    class IFELSEOp : public BaseOp<IFELSEOp<C1, T1, T2>>
   {
     private:
       typename detail::base_type_t<C1> cond_;
@@ -67,13 +68,13 @@ namespace matx
       }
 
       /**
-       * @brief Constructor for an IFELSE statement
+       * @brief Constructor for an IFELSEOp statement
        *
        * @param cond Condition to perform the IF/ELSE on
        * @param op1 Operator if conditional branch is true
        * @param op2 Operator if conditional branch is false
        */
-      __MATX_INLINE__ IFELSE(const C1 &cond, const T1 &op1, const T2 &op2) :
+      __MATX_INLINE__ IFELSEOp(const C1 &cond, const T1 &op1, const T2 &op2) :
                               cond_(cond), op1_(op1), op2_(op2)
     {
       static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
@@ -105,17 +106,33 @@ namespace matx
       /**
        * @brief Operator() for getting values of an if/else
        *
+       * @tparam EPT ElementsPerThread
+       * @tparam Is Index types
+       * @param indices Index values
+       */
+      template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
+              return get_value<ElementsPerThread::ONE>(op1_, indices...);
+            }
+            else {
+              return get_value<ElementsPerThread::ONE>(op2_, indices...);
+            }
+          } else {
+            return Vector<int, static_cast<index_t>(EPT)>{};
+          }
+        }
+
+      /**
+       * @brief Operator() for getting values of an if/else
+       *
        * @tparam Is Index types
        * @param indices Index values
        */
       template <typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value(cond_, indices...)) {
-            get_value(op1_, indices...);
-          }
-          else {
-            get_value(op2_, indices...);
-          }
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
       /**
@@ -170,5 +187,41 @@ namespace matx
       {
         return size_[dim];
       }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return ElementsPerThread::ONE;
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+              self_has_cap,
+            detail::get_operator_capability<Cap>(cond_),
+            detail::get_operator_capability<Cap>(op1_),
+            detail::get_operator_capability<Cap>(op2_)
+          );
+        }
+      }
   };
+
+  } // end namespace detail
+
+  /**
+   *
+   * @brief Compares two operators or views and conditionally executes the second
+   * statement if the first is true. Values from an operator are executed
+   * individually, and the only requirement for the conditional is the comparison
+   * operator must be defined for the particular type. For example, operator< on
+   * two integers is okay, but the same operator on two complex numbers will give
+   * a compiler error.
+   *
+   * @param cond Condition to perform the IF/ELSE on
+   * @param t1 op1
+   *
+   * @param t2 op2
+   */
+  template <typename C1, typename T1, typename T2>
+    auto IFELSE(C1 cond, T1 t1, T2 t2) {
+      return detail::IFELSEOp<C1,T1,T2>(cond,t1,t2);
+    }  
 } // end namespace matx

@@ -59,7 +59,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   float ftone = 2048.0;
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-  cudaExecutor exec{stream};
+  cudaExecutor exec{stream, true};
 
   // Create input signal as a complex exponential
   auto sample_index_range = range<0>({signal_size},0.f,1.f);

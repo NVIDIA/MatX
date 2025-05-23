@@ -60,12 +60,31 @@ namespace matx
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op2);
         }
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()([[maybe_unused]] Is... indices) const
         {
+          auto op_func = [this](const auto &op1, const auto &op2) {
+            return static_cast<int>(scalar_internal_abs(op1 - op2) <=
+              static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * scalar_internal_abs(op2));
+          };
 
-          return static_cast<int>(detail::_internal_abs(get_value(op1_, indices...) - get_value(op2_, indices...)) <=
-              static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * detail::_internal_abs(get_value(op2_, indices...)));
+          const auto op1 = get_value<EPT>(op1_, indices...);
+          const auto op2 = get_value<EPT>(op2_, indices...);
+          return ApplyVecFunc<EPT, int>(op_func, op1, op2);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()([[maybe_unused]] Is... indices) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(op1_),
+                                           detail::get_operator_capability<Cap>(op2_));
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

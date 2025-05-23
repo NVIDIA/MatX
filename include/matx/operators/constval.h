@@ -51,9 +51,19 @@ namespace matx
       __MATX_INLINE__ std::string str() const { return  "constval"; }
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
+      template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            return v_;
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{v_};
+          }
+        }
+
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ T operator()(Is...) const { 
-          return v_; };
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
+          return this->operator()<detail::ElementsPerThread::ONE>();
+        }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const {
         if constexpr (!is_noshape_v<ShapeType>) {
@@ -70,6 +80,11 @@ namespace matx
         else {
           return matxNoRank;
         }
+      }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        return capability_attributes<Cap>::default_value;
       }
     };
   }

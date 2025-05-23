@@ -67,10 +67,15 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+      template <ElementsPerThread EPT, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_.template operator()<EPT>(indices...);
+      };
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_(indices...);
-      };
+        return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+      };      
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -81,6 +86,13 @@ namespace detail {
       {
         return ORank;
       }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        // No specific capabilities enforced
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+      }      
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept

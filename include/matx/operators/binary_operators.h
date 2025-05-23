@@ -117,22 +117,38 @@ namespace matx
         }
       }
 
+      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+      __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
+      {
+        auto i1 = get_value<EPT>(in1_, indices...);
+        auto i2 = get_value<EPT>(in2_, indices...);
+        return op_.template operator()<EPT>(i1, i2);
+      }
+
       template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        auto i1 = get_value(in1_, indices...);
-        auto i2 = get_value(in2_, indices...);
-        return op_(i1, i2);
-      }
+        return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+      }      
 
-      template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <ElementsPerThread EPT, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()(args...);
+            return this->operator()<EPT>(args...);
           }, idx);
       }
 
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+
+        auto lhs_child_cap = detail::get_operator_capability<Cap>(in1_);
+        auto rhs_child_cap = detail::get_operator_capability<Cap>(in2_);
+
+        return combine_capabilities<Cap>(self_has_cap, lhs_child_cap, rhs_child_cap);
+      }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {

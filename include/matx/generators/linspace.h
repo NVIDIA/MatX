@@ -68,8 +68,18 @@ namespace matx
           }
         }
 
-        template <typename... Is>
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(Is... indices) const { 
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }
+
+        template <detail::ElementsPerThread EPT, typename... Is>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
           static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");
           cuda::std::array idx{indices...};
           if constexpr (sizeof...(indices) == 1) {
@@ -81,6 +91,11 @@ namespace matx
               return firsts_[idx[0]] + steps_[idx[0]] * static_cast<T>(idx[1]);
             }
           }
+        }
+
+        template <typename... Is>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

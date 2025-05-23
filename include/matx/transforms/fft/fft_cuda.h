@@ -146,6 +146,7 @@ public:
     if (norm == FFTNorm::ORTHO) {
       (o *= 1.0 / std::sqrt(factor)).run(stream);
     } else if (norm == FFTNorm::FORWARD) {
+      printf("scale\n");
       (o *= 1.0 / factor).run(stream);
     }
 
@@ -183,9 +184,9 @@ public:
     }
 
     if (norm == FFTNorm::ORTHO) {
-      (o *= 1.0 / std::sqrt(factor)).run(stream);
+      (o *= static_cast<s_type>(1.0 / std::sqrt(factor))).run(stream);
     } else if (norm == FFTNorm::BACKWARD) {
-      (o *= 1.0 / factor).run(stream);
+      (o *= static_cast<s_type>(1.0) / factor).run(stream);
     }
 
   }
