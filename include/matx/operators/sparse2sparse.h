@@ -73,7 +73,8 @@ public:
       // NOTE: sparse assignment O = sparse2sparse(A) takes direct reference!
       sparse2sparse_impl(out, a_, ex);
     } else {
-      MATX_THROW(matxNotSupported, "Cannot use sparse2sparse on dense operands");
+      MATX_THROW(matxNotSupported,
+                 "Cannot use sparse2sparse on dense operands");
     }
   }
 };
