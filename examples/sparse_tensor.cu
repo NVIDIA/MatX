@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
@@ -36,8 +37,7 @@
 
 using namespace matx;
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
-{
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   MATX_ENTER_HANDLER();
 
   cudaStream_t stream = 0;
@@ -49,20 +49,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // support in e.g. cuSPARSE, but MatX provides a much more general
   // way to define the sparse tensor storage through a DSL (see doc).
   //
-  experimental::Scalar::print();   // scalars
-  experimental::SpVec::print();    // sparse vectors
-  experimental::COO::print();      // various sparse matrix formats
+  experimental::Scalar::print(); // scalars
+  experimental::SpVec::print();  // sparse vectors
+  experimental::COO::print();    // various sparse matrix formats
   experimental::CSR::print();
   experimental::CSC::print();
   experimental::DCSR::print();
   experimental::DIA::print();
   experimental::SkewDIA::print();
-  experimental::BSR<2,2>::print(); // 2x2 blocks
-  experimental::COO4::print();     // 4-dim tensor in COO
-  experimental::CSF5::print();     // 5-dim tensor in CSF
+  experimental::BSR<2, 2>::print(); // 2x2 blocks
+  experimental::COO4::print();      // 4-dim tensor in COO
+  experimental::CSF5::print();      // 5-dim tensor in CSF
 
   //
-  // Creates a COO matrix for the following 4x8 dense matrix with 5 nonzero
+  // Creates a 4x8 COO matrix for the following 4x8 dense matrix with 5 nonzero
   // elements, using the factory method that uses MatX tensors for the 1-dim
   // buffers. The sparse matrix resides in the same memory space as its buffer
   // constituents.
@@ -81,7 +81,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
   //
   auto vals = make_tensor<float>({5});
-  auto idxi = make_tensor<int>({5}); 
+  auto idxi = make_tensor<int>({5});
   auto idxj = make_tensor<int>({5});
   vals.SetVals({1, 2, 3, 4, 5});
   idxi.SetVals({0, 0, 3, 3, 3});
@@ -122,14 +122,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   auto B = make_tensor<float, 2>({8, 4});
   auto C = make_tensor<float>({4, 4});
-  B.SetVals({
-    { 0,  1,  2,  3}, { 4,  5,  6,  7}, { 8,  9, 10, 11}, {12, 13, 14, 15},
-    {16, 17, 18, 19}, {20, 21, 22, 23}, {24, 25, 26, 27}, {28, 29, 30, 31} });
+  B.SetVals({{0, 1, 2, 3},
+             {4, 5, 6, 7},
+             {8, 9, 10, 11},
+             {12, 13, 14, 15},
+             {16, 17, 18, 19},
+             {20, 21, 22, 23},
+             {24, 25, 26, 27},
+             {28, 29, 30, 31}});
   (C = matmul(Acoo, B)).run(exec);
   print(C);
 
   //
-  // Creates a CSR matrix which is used to solve the following
+  // Creates a 4x4 CSR matrix which is used to solve the following
   // system of equations AX=Y, where X is the unknown.
   //
   // | 1 2 0 0 |   | 1 5 |   |  5 17 |
@@ -147,7 +152,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(Acsr);
   auto X = make_tensor<float>({4, 2});
   auto Y = make_tensor<float>({4, 2});
-  Y.SetVals({ {5, 17}, {6, 18}, {12, 28}, {20, 40} });
+  Y.SetVals({{5, 17}, {6, 18}, {12, 28}, {20, 40}});
   (X = solve(Acsr, Y)).run(exec);
   print(X);
 
@@ -160,11 +165,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // "dense2sparse" operation at the right-hand-side.
   //
   auto D = make_tensor<float, 2>({4, 8});
-  D.SetVals({
-    {0, 11,  0, 12,  0,  0,  0,  0},
-    {0,  0, 13,  0,  0,  0,  0,  0},
-    {0,  0,  0,  0,  0,  0,  0, 14},
-    {0, 15,  0,  0, 16,  0, 17,  0}});
+  D.SetVals({{0, 11, 0, 12, 0, 0, 0, 0},
+             {0, 0, 13, 0, 0, 0, 0, 0},
+             {0, 0, 0, 0, 0, 0, 0, 14},
+             {0, 15, 0, 0, 16, 0, 17, 0}});
   (Acoo = dense2sparse(D)).run(exec);
   print(Acoo);
 

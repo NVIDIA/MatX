@@ -207,10 +207,10 @@ struct SolveCUDSSParamsKeyEq {
   bool operator()(const SolveCUDSSParams_t &l,
                   const SolveCUDSSParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.stream == t.stream && l.nse == t.nse &&
-           l.m == t.m && l.n == t.n && l.k == t.k && l.ptrA0 == t.ptrA0 &&
-           l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 &&
-           l.ptrA4 == t.ptrA4 && l.ptrB == t.ptrB && l.ptrC == t.ptrC;
+           l.stream == t.stream && l.nse == t.nse && l.m == t.m && l.n == t.n &&
+           l.k == t.k && l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 &&
+           l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 && l.ptrA4 == t.ptrA4 &&
+           l.ptrB == t.ptrB && l.ptrC == t.ptrC;
   }
 };
 
