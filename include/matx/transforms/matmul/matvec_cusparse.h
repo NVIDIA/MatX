@@ -40,6 +40,7 @@
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
 #include "matx/core/tensor.h"
+#include "matx/kernels/matvec.cuh"
 
 namespace matx {
 
@@ -303,14 +304,39 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
   MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
               matxInvalidParameter);
 
-  // Get parameters required by these tensors (for caching).
-  auto params =
+  if constexpr (atype::Format::isDIA()) {
+
+    // Fall back to a hand-written kernel for DIA format, since
+    // this format is not supported in cuSPARSE. The hand-written
+    // kernel even performs better than COO/CSR cuSPARSE for matrices
+    // with only a few nonzero diagonals near the main diagonal.
+#ifndef __CUDACC__
+    MATX_THROW(matxNotSupported, "DIA SpMV not supported on host");
+#else
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    assert(alpha == 1.0 && beta == 0.0); // optimized for this case
+    using CRD = typename atype::crd_type;
+    TA *AD = a.Data();
+    TA *BD = b.Data();
+    TA *CD = c.Data();
+    CRD *diags = a.CRDData(1);
+    uint64_t numD = a.crdSize(1);
+    uint64_t n = c.Size(0);
+    uint32_t THREADS = static_cast<uint32_t>(std::min(n, 1024LU));
+    uint32_t BATCHES = static_cast<uint32_t>(cuda::std::ceil(static_cast<double>(n) / THREADS));
+    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, n);
+#endif
+
+  } else {
+
+    // Get parameters required by these tensors (for caching).
+    auto params =
       detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>::GetSpMVParams(
           c, a, b, stream, alpha, beta);
 
-  // Lookup and cache.
-  using cache_val_type = detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>;
-  detail::GetCache().LookupAndExec<detail::spmv_cusparse_cache_t>(
+    // Lookup and cache.
+    using cache_val_type = detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>;
+    detail::GetCache().LookupAndExec<detail::spmv_cusparse_cache_t>(
       detail::GetCacheIdFromType<detail::spmv_cusparse_cache_t>(), params,
       [&]() {
         return std::make_shared<cache_val_type>(c, a, b, stream, alpha, beta);
@@ -318,6 +344,8 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b);
       });
+
+  }
 
   // Copy transformed output back.
   if (!c.isSameView(C)) {
