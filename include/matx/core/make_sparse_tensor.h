@@ -38,6 +38,7 @@
 namespace matx {
 namespace experimental {
 
+// Helper method to zero memory.
 template <typename T>
 __MATX_INLINE__ static void setZero(T *ptr, index_t sz,
                                     matxMemorySpace_t space) {
@@ -48,10 +49,11 @@ __MATX_INLINE__ static void setZero(T *ptr, index_t sz,
   }
 }
 
+// Helper method to fill memory.
 template <typename T>
 __MATX_INLINE__ static void setVal(T *ptr, T val, matxMemorySpace_t space) {
   if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
-    cudaMemcpy(ptr, &val, sizeof(T), cudaMemcpyDeviceToHost);
+    cudaMemcpy(ptr, &val, sizeof(T), cudaMemcpyHostToDevice);
   } else {
     memcpy(ptr, &val, sizeof(T));
   }
