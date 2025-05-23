@@ -38,7 +38,7 @@ namespace matx {
 namespace detail {
 
 template <int RANK>
-inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes,
+inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, uint32_t ept,
                           int max_cta_size = 1024)
 {
   bool stride = false;
@@ -50,19 +50,20 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
   //   Fill in order x, y, z up to 1024 threads
   if constexpr (RANK == 1) {
     while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[0]) {
+      if ((static_cast<index_t>(threads.x) * ept) < sizes[0]) {
         threads.x *= 2;
       }
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[0] + threads.x - 1) / threads.x);
+    int rnd_threads = ept * threads.x;
+    blocks.x = static_cast<int>((sizes[0] + rnd_threads - 1) / rnd_threads);  
     blocks.y = 1;
     blocks.z = 1;  
   }
   else if constexpr (RANK == 2) {
     while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[1]) {
+      if ((static_cast<index_t>(threads.x) * ept) < sizes[1]) {
         threads.x *= 2;
       }
       else if (static_cast<index_t>(threads.y) < sizes[0]) {
@@ -71,7 +72,8 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
       nt *= 2;
     }
     // launch as many blocks as necessary
-    blocks.x = static_cast<int>((sizes[1] + threads.x - 1) / threads.x);
+    int rnd_threads_x = ept * threads.x;
+    blocks.x = static_cast<int>((sizes[1] + rnd_threads_x - 1) / rnd_threads_x);
     blocks.y = static_cast<int>((sizes[0] + threads.y - 1) / threads.y);
     blocks.z = 1; 
 

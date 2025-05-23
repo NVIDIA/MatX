@@ -42,9 +42,10 @@
 #include <type_traits>
 
 #include "cuda_fp16.h"
+#include "matx/executors/host.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
-#include "matx/executors/cuda.h"
+#include "matx/core/vector.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -53,6 +54,7 @@
 
 
 namespace matx {
+  
 
 namespace detail {
   template <int N, typename Executor, typename TupleType, typename... Ops>
@@ -67,6 +69,7 @@ namespace detail {
     }
   }
 };
+
 
 enum {
   matxNoRank = -1
@@ -300,9 +303,10 @@ inline constexpr bool is_settable_xform_v = std::conjunction_v<detail::is_matx_s
                                                //detail::is_matx_tensor_set_op_impl<T>>; // Can be tuple also
 
 namespace detail {
-template <typename T> struct is_executor : std::false_type {};
-template <> struct is_executor<cudaExecutor> : std::true_type {};
-template <ThreadsMode MODE> struct is_executor<HostExecutor<MODE>> : std::true_type {};
+template <typename T, typename = void> struct is_executor : std::false_type {};
+
+template <typename T>
+struct is_executor<T, std::void_t<typename T::matx_executor>> : std::true_type {};
 }
 
 /**
@@ -318,8 +322,10 @@ constexpr bool is_executor_t()
 
 
 namespace detail {
-template<typename T> struct is_cuda_executor : std::false_type {};
-template<> struct is_cuda_executor<matx::cudaExecutor> : std::true_type {};
+template <typename T, typename = void> struct is_cuda_executor : std::false_type {};
+
+template <typename T>
+struct is_cuda_executor<T, std::void_t<typename T::cuda_executor>> : std::true_type {};
 }
 
 /**
@@ -331,8 +337,9 @@ template <typename T>
 inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
 
 namespace detail {
-template<typename T> struct is_host_executor : std::false_type {};
-template<ThreadsMode MODE> struct is_host_executor<matx::HostExecutor<MODE>> : std::true_type {};
+template <typename T, typename = void> struct is_host_executor : std::false_type {};
+template <typename T>
+struct is_host_executor<T, std::void_t<typename T::host_executor>> : std::true_type {};
 
 template<typename T> struct is_select_threads_host_executor : std::false_type {};
 template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecutor> : std::true_type {};
@@ -344,7 +351,7 @@ template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecuto
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_host_executor_v = detail::is_host_executor<remove_cvref_t<T>>::value;
+inline constexpr bool is_host_executor_v = detail::is_host_executor<typename remove_cvref<T>::type>::value;
 
 /**
  * @brief Determine if a type is a select threads host executor
@@ -864,17 +871,6 @@ struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_
 template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
 
 
-template <typename T, typename = void> 
-struct exec_type {
-  using type = T;
-};
-
-template <typename T> 
-struct exec_type<T, typename std::enable_if_t<std::is_same_v<T, int>>> {
-  using type = cudaExecutor;
-};
-
-template <typename T> using exec_type_t = typename exec_type<typename remove_cvref<T>::type>::type;
 
 // Type traits to help with the lack of short-circuit template logic. Numpy
 // doesn't support bfloat16 at all, we just use fp32 for the numpy side
@@ -1169,6 +1165,20 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
     return CUSPARSE_INDEX_32I;
   }
 }
+
+
+template <typename T, typename = void> struct is_vector : std::false_type {};
+template <typename T>
+struct is_vector<T, std::void_t<typename T::matx_vec>>
+    : std::true_type {
+};
+
+
+template< class T >
+inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
+
+template <typename T>
+using make_vector_t = typename std::conditional_t<is_vector_v<T>, T, Vector<T, 1>>;
 
 } // end namespace detail
 

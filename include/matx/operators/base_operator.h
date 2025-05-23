@@ -36,7 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
-
+#include "matx/core/capabilities.h"
 namespace matx
 {
 
@@ -100,6 +100,26 @@ namespace matx
             }
           }
         }
+
+        // // Default implementation for getting an operator's intrinsic capability.
+        // // Derived classes should override this to declare their specific capabilities.
+        // // By default, an operator has NO specific capabilities.
+        // template <detail::OperatorCapability Cap>
+        // __MATX_INLINE__ __MATX_HOST__ auto get_capability_impl() const {
+        //   // Default: this specific operator does not inherently have the requested capability.
+        //   return detail::capability_attributes<Cap>::default_value; 
+        // }
+
+        // // Public interface to check if the operator (sub-expression) has a given capability.
+        // // This calls the derived class's specific implementation (get_capability_impl)
+        // // and combines it with the capabilities of its children based on the query type.
+        // template <detail::OperatorCapability Cap>
+        // __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        //   // Get the capability of the current operator node itself
+        //   // The derived class's get_capability_impl will handle the specific logic for that operator type,
+        //   // including querying children if it's a composite operator.
+        //   return static_cast<const T*>(this)->template get_capability_impl<Cap>();
+        // }        
 
         /**
          * @brief Launch kernel in a GPU stream
