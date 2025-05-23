@@ -941,7 +941,9 @@ MATX_IGNORE_WARNING_POP_GCC
             }
           }
         } else {
-          static_assert(L != L); // unimplemented case
+#ifndef __CUDACC__
+          MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
         }
       }
       return -1; // not found
