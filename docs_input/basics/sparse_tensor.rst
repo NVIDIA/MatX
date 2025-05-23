@@ -8,7 +8,7 @@ The implementation is based on the **Universal Sparse Tensor (UST)** type
 that uses a tensor format DSL (Domain Specific Language) to describe a vast
 space of storage formats. Although the UST type can easily define many common
 storage formats (such as dense vectors and matrices, sparse vectors, sparse
-matrices in COO, CSR, CSC, DCSR, DCSC, or BSR format, with generalizations
+matrices in COO, CSR, CSC, DCSR, DCSC, DIA, or BSR format, with generalizations
 for sparse tensors), it can also define many less common storage formats.
 From MatX's perspective, the advantage of using the UST type (rather than
 various specific sparse storage formats) is that the framework code only has
@@ -25,7 +25,7 @@ Quick Start
 
 Despite the forward looking design of using the UST type, the current
 experimental support provides a few factory methods with the common
-formats COO, CSR, and CSC. The factory methods look similar to e.g.
+formats COO, CSR, CSC, and DIA. The factory methods look similar to e.g.
 sparse construction methods found in SciPy sparse or torch sparse.
 
 For example, to create a COO representation of the following
@@ -108,7 +108,7 @@ the UST type can be found in the `make_sparse_tensor.h`_ file.
 All methods build a sparse tensor storage format from constituent
 1-dim buffers similar to methods found in SciPy or torch sparse.
 A sample usage was already shown above. Currently only methods
-to construct COO, CSR, and CSC are provided::
+to construct COO, CSR, CSC, and DIA are provided::
 
   // Constructs a sparse matrix in COO format directly from the values and
   // the two coordinates vectors. The entries should be sorted by row, then
@@ -120,8 +120,8 @@ to construct COO, CSR, and CSC are provided::
 
   // Constructs a sparse matrix in CSR format directly from the values, the
   // row positions, and column coordinates vectors. The entries should be
-  // sorted by row, then column. Explicit zeros may be stored. Duplicate
-  // entries should not occur. Explicit zeros may be stored.
+  // sorted by row, then column. Duplicate entries should not occur. Explicit
+  // zeros may be stored.
   template <typename ValTensor, typename PosTensor, typename CrdTensor>
   auto make_tensor_csr(ValTensor &val,
                        PosTensor &rowp,
@@ -129,12 +129,23 @@ to construct COO, CSR, and CSC are provided::
 
   // Constructs a sparse matrix in CSC format directly from the values, the
   // column positions, and row coordinates vectors. The entries should be
-  // sorted by columns, then row. Explicit zeros may be stored. Duplicate
-  // entries should not occur. Explicit zeros may be stored.
+  // sorted by columns, then row. Duplicate entries should not occur. Explicit
+  // zeros may be stored.
   template <typename ValTensor, typename PosTensor, typename CrdTensor>
   auto make_tensor_csc(ValTensor &val,
                        PosTensor &colp,
                        CrdTensor &row, const index_t (&shape)[2]);
+
+  // Constructs a sparse matrix in DIA format directly from the values and the
+  // offset vectors. For an m x n matrix, this format uses a linearized storage
+  // where each diagonal has n entries, padded with zeros on the right for the
+  // lower triangular part and padded with zeros on the left for the upper
+  // triagonal part. This format is most efficient for matrices with only a
+  // few nonzero diagonals that are close to the main diagonal.
+  template <typename ValTensor, typename CrdTensor>
+  auto make_tensor_dia(ValTensor &val,
+                       CrdTensor &off,
+                       const index_t (&shape)[2]) {
 
 Matx Implementation of the UST Type
 -----------------------------------
@@ -214,6 +225,8 @@ Currently, the following level formats are supported:
     with positions and coordinates
 (3) **singleton**: a variant of the compressed format, for when coordinates have
     no siblings
+(4) **range**: a variant of the dense format, restricting the range based on a
+    compression expression in the previous level
 
 All level formats have the following level properties:
 
@@ -223,36 +236,38 @@ All level formats have the following level properties:
 Some 2-dim matrix examples are shown below (note that 
 block format has 2 dimensions and 4 levels)::
 
-  COO: map = (i, j) -> ( i : compressed(non-unique), j : singleton )
+  COO: (i, j) -> ( i : compressed(non-unique), j : singleton )
 
-  CSR: map = (i, j) -> ( i : dense, j : compressed )
+  CSR: (i, j) -> ( i : dense, j : compressed )
 
-  CSC: map = (i, j) -> ( j : dense, i : compressed )  # j and i swapped!
+  CSC: (i, j) -> ( j : dense, i : compressed )  # j and i swapped!
 
-  DCSR: map = (i, j) -> ( i : compressed, j : compressed )
+  DCSR: (i, j) -> ( i : compressed, j : compressed )
 
-  DCSC: map = (i, j) -> ( j : compressed, i : compressed )
+  DCSC: (i, j) -> ( j : compressed, i : compressed )
 
-  BSR with 2x3 blocks: map = ( i, j ) -> ( i floordiv 2 : dense,
-                                           j floordiv 3 : compressed,
-                                           i mod 2      : dense,
-                                           j mod 3      : dense )
+  DIA: (i, j) -> ( j - i : compressed, j : range )
+
+  BSR with 2x3 blocks: ( i, j ) -> ( i floordiv 2 : dense,
+                                     j floordiv 3 : compressed,
+                                     i mod 2      : dense,
+                                     j mod 3      : dense )
 
 Two 3-dim tensor examples are shown below::
 
-  COO3: map = (i, j, k) -> ( i : compressed(non-unique),
-                             j : singleton,
-                             k : singleton )
-  CSF3: map = (i, j, k) -> ( i : compressed,
-                             j : compressed,
-                             k : compressed )
+  COO3: (i, j, k) -> ( i : compressed(non-unique),
+                       j : singleton,
+                       k : singleton )
+  CSF3: (i, j, k) -> ( i : compressed,
+                       j : compressed,
+                       k : compressed )
 
 Lastly, a 4-dim tensor examples is given here::
 
-  COO4: map = (i, j, k, l) -> ( i : compressed(non-unique),
-                                j : singleton,
-                                k : singleton,
-                                l : singleton )
+  COO4: (i, j, k, l) -> ( i : compressed(non-unique),
+                          j : singleton,
+                          k : singleton,
+                          l : singleton )
  
 The C++ representation of the latter is given below::
 
