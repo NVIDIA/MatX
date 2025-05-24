@@ -321,10 +321,11 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     TA *CD = c.Data();
     CRD *diags = a.CRDData(1);
     uint64_t numD = a.crdSize(1);
-    uint64_t n = c.Size(0);
+    uint64_t m = a.Size(0);
+    uint64_t n = a.Size(1);
     uint32_t THREADS = static_cast<uint32_t>(std::min(n, 1024LU));
     uint32_t BATCHES = static_cast<uint32_t>(cuda::std::ceil(static_cast<double>(n) / THREADS));
-    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, n);
+    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, m, n);
 #endif
 
   } else {
