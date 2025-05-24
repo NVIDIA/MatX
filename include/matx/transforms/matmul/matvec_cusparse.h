@@ -292,11 +292,10 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
   static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
   static_assert(std::is_same_v<TC, matx::matxFp16> ||
-                std::is_same_v<TC, matx::matxBf16> ||
-                std::is_same_v<TC, float> ||
-                std::is_same_v<TC, double> ||
-                std::is_same_v<TC, cuda::std::complex<float>> ||
-                std::is_same_v<TC, cuda::std::complex<double>>,
+                    std::is_same_v<TC, matx::matxBf16> ||
+                    std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
+                    std::is_same_v<TC, cuda::std::complex<float>> ||
+                    std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
                   a.Size(RANKA - 2) == c.Size(RANKC - 1),
@@ -321,30 +320,32 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     TA *CD = c.Data();
     CRD *diags = a.CRDData(1);
     uint64_t numD = a.crdSize(1);
-    uint64_t n = c.Size(0);
-    uint32_t THREADS = static_cast<uint32_t>(std::min(n, 1024LU));
-    uint32_t BATCHES = static_cast<uint32_t>(cuda::std::ceil(static_cast<double>(n) / THREADS));
-    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, n);
+    uint64_t m = a.Size(0);
+    uint64_t n = a.Size(1);
+    uint32_t THREADS = static_cast<uint32_t>(std::min(m, 1024LU));
+    uint32_t BATCHES = static_cast<uint32_t>(
+        cuda::std::ceil(static_cast<double>(m) / THREADS));
+    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, m,
+                                                     n);
 #endif
 
   } else {
 
     // Get parameters required by these tensors (for caching).
     auto params =
-      detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>::GetSpMVParams(
-          c, a, b, stream, alpha, beta);
+        detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>::GetSpMVParams(
+            c, a, b, stream, alpha, beta);
 
     // Lookup and cache.
     using cache_val_type = detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>;
     detail::GetCache().LookupAndExec<detail::spmv_cusparse_cache_t>(
-      detail::GetCacheIdFromType<detail::spmv_cusparse_cache_t>(), params,
-      [&]() {
-        return std::make_shared<cache_val_type>(c, a, b, stream, alpha, beta);
-      },
-      [&](std::shared_ptr<cache_val_type> cache_type) {
-        cache_type->Exec(c, a, b);
-      });
-
+        detail::GetCacheIdFromType<detail::spmv_cusparse_cache_t>(), params,
+        [&]() {
+          return std::make_shared<cache_val_type>(c, a, b, stream, alpha, beta);
+        },
+        [&](std::shared_ptr<cache_val_type> cache_type) {
+          cache_type->Exec(c, a, b);
+        });
   }
 
   // Copy transformed output back.

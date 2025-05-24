@@ -39,12 +39,12 @@
 
 namespace matx {
 
-// Kernel that performs SpMV for DIA.
+// Kernel that performs SpMV for an m x n DIA matrix.
 template <typename VAL, typename CRD>
 __global__ void dia_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
-                                VAL *C, uint64_t n) {
+                                VAL *C, uint64_t m, uint64_t n) {
   uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < n) {
+  if (i < m) {
     VAL acc = 0.0;
     for (uint64_t d = 0; d < numD; d++) { // numD-DIA SpMV
       int64_t j = i + diags[d];           // signed
