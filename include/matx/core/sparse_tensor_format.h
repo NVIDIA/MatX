@@ -187,6 +187,17 @@ public:
     return false;
   }
 
+  static constexpr bool isDIA() {
+    if constexpr (LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
+             type0::Expr::cj == 0 && type0::Type::isCompressed() &&
+             type1::Expr::isId(1) && type1::Type::isRange();
+    }
+    return false;
+  }
+
   template <bool SZ, class CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
   dim2lvl(const CRD *dims, CRD *lvls) {

@@ -181,5 +181,32 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   (Acsr2 = sparse2sparse(Acoo)).run(exec);
   print(Acsr2);
 
+  //
+  // Creates a 6x6 DIA matrix with 3 nonzero diagonals.
+  //
+  // |  4  1  0  0  0  0 |
+  // | -1  4  1  0  0  0 |
+  // |  0 -1  4  1  0  0 |
+  // |  0  0 -1  4  1  0 |
+  // |  0  0  0 -1  4  1 |
+  // |  0  0  0  0 -1  4 |
+  //
+  auto dvals = make_tensor<float>({3 * 6});
+  auto doffsets = make_tensor<int>({3});
+  dvals.SetVals({-1, -1, -1, -1, -1, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1, 1});
+  doffsets.SetVals({-1, 0, 1});
+  auto Adia = experimental::make_tensor_dia(dvals, doffsets, {6, 6});
+  print(Adia);
+
+  //
+  // Perform a direct SpMV. This is also the correct way of performing
+  // an efficient sparse operation.
+  //
+  auto V = make_tensor<float>({6});
+  auto R = make_tensor<float>({6});
+  V.SetVals({1, 2, 3, 4, 5, 6});
+  (R = matvec(Adia, V)).run(exec);
+  print(R);
+
   MATX_EXIT_HANDLER();
 }

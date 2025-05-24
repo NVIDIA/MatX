@@ -38,18 +38,35 @@
 namespace matx {
 namespace experimental {
 
+// Helper method to zero memory.
+template <typename T>
+__MATX_INLINE__ static void setZero(T *ptr, index_t sz,
+                                    matxMemorySpace_t space) {
+  if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+    cudaMemset(ptr, 0, sz * sizeof(T));
+  } else {
+    memset(ptr, 0, sz * sizeof(T));
+  }
+}
+
+// Helper method to fill memory.
+template <typename T>
+__MATX_INLINE__ static void setVal(T *ptr, T val, matxMemorySpace_t space) {
+  if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+    cudaMemcpy(ptr, &val, sizeof(T), cudaMemcpyHostToDevice);
+  } else {
+    memcpy(ptr, &val, sizeof(T));
+  }
+}
+
 // Helper method to create zero storage.
 template <typename T>
 __MATX_INLINE__ static auto
 makeDefaultNonOwningZeroStorage(index_t sz, matxMemorySpace_t space) {
   T *ptr = nullptr;
   assert(sz > 0);
-  matxAlloc((void **)&ptr, sz * sizeof(T), space, 0);
-  if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
-    cudaMemset(ptr, 0, sz * sizeof(T));
-  } else {
-    memset(ptr, 0, sz * sizeof(T));
-  }
+  matxAlloc((void **)&ptr, sz * sizeof(T), space, /*stream=*/0);
+  setZero(ptr, sz, space);
   raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
                                                /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
@@ -92,7 +109,7 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
   auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
-  tp.data()[1] = val.Size(0);
+  setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
   // Construct COO.
   return sparse_tensor_t<VAL, CRD, POS, COO>(
       shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
@@ -206,7 +223,7 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
   auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
-  tp.data()[1] = val.Size(0);
+  setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
   // Construct DIA.
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
