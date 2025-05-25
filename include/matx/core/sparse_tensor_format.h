@@ -226,7 +226,9 @@ public:
         else
           lvls[L] = dims[ftype::Expr::di] % ftype::Expr::cj;
       } else {
-        static_assert(L != L); // unimplemented case
+#ifndef __CUDACC__
+        MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
       }
       if constexpr (L + 1 < LVL) {
         dim2lvl<SZ, CRD, L + 1>(dims, lvls);
@@ -251,7 +253,9 @@ public:
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
         dims[ftype::Expr::di] += lvls[L]; // update (seen second)
       } else {
-        static_assert(L != L); // unimplemented case
+#ifndef __CUDACC__
+        MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
       }
       if constexpr (L + 1 < LVL) {
         lvl2dim<CRD, L + 1>(lvls, dims);
