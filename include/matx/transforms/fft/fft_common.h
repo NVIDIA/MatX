@@ -140,6 +140,7 @@ namespace detail {
           auto i_pad_part_v = slice(i_new, starts, ends);
 
           (i_new = static_cast<promote_half_t<T2>>(0)).run(stream);
+
           // example-begin copy-test-1
           matx::copy(i_pad_part_v, i, stream);
           // example-end copy-test-1

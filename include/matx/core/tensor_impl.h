@@ -1038,7 +1038,9 @@ MATX_IGNORE_WARNING_POP_GCC
         assert(data_.ldata_ != nullptr);
 #endif
         constexpr int EPT_int = static_cast<int>(EPT);
-        if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
+        if constexpr (EPT == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
@@ -1075,8 +1077,10 @@ MATX_IGNORE_WARNING_POP_GCC
 #ifndef NDEBUG
         assert(data_.ldata_ != nullptr);
 #endif
-        constexpr int EPT_int = static_cast<int>(EPT);        
-        if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
+        constexpr int EPT_int = static_cast<int>(EPT);
+        if constexpr (EPT == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
@@ -1133,8 +1137,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
         int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
         while (width > 1) {
-    // printf("ret width=%u size=%zu (Lsize() %% width)==0=%d (Stride(Rank() - 1) == 1)=%d  (sizeof(T) * width)<= MAX_VEC_WIDTH=%d     (reinterpret_cast<uintptr_t>(ldata_) %% (sizeof(T) * width))== 0  ->%d   stride check->%d\n", 
-    //       width, sizeof(T), (Lsize() % width)==0, (Stride(Rank() - 1) == 1), (sizeof(T) * width)<= MAX_VEC_WIDTH, (reinterpret_cast<uintptr_t>(ldata_) % (sizeof(T) * width))== 0, (int)(Rank() <= 1 || ((Stride(Rank() - 2) % width) == 0)));          
+printf("lsize %lld width %u\n", Lsize(), width);
           if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
             ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
             //(Rank() <= 1 || ((Stride(Rank() - 1) % width) == 0))) { // Pointer is aligned to data size

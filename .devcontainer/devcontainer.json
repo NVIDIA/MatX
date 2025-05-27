@@ -9,8 +9,8 @@
     "dockerfile": "./dev.Dockerfile",
     "args": {
       "REMOTE_USER": "${localEnv:USER}",
-      "REMOTE_UID": "${localEnv:REMOTE_UID:1000}",
-      "REMOTE_GID": "${localEnv:REMOTE_GID:1000}"
+      "REMOTE_UID": "${localEnv:REMOTE_UID:40258}",
+      "REMOTE_GID": "${localEnv:REMOTE_GID:40258}"
     }
   },
   "privileged": true,
@@ -22,7 +22,7 @@
     "gpu": "optional"
   },
   "securityOpt": [
-    "seccomp=unconfined"
+    "seccomp=unconfined",
   ],
   // Features to add to the dev container. More info: https://containers.dev/features.
   // "features": {},
@@ -47,7 +47,7 @@
         "ms-python.python",
         "ms-toolsai.jupyter",
         "eamodio.gitlens",
-        "ms-vscode.cpptools",
+        "llvm-vs-code-extensions.vscode-clangd",
         "ms-vscode.cmake-tools"
       ]
     }

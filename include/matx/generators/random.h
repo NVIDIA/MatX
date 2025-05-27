@@ -281,6 +281,13 @@ namespace detail {
         }
       }
 
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return self_has_cap;
+      }      
+
       // Constructor for randFloatParams
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
           RandomOp(std::forward<ShapeType>(s), seed)
@@ -366,7 +373,7 @@ namespace detail {
        * @tparam Is Index type
        * @param indices Index values
        */
-      template <typename... Is>
+      template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()([[maybe_unused]] Is... indices) const
       {
         T val;

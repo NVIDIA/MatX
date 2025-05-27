@@ -56,7 +56,7 @@ namespace matx
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
 
-        template <typename... Is>
+        template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {  
           cuda::std::array idx{indices...};
@@ -64,16 +64,23 @@ namespace matx
           // If we're on the upper part of the spectrum, return the conjugate of the first half
           if (idx[Rank() - 1] >= op_.Size(Rank()-1)) {
             idx[Rank() - 1] = orig_size_ - idx[Rank() - 1];
-            return conj(get_value(op_, idx));
+            return conj(get_value<EPT>(op_, idx));
           }
 
-          return get_value(op_, idx);         
-        }   
+          return get_value<EPT>(op_, idx);         
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return detail::get_rank<T1>();
         }
+
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
           if (dim == Rank() - 1) {
@@ -82,6 +89,12 @@ namespace matx
           else {
             return op_.Size(dim);
           }
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         template <typename ShapeType, typename Executor>

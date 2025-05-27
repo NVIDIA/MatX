@@ -50,8 +50,10 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
   //   Fill in order x, y, z up to 1024 threads
   if constexpr (RANK == 1) {
     while (nt < max_cta_size) {
+      printf("%lld %lld\n", static_cast<index_t>(threads.x) * ept, sizes[0]);
       if ((static_cast<index_t>(threads.x) * ept) < sizes[0]) {
         threads.x *= 2;
+        printf("threads.x %d\n", threads.x);
       }
       nt *= 2;
     }

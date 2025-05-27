@@ -298,15 +298,19 @@ namespace matx
       {
         return get_matx_value<EPT>(cuda::std::forward<T>(i), indices...);
       }
-      else if constexpr (is_vector_v<T>)
+      else
       {
         return i;
-      }
-      else {
-        std::remove_reference_t<T> val = i;
-        auto v = detail::Vector<decltype(val), static_cast<size_t>(EPT)>(val);
-        return v;
-      }
+      }      
+      // else if constexpr (is_vector_v<T>)
+      // {
+      //   return i;
+      // }
+      // else {
+      //   std::remove_reference_t<T> val = i;
+      //   auto v = detail::Vector<decltype(val), static_cast<size_t>(EPT)>(val);
+      //   return v;
+      // }
     }
 
 

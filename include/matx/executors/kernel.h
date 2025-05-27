@@ -35,7 +35,7 @@
 
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
-
+#include "matx/core/capabilities.h"
 namespace matx {
 namespace detail {
 
@@ -49,15 +49,15 @@ template <class Op> __global__ void matxOpT0Kernel(Op op) {
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPS, class Op>
 __global__ void matxOpT1Kernel(Op op, index_t size0) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (idx < size0) {
+  if (idx * static_cast<index_t>(EPS) < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op)(idx); 
+      (*op).template operator()<EPS>(idx); 
     }
     else {
-      op(idx);
+      op.template operator()<EPS>(idx);
     }
   }
 }

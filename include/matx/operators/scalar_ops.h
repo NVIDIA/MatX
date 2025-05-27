@@ -194,9 +194,7 @@ namespace detail {
       return res;
     }
     else {
-      detail::Vector<decltype(func(v1, v2)), 1> res;
-      res.data[0] = func(v1, v2);
-      return res;
+      return func(v1, v2);
     }
   }
 
@@ -211,9 +209,7 @@ namespace detail {
       return res;
     }
     else {
-      detail::Vector<decltype(func(v1)), 1> res;
-      res.data[0] = func(v1);
-      return res;
+      return func(v1);
     }
   }    
 

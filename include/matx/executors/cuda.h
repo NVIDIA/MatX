@@ -140,14 +140,6 @@ namespace matx
           const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);
           printf("max ept %d\n", max_ept);
 
-          // void run_kernel[](const Op &op, const auto &sizes) {
-          //   if constexpr (Op::Rank() == 0) {
-          //     threads = 1;
-          //     blocks = 1;
-          //     detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
-          //   }
-          // }
-
           if constexpr (Op::Rank() == 0) {
             threads = 1;
             blocks = 1;
@@ -159,10 +151,22 @@ namespace matx
               sizes[i] = op.Size(i);
             }        
 
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, 256);
-
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, max_ept, 256);
+            printf("sizes %lld \n", sizes[0]);
             if constexpr (Op::Rank() == 1) {
-              detail::matxOpT1Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              if (max_ept == 1) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else if (max_ept == 2) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else if (max_ept == 4) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else if (max_ept == 8) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else if (max_ept == 16) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              } else if (max_ept == 32) {
+                detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+              }
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {
