@@ -64,21 +64,37 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
-          {
-            auto x = get_value(x_, indices...);
-            auto y = get_value(y_, indices...);
-            [[maybe_unused]] auto z = get_value(z_, indices...);
+        template <ElementsPerThread EPS, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        {
+          auto x = get_value<EPS>(x_, indices...);
+          auto y = get_value<EPS>(y_, indices...);
+          [[maybe_unused]] auto z = get_value<EPS>(z_, indices...);
 
-            if constexpr (WHICH==0) { // theta
-              return _internal_atan2(y, x);
-            } else if constexpr (WHICH==1) { // phi
-              return _internal_atan2(z, _internal_sqrt(x * x + y * y));
-            } else {  // r
-              return _internal_sqrt(x * x + y * y + z * z);
-            }
+          if constexpr (WHICH==0) { // theta
+            return _internal_atan2(y, x);
+          } else if constexpr (WHICH==1) { // phi
+            return _internal_atan2(z, _internal_sqrt(x * x + y * y));
+          } else {  // r
+            return _internal_sqrt(x * x + y * y + z * z);
           }
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()<EPS>(Is... indices) const {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          // No specific capabilities enforced
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+            detail::get_operator_capability<Cap>(x_), 
+            detail::get_operator_capability<Cap>(y_), 
+            detail::get_operator_capability<Cap>(z_));
+
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

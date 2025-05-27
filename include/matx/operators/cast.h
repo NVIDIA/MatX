@@ -73,16 +73,35 @@ namespace matx
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(const T &op) : op_(op){};
 
-        template <typename... Is>
+        template <ElementsPerThread EPS, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));
+          return static_cast<NewType>(get_value<EPS>(op_, indices...));
+        }
+
+        template <ElementsPerThread EPS, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return static_cast<NewType>(get_value<EPS>(op_, indices...));
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()<EPS>(Is... indices)
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          // No specific capabilities enforced
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         template <typename ShapeType, typename Executor>

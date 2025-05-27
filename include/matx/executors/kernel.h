@@ -63,34 +63,34 @@ __global__ void matxOpT1Kernel(Op op, index_t size0) {
 }
 
 
-template <class Op>
+template <ElementsPerThread EPS, class Op>
 __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-  if (idx < size1 && idy < size0) {
+  if (idx * static_cast<index_t>(EPS) < size1 && idy < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op)(idy, idx); 
+      (*op).template operator()<EPS>(idy, idx); 
     }
     else {
-      op(idy, idx);
+      op.template operator()<EPS>(idy, idx);
     }    
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPS, class Op>
 __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
   
   for(index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
       idy < size0;
       idy += blockDim.y * gridDim.y) {
     for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-        idx < size1;
+        idx * static_cast<index_t>(EPS) < size1;
         idx += blockDim.x * gridDim.x) {
       if constexpr (std::is_pointer_v<Op>) {
-        (*op)(idy, idx); 
+        (*op).template operator()<EPS>(idy, idx); 
       }
       else {
-        op(idy, idx);
+        op.template operator()<EPS>(idy, idx);
       }    
     }
   }

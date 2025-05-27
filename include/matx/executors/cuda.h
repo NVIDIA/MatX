@@ -152,7 +152,6 @@ namespace matx
             }        
 
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, max_ept, 256);
-            printf("sizes %lld \n", sizes[0]);
             if constexpr (Op::Rank() == 1) {
               if (max_ept == 1) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
@@ -170,9 +169,33 @@ namespace matx
             }
             else if constexpr (Op::Rank() == 2) {
               if(stride) {
-                detail::matxOpT2StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                if (max_ept == 1) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                }
               } else {
-                detail::matxOpT2Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                if (max_ept == 1) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT2Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                }
               }
             }
             else if constexpr (Op::Rank() == 3) {

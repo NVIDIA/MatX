@@ -55,10 +55,16 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "at()"; }
         __MATX_INLINE__ AtOp(const Op &op, Is... is) : op_(op), idx_{is...} {};
 
+        template <ElementsPerThread EPS, typename... Is2>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()<EPS>([[maybe_unused]] Is2... indices) const
+        {
+          return op_.template operator()<EPS>(idx_...);
+        }        
+
         template <typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          return get_value(op_, idx_);
+          return this->operator()<detail::ElementsPerThread::ONE>(idx_...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
