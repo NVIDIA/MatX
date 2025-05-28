@@ -64,12 +64,12 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(z);
       }
 
-        template <ElementsPerThread EPS, typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          auto x = get_value<EPS>(x_, indices...);
-          auto y = get_value<EPS>(y_, indices...);
-          [[maybe_unused]] auto z = get_value<EPS>(z_, indices...);
+          auto x = get_value<EPT>(x_, indices...);
+          auto y = get_value<EPT>(y_, indices...);
+          [[maybe_unused]] auto z = get_value<EPT>(z_, indices...);
 
           if constexpr (WHICH==0) { // theta
             return _internal_atan2(y, x);
@@ -81,7 +81,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()<EPS>(Is... indices) const {
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 

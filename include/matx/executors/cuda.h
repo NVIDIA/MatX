@@ -138,7 +138,9 @@ namespace matx
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
           const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);
+          
           printf("max ept %d\n", max_ept);
+          
 
           if constexpr (Op::Rank() == 0) {
             threads = 1;

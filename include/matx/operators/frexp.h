@@ -56,45 +56,45 @@ namespace detail {
 
       };
 
-      template <typename... Is>
+      template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
         [[maybe_unused]] int rexp;        
         if constexpr (is_cuda_complex_v<value_type>) {
           if constexpr (std::is_same_v<float, typename value_type::value_type>) {
             if constexpr (WHICH == 0) { // real fractional
-              const auto frac = cuda::std::frexpf(a_(indices...).real(), &rexp);
+              const auto frac = cuda::std::frexpf(get_value<EPT>(a_, indices...).real(), &rexp);
               return frac;
             } else if constexpr (WHICH == 1) { // real exponent
-              [[maybe_unused]] const auto frac = cuda::std::frexpf(a_(indices...).real(), &rexp);
+              [[maybe_unused]] const auto frac = cuda::std::frexpf(get_value<EPT>(a_, indices...).real(), &rexp);
               return rexp;
             } else if constexpr (WHICH == 2) { // imag fractional
-              const auto frac = cuda::std::frexpf(a_(indices...).imag(), &rexp);
+              const auto frac = cuda::std::frexpf(get_value<EPT>(a_, indices...).imag(), &rexp);
               return frac;
             } else if constexpr (WHICH == 3) { // imag exponent
-              [[maybe_unused]] const auto frac = cuda::std::frexpf(a_(indices...).imag(), &rexp);
+              [[maybe_unused]] const auto frac = cuda::std::frexpf(get_value<EPT>(a_, indices...).imag(), &rexp);
               return rexp;
             }
           }
           else {
             if constexpr (WHICH == 0) { // real fractional
-              const auto frac = cuda::std::frexp(a_(indices...).real(), &rexp);
+              const auto frac = cuda::std::frexp(get_value<EPT>(a_, indices...).real(), &rexp);
               return frac;
             } else if constexpr (WHICH == 1) { // real exponent
-              [[maybe_unused]] const auto frac = cuda::std::frexp(a_(indices...).real(), &rexp);
+              [[maybe_unused]] const auto frac = cuda::std::frexp(get_value<EPT>(a_, indices...).real(), &rexp);
               return rexp;
             } else if constexpr (WHICH == 2) { // imag fractional
-              const auto frac = cuda::std::frexp(a_(indices...).imag(), &rexp);
+              const auto frac = cuda::std::frexp(get_value<EPT>(a_, indices...).imag(), &rexp);
               return frac;
             } else if constexpr (WHICH == 3) { // imag exponent
-              [[maybe_unused]] const auto frac = cuda::std::frexp(a_(indices...).imag(), &rexp);
+              [[maybe_unused]] const auto frac = cuda::std::frexp(get_value<EPT>(a_, indices...).imag(), &rexp);
               return rexp;
             }
           }
         }
         else {
           if constexpr (std::is_same_v<float, value_type>) {
-            [[maybe_unused]] const float frac = cuda::std::frexpf(a_(indices...), &rexp);
+            [[maybe_unused]] const float frac = cuda::std::frexpf(get_value<EPT>(a_, indices...), &rexp);
             if constexpr (WHICH == 0) { // fractional
               return frac;
             } else if constexpr (WHICH == 1) { // exponent
@@ -102,7 +102,7 @@ namespace detail {
             }
           }
           else {
-            [[maybe_unused]] const double frac = cuda::std::frexp(a_(indices...), &rexp);
+            [[maybe_unused]] const double frac = cuda::std::frexp(get_value<EPT>(a_, indices...), &rexp);
             if constexpr (WHICH == 0) { // fractional
               return frac;
             } else if constexpr (WHICH == 1) { // exponent
@@ -110,6 +110,12 @@ namespace detail {
             }
           }
         }
+      }
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+      {
+        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -136,6 +142,12 @@ namespace detail {
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
         return a_.Size(dim);
+      }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
   };

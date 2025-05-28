@@ -343,10 +343,29 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      template <typename... Is>
+      template <detail::ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
         return tmp_out_(indices...);
+      }
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+      }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        // NOTE: Conv2D is FFT only, which can support different EPTs. 
+        // However, the underlying FFTs are currently called without EPT.
+        // For now, let's assume it inherits, but this might need refinement
+        // if specific EPT > 1 is to be plumbed through conv2d's FFTs.
+        
+        auto a_cap = detail::get_operator_capability<Cap>(a_);
+        auto b_cap = detail::get_operator_capability<Cap>(b_);
+        return combine_capabilities<Cap>(self_has_cap, a_cap, b_cap);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

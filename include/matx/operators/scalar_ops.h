@@ -63,7 +63,7 @@ namespace detail {
     } \
   } \
   template <typename T> struct OPNAME##Op {                                     \
-    static __MATX_INLINE__ std::string str(const std::string &in) { return std::string(#FUNC) + "(" + in + ")"; }                 \
+    static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
     template <matx::detail::ElementsPerThread EPT, typename T1V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
@@ -83,7 +83,7 @@ namespace detail {
     } \
   } \
   template <typename T> struct OPNAME##Op {                                     \
-    static __MATX_INLINE__ std::string str(const std::string &in) { return std::string(#FUNC) + "(" + in + ")"; }                 \
+    static __MATX_INLINE__ std::string str() { return #FUNC; }                 \
     template <matx::detail::ElementsPerThread EPT, typename T1V> \
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \

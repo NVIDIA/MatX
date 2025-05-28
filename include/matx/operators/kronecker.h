@@ -64,7 +64,7 @@ namespace matx
           static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
         }        
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           cuda::std::array idx1{indices...};
@@ -76,9 +76,14 @@ namespace matx
           idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
           idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
 
-          return get_value(op2_, idx2) * get_value(op1_, idx1);
+          return get_value<EPT>(op2_, idx2) * get_value<EPT>(op1_, idx1);
         }
 
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
@@ -111,6 +116,16 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
           return op1_.Size(dim) * op2_.Size(dim);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(op1_),
+            detail::get_operator_capability<Cap>(op2_)
+          );
         }
     };
   }

@@ -71,6 +71,7 @@ namespace matx {
       InterpSplineTridiagonalFillOp(const O& dl, const O& d, const O& du, const O& b, const OpX& x, const OpV& v)
           : dl_(dl), d_(d), du_(du), b_(b), x_(x), v_(v)  {}
 
+      template <ElementsPerThread EPT>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ void operator()(index_t idx) const
       {
       
@@ -134,12 +135,29 @@ namespace matx {
         }
       }
 
-      __host__ __device__ inline index_t Size(uint32_t i) const  { return d_.Size(i); }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ void operator()(index_t idx) const
+      {
+        return operator()<detail::ElementsPerThread::ONE>(idx);
+      }
+
+      template <detail::OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return 1;
+        } else {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return self_has_cap;
+        }
+      }
+
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t Size(uint32_t i) const  { return d_.Size(i); }
       static inline constexpr __host__ __device__ int32_t Rank() { return O::Rank(); }
     };
 
 
-
+// NOTE: We force a size of ONE on the vector regardless of the size passed in. This is ok since this is
+// the only path it can take at runtime, but it will get compiler errors without that until this function
+// is updated for vectors
   template <typename OpX, typename OpV, typename OpXQ>
   class Interp1Op : public BaseOp<Interp1Op<OpX, OpV, OpXQ>> {
     public:
@@ -156,7 +174,7 @@ namespace matx {
       mutable detail::tensor_impl_t<value_type, 1> m_; // Derivatives at sample points (spline only)
       mutable value_type *ptr_m_ = nullptr;
 
-      template <typename... Is>
+      template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto searchsorted(const domain_type x_query) const
       {        
         // Binary search to find the interval containing the query point
@@ -170,7 +188,7 @@ namespace matx {
 
         idx_low = 0;
         idx_high = x_.Size(0) - 1;
-        x_low = x_(idx_low);
+        x_low = get_value<ElementsPerThread::ONE>(x_, idx_low); // Use get_value
         if (x_query < x_low) {
           idx_low = x_.Size(0);
           idx_high = 0;
@@ -178,7 +196,7 @@ namespace matx {
         } else if (x_query == x_low) {
           return cuda::std::make_tuple(idx_low, idx_low);
         }
-        x_high = x_(idx_high);
+        x_high = get_value<ElementsPerThread::ONE>(x_, idx_high); // Use get_value
         if (x_query > x_high) {
           idx_low = x_.Size(0) - 1;
           idx_high = x_.Size(0);
@@ -190,7 +208,7 @@ namespace matx {
         // Find the interval containing the query point
         while (idx_high - idx_low > 1) {
           idx_mid = (idx_low + idx_high) / 2;
-          x_mid = x_(idx_mid);
+          x_mid = get_value<ElementsPerThread::ONE>(x_, idx_mid); // Use get_value
           if (x_query == x_mid) {
             return cuda::std::make_tuple(idx_mid, idx_mid);
           } else if (x_query < x_mid) {
@@ -205,25 +223,27 @@ namespace matx {
       }
       
       // Linear interpolation implementation
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate_linear(const domain_type x_query, index_t idx_low, index_t idx_high) const {
         value_type v;
 
         if (idx_high == 0 || idx_low == idx_high) { // x_query <= x(0) or x_query == x(idx_low) == x(idx_high)
-          v = v_(idx_high);
+          v = get_value<ElementsPerThread::ONE>(v_, idx_high); // Use get_value
         } else if (idx_low == x_.Size(0) - 1) { // x_query > x(n-1)
-          v = v_(idx_low);
+          v = get_value<ElementsPerThread::ONE>(v_, idx_low); // Use get_value
         } else {
-          domain_type x_low = x_(idx_low);
-          domain_type x_high = x_(idx_high);
-          value_type v_low = v_(idx_low);
-          value_type v_high = v_(idx_high);
-          v = v_low + (x_query - x_low) * (v_high - v_low) / (x_high - x_low);
+          domain_type x_l = get_value<ElementsPerThread::ONE>(x_, idx_low); // Use get_value (renamed to avoid conflict with member x_)
+          domain_type x_h = get_value<ElementsPerThread::ONE>(x_, idx_high); // Use get_value (renamed)
+          value_type v_low = get_value<ElementsPerThread::ONE>(v_, idx_low); // Use get_value
+          value_type v_high = get_value<ElementsPerThread::ONE>(v_, idx_high); // Use get_value
+          v = v_low + (x_query - x_l) * (v_high - v_low) / (x_h - x_l);
         }
         return v;
       }
 
       // Nearest neighbor interpolation implementation
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate_nearest(const domain_type x_query, index_t idx_low, index_t idx_high) const {
         if (idx_low == x_.Size(0)) { // x_query < x(0)
@@ -231,40 +251,43 @@ namespace matx {
         } else if (idx_high == x_.Size(0)) { // x_query > x(n-1)
           idx_high = x_.Size(0) - 1;
         }
-        domain_type x_low = x_(idx_low);
-        domain_type x_high = x_(idx_high);
-        index_t idx_nearest = (x_query - x_low < x_high - x_query) ? idx_low : idx_high;
-        value_type v = v_(idx_nearest);
+        domain_type x_l = get_value<ElementsPerThread::ONE>(x_, idx_low); // Use get_value (renamed)
+        domain_type x_h = get_value<ElementsPerThread::ONE>(x_, idx_high); // Use get_value (renamed)
+        index_t idx_nearest = (x_query - x_l < x_h - x_query) ? idx_low : idx_high;
+        value_type v = get_value<EPT>(v_, idx_nearest); // Use get_value
         return v;
       }
 
 
       // Next value interpolation implementation
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate_next([[maybe_unused]] const domain_type x_query, [[maybe_unused]] index_t idx_low, index_t idx_high) const {
         if (idx_high == x_.Size(0)) { // x_query > x(n-1)
           idx_high = x_.Size(0) - 1;
         }
-        value_type v = v_(idx_high);
+        value_type v = get_value<ElementsPerThread::ONE>(v_, idx_high); // Use get_value
         return v;
       }
 
       // Previous value interpolation implementation
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate_prev([[maybe_unused]] const domain_type x_query, index_t idx_low, [[maybe_unused]] index_t idx_high) const {
         if (idx_low == x_.Size(0)) { // x_query < x(0)
           idx_low = 0;
         }
-        value_type v = v_(idx_low);
+        value_type v = get_value<ElementsPerThread::ONE>(v_, idx_low); // Use get_value
         return v;
       }
 
       // Spline interpolation implementation
       // Hermite cubic interpolation 
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate_spline([[maybe_unused]] const domain_type x_query, index_t idx_low,  index_t idx_high) const {
         if (idx_high == idx_low) {
-          value_type v = v_(idx_low);
+          value_type v = get_value<ElementsPerThread::ONE>(v_, idx_low); // Use get_value
           return v;
         } else if (idx_low == x_.Size(0)) { // x_query < x(0)
           idx_low = 0;
@@ -275,49 +298,51 @@ namespace matx {
         }
 
         // sample points
-        domain_type x_low = x_(idx_low);
-        domain_type x_high = x_(idx_high);
+        domain_type x_l = get_value<ElementsPerThread::ONE>(x_, idx_low); // Use get_value (renamed)
+        domain_type x_h = get_value<ElementsPerThread::ONE>(x_, idx_high); // Use get_value (renamed)
 
         // values at the sample points
-        value_type v_low = v_(idx_low);
-        value_type v_high = v_(idx_high);
+        value_type v_low = get_value<ElementsPerThread::ONE>(v_, idx_low); // Use get_value
+        value_type v_high = get_value<ElementsPerThread::ONE>(v_, idx_high); // Use get_value
         value_type v_diff = v_high - v_low;
 
         // derivatives at the sample points
-        value_type m_low = m_(idx_low);
-        value_type m_high = m_(idx_high);
+        // m_ is a tensor_impl_t, so it needs .operator()<EPT>() or get_value<EPT>
+        value_type m_low = get_value<ElementsPerThread::ONE>(m_, idx_low); 
+        value_type m_high = get_value<ElementsPerThread::ONE>(m_, idx_high);
 
-        value_type h = x_high - x_low;
-        value_type h_low = x_query - x_low;
-        value_type h_high = x_high - x_query;
+        value_type h_val = x_h - x_l; // Renamed h to h_val to avoid conflict
+        value_type h_l = x_query - x_l;
+        value_type h_h = x_h - x_query;
         
-        value_type t = h_low / h;
-        value_type s = h_high / h;
+        value_type t = h_l / h_val;
+        value_type s = h_h / h_val;
 
         value_type v = s * v_low \
           + t * v_high \
-          + (h  * (m_low * s - m_high * t) + v_diff * (t - s)) * t * s;
+          + (h_val  * (m_low * s - m_high * t) + v_diff * (t - s)) * t * s;
 
         return v;
       }
 
       // Dispatch to appropriate interpolation method based on enum
+      template <ElementsPerThread EPT> // Added EPT
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ 
       value_type interpolate(const domain_type x_query, index_t idx_low, index_t idx_high) const {
         switch (method_) {
           case InterpMethod::LINEAR:
-            return interpolate_linear(x_query, idx_low, idx_high);
+            return interpolate_linear<EPT>(x_query, idx_low, idx_high);
           case InterpMethod::NEAREST:
-            return interpolate_nearest(x_query, idx_low, idx_high);
+            return interpolate_nearest<EPT>(x_query, idx_low, idx_high);
           case InterpMethod::NEXT:
-            return interpolate_next(x_query, idx_low, idx_high);
+            return interpolate_next<EPT>(x_query, idx_low, idx_high);
           case InterpMethod::PREV:
-            return interpolate_prev(x_query, idx_low, idx_high);
+            return interpolate_prev<EPT>(x_query, idx_low, idx_high);
           case InterpMethod::SPLINE:
-            return interpolate_spline(x_query, idx_low, idx_high);
+            return interpolate_spline<EPT>(x_query, idx_low, idx_high);
           default:
             // Default to linear interpolation
-            return interpolate_linear(x_query, idx_low, idx_high);
+            return interpolate_linear<EPT>(x_query, idx_low, idx_high);
         }
       }
 
@@ -450,13 +475,33 @@ namespace matx {
       }
 
 
+      template <ElementsPerThread EPT, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        auto x_query = get_value<EPT>(xq_, indices...);
+        auto [idx_low, idx_high] = searchsorted<EPT>(x_query); // Pass EPT
+
+        return interpolate<EPT>(x_query, idx_low, idx_high); // Pass EPT
+      }
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        auto x_query = xq_(indices...);
-        auto [idx_low, idx_high] = searchsorted(x_query);
+        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+      }
 
-        return interpolate(x_query, idx_low, idx_high);
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return 1;
+        } else {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          // Note: m_ is a temporary internal tensor, not an input operator passed to constructor
+          return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(x_),
+                                           detail::get_operator_capability<Cap>(v_),
+                                           detail::get_operator_capability<Cap>(xq_));
+        }
       }
 
     };

@@ -56,7 +56,7 @@ namespace matx
           static_assert(Rank() > 0);
         };
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
@@ -64,10 +64,16 @@ namespace matx
 
           if (idx[rank_idx] >= op_.Size(rank_idx)) {      
             idx[rank_idx] -= op_.Size(rank_idx);    
-            return get_value(op_, idx).imag();
+            return get_value<EPT>(op_, idx).imag();
           }
 
-          return get_value(op_, indices...).real(); 
+          return get_value<EPT>(op_, indices...).real(); 
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -100,7 +106,13 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+        }
     };
   }
 

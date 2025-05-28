@@ -79,7 +79,7 @@ namespace matx
           MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
-        template <typename Op, typename... Is>
+        template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const decltype(sizes_) &sizes, Is... indices)
         {   
           cuda::std::array<index_t, Rank()> inds{indices...};
@@ -102,19 +102,37 @@ namespace matx
             idx /= op.Size(i);
           }   
 
-          return get_value(cuda::std::forward<Op>(op), ninds);       
+          return get_value<EPT>(cuda::std::forward<Op>(op), ninds);       
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl<EPT>(cuda::std::as_const(op_), sizes_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl(cuda::std::as_const(op_), sizes_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), sizes_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), sizes_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

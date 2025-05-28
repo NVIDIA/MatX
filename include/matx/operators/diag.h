@@ -62,16 +62,16 @@ namespace matx
 
         __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) { }
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
-          using tt = cuda::std::tuple_element_t<0, cuda::std::tuple<Is...>>;
+          using tt = typename cuda::std::common_type_t<Is...>;
 
           if constexpr (RANK == 1) {
             static_assert(sizeof...(Is) == 2, "Indexing of diag() on a 1D input must be 2 indices");
             if (((pp_get<0>(indices...) == indices) && ...)) {
-              return (value_type)(pp_get<0>(indices...));
+              return get_value<EPT>(op_, pp_get<0>(indices...));
             }
             else {
               return (value_type)(0);
@@ -89,7 +89,7 @@ MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
               tmp[RANK - 2] -= k_;
               //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
 MATX_IGNORE_WARNING_POP_GCC
-              return get_value(op_, tmp);
+              return get_value<EPT>(op_, tmp);
             }
             else {
               cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
@@ -98,9 +98,21 @@ MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
               tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
               //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
 MATX_IGNORE_WARNING_POP_GCC
-              return get_value(op_, tmp);
+              return get_value<EPT>(op_, tmp);
             }
           }
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

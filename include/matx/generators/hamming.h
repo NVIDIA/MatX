@@ -33,25 +33,46 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <typename T> class Hamming {
+    template <typename T> class Hamming : public BaseOp<Hamming<T>> {
       private:
         index_t size_;
 
       public:
         using value_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "hamming"; }
 	
         inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
-        inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
-        {
-          return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1));
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          printf("get_capability: %d\n", self_has_cap);
+          return self_has_cap;
         }
+
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
+        {
+          return detail::Apply1DVecFunc<EPT, T>([this](index_t idx) { return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1)); }, i);
+        }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

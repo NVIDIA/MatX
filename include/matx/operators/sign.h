@@ -58,10 +58,10 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          auto v = get_value(op_,indices...);
+          auto v = get_value<EPT>(op_,indices...);
           if constexpr (is_complex_v<value_type> ) {
             if ( v == value_type(0)) {
               return zval_;
@@ -76,6 +76,18 @@ namespace matx
             else 
               return zval_;
           }
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         template <typename ShapeType, typename Executor>

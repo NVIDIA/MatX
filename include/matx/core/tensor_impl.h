@@ -35,6 +35,7 @@
 #include <cassert>
 #include <type_traits>
 #include <cuda/std/functional>
+#include "matx/core/vector.h"
 #include "matx/core/error.h"
 #include "matx/core/defines.h"
 #include "matx/core/tensor_desc.h"

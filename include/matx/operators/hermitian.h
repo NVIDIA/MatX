@@ -60,12 +60,18 @@ namespace matx
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
           cuda::std::array idx{indices...};
           cuda::std::swap(idx[Rank() - 2], idx[Rank() - 1]);
-          return conj(get_value(op_, idx));   
+          return conj(get_value<EPT>(op_, idx));   
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -92,7 +98,13 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+        }
     };
   }
 

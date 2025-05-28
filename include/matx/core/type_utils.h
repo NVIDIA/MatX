@@ -45,7 +45,6 @@
 #include "matx/executors/host.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
-#include "matx/core/vector.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -1165,20 +1164,6 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
     return CUSPARSE_INDEX_32I;
   }
 }
-
-
-template <typename T, typename = void> struct is_vector : std::false_type {};
-template <typename T>
-struct is_vector<T, std::void_t<typename T::matx_vec>>
-    : std::true_type {
-};
-
-
-template< class T >
-inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
-
-template <typename T>
-using make_vector_t = typename std::conditional_t<is_vector_v<T>, T, Vector<T, 1>>;
 
 } // end namespace detail
 

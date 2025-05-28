@@ -131,11 +131,11 @@ namespace matx
         return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
       }      
 
-      template <typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <ElementsPerThread EPT, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()(args...);
+            return this->operator()<EPT>(args...);
           }, idx);
       }
 

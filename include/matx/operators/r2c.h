@@ -64,7 +64,7 @@ namespace matx
           // If we're on the upper part of the spectrum, return the conjugate of the first half
           if (idx[Rank() - 1] >= op_.Size(Rank()-1)) {
             idx[Rank() - 1] = orig_size_ - idx[Rank() - 1];
-            return conj(get_value<EPT>(op_, idx));
+            return internal_conj(get_value<EPT>(op_, idx));
           }
 
           return get_value<EPT>(op_, idx);         

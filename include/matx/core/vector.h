@@ -39,16 +39,6 @@
 namespace matx{
 namespace detail {
 
-template <int N> struct LoadType {
-  using type = float;
-};
-template <> struct LoadType<2> {
-  using type = float2;
-};
-template <> struct LoadType<4> {
-  using type = float4;
-};
-
 
 template <typename T, int N>
 struct alignas(sizeof(T) * N) Vector {
@@ -77,17 +67,42 @@ struct alignas(sizeof(T) * N) Vector {
     }
   }
 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* Data() { return data.data(); }
+
   // __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void Fill(T v) {
   //   cuda::std::fill(data.begin(), data.end(), v);
   // }
 
   static constexpr size_t width = N;
   using type = T;
-  using scalar_type = T;
+  using value_type = T;
   using matx_vec = bool;
   cuda::std::array<T, N> data;
 };
 
+
+template <typename T, typename = void> struct is_vector : std::false_type {};
+template <typename T>
+struct is_vector<T, std::void_t<typename T::matx_vec>>
+    : std::true_type {
+};
+
+
+template< class T >
+inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
+
+template <typename T>
+using make_vector_t = typename std::conditional_t<is_vector_v<T>, T, Vector<T, 1>>;
+
+
+template <typename V>
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetVectorVal(const V& v, int idx) {
+  if constexpr (is_vector_v<V>) {
+    return v.data[idx];
+  } else {
+    return v;
+  }
+}
 
 
 }

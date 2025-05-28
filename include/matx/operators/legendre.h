@@ -99,22 +99,22 @@ namespace matx
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           cuda::std::array<index_t, Rank()> inds{indices...};
           cuda::std::array<index_t, T3::Rank()> xinds{};
-          
+
           int axis1 = axis_[0];
           int axis2 = axis_[1];
           
           // compute n
           index_t nind = inds[axis1];
-          int n = get_value(n_, nind);
+          int n = get_value<EPT>(n_, nind);
           
           // compute m 
           index_t mind = inds[axis2];
-          int m = get_value(m_, mind);
+          int m = get_value<EPT>(m_, mind);
           
           if(axis1>axis2) 
             cuda::std::swap(axis1, axis2);
@@ -128,21 +128,47 @@ namespace matx
             }
           }
 
-          auto x = get_value(in_, xinds);
+          auto lret = [this](auto ln, auto lm, auto lx) {
+            if constexpr (is_complex_half_v<value_type>) {
+              return static_cast<value_type>(legendre(ln, lm, cuda::std::complex<float>(lx)));
+            } else if constexpr (is_matx_half_v<value_type>) {
+              return static_cast<value_type>(legendre(ln, lm, float(lx)));
+            } else {
+              return legendre(ln, lm, lx);
+            }
+          };
 
-          value_type ret;
+          auto x = get_value<EPT>(in_, xinds);
+          if constexpr (EPT != ElementsPerThread::ONE) {
+            Vector<value_type, static_cast<int>(EPT)> ret;
+            #pragma unroll
+            for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
+            }
 
-          // if we are half precision up cast to float
-          if constexpr (is_complex_half_v<value_type>) {
-            ret = static_cast<value_type>(legendre(n, m, cuda::std::complex<float>(x)));
-          } else if constexpr (is_matx_half_v<value_type>) {
-            ret = static_cast<value_type>(legendre(n, m, float(x)));
-          } else {
-            ret = legendre(n, m, x);
+            return ret;
           }
-          
-          return ret;
-        }    
+          else {
+            return lret(n, m, x);
+          }
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(n_),
+            detail::get_operator_capability<Cap>(m_),
+            detail::get_operator_capability<Cap>(in_)
+          );
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept

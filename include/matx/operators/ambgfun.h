@@ -92,10 +92,10 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
-        template <ElementsPerThread EPS, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()<EPS>(Is... indices) const
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPS>(indices...);
+          return tmp_out_.template operator()<EPT>(indices...);
         }
 
         template <typename... Is>

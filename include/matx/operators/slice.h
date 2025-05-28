@@ -144,13 +144,12 @@ namespace matx
 
         template <detail::OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+          auto self_has_cap = capability_attributes<Cap>::default_value;
           if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-            return detail::ElementsPerThread::ONE;
+            self_has_cap = 1;
           }
-          else {
-            return capability_attributes<Cap>::default_value;
-          }
+          auto op_cap = detail::get_operator_capability<Cap>(op_);
+          return combine_capabilities<Cap>(self_has_cap, op_cap);
         }        
 
         template <detail::ElementsPerThread EPT, typename... Is>

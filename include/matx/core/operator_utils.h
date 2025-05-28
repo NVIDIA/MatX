@@ -150,5 +150,20 @@ namespace matx {
         }
       }      
     }
+
+    template <ElementsPerThread EPT, typename T, typename Func>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Apply1DVecFunc(const Func &func, index_t index) {
+      if constexpr (EPT == ElementsPerThread::ONE) {
+        return func(index);
+      } else {
+        Vector<T, static_cast<index_t>(EPT)> result;
+        #pragma unroll
+        for (int i = 0; i < static_cast<index_t>(EPT); i++) {
+          result.data[i] = func(index * static_cast<index_t>(EPT) + i);
+        }
+        return result;
+      }
+    }
+  
   }
 }; 

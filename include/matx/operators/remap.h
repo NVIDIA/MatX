@@ -65,7 +65,7 @@ namespace matx
 
 	      __MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
 
-        template <typename Op, typename Idx, typename... Is>
+        template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, Is... indices)
         {
           static_assert(sizeof...(Is) == Rank());
@@ -75,24 +75,36 @@ namespace matx
 
           // remap current index for dim
           if constexpr (IdxType::Rank() == 0) {
-            ind[DIM] = idx();
+            ind[DIM] = get_value<EPT>(idx);
           } else {
-            ind[DIM] = idx(ind[DIM]);
+            ind[DIM] = get_value<EPT>(idx, ind[DIM]);
           }
 
-          return get_value(cuda::std::forward<Op>(op), ind);
+          return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return get_impl<EPT>(cuda::std::as_const(op_), idx_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl(cuda::std::as_const(op_), idx_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), idx_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), idx_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -126,6 +138,16 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(op_),
+            detail::get_operator_capability<Cap>(idx_)
+          );
         }
 
         ~RemapOp() = default;

@@ -64,20 +64,26 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        {
+          [[maybe_unused]] auto theta = get_value<EPT>(theta_, indices...);
+          [[maybe_unused]] auto phi = get_value<EPT>(phi_, indices...);
+          auto r = get_value<EPT>(r_, indices...);
+
+          if constexpr (WHICH==0) { // X
+            return internal_mul(r, internal_mul(internal_cos(phi), internal_cos(theta)));
+          } else if constexpr (WHICH==1) { // Y
+            return internal_mul(r, internal_mul(internal_cos(phi), internal_sin(theta)));
+          } else {  // Z
+            return internal_mul(r, internal_sin(phi));
+          }
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          [[maybe_unused]] auto theta = get_value(theta_, indices...);
-          [[maybe_unused]] auto phi = get_value(phi_, indices...);
-          auto r = get_value(r_, indices...);
-
-          if constexpr (WHICH==0) { // X
-            return r * _internal_cos(phi) * _internal_cos(theta);
-          } else if constexpr (WHICH==1) { // Y
-            return r * _internal_cos(phi) * _internal_sin(theta);
-          } else {  // Z
-            return r * _internal_sin(phi);
-          }
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         template <typename ShapeType, typename Executor>
@@ -123,6 +129,17 @@ namespace matx
 					index_t size2 = get_expanded_size<Rank()>(phi_, dim);
 					index_t size3 = get_expanded_size<Rank()>(r_, dim);
 					return detail::matx_max(size1, size2, size3);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(theta_),
+            detail::get_operator_capability<Cap>(phi_),
+            detail::get_operator_capability<Cap>(r_)
+          );
         }
     };
   }

@@ -33,26 +33,45 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <typename T> class Bartlett {
+    template <typename T> class Bartlett : public BaseOp<Bartlett<T>> {
       private:
         index_t size_;
 
       public:
         using value_type = T;
+        using matxop = bool;
+
         __MATX_INLINE__ std::string str() const { return "bartlett"; }
 
-	inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
+        inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
-        inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const 
-        {
-          return (T(2) / (T(size_) - 1)) *
-            (((T(size_) - 1) / T(2)) -
-             cuda::std::abs(T(i) - ((T(size_) - 1) / T(2))));
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return self_has_cap;
         }
+
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return detail::Apply1DVecFunc<EPT, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
+        }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

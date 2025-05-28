@@ -167,7 +167,9 @@ public:
 
   template <detail::OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-    return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(out_), 
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+                                      detail::get_operator_capability<Cap>(out_),
                                       detail::get_operator_capability<Cap>(op_));
   }  
 

@@ -38,6 +38,7 @@
 
 namespace matx
 {
+  namespace detail {
   /**
    * Conditionally execute an operator
    *
@@ -94,14 +95,26 @@ namespace matx
       /**
        * @brief Operator() for getting values of an if operator
        *
+       * @tparam EPT ElementsPerThread
+       * @tparam Is Index types
+       * @param indices Index values
+       */
+      template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+          if (get_value<EPT>(cond_, indices...)) {
+            get_value<EPT>(op_, indices...);
+          }
+        }
+
+      /**
+       * @brief Operator() for getting values of an if operator
+       *
        * @tparam Is Index types
        * @param indices Index values
        */
       template <typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value(cond_, indices...)) {
-            get_value(op_, indices...);
-          }
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
       /**
@@ -149,7 +162,19 @@ namespace matx
           cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(
+          self_has_cap,
+          detail::get_operator_capability<Cap>(cond_),
+          detail::get_operator_capability<Cap>(op_)
+        );
+      }
   };
+
+  } // end namespace detail
 
   /**
    *
@@ -166,6 +191,6 @@ namespace matx
    */
   template <typename T1, typename T2>
     auto IF(T1 t1, T2 t2) {
-      return IFOP<T1,T2>(t1,t2);
+      return detail::IFOP<T1,T2>(t1,t2);
     }
 } // end namespace matx

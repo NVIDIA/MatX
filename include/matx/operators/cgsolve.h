@@ -72,10 +72,10 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-        template <ElementsPerThread EPS, typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPS>(indices...);
+          return tmp_out_.template operator()<EPT>(indices...);
         }
 
         template <typename... Is>
@@ -86,7 +86,9 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(
+            self_has_cap,
             detail::get_operator_capability<Cap>(a_),
             detail::get_operator_capability<Cap>(b_)
           );

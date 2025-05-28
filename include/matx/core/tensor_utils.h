@@ -277,7 +277,9 @@ namespace matx
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == N || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
-        return cuda::std::apply(cuda::std::forward<T>(i).template operator()<EPT>, idx);
+        return cuda::std::apply([&](auto... args) {
+          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+        }, idx);        
         //return i(indices...);
       }
       else
@@ -319,7 +321,7 @@ namespace matx
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<EPT>(cuda::std::forward<T>(i), idx);
+        return get_matx_value<EPT, T, IdxType, N>(cuda::std::forward<T>(i), idx);
       }
       else
       {
@@ -395,20 +397,6 @@ namespace matx
 
       return reinterpret_cast<T *>(addr);
     }
-
-    template <typename T, typename I, int32_t R>
-    void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
-      for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
-        idx[r]++;
-        if (idx[r] == op.Size(r)) {
-          idx[r] = 0;
-        }
-        else {
-          return;
-        }
-      }
-    }
-
 
     template <typename T> constexpr DLDataType TypeToDLPackType()
     {
@@ -495,6 +483,19 @@ namespace matx
     auto tv = make_tensor(tp, pa.Shape());
     matx::copy(tv, pa, exec);
     return tv;
+  }
+
+  template <typename T, typename I, int32_t R>
+  void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
+    for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
+      idx[r]++;
+      if (idx[r] == op.Size(r)) {
+        idx[r] = 0;
+      }
+      else {
+        return;
+      }
+    }
   }
 
   }

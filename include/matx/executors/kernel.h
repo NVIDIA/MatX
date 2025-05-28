@@ -49,48 +49,48 @@ template <class Op> __global__ void matxOpT0Kernel(Op op) {
   }
 }
 
-template <ElementsPerThread EPS, class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT1Kernel(Op op, index_t size0) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (idx * static_cast<index_t>(EPS) < size0) {
+  if (idx * static_cast<index_t>(EPT) < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPS>(idx); 
+      (*op).template operator()<EPT>(idx); 
     }
     else {
-      op.template operator()<EPS>(idx);
+      op.template operator()<EPT>(idx);
     }
   }
 }
 
 
-template <ElementsPerThread EPS, class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-  if (idx * static_cast<index_t>(EPS) < size1 && idy < size0) {
+  if (idx * static_cast<index_t>(EPT) < size1 && idy < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPS>(idy, idx); 
+      (*op).template operator()<EPT>(idy, idx); 
     }
     else {
-      op.template operator()<EPS>(idy, idx);
+      op.template operator()<EPT>(idy, idx);
     }    
   }
 }
 
-template <ElementsPerThread EPS, class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
   
   for(index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
       idy < size0;
       idy += blockDim.y * gridDim.y) {
     for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-        idx * static_cast<index_t>(EPS) < size1;
+        idx * static_cast<index_t>(EPT) < size1;
         idx += blockDim.x * gridDim.x) {
       if constexpr (std::is_pointer_v<Op>) {
-        (*op).template operator()<EPS>(idy, idx); 
+        (*op).template operator()<EPT>(idy, idx); 
       }
       else {
-        op.template operator()<EPS>(idy, idx);
+        op.template operator()<EPT>(idy, idx);
       }    
     }
   }

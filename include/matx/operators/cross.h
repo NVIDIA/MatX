@@ -92,7 +92,7 @@ namespace matx
           }
         };
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           cuda::std::array idx{indices...};
@@ -107,11 +107,11 @@ namespace matx
           idx1[idx1.size() - 1] = 1LL;
           idx2[idx2.size() - 1] = 2LL;
 
-          auto a0 = get_value(a_, idx0);
-          auto a1 = get_value(a_, idx1);
+          auto a0 = get_value<EPT>(a_, idx0);
+          auto a1 = get_value<EPT>(a_, idx1);
           
-          auto b0 = get_value(b_, idx0);
-          auto b1 = get_value(b_, idx1);
+          auto b0 = get_value<EPT>(b_, idx0);
+          auto b1 = get_value<EPT>(b_, idx1);
 
           //lots of if-elses, but similar to numpy implementation
           
@@ -120,8 +120,8 @@ namespace matx
           }
 
           if (!isA2D_ && !isB2D_){
-            auto a2 = get_value(a_, idx2);
-            auto b2 = get_value(b_, idx2);
+            auto a2 = get_value<EPT>(a_, idx2);
+            auto b2 = get_value<EPT>(b_, idx2);
             if (idxOut == 0){
                 return a1 * b2 - a2 * b1;
             }
@@ -130,7 +130,7 @@ namespace matx
             
           }
           else if (isA2D_ && !isB2D_){
-            auto b2 = get_value(b_, idx2);
+            auto b2 = get_value<EPT>(b_, idx2);
             if (idxOut == 0){
                 return a1 * b2;
             }
@@ -138,7 +138,7 @@ namespace matx
             return -a0 * b2;
           }
           else{// !isA2D_ && isB2D_, case of both 2D are covered in the first if statement
-            auto a2 = get_value(a_, idx2);
+            auto a2 = get_value<EPT>(a_, idx2);
             if (idxOut == 0){
                 return -a2 * b1;
             }
@@ -147,6 +147,23 @@ namespace matx
           }
           
         }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(a_),
+            detail::get_operator_capability<Cap>(b_)
+          );
+        }
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return out_rank;
