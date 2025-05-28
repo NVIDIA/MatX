@@ -96,12 +96,12 @@ __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size2) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-  if (idx < size2 && idy < size1 && idz < size0) {
+  if (idx * static_cast<index_t>(EPT) < size2 && idy < size1 && idz < size0) {
     if constexpr (std::is_pointer_v<Op>) {
       (*op)(idz, idy, idx); 
     }
@@ -111,7 +111,7 @@ __global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_t size2) {
   
   for(index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
@@ -121,7 +121,7 @@ __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_
         idy < size1;
         idy += blockDim.y * gridDim.y) {
       for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-          idx < size2;
+          idx * static_cast<index_t>(EPT) < size2;
           idx += blockDim.x * gridDim.x) {
         if constexpr (std::is_pointer_v<Op>) {
           (*op)(idz, idy, idx); 
@@ -134,14 +134,14 @@ __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idy = nmy % size2;
   index_t idz = nmy / size2;
   index_t idw = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-  if (idx < size3 && idy < size2 && idz < size1 && idw < size0) {
+  if (idx * static_cast<index_t>(EPT) < size3 && idy < size2 && idz < size1 && idw < size0) {
     if constexpr (std::is_pointer_v<Op>) {
       (*op)(idw, idz, idy, idx); 
     }
@@ -151,7 +151,7 @@ __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size
   }
 }
 
-template <class Op>
+template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
 
   for(index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
@@ -164,7 +164,7 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
           idw < size0;
           idw += blockDim.z * gridDim.z) {
         for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-            idx < size3;
+            idx * static_cast<index_t>(EPT) < size3;
             idx += blockDim.x * gridDim.x) {
 
           if constexpr (std::is_pointer_v<Op>) {

@@ -107,6 +107,17 @@ public:
   {
     return O::Rank();
   }
+
+  template <detail::OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+    return detail::combine_capabilities<Cap>(self_has_cap, 
+      detail::get_operator_capability<Cap>(xpow_),
+      detail::get_operator_capability<Cap>(ba_),
+      detail::get_operator_capability<Cap>(norm_),
+      detail::get_operator_capability<Cap>(pfa_)
+    );
+  }       
 };
 
 /**

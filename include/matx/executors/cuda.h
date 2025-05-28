@@ -202,16 +202,64 @@ namespace matx
             }
             else if constexpr (Op::Rank() == 3) {
               if(stride) {
-                detail::matxOpT3StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                if (max_ept == 1) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                }
               } else {
-                detail::matxOpT3Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                if (max_ept == 1) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT3Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                }
               }
             }
             else if constexpr (Op::Rank() == 4) {
               if(stride) {
-                detail::matxOpT4StrideKernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                if (max_ept == 1) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                }
               } else {
-                detail::matxOpT4Kernel<<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                if (max_ept == 1) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 2) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 4) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 8) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 16) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                } else if (max_ept == 32) {
+                  detail::matxOpT4Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                }
               }
             }        
             else {

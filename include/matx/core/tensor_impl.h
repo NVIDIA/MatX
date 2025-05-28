@@ -1132,8 +1132,13 @@ MATX_IGNORE_WARNING_POP_GCC
       // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
       // type, but only POD types.
       if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-        if (Stride(Rank() - 1) != 1) {
+        if constexpr (Rank() == 0) {
           return 1;
+        }
+        else {
+          if (Stride(Rank() - 1) != 1) {
+            return 1;
+          }
         }
 
         int width = MAX_VEC_WIDTH_BYTES / sizeof(T);

@@ -65,7 +65,7 @@ namespace matx
         {
           cuda::std::array idx{indices...};
           cuda::std::swap(idx[Rank() - 2], idx[Rank() - 1]);
-          return conj(get_value<EPT>(op_, idx));   
+          return internal_conj(get_value<EPT>(op_, idx));   
         }
 
         template <typename... Is>

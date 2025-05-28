@@ -171,9 +171,10 @@ namespace detail {
         //(s = sqrt(s)).run(stream);  // sqrt folded into next op
 
         // IFELSE to avoid nans when dividing by zero
-        (IFELSE(sc != NTypeS(0), 
+        using v_type = typename decltype(v)::value_type;
+        (IFELSE(sc != v_type(0), 
                 w = (v / sqrt(sc)),
-                w = NTypeS(0))).run(stream);
+                w = v_type(0))).run(stream);
 
         (u = matvec(conj(transpose_matrix(R)), w, 2 , 0)).run(stream);
 

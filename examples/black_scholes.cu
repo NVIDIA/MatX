@@ -63,7 +63,8 @@ public:
   BlackScholes(O out, I1 K, I1 V, I1 S, I1 r, I1 T)
       : out_(out), V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
-  __device__ inline void operator()(index_t idx)
+  template <detail::ElementsPerThread EPT>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void operator()(index_t idx)
   {
     auto V = V_(idx);
     auto K = K_(idx);
@@ -81,8 +82,17 @@ public:
     out_(idx) = S * cdf_d1 - K * expRT * cdf_d2;
   }
 
-  __host__ __device__ inline index_t Size(uint32_t i) const  { return out_.Size(i); }
-  static inline constexpr __host__ __device__ int32_t Rank() { return O::Rank(); }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  void operator()(index_t idx) {
+    return this->operator()<detail::ElementsPerThread::ONE>(idx);
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t i) const  { return out_.Size(i); }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return O::Rank(); }
+
+  template <detail::OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {  
+    return detail::capability_attributes<Cap>::default_value;
+  }
 };
 
 /* Arithmetic expression */

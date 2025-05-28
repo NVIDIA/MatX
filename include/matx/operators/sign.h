@@ -62,19 +62,34 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           auto v = get_value<EPT>(op_,indices...);
-          if constexpr (is_complex_v<value_type> ) {
-            if ( v == value_type(0)) {
-              return zval_;
-            } else {
-              return v / abs(v); // sign defintion for complex values
+
+          auto set_val = [this](auto vl) { 
+            if constexpr (is_complex_v<value_type> ) {
+              if ( vl == value_type(0)) {
+                return zval_;
+              } else {
+                return vl / abs(vl); // sign defintion for complex values
+              }
+            } else {  // real branch
+              if( vl < 0) 
+                return value_type(-1);
+              else if ( vl > 0 ) 
+                return value_type(1);
+              else 
+                return zval_;
             }
-          } else {  // real branch
-            if( v < 0) 
-              return value_type(-1);
-            else if ( v > 0 ) 
-              return value_type(1);
-            else 
-              return zval_;
+          };
+
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            return set_val(v);
+          }
+          else {
+            Vector<value_type, static_cast<int>(EPT)> ret;
+            #pragma unroll
+            for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              ret.data[e] = set_val(GetVectorVal(v, e));
+            }
+            return ret;
           }
         }
 

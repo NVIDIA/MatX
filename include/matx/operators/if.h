@@ -93,7 +93,7 @@ namespace matx
     }
 
       /**
-       * @brief Operator() for getting values of an if operator
+       * @brief Operator() for getting values of an if operator. Does not support multiple elements per thread.
        *
        * @tparam EPT ElementsPerThread
        * @tparam Is Index types
@@ -101,8 +101,8 @@ namespace matx
        */
       template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value<EPT>(cond_, indices...)) {
-            get_value<EPT>(op_, indices...);
+          if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
+            get_value<ElementsPerThread::ONE>(op_, indices...);
           }
         }
 
@@ -165,12 +165,16 @@ namespace matx
 
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(
-          self_has_cap,
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return 1;
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
           detail::get_operator_capability<Cap>(cond_),
-          detail::get_operator_capability<Cap>(op_)
-        );
+            detail::get_operator_capability<Cap>(op_)
+          );
+        }
       }
   };
 
