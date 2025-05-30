@@ -197,7 +197,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto doffsets = make_tensor<int>({3});
   dvals.SetVals({-1, -1, -1, -1, -1, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1, 1});
   doffsets.SetVals({-1, 0, 1});
-  auto AdiaJ = experimental::make_tensor_dia<false>(dvals, doffsets, {6, 6});
+  auto AdiaJ = experimental::make_tensor_dia<experimental::DIA_INDEX_J>(dvals, doffsets, {6, 6});
   print(AdiaJ);
 
   //

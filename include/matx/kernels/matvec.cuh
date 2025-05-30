@@ -41,7 +41,7 @@ namespace matx {
 
 // Kernel that performs SpMV for an m x n DIA-I matrix.
 template <typename VAL, typename CRD>
-__global__ void diai_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
+__global__ void diai_spmv_kernel(VAL *A, CRD *diags, uint64_t numDiags, VAL *B,
                                  VAL *C, uint64_t m, uint64_t n) {
   uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < m) {
@@ -58,7 +58,7 @@ __global__ void diai_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
 
 // Kernel that performs SpMV for an m x n DIA-J matrix.
 template <typename VAL, typename CRD>
-__global__ void diaj_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
+__global__ void diaj_spmv_kernel(VAL *A, CRD *diags, uint64_t numDiags, VAL *B,
                                  VAL *C, uint64_t m, uint64_t n) {
   uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < m) {

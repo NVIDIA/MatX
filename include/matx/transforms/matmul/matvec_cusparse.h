@@ -325,10 +325,12 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     uint32_t THREADS = static_cast<uint32_t>(std::min(m, 1024LU));
     uint32_t BATCHES = static_cast<uint32_t>(
         cuda::std::ceil(static_cast<double>(m) / THREADS));
-    if constexpr (atype::Format::isDIAI()
-      diai_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, m, n);
+    if constexpr (atype::Format::isDIAI())
+      diai_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD,
+                                                        m, n);
     else
-      diaj_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, m, n);
+      diaj_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD,
+                                                        m, n);
 #endif
 
   } else {
