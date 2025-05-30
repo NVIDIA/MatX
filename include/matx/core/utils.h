@@ -209,5 +209,13 @@ auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
   return getPermuteDims<RANK>(detail::to_array(dims));
 }
 
+template <int RANK>
+auto __MATX_INLINE__ invPermute(const cuda::std::array<int, RANK> &perm) {
+  cuda::std::array<int, RANK> inv_perm;
+  for (int i = 0; i < RANK; i++) {
+    inv_perm[perm[i]] = i;
+  }
+  return inv_perm;
+}
 };
 };
