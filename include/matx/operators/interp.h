@@ -529,8 +529,39 @@ namespace matx {
 
 
 /**
- * 1D interpolation of samples at query points. 
- * 
+ * 1D interpolation of samples at query points.
+ *
+ * Interpolation is performed along the last dimension. All other dimensions must be of
+ * compatible size.
+ *
+ * @tparam OpX
+ *   Type of sample points
+ * @tparam OpV
+ *   Type of sample values
+ * @tparam OpXQ
+ *   Type of query points
+ * @param x
+ *   Sample points. Last dimension must be sorted in ascending order.
+ * @param v
+ *   Sample values. Must have compatible dimensions with x.
+ * @param xq
+ *   Query points where to interpolate. All dimensions except the last must be of compatible size with x and v (e.g. x and v can be vectors, and xq can be a matrix).
+ * @param method
+ *   Interpolation method (LINEAR, NEAREST, NEXT, PREV, SPLINE)
+ * @returns Operator that interpolates values at query points, with the same dimensions as xq.
+ */
+template <typename OpX, typename OpV, typename OpXQ>
+auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = InterpMethod::LINEAR) {
+  static_assert(OpX::Rank() >= 1, "interp: sample points must be at least 1D");
+  static_assert(OpV::Rank() >= OpX::Rank(), "interp: sample values must have at least the same rank as sample points");
+  static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
+  return detail::Interp1Op(x, v, xq, method);
+}
+
+
+/**
+ * 1D interpolation of samples at query points.
+ *
  * Interpolation is performed along the specified dimension. All other dimensions must be of compatible size.
  *
  * @tparam OpX
@@ -552,43 +583,12 @@ namespace matx {
  * @returns Operator that interpolates values at query points, with the same dimensions as xq.
  */
 template <typename OpX, typename OpV, typename OpXQ>
-auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = InterpMethod::LINEAR) {
-  static_assert(OpX::Rank() >= 1, "interp: sample points must be at least 1D");
-  static_assert(OpV::Rank() >= OpX::Rank(), "interp: sample values must have at least the same rank as sample points");
-  static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
-  return detail::Interp1Op(x, v, xq, method);
-}
-
-
-/**
- * 1D interpolation of samples at query points. 
- * 
- * Interpolation is performed along the last dimension. All other dimensions must be of 
- * compatible size.
- *
- * @tparam OpX
- *   Type of sample points
- * @tparam OpV
- *   Type of sample values
- * @tparam OpXQ
- *   Type of query points
- * @param x
- *   Sample points. Last dimension must be sorted in ascending order.
- * @param v
- *   Sample values. Must have compatible dimensions with x.
- * @param xq
- *   Query points where to interpolate. All dimensions except the last must be of compatible size with x and v (e.g. x and v can be vectors, and xq can be a matrix).
- * @param method
- *   Interpolation method (LINEAR, NEAREST, NEXT, PREV, SPLINE)
- * @returns Operator that interpolates values at query points, with the same dimensions as xq.
- */
-template <typename OpX, typename OpV, typename OpXQ>
 auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, const int (&axis)[1],InterpMethod method = InterpMethod::LINEAR) {
   static_assert(OpX::Rank() >= 1, "interp: sample points must be at least 1D");
   static_assert(OpV::Rank() >= OpX::Rank(), "interp: sample values must have at least the same rank as sample points");
   static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
 
-  
+
   auto x_perm = detail::getPermuteDims<OpX::Rank()>({axis[0] + OpX::Rank() - OpXQ::Rank()});
   auto v_perm = detail::getPermuteDims<OpV::Rank()>({axis[0] + OpV::Rank() - OpXQ::Rank()});
   auto xq_perm = detail::getPermuteDims<OpXQ::Rank()>({axis[0]});
