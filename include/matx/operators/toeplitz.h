@@ -92,25 +92,29 @@ namespace matx
         template <ElementsPerThread EPT>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          if (j > i) {
-            if constexpr (is_matx_op<T2>()) {
-              auto val = get_value<EPT>(op2_, j - i);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            if (j > i) {
+              if constexpr (is_matx_op<T2>()) {
+                auto val = get_value<EPT>(op2_, j - i);
               return val;
+              }
+              else {
+                auto val = op2_[j - i];
+                return val;
+              }
             }
             else {
-              auto val = op2_[j - i];
-              return val;
+              if constexpr (is_matx_op<T1>()) {
+                auto val = get_value<EPT>(op1_, i - j);
+                return val;
+              }
+              else {
+                auto val = op1_[i - j];
+                return val;
+              }          
             }
-          }
-          else {
-            if constexpr (is_matx_op<T1>()) {
-              auto val = get_value<EPT>(op1_, i - j);
-              return val;
-            }
-            else {
-              auto val = op1_[i - j];
-              return val;
-            }          
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
 
@@ -121,10 +125,14 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          auto op1_cap = detail::get_operator_capability<Cap>(op1_);
-          auto op2_cap = detail::get_operator_capability<Cap>(op2_);
-          return combine_capabilities<Cap>(self_has_cap, op1_cap, op2_cap);
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_);
+            return combine_capabilities<Cap>(self_has_cap, op1_cap, op2_cap);
+          }
         }
 
         template <typename ShapeType, typename Executor>

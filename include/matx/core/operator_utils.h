@@ -152,7 +152,7 @@ namespace matx {
     }
 
     template <ElementsPerThread EPT, typename T, typename Func>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Apply1DVecFunc(const Func &func, index_t index) {
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyGeneratorVecFunc(const Func &func, index_t index) {
       if constexpr (EPT == ElementsPerThread::ONE) {
         return func(index);
       } else {

@@ -146,171 +146,171 @@ __MATX_INLINE__ auto svd(const OpA &a, const SVDMode jobz = SVDMode::ALL,
 }
 
 
-namespace detail {
-  template<typename OpA, typename OpX>
-  class SVDPIOp : public BaseOp<SVDPIOp<OpA,OpX>>
-  {
-    private:
-      typename detail::base_type_t<OpA> a_;
-      typename detail::base_type_t<OpX> x_;
-      int iterations_;
-      index_t k_;
+// namespace detail {
+//   template<typename OpA, typename OpX>
+//   class SVDPIOp : public BaseOp<SVDPIOp<OpA,OpX>>
+//   {
+//     private:
+//       typename detail::base_type_t<OpA> a_;
+//       typename detail::base_type_t<OpX> x_;
+//       int iterations_;
+//       index_t k_;
 
-    public:
-      using matxop = bool;
-      using value_type = typename OpA::value_type;
-      using matx_transform_op = bool;
-      using svd_xform_op = bool;
+//     public:
+//       using matxop = bool;
+//       using value_type = typename OpA::value_type;
+//       using matx_transform_op = bool;
+//       using svd_xform_op = bool;
 
-      __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k) 
-      { }
+//       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
+//       __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k) 
+//       { }
 
-      // This should never be called
-      template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+//       // This should never be called
+//       template <typename... Is>
+//       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(a_),
-                                           detail::get_operator_capability<Cap>(x_));
-      }
+//       template <OperatorCapability Cap>
+//       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+//         auto self_has_cap = capability_attributes<Cap>::default_value;
+//         return combine_capabilities<Cap>(self_has_cap, 
+//                                            detail::get_operator_capability<Cap>(a_),
+//                                            detail::get_operator_capability<Cap>(x_));
+//       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_cuda_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, VT) = svdpi(A))");
+//       template <typename Out, typename Executor>
+//       void Exec(Out &&out, Executor &&ex) {
+//         static_assert(is_cuda_executor_v<Executor>, "svdpi() only supports the CUDA executor currently");
+//         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdpi(). ie: (mtie(U, S, VT) = svdpi(A))");
 
-        svdpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, x_, iterations_, ex, k_);
-      }
+//         svdpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, x_, iterations_, ex, k_);
+//       }
 
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return matxNoRank;
-      }
+//       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+//       {
+//         return matxNoRank;
+//       }
 
-      template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
-      {
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }
-      }
+//       template <typename ShapeType, typename Executor>
+//       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+//       {
+//         if constexpr (is_matx_op<OpA>()) {
+//           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+//         }
+//       }
 
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
-      {
-        return 0;
-      }
+//       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+//       {
+//         return 0;
+//       }
 
-  };
-}
+//   };
+// }
 
-/**
- * Perform a SVD decomposition using the power iteration.  This version of
- * SVD works well on small n/m with large batch.
- *
- * @tparam AType
- *   Tensor or operator type for output of A input tensors.
- * @tparam X0Type
- *   Tensor or operator type for X0 initial guess in power iteration.
- *
- * @param A
- *   Input tensor or operator for tensor A input with size `batches x m x n`
- * @param x0
- *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
- *   Random tensor of size `batches x min(n,m)` is suggested.
- * @param iterations
- *   The number of power iterations to perform for each singular value.  
- * @param k
- *    The number of singular values to find.  Default is all singular values: min(m,n).
- */
-template<typename AType, typename X0Type>
-__MATX_INLINE__ auto svdpi(const AType &A, const X0Type &x0, int iterations, index_t k=-1) {
-  return detail::SVDPIOp(A, x0, iterations, k);
-}
-
-
-
-
-namespace detail {
-  template<typename OpA>
-  class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
-  {
-    private:
-      typename detail::base_type_t<OpA> a_;
-      int max_iters_;
-      float tol_;
-
-    public:
-      using matxop = bool;
-      using value_type = typename OpA::value_type;
-      using matx_transform_op = bool;
-      using svd_xform_op = bool;
-
-      __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDBPIOp(const OpA &a, int max_iters, float tol) : a_(a), max_iters_(max_iters), tol_(tol)
-      { }
-
-      // This should never be called
-      template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
-
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
-      }
-
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
-        static_assert(is_cuda_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, VT) = svdbpi(A))");
-
-        svdbpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, max_iters_, tol_, ex);
-      }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return matxNoRank;
-      }
-
-      template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
-      {
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }
-      }
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
-      {
-        return 0;
-      }
+// /**
+//  * Perform a SVD decomposition using the power iteration.  This version of
+//  * SVD works well on small n/m with large batch.
+//  *
+//  * @tparam AType
+//  *   Tensor or operator type for output of A input tensors.
+//  * @tparam X0Type
+//  *   Tensor or operator type for X0 initial guess in power iteration.
+//  *
+//  * @param A
+//  *   Input tensor or operator for tensor A input with size `batches x m x n`
+//  * @param x0
+//  *   Input tensor or operator signaling the initial guess for x0 at each power iteration.  A
+//  *   Random tensor of size `batches x min(n,m)` is suggested.
+//  * @param iterations
+//  *   The number of power iterations to perform for each singular value.  
+//  * @param k
+//  *    The number of singular values to find.  Default is all singular values: min(m,n).
+//  */
+// template<typename AType, typename X0Type>
+// __MATX_INLINE__ auto svdpi(const AType &A, const X0Type &x0, int iterations, index_t k=-1) {
+//   return detail::SVDPIOp(A, x0, iterations, k);
+// }
 
 
 
-  };
-}
 
-/**
- * Perform a SVD decomposition using the block power iteration.  This version of
- * SVD works well on small n/m with large batch.
- *
- * @tparam AType
- *   Tensor or operator type for output of A input tensors.
- *
- * @param A
- *   Input tensor or operator for tensor A input with size `batches x m x n`
- * @param max_iters
- *   The approximate maximum number of QR iterations to perform. 
- * @param tol
- *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
- */
-template<typename AType>
-__MATX_INLINE__ auto svdbpi(const AType &A, int max_iters=10, float tol=0.0f) {
-  return detail::SVDBPIOp(A, max_iters, tol);
-}
+// namespace detail {
+//   template<typename OpA>
+//   class SVDBPIOp : public BaseOp<SVDBPIOp<OpA>>
+//   {
+//     private:
+//       typename detail::base_type_t<OpA> a_;
+//       int max_iters_;
+//       float tol_;
+
+//     public:
+//       using matxop = bool;
+//       using value_type = typename OpA::value_type;
+//       using matx_transform_op = bool;
+//       using svd_xform_op = bool;
+
+//       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
+//       __MATX_INLINE__ SVDBPIOp(const OpA &a, int max_iters, float tol) : a_(a), max_iters_(max_iters), tol_(tol)
+//       { }
+
+//       // This should never be called
+//       template <typename... Is>
+//       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+//       template <OperatorCapability Cap>
+//       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+//         auto self_has_cap = capability_attributes<Cap>::default_value;
+//         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+//       }
+
+//       template <typename Out, typename Executor>
+//       void Exec(Out &&out, Executor &&ex) {
+//         static_assert(is_cuda_executor_v<Executor>, "svdbpi() only supports the CUDA executor currently");
+//         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svdbpi(). ie: (mtie(U, S, VT) = svdbpi(A))");
+
+//         svdbpi_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, max_iters_, tol_, ex);
+//       }
+
+//       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+//       {
+//         return matxNoRank;
+//       }
+
+//       template <typename ShapeType, typename Executor>
+//       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+//       {
+//         if constexpr (is_matx_op<OpA>()) {
+//           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+//         }
+//       }
+
+//       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+//       {
+//         return 0;
+//       }
+
+
+
+//   };
+// }
+
+// /**
+//  * Perform a SVD decomposition using the block power iteration.  This version of
+//  * SVD works well on small n/m with large batch.
+//  *
+//  * @tparam AType
+//  *   Tensor or operator type for output of A input tensors.
+//  *
+//  * @param A
+//  *   Input tensor or operator for tensor A input with size `batches x m x n`
+//  * @param max_iters
+//  *   The approximate maximum number of QR iterations to perform. 
+//  * @param tol
+//  *   The termination tolerance for the QR iteration. Setting this to 0 will skip the tolerance check.
+//  */
+// template<typename AType>
+// __MATX_INLINE__ auto svdbpi(const AType &A, int max_iters=10, float tol=0.0f) {
+//   return detail::SVDBPIOp(A, max_iters, tol);
+// }
 
 }

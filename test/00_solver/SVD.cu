@@ -475,267 +475,267 @@ TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasicBatchedSmallMEQN)
   MATX_EXIT_HANDLER();
 }
 
-template <typename TypeParam, int RANK, typename Executor>
-void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
-  using AType = TypeParam;
-  using SType = typename inner_op_type_t<AType>::type;
+// template <typename TypeParam, int RANK, typename Executor>
+// void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
+//   using AType = TypeParam;
+//   using SType = typename inner_op_type_t<AType>::type;
 
-  cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+//   cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
-  index_t mm = Ashape[RANK-2];
-  index_t nn = Ashape[RANK-1];
-  index_t r = std::min(nn,mm);
+//   index_t mm = Ashape[RANK-2];
+//   index_t nn = Ashape[RANK-1];
+//   index_t r = std::min(nn,mm);
 
-  auto Ushape = Ashape;
-  Ushape[RANK-1] = r;
+//   auto Ushape = Ashape;
+//   Ushape[RANK-1] = r;
 
-  auto VTshape = Ashape;
-  VTshape[RANK-2] = r;
+//   auto VTshape = Ashape;
+//   VTshape[RANK-2] = r;
 
-  cuda::std::array<index_t, RANK-1> Sshape;
-  for(index_t i = 0; i < RANK-2; i++) {
-    Sshape[i] = Ashape[i];
-  }
-  Sshape[RANK-2] = r;
+//   cuda::std::array<index_t, RANK-1> Sshape;
+//   for(index_t i = 0; i < RANK-2; i++) {
+//     Sshape[i] = Ashape[i];
+//   }
+//   Sshape[RANK-2] = r;
 
-  // example-begin svdpi-test-1
-  auto A = make_tensor<AType>(Ashape);
-  auto U = make_tensor<AType>(Ushape);
-  auto VT = make_tensor<AType>(VTshape);
-  auto S = make_tensor<SType>(Sshape);
+//   // example-begin svdpi-test-1
+//   auto A = make_tensor<AType>(Ashape);
+//   auto U = make_tensor<AType>(Ushape);
+//   auto VT = make_tensor<AType>(VTshape);
+//   auto S = make_tensor<SType>(Sshape);
 
-  int iterations = 100;
+//   int iterations = 100;
 
-  (A = random<AType>(AshapeA, NORMAL)).run(exec);
-  auto x0 = random<SType>(std::move(Sshape), NORMAL);
+//   (A = random<AType>(AshapeA, NORMAL)).run(exec);
+//   auto x0 = random<SType>(std::move(Sshape), NORMAL);
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+//   (U = 0).run(exec);
+//   (S = 0).run(exec);
+//   (VT = 0).run(exec);
 
-  (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(exec);
-  // example-end svdpi-test-1
+//   (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(exec);
+//   // example-end svdpi-test-1
 
-  auto Rshape = Ushape;
-  Rshape[RANK-1] = r;
-  Rshape[RANK-2] = r;
+//   auto Rshape = Ushape;
+//   Rshape[RANK-1] = r;
+//   Rshape[RANK-2] = r;
 
-  auto UD = make_tensor<AType>(Ushape);
-  auto UDVT = make_tensor<AType>(Ashape);
-  auto UTU = make_tensor<AType>(Rshape);
-  auto VTV = make_tensor<AType>(Rshape);
+//   auto UD = make_tensor<AType>(Ushape);
+//   auto UDVT = make_tensor<AType>(Ashape);
+//   auto UTU = make_tensor<AType>(Rshape);
+//   auto VTV = make_tensor<AType>(Rshape);
 
-  auto UTUd = make_tensor<SType>(Rshape);
-  auto VTVd = make_tensor<SType>(Rshape);
-  auto Ad = make_tensor<SType>(Ashape);
+//   auto UTUd = make_tensor<SType>(Rshape);
+//   auto VTVd = make_tensor<SType>(Rshape);
+//   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose_matrix(U)) , U)).run(exec);
-  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
+//   (UTU = matmul(conj(transpose_matrix(U)) , U)).run(exec);
+//   (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
-  cuda::std::array<index_t, RANK> Dshape;
-  Dshape.fill(matxKeepDim);
-  Dshape[RANK-2] = mm;
+//   cuda::std::array<index_t, RANK> Dshape;
+//   Dshape.fill(matxKeepDim);
+//   Dshape[RANK-2] = mm;
 
-  // cloning D across matrix
-  auto D = clone<RANK>(S, Dshape);
-  // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-  (UD = U * D).run(exec);
+//   // cloning D across matrix
+//   auto D = clone<RANK>(S, Dshape);
+//   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+//   (UD = U * D).run(exec);
 
-  (UDVT = matmul(UD, VT)).run(exec);
+//   (UDVT = matmul(UD, VT)).run(exec);
 
-  auto e = eye<SType>({r,r});
-  auto eShape = Rshape;
-  eShape[RANK-1] = matxKeepDim;
-  eShape[RANK-2] = matxKeepDim;
+//   auto e = eye<SType>({r,r});
+//   auto eShape = Rshape;
+//   eShape[RANK-1] = matxKeepDim;
+//   eShape[RANK-2] = matxKeepDim;
 
-  auto mdiffU = make_tensor<SType>({});
-  auto mdiffV = make_tensor<SType>({});
-  auto mdiffA = make_tensor<SType>({});
+//   auto mdiffU = make_tensor<SType>({});
+//   auto mdiffV = make_tensor<SType>({});
+//   auto mdiffA = make_tensor<SType>({});
 
-  auto I = clone<RANK>(e, eShape);
+//   auto I = clone<RANK>(e, eShape);
 
-  (UTUd = abs(UTU - I)).run(exec);
-  (VTVd = abs(VTV - I)).run(exec);
-  (Ad = abs(A - UDVT)).run(exec);
+//   (UTUd = abs(UTU - I)).run(exec);
+//   (VTVd = abs(VTV - I)).run(exec);
+//   (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = max(UTUd)).run(exec);
-  (mdiffV = max(VTVd)).run(exec);
-  (mdiffA = max(Ad)).run(exec);
+//   (mdiffU = max(UTUd)).run(exec);
+//   (mdiffV = max(VTVd)).run(exec);
+//   (mdiffA = max(Ad)).run(exec);
 
-  exec.sync();
+//   exec.sync();
 
-#if 0
-  printf("A\n"); print(A);
-  printf("U\n"); print(U);
-  printf("VT\n"); print(VT);
-  printf("S\n"); print(S);
+// #if 0
+//   printf("A\n"); print(A);
+//   printf("U\n"); print(U);
+//   printf("VT\n"); print(VT);
+//   printf("S\n"); print(S);
 
-  printf("UTU\n"); print(UTU);
-  printf("VTV\n"); print(VTV);
-  printf("A\n"); print(A);
-  printf("UDVT\n"); print(UDVT);
+//   printf("UTU\n"); print(UTU);
+//   printf("VTV\n"); print(VTV);
+//   printf("A\n"); print(A);
+//   printf("UDVT\n"); print(UDVT);
 
-  printf("mdiffU: %f\n", (float)mdiffU());
-  printf("mdiffV: %f\n", (float)mdiffV());
-  printf("mdiffA: %f\n", (float)mdiffA());
-#endif
+//   printf("mdiffU: %f\n", (float)mdiffU());
+//   printf("mdiffV: %f\n", (float)mdiffV());
+//   printf("mdiffA: %f\n", (float)mdiffA());
+// #endif
 
-  ASSERT_NEAR( mdiffU(), SType(0), .1);
-  ASSERT_NEAR( mdiffV(), SType(0), .1);
-  ASSERT_NEAR( mdiffA(), SType(0), .00001);
-}
+//   ASSERT_NEAR( mdiffU(), SType(0), .1);
+//   ASSERT_NEAR( mdiffV(), SType(0), .1);
+//   ASSERT_NEAR( mdiffA(), SType(0), .00001);
+// }
 
-TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDPI)
-{
-  MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+// TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDPI)
+// {
+//   MATX_ENTER_HANDLER();
+//   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
     
-  svdpi_test<TestType>({4,4}, this->exec);
-  svdpi_test<TestType>({4,16}, this->exec);
-  svdpi_test<TestType>({16,4}, this->exec);
+//   svdpi_test<TestType>({4,4}, this->exec);
+//   svdpi_test<TestType>({4,16}, this->exec);
+//   svdpi_test<TestType>({16,4}, this->exec);
 
-  svdpi_test<TestType>({25,4,4}, this->exec);
-  svdpi_test<TestType>({25,4,16}, this->exec);
-  svdpi_test<TestType>({25,16,4}, this->exec);
+//   svdpi_test<TestType>({25,4,4}, this->exec);
+//   svdpi_test<TestType>({25,4,16}, this->exec);
+//   svdpi_test<TestType>({25,16,4}, this->exec);
 
-  svdpi_test<TestType>({5,5,4,4}, this->exec);
-  svdpi_test<TestType>({5,5,4,16}, this->exec);
-  svdpi_test<TestType>({5,5,16,4}, this->exec);
+//   svdpi_test<TestType>({5,5,4,4}, this->exec);
+//   svdpi_test<TestType>({5,5,4,16}, this->exec);
+//   svdpi_test<TestType>({5,5,16,4}, this->exec);
   
-  MATX_EXIT_HANDLER();
-}
+//   MATX_EXIT_HANDLER();
+// }
 
-template <typename TypeParam, int RANK, typename Executor>
-void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
-  using AType = TypeParam;
-  using SType = typename inner_op_type_t<AType>::type;
+// template <typename TypeParam, int RANK, typename Executor>
+// void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
+//   using AType = TypeParam;
+//   using SType = typename inner_op_type_t<AType>::type;
 
-  cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
+//   cuda::std::array<index_t, RANK> Ashape = detail::to_array(AshapeA);
 
-  exec.sync();
+//   exec.sync();
 
-  index_t mm = Ashape[RANK-2];
-  index_t nn = Ashape[RANK-1];
-  index_t r = std::min(nn,mm);
+//   index_t mm = Ashape[RANK-2];
+//   index_t nn = Ashape[RANK-1];
+//   index_t r = std::min(nn,mm);
 
-  auto Ushape = Ashape;
-  Ushape[RANK-1] = r;
+//   auto Ushape = Ashape;
+//   Ushape[RANK-1] = r;
 
-  auto VTshape = Ashape;
-  VTshape[RANK-2] = r;
+//   auto VTshape = Ashape;
+//   VTshape[RANK-2] = r;
 
-  cuda::std::array<index_t, RANK-1> Sshape;
-  for(index_t i = 0; i < RANK-2; i++) {
-    Sshape[i] = Ashape[i];
-  }
-  Sshape[RANK-2] = r;
+//   cuda::std::array<index_t, RANK-1> Sshape;
+//   for(index_t i = 0; i < RANK-2; i++) {
+//     Sshape[i] = Ashape[i];
+//   }
+//   Sshape[RANK-2] = r;
 
-  // example-begin svdbpi-test-1
-  auto A = make_tensor<AType>(Ashape);
-  auto U = make_tensor<AType>(Ushape);
-  auto VT = make_tensor<AType>(VTshape);
-  auto S = make_tensor<SType>(Sshape);
+//   // example-begin svdbpi-test-1
+//   auto A = make_tensor<AType>(Ashape);
+//   auto U = make_tensor<AType>(Ushape);
+//   auto VT = make_tensor<AType>(VTshape);
+//   auto S = make_tensor<SType>(Sshape);
 
-  int iterations = 100;
+//   int iterations = 100;
 
-  (A = random<AType>(std::move(Ashape), NORMAL)).run(exec);
+//   (A = random<AType>(std::move(Ashape), NORMAL)).run(exec);
 
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+//   (U = 0).run(exec);
+//   (S = 0).run(exec);
+//   (VT = 0).run(exec);
 
-  (mtie(U, S, VT) = svdbpi(A, iterations)).run(exec);
-  // example-end svdbpi-test-1
+//   (mtie(U, S, VT) = svdbpi(A, iterations)).run(exec);
+//   // example-end svdbpi-test-1
 
-  auto Rshape = Ushape;
-  Rshape[RANK-1] = r;
-  Rshape[RANK-2] = r;
+//   auto Rshape = Ushape;
+//   Rshape[RANK-1] = r;
+//   Rshape[RANK-2] = r;
 
-  auto UD = make_tensor<AType>(Ushape);
-  auto UDVT = make_tensor<AType>(Ashape);
-  auto UTU = make_tensor<AType>(Rshape);
-  auto VTV = make_tensor<AType>(Rshape);
+//   auto UD = make_tensor<AType>(Ushape);
+//   auto UDVT = make_tensor<AType>(Ashape);
+//   auto UTU = make_tensor<AType>(Rshape);
+//   auto VTV = make_tensor<AType>(Rshape);
 
-  auto UTUd = make_tensor<SType>(Rshape);
-  auto VTVd = make_tensor<SType>(Rshape);
-  auto Ad = make_tensor<SType>(Ashape);
+//   auto UTUd = make_tensor<SType>(Rshape);
+//   auto VTVd = make_tensor<SType>(Rshape);
+//   auto Ad = make_tensor<SType>(Ashape);
 
-  (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
-  (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
+//   (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
+//   (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); 
 
-  cuda::std::array<index_t, RANK> Dshape;
-  Dshape.fill(matxKeepDim);
-  Dshape[RANK-2] = mm;
+//   cuda::std::array<index_t, RANK> Dshape;
+//   Dshape.fill(matxKeepDim);
+//   Dshape[RANK-2] = mm;
 
-  // cloning D across matrix
-  auto D = clone<RANK>(S, Dshape);
-  // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-  (UD = U * D).run(exec);
+//   // cloning D across matrix
+//   auto D = clone<RANK>(S, Dshape);
+//   // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+//   (UD = U * D).run(exec);
 
-  (UDVT = matmul(UD, VT)).run(exec);
+//   (UDVT = matmul(UD, VT)).run(exec);
 
-  auto e = eye<SType>({r,r});
-  auto eShape = Rshape;
-  eShape[RANK-1] = matxKeepDim;
-  eShape[RANK-2] = matxKeepDim;
+//   auto e = eye<SType>({r,r});
+//   auto eShape = Rshape;
+//   eShape[RANK-1] = matxKeepDim;
+//   eShape[RANK-2] = matxKeepDim;
 
-  auto mdiffU = make_tensor<SType>({});
-  auto mdiffV = make_tensor<SType>({});
-  auto mdiffA = make_tensor<SType>({});
+//   auto mdiffU = make_tensor<SType>({});
+//   auto mdiffV = make_tensor<SType>({});
+//   auto mdiffA = make_tensor<SType>({});
 
-  auto I = clone<RANK>(e, eShape);
+//   auto I = clone<RANK>(e, eShape);
 
-  (UTUd = abs(UTU - I)).run(exec);
-  (VTVd = abs(VTV - I)).run(exec);
-  (Ad = abs(A - UDVT)).run(exec);
+//   (UTUd = abs(UTU - I)).run(exec);
+//   (VTVd = abs(VTV - I)).run(exec);
+//   (Ad = abs(A - UDVT)).run(exec);
 
-  (mdiffU = max(UTUd)).run(exec);
-  (mdiffV = max(VTVd)).run(exec);
-  (mdiffA = max(Ad)).run(exec);
+//   (mdiffU = max(UTUd)).run(exec);
+//   (mdiffV = max(VTVd)).run(exec);
+//   (mdiffA = max(Ad)).run(exec);
 
-  exec.sync();
+//   exec.sync();
 
-#if 0
-  printf("A\n"); print(A);
-  printf("U\n"); print(U);
-  printf("VT\n"); print(VT);
-  printf("S\n"); print(S);
+// #if 0
+//   printf("A\n"); print(A);
+//   printf("U\n"); print(U);
+//   printf("VT\n"); print(VT);
+//   printf("S\n"); print(S);
 
-  printf("UTU\n"); print(UTU);
-  printf("VTV\n"); print(VTV);
-  printf("A\n"); print(A);
-  printf("UDVT\n"); print(UDVT);
+//   printf("UTU\n"); print(UTU);
+//   printf("VTV\n"); print(VTV);
+//   printf("A\n"); print(A);
+//   printf("UDVT\n"); print(UDVT);
 
-  printf("mdiffU: %f\n", (float)mdiffU());
-  printf("mdiffV: %f\n", (float)mdiffV());
-  printf("mdiffA: %f\n", (float)mdiffA());
-#endif
+//   printf("mdiffU: %f\n", (float)mdiffU());
+//   printf("mdiffV: %f\n", (float)mdiffV());
+//   printf("mdiffA: %f\n", (float)mdiffA());
+// #endif
 
-  ASSERT_NEAR( mdiffU(), SType(0), .1);
-  ASSERT_NEAR( mdiffV(), SType(0), .1);
-  ASSERT_NEAR( mdiffA(), SType(0), .00001);
+//   ASSERT_NEAR( mdiffU(), SType(0), .1);
+//   ASSERT_NEAR( mdiffV(), SType(0), .1);
+//   ASSERT_NEAR( mdiffA(), SType(0), .00001);
   
-  exec.sync();
+//   exec.sync();
 
-}
+// }
 
-TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPI)
-{
-  MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
+// TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPI)
+// {
+//   MATX_ENTER_HANDLER();
+//   using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
 
-  svdbpi_test<TestType>({4,4}, this->exec);
-  svdbpi_test<TestType>({4,16}, this->exec);
-  svdbpi_test<TestType>({16,4}, this->exec);
+//   svdbpi_test<TestType>({4,4}, this->exec);
+//   svdbpi_test<TestType>({4,16}, this->exec);
+//   svdbpi_test<TestType>({16,4}, this->exec);
 
-  svdbpi_test<TestType>({25,4,4}, this->exec);
-  svdbpi_test<TestType>({25,4,16}, this->exec);
-  svdbpi_test<TestType>({25,16,4}, this->exec);
+//   svdbpi_test<TestType>({25,4,4}, this->exec);
+//   svdbpi_test<TestType>({25,4,16}, this->exec);
+//   svdbpi_test<TestType>({25,16,4}, this->exec);
 
-  svdbpi_test<TestType>({5,5,4,4}, this->exec);
-  svdbpi_test<TestType>({5,5,4,16}, this->exec);
-  svdbpi_test<TestType>({5,5,16,4}, this->exec);
+//   svdbpi_test<TestType>({5,5,4,4}, this->exec);
+//   svdbpi_test<TestType>({5,5,4,16}, this->exec);
+//   svdbpi_test<TestType>({5,5,16,4}, this->exec);
 
-  MATX_EXIT_HANDLER();
-}
+//   MATX_EXIT_HANDLER();
+// }

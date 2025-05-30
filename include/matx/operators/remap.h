@@ -69,19 +69,28 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, Is... indices)
         {
-          static_assert(sizeof...(Is) == Rank());
-          static_assert((std::is_convertible_v<Is, index_t> && ... ));
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            static_assert(sizeof...(Is) == Rank());
+            static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-          cuda::std::array ind{indices...};
+            cuda::std::array ind{indices...};
 
-          // remap current index for dim
-          if constexpr (IdxType::Rank() == 0) {
-            ind[DIM] = get_value<ElementsPerThread::ONE>(idx);
+            if constexpr (EPT == ElementsPerThread::ONE) {
+              // remap current index for dim
+              if constexpr (IdxType::Rank() == 0) {
+                ind[DIM] = get_value<EPT>(idx);
+              } else {
+                ind[DIM] = get_value<EPT>(idx, ind[DIM]);
+              }
+
+              return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+            } else {
+              // Cannot take this path since the capabilities force 1, but we need a valid return value
+              return Vector<value_type, static_cast<size_t>(EPT)>();
+            }
           } else {
-            ind[DIM] = get_value<ElementsPerThread::ONE>(idx, ind[DIM]);
+            return Vector<value_type, static_cast<size_t>(EPT)>{};
           }
-
-          return get_value<ElementsPerThread::ONE>(cuda::std::forward<Op>(op), ind);
         }
 
         template <ElementsPerThread EPT, typename... Is>

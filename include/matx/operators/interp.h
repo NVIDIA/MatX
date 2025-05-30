@@ -479,10 +479,14 @@ namespace matx {
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        auto x_query = get_value<ElementsPerThread::ONE>(xq_, indices...);
-        auto [idx_low, idx_high] = searchsorted<ElementsPerThread::ONE>(x_query); // Pass EPT
+        if constexpr (EPT == ElementsPerThread::ONE) {
+          auto x_query = get_value<ElementsPerThread::ONE>(xq_, indices...);
+          auto [idx_low, idx_high] = searchsorted<ElementsPerThread::ONE>(x_query); // Pass EPT
 
-        return interpolate<ElementsPerThread::ONE>(x_query, idx_low, idx_high); // Pass EPT
+          return interpolate<ElementsPerThread::ONE>(x_query, idx_low, idx_high); // Pass EPT
+        } else {
+          return Vector<value_type, static_cast<index_t>(EPT)>{};
+        }
       }
 
       template <typename... Is>

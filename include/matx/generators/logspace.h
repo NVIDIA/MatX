@@ -79,15 +79,18 @@ namespace matx
         template <detail::ElementsPerThread EPT>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return detail::Apply1DVecFunc<EPT, T>([this](index_t i) {
+          auto range_val = range_.template operator()<EPT>(idx);
+          auto log_func = [](const auto &val) {
             if constexpr (is_matx_half_v<T>) {
               return static_cast<T>(
-                  cuda::std::pow(10, static_cast<float>(range_.template operator()<EPT>(i))));
+                  cuda::std::pow(10, static_cast<float>(val)));
             }
             else {
-                return cuda::std::pow(10, range_.template operator()<EPT>(i));
+                return cuda::std::pow(10, val);
             }
-          }, idx);
+          };
+
+          return detail::ApplyVecFunc<EPT, value_type>(log_func, range_val); 
         }
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const

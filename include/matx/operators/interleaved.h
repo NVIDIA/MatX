@@ -61,20 +61,24 @@ namespace matx
  
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ complex_type operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          auto real = get_value<ElementsPerThread::ONE>(op_, indices...);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            auto real = get_value<ElementsPerThread::ONE>(op_, indices...);
 
-          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
-          cuda::std::array idx{indices...};
-          idx[rank_idx] += op_.Size(rank_idx) / 2;
+            constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+            cuda::std::array idx{indices...};
+            idx[rank_idx] += op_.Size(rank_idx) / 2;
 
-          auto imag = get_value<ElementsPerThread::ONE>(op_, idx);
-          return complex_type{real, imag};
+            auto imag = get_value<ElementsPerThread::ONE>(op_, idx);
+            return complex_type{real, imag};
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ complex_type operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }

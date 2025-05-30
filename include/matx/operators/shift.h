@@ -83,18 +83,22 @@ namespace matx
             ShiftType shiftin,
             Is... indices)
         {
-          cuda::std::array idx{indices...};
-          index_t shift = -get_value<EPT>(shiftin, indices...);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array idx{indices...};
+            index_t shift = -get_value<EPT>(shiftin, indices...);
 
-          shift = (shift + idx[DIM]) % sizes[DIM];
+            shift = (shift + idx[DIM]) % sizes[DIM];
 
-          if (shift < 0) {
-            shift += sizes[DIM];
+            if (shift < 0) {
+              shift += sizes[DIM];
+            }
+
+            idx[DIM] = shift;
+
+            return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+          } else {
+            return Vector<value_type, static_cast<size_t>(EPT)>();
           }
-
-          idx[DIM] = shift;
-
-          return get_value<ElementsPerThread::ONE>(cuda::std::forward<Op>(op), idx);
         }
 
         template <ElementsPerThread EPT, typename... Is>

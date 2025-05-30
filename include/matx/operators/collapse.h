@@ -72,26 +72,31 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-          // indices coming in
-          cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-          cuda::std::array<index_t, T1::Rank()> out;         // index going out
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            // indices coming in
+            cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+            cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-#pragma unroll
-          for(int i = 1; i < Rank(); i++) {
-            // copy all but first input index into out array
-            out[DIM + i - 1] = in[i];
+  #pragma unroll
+            for(int i = 1; i < Rank(); i++) {
+              // copy all but first input index into out array
+              out[DIM + i - 1] = in[i];
+            }
+
+            // expand first input index into DIM indices
+            auto ind = in[0];
+  #pragma unroll
+            for(int i = 0; i < DIM; i++) {
+              int d = DIM - i - 1;
+              out[d] = ind % op.Size(d);
+              ind /= op.Size(d);
+            }
+
+            return get_value<EPT>(cuda::std::forward<Op>(op), out);
           }
-
-          // expand first input index into DIM indices
-          auto ind = in[0];
-#pragma unroll
-          for(int i = 0; i < DIM; i++) {
-            int d = DIM - i - 1;
-            out[d] = ind % op.Size(d);
-            ind /= op.Size(d);
+          else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-
-          return get_value<ElementsPerThread::ONE>(cuda::std::forward<Op>(op), out);
         }
 
         template <typename Op, typename... Is>

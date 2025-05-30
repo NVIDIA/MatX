@@ -62,7 +62,7 @@ namespace matx
         template <detail::ElementsPerThread EPT>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return detail::Apply1DVecFunc<EPT, T>([this](index_t i) {
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t i) {
             if constexpr (is_matx_half_v<T>) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
               return first_ + T(static_cast<T>((float)i) * step_);

@@ -45,7 +45,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview / static_cast<scalar_type>(fview)).run(exec);
+  (dview = dview / as_type<scalar_type>(fview)).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -65,7 +65,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   }
   
 
-  (dview = dview + fview).run(exec);
+  (dview = dview + as_type<scalar_type>(fview)).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -82,7 +82,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview - fview).run(exec);
+  (dview = dview - as_type<scalar_type>(fview)).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -99,7 +99,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = fview - dview).run(exec);
+  (dview = as_type<scalar_type>(fview) - dview).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {

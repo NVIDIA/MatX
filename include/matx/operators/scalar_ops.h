@@ -293,9 +293,9 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_cos(T 
 MATX_UNARY_OP_GEN_NOFUNC(cos, Cos);
 
 
-template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
+template <typename T, std::enable_if_t<std::is_floating_point_v<T> || is_matx_half_v<T>, bool> = true>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_expj(T v1) {
-  if constexpr (is_matx_type_v<T>) {
+  if constexpr (is_matx_half_v<T>) {
     return matxHalfComplex<T>{scalar_internal_cos(v1), scalar_internal_sin(v1)};
   }
   else {

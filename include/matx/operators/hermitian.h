@@ -63,9 +63,13 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          cuda::std::array idx{indices...};
-          cuda::std::swap(idx[Rank() - 2], idx[Rank() - 1]);
-          return internal_conj(get_value<EPT>(op_, idx));   
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array idx{indices...};
+            cuda::std::swap(idx[Rank() - 2], idx[Rank() - 1]);
+            return internal_conj(get_value<EPT>(op_, idx));   
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename... Is>
@@ -102,8 +106,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }

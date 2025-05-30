@@ -432,10 +432,10 @@ namespace detail {
               curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(EPT));
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateUniform(gen_, &val.data[0], static_cast<int>(EPT) * 2);
+              curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(EPT) * 2);
+              curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2);
             }
 
             #pragma unroll
@@ -451,10 +451,10 @@ namespace detail {
               curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(EPT), fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
             }
 
             #pragma unroll

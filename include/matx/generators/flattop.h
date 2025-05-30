@@ -65,7 +65,7 @@ namespace matx
         template <detail::ElementsPerThread EPT>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::Apply1DVecFunc<EPT, T>([this](index_t idx) {
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) {
             return  a0  
               - a1 * cuda::std::cos(2*M_PI*idx / (size_ - 1))
               + a2 * cuda::std::cos(4*M_PI*idx / (size_ - 1))

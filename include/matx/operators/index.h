@@ -56,14 +56,18 @@ namespace matx
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          cuda::std::array<index_t, sizeof...(Is)> inds{indices...};
-          return inds[dim_];
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array<index_t, sizeof...(Is)> inds{indices...};
+            return inds[dim_];
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -79,7 +83,11 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          return capability_attributes<Cap>::default_value;
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            return capability_attributes<Cap>::default_value;
+          }
         }
     };
   }   

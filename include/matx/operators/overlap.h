@@ -89,7 +89,11 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, index_t i0)
         {   
-          return get_value<EPT>(cuda::std::forward<Op>(op), i0);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            return get_value<EPT>(cuda::std::forward<Op>(op), i0);
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }        
 
         template <ElementsPerThread EPT>
@@ -157,8 +161,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }

@@ -62,8 +62,12 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
         {    
-          auto arrs = detail::GetIdxFromAbs(op, get_value<ElementsPerThread::ONE>(idx, i));
-          return get_value<ElementsPerThread::ONE>(op, arrs);          
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            auto arrs = detail::GetIdxFromAbs(op, get_value<EPT>(idx, i));
+            return get_value<EPT>(op, arrs);          
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <ElementsPerThread EPT, typename... Is>

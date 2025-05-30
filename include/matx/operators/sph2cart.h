@@ -67,16 +67,20 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          [[maybe_unused]] auto theta = get_value<EPT>(theta_, indices...);
-          [[maybe_unused]] auto phi = get_value<EPT>(phi_, indices...);
-          auto r = get_value<EPT>(r_, indices...);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            [[maybe_unused]] auto theta = get_value<EPT>(theta_, indices...);
+            [[maybe_unused]] auto phi = get_value<EPT>(phi_, indices...);
+            auto r = get_value<EPT>(r_, indices...);
 
-          if constexpr (WHICH==0) { // X
-            return internal_mul(r, internal_mul(internal_cos(phi), internal_cos(theta)));
-          } else if constexpr (WHICH==1) { // Y
-            return internal_mul(r, internal_mul(internal_cos(phi), internal_sin(theta)));
-          } else {  // Z
-            return internal_mul(r, internal_sin(phi));
+            if constexpr (WHICH==0) { // X
+              return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));
+            } else if constexpr (WHICH==1) { // Y
+              return r * (scalar_internal_cos(phi) * scalar_internal_sin(theta));
+            } else {  // Z
+              return r * scalar_internal_sin(phi);
+            }
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
 
@@ -133,13 +137,17 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(
-            self_has_cap,
-            detail::get_operator_capability<Cap>(theta_),
-            detail::get_operator_capability<Cap>(phi_),
-            detail::get_operator_capability<Cap>(r_)
-          );
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(theta_),
+              detail::get_operator_capability<Cap>(phi_),
+              detail::get_operator_capability<Cap>(r_)
+            );
+          }
         }
     };
   }

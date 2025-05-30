@@ -58,9 +58,13 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         { 
-          cuda::std::array idx{indices...};
-          idx[Rank() - 1] = (idx[Rank() - 1] + (op.Size(Rank()-1) + 1) / 2) % op.Size(Rank()-1);
-          return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array idx{indices...};
+            idx[Rank() - 1] = (idx[Rank() - 1] + (op.Size(Rank()-1) + 1) / 2) % op.Size(Rank()-1);
+            return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }  
 
         template <ElementsPerThread EPT, typename... Is>

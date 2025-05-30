@@ -61,18 +61,22 @@ namespace matx
         };
 
         template <ElementsPerThread EPT>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(index_t idx) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          // Horner's method for computing polynomial
-          value_type ttl{get_value<ElementsPerThread::ONE>(coeffs_, 0)};
-          for(int i = 1; i < coeffs_.Size(0); i++) {
-              ttl = ttl * get_value<ElementsPerThread::ONE>(op_, idx) + get_value<ElementsPerThread::ONE>(coeffs_, i);
-          }
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            // Horner's method for computing polynomial
+            value_type ttl{get_value<EPT>(coeffs_, 0)};
+            for(int i = 1; i < coeffs_.Size(0); i++) {
+                ttl = ttl * get_value<EPT>(op_, idx) + get_value<EPT>(coeffs_, i);
+            }
 
-          return ttl;
+            return ttl;
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(index_t idx) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(idx);
         }

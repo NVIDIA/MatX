@@ -59,15 +59,19 @@ namespace matx
         template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {  
-          cuda::std::array idx{indices...};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array idx{indices...};
 
-          // If we're on the upper part of the spectrum, return the conjugate of the first half
-          if (idx[Rank() - 1] >= op_.Size(Rank()-1)) {
-            idx[Rank() - 1] = orig_size_ - idx[Rank() - 1];
-            return internal_conj(get_value<EPT>(op_, idx));
+            // If we're on the upper part of the spectrum, return the conjugate of the first half
+            if (idx[Rank() - 1] >= op_.Size(Rank()-1)) {
+              idx[Rank() - 1] = orig_size_ - idx[Rank() - 1];
+              return internal_conj(get_value<EPT>(op_, idx));
+            }
+
+            return get_value<EPT>(op_, idx);         
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-
-          return get_value<EPT>(op_, idx);         
         }
 
         template <typename... Is>
@@ -93,8 +97,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
 
         template <typename ShapeType, typename Executor>

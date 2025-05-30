@@ -102,59 +102,63 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          cuda::std::array<index_t, Rank()> inds{indices...};
-          cuda::std::array<index_t, T3::Rank()> xinds{};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T3::Rank()> xinds{};
 
-          int axis1 = axis_[0];
-          int axis2 = axis_[1];
-          
-          // compute n
-          index_t nind = inds[axis1];
-          int n = get_value<ElementsPerThread::ONE>(n_, nind);
-          
-          // compute m 
-          index_t mind = inds[axis2];
-          int m = get_value<ElementsPerThread::ONE>(m_, mind);
-          
-          if(axis1>axis2) 
-            cuda::std::swap(axis1, axis2);
+            int axis1 = axis_[0];
+            int axis2 = axis_[1];
+            
+            // compute n
+            index_t nind = inds[axis1];
+            int n = get_value<ElementsPerThread::ONE>(n_, nind);
+            
+            // compute m 
+            index_t mind = inds[axis2];
+            int m = get_value<ElementsPerThread::ONE>(m_, mind);
+            
+            if(axis1>axis2) 
+              cuda::std::swap(axis1, axis2);
 
-          // compute indices for x
-          int idx = 0;
-          for(int i = 0; i < Rank(); i++) {
-            index_t ind = inds[i];
-            if(i != axis1 && i != axis2) {
-              xinds[idx++] = ind;
-            }
-          }
-
-          auto lret = [this](auto ln, auto lm, auto lx) {
-            if constexpr (is_complex_half_v<value_type>) {
-              return static_cast<value_type>(legendre(ln, lm, cuda::std::complex<float>(lx)));
-            } else if constexpr (is_matx_half_v<value_type>) {
-              return static_cast<value_type>(legendre(ln, lm, float(lx)));
-            } else {
-              return legendre(ln, lm, lx);
-            }
-          };
-
-          auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
-          if constexpr (EPT != ElementsPerThread::ONE) {
-            Vector<value_type, static_cast<int>(EPT)> ret;
-            #pragma unroll
-            for (int e = 0; e < static_cast<int>(EPT); ++e) {
-              ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
+            // compute indices for x
+            int idx = 0;
+            for(int i = 0; i < Rank(); i++) {
+              index_t ind = inds[i];
+              if(i != axis1 && i != axis2) {
+                xinds[idx++] = ind;
+              }
             }
 
-            return ret;
-          }
-          else {
-            return lret(n, m, x);
+            auto lret = [this](auto ln, auto lm, auto lx) {
+              if constexpr (is_complex_half_v<value_type>) {
+                return static_cast<value_type>(legendre(ln, lm, cuda::std::complex<float>(lx)));
+              } else if constexpr (is_matx_half_v<value_type>) {
+                return static_cast<value_type>(legendre(ln, lm, float(lx)));
+              } else {
+                return legendre(ln, lm, lx);
+              }
+            };
+
+            auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
+            if constexpr (EPT != ElementsPerThread::ONE) {
+              Vector<value_type, static_cast<int>(EPT)> ret;
+              #pragma unroll
+              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+                ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
+              }
+
+              return ret;
+            }
+            else {
+              return lret(n, m, x);
+            }
+          } else {
+            return Vector<value_type, static_cast<int>(EPT)>{};
           }
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }

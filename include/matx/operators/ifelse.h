@@ -112,11 +112,15 @@ namespace matx
        */
       template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
-            return get_value<ElementsPerThread::ONE>(op1_, indices...);
-          }
-          else {
-            return get_value<ElementsPerThread::ONE>(op2_, indices...);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
+              return get_value<ElementsPerThread::ONE>(op1_, indices...);
+            }
+            else {
+              return get_value<ElementsPerThread::ONE>(op2_, indices...);
+            }
+          } else {
+            return Vector<int, static_cast<index_t>(EPT)>{};
           }
         }
 

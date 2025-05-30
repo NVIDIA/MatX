@@ -89,18 +89,23 @@ MATX_IGNORE_WARNING_POP_GCC
         template <ElementsPerThread EPT, typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
-MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-          cuda::std::array<index_t, Rank()> sind{indices...};
-          cuda::std::array<index_t, T::Rank()> gind;
-MATX_IGNORE_WARNING_POP_GCC
+          if constexpr (EPT == ElementsPerThread::ONE) {
+  MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+            cuda::std::array<index_t, Rank()> sind{indices...};
+            cuda::std::array<index_t, T::Rank()> gind;
+  MATX_IGNORE_WARNING_POP_GCC
 
-          // gather indices
-          for(int i = 0; i < T::Rank(); i++) {
-            auto idx = dims[i];
-            gind[i] = sind[idx];
+            // gather indices
+            for(int i = 0; i < T::Rank(); i++) {
+              auto idx = dims[i];
+              gind[i] = sind[idx];
+            }
+
+            return get_value<EPT>(cuda::std::forward<Op>(op), gind);
           }
-
-          return get_value<EPT>(cuda::std::forward<Op>(op), gind);
+          else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename Op, typename Dims, typename... Is>
@@ -160,8 +165,13 @@ MATX_IGNORE_WARNING_POP_GCC
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }

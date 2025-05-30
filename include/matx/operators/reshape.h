@@ -82,27 +82,31 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const decltype(sizes_) &sizes, Is... indices)
         {   
-          cuda::std::array<index_t, Rank()> inds{indices...};
-          cuda::std::array<index_t, T::Rank()> ninds;
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            cuda::std::array<index_t, T::Rank()> ninds;
 
-          index_t idx = 0;
-          index_t stride = 1;
+            index_t idx = 0;
+            index_t stride = 1;
 
-          // linearlize incoming index
+            // linearlize incoming index
 #pragma unroll
-          for(int i = Rank() - 1 ; i >= 0 ; i--) {
-            idx += stride * inds[i];
-            stride *= sizes[i];
+            for(int i = Rank() - 1 ; i >= 0 ; i--) {
+              idx += stride * inds[i];
+              stride *= sizes[i];
+            }
+
+            // extract new indices
+  #pragma unroll
+            for(int i = T::Rank() - 1; i >= 0; i--) {
+              ninds[i] = idx % op.Size(i);
+              idx /= op.Size(i);
+            }   
+
+            return get_value<EPT>(cuda::std::forward<Op>(op), ninds);       
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-
-          // extract new indices
-#pragma unroll
-          for(int i = T::Rank() - 1; i >= 0; i--) {
-            ninds[i] = idx % op.Size(i);
-            idx /= op.Size(i);
-          }   
-
-          return get_value<EPT>(cuda::std::forward<Op>(op), ninds);       
         }
 
         template <ElementsPerThread EPT, typename... Is>
@@ -131,8 +135,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

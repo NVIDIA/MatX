@@ -47,7 +47,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using value_type = typename T1::value_type;
+        using value_type = typename T1::value_type::value_type;
 
         __MATX_INLINE__ std::string str() const { return "planar(" + op_.str() + ")"; }
 
@@ -59,15 +59,19 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
-          cuda::std::array idx{indices...};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
+            cuda::std::array idx{indices...};
 
-          if (idx[rank_idx] >= op_.Size(rank_idx)) {      
-            idx[rank_idx] -= op_.Size(rank_idx);    
-            return get_value<ElementsPerThread::ONE>(op_, idx).imag();
+            if (idx[rank_idx] >= op_.Size(rank_idx)) {      
+              idx[rank_idx] -= op_.Size(rank_idx);    
+              return get_value<EPT>(op_, idx).imag();
+            }
+
+            return get_value<EPT>(op_, indices...).real(); 
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-
-          return get_value<ElementsPerThread::ONE>(op_, indices...).real(); 
         }
 
         template <typename... Is>

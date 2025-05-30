@@ -61,35 +61,39 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          auto v = get_value<EPT>(op_,indices...);
-
-          auto set_val = [this](auto vl) { 
-            if constexpr (is_complex_v<value_type> ) {
-              if ( vl == value_type(0)) {
-                return zval_;
-              } else {
-                return vl / abs(vl); // sign defintion for complex values
-              }
-            } else {  // real branch
-              if( vl < 0) 
-                return value_type(-1);
-              else if ( vl > 0 ) 
-                return value_type(1);
-              else 
-                return zval_;
-            }
-          };
-
           if constexpr (EPT == ElementsPerThread::ONE) {
-            return set_val(v);
-          }
-          else {
-            Vector<value_type, static_cast<int>(EPT)> ret;
-            #pragma unroll
-            for (int e = 0; e < static_cast<int>(EPT); ++e) {
-              ret.data[e] = set_val(GetVectorVal(v, e));
+            auto v = get_value<EPT>(op_,indices...);
+
+            auto set_val = [this](auto vl) { 
+              if constexpr (is_complex_v<value_type> ) {
+                if ( vl == value_type(0)) {
+                  return zval_;
+                } else {
+                  return vl / abs(vl); // sign defintion for complex values
+                }
+              } else {  // real branch
+                if( vl < 0) 
+                  return value_type(-1);
+                else if ( vl > 0 ) 
+                  return value_type(1);
+                else 
+                  return zval_;
+              }
+            };
+
+            if constexpr (EPT == ElementsPerThread::ONE) {
+              return set_val(v);
             }
-            return ret;
+            else {
+              Vector<value_type, static_cast<int>(EPT)> ret;
+              #pragma unroll
+              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+                ret.data[e] = set_val(GetVectorVal(v, e));
+              }
+              return ret;
+            }
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
 
@@ -101,8 +105,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
 
         template <typename ShapeType, typename Executor>

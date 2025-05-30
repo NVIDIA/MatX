@@ -1099,6 +1099,28 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+    }
+
+    template <ElementsPerThread EPT>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T {
+          return this->operator()<EPT>(args...);
+        }, idx);
+    }
+
+    /**
+     * operator() getter with an array index
+     *
+     * @returns value in tensor
+     *
+     */
+    template <ElementsPerThread EPT>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T& {
+          return this->operator()<EPT>(args...);
+        }, idx);
     }    
 
     /**
@@ -1110,7 +1132,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()(args...);
+          return this->operator()<detail::ElementsPerThread::ONE>(args...);
         }, idx);
     }
 
@@ -1123,7 +1145,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()(args...);
+          return this->operator()<detail::ElementsPerThread::ONE>(args...);
         }, idx);
     }
 

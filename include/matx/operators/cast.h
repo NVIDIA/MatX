@@ -80,20 +80,7 @@ namespace matx
             return static_cast<NewType>(val);   
           };
 
-          return ApplyVecFunc<EPT, NewType>(cast_func, get_value<EPT>(op_, indices...));
-
-          // const auto val = get_value<EPT>(op_, indices...);
-          // if constexpr (EPT == ElementsPerThread::ONE) {
-          //   return cast_func(val);
-          // } else {
-          //   Vector<NewType, static_cast<index_t>(EPT)> out;
-          //   #pragma unroll
-          //   for (int i = 0; i < static_cast<index_t>(EPT); i++) {
-          //     out.data[i] = cast_func(val.data[i]);
-          //   }
-          //   return out;
-          // }          
-          
+          return ApplyVecFunc<EPT, NewType>(cast_func, get_value<EPT>(op_, indices...));        
         }
 
         template <typename... Is>

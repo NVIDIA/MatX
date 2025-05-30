@@ -136,62 +136,41 @@ namespace matx
       }
 
       template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
-        {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
+      {
+        if constexpr (EPT == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<EPT, 0, sizeof...(Ts)>(indices);
         }
+        else {
+          return Vector<value_type, static_cast<index_t>(EPT)>{};
+        }
+      }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
-        {
-          return this->operator()<detail::ElementsPerThread::ONE>(is...);
-        }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
+      {
+        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+      }
 
       template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
-        {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
+      {
+        if constexpr (EPT == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return GetVal<EPT, 0, sizeof...(Ts)>(indices);
         }
+        else {
+          return Vector<value_type, static_cast<index_t>(EPT)>{};
+        }
+      }
 
       template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
-        {
-          return this->operator()<detail::ElementsPerThread::ONE>(is...);
-        }
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
+      {
+        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+      }
 
-      // template <OperatorCapability Cap, size_t... IsIdx>
-      // __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(cuda::std::index_sequence<IsIdx...>) const {
-      //   if constexpr (sizeof...(IsIdx) == 0) { 
-      //     // This case should ideally not be hit due to static_assert(sizeof...(Ts) > 1)
-      //     // but as a fallback, return a neutral capability.
-      //     return capability_attributes<Cap>::default_value; 
-      //   }
-      //   // For a single op in the tuple (should also not be hit if sizeof...(Ts) > 1)
-      //   if constexpr (sizeof...(IsIdx) == 1) { 
-      //     return detail::get_operator_capability<Cap>(cuda::std::get<0>(ops_));
-      //   }
-        
-      //   // Manual fold for pairwise combination
-      //   auto combined_cap = detail::get_operator_capability<Cap>(cuda::std::get<0>(ops_));
-      //   ((combined_cap = combine_capabilities<Cap>(combined_cap, detail::get_operator_capability<Cap>(cuda::std::get<IsIdx>(ops_)))), ...);
-
-      //   // Simpler recursive pairwise combination for ops_ capabilities:
-      //   // Helper to combine capabilities of tuple elements from index K onwards
-      //   auto helper = [&](auto self_helper, size_t K) -> decltype(detail::get_operator_capability<Cap>(cuda::std::get<0>(ops_))) {
-      //       if (K == sizeof...(Ts) - 1) { // Last element
-      //           return detail::get_operator_capability<Cap>(cuda::std::get<K>(ops_));
-      //       }
-      //       return combine_capabilities<Cap>(
-      //           detail::get_operator_capability<Cap>(cuda::std::get<K>(ops_)),
-      //           self_helper(self_helper, K + 1)
-      //       );
-      //   };
-
-      //   if constexpr (sizeof...(Ts) == 0) return capability_attributes<Cap>::default_value; // Should be caught by static_assert
-      //   return helper(helper, 0);
-      // }
 
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {

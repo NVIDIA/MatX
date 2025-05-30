@@ -58,7 +58,7 @@ namespace matx
         template <detail::ElementsPerThread EPT>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::Apply1DVecFunc<EPT, T>([](index_t idx) { return (-2 * (idx & 1)) + 1; }, i);
+          return detail::ApplyGeneratorVecFunc<EPT, T>([](index_t idx) { return (-2 * (idx & 1)) + 1; }, i);
         }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const

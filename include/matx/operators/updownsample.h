@@ -71,17 +71,21 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          static_assert(sizeof...(Is)==Rank());
-          static_assert((std::is_convertible_v<Is, index_t> && ... ));
+          if constexpr (EPT == ElementsPerThread::ONE) {
+              static_assert(sizeof...(Is)==Rank());
+              static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-          // convert variadic type to tuple so we can read/update
-          cuda::std::array<index_t, Rank()> ind{indices...};
-          if ((ind[dim_] % n_) == 0) {
-            ind[dim_] /= n_;
-            return get_value<EPT>(op_, ind);
+              // convert variadic type to tuple so we can read/update
+              cuda::std::array<index_t, Rank()> ind{indices...};
+              if ((ind[dim_] % n_) == 0) {
+                ind[dim_] /= n_;
+                return get_value<EPT>(op_, ind);
+              }
+
+            return static_cast<typename decltype(op_)::value_type>(0);
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-
-          return static_cast<typename decltype(op_)::value_type>(0);
         }
 
         template <typename... Is>
@@ -92,8 +96,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const

@@ -65,41 +65,46 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
-          using tt = typename cuda::std::common_type_t<Is...>;
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
+            using tt = typename cuda::std::common_type_t<Is...>;
 
-          if constexpr (RANK == 1) {
-            static_assert(sizeof...(Is) == 2, "Indexing of diag() on a 1D input must be 2 indices");
-            if (((pp_get<0>(indices...) == indices) && ...)) {
-              return get_value<EPT>(op_, pp_get<0>(indices...));
+            if constexpr (RANK == 1) {
+              static_assert(sizeof...(Is) == 2, "Indexing of diag() on a 1D input must be 2 indices");
+              if (((pp_get<0>(indices...) == indices) && ...)) {
+                return get_value<EPT>(op_, pp_get<0>(indices...));
+              }
+              else {
+                return (value_type)(0);
+              }
             }
             else {
-              return (value_type)(0);
+              static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer op() index than rank of operator");
+
+              // Offset either the rows or columns by k_, depending on if it's negative
+              if (k_ < 0) {
+                cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+                tmp[RANK - 1] = pp_get<RANK-2>(indices...);
+                //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
+  MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+                tmp[RANK - 2] -= k_;
+                //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
+  MATX_IGNORE_WARNING_POP_GCC
+                return get_value<EPT>(op_, tmp);
+              }
+              else {
+                cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
+                //auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
+  MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+                tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
+                //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
+  MATX_IGNORE_WARNING_POP_GCC
+                return get_value<EPT>(op_, tmp);
+              }
             }
           }
           else {
-            static_assert(sizeof...(Is) == RANK - 1, "Diagonal operator must have one fewer op() index than rank of operator");
-
-            // Offset either the rows or columns by k_, depending on if it's negative
-            if (k_ < 0) {
-              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
-              tmp[RANK - 1] = pp_get<RANK-2>(indices...);
-              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) ;
-MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              tmp[RANK - 2] -= k_;
-              //cuda::std::get<RANK - 2>(tup) = cuda::std::get<RANK - 2>(tup) - k_;
-MATX_IGNORE_WARNING_POP_GCC
-              return get_value<EPT>(op_, tmp);
-            }
-            else {
-              cuda::std::array<tt, sizeof...(Is) + 1> tmp{indices...};
-              //auto tup = cuda::std::make_tuple(indices..., static_cast<tt>(0));
-MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-              tmp[RANK - 1] = pp_get<RANK-2>(indices...) + k_;
-              //cuda::std::get<RANK - 1>(tup) = pp_get<RANK-2>(indices...) + k_;
-MATX_IGNORE_WARNING_POP_GCC
-              return get_value<EPT>(op_, tmp);
-            }
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
 
@@ -111,8 +116,12 @@ MATX_IGNORE_WARNING_POP_GCC
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -150,7 +150,7 @@ namespace matx
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            return 1;
           }
           else {
             return capability_attributes<Cap>::default_value;

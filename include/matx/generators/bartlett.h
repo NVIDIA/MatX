@@ -59,7 +59,7 @@ namespace matx
         template <detail::ElementsPerThread EPT>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::Apply1DVecFunc<EPT, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
         }
 
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const

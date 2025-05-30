@@ -66,14 +66,18 @@ namespace matx
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-          if constexpr (Rank() == 0) {
-            return op.template operator()<EPT>();
-          } 
-          else {
-            cuda::std::array idx{indices...};
-            idx[DIM] = op.Size(DIM) - idx[DIM] - 1;
-            return get_value<EPT>(cuda::std::forward<Op>(op), idx);
-          }            
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            if constexpr (Rank() == 0) {
+              return op.template operator()<EPT>();
+            } 
+            else {
+              cuda::std::array idx{indices...};
+              idx[DIM] = op.Size(DIM) - idx[DIM] - 1;
+              return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+            }            
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <ElementsPerThread EPT, typename... Is>
@@ -143,8 +147,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }

@@ -60,7 +60,11 @@ namespace matx
         template <ElementsPerThread EPT, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
         {
-          return *RandomOperatorIterator{op1_, id0};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            return *RandomOperatorIterator{op1_, id0};
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename Is>
@@ -72,7 +76,11 @@ namespace matx
         template <ElementsPerThread EPT, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is id0) 
         {
-          return *RandomOperatorOutputIterator{op1_, id0};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            return *RandomOperatorOutputIterator{op1_, id0};
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename Is>
@@ -116,8 +124,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op1_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op1_));
+          }
         }
     };
   }

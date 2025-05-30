@@ -30,191 +30,191 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-#include "matx.h"
-#include <cassert>
-#include <cstdio>
-#include <math.h>
+// #include "matx.h"
+// #include <cassert>
+// #include <cstdio>
+// #include <math.h>
 
-using namespace matx;
+// using namespace matx;
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
-{
-  MATX_ENTER_HANDLER();
+// int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+// {
+//   MATX_ENTER_HANDLER();
 
-#if 1
-  //using AType = float;
-  using AType = cuda::std::complex<float>;
-  using SType = float;
+// #if 1
+//   //using AType = float;
+//   using AType = cuda::std::complex<float>;
+//   using SType = float;
 
-  cudaStream_t stream = 0;
-  cudaExecutor exec{stream};
+//   cudaStream_t stream = 0;
+//   cudaExecutor exec{stream};
 
-  int m = 5;
-  int n = 4;
+//   int m = 5;
+//   int n = 4;
 
-  int d = std::min(m,n);
-  int k = d;  // number of singular values to find
+//   int d = std::min(m,n);
+//   int k = d;  // number of singular values to find
 
-#if 0
-  int batch = 1;
-  auto A = make_tensor<AType>({batch, m, n});
-  auto U = make_tensor<AType>({batch, m, k});
-  auto VT = make_tensor<AType>({batch, k, n});
-  auto S = make_tensor<SType>({batch, k});
+// #if 0
+//   int batch = 1;
+//   auto A = make_tensor<AType>({batch, m, n});
+//   auto U = make_tensor<AType>({batch, m, k});
+//   auto VT = make_tensor<AType>({batch, k, n});
+//   auto S = make_tensor<SType>({batch, k});
 
-  // for correctness checking
-  auto UD = make_tensor<AType>({batch, m, k});
-  auto UDVT = make_tensor<AType>({batch, m, n});
-  auto UUT = make_tensor<AType>({batch, m, m});
-  auto UTU = make_tensor<AType>({batch, k, k});
-  auto VVT = make_tensor<AType>({batch, n, n});
-  auto VTV = make_tensor<AType>({batch, k, k});
-  auto x0 = random<float>({batch, d}, NORMAL);
+//   // for correctness checking
+//   auto UD = make_tensor<AType>({batch, m, k});
+//   auto UDVT = make_tensor<AType>({batch, m, n});
+//   auto UUT = make_tensor<AType>({batch, m, m});
+//   auto UTU = make_tensor<AType>({batch, k, k});
+//   auto VVT = make_tensor<AType>({batch, n, n});
+//   auto VTV = make_tensor<AType>({batch, k, k});
+//   auto x0 = random<float>({batch, d}, NORMAL);
 
-  (A = random<float>({batch, m, n}, NORMAL)).run(exec);
+//   (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
-#else
-  auto A = make_tensor<AType>({m, n});
-  auto U = make_tensor<AType>({m, k});
-  auto VT = make_tensor<AType>({k, n});
-  auto S = make_tensor<SType>({k});
+// #else
+//   auto A = make_tensor<AType>({m, n});
+//   auto U = make_tensor<AType>({m, k});
+//   auto VT = make_tensor<AType>({k, n});
+//   auto S = make_tensor<SType>({k});
 
-  // for correctness checking
-  auto UD = make_tensor<AType>({m, k});
-  auto UDVT = make_tensor<AType>({m, n});
-  auto UUT = make_tensor<AType>({m, m});
-  auto UTU = make_tensor<AType>({k, k});
-  auto VVT = make_tensor<AType>({n, n});
-  auto VTV = make_tensor<AType>({k, k});
-  auto x0 = random<float>({d}, NORMAL);
+//   // for correctness checking
+//   auto UD = make_tensor<AType>({m, k});
+//   auto UDVT = make_tensor<AType>({m, n});
+//   auto UUT = make_tensor<AType>({m, m});
+//   auto UTU = make_tensor<AType>({k, k});
+//   auto VVT = make_tensor<AType>({n, n});
+//   auto VTV = make_tensor<AType>({k, k});
+//   auto x0 = random<float>({d}, NORMAL);
 
-  (A = random<AType>({m, n}, NORMAL)).run(exec);
+//   (A = random<AType>({m, n}, NORMAL)).run(exec);
 
-#endif
-  cuda::std::array<index_t, U.Rank()> Dshape;
-  Dshape.fill(matxKeepDim);
-  Dshape[U.Rank()-2] = m;
-  // cloning D across
-  auto D = clone<U.Rank()>(S, Dshape);
+// #endif
+//   cuda::std::array<index_t, U.Rank()> Dshape;
+//   Dshape.fill(matxKeepDim);
+//   Dshape[U.Rank()-2] = m;
+//   // cloning D across
+//   auto D = clone<U.Rank()>(S, Dshape);
 
-  float tol = (float)1e-3;
-  int iterations = 20;
+//   float tol = (float)1e-3;
+//   int iterations = 20;
 
-  {
+//   {
 
-    printf("iterations: %d\n", iterations);
+//     printf("iterations: %d\n", iterations);
 
-    (U = 0).run(exec);
-    (S = 0).run(exec);
-    (VT = 0).run(exec);
+//     (U = 0).run(exec);
+//     (S = 0).run(exec);
+//     (VT = 0).run(exec);
 
-    (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(exec);
+//     (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(exec);
 
-    exec.sync();
-    printf("svdpi:\n");
+//     exec.sync();
+//     printf("svdpi:\n");
 
-    printf("S\n");
-    print(S);
-    printf("U\n");
-    print(U);
-    printf("VT\n");
-    print(VT);
+//     printf("S\n");
+//     print(S);
+//     printf("U\n");
+//     print(U);
+//     printf("VT\n");
+//     print(VT);
 
-    if( m <=  n) {
-      printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
-      print(UUT);
-    }
+//     if( m <=  n) {
+//       printf("UUT:\n");
+//       (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
+//       print(UUT);
+//     }
 
-    printf("UTU:\n");
-    (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
-    print(UTU);
+//     printf("UTU:\n");
+//     (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
+//     print(UTU);
 
-    if( n >= m) {
-      printf("VVT:\n");
-      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
-      print(VVT);
-    }
+//     if( n >= m) {
+//       printf("VVT:\n");
+//       (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
+//       print(VVT);
+//     }
 
-    printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
+//     printf("VTV:\n");
+//     (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
 
-    print(VTV);
+//     print(VTV);
 
-    // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-    (UD = U * D).run(exec);
+//     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+//     (UD = U * D).run(exec);
 
-    (UDVT = matmul(UD, VT)).run(exec);
+//     (UDVT = matmul(UD, VT)).run(exec);
 
-    printf("A\n");
-    print(A);
+//     printf("A\n");
+//     print(A);
 
-    printf("UDVT\n");
-    print(UDVT);
+//     printf("UDVT\n");
+//     print(UDVT);
 
-    (A = A - UDVT).run(exec);
+//     (A = A - UDVT).run(exec);
 
-    printf("A-UDVT\n");
-    print(A);
-  }
+//     printf("A-UDVT\n");
+//     print(A);
+//   }
 
-  // Same as above but with svdbpi
-  {
+//   // Same as above but with svdbpi
+//   {
 
-    (U = 0).run(exec);
-    (S = 0).run(exec);
-    (VT = 0).run(exec);
-    // TODO add k
-    (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(exec);
+//     (U = 0).run(exec);
+//     (S = 0).run(exec);
+//     (VT = 0).run(exec);
+//     // TODO add k
+//     (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(exec);
 
-    exec.sync();
-    printf("svdbpi:\n");
+//     exec.sync();
+//     printf("svdbpi:\n");
 
-    printf("S\n");
-    print(S);
-    printf("U\n");
-    print(U);
-    printf("VT\n");
-    print(VT);
+//     printf("S\n");
+//     print(S);
+//     printf("U\n");
+//     print(U);
+//     printf("VT\n");
+//     print(VT);
 
-    if( m <=  n) {
-      printf("UUT:\n");
-      (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
-      print(UUT);
-    }
+//     if( m <=  n) {
+//       printf("UUT:\n");
+//       (UUT = matmul(U, conj(transpose_matrix(U)))).run(exec);
+//       print(UUT);
+//     }
 
-    printf("UTU:\n");
-    (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
-    print(UTU);
+//     printf("UTU:\n");
+//     (UTU = matmul(conj(transpose_matrix(U)), U)).run(exec);
+//     print(UTU);
 
-    if( n >= m) {
-      printf("VVT:\n");
-      (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
-      print(VVT);
-    }
+//     if( n >= m) {
+//       printf("VVT:\n");
+//       (VVT = matmul(conj(transpose_matrix(VT)), VT)).run(exec);
+//       print(VVT);
+//     }
 
-    printf("VTV:\n");
-    (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
+//     printf("VTV:\n");
+//     (VTV = matmul(VT, conj(transpose_matrix(VT)))).run(exec); // works on r x r
 
-    print(VTV);
+//     print(VTV);
 
-    // scale U by eigen values (equivalent to matmul of the diagonal matrix)
-    (UD = U * D).run(exec);
+//     // scale U by eigen values (equivalent to matmul of the diagonal matrix)
+//     (UD = U * D).run(exec);
 
-    (UDVT = matmul(UD, VT)).run(exec);
+//     (UDVT = matmul(UD, VT)).run(exec);
 
-    printf("A\n");
-    print(A);
+//     printf("A\n");
+//     print(A);
 
-    printf("UDVT\n");
-    print(UDVT);
+//     printf("UDVT\n");
+//     print(UDVT);
 
-    (A = A - UDVT).run(exec);
+//     (A = A - UDVT).run(exec);
 
-    printf("A-UDVT\n");
-    print(A);
-  }
-#endif
-  MATX_CUDA_CHECK_LAST_ERROR();
-  MATX_EXIT_HANDLER();
-}
+//     printf("A-UDVT\n");
+//     print(A);
+//   }
+// #endif
+//   MATX_CUDA_CHECK_LAST_ERROR();
+//   MATX_EXIT_HANDLER();
+// }

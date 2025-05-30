@@ -61,13 +61,13 @@ namespace matx
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
           template <ElementsPerThread EPT, typename... Is>
-          auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
+          __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
             get_value<EPT>(op1_, indices...);
             return get_value<EPT>(op2_, indices...);
           }
 
           template <typename... Is>
-          auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
+          __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
             return this->operator()<detail::ElementsPerThread::ONE>(indices...);
           }
 

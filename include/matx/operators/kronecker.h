@@ -67,16 +67,21 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          cuda::std::array idx1{indices...};
-          cuda::std::array idx2{indices...};
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            cuda::std::array idx1{indices...};
+            cuda::std::array idx2{indices...};
 
-          idx2[Rank() - 2] = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
-          idx2[Rank() - 1] = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
+            idx2[Rank() - 2] = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
+            idx2[Rank() - 1] = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
 
-          idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
-          idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
+            idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
+            idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
 
-          return get_value<EPT>(op2_, idx2) * get_value<EPT>(op1_, idx1);
+            return get_value<EPT>(op2_, idx2) * get_value<EPT>(op1_, idx1);
+          }
+          else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
         }
 
         template <typename... Is>
@@ -120,12 +125,18 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(
-            self_has_cap,
-            detail::get_operator_capability<Cap>(op1_),
-            detail::get_operator_capability<Cap>(op2_)
-          );
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          }
+          else {
+            return capability_attributes<Cap>::default_value;
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(op1_),
+              detail::get_operator_capability<Cap>(op2_)
+            );
+          }
         }
     };
   }

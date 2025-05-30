@@ -124,22 +124,26 @@ namespace matx
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-        cuda::std::array<index_t, RANK> indices_o;
+        if constexpr (EPT == ElementsPerThread::ONE) {
+          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
+          cuda::std::array<index_t, RANK> indices_o;
 
-        // operator index
-        index_t oidx = indices[axis_];
+          // operator index
+          index_t oidx = indices[axis_];
 
-        // removing operator axis from indices
-        for(int i = 0; i < axis_; i++) {
-          indices_o[i] = indices[i];
-        } 
-        
-        for(int i = axis_; i < (int)indices_o.size(); i++) {
-          indices_o[i] = indices[i+1];
+          // removing operator axis from indices
+          for(int i = 0; i < axis_; i++) {
+            indices_o[i] = indices[i];
+          } 
+          
+          for(int i = axis_; i < (int)indices_o.size(); i++) {
+            indices_o[i] = indices[i+1];
+          }
+
+          return GetVal<EPT, 0, sizeof...(Ts)>(oidx, indices_o);
+        } else {
+          return Vector<value_type, static_cast<index_t>(EPT)>{};
         }
-
-        return GetVal<EPT, 0, sizeof...(Ts)>(oidx, indices_o);
       }
 
       template <typename... Is>
@@ -195,8 +199,12 @@ namespace matx
 
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(ops_));
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return 1;
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(ops_));
+        }
       }
 
       private:

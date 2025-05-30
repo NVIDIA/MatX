@@ -61,7 +61,7 @@ namespace matx
         }
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()([[maybe_unused]] Is... indices) const
         {
           auto op_func = [this](const auto &op1, const auto &op2) {
             return static_cast<int>(scalar_internal_abs(op1 - op2) <=
@@ -74,7 +74,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()([[maybe_unused]] Is... indices) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
