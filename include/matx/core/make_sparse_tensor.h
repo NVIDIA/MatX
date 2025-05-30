@@ -204,11 +204,11 @@ auto make_zero_tensor_csc(const index_t (&shape)[2],
 
 // Constructs a sparse matrix in DIA format directly from the values and the
 // offset vectors. For an m x n matrix, this format uses a linearized storage
-// where each diagonal has n entries and is access by index I or index J. For
-// index I, diagonals padded with zeros on the left for the lower triangular
+// where each diagonal has n entries and is accessed by index I or index J.
+// For index I, diagonals padded with zeros on the left for the lower triangular
 // part and padded with zeros on the right for the upper triagonal part. This
-// is v.v. for index J. This format is most efficient for matrices with only a
-// few nonzero diagonals that are close to the main diagonal.
+// is vv. when using index J. This format is most efficient for matrices with
+// only a few nonzero diagonals that are close to the main diagonal.
 template <bool I, typename ValTensor, typename CrdTensor>
 auto make_tensor_dia(ValTensor &val, CrdTensor &off,
                      const index_t (&shape)[2]) {
