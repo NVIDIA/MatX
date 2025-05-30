@@ -130,9 +130,15 @@ public:
   {
     //auto &&out = out_(indices...);
     //out = detail::get_value<EPT>(op_, indices...);
-    const auto out = detail::get_value<EPT>(op_, indices...);
-    out_.template operator()<EPT>(indices...) = out;
-    return out;
+    const auto in_val = detail::get_value<EPT>(op_, indices...);
+    using out_type = decltype(out_.template operator()<EPT>(indices...));
+    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+      out_.template operator()<EPT>(indices...) = Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(EPT)>{in_val};
+    }
+    else {
+      out_.template operator()<EPT>(indices...) = in_val;
+    }
+    return in_val;
 
     //return out_(indices...);
   }  

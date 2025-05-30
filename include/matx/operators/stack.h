@@ -85,11 +85,11 @@ namespace matx
       }
 
       template <ElementsPerThread EPT, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
 
         if constexpr ( I == N ) {
-          // This should never happen
-          return value_type(-9999);
+          const auto &op = cuda::std::get<0>(ops_);
+          return get_value<EPT>(op, indices);
         } else {
           if ( I < oidx ) {
             // this is not the correct operator, recurse
@@ -103,13 +103,12 @@ namespace matx
       }
 
       template <ElementsPerThread EPT, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto& GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
 
         if constexpr ( I == N ) {
-          // This should never happen
-          auto &op = cuda::std::get<I-1>(ops_);
+          // This should never happen, but we return a fake value from the first tuple element anyways
+          auto &op = cuda::std::get<0>(ops_);
           return get_value<EPT>(op, indices);
-
         } else {
           if ( I < oidx ) {
             // this is not the correct operator, recurse

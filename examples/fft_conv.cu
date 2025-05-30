@@ -147,7 +147,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //     }
   //   }
   // }
-
+{
+  auto t1a = make_tensor<float>({5});
+  auto t1b = make_tensor<float>({5});
+  auto t1c = make_tensor<float>({5});
+ 
+  const int num_batches = 3;
+  const int N = 16;
+  auto Afull = make_tensor<float>({num_batches, 1, 1, N, N});
+  auto A = lcollapse<3>(Afull);
+  A(0,0,0) = 3;
+}
 
   MATX_EXIT_HANDLER();
 }

@@ -94,7 +94,7 @@ namespace matx
 
           idx[DIM] = shift;
 
-          return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+          return get_value<ElementsPerThread::ONE>(cuda::std::forward<Op>(op), idx);
         }
 
         template <ElementsPerThread EPT, typename... Is>
@@ -123,12 +123,16 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(
-            self_has_cap,
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
             detail::get_operator_capability<Cap>(op_),
-            detail::get_operator_capability<Cap>(shift_)
-          );
+              detail::get_operator_capability<Cap>(shift_)
+            );
+          }
         }
 
         template <typename ShapeType, typename Executor>

@@ -88,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto VTV = make_tensor<AType>({k, k});
   auto x0 = random<float>({d}, NORMAL);
 
-  (A = random<float>({m, n}, NORMAL)).run(exec);
+  (A = random<AType>({m, n}, NORMAL)).run(exec);
 
 #endif
   cuda::std::array<index_t, U.Rank()> Dshape;

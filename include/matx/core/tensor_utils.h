@@ -277,7 +277,7 @@ namespace matx
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == N || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
-        return cuda::std::apply([&](auto... args) {
+        return cuda::std::apply([&i](auto... args) -> decltype(auto) {
           return cuda::std::forward<T>(i).template operator()<EPT>(args...);
         }, idx);        
         //return i(indices...);
@@ -286,7 +286,7 @@ namespace matx
       {
         cuda::std::array<index_t, RANK> nbc_idx; // non-broadcast indices
         cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
-        return cuda::std::apply([&](auto... args) {
+        return cuda::std::apply([&i](auto... args) -> decltype(auto) {
           return cuda::std::forward<T>(i).template operator()<EPT>(args...);
         }, nbc_idx);
       }

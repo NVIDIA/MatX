@@ -63,13 +63,13 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ complex_type operator()(Is... indices) const 
         {
-          auto real = get_value<EPT>(op_, indices...);
+          auto real = get_value<ElementsPerThread::ONE>(op_, indices...);
 
           constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
           cuda::std::array idx{indices...};
           idx[rank_idx] += op_.Size(rank_idx) / 2;
 
-          auto imag = get_value<EPT>(op_, idx);
+          auto imag = get_value<ElementsPerThread::ONE>(op_, idx);
           return complex_type{real, imag};
         }
 
@@ -113,8 +113,13 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }

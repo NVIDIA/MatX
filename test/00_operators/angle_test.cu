@@ -24,7 +24,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, AngleOp)
   (tov0 = angle(tiv0)).run(exec);
   // example-end angle-test-1
   exec.sync();
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_angle(c)));  
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::scalar_internal_angle(c)));  
 
   MATX_EXIT_HANDLER();
 } 

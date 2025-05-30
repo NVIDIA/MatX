@@ -91,7 +91,7 @@ namespace matx
             ind /= op.Size(d);
           }
 
-          return get_value<EPT>(cuda::std::forward<Op>(op), out);
+          return get_value<ElementsPerThread::ONE>(cuda::std::forward<Op>(op), out);
         }
 
         template <typename Op, typename... Is>
@@ -115,13 +115,13 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -171,8 +171,12 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }
@@ -214,7 +218,7 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
-        using matxlvalue = bool;
+        using matxoplvalue = bool;
         using self_type = RCollapseOp<DIM, T1>;
 
         __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
@@ -281,13 +285,13 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

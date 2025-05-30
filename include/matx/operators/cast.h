@@ -76,23 +76,28 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value<EPT>(op_, indices...));
-        }
+          auto cast_func = [this](const auto &val) {
+            return static_cast<NewType>(val);   
+          };
 
-        template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-        {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return ApplyVecFunc<EPT, NewType>(cast_func, get_value<EPT>(op_, indices...));
+
+          // const auto val = get_value<EPT>(op_, indices...);
+          // if constexpr (EPT == ElementsPerThread::ONE) {
+          //   return cast_func(val);
+          // } else {
+          //   Vector<NewType, static_cast<index_t>(EPT)> out;
+          //   #pragma unroll
+          //   for (int i = 0; i < static_cast<index_t>(EPT); i++) {
+          //     out.data[i] = cast_func(val.data[i]);
+          //   }
+          //   return out;
+          // }          
+          
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
-        {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
-        }
-
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -154,25 +159,31 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(get_value<EPT>(real_op_, indices...)),static_cast<inner_type>(get_value<EPT>(imag_op_, indices...)));
-        }
+          auto cast_func = [this](const auto &real, const auto &imag) {
+            using inner_type = typename inner_op_type_t<NewType>::type;
+            return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));            
+          };
 
-        template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
-        {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(get_value<EPT>(real_op_, indices...)),static_cast<inner_type>(get_value<EPT>(imag_op_, indices...)));
+          const auto real_val = get_value<EPT>(real_op_, indices...);
+          const auto imag_val = get_value<EPT>(imag_op_, indices...);
+
+          return ApplyVecFunc<EPT, NewType>(cast_func, real_val, imag_val);
+
+
+          // if constexpr (EPT == ElementsPerThread::ONE) {
+          //   return cast_func(real_val, imag_val);
+          // } else {
+          //   Vector<NewType, static_cast<index_t>(EPT)> out;
+          //   #pragma unroll
+          //   for (int i = 0; i < static_cast<index_t>(EPT); i++) {
+          //     out.data[i] = cast_func(real_val.data[i], imag_val.data[i]);
+          //   }
+          //   return out;
+          // }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
-        {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
-        }
-
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }

@@ -13,6 +13,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
+  using scalar_type = typename TestType::value_type;
+
   ExecType exec{};   
   index_t count = 10;
 
@@ -43,7 +45,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
                 static_cast<detail::value_promote_t<TestType>>(i)};
   }
 
-  (dview = dview / fview).run(exec);
+  (dview = dview / static_cast<scalar_type>(fview)).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {

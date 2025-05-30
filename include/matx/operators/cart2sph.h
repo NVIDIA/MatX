@@ -72,11 +72,11 @@ namespace matx
           [[maybe_unused]] auto z = get_value<EPT>(z_, indices...);
 
           if constexpr (WHICH==0) { // theta
-            return _internal_atan2(y, x);
+            return internal_atan2(y, x);
           } else if constexpr (WHICH==1) { // phi
-            return _internal_atan2(z, _internal_sqrt(x * x + y * y));
+            return internal_atan2(z, internal_sqrt(internal_add(internal_mul(x, x), internal_mul(y, y))));
           } else {  // r
-            return _internal_sqrt(x * x + y * y + z * z);
+            return internal_sqrt(internal_add(internal_add(internal_mul(x, x), internal_mul(y, y)), internal_mul(z, z)));
           }
         }
 

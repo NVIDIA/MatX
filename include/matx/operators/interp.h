@@ -475,13 +475,14 @@ namespace matx {
       }
 
 
+      // Only one element per thread supported
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        auto x_query = get_value<EPT>(xq_, indices...);
-        auto [idx_low, idx_high] = searchsorted<EPT>(x_query); // Pass EPT
+        auto x_query = get_value<ElementsPerThread::ONE>(xq_, indices...);
+        auto [idx_low, idx_high] = searchsorted<ElementsPerThread::ONE>(x_query); // Pass EPT
 
-        return interpolate<EPT>(x_query, idx_low, idx_high); // Pass EPT
+        return interpolate<ElementsPerThread::ONE>(x_query, idx_low, idx_high); // Pass EPT
       }
 
       template <typename... Is>

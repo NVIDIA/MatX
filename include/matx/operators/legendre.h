@@ -110,11 +110,11 @@ namespace matx
           
           // compute n
           index_t nind = inds[axis1];
-          int n = get_value<EPT>(n_, nind);
+          int n = get_value<ElementsPerThread::ONE>(n_, nind);
           
           // compute m 
           index_t mind = inds[axis2];
-          int m = get_value<EPT>(m_, mind);
+          int m = get_value<ElementsPerThread::ONE>(m_, mind);
           
           if(axis1>axis2) 
             cuda::std::swap(axis1, axis2);
@@ -138,7 +138,7 @@ namespace matx
             }
           };
 
-          auto x = get_value<EPT>(in_, xinds);
+          auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
           if constexpr (EPT != ElementsPerThread::ONE) {
             Vector<value_type, static_cast<int>(EPT)> ret;
             #pragma unroll
@@ -161,13 +161,17 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(
-            self_has_cap,
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
             detail::get_operator_capability<Cap>(n_),
             detail::get_operator_capability<Cap>(m_),
-            detail::get_operator_capability<Cap>(in_)
-          );
+              detail::get_operator_capability<Cap>(in_)
+            );
+          }
         }
 
         template <typename ShapeType, typename Executor>

@@ -57,9 +57,21 @@ public:
   template <ElementsPerThread EPT>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    get_value<EPT>(out_, idx) =
-        get_value<EPT>(in_, idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
-        get_value<EPT>(in_, idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+    const auto in_val = get_value<EPT>(in_, idx);
+    if constexpr(EPT == ElementsPerThread::ONE) {
+      get_value<EPT>(out_, idx) =
+          in_val.real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
+          in_val.imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+    } else {
+      remove_cvref_t<decltype(in_val)> invec;
+      #pragma unroll
+      for (index_t i = 0; i < static_cast<int>(EPT); i++) {
+        invec.data[i] =
+            in_val.data[i].real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
+            in_val.data[i].imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+      }
+      get_value<EPT>(out_, idx) = invec;
+    }
   }
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
@@ -117,7 +129,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   MATX_STATIC_ASSERT(OutputTensor::Rank() == 1, matxInvalidDim);
   index_t N = in.Size(OutputTensor::Rank() - 1);
 
-  tensor_t<cuda::std::complex<typename OutputTensor::value_type>, 1> tmp{{N + 1}};
+  tensor_t<typename OutputTensor::value_type, 1> tmp{{N + 1}};
 
   fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
   auto s = slice(tmp, {0}, {N});

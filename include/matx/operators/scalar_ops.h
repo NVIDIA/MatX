@@ -99,7 +99,7 @@ namespace detail {
       return FUNC(v1, v2); \
     } \
     else { \
-      cuda::std::FUNC(v1, v2);    \
+      return cuda::std::FUNC(v1, v2);    \
     } \
   } \
   template <typename T1, typename T2, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE> \

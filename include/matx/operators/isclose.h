@@ -63,8 +63,14 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ int operator()([[maybe_unused]] Is... indices) const
         {
-          return static_cast<int>(abs(get_value<EPT>(op1_, indices...) - get_value<EPT>(op2_, indices...)) <=
-              static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * abs(get_value<EPT>(op2_, indices...)));
+          auto op_func = [this](const auto &op1, const auto &op2) {
+            return static_cast<int>(scalar_internal_abs(op1 - op2) <=
+              static_cast<inner_type>(atol_) + static_cast<inner_type>(rtol_) * scalar_internal_abs(op2));
+          };
+
+          const auto op1 = get_value<EPT>(op1_, indices...);
+          const auto op2 = get_value<EPT>(op2_, indices...);
+          return ApplyVecFunc<EPT, int>(op_func, op1, op2);
         }
 
         template <typename... Is>

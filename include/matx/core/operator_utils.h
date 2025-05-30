@@ -164,6 +164,19 @@ namespace matx {
         return result;
       }
     }
-  
+
+    template <ElementsPerThread EPT, typename OutType, typename Func, typename... Vals>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyVecFunc(const Func &func, const Vals &...vals) {
+      if constexpr (EPT == ElementsPerThread::ONE) {
+        return func(vals...);
+      } else {
+        Vector<OutType, static_cast<index_t>(EPT)> result;
+        #pragma unroll
+        for (int i = 0; i < static_cast<index_t>(EPT); i++) {
+          result.data[i] = func(vals.data[i]...);
+        }
+        return result;
+      }
+    }
   }
 }; 

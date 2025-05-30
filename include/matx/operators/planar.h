@@ -64,10 +64,10 @@ namespace matx
 
           if (idx[rank_idx] >= op_.Size(rank_idx)) {      
             idx[rank_idx] -= op_.Size(rank_idx);    
-            return get_value<EPT>(op_, idx).imag();
+            return get_value<ElementsPerThread::ONE>(op_, idx).imag();
           }
 
-          return get_value<EPT>(op_, indices...).real(); 
+          return get_value<ElementsPerThread::ONE>(op_, indices...).real(); 
         }
 
         template <typename... Is>
@@ -110,8 +110,13 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return 1;
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          }
         }
     };
   }
