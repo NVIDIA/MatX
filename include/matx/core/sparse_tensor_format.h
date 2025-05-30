@@ -187,7 +187,18 @@ public:
     return false;
   }
 
-  static constexpr bool isDIA() {
+  static constexpr bool isDIAI() {
+    if constexpr (LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
+             type0::Expr::cj == 0 && type0::Type::isCompressed() &&
+             type1::Expr::isId(0) && type1::Type::isRange();
+    }
+    return false;
+  }
+
+  static constexpr bool isDIAJ() {
     if constexpr (LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
@@ -337,9 +348,13 @@ using DCSC =
     SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Compressed>>;
 using CROW = SparseTensorFormat<2, LvlSpec<D0, Compressed>, LvlSpec<D1, Dense>>;
 using CCOL = SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Dense>>;
-using DIA =
+using DIAI =
+    SparseTensorFormat<2, LvlSpec<Sub<1, 0>, Compressed>, LvlSpec<D0, Range>>;
+using DIAJ =
     SparseTensorFormat<2, LvlSpec<Sub<1, 0>, Compressed>, LvlSpec<D1, Range>>;
-using SkewDIA =
+using SkewDIAI =
+    SparseTensorFormat<2, LvlSpec<Add<1, 0>, Compressed>, LvlSpec<D0, Range>>;
+using SkewDIAJ =
     SparseTensorFormat<2, LvlSpec<Add<1, 0>, Compressed>, LvlSpec<D1, Range>>;
 
 // Sparse Block Matrices.

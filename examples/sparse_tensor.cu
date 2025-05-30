@@ -55,8 +55,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   experimental::CSR::print();
   experimental::CSC::print();
   experimental::DCSR::print();
-  experimental::DIA::print();
-  experimental::SkewDIA::print();
+  experimental::DIAI::print();
+  experimental::DIAJ::print();
+  experimental::SkewDIAI::print();
+  experimental::SkewDIAJ::print();
   experimental::BSR<2, 2>::print(); // 2x2 blocks
   experimental::COO4::print();      // 4-dim tensor in COO
   experimental::CSF5::print();      // 5-dim tensor in CSF
@@ -195,8 +197,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto doffsets = make_tensor<int>({3});
   dvals.SetVals({-1, -1, -1, -1, -1, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1, 1});
   doffsets.SetVals({-1, 0, 1});
-  auto Adia = experimental::make_tensor_dia(dvals, doffsets, {6, 6});
-  print(Adia);
+  auto AdiaJ = experimental::make_tensor_dia<false>(dvals, doffsets, {6, 6});
+  print(AdiaJ);
 
   //
   // Perform a direct SpMV. This is also the correct way of performing
@@ -205,7 +207,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto V = make_tensor<float>({6});
   auto R = make_tensor<float>({6});
   V.SetVals({1, 2, 3, 4, 5, 6});
-  (R = matvec(Adia, V)).run(exec);
+  (R = matvec(AdiaJ, V)).run(exec);
   print(R);
 
   MATX_EXIT_HANDLER();

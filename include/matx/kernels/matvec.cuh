@@ -39,15 +39,32 @@
 
 namespace matx {
 
-// Kernel that performs SpMV for an m x n DIA matrix.
+// Kernel that performs SpMV for an m x n DIA-I matrix.
 template <typename VAL, typename CRD>
-__global__ void dia_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
-                                VAL *C, uint64_t m, uint64_t n) {
+__global__ void diai_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
+                                 VAL *C, uint64_t m, uint64_t n) {
   uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < m) {
     VAL acc = 0.0;
-    for (uint64_t d = 0; d < numD; d++) { // numD-DIA SpMV
-      int64_t j = i + diags[d];           // signed
+    for (uint64_t d = 0; d < numDiags; d++) {
+      int64_t j = i + diags[d]; // signed
+      if (0 <= j && j < n) {
+        acc += A[d * m + i] * B[j];
+      }
+    }
+    C[i] = acc;
+  }
+}
+
+// Kernel that performs SpMV for an m x n DIA-J matrix.
+template <typename VAL, typename CRD>
+__global__ void diaj_spmv_kernel(VAL *A, CRD *diags, uint64_t numD, VAL *B,
+                                 VAL *C, uint64_t m, uint64_t n) {
+  uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < m) {
+    VAL acc = 0.0;
+    for (uint64_t d = 0; d < numDiags; d++) {
+      int64_t j = i + diags[d]; // signed
       if (0 <= j && j < n) {
         acc += A[d * n + j] * B[j];
       }
