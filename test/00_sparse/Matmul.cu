@@ -70,14 +70,22 @@ template <typename T> static auto makeB() {
   const index_t m = 8;
   const index_t n = 2;
   tensor_t<T, 2> B = make_tensor<T>({m, n});
-  B(0, 0) = static_cast<T>(1);  B(0, 1) = static_cast<T>(2);
-  B(1, 0) = static_cast<T>(3);  B(1, 1) = static_cast<T>(4);
-  B(2, 0) = static_cast<T>(5);  B(2, 1) = static_cast<T>(6);
-  B(3, 0) = static_cast<T>(7);  B(3, 1) = static_cast<T>(8);
-  B(4, 0) = static_cast<T>(9);  B(4, 1) = static_cast<T>(10);
-  B(5, 0) = static_cast<T>(11); B(5, 1) = static_cast<T>(12);
-  B(6, 0) = static_cast<T>(13); B(6, 1) = static_cast<T>(14);
-  B(7, 0) = static_cast<T>(15); B(7, 1) = static_cast<T>(16);
+  B(0, 0) = static_cast<T>(1);
+  B(0, 1) = static_cast<T>(2);
+  B(1, 0) = static_cast<T>(3);
+  B(1, 1) = static_cast<T>(4);
+  B(2, 0) = static_cast<T>(5);
+  B(2, 1) = static_cast<T>(6);
+  B(3, 0) = static_cast<T>(7);
+  B(3, 1) = static_cast<T>(8);
+  B(4, 0) = static_cast<T>(9);
+  B(4, 1) = static_cast<T>(10);
+  B(5, 0) = static_cast<T>(11);
+  B(5, 1) = static_cast<T>(12);
+  B(6, 0) = static_cast<T>(13);
+  B(6, 1) = static_cast<T>(14);
+  B(7, 0) = static_cast<T>(15);
+  B(7, 1) = static_cast<T>(16);
   return B;
 }
 
@@ -85,10 +93,14 @@ template <typename T> static auto makeE() {
   const index_t m = 4;
   const index_t n = 2;
   tensor_t<T, 2> E = make_tensor<T>({m, n});
-  E(0, 0) = static_cast<T>(7);   E(0, 1) = static_cast<T>(10);
-  E(1, 0) = static_cast<T>(45);  E(1, 1) = static_cast<T>(48);
-  E(2, 0) = static_cast<T>(52);  E(2, 1) = static_cast<T>(56);
-  E(3, 0) = static_cast<T>(144); E(3, 1) = static_cast<T>(162);
+  E(0, 0) = static_cast<T>(7);
+  E(0, 1) = static_cast<T>(10);
+  E(1, 0) = static_cast<T>(45);
+  E(1, 1) = static_cast<T>(48);
+  E(2, 0) = static_cast<T>(52);
+  E(2, 1) = static_cast<T>(56);
+  E(3, 0) = static_cast<T>(144);
+  E(3, 1) = static_cast<T>(162);
   return E;
 }
 
@@ -96,13 +108,12 @@ template <typename T> class MatmulSparseTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
-  void SetUp() override {
-    CheckTestTypeSupport<GTestType>();
-  }
+  void SetUp() override { CheckTestTypeSupport<GTestType>(); }
   float thresh = 0.001f;
 };
 
-template <typename T> class MatmulSparseTestsAll : public MatmulSparseTest<T> { };
+template <typename T>
+class MatmulSparseTestsAll : public MatmulSparseTest<T> {};
 
 TYPED_TEST_SUITE(MatmulSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
 
@@ -136,9 +147,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCOO) {
     for (index_t j = 0; j < n; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(O(i, j).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR(O(i, j).imag(), E(i,j ).imag(), this->thresh);
-      }
-      else {
+        ASSERT_NEAR(O(i, j).imag(), E(i, j).imag(), this->thresh);
+      } else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
     }
@@ -154,9 +164,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCOO) {
     for (index_t j = 0; j < n; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(TO(j, i).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR(TO(j, i).imag(), E(i,j ).imag(), this->thresh);
-      }
-      else {
+        ASSERT_NEAR(TO(j, i).imag(), E(i, j).imag(), this->thresh);
+      } else {
         ASSERT_NEAR(TO(j, i), E(i, j), this->thresh);
       }
     }
@@ -180,7 +189,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSR) {
   const auto n = B.Size(1);
 
   // Convert dense A to sparse S.
-  auto S = experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, k});
+  auto S =
+      experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, k});
   (S = dense2sparse(A)).run(exec);
   ASSERT_EQ(S.Nse(), 7);
   ASSERT_EQ(S.posSize(1), m + 1);
@@ -195,9 +205,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSR) {
     for (index_t j = 0; j < n; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(O(i, j).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR(O(i, j).imag(), E(i,j ).imag(), this->thresh);
-      }
-      else {
+        ASSERT_NEAR(O(i, j).imag(), E(i, j).imag(), this->thresh);
+      } else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
     }
@@ -221,7 +230,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
   const auto n = B.Size(1);
 
   // Convert dense A to sparse S.
-  auto S = experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, k});
+  auto S =
+      experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, k});
   (S = dense2sparse(A)).run(exec);
   ASSERT_EQ(S.Nse(), 7);
   ASSERT_EQ(S.posSize(1), k + 1);
@@ -236,9 +246,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
     for (index_t j = 0; j < n; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(O(i, j).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR(O(i, j).imag(), E(i,j ).imag(), this->thresh);
-      }
-      else {
+        ASSERT_NEAR(O(i, j).imag(), E(i, j).imag(), this->thresh);
+      } else {
         ASSERT_NEAR(O(i, j), E(i, j), this->thresh);
       }
     }
@@ -256,9 +265,8 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
     for (index_t j = 0; j < n; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR((O(i, j) - C5).real(), E(i, j).real(), this->thresh);
-        ASSERT_NEAR((O(i, j) - C5).imag(), E(i,j ).imag(), this->thresh);
-      }
-      else {
+        ASSERT_NEAR((O(i, j) - C5).imag(), E(i, j).imag(), this->thresh);
+      } else {
         ASSERT_NEAR(O(i, j) - C5, E(i, j), this->thresh);
       }
     }
