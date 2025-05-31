@@ -303,7 +303,7 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
   MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
               matxInvalidParameter);
 
-  if constexpr (atype::Format::isDIA()) {
+  if constexpr (atype::Format::isDIAI() || atype::Format::isDIAJ()) {
 
     // Fall back to a hand-written kernel for DIA format, since
     // this format is not supported in cuSPARSE. The hand-written
@@ -325,8 +325,12 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     uint32_t THREADS = static_cast<uint32_t>(std::min(m, 1024LU));
     uint32_t BATCHES = static_cast<uint32_t>(
         cuda::std::ceil(static_cast<double>(m) / THREADS));
-    dia_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD, m,
-                                                     n);
+    if constexpr (atype::Format::isDIAI())
+      diai_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD,
+                                                        m, n);
+    else
+      diaj_spmv_kernel<<<BATCHES, THREADS, 0, stream>>>(AD, diags, numD, BD, CD,
+                                                        m, n);
 #endif
 
   } else {

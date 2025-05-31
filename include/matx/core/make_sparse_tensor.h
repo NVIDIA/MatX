@@ -204,11 +204,14 @@ auto make_zero_tensor_csc(const index_t (&shape)[2],
 
 // Constructs a sparse matrix in DIA format directly from the values and the
 // offset vectors. For an m x n matrix, this format uses a linearized storage
-// where each diagonal has n entries, padded with zeros on the right for the
-// lower triangular part and padded with zeros on the left for the upper
-// triagonal part. This format is most efficient for matrices with only a
-// few nonzero diagonals that are close to the main diagonal.
-template <typename ValTensor, typename CrdTensor>
+// where each diagonal has n entries and is accessed by index I or index J.
+// For index I, diagonals padded with zeros on the left for the lower triangular
+// part and padded with zeros on the right for the upper triagonal part. This
+// is vv. when using index J. This format is most efficient for matrices with
+// only a few nonzero diagonals that are close to the main diagonal.
+struct DIA_INDEX_I {};
+struct DIA_INDEX_J {};
+template <typename IDX, typename ValTensor, typename CrdTensor>
 auto make_tensor_dia(ValTensor &val, CrdTensor &off,
                      const index_t (&shape)[2]) {
   using VAL = typename ValTensor::value_type;
@@ -224,7 +227,8 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
   auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
-  // Construct DIA.
+  // Construct DIA-I/J.
+  using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
       {makeDefaultNonOwningEmptyStorage<CRD>(), off.GetStorage()},
