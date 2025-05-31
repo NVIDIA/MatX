@@ -6,6 +6,7 @@ interp1
 Piecewise interpolation with various methods (linear, nearest, next, previous, spline).
 
 .. doxygenfunction:: interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method)
+.. doxygenfunction:: interp1(const OpX &x, const OpV &v, const OpXQ &xq, const int (&axis)[1], InterpMethod method)
 
 Interpolation Methods
 ~~~~~~~~~~~~~~~~~~~~~

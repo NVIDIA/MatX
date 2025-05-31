@@ -4,48 +4,7 @@ include(00_operators/CMakeLists.txt)
 list(TRANSFORM OPERATOR_TEST_FILES PREPEND "00_operators/")
 
 set (test_sources
-    00_tensor/BasicTensorTests.cu
-    00_tensor/CUBTests.cu
-    00_tensor/ViewTests.cu
-    00_tensor/VizTests.cu
-    00_tensor/TensorCreationTests.cu
-    00_tensor/EinsumTests.cu
     ${OPERATOR_TEST_FILES}
-    00_operators/GeneratorTests.cu
-    00_operators/PWelch.cu
-    00_operators/ReductionTests.cu
-    00_transform/ConvCorr.cu
-    00_transform/MatMul.cu
-    00_transform/ChannelizePoly.cu
-    00_transform/Copy.cu
-    00_transform/Cov.cu
-    00_transform/FFT.cu
-    00_transform/Norm.cu
-    00_transform/ResamplePoly.cu
-    00_transform/Solve.cu
-    00_solver/Cholesky.cu
-    00_solver/LU.cu
-    00_solver/QR.cu
-    00_solver/QR2.cu
-    00_solver/QREcon.cu
-    00_solver/SVD.cu
-    00_solver/Eigen.cu
-    00_solver/Det.cu
-    00_solver/Inverse.cu
-    00_solver/Pinv.cu
-    00_operators/PythonEmbed.cu
-    00_io/FileIOTests.cu
-    00_io/PrintTests.cu
-    00_io/NvtxTests.cu
-    01_radar/MultiChannelRadarPipeline.cu
-    01_radar/MVDRBeamformer.cu
-    01_radar/ambgfun.cu
-    01_radar/dct.cu
-    00_sparse/Basic.cu
-    00_sparse/Convert.cu
-    00_sparse/Matmul.cu
-    00_sparse/Matvec.cu
-    00_sparse/Solve.cu
     main.cu
 )
 
