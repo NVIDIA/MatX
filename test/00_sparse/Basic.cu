@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "assert.h"
@@ -38,9 +39,9 @@
 
 using namespace matx;
 
-template <typename T> class BasicSparseTest : public ::testing::Test { };
+template <typename T> class BasicSparseTest : public ::testing::Test {};
 
-template <typename T> class BasicSparseTestsAll : public BasicSparseTest<T> { };
+template <typename T> class BasicSparseTestsAll : public BasicSparseTest<T> {};
 
 TYPED_TEST_SUITE(BasicSparseTestsAll, MatXAllTypesAllExecs);
 
@@ -70,8 +71,12 @@ TYPED_TEST(BasicSparseTestsAll, MakeCOO) {
   vals(0) = static_cast<TestType>(10);
   vals(1) = static_cast<TestType>(20);
   vals(2) = static_cast<TestType>(30);
-  idxi(0) = 0; idxi(1) = 0; idxi(2) = 3;
-  idxj(0) = 3; idxj(1) = 6; idxj(2) = 7;
+  idxi(0) = 0;
+  idxi(1) = 0;
+  idxi(2) = 3;
+  idxj(0) = 3;
+  idxj(1) = 6;
+  idxj(2) = 7;
   auto A = experimental::make_tensor_coo(vals, idxi, idxj, {4, 8});
   ASSERT_EQ(A.Rank(), 2);
   ASSERT_EQ(A.Size(0), 4);
@@ -92,7 +97,8 @@ TYPED_TEST(BasicSparseTestsAll, MakeCOO) {
 TYPED_TEST(BasicSparseTestsAll, MakeZeroCSR) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  auto A = experimental::make_zero_tensor_csr<TestType, index_t, index_t>({17, 33});
+  auto A =
+      experimental::make_zero_tensor_csr<TestType, index_t, index_t>({17, 33});
   ASSERT_EQ(A.Rank(), 2);
   ASSERT_EQ(A.Size(0), 17);
   ASSERT_EQ(A.Size(1), 33);
@@ -115,8 +121,14 @@ TYPED_TEST(BasicSparseTestsAll, MakeCSR) {
   vals(0) = static_cast<TestType>(10);
   vals(1) = static_cast<TestType>(20);
   vals(2) = static_cast<TestType>(30);
-  rowp(0) = 0; rowp(1) = 2; rowp(2) = 2; rowp(3) = 2; rowp(4) = 3;
-  col(0) = 3; col(1) = 6; col(2) = 7;
+  rowp(0) = 0;
+  rowp(1) = 2;
+  rowp(2) = 2;
+  rowp(3) = 2;
+  rowp(4) = 3;
+  col(0) = 3;
+  col(1) = 6;
+  col(2) = 7;
   auto A = experimental::make_tensor_csr(vals, rowp, col, {4, 8});
   ASSERT_EQ(A.Rank(), 2);
   ASSERT_EQ(A.Size(0), 4);
@@ -137,7 +149,8 @@ TYPED_TEST(BasicSparseTestsAll, MakeCSR) {
 TYPED_TEST(BasicSparseTestsAll, MakeZeroCSC) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  auto A = experimental::make_zero_tensor_csc<TestType, index_t, index_t>({17, 33});
+  auto A =
+      experimental::make_zero_tensor_csc<TestType, index_t, index_t>({17, 33});
   ASSERT_EQ(A.Rank(), 2);
   ASSERT_EQ(A.Size(0), 17);
   ASSERT_EQ(A.Size(1), 33);
@@ -160,10 +173,18 @@ TYPED_TEST(BasicSparseTestsAll, MakeCSC) {
   vals(0) = static_cast<TestType>(10);
   vals(1) = static_cast<TestType>(20);
   vals(2) = static_cast<TestType>(30);
-  colp(0) = 0; colp(1) = 0; colp(2) = 0;
-  colp(3) = 0; colp(4) = 1; colp(5) = 1;
-  colp(6) = 1; colp(7) = 2; colp(8) = 3;
-  row(0) = 0; row(1) = 0; row(2) = 3;
+  colp(0) = 0;
+  colp(1) = 0;
+  colp(2) = 0;
+  colp(3) = 0;
+  colp(4) = 1;
+  colp(5) = 1;
+  colp(6) = 1;
+  colp(7) = 2;
+  colp(8) = 3;
+  row(0) = 0;
+  row(1) = 0;
+  row(2) = 3;
   auto A = experimental::make_tensor_csc(vals, colp, row, {4, 8});
   ASSERT_EQ(A.Rank(), 2);
   ASSERT_EQ(A.Size(0), 4);

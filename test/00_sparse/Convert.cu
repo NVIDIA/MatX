@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "assert.h"
@@ -59,12 +60,11 @@ template <typename T> class ConvertSparseTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
-  void SetUp() override {
-    CheckTestTypeSupport<GTestType>();
-  }
+  void SetUp() override { CheckTestTypeSupport<GTestType>(); }
 };
 
-template <typename T> class ConvertSparseTestsAll : public ConvertSparseTest<T> { };
+template <typename T>
+class ConvertSparseTestsAll : public ConvertSparseTest<T> {};
 
 TYPED_TEST_SUITE(ConvertSparseTestsAll, MatXFloatNonComplexTypesCUDAExec);
 
@@ -102,7 +102,7 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCOO) {
   // Convert sparse S back to dense D.
   auto O = make_tensor<TestType>({m, n});
   (O = sparse2dense(S)).run(exec);
-  
+
   // Back to cheap random-access getters only.
   exec.sync();
   for (index_t i = 0; i < m; i++) {
@@ -142,7 +142,8 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSR) {
   const auto n = D.Size(1);
 
   // Convert dense D to sparse S.
-  auto S = experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, n});
+  auto S =
+      experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, n});
   (S = dense2sparse(D)).run(exec);
   ASSERT_EQ(S.Rank(), 2);
   ASSERT_EQ(S.Size(0), m);
@@ -164,7 +165,7 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSR) {
   // Convert sparse S back to dense D.
   auto O = make_tensor<TestType>({m, n});
   (O = sparse2dense(S)).run(exec);
-  
+
   // Back to cheap random-access getters only.
   exec.sync();
   for (index_t i = 0; i < m; i++) {
@@ -199,7 +200,8 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSC) {
   const auto n = D.Size(1);
 
   // Convert dense D to sparse S.
-  auto S = experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, n});
+  auto S =
+      experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, n});
   (S = dense2sparse(D)).run(exec);
   ASSERT_EQ(S.Rank(), 2);
   ASSERT_EQ(S.Size(0), m);
@@ -221,7 +223,7 @@ TYPED_TEST(ConvertSparseTestsAll, ConvertCSC) {
   // Convert sparse S back to dense D.
   auto O = make_tensor<TestType>({m, n});
   (O = sparse2dense(S)).run(exec);
-  
+
   // Back to cheap random-access getters only.
   exec.sync();
   for (index_t i = 0; i < m; i++) {
