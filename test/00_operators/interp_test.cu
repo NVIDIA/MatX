@@ -173,5 +173,86 @@ TEST(InterpTests, Interp)
   }
 
 
+  auto px2 = make_tensor<TestType>({5, 2});
+  auto pv3 = make_tensor<TestType>({3, 5, 2});
+  auto pxq4 = make_tensor<TestType>({4, 3, 6, 2});
+
+  (px2 = permute(x2, {1, 0})).run(exec);
+  (pv3 = permute(v3, {0, 2, 1})).run(exec);
+  (pxq4 = permute(xq4, {0, 1, 3, 2})).run(exec);
+
+
+
+  auto out_perm_linear4 = make_tensor<TestType>(pxq4.Shape());
+  (out_perm_linear4 = interp1(px2, pv3, pxq4, {2}, InterpMethod::LINEAR)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < pxq4.Size(0); i++) {
+    for (index_t j = 0; j < pxq4.Size(1); j++) {
+      for (index_t k = 0; k < pxq4.Size(2); k++) {
+        for (index_t l = 0; l < pxq4.Size(3); l++) {
+          ASSERT_EQ(out_perm_linear4(i, j, k, l), vq_linear(k));
+        }
+      }
+    }
+  }
+  
+
+  auto out_perm_nearest4 = make_tensor<TestType>(pxq4.Shape());
+  (out_perm_nearest4 = interp1(px2, pv3, pxq4, {2}, InterpMethod::NEAREST)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < pxq4.Size(0); i++) {
+    for (index_t j = 0; j < pxq4.Size(1); j++) {
+      for (index_t k = 0; k < pxq4.Size(2); k++) {
+        for (index_t l = 0; l < pxq4.Size(3); l++) {
+          ASSERT_EQ(out_perm_nearest4(i, j, k, l), vq_nearest(k));
+        }
+      }
+    }
+  }
+
+  auto out_perm_next4 = make_tensor<TestType>(pxq4.Shape());
+  (out_perm_next4 = interp1(px2, pv3, pxq4, {2}, InterpMethod::NEXT)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < pxq4.Size(0); i++) {
+    for (index_t j = 0; j < pxq4.Size(1); j++) {
+      for (index_t k = 0; k < pxq4.Size(2); k++) {
+        for (index_t l = 0; l < pxq4.Size(3); l++) {
+          ASSERT_EQ(out_perm_next4(i, j, k, l), vq_next(k));
+        }
+      }
+    }
+  }
+
+  auto out_perm_prev4 = make_tensor<TestType>(pxq4.Shape());
+  (out_perm_prev4 = interp1(px2, pv3, pxq4, {2}, InterpMethod::PREV)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < pxq4.Size(0); i++) {
+    for (index_t j = 0; j < pxq4.Size(1); j++) {
+      for (index_t k = 0; k < pxq4.Size(2); k++) {
+        for (index_t l = 0; l < pxq4.Size(3); l++) {
+          ASSERT_EQ(out_perm_prev4(i, j, k, l), vq_prev(k));
+        }
+      }
+    }
+  }
+
+  auto out_perm_spline4 = make_tensor<TestType>(pxq4.Shape());
+  (out_perm_spline4 = interp1(px2, pv3, pxq4, {2}, InterpMethod::SPLINE)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < pxq4.Size(0); i++) {
+    for (index_t j = 0; j < pxq4.Size(1); j++) {
+      for (index_t k = 0; k < pxq4.Size(2); k++) {
+        for (index_t l = 0; l < pxq4.Size(3); l++) {
+          ASSERT_NEAR(out_perm_spline4(i, j, k, l), vq_spline(k), 1e-4);
+        }
+      }
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }

@@ -66,6 +66,10 @@ namespace matx {
       using x_val_type = typename OpX::value_type;
       using v_val_type = typename OpV::value_type;
 
+      constexpr static int RANK = O::Rank();
+      constexpr static int AXIS = RANK - 1;
+      constexpr static int AXIS_X = OpX::Rank() - 1;
+      constexpr static int AXIS_V = OpV::Rank() - 1;
 
     public:
       InterpSplineTridiagonalFillOp(const O& dl, const O& d, const O& du, const O& b, const OpX& x, const OpV& v)
@@ -76,16 +80,16 @@ namespace matx {
       {
 
         cuda::std::array idx{indices...};
-        index_t idxInterp = idx[Rank() - 1];
+        index_t idxInterp = idx[AXIS];
 
         cuda::std::array idx0{idx};
         cuda::std::array idx1{idx};
         cuda::std::array idx2{idx};
 
         if (idxInterp == 0) { // left boundary condition
-          idx0[Rank() - 1] = idxInterp + 0;
-          idx1[Rank() - 1] = idxInterp + 1;
-          idx2[Rank() - 1] = idxInterp + 2;
+          idx0[AXIS] = idxInterp + 0;
+          idx1[AXIS] = idxInterp + 1;
+          idx2[AXIS] = idxInterp + 2;
 
           x_val_type x0 = get_value(x_, idx0);
           x_val_type x1 = get_value(x_, idx1);
@@ -105,10 +109,10 @@ namespace matx {
           du_(indices...) = h1 + h0;
           b_(indices...) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
         }
-        else if (idxInterp == x_.Size(0) - 1) { // right boundary condition
-          idx0[Rank() - 1] = idxInterp - 2;
-          idx1[Rank() - 1] = idxInterp - 1;
-          idx2[Rank() - 1] = idxInterp;
+        else if (idxInterp == x_.Size(AXIS_X) - 1) { // right boundary condition
+          idx0[AXIS] = idxInterp - 2;
+          idx1[AXIS] = idxInterp - 1;
+          idx2[AXIS] = idxInterp;
 
           x_val_type x0 = get_value(x_, idx0);
           x_val_type x1 = get_value(x_, idx1);
@@ -130,9 +134,9 @@ namespace matx {
           b_(indices...) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
         }
         else { // interior points
-          idx0[Rank() - 1] = idxInterp - 1;
-          idx1[Rank() - 1] = idxInterp;
-          idx2[Rank() - 1] = idxInterp + 1;
+          idx0[AXIS] = idxInterp - 1;
+          idx1[AXIS] = idxInterp;
+          idx2[AXIS] = idxInterp + 1;
 
           x_val_type x0 = get_value(x_, idx0);
           x_val_type x1 = get_value(x_, idx1);
@@ -176,8 +180,10 @@ namespace matx {
       mutable detail::tensor_impl_t<value_type, OpV::Rank()> m_; // Derivatives at sample points (spline only)
       mutable value_type *ptr_m_ = nullptr;
 
-      constexpr static int32_t RANK = OpXQ::Rank();
-      constexpr static int32_t AXIS = RANK - 1;
+      constexpr static int RANK = OpXQ::Rank();
+      constexpr static int AXIS = RANK - 1;
+      constexpr static int AXIS_X = OpX::Rank() - 1;
+      constexpr static int AXIS_V = OpV::Rank() - 1;
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto searchsorted(const cuda::std::array<index_t, RANK> idx, const domain_type x_query) const
@@ -192,13 +198,13 @@ namespace matx {
         cuda::std::array idx_mid{idx};
 
         idx_low[AXIS] = 0;
-        idx_high[AXIS] = x_.Size(x_.Rank() - 1) - 1;
+        idx_high[AXIS] = x_.Size(AXIS_X) - 1;
 
         domain_type x_low, x_high, x_mid;
 
         x_low = get_value(x_, idx_low);
         if (x_query < x_low) {
-          idx_low[AXIS] = x_.Size(x_.Rank() - 1);
+          idx_low[AXIS] = x_.Size(AXIS_X);
           idx_high[AXIS] = 0;
           return cuda::std::make_tuple(idx_low, idx_high);
         } else if (x_query == x_low) {
@@ -206,8 +212,8 @@ namespace matx {
         }
         x_high = get_value(x_, idx_high);
         if (x_query > x_high) {
-          idx_low[AXIS] = x_.Size(x_.Rank() - 1) - 1;
-          idx_high[AXIS] = x_.Size(x_.Rank() - 1);
+          idx_low[AXIS] = x_.Size(AXIS_X) - 1;
+          idx_high[AXIS] = x_.Size(AXIS_X);
           return cuda::std::make_tuple(idx_low, idx_high);
         } else if (x_query == x_high) {
           return cuda::std::make_tuple(idx_high, idx_high);
@@ -237,7 +243,7 @@ namespace matx {
 
         if (idx_high[AXIS] == 0 || idx_low[AXIS] == idx_high[AXIS]) { // x_query <= x(0) or x_query == x(idx_low) == x(idx_high)
           v = get_value(v_, idx_high);
-        } else if (idx_low[AXIS] == x_.Size(0) - 1) { // x_query > x(n-1)
+        } else if (idx_low[AXIS] == x_.Size(AXIS_X) - 1) { // x_query > x(n-1)
           v = get_value(v_, idx_low);
         } else {
           domain_type x_low = get_value(x_, idx_low);
@@ -253,9 +259,9 @@ namespace matx {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_nearest(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
-        if (idx_low[AXIS] == x_.Size(0)) { // x_query < x(0)
+        if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
           v = get_value(v_, idx_high);
-        } else if (idx_high[AXIS] == x_.Size(0)) { // x_query > x(n-1)
+        } else if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
           v = get_value(v_, idx_low);
         } else {
           domain_type x_low = get_value(x_, idx_low);
@@ -274,7 +280,7 @@ namespace matx {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_next(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
-        if (idx_high[AXIS] == x_.Size(0)) { // x_query > x(n-1)
+        if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
           v = get_value(v_, idx_low);
         } else {
           v = get_value(v_, idx_high);
@@ -286,7 +292,7 @@ namespace matx {
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
       value_type interpolate_prev(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
-        if (idx_low[AXIS] == x_.Size(0)) { // x_query < x(0)
+        if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
           v = get_value(v_, idx_high);
         } else {
           v = get_value(v_, idx_low);
@@ -301,12 +307,12 @@ namespace matx {
         if (idx_high[AXIS] == idx_low[AXIS]) {
           value_type v = get_value(v_, idx_low);
           return v;
-        } else if (idx_low[AXIS] == x_.Size(0)) { // x_query < x(0)
+        } else if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
           idx_low[AXIS] = 0;
           idx_high[AXIS] = 1;
-        } else if (idx_high[AXIS] == x_.Size(0)) { // x_query > x(n-1)
-          idx_high[AXIS] = x_.Size(0) - 1;
-          idx_low[AXIS] = x_.Size(0) - 2;
+        } else if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
+          idx_high[AXIS] = x_.Size(AXIS_X) - 1;
+          idx_low[AXIS] = x_.Size(AXIS_X) - 2;
         }
 
         // sample points
@@ -523,9 +529,9 @@ namespace matx {
 
 
 /**
- * 1D interpolation of samples at query points. 
- * 
- * Interpolation is performed along the last dimension. All other dimensions must be of 
+ * 1D interpolation of samples at query points.
+ *
+ * Interpolation is performed along the last dimension. All other dimensions must be of
  * compatible size.
  *
  * @tparam OpX
@@ -549,6 +555,49 @@ auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = I
   static_assert(OpX::Rank() >= 1, "interp: sample points must be at least 1D");
   static_assert(OpV::Rank() >= OpX::Rank(), "interp: sample values must have at least the same rank as sample points");
   static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
-  return detail::Interp1Op<OpX, OpV, OpXQ>(x, v, xq, method);
+  return detail::Interp1Op(x, v, xq, method);
+}
+
+
+/**
+ * 1D interpolation of samples at query points.
+ *
+ * Interpolation is performed along the specified dimension. All other dimensions must be of compatible size.
+ *
+ * @tparam OpX
+ *   Type of sample points
+ * @tparam OpV
+ *   Type of sample values
+ * @tparam OpXQ
+ *   Type of query points
+ * @param x
+ *   Sample points. Last dimension must be sorted in ascending order.
+ * @param v
+ *   Sample values. Must have compatible dimensions with x.
+ * @param xq
+ *   Query points where to interpolate. All dimensions except the specified dimension must be of compatible size with x and v (e.g. x and v can be vectors, and xq can be a matrix).
+ * @param axis
+ *   Dimension (of xq) along which to interpolate.
+ * @param method
+ *   Interpolation method (LINEAR, NEAREST, NEXT, PREV, SPLINE)
+ * @returns Operator that interpolates values at query points, with the same dimensions as xq.
+ */
+template <typename OpX, typename OpV, typename OpXQ>
+auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, const int (&axis)[1],InterpMethod method = InterpMethod::LINEAR) {
+  static_assert(OpX::Rank() >= 1, "interp: sample points must be at least 1D");
+  static_assert(OpV::Rank() >= OpX::Rank(), "interp: sample values must have at least the same rank as sample points");
+  static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
+
+
+  auto x_perm = detail::getPermuteDims<OpX::Rank()>({axis[0] + OpX::Rank() - OpXQ::Rank()});
+  auto v_perm = detail::getPermuteDims<OpV::Rank()>({axis[0] + OpV::Rank() - OpXQ::Rank()});
+  auto xq_perm = detail::getPermuteDims<OpXQ::Rank()>({axis[0]});
+
+  auto px = permute(x, x_perm);
+  auto pv = permute(v, v_perm);
+  auto pxq = permute(xq, xq_perm);
+  auto inv_perm = detail::invPermute<OpXQ::Rank()>(xq_perm);
+
+  return permute(detail::Interp1Op(px, pv, pxq, method), inv_perm);
 }
 } // namespace matx

@@ -44,7 +44,8 @@ namespace matx
 
 // Matches current Linux max
 static constexpr int MAX_CPUS = 1024;
-struct cpu_set_t {
+// Include host_ prefix to avoid name collision with cpu_set_t from <sched.h> on Linux
+struct host_cpu_set_t {
   using set_type = uint64_t;
 
   cuda::std::array<set_type, MAX_CPUS / (8 * sizeof(set_type))> bits_;
@@ -58,7 +59,7 @@ enum class ThreadsMode {
 
 struct HostExecParams {
   HostExecParams(int threads = 1) : threads_(threads) {}
-  HostExecParams(cpu_set_t cpu_set) : threads_(1), cpu_set_(cpu_set) {
+  HostExecParams(host_cpu_set_t cpu_set) : threads_(1), cpu_set_(cpu_set) {
     MATX_ASSERT_STR(false, matxNotSupported, "CPU affinity not supported yet");
   }
 
@@ -67,7 +68,7 @@ struct HostExecParams {
   private:
     int threads_;
 MATX_IGNORE_WARNING_PUSH_CLANG("-Wunused-private-field")    
-    cpu_set_t cpu_set_ {0};
+    host_cpu_set_t cpu_set_ {0};
 MATX_IGNORE_WARNING_POP_CLANG
 };
 
