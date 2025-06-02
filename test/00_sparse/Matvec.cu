@@ -78,7 +78,7 @@ template <typename T> static auto makeC() {
   const index_t m = 4;
   tensor_t<T, 1> E = make_tensor<T>({m});
   E(0) = static_cast<T>(5);
-  E(1) = static_cast<T>(6); 
+  E(1) = static_cast<T>(6);
   E(2) = static_cast<T>(12);
   E(3) = static_cast<T>(20);
   return E;
@@ -88,13 +88,12 @@ template <typename T> class MatvecSparseTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
-  void SetUp() override {
-    CheckTestTypeSupport<GTestType>();
-  }
+  void SetUp() override { CheckTestTypeSupport<GTestType>(); }
   float thresh = 0.001f;
 };
 
-template <typename T> class MatvecSparseTestsAll : public MatvecSparseTest<T> { };
+template <typename T>
+class MatvecSparseTestsAll : public MatvecSparseTest<T> {};
 
 TYPED_TEST_SUITE(MatvecSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
 
@@ -126,8 +125,7 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecCOO) {
     if constexpr (is_complex_v<TestType>) {
       ASSERT_NEAR(O(i).real(), C(i).real(), this->thresh);
       ASSERT_NEAR(O(i).imag(), C(i).imag(), this->thresh);
-    }
-    else {
+    } else {
       ASSERT_NEAR(O(i), C(i), this->thresh);
     }
   }
@@ -149,7 +147,8 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecCSR) {
   const auto n = A.Size(1);
 
   // Convert dense A to sparse S.
-  auto S = experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, n});
+  auto S =
+      experimental::make_zero_tensor_csr<TestType, index_t, index_t>({m, n});
   (S = dense2sparse(A)).run(exec);
   ASSERT_EQ(S.Nse(), 5);
 
@@ -163,8 +162,7 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecCSR) {
     if constexpr (is_complex_v<TestType>) {
       ASSERT_NEAR(O(i).real(), C(i).real(), this->thresh);
       ASSERT_NEAR(O(i).imag(), C(i).imag(), this->thresh);
-    }
-    else {
+    } else {
       ASSERT_NEAR(O(i), C(i), this->thresh);
     }
   }
@@ -186,7 +184,8 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecCSC) {
   const auto n = A.Size(1);
 
   // Convert dense A to sparse S.
-  auto S = experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, n});
+  auto S =
+      experimental::make_zero_tensor_csc<TestType, index_t, index_t>({m, n});
   (S = dense2sparse(A)).run(exec);
   ASSERT_EQ(S.Nse(), 5);
 
@@ -200,8 +199,7 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecCSC) {
     if constexpr (is_complex_v<TestType>) {
       ASSERT_NEAR(O(i).real(), C(i).real(), this->thresh);
       ASSERT_NEAR(O(i).imag(), C(i).imag(), this->thresh);
-    }
-    else {
+    } else {
       ASSERT_NEAR(O(i), C(i), this->thresh);
     }
   }
